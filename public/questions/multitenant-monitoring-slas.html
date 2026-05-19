@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Technical #4 · Multi-tenant SaaS Monitoring (Varying SLAs) · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Technical #4 · Multi-tenant SaaS Monitoring (Varying SLAs)</div>
+  <h1>Technical #4 · Multi-tenant SaaS Monitoring (Varying SLAs)</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 4 · 🕒 Mid May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Design multi-tenant SaaS monitoring with varying client SLA requirements. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Design <strong>multi-tenant SaaS monitoring</strong> with <strong>varying client SLA requirements</strong>. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 技术 round. Databricks / Snowflake / Datadog 都问过.</p>
+<p><strong>Round</strong>：Technical Integration (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你做过 <strong>multi-tenant SaaS infrastructure</strong>:</p>
+<ol><li><strong>不同 SLA tier 怎么 enforce</strong> —— Bronze vs Gold 怎么物理 / 逻辑区分</li><li><strong>Noisy neighbor isolation</strong> —— 大客户不能影响小客户</li><li><strong>Billable signal</strong> —— 哪些 metric 算 billable (latency 5xx 等)</li><li><strong>Aggregation at scale</strong> —— 1B+ events/day 怎么 store + query 每 tenant 不会爆</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. SLA tiers</strong></p>
+<blockquote><p>"How many tiers — Bronze/Silver/Gold? What does each promise (availability %, latency p99, throughput)?"</p></blockquote>
+<p><strong>2. Tenant count + size distribution</strong></p>
+<blockquote><p>"100 tenants or 100k? Long-tail (5 huge, many tiny) or evenly distributed?"</p></blockquote>
+<p><strong>3. Multi-tenancy model</strong></p>
+<blockquote><p>"Pooled (shared infra) or siloed (dedicated)? Hybrid common — small tenants share, large dedicated?"</p></blockquote>
+<p><strong>4. Billing granularity</strong></p>
+<blockquote><p>"Per-API-call billing? Per-resource-hour? Tiered subscription with overage?"</p></blockquote>
+<p><strong>5. Existing observability</strong></p>
+<blockquote><p>"Are we building on Datadog / Prometheus + Grafana? Or greenfield?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify tier model + size dist + multi-tenancy model</td></tr><tr><td>5-20 min</td><td><strong>Storage + ingestion</strong> architecture (Kafka/TSDB sharded by tenant)</td></tr><tr><td>20-30 min</td><td><strong>Noisy neighbor isolation</strong> (quota + WFQ + tiered placement)</td></tr><tr><td>30-40 min</td><td><strong>SLA computation</strong> + per-tenant alert</td></tr><tr><td>40-50 min</td><td>Billable signal aggregation + audit</td></tr><tr><td>50-60 min</td><td>Failure modes + onboarding</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"Clarify — <em>[假设：3 tiers (Bronze 99.5%, Silver 99.9%, Gold 99.99%), 10k tenants long-tail (top 100 = 80% traffic), pooled with dedicated for Gold, per-API-call billing + overage]</em>.</p>
+<p><strong>High-level architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Tenant requests → API Gateway (auth + rate limit per tenant)
+                        ↓
+                 App Layer (multi-tenant DB queries, etc.)
+                        ↓
+                 Telemetry emit (every request: tenant_id, latency, status)
+                        ↓
+                 Kafka (partition by tenant_id)
+                        ↓
+                 Stream Processor (Flink): per-tenant 1-min rollups
+                        ↓
+                 TSDB (sharded by tenant_id)
+                        ↓
+                 Per-tenant dashboard + SLA computer + alerts + billing</code></pre>
+<p><strong>Storage</strong>: ClickHouse with <code>(tenant_id, timestamp)</code> primary key. Per-tenant query naturally hits 1 shard.</p>
+<p><strong>Noisy-neighbor isolation</strong>: 3 layers</p>
+<p><strong>L1: Rate limit at API Gateway</strong></p>
+<ul><li>Token bucket per tenant: Bronze 100 QPS, Silver 1000, Gold 10000 (configurable)</li><li>Burst allowance: 2x for 60s</li><li>Beyond → 429 with <code>Retry-After</code></li></ul>
+<p><strong>L2: Resource quota at app layer</strong></p>
+<ul><li>Per-tenant DB connection pool max (Bronze 5, Silver 50, Gold 500)</li><li>Per-tenant memory budget for query result sets</li><li>Background worker pool fair-share (WFQ — Weighted Fair Queueing)</li></ul>
+<p><strong>L3: Physical isolation for Gold</strong></p>
+<ul><li>Gold tenants run on dedicated replica set</li><li>Bronze/Silver share pooled infra</li><li><strong>Tier upgrade</strong>: deploy fresh dedicated infra in N minutes, drain pooled traffic</li></ul>
+<p><strong>SLA computation</strong>:</p>
+<p>Per-tenant SLOs:</p>
+<ul><li>Availability = (successful_requests / total_requests) over 5min sliding window</li><li>Latency p99 over 5min window</li><li><strong>Error budget</strong>: monthly, draws down on each 5xx / breach</li></ul>
+<p>Daily SLO digest auto-sent to customer + their account manager. Real-time alerts when error budget burn rate &gt; N% per hour.</p>
+<p><strong>Billable signal aggregation</strong>:</p>
+<p>Bill components:</p>
+<ul><li>API calls (counter)</li><li>Storage GB-hours (gauge)</li><li>Compute milliseconds (counter)</li></ul>
+<p>Stream processor outputs:</p>
+<pre class="language-plaintext"><code class="language-plaintext">{
+  tenant_id, hour, total_calls, total_4xx, total_5xx,
+  storage_gb_hours, compute_ms, sla_minutes_breached
+}</code></pre>
+<p>Persist hourly aggregates in <strong>billing DB</strong> (separate from telemetry DB). Monthly rollup → invoice.</p>
+<p><strong>Audit</strong>: every billable event has provenance (request ID + tenant + timestamp). Tenant can self-serve <strong>usage report</strong> + <strong>dispute window</strong> (60 days).</p>
+<p><strong>Failure modes</strong>:</p>
+<ul><li><strong>Quota exhaustion under burst</strong>: gold burst can starve silver if shared pool. Mitigate: separate gold pool.</li><li><strong>Telemetry pipeline lag</strong> at peak: degrade to <strong>sampled telemetry</strong> (1/10) to keep up</li><li><strong>Misattribution</strong>: shared services (rate limiter itself) — attribute by tenant_id in trace</li><li><strong>DDoS via legit tier</strong>: high-tier customer compromise → flood. Per-tenant max QPS hard ceiling even within tier.</li></ul>
+<p><strong>Onboarding new tenant</strong>: provisioning script creates per-tenant quota config + dashboard + alerting rules. &lt;10 min.</p>
+<p><strong>Cost optimization for telemetry</strong>:</p>
+<ul><li>1-minute rollups for hot store (30 days)</li><li>1-hour rollups for warm (1 year)</li><li>Daily rollups for cold (3+ years)</li><li>Saves 90%+ storage cost on long tail"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent 7 markets</strong> 是天然 multi-tenant：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Per-tenant SLA tiers</td><td>7 markets 不同 latency / accuracy SLA</td></tr><tr><td>Noisy neighbor isolation</td><td>Indonesia 流量 burst 不影响 Thailand</td></tr><tr><td>Token bucket rate limit</td><td>API gateway 自然有</td></tr><tr><td>Per-tenant dashboard</td><td>你 weekly 跟 regional ops review</td></tr><tr><td>Billing signal</td><td>ByteDance 内部 chargeback 通常按 region</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"We treated 7 markets as 7 tenants in our voice agent. Each had a different SLA — Indonesia high-volume tolerance for 200ms, Thailand stricter at 150ms. We isolated via <strong>per-market Kafka partitions + dedicated inference replicas for the top-3 markets</strong>. Indonesia burst once during a payday spike — 5x normal traffic. <strong>Because the top-3 were dedicated, Thailand and Korea were unaffected</strong>. That isolation was worth its hardware cost."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Gold tenant suddenly spikes 20x, burns through capacity. What now?" <strong>A</strong>: Tier-protected:</p>
+<ul><li>Hard ceiling per tenant even in tier (e.g., 100k QPS max regardless of Gold)</li><li>Auto-scale dedicated infra (+20% capacity for 1h)</li><li>Customer-facing alert: "you're approaching capacity, do you need a tier upgrade?"</li><li>Bill overage 1.5x normal rate (motivation to upgrade)</li></ul>
+<p><strong>Q2</strong>: "Bronze tenant DDoS attempt — how protect Silver/Gold?" <strong>A</strong>:</p>
+<ul><li>Pooled Bronze infra completely separate physical from Silver/Gold</li><li>Cross-tier blast radius zero by design</li><li>Automated anomaly detection on Bronze: 100x normal → temporary throttle + alert customer</li></ul>
+<p><strong>Q3</strong>: "1B events/day storage cost — how reduce?" <strong>A</strong>:</p>
+<ul><li>90% to cold tier after 30 days (1/30 the cost)</li><li><strong>Aggregate-first storage</strong>: raw events for 7d, 1-min rollups for 90d, 1-hour for year+</li><li><strong>Sampling</strong> for non-critical metrics (debug traces)</li><li><strong>Per-tenant retention</strong> (Bronze 30d, Gold 1y)</li></ul>
+<p><strong>Q4</strong>: "Customer disputes a billing line. How do we prove?" <strong>A</strong>:</p>
+<ul><li><strong>Per-request audit log</strong> retained 13 months (1 year + buffer)</li><li>Tenant can self-serve usage report (CSV download)</li><li>Dispute window 60 days</li><li><strong>Cryptographic signature</strong> on monthly invoice (tamper-proof)</li><li>Internal "billing replay" tool: ops can reconstruct billing from raw logs</li></ul>
+<p><strong>Q5</strong>: "Multi-region deployment. SLA computed in which region?" <strong>A</strong>:</p>
+<ul><li>SLO <strong>per region</strong> (each region has its own availability score)</li><li>Customer sees <strong>per-region</strong> dashboard</li><li>Overall SLA = min(regions used) OR weighted by traffic distribution (negotiated)</li><li>Cross-region failover may pause SLO computation briefly (5-10 min)</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Single shared infra</strong> for all tiers — no isolation</li><li><strong>没 rate limit at gateway</strong> — app layer overloaded</li><li><strong>没 quota per-tenant DB connections</strong> — single tenant 杀全 DB</li><li><strong>Billing 跟 telemetry 同 DB</strong> — billing 精度受 telemetry retention 影响</li><li><strong>Aggregate at query time</strong> — query 慢 + 贵</li><li><strong>没 dispute window / audit</strong> — billing 不可挑战, customer 怒</li><li><strong>Sampling for everything</strong> — billing 数据不能 sample</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>3-layer isolation</strong> (gateway / app / physical)</li><li><strong>Tier-based dedicated infra</strong> for Gold</li><li><strong>Error budget burn rate</strong> alerts (modern SRE)</li><li><strong>Aggregate-first storage</strong> (rollups &gt; raw)</li><li><strong>Billing 独立 DB</strong> + cryptographic invoice</li><li><strong>Per-region SLO</strong> computation</li><li><strong>Hard ceiling even in tier</strong> anti-DDoS</li><li><strong>Tenant self-serve usage report</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">3 isolation layers:
+  L1 API Gateway: token bucket per tenant by tier
+  L2 App: DB pool, memory quota, WFQ
+  L3 Physical: dedicated replicas for Gold
+
+SLA computation:
+  Availability % over sliding window
+  Latency p99 over window
+  Error budget monthly, alert on burn rate
+
+Tier 标准:
+  Bronze 99.5% / 100 QPS / pooled
+  Silver 99.9% / 1k QPS / pooled
+  Gold 99.99% / 10k QPS / dedicated
+
+Storage (cost optim):
+  Raw 7d in hot
+  1-min rollups 30-90d in warm
+  1-hour 1-year+ in cold
+  Daily 3+ years compliance
+
+Billing:
+  Separate DB from telemetry
+  Per-request audit 13 months
+  Tenant self-serve report
+  Crypto-signed invoice
+  60-day dispute window
+
+Noisy neighbor:
+  Hard ceiling even in tier
+  Auto-scale on Gold burst
+  Bronze完全 isolated from Silver/Gold</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="model-worse-than-manual.html">← Case Study #5 · Model Performs Worse Than Manual Process</a>
+    <a href="file-system-permissions.html">Technical #6 · File System Permissions (Python, hierarchy + timestamps) →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API) · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API)</div>
+  <h1>Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API)</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 5 · 🕒 Early May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Design an OAuth 1.0/2.0 integration bridging between a client's CRM and your platform API. Cover token exchange, middleware placement, retry logic, credential rotation.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Design an <strong>OAuth 1.0/2.0 integration</strong> bridging between a client's <strong>CRM</strong> and your <strong>platform API</strong>. Cover token exchange, middleware placement, retry logic, and credential rotation."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 列出的 FDE 核心 integration 题。Palantir / Salesforce / Databricks / Google Cloud FDE 都问过。</p>
+<p><strong>Round</strong>：Technical Integration (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>enterprise integration 实战</strong>。OAuth 在每家 customer 都不一样：</p>
+<ol><li><strong>OAuth 2.0 4 个 grant types 知不知道</strong> —— authorization_code / client_credentials / refresh_token / device_code</li><li><strong>Token storage + rotation</strong> —— 真生产 deployment 必须 handle</li><li><strong>Middleware placement</strong> —— SDK / proxy / dedicated service？</li><li><strong>Failure modes</strong> —— token expire mid-call, refresh race, revocation</li><li><strong>Multi-tenant secrets management</strong></li></ol>
+<p>不考"OAuth 是什么"，考"你 production 部署过 OAuth integration"。</p>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. Which direction</strong></p>
+<blockquote><p>"Are <strong>we</strong> acting on behalf of client's CRM users (we're OAuth client) or is CRM calling our API on behalf of users (we're OAuth server)? Often both, but design is different."</p></blockquote>
+<p><strong>2. Which OAuth version</strong></p>
+<blockquote><p>"OAuth 1.0a is HMAC-signed and deprecated. Most modern CRMs (Salesforce, HubSpot, Dynamics) use 2.0. Is the client on an older version requiring 1.0?"</p></blockquote>
+<p><strong>3. Grant type</strong></p>
+<blockquote><p>"Are we acting <strong>as a user</strong> (authorization_code + refresh_token) or <strong>as the application</strong> (client_credentials)?"</p></blockquote>
+<p><strong>4. Token lifetime</strong></p>
+<blockquote><p>"What's the client's access token TTL? (Salesforce default is 2h, HubSpot 30min). Refresh token TTL? Revocation policy?"</p></blockquote>
+<p><strong>5. Volume / SLA</strong></p>
+<blockquote><p>"QPS to CRM and from CRM? Rate limits on their side? Bursty or sustained?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + grant + version</td></tr><tr><td>5-20 min</td><td><strong>End-to-end token exchange flow</strong> (画 sequence diagram)</td></tr><tr><td>20-35 min</td><td><strong>Middleware</strong> placement (Token Service vs SDK vs proxy)</td></tr><tr><td>35-45 min</td><td><strong>Retry + rotation + revocation</strong></td></tr><tr><td>45-60 min</td><td>Failure modes + multi-tenant key mgmt</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"Clarify first — <em>[假设答：we're OAuth client, CRM is Salesforce, authorization_code grant with refresh_token, 2h access + 90d refresh, 100 QPS sustained]</em>.</p>
+<p><strong>End-to-end token exchange flow</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. User clicks 'Connect Salesforce' in our UI
+2. We redirect to:
+   https://login.salesforce.com/services/oauth2/authorize
+     ?client_id=...&amp;redirect_uri=...&amp;response_type=code&amp;scope=api+refresh_token
+3. User authorizes, redirected to us with ?code=...
+4. Our backend POST to /services/oauth2/token:
+   grant_type=authorization_code, code=, client_id=, client_secret=, redirect_uri=
+5. SF returns {access_token, refresh_token, expires_in=7200, instance_url}
+6. We persist {tenant_id, sf_org_id, encrypted(access_token), encrypted(refresh_token), expires_at}
+7. Subsequent CRM calls: Authorization: Bearer &lt;access_token&gt;
+8. On 401: refresh access_token via refresh grant, retry once</code></pre>
+<p><strong>Middleware placement</strong> — 3 options:</p>
+<table class="md-table"><thead><tr><th>Pattern</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>SDK lib in every service</td><td>Latency-low</td><td>Auth logic duplicated, hard to rotate</td></tr><tr><td>Sidecar proxy per service</td><td>Auth-isolated</td><td>Per-service ops</td></tr><tr><td><strong>Central Token Service</strong></td><td>Auth single source of truth, easy rotation</td><td>+1 hop latency (~5ms)</td></tr></tbody></table>
+<p><strong>STAFF answer</strong>: Central Token Service with <strong>local cache in service</strong>. Service queries Token Service every 30s for current valid token (or on 401 forced refresh). Token Service handles refresh, encryption, revocation.</p>
+<p><strong>Retry logic</strong>:</p>
+<pre class="language-python"><code class="language-python">def call_crm(endpoint, body, tenant_id):
+    token = token_service.get(tenant_id)
+    resp = http.post(endpoint, body, headers={'Authorization': f'Bearer {token}'})
+    if resp.status == 401:
+        # Token expired or revoked
+        token = token_service.refresh(tenant_id)  # acquires fresh
+        resp = http.post(...)  # ONE retry
+    if resp.status == 429:
+        # Rate limited; backoff per Salesforce's Retry-After header
+        sleep(int(resp.headers['Retry-After']))
+        resp = http.post(...)
+    if resp.status &gt;= 500:
+        # Idempotent? retry with jittered exponential backoff up to 3x
+    return resp</code></pre>
+<p>Single retry on 401, multiple on 5xx with backoff, never retry on 4xx (other than 401/429).</p>
+<p><strong>Credential rotation</strong>:</p>
+<ul><li><strong>client_secret rotation</strong>: Salesforce rotates on suspicion. Our system supports <strong>2 active secrets</strong> (old + new) for 30-day cutover.</li><li><strong>access_token expiry</strong>: handled by refresh</li><li><strong>refresh_token revocation</strong>: when user clicks "disconnect" in CRM, refresh fails — alert, re-prompt user</li></ul>
+<p><strong>Failure modes</strong>:</p>
+<ul><li><strong>Refresh race</strong>: 10 concurrent requests all see 401 → 10 refreshes hit Salesforce. <strong>Solution</strong>: distributed lock per tenant (Redis SETNX) on refresh, first wins, others wait</li><li><strong>Clock skew</strong>: server time off → premature expiry. Add 30s buffer</li><li><strong>PII in tokens</strong> (JWT): never log tokens. Audit logs use token hash</li><li><strong>Multi-region</strong>: Token Service per region with cross-region cache invalidation on revocation</li></ul>
+<p><strong>Multi-tenant secrets</strong>:</p>
+<ul><li>per-tenant client_id/client_secret stored in <strong>HSM</strong> (or Vault)</li><li>encryption at rest with per-tenant DEK + central KEK</li><li><strong>access_token + refresh_token</strong> in DB encrypted with per-tenant DEK</li><li>audit log every token access (compliance)</li></ul>
+<p><strong>What I'd add for production</strong>:</p>
+<ul><li><strong>Monitoring</strong>: track 401 / 429 / 5xx rates per tenant. Spike in 401 = upstream credential rotation</li><li><strong>Token lifecycle dashboard</strong>: time-since-last-refresh, tokens nearing expiry</li><li><strong>Test harness</strong>: mock OAuth server for integration tests"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent 7 markets</strong> + <strong>BNPL chatbot</strong> 都有 enterprise auth：</p>
+<table class="md-table"><thead><tr><th>OAuth 题</th><th>你的经验</th></tr></thead><tbody><tr><td>Token exchange + refresh</td><td>你的 voice agent 集成 7 个市场的 repayment 系统 — 各自不同 auth</td></tr><tr><td>Multi-tenant secrets in HSM</td><td>BNPL chatbot 跨 ByteDance internal 多 service</td></tr><tr><td>Distributed lock on refresh</td><td>Voice agent 你做过 thundering herd 类似问题</td></tr><tr><td>ConvFinQA: secure API key handling</td><td>你做过 <code>.env</code> + os.environ 模式, not hardcoded</td></tr><tr><td>Token Service central pattern</td><td>你的 internal Agent Platform 应该有共享 service 设计</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"I've implemented this pattern across 7 markets for the voice agent — each market's repayment system had different auth (some OAuth 2.0, some HMAC, some IP-allowlisted JWT). We centralized into a Token Service with per-tenant DEK encryption + distributed refresh lock. The trickiest failure mode I hit was <strong>clock skew between our service and the customer's auth server</strong> — a 30s buffer fixed 95% of premature-expiry incidents."</p></blockquote>
+<p>→ 显你真生产过 enterprise auth.</p>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Refresh race — 10 concurrent calls all 401. What happens?" <strong>A</strong>: Without coordination, 10 parallel refresh requests hit Salesforce → 10 different refresh_tokens → 9 are now invalidated (Salesforce rotates refresh on use). 解：</p>
+<ul><li><strong>Distributed lock per tenant on refresh</strong> (Redis <code>SETNX</code> with TTL)</li><li>Holder refreshes, writes new tokens, releases lock</li><li>Others wait up to 5s, then re-read tokens</li></ul>
+<p><strong>Q2</strong>: "Token Service is single point of failure. 100k QPS impact if it goes down." <strong>A</strong>:</p>
+<ul><li><strong>Stateless multi-instance</strong> behind LB</li><li><strong>Local cache in service</strong> (30s TTL) — if Token Service is unreachable, use cached token until expiry</li><li><strong>Read replica</strong> for token DB (writes are rare)</li><li><strong>Async refresh path</strong> — refresh tokens 5 min before expire (warm), don't wait until 401</li></ul>
+<p><strong>Q3</strong>: "Customer says we can't store their refresh_token. What now?" <strong>A</strong>: 3 patterns:</p>
+<ol><li><strong>Token broker on customer side</strong> — customer hosts a service that holds tokens, we call that service. Customer-owns-keys model.</li><li><strong>HSM with customer-controlled KEK</strong> — we store but encrypted by their KMS, customer can revoke decryption</li><li><strong>OAuth on-behalf-of (OBO) flow</strong> — Microsoft / Google support; we get short-lived tokens per request, no refresh storage</li></ol>
+<p><strong>Q4</strong>: "PCI / HIPAA compliance — tokens are sensitive data?" <strong>A</strong>:</p>
+<ul><li>Tokens themselves aren't typically classified PII, but <strong>tokens can be exchanged for PII</strong>, so treat as sensitive</li><li><strong>Never log tokens</strong> (use hash for correlation)</li><li><strong>TLS 1.3</strong> in transit, AES-256 at rest</li><li><strong>Access audit</strong> every read with actor + reason</li><li><strong>Tokenized DB column</strong> with field-level encryption</li></ul>
+<p><strong>Q5</strong>: "Salesforce rate-limits us at 100 req/min/org. How do we serve a customer with 1M API calls/day?" <strong>A</strong>:</p>
+<ul><li><strong>Batch operations</strong> — use Bulk API (1 request = 10k records)</li><li><strong>CDC subscription</strong> instead of polling — receive change events, no polling needed</li><li><strong>Composite REST</strong> — pack 25 operations per request</li><li><strong>Queue + backpressure</strong> — our system caches, batches, retries</li><li>If still hitting limits, work with Salesforce account team for higher quota tier</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>OAuth 2.0 当 single thing</strong> — 4 个 grant types 区分不清</li><li><strong>每 service SDK</strong> — auth 逻辑分散</li><li><strong>没 refresh race 处理</strong> — production thunder</li><li><strong>明文存 token</strong> — security violation</li><li><strong>不处理 clock skew</strong> — 30s buffer 是经典 fix</li><li><strong>没 multi-tenant key isolation</strong></li><li><strong>没 monitor 401/429 rate</strong> — 上游问题 silent</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Central Token Service + local cache</strong> pattern</li><li><strong>Distributed lock on refresh</strong> prevent stampede</li><li><strong>2 active client_secrets</strong> for rotation cutover</li><li><strong>OBO flow</strong> for compliance-strict customers</li><li><strong>30s clock skew buffer</strong></li><li><strong>Composite + Bulk API</strong> for rate-limit avoidance</li><li><strong>HSM / Vault</strong> for client_secret</li><li><strong>Tokenized DB column + per-tenant DEK</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">OAuth grant types:
+  authorization_code  - user delegation (most CRMs)
+  refresh_token       - long-lived re-issue
+  client_credentials  - service-to-service
+  device_code         - IoT / TV
+
+Architecture:
+  Service → Token Service (central) → CRM
+            ↓
+        per-tenant secrets in HSM
+        access/refresh in DB (encrypted DEK)
+
+Retry rules:
+  401 → refresh + 1 retry
+  429 → respect Retry-After header
+  5xx → exponential backoff up to 3
+  Other 4xx → don't retry
+
+Failure modes:
+  - Refresh race → distributed lock per tenant
+  - Clock skew → 30s buffer
+  - Stampede on rotation → warm refresh 5min before expire
+  - Token in logs → hash for correlation
+
+Multi-tenant security:
+  HSM/Vault for client_secret
+  Per-tenant DEK + central KEK
+  Audit log every access
+  TLS 1.3 + AES-256
+
+Rate-limit mitigation:
+  Bulk API (10k/req)
+  Composite REST (25 ops/req)
+  CDC subscription not polling
+  Backpressure queue</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="legacy-erp-no-api.html">← Case Study #4 · Legacy ERP Without API Layer</a>
+    <a href="debug-staging-vs-prod.html">Technical #2 · Debug Agent Inconsistency (Staging vs Prod) →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Technical #5 · Reliable Webhook with Flaky Clients · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Technical #5 · Reliable Webhook with Flaky Clients</div>
+  <h1>Technical #5 · Reliable Webhook with Flaky Clients</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 3 · 🕒 Early May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Design reliable webhook integration when client systems frequently go offline. Cover retry, idempotency, dead-letter handling, backpressure.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Design <strong>reliable webhook integration</strong> when client systems <strong>frequently go offline</strong>. Cover retry, idempotency, dead-letter handling, backpressure."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 技术 round 经典. Stripe-style webhook problem 适用所有 enterprise.</p>
+<p><strong>Round</strong>：Technical Integration (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你做过 <strong>producer-side webhook delivery</strong> —— Stripe/Twilio/Shopify 都解过的标准问题：</p>
+<ol><li><strong>At-least-once vs exactly-once</strong> —— 哪个 realistic</li><li><strong>Idempotency model</strong> —— 客户端 dedup 还是服务端</li><li><strong>Retry strategy</strong> —— exponential backoff + jitter + cap</li><li><strong>DLQ (dead letter queue)</strong> —— 永远失败的事件怎么 handle</li><li><strong>Backpressure</strong> —— 客户端 slow，我方 queue 不能爆</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. Direction</strong></p>
+<blockquote><p>"We send to client (we're webhook producer) or client sends to us (we're webhook consumer)? Usually 前者 for SaaS."</p></blockquote>
+<p><strong>2. Volume</strong></p>
+<blockquote><p>"Events/sec sustained + peak? 100/s? 10k/s?"</p></blockquote>
+<p><strong>3. Order matter?</strong></p>
+<blockquote><p>"Strict ordering required (e.g., <code>created → updated → deleted</code> for same entity), or events independent?"</p></blockquote>
+<p><strong>4. Acceptable delay</strong></p>
+<blockquote><p>"How fresh? Real-time (&lt;1s), seconds-fresh (&lt;10s), or eventual (&lt;1min)?"</p></blockquote>
+<p><strong>5. Client patterns</strong></p>
+<blockquote><p>"All clients behave similar, or 1% are slow + 1% always down + 98% fine? Long-tail behavior changes design."</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + volume + ordering</td></tr><tr><td>5-15 min</td><td>Core delivery model (queue → worker → HTTP POST)</td></tr><tr><td>15-25 min</td><td>Retry strategy (backoff + jitter + cap + DLQ)</td></tr><tr><td>25-35 min</td><td>Idempotency (event_id) + ordering</td></tr><tr><td>35-45 min</td><td>Backpressure + per-client rate limit + monitoring</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"Clarify — <em>[假设：we're producer, 1k events/sec sustained 10k peak, ordering matters per-entity not globally, real-time aim &lt;5s p99, 5% of clients are flaky]</em>.</p>
+<p><strong>Architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Event source → Kafka topic (partition by client_id × entity_id for per-entity order)
+                   ↓
+             Webhook Worker Pool (consumers per client_id partition)
+                   ↓
+             HTTP POST to client URL
+                   ↓ (on failure)
+             Retry Queue (Kafka with delay) → Worker
+                   ↓ (after N retries)
+             DLQ (cold storage, S3 + dashboard)</code></pre>
+<p><strong>Delivery model</strong>: at-least-once with idempotent receiver. <strong>Exactly-once is fiction across network</strong>, force client to dedup by <code>event_id</code>.</p>
+<p><strong>Retry strategy</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Attempt 1: immediate
+Attempt 2: 30s
+Attempt 3: 2min
+Attempt 4: 10min
+Attempt 5: 1h
+Attempt 6: 6h
+Attempt 7: 24h
+Attempt 8: DLQ</code></pre>
+<p>Each with <strong>±20% jitter</strong> to prevent retry stampede.</p>
+<p>Total retry window ~36 hours. After DLQ, <strong>manual + alert customer</strong>.</p>
+<p><strong>What status codes to retry</strong>:</p>
+<ul><li><strong>5xx</strong>: retry (server-side temporary)</li><li><strong>429</strong>: retry with <code>Retry-After</code> header</li><li><strong>408, 503</strong>: retry</li><li><strong>Connection errors, timeouts</strong>: retry</li><li><strong>4xx other than 408/429</strong>: NO retry (permanent error like 401 = bad creds, 422 = bad data)</li></ul>
+<p><strong>Idempotency</strong>:</p>
+<ul><li>Every webhook includes <code>X-Event-Id</code> header (UUID)</li><li>Client is expected to dedup by this ID</li><li>Documented in our spec</li><li>Provide a <strong>dedup-cache library</strong> for top languages</li></ul>
+<p><strong>Ordering per-entity</strong>:</p>
+<ul><li>Partition Kafka topic by <code>client_id × entity_id</code></li><li>Single consumer per partition guarantees ordered delivery</li><li>If <code>order_123.updated</code> retries 30s, all subsequent <code>order_123</code> events wait. Deadline:</li><li>After max wait (5 min), <strong>skip</strong> the stuck event into DLQ, send next</li><li>Customer notified: "order_123 events out-of-order, oldest in DLQ"</li></ul>
+<p><strong>Backpressure</strong>:</p>
+<ul><li>Per-client max in-flight requests (e.g., 50 concurrent POSTs)</li><li>If client returns 429 / consistently slow → <strong>dynamic backoff per client</strong> (their queue depth grows, we slow more)</li><li>Kafka topic-level retention 14 days — even if client is down 13 days, replay works</li><li><strong>If client's queue grows &gt; 1M events</strong>, <strong>page customer</strong> + auto-suspend webhook with alert</li></ul>
+<p><strong>Signing for security</strong>:</p>
+<ul><li>Every webhook signed with HMAC-SHA256 + client secret</li><li>Header: <code>X-Signature: t=&lt;timestamp&gt;,v1=&lt;hash&gt;</code></li><li>Client verifies → guards against forged webhooks from attackers</li><li>Secret rotation: support 2 active secrets (current + previous) for 30-day cutover</li></ul>
+<p><strong>Monitoring</strong>:</p>
+<ul><li><strong>Per-client delivery rate</strong> (over 5 min): alert if drops to 0</li><li><strong>Queue depth</strong> per client</li><li><strong>DLQ size</strong> per event type</li><li><strong>p99 delivery latency</strong> end-to-end</li></ul>
+<p><strong>Failure modes</strong>:</p>
+<ul><li><strong>Stampede on retry</strong>: jitter solves</li><li><strong>Client URL changes</strong>: provide self-serve config update</li><li><strong>Client returns 200 but didn't process</strong>: that's their bug, we're done at HTTP layer</li><li><strong>DLQ explodes</strong>: alert, then <strong>bulk-retry option</strong> for ops once client recovers</li><li><strong>DDoS via webhook</strong>: if attacker injects events → we'd flood client. <strong>Rate limit at event source</strong></li></ul>
+<p><strong>Customer experience</strong>:</p>
+<ul><li><strong>Real-time dashboard</strong>: per-event status (delivered / retrying / DLQ)</li><li><strong>Self-serve retry</strong>: customer can manually replay specific events</li><li><strong>Audit log</strong>: every attempt + response code logged 90 days</li><li><strong>Webhook testing tool</strong>: simulate POSTs to validate client's endpoint</li></ul>
+<p><strong>Phasing 30 days</strong>:</p>
+<ul><li>Wk 1: Core delivery + simple retry</li><li>Wk 2: Idempotency + signing</li><li>Wk 3: DLQ + monitoring dashboard</li><li>Wk 4: Self-serve retry tool + ordering"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent multi-region</strong> + <strong>BNPL chatbot retry logic</strong> 都涉及类似：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>At-least-once + dedup</td><td>ConvFinQA agent retry with idempotency key (<code>client_msg_id</code>)</td></tr><tr><td>Exponential backoff + jitter</td><td>Voice agent ASR/TTS retry pipeline</td></tr><tr><td>DLQ pattern</td><td>Voice agent failed calls 上报系统</td></tr><tr><td>HMAC signing</td><td>Voice agent multi-tenant auth (类似)</td></tr><tr><td>Per-client backpressure</td><td>7 markets traffic asymmetry handling</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"On the voice agent retry pipeline I built, we used <strong>exponential backoff with jitter + 7 retry attempts capped at 36h</strong> with DLQ to S3. The thing that surprised me was <strong>per-client behavioral fingerprinting</strong> — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: <strong>don't retry the same way for all clients</strong>, adapt to their pattern."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Customer says they need 99.99% delivery. Possible?" <strong>A</strong>: 跟 99.99% <strong>eventual</strong> delivery 是可行的 (we always retry until DLQ), 但 <strong>99.99% within real-time</strong> 是 unsupportable if client is down. Frame:</p>
+<ul><li>"99.99% eventual delivery via 36h retry window — yes"</li><li>"99.99% delivered within 5s — requires client to maintain 99.99% uptime, which is <strong>on them</strong>"</li><li><strong>Customer Tier upgrade</strong>: dedicated worker pool for Gold (more aggressive retry, lower queue depth)</li></ul>
+<p><strong>Q2</strong>: "Client only accepts 1 webhook at a time (no concurrency). 10k events/sec arrives. Stuck?" <strong>A</strong>:</p>
+<ul><li>Per-client concurrency = 1 → queue grows</li><li>After queue depth &gt; threshold → page customer with options:</li></ul>
+<ol><li>Customer's URL handler must process faster (their problem)</li><li>We <strong>batch deliver</strong> N events per call (negotiate API change)</li><li>Customer accepts increased latency / DLQ growth</li></ol>
+<p><strong>Q3</strong>: "Client misses 3-day event burst, asks us to replay everything 'newest first'." <strong>A</strong>:</p>
+<ul><li>DLQ retention 30 days → can replay</li><li><strong>Replay UI</strong>: customer picks time range, replay starts</li><li><strong>Newest-first</strong> for catching up: emit events in reverse-time order</li><li>Standard pattern for migration-back-online scenarios</li></ul>
+<p><strong>Q4</strong>: "Race: client sends 'updated' before we deliver 'created'. State mismatch." <strong>A</strong>: 不可能 from our side if same-entity events partitioned to same Kafka partition (FIFO). But race CAN happen if <strong>client</strong> does parallel processing internally → that's their architecture. We help by including:</p>
+<ul><li><code>event_sequence_number</code> per entity (we own)</li><li><code>created_at</code> server-side timestamp</li><li>Client should buffer + process in order if their handler is async</li></ul>
+<p><strong>Q5</strong>: "We need to deliver to webhook URL behind firewall (corporate). They can't expose endpoint." <strong>A</strong>: 3 options:</p>
+<ol><li><strong>Polling reverse</strong>: client polls us instead of us pushing. Less real-time but firewall-friendly</li><li><strong>Long polling / SSE</strong>: server-sent events client opens</li><li><strong>Customer-hosted gateway</strong>: we push to their cloud broker (e.g., AWS EventBridge), they consume from inside firewall</li></ol>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Promise exactly-once</strong> — 不存在</li><li><strong>No DLQ</strong> — events 永远 stuck in retry</li><li><strong>没 jitter</strong> — retry stampede</li><li><strong>Retry on 4xx</strong> — wastes resources on permanent errors</li><li><strong>没 ordering 处理</strong> — multi-event entities race</li><li><strong>没 backpressure</strong> — slow client cause queue OOM</li><li><strong>没 HMAC signing</strong> — replay attacks / forged webhooks</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>at-least-once + client-side idempotency</strong> standard pattern</li><li><strong>Per-entity Kafka partition</strong> for ordering</li><li><strong>Exponential backoff + jitter + 7 attempts + DLQ</strong></li><li><strong>HMAC-SHA256 signing</strong> + 2-secret rotation</li><li><strong>Self-serve retry UI</strong> for customer</li><li><strong>Per-client adaptive backoff</strong> based on history</li><li><strong>Webhook testing tool</strong> for onboarding</li><li><strong>Polling fallback</strong> for firewall'd clients</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Delivery model:
+  at-least-once + receiver dedup by event_id
+
+Retry schedule (with ±20% jitter):
+  immediate / 30s / 2m / 10m / 1h / 6h / 24h / DLQ
+  Total ~36h window
+
+What to retry:
+  5xx, 408, 429 (with Retry-After), conn errors
+  NEVER 4xx (other than 408/429)
+
+Ordering:
+  Kafka partition by client × entity
+  Single consumer per partition
+  Skip stuck events to DLQ after 5min
+
+Backpressure:
+  Per-client max concurrency
+  Queue depth alert &gt; threshold
+  Auto-suspend at extreme depth
+  Tenant tier dedicated workers for Gold
+
+Security:
+  HMAC-SHA256 signing
+  2 active secrets for rotation
+  Replay protection via timestamp
+  TLS 1.3 transit
+
+Customer tools:
+  Dashboard: per-event status
+  Self-serve retry by time range
+  Audit log 90 days
+  Test endpoint validator
+
+红线:
+  - Exactly-once promise (fiction)
+  - No DLQ
+  - No jitter
+  - Retry on 4xx</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="data-pipeline-drift.html">← Technical #3 · Data Pipeline Quality Drift Detection</a>
+    <a href="recurring-fix-failure.html">Client Sim #3 · Recurring Fix Failure / Client Losing Confidence →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

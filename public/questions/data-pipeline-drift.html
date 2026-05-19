@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Technical #3 · Data Pipeline Quality Drift Detection · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Technical #3 · Data Pipeline Quality Drift Detection</div>
+  <h1>Technical #3 · Data Pipeline Quality Drift Detection</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 3 · 🕒 Early May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Build a detection system for data pipeline quality degradation on specific days. Cover metrics, thresholds, alerting, and root-cause routing.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Build a <strong>detection system for data pipeline quality degradation</strong> on specific days. Cover metrics, thresholds, alerting, and root-cause routing."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 技术 round 经典。Databricks / Salesforce / Snowflake FDE 都问过。</p>
+<p><strong>Round</strong>：Technical Integration (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你 <strong>production data ops</strong> —— 数据 pipeline 半挂掉是 enterprise 最常见 silent failure。</p>
+<ol><li><strong>Data quality 6 个维度</strong> —— 你知道几个？</li><li><strong>Detection 灵敏度 vs 噪声 trade-off</strong> —— 太 sensitive 警报疲劳, 太 loose 漏 bug</li><li><strong>Drift 类型区分</strong> —— schema / distribution / volume / freshness / null-rate</li><li><strong>Root-cause routing</strong> —— 不是只 alert, 是路由给对的人</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. Pipeline structure</strong></p>
+<blockquote><p>"Single pipeline or many? Batch (daily) or streaming? Source → sink 几跳？"</p></blockquote>
+<p><strong>2. Downstream consumers</strong></p>
+<blockquote><p>"What breaks downstream if pipeline goes bad — model training? dashboard? customer-facing feature?"</p></blockquote>
+<p><strong>3. Existing</strong></p>
+<blockquote><p>"Any current monitoring (Datadog / Airflow / Great Expectations)? Or greenfield?"</p></blockquote>
+<p><strong>4. Acceptable false positive rate</strong></p>
+<blockquote><p>"Pager fatigue cost: how many false alerts per week are we willing to tolerate? 1? 5? 20?"</p></blockquote>
+<p><strong>5. Recent incident</strong></p>
+<blockquote><p>"Was there a specific incident that drove this ask? Often the customer wants to detect 'the next time X happens'."</p></blockquote>
+<hr />
+<h3>6 个 data quality 维度</h3>
+<table class="md-table"><thead><tr><th>维度</th><th>What</th><th>怎么 detect</th></tr></thead><tbody><tr><td><strong>1. Volume</strong></td><td>Row count drops / surges</td><td>Time-series anomaly (z-score / Prophet)</td></tr><tr><td><strong>2. Freshness</strong></td><td>Data not arriving on time</td><td>SLA on <code>MAX(updated_at)</code></td></tr><tr><td><strong>3. Schema</strong></td><td>Column added/removed/typed-different</td><td>Schema diff at each ingest</td></tr><tr><td><strong>4. Null rate</strong></td><td>% null per column shifts</td><td>Track per-column null %, alert on Δ &gt; 5%</td></tr><tr><td><strong>5. Distribution</strong></td><td>Statistical drift on values (KS test, PSI)</td><td>Compare today vs 7d avg</td></tr><tr><td><strong>6. Referential integrity</strong></td><td>FK violations / orphan rows</td><td>Constraint checks</td></tr></tbody></table>
+<p><strong>STAFF 答</strong>：每个维度独立 detector, 各有 threshold + escalation。</p>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify pipeline + downstream stakes</td></tr><tr><td>5-20 min</td><td>6 维度 detection system 设计</td></tr><tr><td>20-30 min</td><td>Alert routing + de-duplication + on-call rotation</td></tr><tr><td>30-45 min</td><td>Root cause routing (data team vs upstream vs infra)</td></tr><tr><td>45-60 min</td><td>Failure modes (alert fatigue) + dashboard</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"Clarify — <em>[假设：daily batch pipeline, customer order data → analytics warehouse, downstream = sales dashboard + ML training, no existing monitoring beyond Airflow task success, customer was bit by a 2-week data corruption that went undetected]</em>.</p>
+<p><strong>6-维度 detection 系统</strong>：</p>
+<p><strong>1. Volume</strong></p>
+<ul><li>Daily row count per table</li><li>Compare today vs <strong>7d trailing mean ± 3 SD</strong></li><li>Alert if drop &gt; 20% or surge &gt; 50%</li><li>Use Prophet for seasonality (Black Friday surges normal)</li></ul>
+<p><strong>2. Freshness</strong></p>
+<ul><li><code>MAX(updated_at)</code> per source table polled every 30 min</li><li>Alert if older than expected SLA + 1h grace</li><li>Mean-time-to-fresh tracked as SLI</li></ul>
+<p><strong>3. Schema</strong></p>
+<ul><li>Snapshot schema at every ingest start</li><li><code>git-diff</code> style: column added/removed/type changed</li><li><strong>Breaking changes alert immediately</strong>; non-breaking (e.g., new nullable column) info-only</li><li>Use Great Expectations or dbt schema tests</li></ul>
+<p><strong>4. Null rate per column</strong></p>
+<ul><li>Top-20 important columns, track null %</li><li>Daily compute; alert if jumps &gt; 5pp from 7d mean</li><li><strong>Critical columns</strong> (customer_id, order_id) zero-tolerance: any null alerts immediately</li></ul>
+<p><strong>5. Distribution drift</strong></p>
+<ul><li>Key numeric columns: today's mean / std / quantiles vs 7d</li><li>Categorical: PSI (Population Stability Index) per category</li><li>PSI &gt; 0.25 alert, &gt; 0.1 watch</li><li><strong>KS test</strong> for continuous</li></ul>
+<p><strong>6. Referential integrity</strong></p>
+<ul><li>Foreign keys: orphan rows count per day</li><li>Constraint violations (e.g., <code>quantity &lt; 0</code>)</li><li>Alert any rise</li></ul>
+<p><strong>Alert routing + dedup</strong>:</p>
+<p>Routes by failure pattern:</p>
+<ul><li>Volume spike + freshness OK → likely <strong>upstream data flood</strong>, ping data engineering</li><li>Volume drop + freshness fail → <strong>upstream system down</strong>, ping source-system team</li><li>Schema change → <strong>upstream API change</strong>, ping integration team</li><li>Null spike on single column → <strong>upstream nullable field change</strong>, ping data engineering</li><li>PSI drift no schema change → <strong>business event</strong> (campaign / seasonal), ping product analytics</li><li>Constraint violations → <strong>data quality bug</strong>, ping data eng</li></ul>
+<p>Each route has SLO + on-call rotation. Pager dedup: same root-cause alerts within 1h grouped into single incident.</p>
+<p><strong>Alert fatigue prevention</strong> (the actual hard part):</p>
+<ul><li><strong>Stratify alerts</strong>: P0 (broke customer flow) / P1 (broke internal flow) / P2 (info)</li><li>Only P0/P1 page; P2 to Slack</li><li><strong>Auto-resolve</strong> when condition clears for 30 min</li><li><strong>Suppression rules</strong>: known-bad day windows (e.g., Black Friday) suppressed</li><li><strong>Quarterly review</strong>: alerts that have never paged in 90 days → tune up; alerts paging 5x/wk → tune down or auto-resolve</li></ul>
+<p><strong>Root-cause routing flow</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Alert fires →
+  1. Tag with detected dimension (volume / schema / etc.)
+  2. Tag with table + column + source
+  3. Match against known patterns (table from this source has had X-type drift before)
+  4. Route to default owner of that source / table
+  5. Include in alert: link to data lineage graph showing upstream</code></pre>
+<p><strong>Dashboard</strong>:</p>
+<ul><li>Per-table health: green/yellow/red across 6 dims</li><li>Time-series of each metric, last 30 days</li><li>Recent alerts with status</li><li>SLO compliance (data freshness 99%)</li></ul>
+<p><strong>Phasing 60 days</strong>:</p>
+<ul><li>Wk 1-2: Volume + Freshness + Schema (foundational, low false positive)</li><li>Wk 3-4: Null rate</li><li>Wk 5-6: Distribution drift</li><li>Wk 7-8: Referential integrity + routing automation</li></ul>
+<p><strong>Failure mode</strong>: pager fatigue. Quote real number: pager noise &gt; 5/week causes engineer to ignore. <strong>Tune aggressively for first month</strong>, expect 70% suppression rate.</p>
+<p><strong>What to NOT do</strong>: ML-based anomaly detection day 1. Black-box ML alerts → can't debug → trust collapses. Use <strong>simple statistical rules</strong> until volume justifies ML."</p></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>ConvFinQA eval pipeline</strong> + <strong>voice agent monitoring</strong> 直接 reframe：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>6-dim data quality monitoring</td><td>ConvFinQA stratified eval — distribution check across 4 length buckets</td></tr><tr><td>Distribution drift PSI</td><td>ConvFinQA classify_failure 类似分类思路</td></tr><tr><td>Alert fatigue tuning</td><td>Voice agent 监控 7 markets, you 必经过 alert tuning</td></tr><tr><td>Per-table health dashboard</td><td>Voice agent latency dashboard 同款</td></tr><tr><td>Root cause routing</td><td>Voice agent failure routing to LLM / ASR / TTS team</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"When I built the eval pipeline for ConvFinQA, I learned that even <strong>stratified sampling by 4 length buckets</strong> wasn't enough to catch distribution drift — I had to add a <strong>per-turn-index breakdown</strong> to spot a cascade where T0 errors propagate. For pipeline data quality, I'd apply the same lesson: <strong>not aggregate metric, but </strong>per-segment** — by table, by source, by column. Aggregate hides 90% of drift."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Customer wants ML-based anomaly detection. Auto-magic." <strong>A</strong>: 推回去：</p>
+<ul><li>"Day 1 ML detection is a trap — black-box alerts, no engineer can RCA, trust collapses"</li><li>"Statistical rules first (z-score / quantile). Once stable for 3 months, <strong>then</strong> layer ML on top of statistical, with <strong>explainable output</strong>"</li><li>Use Prophet for seasonality (interpretable), not deep models</li></ul>
+<p><strong>Q2</strong>: "Volume drops 50% on a Sunday — false positive (weekend)?" <strong>A</strong>: Seasonality:</p>
+<ul><li><strong>Prophet</strong> decomposes weekly seasonality automatically</li><li>Or <strong>per-day-of-week baselines</strong> (Sunday compared to last 4 Sundays)</li><li>Or <strong>calendar-aware suppression</strong> (holidays, regional events)</li></ul>
+<p><strong>Q3</strong>: "How fast can you detect a corruption that affects 0.1% of rows?" <strong>A</strong>: Hard. 0.1% is below natural variance. Mitigations:</p>
+<ul><li><strong>Sampling</strong>: stratified row-level checks on 10k random rows / day, run referential / constraint checks</li><li><strong>Domain rules</strong>: if customer has business rules (e.g., "order_total = sum(line_items)"), assert these</li><li>Catch downstream: model accuracy or dashboard ratio drift detects 0.1% if it accumulates</li></ul>
+<p><strong>Q4</strong>: "Customer's source system makes schema changes daily. How not to alert every time?" <strong>A</strong>:</p>
+<ul><li><strong>Schema-change allow-list</strong>: customer maintains list of "expected upcoming changes"</li><li><strong>Non-breaking auto-accept</strong>: add nullable column = info-only</li><li><strong>Breaking changes still alert</strong>: column drop / type change / required field rename</li></ul>
+<p><strong>Q5</strong>: "We need to be auditable for SOC 2. How does monitoring help?" <strong>A</strong>:</p>
+<ul><li>Every alert + resolution logged immutable for 1 year</li><li>Compliance dashboard: % SLOs met, MTTR, alert backlog</li><li><strong>Pipeline health</strong> is increasingly a SOC 2 / SOX item</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>ML anomaly day 1</strong> — black-box, untrustable</li><li><strong>Single threshold for all tables</strong> — important tables need tighter</li><li><strong>没 dedup</strong> — alert storm on single root cause</li><li><strong>没 P0/P1/P2 stratification</strong> — page on everything = page on nothing</li><li><strong>没 routing</strong> — alert lands in #general, nobody owns</li><li><strong>没 dashboard</strong> — only alerting = no daily situational awareness</li><li><strong>过 aggregate</strong> — miss per-segment drift</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>6 distinct dims</strong> with separate detectors</li><li><strong>PSI for categorical drift</strong> specific metric</li><li><strong>Prophet for seasonality</strong> (interpretable)</li><li><strong>Alert routing by detected dim</strong> + lineage</li><li><strong>Auto-resolve + suppression</strong> for fatigue</li><li><strong>Phasing 60 days</strong> from foundational to advanced</li><li><strong>Statistical first, ML later</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">6 dims of data quality:
+  Volume / Freshness / Schema / Null / Distribution / Referential
+
+Detection methods:
+  Volume: z-score + Prophet (seasonality)
+  Freshness: SLA on MAX(updated_at)
+  Schema: snapshot + diff (Great Expectations)
+  Null rate: per-column %, Δ&gt;5pp alert
+  Distribution: PSI &gt; 0.25 alert
+  Referential: FK constraint check
+
+Alert structure:
+  P0/P1/P2 stratification (page on P0/P1)
+  Auto-resolve when stable
+  Dedup within 1h
+  Calendar suppression
+
+Routing by detected dim:
+  Volume drop → source system team
+  Schema change → integration team
+  PSI drift → product analytics
+  Null spike → data engineering
+
+Phasing 60 days:
+  Wk 1-2: Volume / Freshness / Schema
+  Wk 3-4: Null
+  Wk 5-6: Distribution
+  Wk 7-8: Referential + routing automation
+
+红线:
+  - ML day 1
+  - Single threshold
+  - 没 dedup
+  - 没 dashboard for daily review</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="debug-staging-vs-prod.html">← Technical #2 · Debug Agent Inconsistency (Staging vs Prod)</a>
+    <a href="webhook-flaky-clients.html">Technical #5 · Reliable Webhook with Flaky Clients →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

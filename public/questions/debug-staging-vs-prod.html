@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Technical #2 · Debug Agent Inconsistency (Staging vs Prod) · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Technical #2 · Debug Agent Inconsistency (Staging vs Prod)</div>
+  <h1>Technical #2 · Debug Agent Inconsistency (Staging vs Prod)</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 4 · 🕒 Early May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">An AI agent returns inconsistent results in production compared to staging. Walk through your debugging approach end-to-end.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"An <strong>AI agent returns inconsistent results in production</strong> compared to staging. Walk through your debugging approach end-to-end."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 列出的高频技术 round 题。OpenAI / Anthropic / Google FDE 都问过。</p>
+<p><strong>Round</strong>：Technical Integration / Debug (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>production deployment 的诊断套路</strong>。AI deployment 大多数失败都是这个 shape：</p>
+<ol><li><strong>5 类典型 root cause</strong> —— 你知道几个？</li><li><strong>诊断顺序</strong> —— 先 cheap 后 expensive</li><li><strong>能不能 reproduce</strong> —— production-only bug 是最难的</li><li><strong>Don't blame the model first</strong> —— 9/10 root cause 不是 model</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. Define "inconsistent"</strong></p>
+<blockquote><p>"What kind of inconsistency — <strong>wrong</strong> answers, <strong>different</strong> answers each time (non-determinism), or <strong>slower</strong> answers?"</p></blockquote>
+<p><strong>2. Frequency</strong></p>
+<blockquote><p>"All requests, or specific ones? Percentage? Same input always reproduces?"</p></blockquote>
+<p><strong>3. Same model artifact</strong></p>
+<blockquote><p>"Are staging and prod running the <strong>identical model checkpoint</strong>? Same model version + system prompt + tokenizer?"</p></blockquote>
+<p><strong>4. Same input data</strong></p>
+<blockquote><p>"Are users in prod sending the <strong>same shape</strong> of input? Could distribution have shifted?"</p></blockquote>
+<p><strong>5. Recent change</strong></p>
+<blockquote><p>"Has anything changed recently — new release, new feature flag, upstream API changes, infrastructure migration?"</p></blockquote>
+<hr />
+<h3>5 类典型 root cause</h3>
+<table class="md-table"><thead><tr><th>Class</th><th>What</th><th>Diagnosis cost</th></tr></thead><tbody><tr><td><strong>C1: Config drift</strong></td><td>model version / system prompt / temperature differ</td><td>低 (1h diff configs)</td></tr><tr><td><strong>C2: Feature pipeline drift</strong></td><td>prod features are stale / missing / encoded differently</td><td>中 (need trace)</td></tr><tr><td><strong>C3: Input distribution shift</strong></td><td>real users send things staging tests didn't cover</td><td>中 (need distribution compare)</td></tr><tr><td><strong>C4: Non-determinism</strong></td><td>temperature &gt; 0, batch size affects sampling, multi-replica state</td><td>中</td></tr><tr><td><strong>C5: Infrastructure</strong></td><td>timeout differences, GPU vs CPU, library version, region latency triggering shorter response</td><td>中-高</td></tr></tbody></table>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify + reproduce attempt</td></tr><tr><td>5-15 min</td><td>C1 cheapest checks first (config diff)</td></tr><tr><td>15-25 min</td><td>C2/C3 — feature + input distribution</td></tr><tr><td>25-40 min</td><td>C4/C5 — non-determinism + infra</td></tr><tr><td>40-50 min</td><td>Fix + add observability so it doesn't happen again</td></tr><tr><td>50-60 min</td><td>Roll out fix safely</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"First clarify — <em>[假设：30% of requests, same input不一定 reproduce, configs claim identical, no recent release, infrastructure migrated last week from us-east to multi-region]</em>.</p>
+<p>Last clue is gold: <strong>infrastructure migrated</strong> → C5 candidate.</p>
+<p>But I'd still go systematic, cheapest first:</p>
+<p><strong>Step 1: Reproduce on prod with controlled input</strong> (1 hour)</p>
+<ul><li>Capture <strong>10 prod requests + responses</strong> with full context</li><li>Replay each on staging with same request</li><li>See if outputs match. If yes → environmental. If no → input or pipeline.</li></ul>
+<p><strong>Step 2: C1 config diff</strong> (30 min)</p>
+<ul><li><code>diff staging_config prod_config</code>: model ID, system prompt, temperature, top_p, max_tokens, stop sequences</li><li>Check <strong>deployed model artifact hash</strong> matches</li><li>Check <strong>tokenizer version</strong></li><li>Check <strong>feature flags</strong> active on prod vs staging</li></ul>
+<p><strong>Step 3: C2 feature pipeline trace</strong> (2 hours)</p>
+<ul><li>For one failing request: trace every input feature value end-to-end</li><li>Are all features present? Same range / encoding as training?</li><li>Common bug: <strong>missing feature defaults to wrong sentinel</strong> (e.g., <code>-1</code> instead of <code>null</code> → model interprets as "very low score")</li></ul>
+<p><strong>Step 4: C3 input distribution</strong> (1 hour)</p>
+<ul><li>Compute distribution of input features over last 24h prod vs 24h staging</li><li>Look for <strong>categories never seen in staging</strong></li><li><strong>Length distribution</strong>: prod might have 99th percentile request 10x longer than staging</li></ul>
+<p><strong>Step 5: C4 non-determinism</strong> (1 hour)</p>
+<ul><li>If temperature &gt; 0: same input should produce different output. Is that the inconsistency?</li><li><strong>Batching</strong>: vLLM / SGLang batch size affects sampling. Compare batch size statistics.</li><li>Multi-replica: any state per-replica that varies?</li></ul>
+<p><strong>Step 6: C5 infrastructure</strong> (most likely given migration clue)</p>
+<ul><li><strong>Timeout</strong>: prod may have shorter timeout → model truncates output mid-generation</li><li><strong>Concurrency</strong>: prod under load → models may share KV cache improperly</li><li><strong>GPU vs CPU</strong> (or different GPU types): rare but real, FP16 rounding differs</li><li><strong>Region latency</strong>: client timeout causes early disconnection, model returns partial</li><li><strong>DNS / TLS handshake</strong>: degraded prod path adds 200ms, but doesn't change output... unless triggers shorter max_tokens</li><li><strong>Library mismatch</strong>: different transformers / torch version between staging and prod</li></ul>
+<p><strong>Given the 'multi-region migration' clue, my top 2 hypotheses</strong>:</p>
+<ul><li><strong>Region routing inconsistency</strong>: 30% of traffic goes to a region with subtly different infra (e.g., older GPU type, library version, env variable)</li><li><strong>Timeout truncation</strong>: cross-region call to LLM service has higher latency, downstream timeout truncates response</li></ul>
+<p><strong>Immediate diagnostic</strong>:</p>
+<ul><li>Tag every prod request with <strong>region</strong>, <strong>GPU type</strong>, <strong>library hash</strong></li><li>Aggregate inconsistency rate by region</li><li>If 30% inconsistency clusters in 1 region, <strong>prove the hypothesis</strong></li></ul>
+<p><strong>Fix path</strong>:</p>
+<ul><li>Short-term: <strong>route 100% to known-good region</strong>, accept higher latency from non-local users</li><li>Mid-term: align library versions / infra across regions (idempotent rebuild)</li><li>Long-term: <strong>per-request artifact provenance log</strong> so we always know which model+infra+config served each response</li></ul>
+<p><strong>What I'd add to prevent recurrence</strong>:</p>
+<ul><li><strong>Hash-versioned deployment artifacts</strong>: every deploy logs SHA of model + tokenizer + system prompt + every dependency. <code>prod_hash == staging_hash</code> is invariant.</li><li><strong>Per-request observability</strong>: log temperature, model_id, region, GPU type per request. <strong>Without this, we'd never know.</strong></li><li><strong>Shadow eval pipeline</strong>: 1% of prod traffic goes to staging-mirror, daily diff alerts on drift</li><li><strong>Canary on every deploy</strong>: 1% → 10% → 100% with auto-rollback on error budget breach"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent multi-region</strong> + <strong>ConvFinQA RL alignment</strong> 都涉及 production debug：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Multi-region inconsistency</td><td>Voice agent 跨 7 markets 不同 region</td></tr><tr><td>Library / artifact hash mismatch</td><td>vLLM / SGLang upgrade 你做过</td></tr><tr><td>Per-request observability</td><td>Voice agent 端到端 latency tracing 你 own</td></tr><tr><td>Canary on every deploy</td><td>7 markets phased rollout</td></tr><tr><td>Shadow eval</td><td>ConvFinQA stratified 300 eval 类似</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"I've literally lived this. When we rolled out the voice agent from Singapore-only to multi-region, we got 25% inconsistency rate on Thai customers. We traced it to a <strong>library mismatch</strong> — the Thai region's vLLM was on an older version with different default sampling. We instituted <strong>hash-versioned deploy artifacts</strong> across all regions after that incident — every release we log SHA of model + tokenizer + library and assert equivalence pre-deploy. Saved us 3 more incidents in the year."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "We've checked configs identical, reproduces 30% of time, but staging doesn't show it. What now?" <strong>A</strong>: Look at <strong>load</strong>: production has 100x traffic. Bug surfaces under <strong>concurrency or batching</strong>. Solutions:</p>
+<ul><li>Simulate prod load on staging with synthetic traffic</li><li>Profile vLLM batching: high concurrency triggers paged-attention re-use, can produce subtly different outputs</li><li>Check <strong>KV cache eviction</strong> under memory pressure</li></ul>
+<p><strong>Q2</strong>: "We can't reproduce even with same input on prod replay. Is it a ghost?" <strong>A</strong>: Non-determinism likely. Audit:</p>
+<ul><li>Is <code>temperature=0</code> enforced? Top-p &gt; 0 still has limited non-det</li><li>Is model <strong>deterministic seed</strong> set? OpenAI's <code>seed</code> parameter</li><li>Tokenizer order: BPE merges might differ between versions</li><li>GPU kernel non-det: cuBLAS GEMM has known reproducibility issues; force <code>torch.backends.cudnn.deterministic = True</code></li></ul>
+<p><strong>Q3</strong>: "Bug is intermittent and we can't catch it in staging. Just ship fix?" <strong>A</strong>: 不行. Without root cause:</p>
+<ul><li>High chance fix doesn't address actual bug</li><li>High chance fix introduces new bug</li></ul>
+<p><strong>Workaround</strong>: ship <strong>observability first</strong> (per-request logs + region tags), then wait 24h for <strong>enough samples to find pattern</strong>. Patience beats hasty patch.</p>
+<p><strong>Q4</strong>: "Customer demands immediate fix. We don't know root cause." <strong>A</strong>: Negotiate:</p>
+<ul><li>"We can <strong>roll back to last-known-good infra</strong> in 4 hours — restores consistency at cost of feature X. Acceptable?"</li><li>"Or <strong>disable agent for these specific input types</strong> that fail — partial coverage but 100% consistent"</li><li>"Or <strong>A/B with 0% prod traffic for 2 days</strong> while we get root cause from observability instrumented now"</li></ul>
+<p>The honest "we'll patch blindly" path almost always extends the incident.</p>
+<p><strong>Q5</strong>: "If it's prompt change ourselves silently made, how do we prevent next time?" <strong>A</strong>:</p>
+<ul><li><strong>System prompt as code</strong>: stored in git with version + commit hash, deployed via CI</li><li><strong>Prompt evals on PR</strong>: every prompt change must pass eval suite before merge</li><li><strong>Audit log + diff</strong>: every prompt change emits diff to a team channel</li><li><strong>Per-request prompt SHA</strong> logged so we can reconstruct what was in effect</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>立刻 blame model</strong> — 90% root cause 不是 model</li><li><strong>没尝试 reproduce</strong> — 直接 hypothesize</li><li><strong>跳过 C1 config diff</strong> — 最 cheap, 最 common 原因</li><li><strong>忽略 infra migration clue</strong> — recently-changed = recently-broken</li><li><strong>Ship fix without root cause</strong> — 通常 reverberate</li><li><strong>没 observability instrumentation 先</strong> — 没 tag region/GPU/lib version 啥都 trace 不到</li><li><strong>Customer 给 immediate pressure 就 cave</strong> — negotiate workaround 时间换 quality</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>5 root cause classes</strong> 清晰列</li><li><strong>Cheapest-first 诊断顺序</strong></li><li><strong>Per-request artifact provenance log</strong> as preventive</li><li><strong>Shadow eval at 1% traffic</strong> 防 future drift</li><li><strong>Canary auto-rollback on error budget</strong> standard SRE</li><li><strong>GPU non-determinism</strong> awareness (cuBLAS GEMM)</li><li><strong>System prompt as code + eval-on-PR</strong></li><li><strong>Negotiate workaround for time</strong> 不 cave under pressure</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 root cause classes (cheapest first):
+  C1 Config drift (model / prompt / temp)
+  C2 Feature pipeline drift
+  C3 Input distribution shift
+  C4 Non-determinism (temp, batch, multi-replica)
+  C5 Infrastructure (region / GPU / lib)
+
+Diagnostic flow:
+  1. Reproduce on prod, replay on staging
+  2. diff configs (model + prompt + dep versions)
+  3. Trace 1 feature pipeline end-to-end
+  4. Distribution compare (last 24h prod vs staging)
+  5. Check non-determinism (seed, batch, replica)
+  6. Tag region + GPU + lib hash, aggregate
+
+Quick wins:
+  - Per-request observability (region/gpu/lib SHA)
+  - Hash-versioned deploy artifacts
+  - Shadow 1% prod to staging-mirror
+  - Canary + auto-rollback on every deploy
+
+Workarounds while diagnosing:
+  - Route 100% to known-good region
+  - Disable agent for specific input types
+  - Roll back infra (4-6h)
+  - DO NOT patch blindly
+
+红线:
+  - Don't blame model first
+  - Don't ship fix without RC
+  - Don't ignore "recently changed"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="oauth-crm-platform-integration.html">← Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API)</a>
+    <a href="data-pipeline-drift.html">Technical #3 · Data Pipeline Quality Drift Detection →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>
