@@ -36,6 +36,9 @@ SOURCES = [
     ("Google", ROOT / "site" / "data" / "google-all-questions.json"),
     # Hand-written guides / longform articles (not scraped from hellointerview)
     ("OpenAI", ROOT / "site" / "data" / "guides.json"),
+    # FDE (Forward Deployed Engineer) curated real interview questions
+    # from Palantir / OpenAI / ElevenLabs / Google FDE reports
+    ("FDE", ROOT / "site" / "data" / "fde-questions.json"),
 ]
 
 def main():

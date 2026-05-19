@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Study #5 · Model Performs Worse Than Manual Process · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Case Study #5 · Model Performs Worse Than Manual Process</div>
+  <h1>Case Study #5 · Model Performs Worse Than Manual Process</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 4 · 🕒 Mid May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">After deployment, the model performs worse than the previous manual process the customer was using. How do you investigate and what do you do?</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"After deployment, the <strong>model performs worse than the previous manual process</strong> the customer was using. How do you investigate and what do you do?"</p></blockquote>
+<p><strong>出处</strong>：fde.academy 列出的"AI deployment 失败诊断"经典题。OpenAI / Google FDE 都常问。</p>
+<p><strong>Round</strong>：Case Study / Deployment Scenario (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>面对 AI deployment 失败时的工程冷静</strong>。AI deployment 失败比成功多。考点：</p>
+<ol><li><strong>Don't panic, don't blame</strong> —— 立刻 reach for "model is bad" 或 "customer integrated wrong" 都是 ego</li><li><strong>First measure, then hypothesize</strong> —— 你拿什么数据来比较 model vs manual?</li><li><strong>5 个 hypothesis class</strong> —— 你能拆出来吗</li><li><strong>De-risk vs Roll back</strong> —— 知道 partial 退回 / kill switch</li><li><strong>Don't avoid 'maybe model is wrong for this task'</strong> —— 这是有可能的, 你愿不愿意诚实说</li></ol>
+<hr />
+<h3>5 个 clarifying questions</h3>
+<p><strong>1. Define "worse"</strong></p>
+<blockquote><p>"What metric is worse — accuracy? Speed? User satisfaction? <strong>Worse for the customer's KPI or for some technical metric we set</strong>?"</p></blockquote>
+<p><strong>2. Worse by how much</strong></p>
+<blockquote><p>"5% worse or 50% worse? In a controlled comparison or anecdotal?"</p></blockquote>
+<p><strong>3. Population overlap</strong></p>
+<blockquote><p>"Is the model handling the <strong>same cases</strong> the manual process did? Or is it triggering on different inputs?"</p></blockquote>
+<p><strong>4. Time since deployment</strong></p>
+<blockquote><p>"How long has it been live? 1 week (still ramping) vs 3 months (stable comparison)?"</p></blockquote>
+<p><strong>5. Customer's actual complaint</strong></p>
+<blockquote><p>"What did the customer <strong>specifically say</strong>? 'Numbers are bad' vs 'one user yelled at me' is very different signal."</p></blockquote>
+<hr />
+<h3>5 个 hypothesis classes (诊断框架)</h3>
+<table class="md-table"><thead><tr><th>Hypothesis</th><th>What's wrong</th><th>Investigation</th></tr></thead><tbody><tr><td><strong>H1: Apple-to-orange comparison</strong></td><td>Model handles harder cases than human did</td><td>Compare on same input distribution</td></tr><tr><td><strong>H2: Distribution shift</strong></td><td>Live data ≠ training data</td><td>Compare train / test / live distributions</td></tr><tr><td><strong>H3: Edge case dominance</strong></td><td>Manual = expert with 20 years intuition handling rare cases. Model trained on bulk cases.</td><td>Stratify by case rarity, see where model fails</td></tr><tr><td><strong>H4: System integration failure</strong></td><td>Model is fine, but upstream feature is broken / latent in prod</td><td>Trace feature pipeline end-to-end</td></tr><tr><td><strong>H5: 真的 model 不行</strong></td><td>Task may need different ML approach</td><td>Compare ML SOTA vs human, look at error analysis</td></tr></tbody></table>
+<p>每个 hypothesis 对应不同 fix。<strong>Don't fix before diagnosing</strong>.</p>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-10 min</td><td>Clarify metric + magnitude + time</td></tr><tr><td>10-25 min</td><td>5 hypothesis classes, propose diagnosis order</td></tr><tr><td>25-40 min</td><td>Pick most likely hypothesis (usually H1 or H3), deep dive investigation</td></tr><tr><td>40-50 min</td><td>Remediation by hypothesis + safeguard</td></tr><tr><td>50-60 min</td><td>Communicate to customer + organizational implication</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"First, I need to scope what 'worse' actually means — <em>[clarifying questions]</em>. Assume <strong>accuracy worse by 8% on customer's primary KPI, 3 months post-deploy, customer says 'numbers are bad'</strong>.</p>
+<p>Before assigning blame, I want to <strong>5-way hypothesize</strong>:</p>
+<p><strong>H1: Apple-to-orange comparison</strong> — manual process was handling 70% of easy cases + escalating hard ones. Model now handles 100%. Of course aggregate looks worse.</p>
+<ul><li><strong>Investigate</strong>: rerun manual process <strong>on the model's hard cases only</strong> (or use historical data). If manual loses to model on hard cases, story changes.</li></ul>
+<p><strong>H2: Distribution shift</strong> — training data was 2 years old, customer's business changed.</p>
+<ul><li><strong>Investigate</strong>: compute KL divergence between training and live features. Check for new categories / values that weren't in training.</li></ul>
+<p><strong>H3: Edge case dominance</strong> — manual = 20-year expert handling 5% rare-but-critical cases perfectly. Model trained on 95% bulk cases, fails on the rare 5%.</p>
+<ul><li><strong>Investigate</strong>: stratify error rate by case rarity. If model is fine on common, terrible on rare, this is it.</li></ul>
+<p><strong>H4: Integration / feature pipeline failure</strong> — model is OK in offline eval, but in prod a feature is missing or stale.</p>
+<ul><li><strong>Investigate</strong>: trace 10 live errors end-to-end. Check feature values vs training distribution. Look for nulls / defaults / encoding bugs.</li></ul>
+<p><strong>H5: 真的 model 不行 for this task</strong> — maybe task is fundamentally hard, manual was a low bar, and our ML choice was wrong.</p>
+<ul><li><strong>Investigate</strong>: error analysis on 100 errors. If errors are correlated and structurally hard, consider that ML may not be the right tool.</li></ul>
+<p><strong>My priority order</strong> (typical):</p>
+<ol><li>Start with <strong>H1 + H3</strong> (5 days) — fastest to investigate, usually reveals truth</li><li>Then <strong>H4</strong> (2 days) — easy to check via tracing</li><li><strong>H2</strong> (3 days) — distributional analysis</li><li><strong>H5</strong> last — only after others ruled out</li></ol>
+<p><strong>Most likely outcome</strong>: <strong>H1 + H3 combo</strong>. Manual was selective + expert-on-rare. Model is comprehensive + average-on-rare.</p>
+<p><strong>Remediation if H1 + H3</strong>:</p>
+<ul><li><strong>Triage routing</strong>: model handles common cases (90% volume, accuracy &gt; manual). Hard cases auto-route to human reviewer (5%) or expert (5%).</li><li><strong>Specialist sub-model</strong>: train second model fine-tuned on rare-but-critical cases.</li><li><strong>Confidence threshold</strong>: model only auto-decides when confidence &gt; X, else escalate.</li><li><strong>Net business outcome</strong>: 90% throughput improvement at 0% accuracy regression on the critical 10%. Customer wins.</li></ul>
+<p><strong>Safeguards while diagnosing</strong>:</p>
+<ul><li><strong>Roll back to manual</strong> for highest-stakes case category immediately while we investigate (1 day to set up)</li><li>Keep model running on low-stakes for telemetry</li><li>Daily standup with customer for first 2 weeks</li></ul>
+<p><strong>Communicating to customer</strong>:</p>
+<ul><li><strong>Day 1: We acknowledge</strong> the issue, we have a diagnosis plan, here's the timeline (2 weeks for full diagnosis).</li><li><strong>Day 7: Interim findings</strong> with most likely hypothesis.</li><li><strong>Day 14: Diagnosis + concrete remediation plan</strong>.</li><li>Never say 'it's working as designed' before diagnosing.</li></ul>
+<p><strong>Two risks to surface</strong>:</p>
+<ul><li><strong>If it's H5</strong> (model genuinely wrong for task), the right answer is <strong>graceful retreat</strong> — partial scope, manual still owns most cases, model assists. Don't double down trying to make ML fit.</li><li><strong>If customer wants instant rollback</strong>, push back: "We can roll back stake-1 today, but full rollback wastes our 6 months of integration. Let me show you 2-week diagnosis path." Buy time."</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent deployment</strong> + <strong>ConvFinQA ablation</strong> 直接 reframe：</p>
+<table class="md-table"><thead><tr><th>题里的情况</th><th>你做过</th></tr></thead><tbody><tr><td>Model worse than manual diagnosis</td><td>ConvFinQA 你做过 9 variant ablation — 都比 control 差！这就是这道题的精确等价</td></tr><tr><td>Apple-to-orange comparison</td><td>ConvFinQA "conditional acc on non-None preds" — 你已经做过这种 trick</td></tr><tr><td>Edge case dominance</td><td>Voice agent ASR 在某些方言上 degrade — 你处理过</td></tr><tr><td>H4: feature pipeline failure</td><td>Voice agent 上线后 latency 漂移 / context window 漏 features 你 debug 过</td></tr><tr><td>Roll back to manual safety</td><td>Voice agent fallback to human agent 你设计过</td></tr><tr><td>Triage routing (model + human)</td><td>Indonesia refund tier 经典 case</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"Funnily this is exactly what happened with my ConvFinQA ablation experiment. I tried 9 variants of common agent patterns — typed lookup, critic, plan tags, all combinations — and <strong>none beat the simple baseline</strong>. I documented it as a negative result. The lesson I took: <strong>before assigning model performance loss to 'model is bad', exhaustively rule out apples-to-orange and integration issues</strong>. In the customer case, I'd run the same 5-hypothesis decomposition with shadow data first."</p></blockquote>
+<p>→ ConvFinQA negative result 在这里成神器 — 真实 deployment 失败诊断经验。</p>
+<hr />
+<h3>5 个 follow-ups</h3>
+<p><strong>Q1</strong>: "Customer demands full rollback today. CFO threatening contract cancellation." <strong>A</strong>: 谈判, 不投降：</p>
+<ul><li>"We hear you. <strong>Stake-1 / safety-critical category rolls back to manual today</strong> (1 day to set up). Lower-stake stays on model so we can keep telemetry to diagnose."</li><li>"If after 2 weeks we can't show concrete improvement plan, we agree to discuss broader rollback. But pulling all 6 months of work in 24 hours is in your interest to avoid too."</li><li>Get this in writing.</li></ul>
+<p><strong>Q2</strong>: "H5 turns out true. Model genuinely worse. Now what?" <strong>A</strong>: <strong>Graceful retreat</strong>, not denial:</p>
+<ul><li>"We were wrong about scope. The model <strong>assists not replaces</strong> the manual process. New goal: 50% volume reduction on bulk cases, 100% volume kept on critical."</li><li>Renegotiate contract terms (consulting fees for ongoing optimization, not SaaS for replacement)</li><li>Add specialist human review tier for cases model is bad at</li><li>Track new KPI: total cost per case, not pure accuracy.</li></ul>
+<p><strong>Q3</strong>: "Model is right but customer hates it because output looks different from human's. Cosmetic problem." <strong>A</strong>: 这是 H4 变种 — UX integration issue, not model issue. 解：</p>
+<ul><li><strong>Format normalization layer</strong>: make model output <strong>look like</strong> human output (rounding, terminology, structure)</li><li><strong>Side-by-side display</strong> in UI for first month so customer can build trust</li><li><strong>Confidence indicators</strong> — show "model 88% sure" so user can intuit when to verify</li><li>通常 2-4 周 fix。<strong>Don't retrain the model</strong>.</li></ul>
+<p><strong>Q4</strong>: "Manual process operator quit. Now there's no 'better' baseline to fall back to." <strong>A</strong>: 紧急但好机会：</p>
+<ul><li><strong>Hire interim contractor for 6 weeks</strong> as fallback while we fix model</li><li>Document operator's decision logic from their case history → <strong>enrich training data</strong></li><li>紧急 retrain on operator's specific decisions</li><li><strong>Don't let "they quit" become "model gets blamed" by default</strong> — establish the model has known issues, set realistic expectations</li></ul>
+<p><strong>Q5</strong>: "Customer wants you to add lots of 'rules' on top of model to fix specific cases." <strong>A</strong>: 危险路。Rules-on-top spreads infinitely + becomes unmaintainable. Better:</p>
+<ul><li><strong>Whitelist concrete failure modes</strong>: 5-10 specific case patterns where manual rule overrides model. Document them. Cap at 20.</li><li><strong>Track override rate</strong>: if &gt; 30% of decisions overridden by rules, the model itself needs retraining, not more rules.</li><li><strong>Sunset rules</strong>: each rule has expiry, retrain model to absorb the rule's intent.</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>立刻 blame model</strong> — 没诊断 jumping to "我们 model 有问题"</li><li><strong>立刻 blame customer</strong> — "你们 integrate 错了" 出口</li><li><strong>没 5 hypothesis 框架</strong> — 没结构化</li><li><strong>跳过 H1 apple-to-orange</strong> — 最常见原因</li><li><strong>没 immediate safeguard</strong> — diagnose 期间不保护 customer</li><li><strong>不敢说 H5</strong> — 永远不承认 model 是错选</li><li><strong>直接 retrain</strong> — 没诊断就 retrain, 大概率没解决根因</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>5-hypothesis decomposition</strong> 完整说出来</li><li><strong>Apple-to-orange first</strong> — 最常 root cause</li><li><strong>Triage routing (model + human)</strong> 作为 H1/H3 standard fix</li><li><strong>Daily standup with customer</strong> 期间</li><li><strong>Graceful retreat plan</strong> for H5</li><li><strong>Negotiate rollback scope</strong> 不全 yield</li><li><strong>Quote ConvFinQA negative result experience</strong></li><li><strong>Sunset rules</strong> — 防 rules-on-top death spiral</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 Hypotheses (diagnose 顺序):
+  H1 Apple-to-orange (manual on easy cases only)
+  H2 Distribution shift  
+  H3 Edge case dominance (expert intuition rare)
+  H4 Integration / feature pipeline fail
+  H5 Model genuinely wrong for task
+
+Priority diagnose:
+  H1 + H3 first (5 days)
+  H4 fast (2 days)
+  H2 medium (3 days)
+  H5 last (only if others rule out)
+
+Standard fix if H1 + H3:
+  - Triage routing (90% common to model, 10% rare to human)
+  - Specialist sub-model on rare cases
+  - Confidence threshold escalation
+
+Customer comms cadence:
+  Day 1: acknowledge + plan
+  Day 7: interim hypothesis
+  Day 14: diagnosis + remediation
+  Daily standup during diagnosis
+
+Safeguard:
+  - Roll back highest-stake category immediately
+  - Keep model on low-stake for telemetry
+  - Kill switch always live
+
+红线 (don't):
+  - Blame customer
+  - Blame model without diagnosis
+  - Retrain blindly
+  - Rules-on-top death spiral
+  - Refuse H5 even if true</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="911-emergency-response.html">← Case Study #1 · 911 Emergency Response Time</a>
+    <a href="multitenant-monitoring-slas.html">Technical #4 · Multi-tenant SaaS Monitoring (Varying SLAs) →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

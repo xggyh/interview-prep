@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Study #4 · Legacy ERP Without API Layer · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Case Study #4 · Legacy ERP Without API Layer</div>
+  <h1>Case Study #4 · Legacy ERP Without API Layer</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 3 · 🕒 Early May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Integrate your AI platform with a 15-year-old on-premise ERP system that lacks an API layer. What's your approach?</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Integrate your AI platform with a <strong>15-year-old on-premise ERP</strong> system that <strong>lacks an API layer</strong>. What's your approach?"</p></blockquote>
+<p><strong>出处</strong>：fde.academy 经典 deployment scenario。Salesforce / Palantir / Databricks 都问过。</p>
+<p><strong>Round</strong>：Case Study (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>真实企业部署经验</strong>。Enterprise customer 90% 都有 legacy 系统。考点：</p>
+<ol><li><strong>You don't write your own ETL from scratch as plan A</strong> —— 是不是真做过 enterprise deployment</li><li><strong>5 个 integration patterns 你知道几个</strong> —— file drop, DB direct read, screen scraping, ESB, CDC</li><li><strong>Politics</strong>：legacy ERP 通常 IT team 不让动. 怎么 navigate</li><li><strong>Risk staging</strong>：read-only first, write much later</li></ol>
+<hr />
+<h3>5 个 clarifying questions</h3>
+<p><strong>1. What ERP</strong></p>
+<blockquote><p>"Which ERP — SAP R/3, Oracle EBS, JDE, custom Java? Each has different escape hatches."</p></blockquote>
+<p><strong>2. What data do we actually need</strong></p>
+<blockquote><p>"Read-only or read-write? Real-time, hourly, or daily-fresh enough? Volumes — 1k records or 1M?"</p></blockquote>
+<p><strong>3. What can IT actually allow</strong></p>
+<blockquote><p>"Has IT explicitly said no-API in writing? Or is it 'no one's built it'? Can they expose a <strong>read-only DB replica</strong>? VPN access? File drop on SFTP?"</p></blockquote>
+<p><strong>4. SLA / regulatory</strong></p>
+<blockquote><p>"Is this regulated data (PII / financial / healthcare)? What's the data residency requirement?"</p></blockquote>
+<p><strong>5. Current pain</strong></p>
+<blockquote><p>"How does the business currently get this data <strong>for any other system</strong>? There's almost always an existing CSV-export-to-shared-drive workflow we can piggyback on."</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-10 min</td><td>Clarify + understand current data flow inside customer</td></tr><tr><td>10-25 min</td><td>5 integration patterns, <strong>rank by ETA-to-ship + risk</strong></td></tr><tr><td>25-40 min</td><td>Recommend pattern + design data flow</td></tr><tr><td>40-50 min</td><td>Failure modes + how to convince IT</td></tr><tr><td>50-60 min</td><td>Phasing read-only → write</td></tr></tbody></table>
+<hr />
+<h3>5 个 integration patterns（必须知道）</h3>
+<table class="md-table"><thead><tr><th>Pattern</th><th>速度</th><th>风险</th><th>适用</th></tr></thead><tbody><tr><td><strong>1. Direct DB read (replica)</strong></td><td>Fast (real-time)</td><td>低 if read-only replica</td><td>ERP 有 DB replica</td></tr><tr><td><strong>2. File drop (SFTP, CSV/XML)</strong></td><td>Slow (daily)</td><td>极低</td><td>IT 不让你直连任何东西</td></tr><tr><td><strong>3. Change Data Capture (CDC)</strong></td><td>Real-time</td><td>中 (需 DBA 配合)</td><td>DB binlog 能 expose</td></tr><tr><td><strong>4. ESB / message bus (TIBCO, MQ)</strong></td><td>Real-time</td><td>中 (已有 bus)</td><td>大企业有现成 ESB</td></tr><tr><td><strong>5. Screen scraping (RPA - UiPath/Automation Anywhere)</strong></td><td>Slow</td><td>高 (脆弱 + 维护噩梦)</td><td><strong>绝对最后选项</strong>，但有时 IT 只允许这个</td></tr><tr><td><strong>6. Build a thin API wrapper</strong></td><td>Slow ramp-up</td><td>中</td><td>你 own infra, 但需 IT signoff</td></tr></tbody></table>
+<p><strong>STAFF/FDE 答</strong>：永远<strong>先试 pattern 1 + 2</strong>（read-only DB + file drop），ramp 到 3 (CDC) for real-time，never 5 unless desperate。</p>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"First, clarifying — <em>[问 5 questions]</em>. Assume <strong>SAP R/3, read-only access needed, daily-fresh OK, IT says no direct API but open to discussion</strong>.</p>
+<p><strong>My approach is 3-phase</strong>:</p>
+<p><strong>Phase 1 (Week 1-2): File drop baseline + value demo</strong></p>
+<ul><li>SAP already exports nightly CSVs to a shared SFTP for the BI team — confirm this in week 1</li><li>We <strong>piggyback on that existing export</strong> — read CSV via batch ETL, ingest to our platform</li><li>Daily refresh, last-day-stale OK for v1</li><li><strong>Deliver visible value within 2 weeks</strong>: dashboard / first AI insight that customer didn't have before</li></ul>
+<p><strong>Phase 2 (Month 2-3): Pursue read-only DB replica</strong></p>
+<ul><li>With Phase 1 winning, <strong>revisit IT conversation</strong> with leverage: "you've seen the value, can we accelerate to near-real-time?"</li><li>Ask for <strong>read-only replica of the SAP schema</strong> — DBAs are usually willing to set up a 30-min-lag replica</li><li>We connect to replica directly, no impact on prod ERP</li><li>Latency drops from 24h to 30min</li></ul>
+<p><strong>Phase 3 (Month 4-6): CDC for real-time use cases</strong></p>
+<ul><li>For specific use cases needing &lt; 5min latency, set up CDC (e.g., Debezium reading SAP database log)</li><li>This requires deeper IT collaboration but <strong>business case is now strong</strong></li></ul>
+<p><strong>Pattern selection logic</strong>:</p>
+<ul><li>File drop &gt; API for politics: "we read what BI already reads" is unobjectionable</li><li>DB replica &gt; API for capacity: APIs require IT to build; replica is "give us a connection string"</li><li>CDC &gt; polling for real-time: scales to millions of records</li><li><strong>Never screen-scrape SAP</strong> — UI changes break weekly, becomes unmaintainable</li></ul>
+<p><strong>Failure modes</strong>:</p>
+<ul><li>SAP schema undocumented — many tables, cryptic column names. <strong>Get SAP analyst time</strong> to map.</li><li>Soft-deletes vs hard-deletes — ERP has both, miss the wrong one and your data is stale.</li><li>Joins across modules — SAP HR + FI + MM modules don't link cleanly. Need domain-specific glue.</li><li>Timezone bugs — global ERP across regions, timestamps mixed.</li></ul>
+<p><strong>Convincing IT</strong> (the actual hard part):</p>
+<ul><li><strong>Start with they can already do</strong> (read CSV they already produce)</li><li><strong>Show value before asking for more</strong></li><li><strong>Offer reciprocal value</strong> to IT — e.g., we'll write back error reports that help their data quality</li><li><strong>Get their head-of-data on our side</strong> before going to CIO</li><li><strong>Sign data processing agreement</strong> (DPA) upfront — IT loves paperwork that protects them</li></ul>
+<p><strong>Two scope risks</strong>:</p>
+<ul><li><strong>Write-back to SAP is 10x harder than read</strong> — promise read-only for v1, revisit write-back after 6mo</li><li><strong>Master data management problem</strong> — if customer has 'who is a customer' inconsistent across SAP / Salesforce / Snowflake, <strong>that's a 6-month MDM project before we can do anything useful</strong>. Identify early."</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>BNPL chatbot</strong> + <strong>voice agent</strong> 都涉及 enterprise integration：</p>
+<table class="md-table"><thead><tr><th>Legacy ERP 题</th><th>你的经验</th></tr></thead><tbody><tr><td>Integrate without official API</td><td>BNPL chatbot 跨 ByteDance 内部多系统</td></tr><tr><td>Read-only replica → CDC ramp</td><td>Voice agent 接 7 markets repayment system 你做过类似</td></tr><tr><td>Politics with IT team</td><td>你跨 product / ops / regional 7 markets, 政治经验丰富</td></tr><tr><td>Phase 1 visible value</td><td>Refund tier scoping — "70% throughput at 0% risk" 同款 pattern</td></tr><tr><td>Don't screen-scrape</td><td>Voice agent ASR/TTS 真接生产 system, 不靠 UI hack</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"I've seen this exact shape at ByteDance Global Payment — we needed to integrate the voice agent with regional repayment systems that ranged from modern microservices in Singapore to <strong>15-year-old monolith in one market</strong>. We started with <strong>CSV exports the BI team already had</strong>, deployed v1 in 2 weeks, then later upgraded that one market to CDC via Debezium once we had political capital. The lesson I'd carry forward: <strong>velocity-of-value beats elegance — ship the ugly thing first</strong>."</p></blockquote>
+<p>→ 你有真做过 legacy integration 的 deployment 经验，比 90% candidate 强。</p>
+<hr />
+<h3>5 个 follow-ups</h3>
+<p><strong>Q1</strong>: "IT 团队完全拒绝任何 DB access，只能 file drop。" <strong>A</strong>: Fine. File drop scaling tactics:</p>
+<ul><li><strong>Frequency</strong>: negotiate from daily → hourly → 15-min. Each level needs different DB load justification.</li><li><strong>Compression + diff</strong>: only push changed rows (cdc-like behavior over files).</li><li><strong>Acknowledgment loop</strong>: SFTP file with <code>.lock</code> → <code>.ready</code> pattern so we don't read partial files.</li></ul>
+<p>15-min file drop covers 95% of "real-time" use cases.</p>
+<p><strong>Q2</strong>: "We need write-back to SAP. How risky?" <strong>A</strong>: Very. SAP writes can corrupt ERP state, trigger downstream finance integrity issues, and CFO's career risk. Pattern:</p>
+<ul><li><strong>Never direct DB write</strong> — use SAP's official IDoc / RFC / BAPI interface, even if it's slower.</li><li><strong>Stage in our system first, batch push</strong> to ERP with reconciliation log.</li><li><strong>Compensating transaction design</strong> — every write has a known-rollback step.</li><li><strong>Pilot with 1 specific transaction type</strong> (e.g., purchase order status) for 60 days before expanding.</li></ul>
+<p><strong>Q3</strong>: "SAP analyst time is unavailable to map schema. Stuck." <strong>A</strong>: 3 options:</p>
+<ol><li><strong>Reverse-engineer from CSV exports</strong> — what data shapes are already coming out? Use that as truth.</li><li><strong>Hire a 3rd-party SAP consultant</strong> (3-day engagement, $5k) to map the 20 tables we care about.</li><li><strong>Pay client's BI vendor</strong> (whoever maintains BI today) to give us their schema docs.</li></ol>
+<p>This is <strong>a budget question, not a technical question</strong>.</p>
+<p><strong>Q4</strong>: "Customer wants us to upgrade their ERP itself. Scope explosion?" <strong>A</strong>: Hard no. 政治 + 技术 + 时间都不允许。Frame:</p>
+<ul><li>"Upgrading SAP is a 2-year, $5M project that needs an SI partner. We're not that vendor. We can <strong>make your old SAP look modern from the AI side</strong> without touching SAP itself."</li><li>Offer to <strong>introduce them to an SI partner</strong> for ERP modernization — get goodwill without owning that risk.</li></ul>
+<p><strong>Q5</strong>: "How do you handle SAP schema changes mid-deployment?" <strong>A</strong>:</p>
+<ul><li><strong>Schema versioning</strong>: tag each ingest with SAP schema version (e.g., date of last DDL change). Customer notifies us before changes.</li><li><strong>Backward-compatible reads</strong>: our ingestion code handles N and N-1 schemas, sunsets old after 90 days.</li><li><strong>Schema diff alerts</strong>: nightly cron diffs DB schema, alerts to FDE.</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>直接说"build an API for them"</strong> — 6 个月项目当 deployment 卖</li><li><strong>Screen-scraping 当主方案</strong> — fragile + maintenance nightmare</li><li><strong>忽略 IT politics</strong> — 技术方案再好，IT 不让也白搭</li><li><strong>Read 跟 write 不区分</strong> — write-back 风险量级不同</li><li><strong>没 phasing</strong> — 直接上 CDC，IT 直接 block</li><li><strong>MDM 问题忽略</strong> — 客户内部数据不一致是部署 blocker</li><li><strong>没 quick win 概念</strong> — 6 个月才 deliver value, 客户已经放弃</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Piggyback on existing BI export</strong> — minimum IT effort, fast value</li><li><strong>5 patterns 排序 by velocity + risk</strong> 主动 say out</li><li><strong>Phase 1 value before asking for more</strong> — political capital strategy</li><li><strong>Compensating transaction for write-back</strong> — show production safety mindset</li><li><strong>MDM identified as 6mo blocker</strong> — surface real risk</li><li><strong>Refer SAP SI partner for upgrade</strong> — politically savvy</li><li><strong>Quote your TikTok experience</strong> — 15-year-old monolith integration</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 integration patterns ranked:
+  1. File drop (existing BI export) - fastest, lowest risk
+  2. Read-only DB replica - moderate
+  3. CDC (Debezium / native log) - real-time read
+  4. ESB (TIBCO/MQ) - if customer has bus
+  5. Custom API wrapper - slow ramp-up
+  X. Screen-scraping - NEVER unless desperate
+
+3-phase rollout:
+  Phase 1 (2 wk): File drop, daily, visible value
+  Phase 2 (2 mo): Read-only replica, 30min lag
+  Phase 3 (4 mo): CDC for real-time use cases
+
+Politics tactics:
+  - Piggyback on what IT already does
+  - Show value before asking for more
+  - Get DBA / data lead as ally first
+  - Offer reciprocal value (data quality fix)
+  - DPA / paperwork upfront
+
+Write-back:
+  - Never direct DB
+  - IDoc / RFC / BAPI only
+  - Stage + batch + reconciliation
+  - Compensating transactions
+  - Pilot 1 transaction type, 60 days
+
+红线:
+  - Don't screen-scrape
+  - Don't promise ERP upgrade
+  - Don't promise write-back v1
+  - Don't ignore MDM if data inconsistent</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="healthcare-12pct-adoption.html">← Case Study #3 · Healthcare 12% Adoption Diagnosis</a>
+    <a href="oauth-crm-platform-integration.html">Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API) →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

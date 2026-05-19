@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Study #1 · 911 Emergency Response Time · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / FDE / Case Study #1 · 911 Emergency Response Time</div>
+  <h1>Case Study #1 · 911 Emergency Response Time</h1>
+  <div class="header-meta">
+    <span class="tag tag-fde">FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="https://fde.academy/blog/forward-deployed-engineer-interview-questions" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#dc2626"><strong>FDE</strong> · Senior+ · 📋 8 · 🕒 Mid May, 2026</span></div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">[Palantir 经典原版] A major city wants to use our platform to reduce 911 emergency response times. They have call data, traffic data, and ambulance GPS data. You have 60 minutes. Go.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"A major city wants to use our platform to <strong>reduce 911 emergency response times</strong>. They have <strong>911 call data, traffic data, and ambulance GPS data</strong>. You have <strong>60 minutes</strong>. Go."</p></blockquote>
+<p><strong>出处 / 公司</strong>：<strong>Palantir 经典原版</strong>（FDE 这个 round 的"始祖"）。后被 OpenAI / Google / Salesforce / Databricks 全部复用。多个候选人在 Glassdoor / Medium / fde.academy 公开 report。</p>
+<p><strong>Round</strong>：Case Study / Decomposition（30-60 min，single-question）</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>：考你"做出一个 911 系统的方案"。 <strong>是</strong>：考你<strong>面对一个庞大、模糊、含多个数据源的真实客户问题，能不能在 60 min 内做出 structured decomposition + propose tractable MVP + surface tradeoffs</strong>。</p>
+<p>3 个评分轴：</p>
+<ol><li><strong>Clarify before solving</strong> —— 一上来就画图、写代码 = 失分。FDE 圈一个共识："Jumping to answers is an immediate red flag"</li><li><strong>Tractable MVP</strong> —— 你能从一个无边界问题里切出一个<strong>3 周能交付 + 测得到 KPI</strong>的最小版本</li><li><strong>Surface tradeoffs proactively</strong> —— 在面试官追问前就主动说"这个方案的失败模式是 X / Y / Z"</li></ol>
+<hr />
+<h3>一上来必问的 5 个 clarifying questions</h3>
+<p><strong>1. Stakeholders &amp; success metric</strong></p>
+<blockquote><p>"Who's the buyer — the mayor's office? Police? Fire department? And what's their <strong>single KPI</strong>? Average response time? P99 response time? Response time for a specific call category like cardiac arrest?"</p></blockquote>
+<p><strong>为什么问</strong>：每个 stakeholder 的 metric 不一样。Police 关心 violent crime 响应；fire 关心 structure fire 响应；mayor's PR 关心 average。<strong>先锁 KPI</strong>，不然后面所有 design 都飘。</p>
+<p><strong>2. Constraints</strong></p>
+<blockquote><p>"What's the <strong>integration constraint</strong> — do we have read access to dispatch system, or just batch dumps overnight? Real-time GPS feed from ambulances, or 5-min sampled? Is the city willing to deploy on our cloud, or strict on-premise?"</p></blockquote>
+<p><strong>为什么问</strong>：FDE 是 deployment 工程师，不是 research scientist。data freshness + integration mode 决定整个 architecture 是 batch ETL vs streaming。</p>
+<p><strong>3. Baseline</strong></p>
+<blockquote><p>"What's the <strong>current</strong> average response time? And what's the city's stated target — 10% improvement, or moonshot 50%?"</p></blockquote>
+<p><strong>为什么问</strong>：no baseline = no eval。10% 改进 (统计 noise above threshold) 跟 50% 改进 (要换 dispatch policy 那种级别) 是完全不同的项目 scope。</p>
+<p><strong>4. Scope of platform</strong></p>
+<blockquote><p>"When you say 'our platform' — are we <strong>dispatch software</strong> (operator picks an ambulance), or <strong>predictive routing</strong> (real-time traffic-aware route), or <strong>resource pre-positioning</strong> (where to park idle ambulances)?"</p></blockquote>
+<p><strong>为什么问</strong>：60 min 内做不完全部。<strong>Force the interviewer to scope you down</strong>。</p>
+<p><strong>5. Failure mode tolerance</strong></p>
+<blockquote><p>"What's the <strong>cost of a wrong prediction</strong>? If we route an ambulance through traffic that turns bad mid-route, what's the fallback?"</p></blockquote>
+<p><strong>为什么问</strong>：emergency response is <strong>safety-critical</strong>。失败一次进新闻。<strong>Risk appetite 决定 model 类型</strong>（lookup-table baseline vs ML 模型 vs hybrid）。</p>
+<hr />
+<h3>5 步框架（60 min 时间分配）</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th><th>要做什么</th></tr></thead><tbody><tr><td>0-10 min</td><td><strong>Clarify + scope</strong></td><td>上面 5 个问题，把范围 narrow 到 1 个具体子问题（e.g. "real-time predictive routing for ambulance dispatch"）</td></tr><tr><td>10-25 min</td><td><strong>Architecture sketch</strong></td><td>3 个 components：data ingestion / decision engine / dispatcher integration</td></tr><tr><td>25-40 min</td><td><strong>Deep dive 1 component</strong></td><td>选最难的 1 个（通常是 decision engine + 实时 traffic）展开讲</td></tr><tr><td>40-50 min</td><td><strong>Failure modes + measurement</strong></td><td>"这个 design 怎么挂"、KPI 怎么测、 dispatcher 怎么 trust</td></tr><tr><td>50-60 min</td><td><strong>Phasing + scope reduction</strong></td><td>90-day MVP 应该长什么样、phase 2/3 是什么</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample 完整 monologue）</h3>
+<blockquote><p>"Before diving in, let me ask 5 things — <em>[问 5 clarifying questions, 假设面试官回应：mayor's KPI = average response time, target = 15% reduction in 12 months, real-time GPS + 5-min traffic, scope = predictive routing not pre-positioning]</em>.</p>
+<p>OK so the problem is <strong>real-time predictive routing</strong>: given an incoming 911 call with location + category, route the optimal ambulance with optimal path, factoring current traffic.</p>
+<p><strong>Architecture is 3 layers</strong>:</p>
+<ol><li><strong>Ingest</strong> — 3 streams: 911 calls (sub-second, push), ambulance GPS (1Hz pull), traffic feed (5-min batch).</li><li><strong>Decision engine</strong> — for each new call: (a) candidate ambulances = those within 5km radius + not currently transporting; (b) ETA estimator per (ambulance, call) pair using current traffic graph; (c) pick min-ETA dispatch.</li><li><strong>Dispatcher integration</strong> — push recommendation to existing CAD (computer-aided dispatch) system, <strong>suggest don't replace</strong>. Human dispatcher confirms or overrides.</li></ol>
+<p><strong>The hard part is the ETA estimator under traffic uncertainty</strong>. I'd start with a <strong>simple shortest-path on the road graph weighted by current avg speed</strong> as v0 baseline. Run it for 4 weeks shadow-mode — predictions logged but not surfaced to dispatchers — and measure prediction error against actual transit times. If MAE is acceptable (say &lt;90 seconds), graduate to live recommend. If not, layer in an ML model that learns time-of-day / weather / event corrections.</p>
+<p><strong>Failure modes I'd preemptively address</strong>:</p>
+<ul><li>Model recommends ambulance A but A is unavailable for human reason (radio down, crew swap) — fallback to dispatcher's manual pick within 5 seconds.</li><li>Traffic feed stale → degrade gracefully to no-traffic shortest path (don't fail closed).</li><li>Edge case: cardiac arrest call where time matters in absolute terms — bypass ML, use deterministic nearest-available.</li><li>'Distrust dispatcher' problem: if dispatchers don't trust the rec, they ignore it. Track override rate as a North Star metric.</li></ul>
+<p><strong>Measurement</strong>: in-flight A/B isn't ethical (denying half the city the improvement), so we'd do <strong>before/after with comparable-period control</strong> (last year's response times for same months/categories), measuring p50 and p99 response time, plus override rate.</p>
+<p><strong>Phasing</strong>:</p>
+<ul><li>Phase 1 (0-3 mo): shadow-mode predictions, no dispatcher impact, baseline data</li><li>Phase 2 (3-6 mo): opt-in recommend to top-quartile dispatchers (volunteer)</li><li>Phase 3 (6-12 mo): default-on, dispatchers override if needed</li></ul>
+<p>I'd want to flag <strong>two scope risks</strong>: (1) data quality on ambulance GPS — if it's unreliable we're cooked; (2) political — the city's existing dispatch vendor will resist us replacing them. I'd want a pre-engagement with their CTO before we commit to a timeline."</p></blockquote>
+<p>⏱️ ~5 minutes spoken。剩下 55 分钟交给面试官 deep-dive 任何 component。</p>
+<hr />
+<h3>简历专属 reframe（Gao Xin 简历专用）</h3>
+<p>你的 <strong>debt collection voice agent</strong> 项目跟这道题<strong>结构上高度同构</strong>：</p>
+<table class="md-table"><thead><tr><th>911 题</th><th>你的 voice agent</th></tr></thead><tbody><tr><td>Multi-source data (calls / traffic / GPS)</td><td>Multi-source data (customer profile / call history / repayment status)</td></tr><tr><td>Real-time decision under time pressure</td><td>Real-time conversation under latency pressure (p99 &lt; 800ms streaming)</td></tr><tr><td>Stakeholder mismatch (mayor vs police vs fire)</td><td>Stakeholder mismatch (legal vs ops vs product across 7 markets)</td></tr><tr><td>Safety-critical, fallback to human</td><td>Trust-critical, fallback to human agent</td></tr><tr><td>Hard to A/B (ethics)</td><td>Cross-market A/B testing — 你做过</td></tr><tr><td>Shadow-mode → opt-in → default-on phasing</td><td>RL alignment 你也是 phase-by-phase 上的</td></tr></tbody></table>
+<p><strong>面试时可以主动说</strong>：</p>
+<blockquote><p>"Actually this problem structure mirrors something I just shipped — a voice AI agent for debt collection across 7 markets. Same shape: multi-source data, real-time decision, safety-critical with human fallback, hard to A/B because the controlled-experiment is ethically tricky. I used a <strong>shadow-mode → opt-in → default-on phasing</strong> for that rollout, which I'd reuse here."</p></blockquote>
+<p>→ 这一招立刻把你从"FDE candidate"升级到"FDE who has already done this in production"。</p>
+<hr />
+<h3>5 个常见 follow-ups</h3>
+<p><strong>Q1</strong>: "What if the city has bad GPS data on ambulances — 30% of pings are stale?" <strong>A</strong>: 先 measure stale rate per ambulance per time-of-day → identify if it's vehicle-specific (broken hardware) vs systematic (e.g., GPS dead in tunnels). For systematic gaps, layer in <strong>dead reckoning</strong> (last known position + heading × elapsed time). For broken hardware, flag to ops for fleet remediation. Model itself: degrade to "any nearby available ambulance" if stale rate &gt; 50% in that region.</p>
+<p><strong>Q2</strong>: "Mayor wants results in 6 weeks not 12 months." <strong>A</strong>: 时间压缩 → narrow scope。6 周做不完 ML routing，但能做<strong>dashboard + manual decision support</strong>：把"哪辆 ambulance 在哪 / 当前 traffic 怎样 / 推荐谁出动"实时给 dispatcher 看，<strong>还是 dispatcher 决定</strong>。这是 deterministic + transparent，6 周可行。Mayor 还是能 announce "AI-assisted dispatch saving lives"。<strong>逆向 scope 是 FDE 核心技能</strong>。</p>
+<p><strong>Q3</strong>: "How do you avoid getting the city sued when an ambulance is misrouted?" <strong>A</strong>: 3 个 legal-safe defaults：</p>
+<ol><li><strong>Recommendation, not decision</strong> — dispatcher always has final call, audited.</li><li><strong>Conservative threshold</strong> — recommend only when model confidence &gt; 80%, fall back to traditional dispatch otherwise.</li><li><strong>Full audit log</strong> — every recommendation + override + outcome logged immutable for legal review.</li></ol>
+<p><strong>Q4</strong>: "City's dispatch vendor (e.g., RapidDeploy) doesn't want to integrate. What do you do?" <strong>A</strong>: This is <strong>the actual blocker</strong>, not technical. 3 options:</p>
+<ol><li><strong>Side-car</strong>: read-only access to dispatch logs, recommendations shown in separate UI to dispatcher. Vendor doesn't have to change anything.</li><li><strong>Vendor partnership</strong>: bring vendor in as joint go-to-market partner, give them rev share.</li><li><strong>City RFP</strong>: get city to mandate API access in vendor renewal. Slow but durable.</li></ol>
+<p>Most FDE situations end up as #1 (side-car) — minimizes vendor politics.</p>
+<p><strong>Q5</strong>: "If the model performs worse than dispatchers' intuition, what do you do?" <strong>A</strong>: First — <strong>don't take it personally</strong>. Dispatchers have years of context. The right framing is "the model is a 90th-percentile assistant for a 95th-percentile expert" — useful for the 10% of cases where the expert is new / tired / stressed, harmful if it overrides the expert in normal cases. So: track <strong>override rate vs outcome</strong> carefully. If overrides have better outcomes than non-overrides, <strong>the model needs retraining on the dispatcher's decisions</strong>, not deployment.</p>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>一上来就画 architecture</strong> — 没 clarify，方案脱离 stakeholder 实际需求。</li><li><strong>把它当 system design 题做</strong> — 算 QPS / DB shard。不是这道题在考的。</li><li><strong>忽略 dispatcher 这个角色</strong> — 把人类完全 cut out 是 safety-critical 系统的红旗。</li><li><strong>没说 phasing</strong> — "6 个月一次性上线"在 FDE 面试官眼里 = 没部署过任何东西。</li><li><strong>忽略数据质量</strong> — 假设 GPS / traffic 完美。<strong>FDE 全职在跟脏数据死磕</strong>。</li><li><strong>不主动 surface failure modes</strong> — 等面试官追问 = 失分。</li><li><strong>答案太长，没给面试官追问的空间</strong> — 6-7 分钟讲完，剩下 50 分钟 deep-dive，是节奏目标。</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Shadow-mode → opt-in → default-on phasing</strong> 主动提</li><li><strong>Override rate as a North Star metric</strong> ——把"用户信任"量化成 metric</li><li><strong>Side-car integration pattern</strong> 应对 vendor 政治</li><li><strong>Legal-safe defaults</strong>（recommendation not decision / audit log）</li><li><strong>Dead reckoning</strong> 处理 GPS gap — 体现你处理过脏数据</li><li><strong>Before/after with same-period control</strong> 替代 A/B 因为 ethics</li><li><strong>Quote a real number from your past work</strong> — 用 voice agent 的具体经验加权重</li></ol>
+<hr />
+<h3>11. Cheat sheet (面前 5 min 看)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 上来画图 / 算 QPS
+  - 假设你知道 stakeholder
+  - 一次讲完整方案，留空白
+
+要做:
+  1. 5 个 clarifying 问题先问
+  2. Scope 到一个 sub-problem
+  3. 3-layer architecture sketch
+  4. Deep dive 1 component
+  5. Surface failure modes 主动
+  6. Phasing: shadow → opt-in → default
+
+关键 phrases:
+  - "Let me ask a few things before designing..."
+  - "I'd narrow this to..."
+  - "Before being asked, I want to flag..."
+  - "This mirrors something I shipped at TikTok..." (用 voice agent)
+  - "I'd phase this..."
+
+数字 anchors (随机选 2-3 个引用):
+  - 4 周 shadow mode
+  - MAE &lt; 90s for ETA
+  - 80% model confidence threshold
+  - Override rate &lt; 30% target</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="g-openai-fde-takehome-convfinqa.html">← OpenAI FDE Take-home Walkthrough — ConvFinQA Agent</a>
+    <a href="model-worse-than-manual.html">Case Study #5 · Model Performs Worse Than Manual Process →</a>
+  </div>
+</main>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

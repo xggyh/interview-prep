@@ -18,15 +18,18 @@ LEGACY_JSON = ROOT / "openai-interview-questions.json"
 QUESTIONS_JSON = UNIFIED_JSON if UNIFIED_JSON.exists() else LEGACY_JSON
 
 # Company display order on the index page
-COMPANY_ORDER = ["OpenAI", "Google"]
+COMPANY_ORDER = ["FDE", "OpenAI", "Google"]
 
 # Per-company brand color (used for the company badge tint)
 COMPANY_COLOR = {
+    "FDE":    "#dc2626",   # FDE red (Palantir/OpenAI/Google composite)
     "OpenAI": "#10a37f",   # OpenAI green
     "Google": "#4285f4",   # Google blue
     "Meta":   "#1877f2",
     "Amazon": "#ff9900",
     "Anthropic": "#d97706",
+    "Palantir": "#000000",
+    "ElevenLabs": "#7c3aed",
 }
 
 # Questions that have been rewritten in extended teaching-style depth.
@@ -334,6 +337,7 @@ def parse_comments(comments_raw: str):
 def render_index(questions, type_groups, company_groups, recency_sorted):
     """Render index.html with company + type filters."""
     types_meta = [
+        ("FDE", "FDE（Forward Deployed Engineer 真题 + reframe）"),
         ("Guide", "Guide（专题文章）"),
         ("Coding", "Coding 题（算法 / LLD 编码）"),
         ("System Design", "System Design 题（架构设计）"),
@@ -777,11 +781,12 @@ def main():
     for i, q in enumerate(recency_sorted):
         slug_id = q["slug"].rsplit("/", 1)[-1]
         raw_path = RAW_DIR / f"{slug_id}.json"
-        if not raw_path.exists():
-            print(f"  no raw data for {slug_id}; skipping")
-            continue
-        with open(raw_path) as f:
-            raw = json.load(f)
+        if raw_path.exists():
+            with open(raw_path) as f:
+                raw = json.load(f)
+        else:
+            # FDE / Guide entries — no scraped raw page. Render from q only.
+            raw = {}
         analysis_path = ANALYSES_DIR / f"{slug_id}.md"
         analysis_md = analysis_path.read_text(encoding="utf-8") if analysis_path.exists() else ""
         prev_q = recency_sorted[i - 1] if i > 0 else None
