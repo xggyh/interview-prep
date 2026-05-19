@@ -31,7 +31,99 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Client <strong>demands a 6-week feature delivered in 3 days</strong>. Manage expectations without losing the relationship."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 客户模拟. 几乎所有 enterprise SaaS FDE 都遇到.</p>
+<p><strong>Round</strong>：Client Simulation (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>scope negotiation + 拒绝艺术</strong>：</p>
+<ol><li><strong>不能直接说 no</strong> —— 杀关系</li><li><strong>不能直接说 yes</strong> —— 杀团队</li><li><strong>Decompose</strong> the ask 找 what they really need</li><li><strong>Tradeoff transparency</strong> —— 给客户做选择, 不替他们做</li><li><strong>Counter-offer</strong> with phased delivery</li></ol>
+<hr />
+<h3>黄金 framework：D·D·O·C</h3>
+<table class="md-table"><thead><tr><th>Step</th><th>What</th><th>Sample line</th></tr></thead><tbody><tr><td><strong>D</strong></td><td><strong>Deeper why</strong></td><td>"Help me understand the urgency — what happens on day 4 if this isn't ready?"</td></tr><tr><td><strong>D</strong></td><td><strong>Decompose</strong></td><td>"Of the 6-week scope, what's the <strong>must-have-on-day-3</strong> vs nice-to-have?"</td></tr><tr><td><strong>O</strong></td><td><strong>Offer phased</strong></td><td>"Here's what I think is feasible: Tier 1 in 3 days (covers your urgent need), Tier 2 in 2 weeks, Tier 3 in 6 weeks."</td></tr><tr><td><strong>C</strong></td><td><strong>Commit specifically</strong></td><td>"By Thursday 5pm I'll have Tier 1 demoed. Want my CTO to send written commitment?"</td></tr></tbody></table>
+<hr />
+<h3>5 个 "do say"</h3>
+<p>✅ "Help me understand what happens on day 4" → reveals real driver ✅ "If we shipped only 30% in 3 days, would that cover the critical use case?" → opens decomposition ✅ "Here are 3 options with tradeoffs..." → put choice on them ✅ "I want to be honest — if we promise 6w in 3d, we'll ship buggy work that we'll spend the next 3 weeks fixing" → transparent risk ✅ "Can we get your team to do X part, so my team can focus on Y?" → joint ownership</p>
+<hr />
+<h3>5 个 "do not say"</h3>
+<p>❌ "That's not possible" → relationship-ender, doesn't open dialog ❌ "Let me check with engineering" → punt, slow, looks weak ❌ "We'll try our best" → commitment by ambiguity, sets up failure ❌ "If we work weekends..." → heroics promise, sets unsustainable precedent ❌ "Your timeline is unreasonable" → blames customer</p>
+<hr />
+<h3>Sample script</h3>
+<blockquote><p><em>[Client: "I need the multi-tenant analytics dashboard by Thursday — 3 days from now."]</em></p>
+<p>"OK, I hear you on the urgency. Two quick questions before I propose something:</p>
+<ol><li>Help me understand what's driving Thursday — is there a specific meeting / customer commitment / board deadline?</li></ol>
+<p><em>[Client: "I'm presenting Q3 wins to the CFO Thursday. I need to show analytics."]</em></p>
+<ol><li>Of the full analytics dashboard (multi-tenant, drill-down, exports, alerts, scheduled reports), <strong>what's the absolute minimum that gets you through Thursday's CFO meeting</strong>?</li></ol>
+<p><em>[Client: "Just showing total volume + revenue per customer for top 10 customers, in a chart."]</em></p>
+<p>Got it. So the <strong>must-have-for-CFO</strong> is a clean visualization of 10 numbers, not the full feature. Let me propose 3 options:</p>
+<p><strong>Option A (3 days)</strong>: Single-tenant view of top-10 customer volume + revenue, exported to a Looker dashboard. Not the full multi-tenant analytics, but <strong>CFO won't know the difference for Thursday</strong>. Estimated cost: 2 engineer-days.</p>
+<p><strong>Option B (2 weeks)</strong>: Above + per-customer drill-down + 1-month historical. Better, but not Thursday-feasible.</p>
+<p><strong>Option C (6 weeks)</strong>: Full original scope. The right long-term answer.</p>
+<p><strong>My recommendation</strong>: Option A for Thursday, then we de-prioritize a less urgent feature on our roadmap to start B+C immediately. CFO gets her meeting, we don't ship rushed multi-tenant code that haunts us.</p>
+<p>One ask back: <strong>can your data team provide a CSV of the 10 customer aggregates by tomorrow EOD</strong>? That lets us focus on visualization, not data plumbing.</p>
+<p>If you go with Option A, I'll have it demoed by Thursday morning, plenty of buffer for CFO afternoon. <strong>Want my CTO to send written commitment by EOD today?</strong>"</p></blockquote>
+<p>⏱️ ~5 min conversation.</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>Indonesia refund tier scoping</strong> HR 用过的故事 —— <strong>直接套</strong>。</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的故事</th></tr></thead><tbody><tr><td>Client wants 6w in 3d</td><td>Indonesia ops wanted full auto-refund</td></tr><tr><td>Decompose into tiers</td><td>Tier 1 (info lookup) / Tier 2 (structured) / Tier 3 (refund)</td></tr><tr><td>Offer phased</td><td>Tier 1 first → measure → expand</td></tr><tr><td>Save relationship</td><td>Got 70% throughput at 0% risk</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"This is <strong>exactly</strong> the move I made with Indonesia ops 6 months ago. They wanted full autonomous refund decisions on day 1. I decomposed into 3 tiers — lookup, structured tasks, refund decisions. Shipped tier 1 in 2 weeks, ran 2 weeks of data, then graduated. <strong>They got 70% of the value in 4 weeks with 0% accuracy risk</strong>, vs the alternative which would've been an 8% wrong-call rate.</p>
+<p>The lesson I'd apply here: <strong>what they ask for is rarely what they actually need</strong>. The honest question is 'what's the smallest thing that gets you through Thursday', then build that with a roadmap to bigger."</p></blockquote>
+<hr />
+<h3>5 个 follow-ups</h3>
+<p><strong>Q1</strong>: "Client refuses tiering — wants everything Thursday." <strong>A</strong>: 升级 transparency:</p>
+<ul><li>"I want to be honest with you. We can ship <strong>a version</strong> in 3 days, but it will have known bugs and we'll spend the next 4 weeks fixing them. The total time-to-stable will be <strong>longer</strong> than tiering. <strong>The CFO meeting is the wrong use case to risk a bad demo on.</strong>"</li><li>Bring in your manager / their account manager if needed — peer-level conversation often unblocks</li></ul>
+<p><strong>Q2</strong>: "Client agrees to tier 1, but on Thursday demands tier 3 ready 'soon'." <strong>A</strong>: This is <strong>goal-post shifting</strong>, common pattern. Counter:</p>
+<ul><li>"Glad tier 1 works for CFO. Let me put tier 2 + 3 on the official roadmap with dates. <strong>Tier 2 by week 5, Tier 3 by week 10</strong>. I'll send a tracking doc with weekly updates so you have visibility."</li><li><strong>Concrete dates with written commitment</strong> &gt; vague urgency.</li></ul>
+<p><strong>Q3</strong>: "Your engineering manager says even tier 1 in 3 days is impossible." <strong>A</strong>: Don't 1-sidedly promise customer:</p>
+<ul><li>Acknowledge engineering's constraint: "If tier 1 can't be done in 3 days, what can?"</li><li>Find the <strong>smallest possible 3-day deliverable</strong> — maybe a hardcoded mockup, manual data pull, single-customer view</li><li>Re-propose to customer with the actually-feasible version</li></ul>
+<p><strong>Q4</strong>: "Customer says other vendor promised 6w-in-3d." <strong>A</strong>: Don't take the bait:</p>
+<ul><li>"If they can really do that with quality, they should win this. Honestly — I'd rather lose this deal than ship something that hurts both our reputations. <strong>But in my experience, promises like that mean the work continues for weeks past the demo</strong>. I'd ask them: what happens day 4-30?"</li><li>This converts to <strong>due diligence</strong>: if you're confident in your team's craft, exposing it as superior is the move.</li></ul>
+<p><strong>Q5</strong>: "Sales manager pressures you to commit to 6w-in-3d to close the deal." <strong>A</strong>: Hardest. Internal alignment first:</p>
+<ul><li>"If we commit, here are the 3 ways this fails — buggy demo + 4-week recovery / can't actually demo + lost trust / team burnout + attrition."</li><li>Offer: "I can commit to tier-1 in 3 days, full scope by week 10. <strong>If sales needs 6w-in-3d, that's a different deal with caveats</strong> — let's get legal to write 'demo readiness' rather than 'production-ready'."</li><li>Worst case, <strong>document your concerns in writing</strong> to sales / leadership before agreeing.</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>直接 no</strong> — kills relationship</li><li><strong>直接 yes</strong> — kills team</li><li><strong>没 ask why now</strong> — miss real driver</li><li><strong>没 decompose</strong> — treat ask as monolithic</li><li><strong>没 written commitment</strong> — verbal forgotten</li><li><strong>Heroics promise</strong> — sets unsustainable</li><li><strong>Internal misalignment</strong> with sales/eng before negotiating</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>D·D·O·C framework</strong> explicit</li><li><strong>"What happens on day 4"</strong> discovery move</li><li><strong>3-option presentation</strong> puts choice on client</li><li><strong>Smallest viable scope</strong> + roadmap with dates</li><li><strong>Joint ownership</strong> (ask their team to do X)</li><li><strong>Written CTO commit</strong> for confidence</li><li><strong>Quote Indonesia refund tier scoping</strong></li><li><strong>Reframe vendor comparison as DD opportunity</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">D·D·O·C:
+  Deeper why (what happens day 4?)
+  Decompose ask (must-have vs nice)
+  Offer phased (3 options, tradeoffs)
+  Commit specifically (date + written)
+
+Standard 3 options:
+  A: 1-day urgent minimum
+  B: 2-week medium
+  C: 6-week original
+
+Phrases:
+  - "What's driving the timeline?"
+  - "Of the full scope, what's the must-have-today?"
+  - "Here are 3 options with tradeoffs..."
+  - "Want written commitment by EOD?"
+  - "If we promise that, here's how it fails..."
+
+Anti-patterns:
+  - "Not possible"
+  - "We'll try"
+  - "Engineering needs to check"
+  - "If we work weekends"
+
+Internal alignment first:
+  - Sales: get commitment language right
+  - Eng: confirm smallest viable
+  - Manager: peer-level escalation if needed
+
+红线:
+  - Promise without alignment
+  - Verbal-only commitments
+  - Heroics culture</code></pre>
   </section>
 
   

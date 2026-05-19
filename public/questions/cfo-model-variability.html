@@ -31,7 +31,101 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Explain to a <strong>non-technical CFO</strong> why the model produces <strong>different outputs for the same input</strong> (non-determinism is <strong>not a bug</strong>). Without losing trust."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 客户模拟. OpenAI / Google FDE / AI deploy companies 都问.</p>
+<p><strong>Round</strong>：Client Simulation (30-45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>技术 → business 翻译</strong>能力。LLM stochastic output 对工程师 obvious, 对 CFO 是 "I'm paying $1M for randomness?":</p>
+<ol><li><strong>类比能力</strong> —— CFO 不需要懂 temperature, 但需要 mental model</li><li><strong>Trust framing</strong> —— "不一致" 听起来像 "不可靠"</li><li><strong>Audit &amp; guardrails</strong> —— CFO 关心 compliance / financial impact</li><li><strong>When CFO is right</strong> —— if their use case actually needs determinism, <strong>don't argue, change architecture</strong></li></ol>
+<hr />
+<h3>黄金 framework：A·B·C·D</h3>
+<table class="md-table"><thead><tr><th>Step</th><th>What</th><th>Sample</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>Acknowledge concern</strong></td><td>"I understand why this looks like a defect"</td></tr><tr><td><strong>B</strong></td><td><strong>Business-language analogy</strong></td><td>Use CFO's domain (financial, accounting)</td></tr><tr><td><strong>C</strong></td><td><strong>Concrete bounds</strong></td><td>What is and isn't varying — show metrics</td></tr><tr><td><strong>D</strong></td><td><strong>Deterministic option</strong></td><td>"If your use case needs strict determinism, here's the path"</td></tr></tbody></table>
+<hr />
+<h3>3 个 successful analogies for CFO</h3>
+<p><strong>Analogy #1: Financial advisor</strong></p>
+<blockquote><p>"Imagine you ask the same financial advisor the same question twice. Each time, you'd expect the <strong>same recommendation</strong>, but slightly different wording, different supporting arguments. They might emphasize different angles based on what they're thinking that day. <strong>The conclusion is consistent, the wording varies</strong>. Our model behaves similarly — the <strong>bottom-line decision is stable</strong>, but the prose varies. This is by design, because it actually produces <strong>better answers</strong> than a robot reading from a script."</p></blockquote>
+<p><strong>Analogy #2: Auditing</strong></p>
+<blockquote><p>"When two auditors look at the same financials, you wouldn't expect identical reports word-for-word. You'd expect them to <strong>flag the same issues</strong>. Our model is the same — for compliance-critical fields, the <strong>flagged issues are 99% consistent</strong>. The framing varies. We track the consistency rate as a metric — 99% means the model is healthy."</p></blockquote>
+<p><strong>Analogy #3: Stock analyst</strong></p>
+<blockquote><p>"If you ask 5 analysts the same question on different days, they don't write <strong>identical</strong> reports — but they reach <strong>similar conclusions</strong>. Our model has the same kind of natural variation. <strong>The decision is what matters, not the wording</strong>."</p></blockquote>
+<hr />
+<h3>Sample script (full role-play)</h3>
+<blockquote><p><em>[CFO: "I ran the same query 3 times and got 3 different answers. How am I supposed to trust this for our annual report?"]</em></p>
+<p>"I completely understand why this looks broken. Let me walk you through what's actually happening, then propose how we make this safe for the annual-report use case.</p>
+<p><strong>What's happening</strong>: our model isn't a database lookup — it's more like a <strong>financial analyst on your team</strong>. Imagine you asked 3 different analysts the same question. They'd reach <strong>similar conclusions</strong> but with different wording, different supporting arguments, different angles emphasized. That's because they're <strong>reasoning</strong> about your data, not just retrieving it. The model does the same — it's how it produces nuanced answers, not just lookup-table responses.</p>
+<p><strong>What's actually different vs the same</strong>: I can show you metrics. For the kind of question you ran:</p>
+<ul><li><strong>Numerical answer</strong>: same in 99.2% of repeats (we measure this)</li><li><strong>Key findings flagged</strong>: same in 97% of repeats</li><li><strong>Wording / supporting prose</strong>: varies — and we want it to, because identical wording would feel robotic</li></ul>
+<p><strong>For the annual report specifically</strong>, you're right that you need <strong>strict reproducibility</strong> — auditors need to verify the same input gave the same output. For that use case, we offer <strong>2 options</strong>:</p>
+<p><strong>Option 1: Pin random seed</strong> — for any query you mark 'production-final', we use a fixed random seed. Same input → exact same output, every time. Tradeoff: slightly more rigid wording.</p>
+<p><strong>Option 2: Cached result</strong> — your annual report query runs once, result is stored with a verification hash. All future re-reads return the cached version with full audit trail.</p>
+<p><strong>My recommendation</strong>: Option 2 for the annual report — that's how financial systems handle this. The model <strong>generates the analysis once</strong>, and from that point on it's a <strong>stored artifact</strong>, like a signed document. You can re-open it any time, byte-for-byte identical.</p>
+<p>Would that address what you're concerned about? Anything else feels off?"</p></blockquote>
+<p>⏱️ 5-6 min spoken.</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent for debt collection</strong> 必涉及这种 conversation：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Non-tech stakeholder explanation</td><td>7 markets ops teams 多数非技术</td></tr><tr><td>Compliance/audit framing</td><td>Debt collection is regulated, 你必懂</td></tr><tr><td>Determinism path for compliance</td><td>Voice agent 有 fixed-decision paths for regulated actions</td></tr><tr><td>Numerical consistency metric</td><td>你的 ConvFinQA eval — consistency is measurable</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"I had this exact conversation with the Indonesia regulatory body when we deployed the voice agent. They worried about model 'inconsistency' — would two customers asking the same question get different financial answers? My move was: (1) show them the <strong>99% consistency on numerical decisions</strong>, (2) for regulated dialog paths, we <strong>pinned the response template</strong> (deterministic), (3) for natural-conversation paths, we accept variation but log every decision for audit. <strong>They signed off because we gave them both — flexibility where it's value-add, determinism where compliance requires it</strong>."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Auditor demands all outputs be reproducible. Full determinism." <strong>A</strong>: 答应 + 解释 tradeoff:</p>
+<ul><li>"Doable. We can pin seed + temperature=0 for audit-flagged queries. <strong>Tradeoff</strong>: outputs become slightly more rigid, may feel less helpful. For audit specifically that's the right call."</li><li>"What I'd suggest: <strong>2-mode system</strong>. Default mode for productivity (some variation). Audit mode for compliance-flagged queries (full reproducibility, with hash log)."</li></ul>
+<p><strong>Q2</strong>: "Show me the numbers — what's the actual numerical consistency rate?" <strong>A</strong>: 不 ballpark:</p>
+<ul><li>"Let me pull the data. Last 1000 production queries, run each 3x. <strong>For numerical outputs: 99.1% identical, 0.7% within ±1% of mean, 0.2% &gt; 1% deviation</strong>."</li><li>If you don't have data: "I'll have this measured + reported by Wednesday."</li><li><strong>Never fake numbers</strong>.</li></ul>
+<p><strong>Q3</strong>: "What if I get audited and the auditor sees different outputs?" <strong>A</strong>: 3-tier defense:</p>
+<ul><li><strong>Audit log</strong>: every query timestamped + input + output + model version + seed + temp</li><li><strong>Reproducibility on demand</strong>: with the audit log, we can re-execute identical inputs → identical outputs (using same model+seed+temp)</li><li><strong>Read-only artifacts</strong>: production-final outputs (like annual report figures) hash-stored, immutable</li><li>"Show your auditor the artifact, not a re-run."</li></ul>
+<p><strong>Q4</strong>: "Why not just always use determinism then?" <strong>A</strong>:</p>
+<ul><li>"For creative / analytical tasks, slight variation produces <strong>better answers</strong> — the model explores more solution space."</li><li>"For procedural / lookup / compliance tasks, determinism is right."</li><li>"We give you per-query control: deterministic for finance, default for general."</li></ul>
+<p><strong>Q5</strong>: "Our CTO says LLM is too unpredictable for finance. Should we cancel?" <strong>A</strong>: 不 fight 全否认:</p>
+<ul><li>"Your CTO is right to be cautious. LLMs in finance is <strong>about deployment patterns, not model choice</strong>. We can build the deterministic + audit-friendly version they want. Can we get them in a 30-min call so I can show specifically the architecture?"</li><li>This shifts conversation from "should we use this" to "how do we use this safely".</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>用 'temperature' 'top-p' 'stochastic'</strong> — CFO 听不懂 → 失信</li><li><strong>Argue 'it's not a bug'</strong> — defensive, loses</li><li><strong>没 concrete consistency 数字</strong> — feels handwavy</li><li><strong>没提 determinism option</strong> — CFO 没出路</li><li><strong>Patronize</strong> — "you don't need to understand" — explosive</li><li><strong>没 audit log story</strong> — compliance ask 主要</li><li><strong>Promise 0 variability without changing architecture</strong></li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Financial advisor / auditor / stock analyst</strong> analogies</li><li><strong>Concrete consistency metrics</strong> (99.1% etc)</li><li><strong>2-mode system</strong>: default + audit/deterministic</li><li><strong>Hash-stored artifacts</strong> for immutable</li><li><strong>Per-query control</strong> — flexibility</li><li><strong>Quote Indonesia regulatory experience</strong></li><li><strong>Joint call with CTO</strong> to address tech objections</li><li><strong>Audit log + replay</strong> capability</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">A·B·C·D:
+  Acknowledge concern
+  Business-language analogy (FA / auditor / stock analyst)
+  Concrete bounds (99% consistency on decision)
+  Deterministic option (pin seed / cache result)
+
+Useful analogies:
+  - "Same advisor, slightly different wording, same conclusion"
+  - "Auditors flag same issues, write different reports"  
+  - "Stock analysts reach similar conclusions"
+
+Concrete metrics to quote:
+  - 99.1% identical numerical outputs
+  - 97% identical flagged findings
+  - &lt;0.5% &gt; 1% deviation
+
+2-mode system:
+  Default: temp=0.3, slight variation, more nuanced
+  Compliance: temp=0, pinned seed, exact reproducible
+
+For audit:
+  - Every query logged: input + output + model + seed + temp
+  - Production-final results hash-stored as immutable
+  - Replay on demand
+  - "Show artifact, not re-run"
+
+Words to avoid:
+  - temperature, top-p, stochastic, sampling
+  - "by design"
+  - "trust me"
+
+Words to use:
+  - reasoning vs lookup
+  - consistency rate
+  - audit log
+  - artifact / signed document
+  - replay</code></pre>
   </section>
 
   

@@ -31,7 +31,94 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Your <strong>live demo fails</strong> in front of the client's executive team. What do you communicate, <strong>in what order</strong>, and how do you recover the deployment timeline?"</p></blockquote>
+<p><strong>出处</strong>：fde.academy 客户模拟经典. Palantir / Salesforce / OpenAI 都问.</p>
+<p><strong>Round</strong>：Client Simulation / Role-play (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不</strong>考你 "怎么 fix the bug"。考<strong>沟通顺序 + 心态稳定 + business 思维</strong>：</p>
+<ol><li><strong>Acknowledge before explaining</strong> —— 不要立刻 jump to "let me explain why this happened"</li><li><strong>Buy time without sounding evasive</strong></li><li><strong>Reframe the meeting</strong> —— 把 demo-failure 转成 "live debugging value-demo"</li><li><strong>Save the deal</strong>, not your ego</li><li><strong>Follow-up commitment 实在</strong></li></ol>
+<hr />
+<h3>黄金 framework：A·D·O·R</h3>
+<table class="md-table"><thead><tr><th>Step</th><th>Stand for</th><th>What you say</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>Acknowledge</strong></td><td>"OK, the demo is hitting an issue. I appreciate you all making time for this — let me handle it directly."</td></tr><tr><td><strong>D</strong></td><td><strong>Diagnose live (or fake diagnose)</strong></td><td>"Looks like [hypothesis]. Let me try [action]." If it doesn't work in 2 min, move on.</td></tr><tr><td><strong>O</strong></td><td><strong>Offer alternative</strong></td><td>"Rather than debug live and burn your time, let me [walk you through the working flow on staging / show the recent data we generated / share the slide explanation of what would have happened]."</td></tr><tr><td><strong>R</strong></td><td><strong>Recommit</strong></td><td>"I'll have a 1-page incident report by EOD tomorrow + a re-demo invitation. Does Thursday 10am work?"</td></tr></tbody></table>
+<p>整套大约 <strong>3-5 分钟</strong>, 然后转 meeting agenda。</p>
+<hr />
+<h3>4 个 critical "do not say"</h3>
+<p>❌ <strong>"This works fine in our demo environment."</strong> → blames customer's environment, sounds defensive ❌ <strong>"This is a known issue we're going to fix."</strong> → admit ongoing bug, executives lose confidence ❌ <strong>"Let me debug this real quick."</strong> + 15min silence → kills the room ❌ <strong>"Engineering will look into it."</strong> → punt to absent party, makes you look like middleman not owner</p>
+<hr />
+<h3>4 个 critical "do say"</h3>
+<p>✅ <strong>"I'm going to handle this directly. Give me 2 minutes."</strong> → ownership ✅ <strong>"Rather than burn your time on the debugging, let me show you [working scenario]"</strong> → time-respect + still convey value ✅ <strong>"This is exactly the kind of failure mode we'd want to catch in pre-deploy testing — let me walk you through how we'd build that monitoring."</strong> → turn the failure into a feature demo ✅ <strong>"Here's my commitment: 1-pager by EOD tomorrow, re-demo Thursday."</strong> → concrete next step</p>
+<hr />
+<h3>Sample script (full role play)</h3>
+<blockquote><p><em>[Demo screen freezes / returns error]</em></p>
+<p>"Looks like the demo is hitting an issue. Let me handle that directly — give me 2 minutes to check what's going on."</p>
+<p><em>[20 seconds of looking at terminal, trying obvious fix]</em></p>
+<p>"OK, I see what it is — looks like the integration with your test environment is throwing a permission error. <strong>This is fixable on our side</strong>, but I don't want to burn your meeting time debugging in front of you.</p>
+<p><strong>What I'd like to do instead</strong>: I have a screen recording from yesterday's working demo on the same data shape. Let me share it — <em>[2 min recording]</em> — then we walk through the questions you came with, and I take an action item to get the live environment fixed by tomorrow.</p>
+<p><em>[After the recording]</em></p>
+<p>Actually, this issue here is a useful conversation. <strong>One of the things you'll want from us is exactly this kind of failure detection in production</strong> — we want to demonstrate not just that the system works, but how it fails. So let me also share the <strong>observability layer we'd build</strong> so issues like this surface in seconds, not in customer demos.</p>
+<p><em>[Spend 10 min on observability — substantive value]</em></p>
+<p><strong>My commitments</strong>:</p>
+<ol><li>Root cause + fix by EOD tomorrow (I'll send 1-page incident analysis)</li><li>Re-demo on the same scenarios Thursday 10am — does that work for everyone's calendar?</li><li>We'll add the failure-detection monitoring I just described to the rollout plan</li></ol>
+<p>Sorry again for the timing. What other questions do you have?"</p></blockquote>
+<p>⏱️ 3 min from failure → recovered agenda.</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>voice agent 7 markets</strong> 一定经历过 live failure：</p>
+<ul><li><strong>A</strong>: "I appreciate you all making time — let me handle this directly"</li><li><strong>D</strong>: 你已经在 prod debug 7 markets 多次, 知道哪些 hypothesis fastest to验证</li><li><strong>O</strong>: 你的 Voice agent 有 staging 录屏 (production deployment 标配)</li><li><strong>R</strong>: 你的 RCA writeup quality + re-demo 频率你做过</li></ul>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"I've actually been on this side of a failed demo. We were demoing the voice agent to the Indonesia regulatory body, the model started outputting English mid-call because a Thai prompt config leaked into the Indonesia model checkpoint. I did exactly the <strong>acknowledge → buy 2 min → switch to recorded showcase → commit RCA by EOD</strong> flow. We re-demoed 48h later with the fix + a new observability layer that would have caught the leak. <strong>They actually signed faster</strong> after that — they saw we handle failure professionally. The demo failure became a sales asset."</p></blockquote>
+<p>→ 这是 STAFF/FDE level signal。</p>
+<hr />
+<h3>5 个 follow-ups</h3>
+<p><strong>Q1</strong>: "What if you genuinely don't know what's wrong?" <strong>A</strong>: Don't lie. Say: "I have 2-3 hypotheses I'd need to verify. Rather than guess in front of you, let me commit to a 1-pager by EOD tomorrow with root cause and fix timeline." Customers respect honesty more than fake competence.</p>
+<p><strong>Q2</strong>: "Customer's CEO is annoyed and pressing for explanation." <strong>A</strong>: Don't argue back. <strong>Lower their stress first</strong>:</p>
+<ul><li>"I hear you. This shouldn't have happened in front of you. I'm going to own it."</li><li>"What I can commit to right now: detailed incident report by EOD tomorrow, dedicated re-demo within 5 days. Anything else you need from me in the next 24h?"</li><li><strong>Send a follow-up email 30 min after the meeting</strong> with written commitments. Reduces "did they really say that?" doubt.</li></ul>
+<p><strong>Q3</strong>: "Customer wants to cancel the contract on the spot." <strong>A</strong>:</p>
+<ul><li>"I hear that. I'd be frustrated too. Before we discuss contract action, can I propose: I'll fix the issue by tomorrow, run a re-demo by Friday at no cost, and we revisit your decision then?"</li><li>Get <strong>time + concrete deliverables</strong> before they pull the trigger. People rarely cancel after they get a clean follow-up.</li></ul>
+<p><strong>Q4</strong>: "Your manager joins the call and contradicts you mid-recovery." <strong>A</strong>:</p>
+<ul><li>Don't contradict back in front of customer. Politely sync: "Let me clarify — I was committing to EOD tomorrow for the incident report. Maybe we can align after the call on the broader timeline."</li><li>After the call: <strong>explicit alignment with manager</strong> about who owns customer commitment.</li><li>Never let customer see internal disagreement during incident — confidence erosion.</li></ul>
+<p><strong>Q5</strong>: "Re-demo also fails." <strong>A</strong>: Worst case. 3 moves:</p>
+<ul><li><strong>Don't re-demo a 3rd time without confidence</strong>. Move to async: "let me record + share, you provide feedback, we iterate without burning your time"</li><li><strong>Engage their technical lead 1:1</strong>: have them in our staging env, debug together — converts adversary to ally</li><li><strong>Escalate at our side</strong>: this customer relationship is in jeopardy. CEO/CRO involvement needed.</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Long silence while debugging</strong> — kills the room</li><li><strong>Blame infrastructure / customer environment</strong> — defensive</li><li><strong>Punt to engineering</strong> — looks like middleman</li><li><strong>Promise speedy fix without checking</strong> — sets up second failure</li><li><strong>Don't write follow-up email</strong> — let memory drift</li><li><strong>Defensive body language</strong> — pacing, sighing, looking away</li><li><strong>Re-demo too soon</strong> — same risk</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>A·D·O·R framework</strong> in real time</li><li><strong>Turn failure into feature demo</strong> (observability layer)</li><li><strong>Written commitments</strong> within 30 min of meeting</li><li><strong>Specific re-demo date</strong> (not "next week")</li><li><strong>Quote a real prior experience</strong> — Indonesia voice agent</li><li><strong>Pre-emptive internal alignment</strong> if manager joins</li><li><strong>Move to async</strong> if re-demo fails</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">A·D·O·R:
+  A - Acknowledge ownership immediately
+  D - Diagnose live (cap at 2 min)
+  O - Offer alternative value (recorded demo / observability talk)
+  R - Recommit specific date
+
+Time budget:
+  0-30s: acknowledge
+  30s-2m: try diagnose live
+  2m-3m: pivot to alternative
+  3m-end: substantive content + agenda
+  +30 min after: follow-up email
+
+DO say:
+  "Give me 2 minutes"
+  "Rather than burn your time"
+  "This failure mode is exactly what we'd monitor for"
+  "1-pager by EOD tomorrow"
+
+DON'T say:
+  "Works in our env"
+  "Known issue"
+  "Engineering will look"
+  "Real quick"
+
+Severity escalation:
+  Failed re-demo → async sharing
+  Customer threatens cancel → buy time + commitments
+  CEO angry → don't defend, ower
+  Manager contradicts → resync after, never publicly</code></pre>
   </section>
 
   

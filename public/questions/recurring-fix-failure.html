@@ -31,7 +31,87 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Deployed fix fails; the <strong>same problem recurs</strong>; client is <strong>losing confidence</strong> in your team. How do you communicate, what do you change in your process?"</p></blockquote>
+<p><strong>出处</strong>：fde.academy 客户模拟. Palantir / OpenAI / Salesforce 都问. 真实 deployment 最难的 moment 之一.</p>
+<p><strong>Round</strong>：Client Simulation (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>你能不能 <strong>professionally own a streak of failures</strong>：</p>
+<ol><li><strong>Stop digging the hole</strong> —— 别再 promise quick fix</li><li><strong>Process-level admission</strong> —— 不是"this bug specific", 是"我们的诊断方法有问题"</li><li><strong>Bring in fresh eyes</strong> —— 你已经 stuck in same hypothesis</li><li><strong>Compensation</strong> —— offer something they didn't ask for</li><li><strong>Plan to rebuild trust</strong> —— rebuild trust is <strong>months</strong>, not 1 fix</li></ol>
+<hr />
+<h3>黄金 framework：A·R·R·R</h3>
+<table class="md-table"><thead><tr><th>Step</th><th>What</th><th>Why</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>Admit process-level fault</strong></td><td>"Our diagnosis wasn't deep enough" — not blaming bug</td></tr><tr><td><strong>R</strong></td><td><strong>Reset approach</strong></td><td>"I'm bringing in [senior eng / new lead / pair-debug with your team]"</td></tr><tr><td><strong>R</strong></td><td><strong>Reduce blast radius</strong></td><td>"While we fix, here's what we're doing to prevent customer impact"</td></tr><tr><td><strong>R</strong></td><td><strong>Re-earn over time</strong></td><td>"Trust gets rebuilt by N weeks of stability, not by next sprint's deliverable"</td></tr></tbody></table>
+<hr />
+<h3>Sample script</h3>
+<blockquote><p><em>[Client (CTO): "This is the 3rd time. I'm seriously considering canceling. What's your team doing?"]</em></p>
+<p>"I hear you. <strong>You're right to be frustrated</strong> — and your reaction is justified. I'm not going to argue or list mitigations until I address what really matters here.</p>
+<p><strong>Three things I want to commit to right now:</strong></p>
+<p><strong>1. Process change, not 'we'll try harder':</strong> Our previous fixes treated this as a 'specific bug to patch'. The pattern of recurrence tells me <strong>our diagnostic approach is wrong</strong>, not just our code. So I'm changing how we approach this entirely.</p>
+<p>Specifically:</p>
+<ul><li>I'm bringing in our principal engineer [name] who hasn't been touching this code — fresh eyes</li><li>We're spending 1 week on <strong>just root cause analysis, no patches</strong> — I'm explicitly not promising a fix in the next sprint</li><li>We'll pair-debug with your team — your engineer sits with mine. You see what we're trying.</li></ul>
+<p><strong>2. Reduce blast radius immediately:</strong> We're not waiting for the fix. Within 24h, I'll have a <strong>feature flag system</strong> so we can disable the problem code path on your environment without taking down the whole feature. If issue recurs, we kill the path within minutes, not hours.</p>
+<p><strong>3. Earn trust back — not by promises, by stability:</strong> I'm not going to tell you 'this fix will work for sure'. I've said that twice already, you don't believe me, and you shouldn't. What I will tell you:</p>
+<ul><li><strong>30 days of stability</strong> before I claim it's fixed</li><li><strong>Daily 10-min syncs for first 2 weeks</strong> so you have visibility</li><li><strong>A post-mortem write-up</strong> for past failures shared with you, internal-grade, not sanitized</li></ul>
+<p><strong>One ask back:</strong> I know you're considering canceling. <strong>Would you give us 30 days under this plan</strong> before deciding? If we miss any milestone, the cancellation is your call without penalty discussions.</p>
+<p>What I'm offering is <strong>work and accountability, not excuses</strong>. Is that something you can accept?"</p></blockquote>
+<p>⏱️ 5-7 min. Then listen to their response carefully.</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>ConvFinQA 9-variant ablation</strong> + <strong>Indonesia voice agent debugging</strong> :</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Recurring fix doesn't work</td><td>ConvFinQA — 8 个 variant 都失败, 你 honestly reported negative result</td></tr><tr><td>Process-level admission</td><td>ConvFinQA 你写了 "all 8 variants regressed, here's why" 不 hide</td></tr><tr><td>Fresh eyes / bring in others</td><td>Voice agent 跨 7 markets — 每个市场带 fresh perspective</td></tr><tr><td>Feature flag for blast radius</td><td>Voice agent multi-market gradual rollout</td></tr><tr><td>Daily syncs + post-mortem</td><td>你做过</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"Funnily this exact shape happened in my ConvFinQA work. I tried 9 variants of agent improvements. The first 3 made it worse. I had a choice: keep patching, or admit 'my hypothesis is wrong, let me try something fundamentally different'. I picked admission, documented the negative result openly. <strong>Customers in this situation prefer honest reset over the 4th 'this time will work'</strong>. So I'd offer them the equivalent: a fresh-eyes RCA week, no patches, and let them watch us think."</p></blockquote>
+<p>→ 真实 honest 经验, FDE 级别 signal.</p>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Client refuses 30-day grace. Wants exit clause activated." <strong>A</strong>: 别 fight contract. Move to relationship preservation:</p>
+<ul><li>"I respect that decision. Before any contract action, can I propose: <strong>2-week reset</strong>, no charges during that period, you get the post-mortem + fix attempt. If still bad on day 14, you decide."</li><li>This buys time + shows good faith. Most CTOs say yes to "free 2 weeks".</li></ul>
+<p><strong>Q2</strong>: "Senior engineer you bring in finds it's a deeper architectural issue. 6-month fix." <strong>A</strong>: This is where most FDE fail — they hide. Don't:</p>
+<ul><li>"We've identified the root issue. It's a <strong>6-month architectural change</strong> to truly fix. Here are 3 paths: (1) workaround that buys you 6 months at known limitations, (2) commit to the rewrite jointly, (3) we de-scope the affected feature."</li><li>Let customer choose. They might pick #3 — that's fine, <strong>graceful degradation &gt; 6 more months of denial</strong>.</li></ul>
+<p><strong>Q3</strong>: "Customer's CFO involved now, talking about damages." <strong>A</strong>: 上 lawyer 之前一定 try:</p>
+<ul><li>Escalate to your CEO + your account manager</li><li>Joint call with their CFO + your CEO</li><li>Offer <strong>specific service credits / discount</strong> (e.g., 3 months free) as good-faith</li><li>Don't unilaterally promise damages — but <strong>acknowledge real cost</strong> to their business</li><li>Document everything from this point forward</li></ul>
+<p><strong>Q4</strong>: "Your manager wants you to spin the situation 'we've made great progress'." <strong>A</strong>: Disagree internally:</p>
+<ul><li>"If we tell them 'great progress' and the next fix fails, we lose the customer permanently."</li><li>"Honest reset is more likely to save the relationship than spin."</li><li>If manager insists, <strong>escalate to senior leadership</strong> — this is a career-defining choice for you. Spin and you become part of the failure pattern.</li></ul>
+<p><strong>Q5</strong>: "How long does trust take to rebuild?" <strong>A</strong>: Realistic: <strong>3-6 months of stability</strong> before customer's trust returns. Specifically:</p>
+<ul><li>30 days zero incidents on the previous bug class</li><li>60 days delivery of committed features on time</li><li>90 days no surprise — proactive comms on potential issues</li><li>6 months — relationship moves from "watching us fail" to "trusting us by default"</li></ul>
+<p><strong>Don't promise faster recovery</strong>. People rebuild trust slower than they lose it.</p>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>"This time we got it"</strong> — credibility-burning</li><li><strong>Argue or defend</strong> when customer is frustrated</li><li><strong>No process-level admission</strong> — treating it as bug-specific</li><li><strong>No blast radius reduction</strong> — fix is sole strategy</li><li><strong>Spin progress</strong> — disaster long-term</li><li><strong>Promise rapid trust rebuild</strong> — 30-day trust = lie</li><li><strong>Hide deeper architectural issue</strong> if discovered</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>A·R·R·R</strong> process-level framework</li><li><strong>Fresh principal engineer</strong> to break stuck thinking</li><li><strong>Pair-debug with customer's team</strong> — radical transparency</li><li><strong>Feature flag for blast radius</strong> immediate mitigation</li><li><strong>30-day grace period offer</strong> before contract action</li><li><strong>Daily syncs first 2 weeks</strong> for visibility</li><li><strong>Honest 6-month timeline</strong> if architectural</li><li><strong>Service credits</strong> as good-faith</li><li><strong>Quote ConvFinQA negative result honesty</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">A·R·R·R:
+  Admit process-level fault (not just bug)
+  Reset approach (fresh eyes, RCA week, pair-debug)
+  Reduce blast radius (feature flag, kill switch)
+  Re-earn over time (30/60/90 day stability)
+
+Phrases:
+  - "You're right to be frustrated"
+  - "Our diagnostic approach was wrong, not just our code"
+  - "I'm bringing in fresh eyes"
+  - "30 days of stability before I claim it's fixed"
+  - "Daily 10-min syncs first 2 weeks"
+  - "Pair-debug with your team"
+  - "Service credit / 3 months free"
+
+What customers want:
+  - Honest reset &gt; 4th "this will work"
+  - Visibility into our thinking
+  - Reduced blast radius FIRST
+  - Time to evaluate (30 days)
+  - Don't argue
+
+What kills relationship:
+  - Spin / "great progress" message
+  - Another quick-fix promise
+  - Hide deeper issue
+  - Argue when frustrated
+  - Internal misalignment in front of them</code></pre>
   </section>
 
   

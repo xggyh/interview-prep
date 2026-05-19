@@ -31,7 +31,118 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p>"Client's <strong>IT team blocks your integration</strong> citing <strong>security concerns</strong>. Navigate the politics, get unblocked, ship the deployment."</p></blockquote>
+<p><strong>出处</strong>：fde.academy 客户模拟. Enterprise FDE 必经的政治情景.</p>
+<p><strong>Round</strong>：Client Simulation (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>enterprise politics navigation</strong>:</p>
+<ol><li><strong>理解 IT 真实诉求</strong> —— security 是表面理由，真问题可能是 NIH / 控制欲 / 担心 layoff</li><li><strong>Joint problem solving</strong> —— 跟 IT 站一边对外, 不是 vs IT</li><li><strong>Compliance language</strong> —— 你说"我们 secure" → IT 听 "noise"; 你说 "SOC 2 + DPA + per-tenant encryption" → IT 听 "checklist items I can take to my boss"</li><li><strong>Phased approach</strong> —— restrictive first, expand on trust</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<p><strong>1. What specifically is the concern</strong></p>
+<blockquote><p>"Did they say which control they're worried about — data residency, encryption in transit, identity management, audit logging?"</p></blockquote>
+<p><strong>2. Who specifically</strong></p>
+<blockquote><p>"Is it CISO, CISO's deputy, security architect, compliance team? Each has different motivations."</p></blockquote>
+<p><strong>3. Past pattern</strong></p>
+<blockquote><p>"Have they blocked other vendor integrations recently? If so, what got unblocked? What didn't?"</p></blockquote>
+<p><strong>4. Business sponsor pressure</strong></p>
+<blockquote><p>"Is our business sponsor (e.g., VP of Sales whose team needs us) pushing back at IT internally?"</p></blockquote>
+<p><strong>5. Timing</strong></p>
+<blockquote><p>"Hard block (we can't proceed) or soft (delayed pending review)? What's their stated process / timeline?"</p></blockquote>
+<hr />
+<h3>IT 真实顾虑的 4 个 layer</h3>
+<table class="md-table"><thead><tr><th>Layer</th><th>What they say</th><th>What they mean</th></tr></thead><tbody><tr><td><strong>L1 Surface</strong></td><td>"Data leaves our network"</td><td>Standard infosec concern, addressable with controls</td></tr><tr><td><strong>L2 Control</strong></td><td>"We don't manage your access"</td><td>Want oversight, not necessarily veto</td></tr><tr><td><strong>L3 NIH</strong></td><td>"We have internal alternative"</td><td>They've been building or own competing system</td></tr><tr><td><strong>L4 Career</strong></td><td>"Vendor outage = my fault"</td><td>Personal risk if you fail</td></tr></tbody></table>
+<p>每层 different remedy. <strong>L1 = checklist; L2 = governance access; L3 = make them ally; L4 = legal &amp; contract guarantees</strong>.</p>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify which layer + who specifically</td></tr><tr><td>5-15 min</td><td><strong>1:1 with IT lead</strong> to understand real concern (not group call)</td></tr><tr><td>15-25 min</td><td>Propose 3-tier integration (most restricted → expanding)</td></tr><tr><td>25-35 min</td><td>Compliance / cert / contract checklist</td></tr><tr><td>35-45 min</td><td>Joint pilot + governance</td></tr></tbody></table>
+<hr />
+<h3>Sample script (full role-play)</h3>
+<blockquote><p><em>[Setting: I've gotten the message that IT (CISO Maria) blocks our integration. Business sponsor (VP Sales David) is pushing back internally. I request a 1:1 with Maria.]</em></p>
+<p>"Hi Maria, thanks for taking the time. I want to start by understanding your concerns directly rather than getting them filtered through David.</p>
+<p><em>[Listen for 5-10 min, don't argue]</em></p>
+<p><em>[Maria: 'You're sending sensitive customer data to your servers. We don't know your infrastructure. And David's team wants to skip our review process.']</em></p>
+<p>OK, three concerns there:</p>
+<p><strong>1. Sensitive data leaving your network</strong> — that's a legitimate concern. Here's our standard answer:</p>
+<ul><li>All data <strong>encrypted at rest with AES-256, per-tenant DEK + customer-controlled KEK</strong>. We can't decrypt without your key.</li><li><strong>TLS 1.3 in transit</strong>, no exceptions</li><li><strong>SOC 2 Type II</strong> + <strong>ISO 27001</strong> certifications, recent audit reports available</li><li><strong>DPA + customer-owned encryption</strong> option — your KMS controls our access</li><li>Optional: <strong>private deployment</strong> — we run in your VPC, no data crosses your network</li></ul>
+<p><strong>2. Unknown infrastructure</strong> — fair. Here's what I can offer:</p>
+<ul><li><strong>Technical due diligence package</strong>: architecture diagrams, threat model, pen-test reports</li><li><strong>30-day evaluation</strong> in non-production sandbox, you and your team have full audit access</li><li><strong>Quarterly security reviews</strong> post-deploy</li><li><strong>Hotline access</strong> to our security team</li></ul>
+<p><strong>3. Bypass of your review</strong> — that's something I want to fix, not avoid. <strong>What's your normal vendor security review process?</strong> Let me put us through it formally, not skip it. David's urgency doesn't justify bypassing your process — that creates more risk than it solves.</p>
+<p><strong>What I'd propose: 3-tier rollout</strong>:</p>
+<p><strong>Tier 1 (week 1-2): Sandbox-only pilot</strong></p>
+<ul><li>Non-prod data, single use case, restricted access</li><li>Your team gets full audit visibility</li><li>You can pull the plug any time</li></ul>
+<p><strong>Tier 2 (week 3-6): Production with limits</strong></p>
+<ul><li>Specific use case, single team</li><li>Customer-controlled encryption keys (Bring-Your-Own-Key)</li><li>Daily access log to you</li></ul>
+<p><strong>Tier 3 (week 7-12+): Broader rollout</strong></p>
+<ul><li>Only with your team's explicit signoff at each stage</li><li>You define the criteria for expansion</li></ul>
+<p><strong>One thing I want to ask back</strong>: David is pushing because his team has real business needs. <strong>Could we set up a 3-way working session</strong> with you, David, and me to align on what's acceptable timeline given security review? I don't want this to be 'sales vs IT'. I want us to be 'partners against the actual constraints'.</p>
+<p>What questions do you have? Or what concerns I haven't addressed?"</p></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>ByteDance internal cross-org deployment</strong> + <strong>multi-market regulatory engagement</strong>:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>IT block on security</td><td>ByteDance 内部多 region compliance 你必经过</td></tr><tr><td>1:1 with CISO style</td><td>7 markets each has CISO/security lead</td></tr><tr><td>3-tier rollout</td><td>Indonesia refund tier scoping 同思路</td></tr><tr><td>BYOK encryption</td><td>Voice agent for regulated banking</td></tr><tr><td>SOC 2 / ISO 27001</td><td>ByteDance enterprise security stack</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"I've done this exact dance for the voice agent in Indonesia — their financial regulator (OJK) had security review pushback. The move that unstuck us: I requested a <strong>1:1 with the OJK compliance lead</strong> to hear the real concern (turns out: a previous foreign vendor had been opaque about data residency). I proposed (a) data-residency-in-Indonesia guarantee, (b) BYOK encryption with their KMS, (c) <strong>3-tier rollout with their veto at each step</strong>. <strong>Took 2 months instead of 2 weeks but we got production approval — and they trusted us afterward</strong>, which paid back 10x over the project lifecycle."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Sales VP wants to escalate over IT to CIO. Should I support?" <strong>A</strong>: Almost always <strong>don't</strong>:</p>
+<ul><li>"Escalation wins the battle, loses the war. IT will block harder next time + every time after."</li><li>"Better: I run the security process. If after 30 days I've addressed concerns and still blocked, <strong>then</strong> we talk escalation. Right now we haven't done the work to deserve escalation."</li><li>Coach the sales VP to be patient.</li></ul>
+<p><strong>Q2</strong>: "IT requires 6-month security review. Customer needs deploy in 6 weeks." <strong>A</strong>: Decompose:</p>
+<ul><li>"Full security review for full feature: 6 months. We respect that."</li><li>"<strong>Sandbox pilot with non-prod data: 2 weeks</strong> through a lighter review (no production data, no production access). Customer can test integration patterns."</li><li>"<strong>Limited production scope</strong> with strict controls: 6 weeks (with your continued review of bigger scope in parallel)."</li><li>让 IT come up with the smallest reviewable unit.</li></ul>
+<p><strong>Q3</strong>: "IT really doesn't want any 3rd party vendor. NIH attitude." <strong>A</strong>: Convert NIH to ally:</p>
+<ul><li>"Maria, your team's expertise in [their domain] is something we'd lose if we just dropped a vendor solution. <strong>What if we structured this as a joint platform</strong> — your team owns the data layer, we own the AI layer, you have full visibility and control. We're partners, not vendor-customer."</li><li>This is <strong>building IT's career</strong> not threatening it.</li></ul>
+<p><strong>Q4</strong>: "Pen-test report from us — IT's pen-tester rejects it, wants their own." <strong>A</strong>: 绝对 yes:</p>
+<ul><li>"Of course. Recommend [reputable firm] or your preferred — we'll pay for the engagement (within reason) and grant whatever access you need."</li><li>"<strong>Their pen-test gives them confidence we can't fake</strong>. It also catches things we'd miss. Win-win."</li></ul>
+<p><strong>Q5</strong>: "Legal team says our standard contract isn't acceptable. Customizations required." <strong>A</strong>:</p>
+<ul><li>"Legal customizations are normal at enterprise — we have a contract review process. Walk me through what specifically needs to change?"</li><li>Top common: data ownership, liability cap, audit rights, indemnification, source code escrow</li><li>Don't promise but commit to fast-tracking review — <strong>48h response on each request</strong></li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Argue with IT in group call</strong> — public loss</li><li><strong>Escalate over IT to CIO</strong> — long-term lose</li><li><strong>Promise "我们 secure"</strong> without checklist</li><li><strong>Skip their process</strong> — bypass = burning bridge</li><li><strong>Blame sales VP</strong> to IT — internal disloyalty</li><li><strong>NIH attitude 当 obstinacy</strong> — miss ally opportunity</li><li><strong>No phased option</strong> — all-or-nothing fails</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>1:1 first</strong> before group call</li><li><strong>4-layer concern model</strong> (Surface/Control/NIH/Career)</li><li><strong>BYOK customer-controlled encryption</strong></li><li><strong>SOC 2 + ISO 27001 + DPA</strong> specific</li><li><strong>3-tier rollout with IT veto</strong> at each stage</li><li><strong>3-way working session</strong> with sales + IT + you</li><li><strong>Joint platform framing</strong> for NIH cases</li><li><strong>Customer-paid 3rd party pen-test</strong></li><li><strong>Quote Indonesia OJK regulatory experience</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">IT 4-layer real concern:
+  L1 Surface: data leaving network → checklist
+  L2 Control: oversight → governance access
+  L3 NIH: internal alternative → make ally
+  L4 Career: vendor failure = my fault → legal/SLA
+
+5 步 flow:
+  1. 1:1 with IT lead first
+  2. Listen, no defending
+  3. 3-tier rollout with IT veto each stage
+  4. Compliance checklist (SOC 2 / ISO / DPA / BYOK)
+  5. Joint working session sales + IT + you
+
+Standard checklist:
+  - AES-256 at rest, per-tenant DEK + customer KEK
+  - TLS 1.3 in transit
+  - SOC 2 Type II + ISO 27001
+  - DPA + BYOK option
+  - Private deployment in their VPC option
+  - Quarterly security review
+  - 3rd party pen-test (their choice, we pay)
+
+3-tier rollout:
+  T1 (2 wk): sandbox, non-prod, audit access
+  T2 (4-6 wk): prod with limits, BYOK
+  T3 (12 wk): broader, IT signoff each stage
+
+Phrases:
+  "I want to understand directly, not filtered"
+  "What's your normal process — let's go through it"
+  "Joint platform, you own data, we own AI"
+  "You can pull the plug any time"
+
+红线:
+  - Escalate over IT
+  - Skip review process
+  - Public group argument
+  - Promise without checklist</code></pre>
   </section>
 
   
