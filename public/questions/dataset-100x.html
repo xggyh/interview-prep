@@ -31,7 +31,98 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Technical Screen, post take-home]</strong></p>
+<p>"Take-home was on small dataset. <strong>What would you change architecturally if the dataset was 100x larger</strong>?"</p></blockquote>
+<p><strong>出处</strong>：OpenAI FDE 真题. Google Cloud FDE 必问 (Gemini + Vertex AI scaling).</p>
+<p><strong>Round</strong>：Technical Screen (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>scaling 思维</strong>——take-home 是 toy problem, production 是另一回事:</p>
+<ol><li><strong>What breaks first at 100x</strong> —— bottleneck 识别</li><li><strong>5 dimensions of scale</strong> —— ingest / storage / index / query / cost</li><li><strong>trade-offs at scale</strong> —— precision vs latency vs cost</li><li><strong>graceful degradation</strong> —— 哪些 feature 在 scale 下牺牲</li><li><strong>knowing the platform</strong> —— 用 Vertex AI / Pinecone / OpenSearch 的限制</li></ol>
+<hr />
+<h3>5 个 scale dimensions</h3>
+<table class="md-table"><thead><tr><th>Dim</th><th>100x impact</th><th>What breaks</th></tr></thead><tbody><tr><td><strong>1. Ingestion</strong></td><td>100x docs to embed</td><td>Embedding API rate / cost / time</td></tr><tr><td><strong>2. Storage</strong></td><td>100x vectors</td><td>Memory budget, cluster size</td></tr><tr><td><strong>3. Index build</strong></td><td>100x indexing time</td><td>Single-node infeasible</td></tr><tr><td><strong>4. Query latency</strong></td><td>More vectors to search</td><td>ANN recall degrades, p99 grows</td></tr><tr><td><strong>5. Cost</strong></td><td>100x compute + storage</td><td>Budget</td></tr></tbody></table>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-3 min</td><td>Frame: assume 1M docs → 100M docs</td></tr><tr><td>3-10 min</td><td>Walk through 5 scale dimensions, what breaks</td></tr><tr><td>10-25 min</td><td>Architecture changes for each</td></tr><tr><td>25-40 min</td><td>Cost / latency tradeoffs</td></tr><tr><td>40-60 min</td><td>Deep dive on chosen change</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Assume take-home was 1k docs, 100x = 100k. Or if take-home was 1M, 100x = 100M docs. Walk through both since architecture changes are different.</p>
+<p><strong>For 100k docs</strong> (1k → 100k):</p>
+<ul><li><strong>Ingestion</strong>: 100k embeds @ 50ms/doc = 1.4h serial → batch parallel + OpenAI batch API → 30 min</li><li><strong>Storage</strong>: 100k × 1.5KB = 150MB → still fits in RAM, no infra change</li><li><strong>Index</strong>: rebuild on every add infeasible → switch to <strong>incremental index</strong> (HNSW supports add)</li><li><strong>Query</strong>: HNSW p99 &lt; 50ms at 100k → fine</li><li><strong>Cost</strong>: 100k × $0.0001 embed = $10 one-time, $0.001/query — cheap</li></ul>
+<p>Most changes are <strong>operational</strong>, not architectural.</p>
+<p><strong>For 100M docs</strong> (1M → 100M):</p>
+<ul><li><strong>Ingestion</strong>: 100M @ 50ms = 1400h serial → MUST batch + parallel + distributed → 10 days even with 100 workers</li><li><strong>Storage</strong>: 100M × 1.5KB = 150GB — RAM-tight. <strong>Switch to disk-backed ANN</strong> (DiskANN / FAISS IVF-Disk) or <strong>per-shard cluster</strong></li><li><strong>Index</strong>: 100M HNSW won't fit single-node. <strong>Sharded index</strong> (10 shards × 10M each) with parallel query</li><li><strong>Query</strong>: HNSW recall degrades at scale → <strong>2-stage retrieve</strong>: cheap shard 1 (recall@100), expensive rerank top-10</li><li><strong>Cost</strong>: $10k+ one-time embed, $0.05/query — material</li></ul>
+<p><strong>Architecture diff</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1k - 1M docs:        Single-node HNSW + bi-encoder rerank
+1M - 100M docs:      Sharded HNSW (or IVF) + 2-stage rerank
+&gt; 100M docs:         Distributed cluster (Vespa / Milvus) + tiered hot/cold</code></pre>
+<p><strong>At 100M I'd specifically change</strong>:</p>
+<ol><li><strong>Embedding model</strong>: maybe distill to smaller (768→256 dim) to save 3x storage</li><li><strong>Vector quantization</strong>: PQ (Product Quantization) on cold tier, full precision on hot</li><li><strong>Sharding strategy</strong>: by topic/category for query routing → only hit relevant shard</li><li><strong>Cache layer</strong>: top-1000 common queries cached in Redis, 90% hit rate at 5ms</li><li><strong>Async indexing</strong>: docs queued, indexed within 5 min, eventually consistent</li><li><strong>Cold tier</strong>: docs not accessed in 30 days → moved to S3 (still retrievable but with latency premium)</li></ol>
+<p><strong>What breaks first</strong> in my experience: <strong>embedding cost + ingestion time</strong>, not query speed. People underestimate this:</p>
+<ul><li>100M docs × $0.0001 = $10k for first embed</li><li>On every model upgrade, re-embed → $10k each time</li><li><strong>Lesson</strong>: pick embedding model carefully because migration is expensive</li></ul>
+<p><strong>Tradeoffs at 100M I'd accept</strong>:</p>
+<ul><li><strong>Recall@10 drops 5pp</strong> (from 92% to 87%) for 50% latency reduction</li><li><strong>5-min indexing lag</strong> for 10x cost reduction</li><li><strong>Cold queries slower</strong> (200ms vs 50ms) for 90% storage cost reduction</li></ul>
+<p><strong>What I'd NOT change</strong> at 100M:</p>
+<ul><li>Reranking (still cheap relative to retrieval)</li><li>Embedding model (consistency across vectors &gt; cost)</li><li>Hybrid retrieval (BM25 scales fine)"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>TikTok scale (1B users)</strong> + <strong>vLLM/SGLang infra</strong>:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>100x scale planning</td><td>TikTok payment scale — 你 daily 想</td></tr><tr><td>Distributed inference</td><td>vLLM / SGLang you optimized</td></tr><tr><td>Cost-aware architecture</td><td>Voice agent 7 markets 你必 cost-tune</td></tr><tr><td>Sharding strategy</td><td>你处理过多 region routing</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"At TikTok we constantly think about 100x — what was per-region in Singapore at 10M users becomes per-region across 7 markets at 100M users. The pattern I learned: <strong>embedding cost + ingestion time hit first, not query speed</strong>. We had to switch to distilled embedding (768→384) + per-region sharding by language to control cost. The trick: <strong>never re-embed entire corpus on model upgrade — embed delta, run dual-index during migration, cutover when new is faster</strong>."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Cold tier queries — how slow is acceptable?" <strong>A</strong>: Depends on user expectation:</p>
+<ul><li>Interactive query (user waiting): &lt; 500ms total budget</li><li>Background / async (e.g., batch reports): &lt; 30s</li><li>For cold queries that miss hot tier, <strong>partial result fast</strong> (top-10 from hot) + <strong>full result async</strong> (top-100 from hot + cold)</li><li>User UX: "showing top results now, full results refreshing..."</li></ul>
+<p><strong>Q2</strong>: "How do you migrate embeddings on model upgrade?" <strong>A</strong>: <strong>Dual-index pattern</strong>:</p>
+<ul><li>Build new index in shadow (read v2 while serving v1)</li><li>Run <strong>A/B for 1 week</strong> — same query, return both v1 + v2 results, measure recall + user metrics</li><li>If v2 is better on user metrics, cutover</li><li>Keep v1 readable for 1 month (rollback safety)</li></ul>
+<p><strong>Q3</strong>: "Cost is bigger concern than latency. What changes?" <strong>A</strong>: Aggressively:</p>
+<ul><li>Distilled embedding (50% storage save)</li><li>Aggressive PQ quantization (8x compression, 5pp recall loss)</li><li>Smaller rerank model</li><li>Aggressive cache (24h TTL on results)</li><li>Cold tier earlier (after 7 days idle)</li></ul>
+<p><strong>Q4</strong>: "Distributed system means new failure modes. How handle?" <strong>A</strong>:</p>
+<ul><li><strong>Query fan-out</strong>: ask all shards, merge top-K. If a shard fails, <strong>degraded result</strong> (top-K from N-1 shards) rather than 5xx</li><li><strong>Shard rebalancing</strong>: hot shard detected → split. Live, no downtime</li><li><strong>Re-index after failure</strong>: shard goes down + comes back → reads from replica, no service interruption</li><li><strong>End-to-end SLO</strong>: degraded vs failed, alert on degraded but don't page</li></ul>
+<p><strong>Q5</strong>: "Customer wants real-time index. Embed in &lt; 1s after upload." <strong>A</strong>:</p>
+<ul><li>1s embed feasible for single doc (50ms embed + 100ms HNSW add + 100ms commit)</li><li>Batch ingest &gt; 100 docs/s breaks single-node ingest queue</li><li>Mitigations:</li><li><strong>Write-ahead log</strong> (Kafka) for ingest events</li><li><strong>Multi-shard parallel ingest</strong></li><li><strong>Tiered ingest priority</strong>: VIP customer ingests prioritized</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Just "use Pinecone scaling"</strong> — vendor lock-in answer</li><li><strong>Same architecture for 100x</strong> — 1M vs 100M needs different design</li><li><strong>Ignore cost</strong> — 100x docs = 100x embed cost</li><li><strong>Reranking 不 scale</strong> assumption — 实际 reranks scale fine</li><li><strong>Single-node HNSW for 100M</strong> — won't fit</li><li><strong>No graceful degradation</strong> — fail loud &gt; degrade quiet</li><li><strong>Forget operational</strong> (rate limits, batch APIs)</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>5-dimension scale framework</strong></li><li><strong>Different architecture for 100k vs 100M</strong></li><li><strong>Embedding cost + migration as #1 concern</strong></li><li><strong>Dual-index migration pattern</strong></li><li><strong>PQ quantization + distilled embed</strong> for cost</li><li><strong>Graceful degradation</strong> (return partial top-K)</li><li><strong>Quote TikTok 1B user experience</strong></li><li><strong>Tradeoff transparency</strong> (5pp recall for 50% latency)</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 scale dimensions:
+  Ingest / Storage / Index build / Query latency / Cost
+
+Architecture by scale:
+  1k - 1M: single-node HNSW + bi-encoder + cross-encoder rerank
+  1M - 100M: sharded HNSW or IVF + 2-stage rerank
+  &gt;100M: distributed Vespa/Milvus + tiered hot/cold
+
+At 100M changes:
+  - Distilled embedding (50% storage)
+  - PQ quantization (8x compression)
+  - Sharding by topic/category (query routing)
+  - 5-min async indexing
+  - Cache top-1000 queries
+  - Cold tier after 30d idle
+
+What breaks first:
+  - Embedding cost (not query speed)
+  - Re-embed on model upgrade ($10k+ each time)
+  - Index build time on single node
+
+Migration pattern:
+  Dual-index v1 + v2 in parallel
+  A/B for 1 week with metrics
+  Cutover only on win
+  Keep v1 readable 1 month
+
+Tradeoffs accept:
+  - 5pp recall for 50% latency
+  - 5-min indexing lag for 10x cost down
+  - Cold query 4x slower for 90% storage save</code></pre>
   </section>
 
   

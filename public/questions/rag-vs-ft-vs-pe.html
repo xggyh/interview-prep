@@ -31,7 +31,117 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Technical Deep Dive - 60 min]</strong></p>
+<p>"Walk me through the <strong>tradeoffs of RAG vs fine-tuning vs prompt engineering</strong>. When does each win?"</p></blockquote>
+<p><strong>出处</strong>：OpenAI FDE 真题. Google Cloud FDE / Anthropic FDE 都问.</p>
+<p><strong>Round</strong>：Technical Deep Dive (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>production AI decision-making</strong>：</p>
+<ol><li><strong>3 个技术 distinct 区分</strong> —— 很多 candidate 混淆</li><li><strong>真实 cost / quality / latency tradeoffs</strong></li><li><strong>Combinations</strong> —— 真实 production 是 hybrid</li><li><strong>When NOT to use each</strong> —— 同等重要</li><li><strong>Knowing limits</strong> —— FT 不能 inject knowledge, PE 限于 context window</li></ol>
+<hr />
+<h3>3 个技术 cheat sheet</h3>
+<table class="md-table"><thead><tr><th>Aspect</th><th>Prompt Engineering</th><th>RAG</th><th>Fine-tuning</th></tr></thead><tbody><tr><td><strong>改变什么</strong></td><td>Input only</td><td>Input (retrieved context)</td><td>Model weights</td></tr><tr><td><strong>典型 cost</strong></td><td>$ / query</td><td>$$ / query (retrieve + LLM)</td><td>$$$$ upfront, $ / query</td></tr><tr><td><strong>Latency</strong></td><td>Fast</td><td>+50-100ms for retrieval</td><td>Same as base model</td></tr><tr><td><strong>数据需求</strong></td><td>0 / few-shot</td><td>知识 corpus</td><td>1k-100k examples</td></tr><tr><td><strong>更新成本</strong></td><td>Edit prompt</td><td>Re-embed delta</td><td>Re-train</td></tr><tr><td><strong>可解释性</strong></td><td>High</td><td>Cite sources</td><td>Low (black-box)</td></tr><tr><td><strong>Best for</strong></td><td>Reasoning patterns</td><td>Factual knowledge</td><td>Style / format / structure</td></tr><tr><td><strong>Worst for</strong></td><td>Domain knowledge</td><td>Reasoning patterns</td><td>Frequently-changing facts</td></tr></tbody></table>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-3 min</td><td>1 sentence each</td></tr><tr><td>3-15 min</td><td>When each wins (with examples)</td></tr><tr><td>15-30 min</td><td>When each loses</td></tr><tr><td>30-45 min</td><td>Combinations + hybrid systems</td></tr><tr><td>45-60 min</td><td>Cost analysis at scale</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample monologue）</h3>
+<blockquote><p>"Three distinct techniques with different cost/quality/maintainability profiles.</p>
+<p><strong>Prompt Engineering</strong> changes the <strong>input format</strong> — system prompt, examples, structure. Cheapest, fastest, most maintainable. Loses to: factual knowledge the model doesn't have, style requirements that don't fit prompts.</p>
+<p><strong>RAG</strong> retrieves relevant docs at query time. Best for <strong>factual / domain-specific / frequently-updated knowledge</strong>. Loses to: tasks where the model just doesn't reason well even with the info, or where retrieval is slow/expensive.</p>
+<p><strong>Fine-tuning</strong> updates the model weights to bake-in patterns. Best for <strong>style, output format, low-resource languages, or specific reasoning patterns</strong>. Loses to: factual knowledge (can't reliably 'inject' facts), changing data, cost.</p>
+<p><strong>When each wins</strong>:</p>
+<p><strong>PE wins</strong>:</p>
+<ul><li><strong>Structured output format</strong> (e.g., JSON schema following)</li><li><strong>Light persona / tone</strong> ('you are a helpful assistant')</li><li><strong>Few-shot reasoning patterns</strong> (chain-of-thought)</li><li><strong>Quick MVP / prototype</strong> before commitment</li><li><strong>Frequently changing requirements</strong> — just edit prompt</li></ul>
+<p><strong>RAG wins</strong>:</p>
+<ul><li><strong>Company-specific docs</strong> (HR policy, product docs)</li><li><strong>Up-to-date info</strong> (today's news, current customer data)</li><li><strong>Citing sources</strong> required (legal, medical)</li><li><strong>Tenant-specific knowledge</strong> (each customer has own corpus)</li><li><strong>Knowledge corpus too large for context window</strong></li></ul>
+<p><strong>Fine-tuning wins</strong>:</p>
+<ul><li><strong>Consistent output format / style</strong> that prompts can't reliably enforce</li><li><strong>Low-resource language / domain</strong> model doesn't speak well</li><li><strong>Specific reasoning patterns</strong> model needs to learn (e.g., medical diagnostics framework)</li><li><strong>Volume cost reduction</strong>: small fine-tuned model can replace expensive prompts on big model</li><li><strong>Compliance</strong>: domain-specific behaviors auditable in weights, not configurable</li></ul>
+<p><strong>When each loses</strong>:</p>
+<p><strong>PE loses when</strong>:</p>
+<ul><li>Knowledge isn't in model + can't fit in context (RAG win)</li><li>Output style requirements are subtle (FT win)</li><li>Prompts get &gt; 5000 tokens, paying ineffectively per query</li></ul>
+<p><strong>RAG loses when</strong>:</p>
+<ul><li>The task is <strong>reasoning</strong>, not knowledge retrieval (just sending retrieved chunks doesn't help)</li><li><strong>Latency budget</strong> is tight (&lt; 100ms total — RAG adds 30-100ms)</li><li>Corpus is <strong>noisy</strong> and retrieval brings irrelevant content</li><li><strong>Small static knowledge</strong> that fits in prompt (just put it in prompt)</li></ul>
+<p><strong>FT loses when</strong>:</p>
+<ul><li>Knowledge changes (re-train cost prohibitive)</li><li><strong>Small data</strong> (&lt; 1k examples, will overfit)</li><li><strong>Base model quality</strong> matters and you don't have eval discipline</li><li>Hallucination concerns — FT can amplify, not reduce</li></ul>
+<p><strong>Combinations (real production)</strong>:</p>
+<ol><li><strong>PE + RAG</strong>: most common. Prompt teaches reasoning + format, RAG injects current knowledge.</li></ol>
+<p>Example: customer support — system prompt teaches escalation rules, RAG retrieves customer history.</p>
+<ol><li><strong>PE + FT</strong>: fine-tune for style + format, prompt for query specifics.</li></ol>
+<p>Example: code generation — FT on company codebase style, prompt with specific task.</p>
+<ol><li><strong>RAG + FT</strong>: rare but valuable. FT for query-rewriting / retrieval, RAG for knowledge.</li></ol>
+<p>Example: financial advisor — FT on advisor reasoning patterns, RAG on portfolio data.</p>
+<ol><li><strong>All 3</strong>: enterprise systems. FT for company-specific reasoning, RAG for facts, prompt for query.</li></ol>
+<p>Example: ChatGPT-for-enterprise wrappers do this.</p>
+<p><strong>Cost analysis at scale</strong>:</p>
+<p>At 100k queries/day with GPT-4-class model:</p>
+<table class="md-table"><thead><tr><th>Technique</th><th>Setup cost</th><th>Per-query cost</th><th>Total / month</th></tr></thead><tbody><tr><td>PE only</td><td>$0</td><td>$0.05</td><td>$150k</td></tr><tr><td>+ RAG</td><td>$1k (embed)</td><td>$0.06</td><td>$180k</td></tr><tr><td>+ FT (small data)</td><td>$5-50k</td><td>$0.05</td><td>$150k + 5-50k amortized</td></tr><tr><td>FT + RAG hybrid</td><td>$50k+</td><td>$0.04 (smaller model)</td><td>$120k + 50k</td></tr></tbody></table>
+<p>Hybrid usually wins at scale because FT lets you use <strong>smaller cheaper model</strong>. But <strong>only after</strong> you've proven the use case with PE+RAG.</p>
+<p><strong>My pragmatic order</strong>:</p>
+<ol><li><strong>Start with PE only</strong> (week 1) — establish baseline + eval suite</li><li><strong>Add RAG</strong> (week 2-3) — measure recall@K, eval lift</li><li><strong>Add FT</strong> (month 2+) — only if PE+RAG plateaus and high volume justifies cost</li></ol>
+<p><strong>Anti-pattern: FT for facts</strong>: "let's fine-tune on our product docs to teach the model" — almost always wrong. FT doesn't reliably encode facts. <strong>Use RAG</strong>."</p></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>BNPL chatbot (Agentic + RAG)</strong> + <strong>voice agent (SFT + DPO + RL post-training)</strong>:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>RAG for company knowledge</td><td>BNPL chatbot FAQ RAG</td></tr><tr><td>Fine-tuning for style/domain</td><td>Voice agent SFT/DPO for multilingual debt collection style</td></tr><tr><td>RL alignment</td><td>Voice agent reward modeling 你 own</td></tr><tr><td>Combination in production</td><td>BNPL + voice agent 都是 hybrid</td></tr><tr><td>Cost-aware decisions</td><td>TikTok scale 你 always think cost</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"I've literally shipped all three in production. For BNPL chatbot: prompt engineering for intent routing + RAG for FAQ knowledge — works great, no fine-tuning needed. For voice agent: needed cross-lingual debt-collection tone consistency that prompts couldn't reliably enforce, so we <strong>post-trained (SFT + DPO + RL alignment)</strong> for style. The lesson I'd offer: <strong>start with PE-only, add RAG when knowledge gap visible, fine-tune only when style/format quality plateaus</strong>. Never fine-tune to inject facts — RAG is the right tool."</p></blockquote>
+<p>→ 你简历最 match 的题之一。</p>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Customer wants their docs 'baked into the model'. Should we fine-tune?" <strong>A</strong>: <strong>No, almost certainly RAG</strong>:</p>
+<ul><li>FT doesn't reliably encode facts (can hallucinate variations)</li><li>Docs change → need re-FT → expensive</li><li>No citation → compliance issues</li><li><strong>Sit-and-explain why</strong> to customer with their actual docs: "if your policy changes monthly, RAG handles automatically; FT requires monthly re-train."</li></ul>
+<p><strong>Q2</strong>: "When does fine-tuning make economic sense at 100k queries/day?" <strong>A</strong>: Math:</p>
+<ul><li>GPT-4 ($0.03/1k input + $0.06/1k output) → ~$0.05/query → $150k/month</li><li>Fine-tuned GPT-4o-mini ($0.0015/1k input + $0.006/1k output) → $0.005/query if quality match → $15k/month</li><li>FT setup $50k one-time → recover in <strong>3.5 months at this volume</strong></li><li><strong>Rule of thumb</strong>: &gt; 50k queries/day, FT a smaller model often pays back in &lt; 6 months</li></ul>
+<p><strong>Q3</strong>: "What if RAG isn't returning relevant docs?" <strong>A</strong>: Multi-pronged:</p>
+<ul><li><strong>Chunking</strong>: try semantic / paragraph-aware vs fixed</li><li><strong>Retrieval method</strong>: try hybrid (dense + BM25), reranker</li><li><strong>Query rewriting</strong>: LLM rewrite user query before retrieve (handles ambiguous)</li><li><strong>HyDE</strong>: have LLM hypothesize an answer, embed that, retrieve similar docs</li><li><strong>Don't fine-tune</strong> to fix retrieval — separate problem</li></ul>
+<p><strong>Q4</strong>: "Our fine-tuned model performs worse than base + prompt. Why?" <strong>A</strong>: Common causes:</p>
+<ul><li><strong>Overfitting</strong> to small training set (&lt; 1k examples)</li><li><strong>Catastrophic forgetting</strong> — model loses general capability</li><li><strong>Bad eval</strong> — measured on training data not held-out</li><li><strong>Wrong base model</strong> — fine-tuning the wrong base for task</li><li><strong>Format issues</strong> — training examples inconsistent</li></ul>
+<p>Fix: <strong>bigger eval set first, LoRA not full fine-tune, mixture of new + general data</strong>.</p>
+<p><strong>Q5</strong>: "Long-context (Gemini 1.5 Pro / Claude 200k) — does this kill RAG?" <strong>A</strong>: <strong>Not yet</strong>:</p>
+<ul><li>Long-context wins when corpus &lt; 1M tokens, static, no privacy concerns</li><li>RAG wins when: large + dynamic / multi-tenant / per-user / cost</li><li><strong>Hybrid</strong>: RAG retrieves top-K, feeds 50-100k into long-context model. Best of both.</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Treat as 3 alternatives</strong> when they're complementary</li><li><strong>FT to inject facts</strong> — top anti-pattern</li><li><strong>PE only</strong> when knowledge gap obvious</li><li><strong>Skip eval baseline</strong> before adding techniques</li><li><strong>Forget cost analysis</strong> at scale</li><li><strong>No mention of combinations</strong></li><li><strong>Confuse RAG with semantic search</strong> — RAG is retrieve + generate, not retrieve alone</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>3x3 comparison table</strong> sharp</li><li><strong>Concrete cost math</strong> ($150k/mo + amortize)</li><li><strong>PE → RAG → FT pragmatic order</strong></li><li><strong>Combinations (all 4 patterns)</strong></li><li><strong>Anti-pattern: FT for facts</strong> named</li><li><strong>Long-context awareness</strong> (current)</li><li><strong>HyDE / query rewriting</strong> beyond basic RAG</li><li><strong>Quote BNPL chatbot + voice agent experience</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">3 techniques cheat sheet:
+                PE        RAG       FT
+  Changes:      input     input+ctx weights
+  Setup cost:   $0        $1k       $5-50k
+  Per query:    $$$$      $$$$      $$
+  Latency:      fast      +retrieve same
+  Updates:      edit      re-embed  re-train
+  Best for:     reasoning facts     style
+  Worst for:    knowledge reasoning facts
+
+Combinations (production reality):
+  PE + RAG (most common — customer support)
+  PE + FT (style + query)
+  RAG + FT (rare — finance / medical)
+  All 3 (enterprise)
+
+Pragmatic order:
+  Week 1: PE only + eval suite
+  Week 2-3: + RAG, measure lift
+  Month 2+: + FT only if quality plateaus + volume justifies
+
+Cost @ 100k queries/day:
+  PE only: $150k/month
+  + RAG: $180k/month
+  FT smaller model: $15k/month after $50k setup
+  Payback: 3-6 months at this volume
+
+Anti-patterns:
+  - FT for facts (use RAG)
+  - PE only when knowledge gap (add RAG)
+  - FT on &lt; 1k examples (overfits)
+  - FT to fix retrieval problem</code></pre>
   </section>
 
   

@@ -31,7 +31,93 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Technical Screen - 60 min, post take-home]</strong></p>
+<p>"<strong>Why did you choose that chunking strategy?</strong> Why not a different retrieval method?"</p></blockquote>
+<p><strong>出处</strong>：OpenAI FDE 真题（gaijineer.co 候选人 report）. Google FDE 上 Vertex AI RAG, ElevenLabs FDE 都会问.</p>
+<p><strong>Round</strong>：Technical Screen / Take-home Follow-up (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>这是个 <strong>追问式</strong> 问题, follow up on candidate's take-home. 考你:</p>
+<ol><li><strong>能不能解释 design choice 的 reasoning</strong> —— 不是"我用了 X", 是 "我考虑了 X / Y / Z, 选 X 因为..."</li><li><strong>知不知道 alternative</strong> —— 没考虑过 = 没经验</li><li><strong>knowing what you don't know</strong> —— "这是我做的选择, 但 X 场景我会重选"</li><li><strong>Honest tradeoffs</strong> —— 不假装 perfection</li></ol>
+<hr />
+<h3>5 个 chunking strategies (必知)</h3>
+<table class="md-table"><thead><tr><th>策略</th><th>What</th><th>When</th></tr></thead><tbody><tr><td><strong>1. Fixed-size token</strong></td><td>每 512 token 一切</td><td>Default baseline, fast</td></tr><tr><td><strong>2. Recursive sentence/paragraph</strong></td><td>按 hierarchy split (paragraph &gt; sentence &gt; word) until &lt;= limit</td><td>Better for prose</td></tr><tr><td><strong>3. Semantic chunking</strong></td><td>Embed neighboring sentences, group by similarity</td><td>Better topic coherence, slower</td></tr><tr><td><strong>4. Document-structure aware</strong></td><td>Markdown / PDF / HTML respects headers, tables, lists</td><td>Best for structured docs</td></tr><tr><td><strong>5. Late chunking</strong></td><td>Embed full doc first, then chunk on the embeddings</td><td>Preserves long-range context</td></tr></tbody></table>
+<p>每个 trade off: <strong>speed × coherence × granularity</strong>.</p>
+<hr />
+<h3>5 个 retrieval methods (必知)</h3>
+<table class="md-table"><thead><tr><th>方法</th><th>What</th><th>When</th></tr></thead><tbody><tr><td><strong>1. Dense (semantic)</strong></td><td>Vector embedding + ANN search</td><td>Default semantic match</td></tr><tr><td><strong>2. Sparse (BM25 / keyword)</strong></td><td>TF-IDF style word match</td><td>Acronyms, exact terms, IDs</td></tr><tr><td><strong>3. Hybrid</strong></td><td>Dense + sparse weighted</td><td>Production best practice</td></tr><tr><td><strong>4. ColBERT / Late interaction</strong></td><td>Per-token embeddings, expensive</td><td>Very high precision</td></tr><tr><td><strong>5. Reranking</strong></td><td>Initial retrieve 100 candidates, cross-encoder rerank top 10</td><td>Production quality boost</td></tr></tbody></table>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-2 min</td><td>Anchor: what you chose, <strong>summarize in 1 sentence</strong></td></tr><tr><td>2-7 min</td><td>Why you chose it (tradeoffs you considered)</td></tr><tr><td>7-12 min</td><td>Alternatives you considered + why rejected</td></tr><tr><td>12-20 min</td><td>When you'd change choice (scale / data shape / latency)</td></tr><tr><td>20-60 min</td><td>Deeper followups</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample, assuming take-home used semantic chunking + hybrid retrieval）</h3>
+<blockquote><p>"For the take-home, I chose <strong>semantic chunking (300-500 tokens, paragraph-aware) + hybrid retrieval (dense + BM25 with α=0.7 dense weight) + cross-encoder rerank top-10</strong>.</p>
+<p><strong>Why semantic chunking</strong>:</p>
+<ul><li>Take-home docs were <strong>technical articles</strong> — concept-coherent paragraphs matter. Fixed-size token chunking splits mid-sentence which hurts recall on multi-sentence concepts.</li><li>I started with fixed-512 baseline, saw retrieval missing answers that spanned sentence boundaries.</li><li>Semantic chunking with <strong>30% overlap</strong> (so concepts spanning boundary are in both chunks) fixed it.</li><li><strong>Tradeoff I accepted</strong>: chunk count increased 1.4x (vs fixed), embedding cost up 1.4x, retrieval slightly slower. Acceptable for the quality lift.</li></ul>
+<p><strong>Why hybrid retrieval (not pure dense)</strong>:</p>
+<ul><li>Take-home docs contained <strong>product codes / API names / specific identifiers</strong> (e.g., "GPT-4-turbo", "0.7-temperature").</li><li>Pure semantic embedding doesn't index those well — "GPT-4" and "GPT-3" embed close, but for the user's question they're meaningfully different.</li><li>BM25 catches exact term match. Hybrid gets both.</li><li>α=0.7 dense was empirical: I tried 0.5/0.6/0.7/0.8 on eval set, 0.7 best.</li></ul>
+<p><strong>Why cross-encoder rerank</strong>:</p>
+<ul><li>Bi-encoder retrieval is fast but coarse — top-10 from bi-encoder might have 30% miss rate</li><li>Cross-encoder (e.g., <code>cross-encoder/ms-marco-MiniLM-L-12-v2</code>) is slow but precise</li><li><strong>Compromise</strong>: retrieve top-100 with bi-encoder (cheap), rerank top-10 with cross-encoder (3x latency cost, 20pp recall@10 improvement)</li></ul>
+<p><strong>What I considered and rejected</strong>:</p>
+<ul><li><strong>Late chunking (Jina v3 style)</strong>: better long-range context but <strong>slow embedding</strong> + new infra. Not worth for 100-doc take-home.</li><li><strong>ColBERT</strong>: maximum precision but <strong>5x storage</strong> — overkill for this scale.</li><li><strong>Document-structure-aware chunking</strong>: docs were not strictly structured (no clear markdown hierarchy), so paragraph-aware was the right level.</li></ul>
+<p><strong>When I'd change choice</strong>:</p>
+<ul><li><strong>Dataset &gt; 1M docs</strong>: pre-rerank latency adds up, would consider distilled cross-encoder or skip rerank for top-50</li><li><strong>Multi-modal (image + text)</strong>: need different chunker entirely (image embedding model)</li><li><strong>Tabular / structured data</strong>: chunking is wrong abstraction, use direct cell retrieval (text-to-SQL or RowEmbedding)</li><li><strong>Long-context model (Gemini 1.5 Pro 1M)</strong>: maybe skip retrieval altogether, put whole doc in context — chunking becomes anti-pattern</li></ul>
+<p><strong>Honest gap</strong>: I didn't try <strong>HyDE (Hypothetical Document Embedding)</strong> which Anthropic + others recommend for short queries. Would test that next iteration."</p></blockquote>
+<p>⏱️ ~6 min spoken.</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>BNPL chatbot RAG</strong> + <strong>ConvFinQA reference impl</strong>：</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Chunking choice</td><td>BNPL FAQ RAG — 你必经过 chunking debugging</td></tr><tr><td>Hybrid retrieval</td><td>BNPL 含 product/order ID, hybrid 是 production reality</td></tr><tr><td>Rerank vs no rerank</td><td>ConvFinQA <code>match_numeric</code> 思路类似</td></tr><tr><td>Eval-driven choice</td><td>ConvFinQA 9-variant ablation 你做过 evidence-driven</td></tr></tbody></table>
+<p><strong>主动说</strong>：</p>
+<blockquote><p>"For our BNPL chatbot at TikTok, I went through this exact decision path. Started with fixed-512 chunking + pure semantic. Quickly realized customer queries contained <strong>product codes and merchant names</strong> — semantic alone was missing 20% of high-intent queries. Added BM25 weighted at 0.3 → recall@5 jumped from 72% to 86%. Then for the 'why was my refund delayed' kind of query that requires multi-paragraph context, we did <strong>30% chunk overlap + cross-encoder rerank</strong>. Each addition we measured before keeping. <strong>Eval first, optimization second</strong>."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Why not just use a vector DB's default settings?" <strong>A</strong>: Vector DB defaults are <strong>infrastructure choices, not retrieval-quality choices</strong>. Pinecone's default fixed-size chunker is fine for getting started, but the retrieval-quality difference between default and tuned can be 20pp on recall@10. <strong>In production, defaults cost you accuracy that translates to user complaints</strong>.</p>
+<p><strong>Q2</strong>: "Tell me about a time chunking strategy failed for you." <strong>A</strong>: BNPL chatbot example — initial fixed-512 chunking split refund-policy mid-paragraph. User asks "what's the refund timeline?", retrieval gets first half ("Refunds processed via...") not second half ("...within 14 days"). Fix: paragraph-aware chunking + 30% overlap.</p>
+<p><strong>Q3</strong>: "Cross-encoder rerank is expensive. How do you make it production-fast?" <strong>A</strong>:</p>
+<ul><li><strong>Distillation</strong>: train smaller cross-encoder (50M params) on bigger model's outputs</li><li><strong>Batching</strong>: rerank top-K in single forward pass</li><li><strong>Caching</strong>: hot queries' rerank results cached for 1h</li><li><strong>Skip for high-confidence</strong>: if top-1 bi-encoder score &gt; 0.9, skip rerank</li></ul>
+<p><strong>Q4</strong>: "How would you handle multi-language docs?" <strong>A</strong>:</p>
+<ul><li><strong>Multilingual embeddings</strong>: LaBSE / multilingual-e5</li><li><strong>Cross-lingual retrieval</strong>: query in English, retrieve from Chinese docs via shared embedding space</li><li><strong>Per-language BM25</strong> if hybrid (tokenization differs)</li><li>Test on actual user query language distribution</li></ul>
+<p><strong>Q5</strong>: "Long-context models (Gemini 1.5 / Claude 200k) — does RAG become obsolete?" <strong>A</strong>: <strong>Not yet, but the use case narrows</strong>:</p>
+<ul><li>Long-context replaces RAG when: doc set is <strong>small</strong> (&lt; 1M tokens), <strong>static</strong>, <strong>no privacy issues</strong> with sending it</li><li>RAG still wins when: doc set is huge / dynamic / per-user / cost-sensitive (long context is expensive per call)</li><li><strong>Hybrid</strong>: RAG retrieves the 50-100k most relevant tokens, feed into long-context model</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>"我用了 X 因为 X 是 standard"</strong> — no reasoning</li><li><strong>不知道 alternatives</strong> — limited experience signal</li><li><strong>过度 optimization without eval</strong> — guessing</li><li><strong>Defensive when challenged</strong> — interview is about thinking, not being right</li><li><strong>"我会试 HyDE"</strong> without specific plan — vague</li><li><strong>Ignore long-context trend</strong> — out of date</li><li><strong>Talk implementation 太久</strong> without articulating principle</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>List 5 chunking + 5 retrieval methods</strong> systematically</li><li><strong>Eval-driven choice</strong> (numbers, not opinions)</li><li><strong>"When I'd change"</strong> — situational awareness</li><li><strong>Honest gap</strong> — what you didn't try</li><li><strong>Long-context model awareness</strong> — current</li><li><strong>Quote your TikTok BNPL experience</strong></li><li><strong>30% overlap specific number</strong></li><li><strong>α=0.7 specific dense weight from eval</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 chunking strategies:
+  1. Fixed-size token (default, fast)
+  2. Recursive sentence/paragraph (prose)
+  3. Semantic (similarity-based, slower)
+  4. Document-structure aware (markdown/PDF)
+  5. Late chunking (preserves long-range)
+
+5 retrieval methods:
+  1. Dense (semantic embed + ANN)
+  2. Sparse (BM25 / TF-IDF)
+  3. Hybrid (dense + sparse weighted)
+  4. ColBERT / late interaction (precision, expensive)
+  5. Rerank (cross-encoder top-10)
+
+Production standard:
+  Semantic chunking 300-500 tokens, 30% overlap
+  + Hybrid retrieval (α=0.7 dense)
+  + Cross-encoder rerank top-10 of top-100
+
+When to change:
+  &gt; 1M docs → drop rerank or distill
+  Multi-modal → different chunker
+  Tabular → row retrieval not chunking
+  Long-context 1M → maybe skip RAG
+
+Key principle:
+  Eval first, optimize second
+  α weight is empirical not theoretical
+  Default settings cost 20pp recall</code></pre>
   </section>
 
   

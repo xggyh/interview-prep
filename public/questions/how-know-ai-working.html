@@ -31,7 +31,123 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Technical Deep Dive]</strong></p>
+<p>"How do you <strong>know your AI system is actually working well</strong> in production? Cover evaluation: automated metrics, human feedback, online vs offline."</p></blockquote>
+<p><strong>出处</strong>：OpenAI FDE 真题. 几乎所有 FDE 都问 (Google / Anthropic / Salesforce).</p>
+<p><strong>Round</strong>：Technical Deep Dive (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>production AI eval discipline</strong>:</p>
+<ol><li><strong>Offline vs Online vs Production</strong> 三层</li><li><strong>Automated metrics 局限</strong> —— 知道 BLEU / ROUGE 不够</li><li><strong>Human-in-the-loop</strong> —— 知不知道怎么 scale</li><li><strong>Drift detection</strong> —— production over time</li><li><strong>LLM-as-judge</strong> —— 知道但 caution</li></ol>
+<hr />
+<h3>Eval 3 层架构</h3>
+<table class="md-table"><thead><tr><th>Layer</th><th>When</th><th>Cost</th><th>Speed</th><th>Signal quality</th></tr></thead><tbody><tr><td><strong>Offline (golden set)</strong></td><td>Pre-deploy, every CI run</td><td>Low</td><td>Fast</td><td>High but limited coverage</td></tr><tr><td><strong>Online (live A/B)</strong></td><td>Post-deploy, controlled rollout</td><td>Medium</td><td>Days</td><td>High, real user signal</td></tr><tr><td><strong>Production monitoring</strong></td><td>Always-on</td><td>Low</td><td>Real-time</td><td>Lag indicator only</td></tr></tbody></table>
+<p><strong>最佳 production 系统三者都有</strong>, 各自 catch 不同 failure.</p>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Frame: 3-layer eval pyramid</td></tr><tr><td>5-20 min</td><td>Layer 1: Offline metrics (auto + LLM-judge + human)</td></tr><tr><td>20-35 min</td><td>Layer 2: Online A/B + canary</td></tr><tr><td>35-50 min</td><td>Layer 3: Production drift monitoring</td></tr><tr><td>50-60 min</td><td>Special: human-in-loop scaling, eval cost</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Production AI eval is <strong>3 layers</strong>, each catches different failures.</p>
+<p><strong>Layer 1: Offline (Golden Set + Automated + LLM-Judge)</strong></p>
+<p>Before deploy, every CI run:</p>
+<ul><li><strong>Golden set</strong> of 500-2000 hand-curated query+expected pairs</li><li>Run model on all, measure metrics</li><li>Required pass rate (e.g., 80% exact-match or rubric pass) before merge</li></ul>
+<p><strong>Automated metrics</strong> (cheap, narrow):</p>
+<ul><li>Exact match for structured tasks (math answer, classification)</li><li><strong>String similarity</strong> (BLEU, ROUGE) — known weak signal for generation</li><li><strong>Embedding similarity</strong> to reference — better than ROUGE</li><li><strong>JSON schema compliance</strong> for structured output</li><li><strong>Refusal rate</strong> (does model fail when it should refuse?)</li></ul>
+<p><strong>LLM-as-judge</strong> (medium, broader):</p>
+<ul><li>Stronger model evaluates outputs on rubric</li><li>Score 1-5 on dimensions: relevance / accuracy / safety / format</li><li><strong>3-judge ensemble</strong> if single judge biased</li><li><strong>Calibration</strong>: judge accuracy on hand-labeled subset must be &gt; 90%</li><li><strong>Cost</strong>: ~$0.05/eval, run on 500-sample golden set = $25/CI run</li></ul>
+<p><strong>Human eval</strong> (expensive, gold):</p>
+<ul><li>Curated 50-100 examples reviewed by subject experts</li><li>Run weekly + before major changes</li><li><strong>Use case</strong>: catch what LLM-judge misses (subtle quality, domain nuance)</li></ul>
+<p><strong>Layer 2: Online A/B + Canary</strong></p>
+<p>Post-deploy:</p>
+<ul><li><strong>Canary</strong>: 1% → 5% → 50% → 100% over 1-2 weeks</li><li><strong>A/B test</strong>: half users on new, half on old, measure user outcomes</li><li><strong>Auto-rollback</strong> on error budget breach (e.g., error rate &gt; 1% over 1h)</li></ul>
+<p><strong>User outcomes</strong> (best signal):</p>
+<ul><li><strong>Direct feedback</strong>: thumbs-up / thumbs-down ratio per response</li><li><strong>Implicit signals</strong>: response acceptance / regeneration / abandonment</li><li><strong>Downstream</strong>: did user achieve their goal? (e.g., did the bot resolve the support ticket?)</li><li><strong>Business</strong>: revenue / engagement / retention impact</li></ul>
+<p><strong>Layer 3: Production Drift Monitoring</strong></p>
+<p>Always-on:</p>
+<ul><li><strong>Input distribution drift</strong>: today's queries vs last week. KL divergence alert.</li><li><strong>Output drift</strong>: response length / refusal rate / structure mix</li><li><strong>Error rate</strong>: per request type, alert on spike</li><li><strong>Latency p99</strong></li><li><strong>Per-user / per-tenant metrics</strong> for fairness</li></ul>
+<p><strong>Critical pattern: Online + Production catches what offline misses</strong>:</p>
+<ul><li><strong>Distribution shift</strong> — golden set goes stale</li><li><strong>Adversarial queries</strong> — users find edge cases offline didn't anticipate</li><li><strong>Subtle drift</strong> — model behavior changes after dependency updates</li></ul>
+<p><strong>Special: Human-in-the-loop scaling</strong>:</p>
+<p>Pure human eval doesn't scale. Pattern:</p>
+<ul><li><strong>Triage</strong>: only escalate samples where LLM-judge confidence is low or disagrees with metrics</li><li><strong>Active learning</strong>: model identifies cases it's uncertain on → human reviews → expands golden set</li><li><strong>Expert hours budget</strong>: 10-20% of expert team time on eval is sustainable; more burns out</li></ul>
+<p><strong>Specific tools</strong>:</p>
+<ul><li><strong>Braintrust</strong> / <strong>Langfuse</strong> / <strong>Phoenix</strong> for eval pipelines</li><li><strong>W&amp;B Tables</strong> for offline eval logging</li><li><strong>Grafana</strong> for production drift dashboards</li><li><strong>PagerDuty</strong> for SLO alerts</li></ul>
+<p><strong>Eval cost</strong> at scale:</p>
+<ul><li>1000-query golden set × $0.05 LLM-judge eval = $50 per CI run × 50 runs/week = $2.5k/week</li><li>Production drift: 100M queries/day × $0.001 monitoring = $100/day</li><li>Total: ~$15k/year, often <strong>less than 1% of inference cost</strong>, very worth it</li></ul>
+<p><strong>What I'd warn against</strong>:</p>
+<ul><li><strong>Eval debt</strong>: launching without offline eval, hoping production catches issues. Disaster.</li><li><strong>Goodhart's Law</strong>: optimize for metric → metric gets gamed (e.g., optimize for length → bot gets verbose)</li><li><strong>No human in loop</strong>: 100% LLM-judge → blind spots compound</li><li><strong>Same model judges itself</strong> — biased</li><li><strong>Static golden set</strong> without refresh — gets stale"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>ConvFinQA stratified-300 eval + 9-variant ablation</strong> + <strong>voice agent multi-market eval</strong>:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Offline golden set + auto metrics</td><td>ConvFinQA stratified eval pipeline (你 own)</td></tr><tr><td>LLM-as-judge with disagreement</td><td>ConvFinQA critic 实验 — 4/358 trigger, you honestly reported</td></tr><tr><td>A/B test in production</td><td>Voice agent 7 markets phased rollout</td></tr><tr><td>Drift detection</td><td>Voice agent per-market metric monitoring</td></tr><tr><td>Human-in-loop for low-confidence</td><td>Refund tier — agent flags uncertain → human</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"I've built this exact 3-layer system for two AI projects. For ConvFinQA I built <strong>stratified 300-conv eval + critic variant</strong>, where critic only triggered on percent_change/divide ops — got 4/358 useful flags. The negative result taught me <strong>eval cost vs signal quality trade-off</strong>: aggressive eval triggers cost more but mostly produce noise. <strong>Cheap broad eval + targeted expensive eval beats one-size-fits-all</strong>. For voice agent, we ran <strong>shadow-mode for 4 weeks per market + thumbs feedback + business metric (repayment rate) A/B</strong>. Catching distribution shift on Indonesia after the first week saved 2 weeks of bad metrics."</p></blockquote>
+<p>→ ConvFinQA negative result + voice agent A/B 都是 gold reference。</p>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "LLM-as-judge — how do you know judge is reliable?" <strong>A</strong>: 3-step validation:</p>
+<ol><li><strong>Hand-label 100 examples</strong> by experts (gold standard)</li><li><strong>Run judge on same 100</strong>, compute agreement (Cohen's kappa, accuracy)</li><li>Judge must reach <strong>&gt; 90% agreement</strong> with human to be trusted</li><li><strong>Re-validate quarterly</strong> as model / task drift</li><li><strong>Avoid same model self-eval</strong> — bias</li></ol>
+<p><strong>Q2</strong>: "Customer asks: how confident are you the model is working today?" <strong>A</strong>: Build a <strong>live confidence dashboard</strong>:</p>
+<ul><li>Error budget remaining (e.g., 99.5% SLO, 0.3% burned)</li><li>Drift indicators (input distribution Δ vs 7d baseline)</li><li>Recent canary results</li><li>Human-flag rate (production samples flagged by LLM-judge)</li><li>"Latest weekly human eval pass rate: 94%"</li></ul>
+<p>Show numbers, not feels. Customers trust numbers + trend graphs.</p>
+<p><strong>Q3</strong>: "We don't have user feedback signal. What do we use?" <strong>A</strong>:</p>
+<ul><li><strong>Implicit signals</strong>: regeneration rate (user hit retry), session length, click-through</li><li><strong>Downstream</strong>: did user complete intended action (purchase, file ticket close)</li><li><strong>External sensors</strong>: changes in support ticket volume after deploy</li><li><strong>Hire human eval</strong>: if no implicit signal, contract human eval</li></ul>
+<p><strong>Q4</strong>: "How much should eval cost as % of inference cost?" <strong>A</strong>:</p>
+<ul><li>Mature: 5-15% of inference. &lt; 5% likely under-investing.</li><li>Early production: 20-50% (need confidence in deploys)</li><li>Critical domains (medical, legal): 50%+ — human review on everything</li></ul>
+<p>Cost is justified by avoided incidents (1 silent quality regression in production = lost contract).</p>
+<p><strong>Q5</strong>: "Eval suite passes but customers complain. Why?" <strong>A</strong>: Eval suite doesn't reflect production. Causes:</p>
+<ul><li><strong>Golden set unrepresentative</strong> (e.g., synthetic queries vs real customer language)</li><li><strong>Wrong metric</strong>: ROUGE high but users hate verbose output</li><li><strong>No diversity</strong> in golden set (overfit to certain query type)</li><li><strong>Drift</strong>: production distribution shifted, eval set stale</li></ul>
+<p>Fix: <strong>production sampling</strong>, hand-label random samples weekly, add to eval set. <strong>Always have human review channel</strong>.</p>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Offline only</strong> (no production monitoring)</li><li><strong>Metrics without human</strong> — LLM-judge or implicit signal at minimum</li><li><strong>BLEU / ROUGE for generation</strong> — known weak</li><li><strong>Single judge, same model family</strong> — biased</li><li><strong>Static golden set</strong> — stale fast</li><li><strong>No drift detection</strong> — production silently drifts</li><li><strong>No alerts / SLOs</strong> — discover regression from customer complaint</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>3-layer eval pyramid</strong> explicit</li><li><strong>LLM-judge calibration via human-labeled subset</strong></li><li><strong>Production sampling → golden set refresh</strong></li><li><strong>Goodhart's Law awareness</strong></li><li><strong>Specific tools</strong> (Braintrust, Langfuse, Phoenix)</li><li><strong>Cost as % of inference</strong> (5-15% mature)</li><li><strong>Quote ConvFinQA + voice agent experience</strong></li><li><strong>Confidence dashboard</strong> for customer-facing</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">3-layer eval pyramid:
+  Offline (CI / pre-deploy): golden set + auto + LLM-judge + human
+  Online (canary + A/B): user signals + outcomes
+  Production (always-on): drift + error rate + per-tenant
+
+Offline metrics:
+  - Exact-match (structured)
+  - Embedding similarity (vs ROUGE)
+  - JSON schema compliance
+  - Refusal rate
+  - LLM-judge with rubric
+  - 3-judge ensemble
+  - Human expert weekly
+
+LLM-judge requirements:
+  - Different model than under test
+  - &gt; 90% agreement with human labels
+  - Quarterly recalibration
+  - Rubric not opinion
+
+Online:
+  - Canary 1% → 5% → 50% → 100%
+  - A/B with user outcomes
+  - Auto-rollback on SLO breach
+
+Production:
+  - Input distribution drift (KL divergence)
+  - Output length / refusal rate
+  - Per-tenant error rate
+  - Latency p99
+  - User feedback (thumbs / implicit)
+
+Anti-patterns:
+  - BLEU / ROUGE only for generation
+  - Same model self-eval
+  - Static golden set
+  - No drift detection
+  - No alerts / SLOs
+
+Cost target: 5-15% of inference cost</code></pre>
   </section>
 
   

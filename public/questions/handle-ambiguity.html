@@ -31,7 +31,96 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Hiring Manager Round]</strong></p>
+<p>"How do you <strong>handle ambiguity</strong>? Tell me a story where requirements were unclear and you had to make calls without complete information."</p></blockquote>
+<p><strong>出处</strong>：OpenAI / Google FDE hiring manager 必问. Palantir/Salesforce 也问.</p>
+<p><strong>Round</strong>：Hiring Manager (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>FDE 工作 90% 时间在 ambiguity 里:</p>
+<ol><li><strong>Process</strong> —— 有 framework 处理还是 panic</li><li><strong>Decision-making</strong> —— 在不完整信息下 commit</li><li><strong>Reversibility awareness</strong> —— 知道 one-way vs two-way doors</li><li><strong>Communication</strong> —— 用 stakeholder 验证 vs 自己 silo</li><li><strong>Story quality</strong> —— STAR + 具体 metrics</li></ol>
+<hr />
+<h3>黄金 framework：D·D·D·V</h3>
+<table class="md-table"><thead><tr><th>Step</th><th>What</th></tr></thead><tbody><tr><td><strong>D</strong></td><td><strong>Diagnose ambiguity type</strong> (info-missing vs decision-required vs unknown-unknown)</td></tr><tr><td><strong>D</strong></td><td><strong>Decompose</strong> into known + unknown + assumption</td></tr><tr><td><strong>D</strong></td><td><strong>Decide</strong> by reversibility (one-way: slow + investigate; two-way: ship + measure)</td></tr><tr><td><strong>V</strong></td><td><strong>Validate</strong> with stakeholder + ship + learn</td></tr></tbody></table>
+<hr />
+<h3>你专属 STAR story（用 Indonesia refund tier）</h3>
+<p><strong>Situation</strong>:</p>
+<blockquote><p>"On the voice agent project, the Indonesia regional ops team asked us to <strong>automate refund decisions</strong> — agent could approve or deny refunds without a human. The ask came as a Friday Slack message: 'we want full automation by next quarter, can you do it?'</p>
+<p>There was huge ambiguity: what kinds of refunds, what amount limits, who's accountable for wrong calls, what's the cost of a wrong call, what does 'next quarter' mean."</p></blockquote>
+<p><strong>Task</strong>:</p>
+<blockquote><p>"I had to either commit to a timeline I couldn't actually verify, or push back without scope information, or <strong>find a way to commit conditionally</strong> with information learned along the way."</p></blockquote>
+<p><strong>Action</strong>:</p>
+<blockquote><p>"I did 3 things:</p>
+<p><strong>1. Diagnose</strong> the ambiguity. This was 'decision-required without enough info' — not 'unknown unknown'. The right move was <strong>structured discovery, not pause</strong>.</p>
+<p><strong>2. Decompose</strong>: I broke 'automate refunds' into 3 tiers:</p>
+<ul><li>Tier 1: info lookup (look up policy, balance — agent says read-only facts)</li><li>Tier 2: structured tasks (calculate fees, look up case status)</li><li>Tier 3: refund decisions (approve / deny — the real ask)</li></ul>
+<p>Each tier has different <strong>risk profile</strong> and <strong>decision reversibility</strong>.</p>
+<p><strong>3. Decide by reversibility</strong>:</p>
+<ul><li>Tier 1: <strong>two-way door</strong> (wrong info bot says easy to correct, low cost). Ship in 2 weeks, measure.</li><li>Tier 2: <strong>mostly two-way</strong> (some financial calc, but human reviews). Ship in 4 weeks.</li><li>Tier 3: <strong>one-way door</strong> (wrong refund = direct financial loss, customer trust impact, regulatory). Need 12+ weeks investigation before committing.</li></ul>
+<p><strong>4. Validate</strong>: I went back to ops team with 'here are 3 things I can commit to and timelines, here's why tier 3 needs more time'. They initially pushed for full tier 3 in 8 weeks. <strong>I ran a 2-week pilot showing tier 1 + 2 covered 70% of volume at 0% wrong-call rate, vs full automation projected at 8% wrong-call rate</strong>.</p>
+<p>Data made the call obvious. We shipped tier 1+2 first."</p></blockquote>
+<p><strong>Result</strong>:</p>
+<blockquote><p>"Ops got 70% of throughput at 0% risk in 6 weeks. Tier 3 came online 6 months later <strong>after we had policy + monitoring + human-in-loop infrastructure</strong>. <strong>Zero wrong refunds in production for tier 3 in first 90 days</strong>.</p>
+<p>What I learned: <strong>scope ambiguity is rarely about timeline — it's about the asker not having decomposed the problem yet</strong>. When you decompose for them with reversibility analysis, they often realize their own ask was too broad. Then they thank you."</p></blockquote>
+<p>⏱️ ~3 min spoken. HM can ask deep follow-ups for another 10 min.</p>
+<hr />
+<h3>5 个 "what to NOT say"</h3>
+<p>❌ "I just ship and iterate" → no thoughtfulness, scares hiring manager ❌ "I align with my manager and ask them to decide" → no judgment ❌ "I do a lot of research first" → if literal, can mean analysis paralysis ❌ "It depends" without follow-through → wishy-washy ❌ Generic story without metrics → not memorable</p>
+<hr />
+<h3>5 个 "do say" formulas</h3>
+<p>✅ <strong>"I diagnose what kind of ambiguity it is"</strong> → process signal ✅ <strong>"I decompose into known / unknown / assumption"</strong> → clarity ✅ <strong>"For reversible decisions, I ship fast and measure"</strong> → bias to action ✅ <strong>"For irreversible decisions, I invest in investigation"</strong> → judgment ✅ <strong>"I validate with the stakeholder before final commit"</strong> → collaboration</p>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>Indonesia refund tier story 是 <strong>黄金叙事</strong> for this question. 但你可以扩展：</p>
+<table class="md-table"><thead><tr><th>Question variant</th><th>Best story</th></tr></thead><tbody><tr><td>"Handle ambiguity"</td><td>Indonesia refund tier (decompose + reversibility)</td></tr><tr><td>"Make decision without info"</td><td>Voice agent multi-region rollout (phased + measured)</td></tr><tr><td>"Push back on stakeholder"</td><td>Same — refund tier</td></tr><tr><td>"Bias to action vs caution"</td><td>ConvFinQA — bias to ship, measured, found negative result, <strong>published it honestly</strong></td></tr></tbody></table>
+<hr />
+<h3>5 follow-ups (recruiter / HM 会追问)</h3>
+<p><strong>Q1</strong>: "What if your decomposition is wrong — turn out tier 3 actually fine to automate quickly?" <strong>A</strong>: "Then I learn and reshape. The 2-week pilot was specifically designed to <strong>stress-test my assumption</strong>. If pilot showed 0% wrong-call on tier 3 difficult cases, I'd accelerate. <strong>Decomposition is a hypothesis, not a commandment</strong> — the eval is the truth."</p>
+<p><strong>Q2</strong>: "What if the ops team got angry at the pushback?" <strong>A</strong>: "They were initially frustrated — 'we asked for 8 weeks, why 12 weeks for tier 3'. The reframe that worked: <strong>'I want to give you the right answer faster, not the wrong answer on time'</strong>. Showed them the cost-of-wrong-call analysis (estimated 8% wrong rate × $X per refund = $Y monthly liability). Numbers diffused the emotional ask."</p>
+<p><strong>Q3</strong>: "How do you know when 'decompose more' becomes procrastination?" <strong>A</strong>: "Pragmatic rule: <strong>decomposition that takes longer than 10% of the implementation timeline is over-decomposition</strong>. For a 12-week project, &gt; 1 week of scoping is procrastination. <strong>At some point, ship a small piece and learn from data</strong>. I'd rather over-decompose by 1 day than under-ship for 4 weeks."</p>
+<p><strong>Q4</strong>: "Have you ever made a wrong call under ambiguity?" <strong>A</strong>: Have a real one ready:</p>
+<blockquote><p>"Yes. On the voice agent, I initially scoped the multi-region rollout as 'translate prompts per language, ship'. Turns out <strong>debt-collection cultural norms differ wildly</strong> — what's polite in Thailand is rude in Korea. We had to redo the persona + escalation logic per market. <strong>Cost: 4 extra weeks</strong>. <strong>Lesson: 'localization' for AI means more than translation; I now scope cultural review as part of multi-market projects</strong>."</p></blockquote>
+<p><strong>Q5</strong>: "How do you balance speed and quality under ambiguity?" <strong>A</strong>: "By <strong>reversibility classification</strong>: two-way doors → speed. One-way doors → quality. I explicitly tag every decision when scoping. <strong>Most decisions are two-way and can be reversed cheaply</strong> — over-optimizing for quality on those is waste."</p>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>No structured framework</strong> — just narrative</li><li><strong>Pure speed/pure caution</strong> — no nuance</li><li><strong>Story without metrics</strong> (70% / 0% / 6 weeks)</li><li><strong>Blame stakeholder</strong> for ambiguity</li><li><strong>Solo decision</strong> without stakeholder validation</li><li><strong>Generic story</strong> — sounds rehearsed</li><li><strong>Doesn't tie to what FDE does</strong> (deployment ambiguity)</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>D·D·D·V framework</strong> explicit</li><li><strong>Reversibility classification</strong> (one-way vs two-way doors)</li><li><strong>"Decomposition is hypothesis" awareness</strong></li><li><strong>Specific metrics in story</strong> (70% / 0% / 8 weeks)</li><li><strong>Acknowledge wrong call you made</strong> in follow-up</li><li><strong>Tie to FDE day-to-day</strong> (customer deployment ambiguity is universal)</li><li><strong>Quote business-language framing</strong> ("right answer faster vs wrong answer on time")</li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">D·D·D·V framework:
+  Diagnose ambiguity type
+  Decompose into known / unknown / assumption
+  Decide by reversibility (one-way slow, two-way fast)
+  Validate with stakeholder
+
+Reversibility classifier:
+  Two-way doors → ship + measure (most decisions)
+  One-way doors → investigate first
+  ID at scoping time, not after
+
+Indonesia refund tier story:
+  S: ops wants auto refund "next quarter"
+  T: scope + timeline conflict
+  A: 3-tier decomposition by reversibility,
+     pilot 2 weeks, data-driven reframe
+  R: 70% throughput, 0% risk, 6 weeks
+
+Phrases:
+  "I diagnose what kind of ambiguity"
+  "Reversibility classification"
+  "Two-way doors → ship + measure"
+  "Decomposition is hypothesis"
+  "Right answer faster, not wrong on time"
+
+Anti-patterns:
+  "I just ship"
+  "I ask manager"
+  "I research first"
+  "It depends" without follow-up
+  No metrics</code></pre>
   </section>
 
   

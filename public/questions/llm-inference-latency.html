@@ -31,7 +31,144 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目（verbatim）</h3>
+<blockquote><p><strong>[OpenAI Technical Screen]</strong></p>
+<p>"How would you <strong>diagnose high latency in an LLM inference pipeline</strong> in production?"</p></blockquote>
+<p><strong>出处</strong>：OpenAI FDE 真题, Google FDE (Vertex AI inference) 必问.</p>
+<p><strong>Round</strong>：Technical Screen (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>LLM serving production 经验</strong>：</p>
+<ol><li><strong>Inference pipeline 各阶段</strong> —— 知道哪些 component 在 critical path</li><li><strong>常见 bottleneck pattern</strong> —— TTFT vs throughput 区分</li><li><strong>vLLM / SGLang / TensorRT 优化点</strong> —— 知不知道</li><li><strong>Cold start vs steady state</strong></li><li><strong>Diagnosis order</strong> —— cheapest first</li></ol>
+<hr />
+<h3>LLM inference pipeline 解剖</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Request → API Gateway → Rate limiter → Auth
+              ↓
+        Token Service / OAuth
+              ↓
+        Pre-processing (prompt assembly, RAG retrieve)
+              ↓
+        Inference Engine (vLLM / SGLang / TensorRT)
+              ↓ 
+              ├── Tokenize input
+              ├── Prefill (compute KV cache for prompt)
+              ├── Decode (generate tokens, autoregressive)
+              ├── Stream tokens back
+              ↓
+        Post-processing (parse JSON, validate, structured output)
+              ↓
+        Response to client</code></pre>
+<p>每段都可能是瓶颈, <strong>每段 latency 量级不同</strong>:</p>
+<table class="md-table"><thead><tr><th>Stage</th><th>Typical latency</th><th>Common pathology</th></tr></thead><tbody><tr><td>Gateway / auth</td><td>&lt; 5ms</td><td>Token Service 1 hop adds 5-50ms</td></tr><tr><td>RAG retrieve</td><td>20-100ms</td><td>Vector DB cold start, network</td></tr><tr><td>Tokenize</td><td>1-5ms</td><td>Big prompt, rare unicode</td></tr><tr><td>Prefill</td><td>50-500ms</td><td>Long context, batch size, no KV cache hit</td></tr><tr><td>Decode</td><td>10-30 tokens/s</td><td>Model size, sampling, batch contention</td></tr><tr><td>Post-process</td><td>&lt; 10ms</td><td>Structured output (JSON schema enforce)</td></tr><tr><td>Network egress</td><td>&lt; 5ms</td><td>Cross-region, TLS handshake</td></tr></tbody></table>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-3 min</td><td>Clarify which latency (TTFT? throughput? total?)</td></tr><tr><td>3-10 min</td><td>Walk down 7-stage pipeline, where to add timing</td></tr><tr><td>10-25 min</td><td>Common pathology patterns</td></tr><tr><td>25-40 min</td><td>Tools for diagnosis (traces, profiles)</td></tr><tr><td>40-60 min</td><td>Specific scenario deep dive</td></tr></tbody></table>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Which latency metric</strong></p>
+<blockquote><p>"p50 / p99 / max? <strong>Time-to-first-token (TTFT)</strong> or <strong>time-to-last-token (TTLT)</strong> or total? Streaming or non-streaming?"</p></blockquote>
+<p><strong>2. New problem or recent regression</strong></p>
+<blockquote><p>"Always slow, or got worse recently? If recent: deploy / config / traffic change?"</p></blockquote>
+<p><strong>3. All requests or specific</strong></p>
+<blockquote><p>"Long prompts only? Specific user / tenant? Specific time of day?"</p></blockquote>
+<p><strong>4. Magnitude</strong></p>
+<blockquote><p>"How much over expectation — 2x slower, 10x slower? Helps narrow."</p></blockquote>
+<p><strong>5. Existing observability</strong></p>
+<blockquote><p>"Do we have per-stage timing? Trace spans? Or do I need to add instrumentation first?"</p></blockquote>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: streaming use case, <strong>TTFT (time-to-first-token) p99 jumped from 800ms to 3.5s</strong> last week, only on <strong>long prompt requests (&gt;2k tokens)</strong>, observability shows total time but no per-stage breakdown]</em>.</p>
+<p>Last week change + long prompt + TTFT → <strong>strong hypothesis: prefill bottleneck</strong>, but I'd still go systematic.</p>
+<p><strong>Step 1: Add per-stage timing first</strong> (1h) Without breakdown, all diagnosis is guess. Instrument:</p>
+<ul><li><code>gateway_start</code>, <code>auth_done</code>, <code>prompt_assembled</code>, <code>rag_retrieved</code>, <code>tokenized</code>, <code>prefill_done</code>, <code>first_token</code>, <code>last_token</code>, <code>response_sent</code></li><li>Tag each span with <code>prompt_tokens</code>, <code>output_tokens</code>, <code>model_id</code>, <code>region</code>, <code>tenant_id</code></li></ul>
+<p><strong>Step 2: Look at where the 2.7s went</strong> (1h) If it's prefill (KV cache compute on prompt): consistent with long prompt → <strong>prefill bottleneck</strong> If it's decode: not it (TTFT regression, not throughput) If it's RAG: pre-prompt step</p>
+<p><strong>Step 3: Common prefill bottleneck causes</strong>:</p>
+<p><strong>A: Long prompt + small batch</strong> Prefill compute scales O(N²) with prompt tokens. 2k → 4k prompt is 4x compute. Combined with low batch utilization → bad. <strong>Fix</strong>: enable <strong>prefix caching</strong> (vLLM, SGLang both support) — if many requests share prefix (e.g., system prompt), cache its KV.</p>
+<p><strong>B: KV cache eviction under load</strong> If GPU memory full, KV from one request evicted, <strong>prefill recomputes</strong> on next access. Catastrophic. <strong>Fix</strong>: paged-attention (vLLM standard), increase GPU memory, or reduce max concurrent.</p>
+<p><strong>C: Batch size too small (low GPU utilization)</strong> vLLM continuous batching: if traffic light, batches small, GPU underutilized but still N² <strong>Fix</strong>: chunked prefill — break long prefill into chunks that mix with decode in same step. SGLang 默认开.</p>
+<p><strong>D: Cold start / model not warm</strong> First request after idle: weights paged from CPU to GPU, slow. <strong>Fix</strong>: keepalive / scheduled warm-up</p>
+<p><strong>E: Tensor parallelism overhead</strong> If TP=4 (model split across 4 GPUs), cross-GPU comm adds latency. <strong>Fix</strong>: tune TP based on batch size; smaller batch → less TP benefit.</p>
+<p><strong>F: Tokenizer / preprocessing</strong> Rare but real — unusual unicode, large vocabulary, slow tokenize.</p>
+<p><strong>G: Quantization mode mismatch</strong> If runtime quantization (FP16 → INT8) is on but kernels are slow → unexpected lag</p>
+<p><strong>Step 4: After identifying, fix + measure</strong> (4h)</p>
+<p><strong>For long-prompt regression specifically</strong>:</p>
+<ol><li>Check vLLM version / config — was prefix caching disabled?</li><li>Check if max prompt length recently bumped (causing more requests to hit slow path)</li><li>Check GPU memory headroom — under load?</li><li>Test with <strong>chunked prefill</strong> enabled</li></ol>
+<p><strong>Step 5: Tools I'd use</strong>:</p>
+<ul><li><strong>NVIDIA Nsight Systems</strong> for GPU profile (kernel-level breakdown)</li><li><strong>vLLM metrics endpoint</strong> (request scheduler stats, batch sizes, GPU util)</li><li><strong>PyTorch Profiler</strong> for ad-hoc CPU/GPU stage timing</li><li><strong>Distributed tracing</strong> (Jaeger / OpenTelemetry) for cross-service</li><li><code>nvidia-smi dmon -s u</code> for live GPU util</li></ul>
+<p><strong>Step 6: Prevent recurrence</strong>:</p>
+<ul><li><strong>TTFT SLO + alert</strong> on regression</li><li><strong>Synthetic canary</strong>: 100 standard prompts every 5 min, measure latency, alert on p99 deviation</li><li><strong>Per-deploy automated benchmark</strong>: prefill / decode / total latency baseline before merge</li></ul>
+<p><strong>What I'd skip on first pass</strong>:</p>
+<ul><li>Hardware change (more GPUs) — expensive, fix software first</li><li>Model swap to smaller — quality regression risk"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<p>你的 <strong>vLLM / SGLang post-training infra</strong> + <strong>voice agent latency</strong>:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>LLM inference optimization</td><td><strong>你简历直接写 'vLLM, SGLang, memory-efficiency tuning'</strong></td></tr><tr><td>Streaming voice latency p99 &lt; 800ms</td><td>Voice agent 你 own</td></tr><tr><td>KV cache management</td><td>Multi-turn voice agent 必处理</td></tr><tr><td>GPU profiling</td><td>vLLM tuning 你做过</td></tr></tbody></table>
+<p><strong>主动说</strong>:</p>
+<blockquote><p>"I literally lived this in our voice agent. We hit a TTFT regression after upgrading vLLM 0.5 → 0.6 — turned out prefix caching default changed, our system prompt re-prefilled every request. Adding <strong>explicit prefix cache hint + chunked prefill</strong> brought TTFT from 1.2s back to 400ms. The pattern I'd recommend: <strong>never assume your infra config is what you think — diff against the actual runtime config before each diagnosis</strong>."</p></blockquote>
+<p>→ 这是你简历最强 match 的题, 一定 ace。</p>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "GPU at 100% but latency is still high. What gives?" <strong>A</strong>:</p>
+<ul><li>100% GPU util ≠ effective work. Could be memory copy / kernel launch overhead</li><li><strong>Profile</strong>: NVIDIA Nsight → check kernel-level. If <code>Memcpy</code> 占 30% → memory bound, not compute</li><li><strong>vLLM stats</strong>: check <code>gpu_cache_usage</code> — if &gt; 95%, KV cache pressure causing eviction</li><li>Could be <strong>batch wait time</strong> — requests waiting for batch fill, GPU not the bottleneck</li></ul>
+<p><strong>Q2</strong>: "Smaller model latency similar to bigger model. Why?" <strong>A</strong>:</p>
+<ul><li><strong>Network / preprocessing</strong> dominates if model compute is small</li><li><strong>Batch overhead constant</strong> regardless of model size</li><li><strong>Decode speed</strong> is memory-bandwidth-bound, smaller model marginal improvement</li><li>Smaller model wins on <strong>throughput</strong> more than latency unless prompt is huge</li></ul>
+<p><strong>Q3</strong>: "Customer reports 5x latency, but our metrics show p99 fine. Disconnect?" <strong>A</strong>:</p>
+<ul><li>Metrics likely miss <strong>client-perceived</strong> latency: TLS handshake, DNS, client-side parsing</li><li>Add <strong>client SDK timing</strong>: time from user action → display</li><li><strong>Mid-percentile drift</strong>: p99 fine but p99.9 catastrophic → "they happen to land on the long-tail"</li><li><strong>Streaming TTFT vs TTLT</strong> mismatch: customer sees TTLT, we measure TTFT</li></ul>
+<p><strong>Q4</strong>: "vLLM vs SGLang vs TensorRT — which for production?" <strong>A</strong>:</p>
+<ul><li><strong>vLLM</strong>: most popular, broad model support, good ops tooling. Default choice.</li><li><strong>SGLang</strong>: faster (better chunked prefill, RadixAttention), but newer + smaller community</li><li><strong>TensorRT-LLM</strong>: highest throughput for NVIDIA, locked into NVIDIA stack, complex to operate</li><li>For most: <strong>vLLM</strong>. For very high QPS / NVIDIA-only: TensorRT-LLM. For latency-sensitive multi-turn: try SGLang.</li></ul>
+<p><strong>Q5</strong>: "Multi-region serving — how route?" <strong>A</strong>:</p>
+<ul><li><strong>Latency-based routing</strong> (AWS Global Accelerator / GCP Premium Tier): user → closest region</li><li><strong>Affinity routing</strong> for multi-turn: same user → same region → reuse KV cache</li><li><strong>Failover</strong>: region failure → next closest, prewarm second-region cache</li><li><strong>Cost optimization</strong>: cheaper inference in US-East, route batch / async there</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>No per-stage instrumentation first</strong> — diagnosis by hypothesis</li><li><strong>Confuse TTFT vs TTLT vs throughput</strong></li><li><strong>Hardware fix first</strong> (more GPUs) — expensive</li><li><strong>Don't know vLLM features</strong> — prefix cache, chunked prefill, paged attention</li><li><strong>Skip GPU memory check</strong> — KV cache pressure subtle</li><li><strong>Don't profile, just guess</strong> — Nsight / vLLM metrics are free</li><li><strong>No SLO / canary</strong> to prevent recurrence</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>7-stage pipeline breakdown</strong></li><li><strong>Per-stage instrumentation first</strong> before fix</li><li><strong>7 common prefill pathology</strong> (A-G)</li><li><strong>Specific tools</strong> (Nsight, vLLM metrics, OTel)</li><li><strong>Prefix caching</strong> as standard</li><li><strong>Chunked prefill</strong> technique</li><li><strong>Synthetic canary</strong> for regression prevention</li><li><strong>Quote vLLM 0.5→0.6 upgrade experience</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">LLM inference 7 stages:
+  Gateway/auth (5ms)
+  RAG retrieve (20-100ms)
+  Tokenize (1-5ms)
+  Prefill (50-500ms, O(N²))
+  Decode (10-30 tok/s)
+  Post-process (10ms)
+  Network egress (5ms)
+
+Metrics distinguish:
+  TTFT (time to first token) — UX for streaming
+  TTLT (time to last token) — total
+  Throughput (tokens/s) — capacity
+
+Common prefill bottleneck (A-G):
+  A: Long prompt + small batch → prefix cache
+  B: KV cache eviction → paged-attention + more mem
+  C: Batch too small → chunked prefill
+  D: Cold start → keepalive / warm
+  E: TP overhead → tune TP per batch
+  F: Tokenizer slow → rare
+  G: Quantization mode → check config
+
+Diagnosis order:
+  1. Instrument per-stage (free, must do first)
+  2. Identify regression stage from spans
+  3. Check vLLM/SGLang config diff
+  4. Check GPU memory + util
+  5. Profile with Nsight
+  6. Test fix on canary
+  7. Add SLO + alert
+
+Tools:
+  - vLLM metrics endpoint
+  - NVIDIA Nsight Systems
+  - PyTorch Profiler
+  - Jaeger / OpenTelemetry
+  - nvidia-smi dmon -s u
+
+Stack choice:
+  vLLM default
+  SGLang for low-latency multi-turn
+  TensorRT-LLM for max throughput NVIDIA-only</code></pre>
   </section>
 
   
