@@ -37,7 +37,182 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"Customer wants to serve a fine-tuned LLM at <strong>1M QPS</strong>, p99 latency &lt; 1s. Walk through your <strong>serving stack</strong>: hardware, software, optimizations."</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"Why is vLLM faster than naive transformer serving? Walk through PagedAttention + continuous batching."</p></blockquote>
+<p><strong>Round</strong>: LLM Infra / Serving (60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>LLM serving infra</strong>:</p>
+<ol><li><strong>Continuous batching</strong> —— vLLM 核心</li><li><strong>PagedAttention</strong> —— KV cache 管理</li><li><strong>Prefix caching</strong> —— shared prompt 优化</li><li><strong>Speculative decoding</strong> —— 小 model + 大 model</li><li><strong>Parallelism</strong> —— TP / PP / data parallel</li><li><strong>Production stack</strong> —— Triton / vLLM / SGLang / TensorRT</li></ol>
+<p>这是你简历明确有的领域 ("vLLM, SGLang, Megatron, DeepSpeed").</p>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Model size</strong></p>
+<blockquote><p>"7B / 70B / 400B params? Determines GPU class + parallelism."</p></blockquote>
+<p><strong>2. Request profile</strong></p>
+<blockquote><p>"Avg input + output tokens? Burst / steady?"</p></blockquote>
+<p><strong>3. SLA</strong></p>
+<blockquote><p>"p99 &lt; 1s — for TTFT (time to first token) or full response?"</p></blockquote>
+<p><strong>4. Cost target</strong></p>
+<blockquote><p>"$ per 1K tokens you can charge / spend?"</p></blockquote>
+<p><strong>5. Hardware available</strong></p>
+<blockquote><p>"H100s / A100s / TPUs / mixed? Cloud / on-prem?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify model / load / SLA / hardware</td></tr><tr><td>5-15 min</td><td>Hardware + parallelism plan</td></tr><tr><td>15-25 min</td><td>vLLM internals (batching + PagedAttention)</td></tr><tr><td>25-35 min</td><td>Optimizations (prefix cache / spec decode / quantization)</td></tr><tr><td>35-45 min</td><td>Routing / autoscaling / observability</td></tr><tr><td>45-60 min</td><td>Cost math + failover</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: 70B model, avg in/out 500/200 tokens, p99 &lt; 1s for full response, $0.001/1K tokens target, H100 80GB available]</em>.</p>
+<p><strong>1M QPS at 70B is non-trivial</strong>: 1M QPS × 700 tokens/req = 700M tokens/sec. At 100 tokens/sec/GPU baseline = 7M GPUs naively. So we need <strong>batching + concurrency tricks</strong> for orders-of-magnitude speedup.</p>
+<p><strong>Hardware + parallelism plan</strong>:</p>
+<p>70B in FP16 = 140GB → must split across GPUs.</p>
+<pre class="language-plaintext"><code class="language-plaintext">Tensor Parallelism (TP=8): model split column-wise across 8 GPUs
+Per-replica: 8 × H100 80GB
+1 replica throughput: ~3-5K tokens/sec output (with batching)
+For 700M tokens/sec → need ~150K-200K replicas → ~1.5M GPUs</code></pre>
+<p>Realistic numbers say no single deployment hits 1M QPS for 70B. So:</p>
+<ul><li>Distill / cascade: cheaper model handles 90%, escalate to 70B for hard</li><li>Or scale horizontally with router</li></ul>
+<p><strong>vLLM internals</strong> (核心):</p>
+<p><strong>Continuous batching</strong>:</p>
+<p>Naive batching: collect N requests, pad to longest, process. Wastes compute on padding + delayed requests.</p>
+<p>vLLM continuous batching: at each step (one token generation), <strong>independently scheduled per request</strong>. New request joins running batch; completed exits. No padding waste.</p>
+<pre class="language-plaintext"><code class="language-plaintext">Time T0: batch = [req_A (gen tok 5), req_B (gen tok 12)]
+Time T1: req_C arrives, batch = [req_A (tok 6), req_B (tok 13), req_C (prefill)]
+Time T2: req_B done, req_D arrives, batch = [req_A (tok 7), req_C (gen tok 1), req_D (prefill)]</code></pre>
+<p>Throughput: 5-10x naive batching.</p>
+<p><strong>PagedAttention</strong>:</p>
+<p>KV cache for transformer can be huge (multi-GB per request). Naive: pre-allocate max possible per request → wasteful.</p>
+<p>vLLM PagedAttention: store KV cache in <strong>pages</strong> (like OS virtual memory).</p>
+<ul><li>Each request has page table mapping logical → physical pages</li><li>Pages allocated on-demand, freed when request done</li><li>Multiple requests share unused page space</li></ul>
+<p>Result: 24x more concurrent requests fit in GPU memory.</p>
+<p><strong>Prefix caching</strong>:</p>
+<p>Common scenario: many requests share prefix (system prompt, RAG context).</p>
+<pre class="language-plaintext"><code class="language-plaintext">Req A: [system prompt] [RAG: doc-X] [user query 1]
+Req B: [system prompt] [RAG: doc-X] [user query 2]
+Shared prefix: [system prompt] [RAG: doc-X]</code></pre>
+<p>Compute KV for prefix once, reuse across requests. Saves prefill compute.</p>
+<p>Gains: 2-3x for FAQ workloads (lots of repeated prefix).</p>
+<p><strong>Speculative decoding</strong>:</p>
+<p>Small draft model proposes N tokens fast, big model verifies in parallel.</p>
+<pre class="language-python"><code class="language-python"># Draft: 7B model proposes [tok_a, tok_b, tok_c, tok_d]
+# Big: 70B model evaluates all 4 in parallel
+# Accept until first divergence</code></pre>
+<p>If acceptance rate 70%, get ~2-3x latency reduction. Best for latency-sensitive.</p>
+<p><strong>Quantization</strong>:</p>
+<p>FP16 → INT8 / FP8 / INT4. 70B FP16 (140GB) → INT4 (35GB). Less GPUs needed, faster ops.</p>
+<p>Quality cost: 1-3% on benchmark. Production: usually OK.</p>
+<p>Tools: <strong>GPTQ, AWQ, FP8 (H100 native)</strong>.</p>
+<p><strong>Stack choice</strong>:</p>
+<table class="md-table"><thead><tr><th>Component</th><th>Choice</th><th>Why</th></tr></thead><tbody><tr><td>Serving engine</td><td><strong>vLLM 0.6+</strong></td><td>Continuous batch + paged attn + prefix cache built-in</td></tr><tr><td>Or <strong>SGLang</strong></td><td>Better for structured output / multi-LoRA</td></tr><tr><td>Lower-level</td><td><strong>TensorRT-LLM</strong></td><td>Best raw throughput, more setup</td></tr><tr><td>Frontend</td><td><strong>Triton Inference Server</strong></td><td>Multi-model deployment</td></tr><tr><td>Routing</td><td>Custom or <strong>Envoy + custom filter</strong></td><td>Tenant / model routing</td></tr></tbody></table>
+<p><strong>Routing layer</strong>:</p>
+<pre class="language-python"><code class="language-python">def route(request):
+    model = decide_model(request)  # complexity-based routing
+    replica = least_loaded_replica(model)
+    return replica.handle(request)</code></pre>
+<p>Cost-aware routing: cheap model first, escalate.</p>
+<p><strong>Autoscaling</strong>:</p>
+<p>Predict load 5-15 min ahead (time-of-day patterns), pre-warm GPUs. Cold start of LLM serving is <strong>slow</strong> (load weights 1-5 min).</p>
+<p>Strategies:</p>
+<ul><li><strong>Pre-allocated buffer</strong>: 20% extra capacity always running</li><li><strong>Burst absorber</strong>: queue with timeout, cheap model spillover</li><li><strong>Graceful degradation</strong>: reduce quality (smaller model) under load</li></ul>
+<p><strong>Observability</strong>:</p>
+<table class="md-table"><thead><tr><th>Metric</th><th>Why</th></tr></thead><tbody><tr><td>TTFT (time-to-first-token)</td><td>User-perceived latency</td></tr><tr><td>TPOT (time-per-output-token)</td><td>Throughput per request</td></tr><tr><td>Batch size avg / max</td><td>Utilization</td></tr><tr><td>KV cache utilization</td><td>Memory pressure</td></tr><tr><td>Token cost per request</td><td>Economics</td></tr><tr><td>Queue depth</td><td>Backpressure signal</td></tr><tr><td>Eval pass rate (sampled)</td><td>Quality drift</td></tr></tbody></table>
+<p><strong>Cost math</strong>:</p>
+<p>H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.0002/1K tokens raw compute. Plus: prefix-cache hit gains, batching efficiency. Achievable: $0.001-0.002 / 1K tokens with optimization.</p>
+<p><strong>Failover</strong>:</p>
+<ul><li>Per-replica health check (heartbeat)</li><li>Inflight requests on failed replica → retry on healthy</li><li>KV cache lost on failover; LLM redoes prefill (acceptable, &lt; 1s usually)</li></ul>
+<p><strong>What NOT to do</strong>:</p>
+<ul><li>Naive batching (no continuous)</li><li>Pre-allocate KV per request (use PagedAttention)</li><li>Spawn replica per request (use multi-tenant)</li><li>Skip prefix caching for FAQ-like workloads</li><li>Ignore quantization (50% cost savings free)"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>vLLM / SGLang</td><td>你简历明列</td></tr><tr><td>Megatron / DeepSpeed</td><td>你简历明列 — TP/PP 你 know</td></tr><tr><td>GPU-accelerated inference</td><td>你简历明列</td></tr><tr><td>Cost optimization</td><td>TikTok payment infra scale</td></tr><tr><td>Multi-tenant routing</td><td>Voice agent 7 markets</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"I worked on vLLM + SGLang serving stack for a 70B fine-tuned model. Continuous batching alone got us 6x throughput over static batching. Adding <strong>prefix caching</strong> for our agent-loop (where system prompt is shared across all calls in a session) saved another 30% prefill compute. We used <strong>TP=8 + speculative decoding</strong> with 7B draft model — for latency-bound calls (voice agent), TTFT dropped from 800ms to 300ms. INT8 quantization let us fit 2 replicas where 1 fit before, near-zero quality loss on eval set."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "TTFT vs TPOT trade-off?" <strong>A</strong>:</p>
+<ul><li><strong>TTFT</strong> matters for streaming UX (user starts seeing tokens)</li><li><strong>TPOT</strong> matters for total completion time</li><li>vLLM optimizes both via batching</li><li>Speculative decoding: TTFT slightly worse, TPOT better</li><li>Per-use-case: chat priority TTFT, batch priority TPOT</li></ul>
+<p><strong>Q2</strong>: "Multi-LoRA serving — many fine-tuned versions of base model. Approach?" <strong>A</strong>:</p>
+<ul><li><strong>S-LoRA / Punica</strong>: serve many LoRA adapters on same base model</li><li>Base model weights shared in GPU</li><li>LoRA adapters small (~MB), hot-swap per request</li><li>vLLM 0.6+ supports built-in</li><li>Saves cost massively vs separate replicas per fine-tune</li></ul>
+<p><strong>Q3</strong>: "Autoscaling for spikes — LLM cold start 1-5 min. How handle?" <strong>A</strong>:</p>
+<ul><li><strong>Pre-warm buffer</strong>: always 20% extra running</li><li><strong>Predictive scaling</strong>: time-of-day patterns, pre-warm 10 min ahead</li><li><strong>Burst spillover</strong>: overflow to cheaper model / queue</li><li><strong>Graceful degradation</strong>: smaller model during spike</li></ul>
+<p><strong>Q4</strong>: "vLLM vs SGLang vs TensorRT-LLM — when each?" <strong>A</strong>:</p>
+<ul><li><strong>vLLM</strong>: most popular, best continuous batching, easy setup</li><li><strong>SGLang</strong>: structured output (JSON / regex), multi-LoRA, lang-level optimization</li><li><strong>TensorRT-LLM</strong>: max raw throughput, complex setup, NVIDIA-locked</li><li><strong>Default</strong>: vLLM unless need specific feature</li></ul>
+<p><strong>Q5</strong>: "Eval quality drops mysteriously. Debug?" <strong>A</strong>:</p>
+<ul><li><strong>Quantization regression</strong>: INT8 too aggressive on certain queries</li><li><strong>Speculative decoding accept rate too low</strong> → silent quality drop</li><li><strong>Prefix cache corruption</strong> rare bug</li><li>Eval suite must include corner cases for these specific optims</li><li><strong>A/B</strong>: route 5% to baseline (no optims), compare quality</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Naive batching</strong> — 5x throughput loss</li><li><strong>Pre-allocate KV per request</strong> — use PagedAttention</li><li><strong>No prefix cache for FAQ workload</strong> — leave 2-3x on table</li><li><strong>One GPU per replica</strong> — for 70B impossible</li><li><strong>No quantization</strong> — 50% extra cost</li><li><strong>No autoscaling pre-warm</strong> — cold start kills burst</li><li><strong>No quality eval per optim</strong> — silent regression</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Continuous batching mechanics</strong> explained</li><li><strong>PagedAttention</strong> with virtual-memory analogy</li><li><strong>Prefix caching</strong> for shared prefix</li><li><strong>Speculative decoding</strong> trade-off</li><li><strong>TP/PP</strong> for big models</li><li><strong>Quantization</strong> (INT8/INT4 + FP8 native H100)</li><li><strong>vLLM/SGLang/TensorRT-LLM</strong> stack choice rationale</li><li><strong>TTFT vs TPOT</strong> distinction</li><li><strong>Cost math</strong> explicit</li><li><strong>Quote your vLLM+SGLang work</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">6 levers for high throughput:
+  1. Continuous batching (vLLM) — 5-10x naive
+  2. PagedAttention — 24x more concurrent
+  3. Prefix caching — 2-3x repeated prefix
+  4. Speculative decoding — 2-3x latency
+  5. Tensor parallelism — big model fit
+  6. Quantization (INT8/INT4/FP8) — 50% memory
+
+Stack:
+  Engine: vLLM (default) / SGLang (structured) / TensorRT-LLM (max)
+  Frontend: Triton
+  Routing: Envoy + custom
+
+Parallelism strategies:
+  TP: split model across GPUs (column-wise)
+  PP: split layers across GPUs (pipeline)
+  DP: replicate model, split batch
+  Combine for big models (70B+)
+
+Latency optimization:
+  Speculative decoding (small draft → big verify)
+  KV cache reuse (prefix)
+  FlashAttention v2/v3
+  CUDA graphs
+
+Throughput optimization:
+  Continuous batching
+  Larger batch sizes
+  PagedAttention
+  S-LoRA multi-tenancy
+
+Quantization:
+  INT8 — 1-2% quality cost
+  INT4 — 2-5% quality cost
+  FP8 — H100 native, near-FP16 quality
+  Tools: GPTQ, AWQ, FP8
+
+Routing:
+  Cost-aware (cheap first, escalate)
+  Least-loaded replica
+  Tenant isolation
+  Burst spillover
+
+Autoscaling:
+  Pre-warm 20% buffer
+  Predictive (time-of-day)
+  Burst absorber (queue + cheap model)
+  Graceful degradation
+
+Observability:
+  TTFT / TPOT
+  Batch size avg/max
+  KV cache util
+  Token cost / req
+  Queue depth
+  Eval quality (5% baseline A/B)
+
+红线:
+  - Naive batching
+  - Pre-allocate KV
+  - One GPU per req
+  - No quantization
+  - No autoscale
+  - No quality eval per optim</code></pre>
   </section>
 
   
@@ -49,7 +224,369 @@
     <a href="gfde-t3-observability.html">T3.4 · Observability for Agent System (tracing / logging / metrics) →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "Customer wants to serve a fine-tuned LLM at **1M QPS**, p99 latency < 1s. Walk through your **serving stack**: hardware, software, optimizations."
+
+或追问形态:
+
+> "Why is vLLM faster than naive transformer serving? Walk through PagedAttention + continuous batching."
+
+**Round**: LLM Infra / Serving (60 min)
+
+---
+
+## 这道题在考什么
+
+考你**LLM serving infra**:
+
+1. **Continuous batching** —— vLLM 核心
+2. **PagedAttention** —— KV cache 管理
+3. **Prefix caching** —— shared prompt 优化
+4. **Speculative decoding** —— 小 model + 大 model
+5. **Parallelism** —— TP / PP / data parallel
+6. **Production stack** —— Triton / vLLM / SGLang / TensorRT
+
+这是你简历明确有的领域 ("vLLM, SGLang, Megatron, DeepSpeed").
+
+---
+
+## 必问 clarifying
+
+**1. Model size**
+
+> "7B / 70B / 400B params? Determines GPU class + parallelism."
+
+**2. Request profile**
+
+> "Avg input + output tokens? Burst / steady?"
+
+**3. SLA**
+
+> "p99 < 1s — for TTFT (time to first token) or full response?"
+
+**4. Cost target**
+
+> "$ per 1K tokens you can charge / spend?"
+
+**5. Hardware available**
+
+> "H100s / A100s / TPUs / mixed? Cloud / on-prem?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify model / load / SLA / hardware |
+| 5-15 min | Hardware + parallelism plan |
+| 15-25 min | vLLM internals (batching + PagedAttention) |
+| 25-35 min | Optimizations (prefix cache / spec decode / quantization) |
+| 35-45 min | Routing / autoscaling / observability |
+| 45-60 min | Cost math + failover |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: 70B model, avg in/out 500/200 tokens, p99 < 1s for full response, $0.001/1K tokens target, H100 80GB available]*.
+>
+> **1M QPS at 70B is non-trivial**: 1M QPS × 700 tokens/req = 700M tokens/sec. At 100 tokens/sec/GPU baseline = 7M GPUs naively. So we need **batching + concurrency tricks** for orders-of-magnitude speedup.
+>
+> **Hardware + parallelism plan**:
+>
+> 70B in FP16 = 140GB → must split across GPUs.
+>
+> ```
+> Tensor Parallelism (TP=8): model split column-wise across 8 GPUs
+> Per-replica: 8 × H100 80GB
+> 1 replica throughput: ~3-5K tokens/sec output (with batching)
+> For 700M tokens/sec → need ~150K-200K replicas → ~1.5M GPUs
+> ```
+>
+> Realistic numbers say no single deployment hits 1M QPS for 70B. So:
+> - Distill / cascade: cheaper model handles 90%, escalate to 70B for hard
+> - Or scale horizontally with router
+>
+> **vLLM internals** (核心):
+>
+> **Continuous batching**:
+>
+> Naive batching: collect N requests, pad to longest, process. Wastes compute on padding + delayed requests.
+>
+> vLLM continuous batching: at each step (one token generation), **independently scheduled per request**. New request joins running batch; completed exits. No padding waste.
+>
+> ```
+> Time T0: batch = [req_A (gen tok 5), req_B (gen tok 12)]
+> Time T1: req_C arrives, batch = [req_A (tok 6), req_B (tok 13), req_C (prefill)]
+> Time T2: req_B done, req_D arrives, batch = [req_A (tok 7), req_C (gen tok 1), req_D (prefill)]
+> ```
+>
+> Throughput: 5-10x naive batching.
+>
+> **PagedAttention**:
+>
+> KV cache for transformer can be huge (multi-GB per request). Naive: pre-allocate max possible per request → wasteful.
+>
+> vLLM PagedAttention: store KV cache in **pages** (like OS virtual memory). 
+> - Each request has page table mapping logical → physical pages
+> - Pages allocated on-demand, freed when request done
+> - Multiple requests share unused page space
+>
+> Result: 24x more concurrent requests fit in GPU memory.
+>
+> **Prefix caching**:
+>
+> Common scenario: many requests share prefix (system prompt, RAG context).
+>
+> ```
+> Req A: [system prompt] [RAG: doc-X] [user query 1]
+> Req B: [system prompt] [RAG: doc-X] [user query 2]
+> Shared prefix: [system prompt] [RAG: doc-X]
+> ```
+>
+> Compute KV for prefix once, reuse across requests. Saves prefill compute.
+>
+> Gains: 2-3x for FAQ workloads (lots of repeated prefix).
+>
+> **Speculative decoding**:
+>
+> Small draft model proposes N tokens fast, big model verifies in parallel.
+>
+> ```python
+> # Draft: 7B model proposes [tok_a, tok_b, tok_c, tok_d]
+> # Big: 70B model evaluates all 4 in parallel
+> # Accept until first divergence
+> ```
+>
+> If acceptance rate 70%, get ~2-3x latency reduction. Best for latency-sensitive.
+>
+> **Quantization**:
+>
+> FP16 → INT8 / FP8 / INT4. 70B FP16 (140GB) → INT4 (35GB). Less GPUs needed, faster ops.
+>
+> Quality cost: 1-3% on benchmark. Production: usually OK.
+>
+> Tools: **GPTQ, AWQ, FP8 (H100 native)**.
+>
+> **Stack choice**:
+>
+> | Component | Choice | Why |
+> |---|---|---|
+> | Serving engine | **vLLM 0.6+** | Continuous batch + paged attn + prefix cache built-in |
+> | Or **SGLang** | Better for structured output / multi-LoRA |
+> | Lower-level | **TensorRT-LLM** | Best raw throughput, more setup |
+> | Frontend | **Triton Inference Server** | Multi-model deployment |
+> | Routing | Custom or **Envoy + custom filter** | Tenant / model routing |
+>
+> **Routing layer**:
+>
+> ```python
+> def route(request):
+>     model = decide_model(request)  # complexity-based routing
+>     replica = least_loaded_replica(model)
+>     return replica.handle(request)
+> ```
+>
+> Cost-aware routing: cheap model first, escalate.
+>
+> **Autoscaling**:
+>
+> Predict load 5-15 min ahead (time-of-day patterns), pre-warm GPUs. Cold start of LLM serving is **slow** (load weights 1-5 min).
+>
+> Strategies:
+> - **Pre-allocated buffer**: 20% extra capacity always running
+> - **Burst absorber**: queue with timeout, cheap model spillover
+> - **Graceful degradation**: reduce quality (smaller model) under load
+>
+> **Observability**:
+>
+> | Metric | Why |
+> |---|---|
+> | TTFT (time-to-first-token) | User-perceived latency |
+> | TPOT (time-per-output-token) | Throughput per request |
+> | Batch size avg / max | Utilization |
+> | KV cache utilization | Memory pressure |
+> | Token cost per request | Economics |
+> | Queue depth | Backpressure signal |
+> | Eval pass rate (sampled) | Quality drift |
+>
+> **Cost math**:
+>
+> H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.0002/1K tokens raw compute.
+> Plus: prefix-cache hit gains, batching efficiency.
+> Achievable: $0.001-0.002 / 1K tokens with optimization.
+>
+> **Failover**:
+>
+> - Per-replica health check (heartbeat)
+> - Inflight requests on failed replica → retry on healthy
+> - KV cache lost on failover; LLM redoes prefill (acceptable, < 1s usually)
+>
+> **What NOT to do**:
+> - Naive batching (no continuous)
+> - Pre-allocate KV per request (use PagedAttention)
+> - Spawn replica per request (use multi-tenant)
+> - Skip prefix caching for FAQ-like workloads
+> - Ignore quantization (50% cost savings free)"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| vLLM / SGLang | 你简历明列 |
+| Megatron / DeepSpeed | 你简历明列 — TP/PP 你 know |
+| GPU-accelerated inference | 你简历明列 |
+| Cost optimization | TikTok payment infra scale |
+| Multi-tenant routing | Voice agent 7 markets |
+
+**Quote**:
+
+> "I worked on vLLM + SGLang serving stack for a 70B fine-tuned model. Continuous batching alone got us 6x throughput over static batching. Adding **prefix caching** for our agent-loop (where system prompt is shared across all calls in a session) saved another 30% prefill compute. We used **TP=8 + speculative decoding** with 7B draft model — for latency-bound calls (voice agent), TTFT dropped from 800ms to 300ms. INT8 quantization let us fit 2 replicas where 1 fit before, near-zero quality loss on eval set."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "TTFT vs TPOT trade-off?"
+**A**:
+- **TTFT** matters for streaming UX (user starts seeing tokens)
+- **TPOT** matters for total completion time
+- vLLM optimizes both via batching
+- Speculative decoding: TTFT slightly worse, TPOT better
+- Per-use-case: chat priority TTFT, batch priority TPOT
+
+**Q2**: "Multi-LoRA serving — many fine-tuned versions of base model. Approach?"
+**A**:
+- **S-LoRA / Punica**: serve many LoRA adapters on same base model
+- Base model weights shared in GPU
+- LoRA adapters small (~MB), hot-swap per request
+- vLLM 0.6+ supports built-in
+- Saves cost massively vs separate replicas per fine-tune
+
+**Q3**: "Autoscaling for spikes — LLM cold start 1-5 min. How handle?"
+**A**:
+- **Pre-warm buffer**: always 20% extra running
+- **Predictive scaling**: time-of-day patterns, pre-warm 10 min ahead
+- **Burst spillover**: overflow to cheaper model / queue
+- **Graceful degradation**: smaller model during spike
+
+**Q4**: "vLLM vs SGLang vs TensorRT-LLM — when each?"
+**A**:
+- **vLLM**: most popular, best continuous batching, easy setup
+- **SGLang**: structured output (JSON / regex), multi-LoRA, lang-level optimization
+- **TensorRT-LLM**: max raw throughput, complex setup, NVIDIA-locked
+- **Default**: vLLM unless need specific feature
+
+**Q5**: "Eval quality drops mysteriously. Debug?"
+**A**:
+- **Quantization regression**: INT8 too aggressive on certain queries
+- **Speculative decoding accept rate too low** → silent quality drop
+- **Prefix cache corruption** rare bug
+- Eval suite must include corner cases for these specific optims
+- **A/B**: route 5% to baseline (no optims), compare quality
+
+---
+
+## ❌ 易错点
+
+1. **Naive batching** — 5x throughput loss
+2. **Pre-allocate KV per request** — use PagedAttention
+3. **No prefix cache for FAQ workload** — leave 2-3x on table
+4. **One GPU per replica** — for 70B impossible
+5. **No quantization** — 50% extra cost
+6. **No autoscaling pre-warm** — cold start kills burst
+7. **No quality eval per optim** — silent regression
+
+---
+
+## ✅ 加分项
+
+1. **Continuous batching mechanics** explained
+2. **PagedAttention** with virtual-memory analogy
+3. **Prefix caching** for shared prefix
+4. **Speculative decoding** trade-off
+5. **TP/PP** for big models
+6. **Quantization** (INT8/INT4 + FP8 native H100)
+7. **vLLM/SGLang/TensorRT-LLM** stack choice rationale
+8. **TTFT vs TPOT** distinction
+9. **Cost math** explicit
+10. **Quote your vLLM+SGLang work**
+
+---
+
+## Cheat Sheet
+
+```
+6 levers for high throughput:
+  1. Continuous batching (vLLM) — 5-10x naive
+  2. PagedAttention — 24x more concurrent
+  3. Prefix caching — 2-3x repeated prefix
+  4. Speculative decoding — 2-3x latency
+  5. Tensor parallelism — big model fit
+  6. Quantization (INT8/INT4/FP8) — 50% memory
+
+Stack:
+  Engine: vLLM (default) / SGLang (structured) / TensorRT-LLM (max)
+  Frontend: Triton
+  Routing: Envoy + custom
+
+Parallelism strategies:
+  TP: split model across GPUs (column-wise)
+  PP: split layers across GPUs (pipeline)
+  DP: replicate model, split batch
+  Combine for big models (70B+)
+
+Latency optimization:
+  Speculative decoding (small draft → big verify)
+  KV cache reuse (prefix)
+  FlashAttention v2/v3
+  CUDA graphs
+
+Throughput optimization:
+  Continuous batching
+  Larger batch sizes
+  PagedAttention
+  S-LoRA multi-tenancy
+
+Quantization:
+  INT8 — 1-2% quality cost
+  INT4 — 2-5% quality cost
+  FP8 — H100 native, near-FP16 quality
+  Tools: GPTQ, AWQ, FP8
+
+Routing:
+  Cost-aware (cheap first, escalate)
+  Least-loaded replica
+  Tenant isolation
+  Burst spillover
+
+Autoscaling:
+  Pre-warm 20% buffer
+  Predictive (time-of-day)
+  Burst absorber (queue + cheap model)
+  Graceful degradation
+
+Observability:
+  TTFT / TPOT
+  Batch size avg/max
+  KV cache util
+  Token cost / req
+  Queue depth
+  Eval quality (5% baseline A/B)
+
+红线:
+  - Naive batching
+  - Pre-allocate KV
+  - One GPU per req
+  - No quantization
+  - No autoscale
+  - No quality eval per optim
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

@@ -37,7 +37,176 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"<strong>Gemini 1.5 / Claude has 1M / 200K context now</strong>. Some say 'long-context kills RAG' — just stuff everything in. Do you agree? When to use which?"</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"Customer has 100K-page legal docs. Build a chatbot. Long context, RAG, or hybrid? Defend choice."</p></blockquote>
+<p><strong>Round</strong>: RAG Architecture / Trade-off (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>modern (2026) understanding</strong> of LLM landscape + production trade-offs:</p>
+<ol><li><strong>Long-context truly available</strong> but with caveats (cost, latency, lost-in-middle)</li><li><strong>RAG NOT dead</strong> — different sweet spot</li><li><strong>Hybrid 是主流答案</strong></li><li><strong>Cost math</strong> — long-context $$$ per call</li><li><strong>Update frequency</strong> —— RAG natural, long-context needs reload</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Corpus size</strong></p>
+<blockquote><p>"Total token count? 1M context window 大 doc OK; 100M? not even close."</p></blockquote>
+<p><strong>2. Update frequency</strong></p>
+<blockquote><p>"Static (one-time legal corpus) or dynamic (daily news)? Affects feasibility."</p></blockquote>
+<p><strong>3. Query pattern</strong></p>
+<blockquote><p>"1 user, 10 query/day or 1000 users, 10K query/day? Cost scaling differs."</p></blockquote>
+<p><strong>4. Latency / cost tolerance</strong></p>
+<blockquote><p>"Each query $5 + 30s OK (research tool) or need $0.01 + 1s (consumer)?"</p></blockquote>
+<p><strong>5. Precision需求</strong></p>
+<blockquote><p>"Citation traceability needed (legal)? RAG natural. Long-context needs special prompting."</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify corpus / volume / cost / precision</td></tr><tr><td>5-15 min</td><td>Long-context limits (cost / latency / lost-in-middle)</td></tr><tr><td>15-25 min</td><td>RAG limits (retrieval miss, multi-hop)</td></tr><tr><td>25-35 min</td><td>Hybrid pattern (RAG retrieval + long-context for chunks)</td></tr><tr><td>35-45 min</td><td>Decision tree + recommendation</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: 100K legal docs ~ 500M tokens total, monthly update, low-volume high-value queries ($5/q acceptable), citation required]</em>.</p>
+<p>Quick answer: <strong>hybrid</strong>. Pure long-context doesn't fit 500M tokens (1M max). Pure RAG can miss multi-page context. Use <strong>RAG-retrieval + long-context-for-chunks</strong>.</p>
+<p>Let me defend by walking trade-offs:</p>
+<p><strong>Long-context strengths</strong>:</p>
+<ul><li><strong>No retrieval miss</strong> —— model sees everything</li><li><strong>Multi-hop reasoning</strong> without explicit retrieval planning</li><li><strong>Implicit context</strong> across distant pages handled</li></ul>
+<p><strong>Long-context weaknesses</strong>:</p>
+<ul><li><strong>Token cost</strong>: 1M tokens × $0.003/1K = $3 per call (1M context Gemini cost)</li><li><strong>Latency</strong>: 1M context ~30-60s per call</li><li><strong>Lost-in-middle</strong>: even with 1M, attention is U-shaped, middle pages worse recall</li><li><strong>Doesn't scale to 500M corpus</strong> — fits 1M max</li><li><strong>No granular update</strong>: change 1 doc → reload all</li></ul>
+<p><strong>RAG strengths</strong>:</p>
+<ul><li><strong>Scales to billion-token corpus</strong> (indexed once, query small)</li><li><strong>Per-query cost cheap</strong>: $0.01-0.10</li><li><strong>Per-query latency low</strong>: 100ms-2s</li><li><strong>Granular update</strong>: change 1 doc → re-embed that chunk</li><li><strong>Citation natural</strong>: retrieved chunks have provenance</li></ul>
+<p><strong>RAG weaknesses</strong>:</p>
+<ul><li><strong>Retrieval miss</strong>: if relevant info not in top-k, LLM can't see it</li><li><strong>Multi-hop</strong>: 'A relates to B which connects to C' — needs iterative retrieval</li><li><strong>Chunking fragility</strong>: bad chunking → broken context</li><li><strong>Engineering complexity</strong>: indexing pipeline, eval, reranker</li></ul>
+<p><strong>Decision tree</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Corpus total &lt; 200K tokens?
+  YES → Long-context (just stuff it)
+  NO  ↓
+
+Corpus &lt; 1M tokens AND query budget &gt; $1?
+  YES → Long-context if Gemini/Claude
+  NO  ↓
+
+Multi-hop reasoning heavy?
+  YES → Hybrid (RAG retrieve + agent-iterative)
+  NO  → Pure RAG</code></pre>
+<p><strong>Hybrid pattern recommended for our case</strong>:</p>
+<pre class="language-python"><code class="language-python">def hybrid_qa(query, corpus_index, long_context_model):
+    # Stage 1: RAG retrieves top relevant docs (whole docs, not chunks)
+    relevant_docs = retrieve_docs(query, corpus_index, top_k=10)
+    # 10 docs × 50K tokens each = 500K tokens — fits Gemini 1.5
+    
+    # Stage 2: Long-context model reads all top-10
+    context = '\n'.join([f'[Doc {d.id}]\n{d.full_text}' for d in relevant_docs])
+    
+    answer = long_context_model.generate(
+        prompt=f"""
+        Documents:
+        {context}
+        
+        Question: {query}
+        
+        Answer with citations [Doc N].
+        """,
+    )
+    return answer</code></pre>
+<p>Best of both:</p>
+<ul><li>RAG narrows 500M → 500K</li><li>Long-context handles within-500K with multi-hop, no chunking loss</li><li>Cost per query: $1.50 (500K × $3) instead of $3 (1M)</li><li>Latency: 15s instead of 60s</li></ul>
+<p><strong>Cost math</strong> for our case:</p>
+<table class="md-table"><thead><tr><th>Approach</th><th>Cost/query</th><th>Latency</th><th>Feasibility</th></tr></thead><tbody><tr><td>Pure long-context</td><td>N/A</td><td>N/A</td><td>Corpus 500M &gt; 1M limit</td></tr><tr><td>Pure RAG</td><td>$0.05</td><td>2s</td><td>Misses multi-hop</td></tr><tr><td><strong>Hybrid (10 docs)</strong></td><td><strong>$1.50</strong></td><td><strong>15s</strong></td><td><strong>Fits + multi-hop OK</strong></td></tr><tr><td>Hybrid (3 docs, 150K)</td><td>$0.50</td><td>5s</td><td>Compromise</td></tr></tbody></table>
+<p><strong>Volume scaling</strong>:</p>
+<p>If 100 queries/day, hybrid is $150/day → manageable If 100K queries/day, $150K/day → must optimize: cache, smaller context, cheaper model</p>
+<p><strong>Citation / traceability</strong>:</p>
+<p>Even with long-context, <strong>enforce citation</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Prompt: "...Answer with [Doc N, page M] citations for every factual claim."
+Post-process: parse citations, validate against actual doc text.</code></pre>
+<p>RAG natural (retrieved chunk has ID). Long-context needs explicit prompt.</p>
+<p><strong>Update strategy for hybrid</strong>:</p>
+<ul><li>Doc changes → re-embed only that doc (RAG-level update)</li><li>Index searchable, query latency unchanged</li><li>Long-context model sees fresh docs (loaded fresh each query)</li></ul>
+<p><strong>When pure long-context wins</strong>:</p>
+<ul><li>Small corpus (&lt; 200K tokens)</li><li>Multi-hop with cross-doc reasoning</li><li>Research / one-off analysis (cost less concern)</li><li>No retrieval engineering team</li></ul>
+<p><strong>When pure RAG wins</strong>:</p>
+<ul><li>Large corpus (&gt; 10M tokens)</li><li>High QPS, cost-sensitive</li><li>Granular real-time updates</li><li>Strong retrieval engineering team</li></ul>
+<p><strong>Most production</strong>: <strong>hybrid</strong>.</p>
+<p><strong>2026 trend</strong>: as context windows grow (1M → 10M), the cutoff shifts, but hybrid remains optimal for scale-cost balance."</p></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>RAG (BNPL chatbot)</td><td>你 + RAG 经验直接相关</td></tr><tr><td>ConvFinQA</td><td>财务文档 multi-hop, hybrid 思路</td></tr><tr><td>Long-context awareness</td><td>Voice agent — multi-turn long history mgmt 你做过</td></tr><tr><td>Cost optimization</td><td>TikTok payment infra — cost-per-call always考虑</td></tr><tr><td>Citation</td><td>Compliance — refund / collection 必 citation</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"ConvFinQA was exactly this trade-off — financial reports avg 200K tokens each, multi-hop questions. We tried pure RAG (recall lost on cross-table joins) and pure long-context (cost prohibitive at scale, plus 200K Claude was slow). Final architecture: <strong>RAG retrieves relevant tables + paragraphs</strong>, <strong>long-context (Claude 100K) handles within-retrieved-context multi-hop reasoning</strong>. Latency 8s, cost $0.30/q, accuracy comparable to pure long-context at 1/5 cost."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "10M context — will RAG die?" <strong>A</strong>: No. Reasons:</p>
+<ul><li><strong>Corpus often &gt; 10M</strong> (enterprise data lakes)</li><li><strong>Cost</strong> still $$$ at 10M tokens/query</li><li><strong>Latency</strong> still slow</li><li>RAG just shifts to <strong>wider chunks</strong> (whole docs not paragraphs) when long-context cheap</li></ul>
+<p><strong>Q2</strong>: "Hybrid is complex. Can I just use long-context everywhere if cheap enough?" <strong>A</strong>: Cost is the gate:</p>
+<ul><li>100K tokens × $0.003 = $0.30/q → 1M queries/day = $300K/day. Prohibitive.</li><li>10K tokens (RAG-narrowed) × $0.003 = $0.03/q → $30K/day. Sustainable.</li><li>Always cheaper to retrieve first</li></ul>
+<p><strong>Q3</strong>: "Long-context is lost-in-middle. Is RAG immune?" <strong>A</strong>: Not immune, but better managed:</p>
+<ul><li>RAG retrieves <strong>only relevant</strong>, no middle to lose in</li><li>BUT if 50 chunks retrieved, middle ones in LLM context still lost-in-middle</li><li>Mitigation: rerank chunks by relevance order, put best at start/end</li></ul>
+<p><strong>Q4</strong>: "Citation precision — how compare?" <strong>A</strong>:</p>
+<ul><li><strong>RAG</strong>: every claim mapped to retrieved chunk ID</li><li><strong>Long-context</strong>: prompt-enforced citation, but model may hallucinate page reference</li><li><strong>Hybrid</strong>: RAG-style citation (chunk → doc → page), validated post-LLM</li><li>RAG wins citation reliability</li></ul>
+<p><strong>Q5</strong>: "Customer prefers long-context for simplicity. Defend hybrid." <strong>A</strong>:</p>
+<ul><li>Pure long-context is <strong>vendor lock-in</strong> (only Gemini/Claude at 1M, no OpenAI parity)</li><li>Cost scales linearly with context size, hybrid sublinear with retrieval</li><li>Multi-tenancy: each customer's data isolated → RAG natural</li><li>Real-time updates: RAG re-embed delta, long-context full reload</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>'Long-context killed RAG'</strong> — wrong, complementary</li><li><strong>Pure long-context for huge corpus</strong> — doesn't fit, $$$</li><li><strong>Pure RAG for multi-hop</strong> — retrieval miss across hops</li><li><strong>Ignore cost math</strong> — production economics</li><li><strong>No citation strategy</strong> — long-context hallucinates refs</li><li><strong>Forget vendor lock-in</strong> — 1M is Gemini/Claude only</li><li><strong>Forget update frequency</strong> — long-context bad for dynamic data</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Hybrid 是默认答案</strong> in production</li><li><strong>Decision tree</strong> by corpus size + cost + multi-hop</li><li><strong>Cost math</strong> explicit ($1.50/q vs $3 vs $0.05)</li><li><strong>Lost-in-middle</strong> both approaches</li><li><strong>Citation strategy</strong> comparison</li><li><strong>Update frequency</strong> consideration</li><li><strong>Vendor lock-in</strong> awareness</li><li><strong>Quote ConvFinQA RAG+long-context architecture</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Long-context strengths:
+  No retrieval miss
+  Multi-hop natural
+  Implicit cross-doc context
+
+Long-context weaknesses:
+  Cost ($3/q at 1M tokens)
+  Latency (30-60s)
+  Lost-in-middle still real
+  Doesn't fit &gt; 1M corpus
+  No granular update
+
+RAG strengths:
+  Scales to billion tokens
+  Cheap per query ($0.01-0.10)
+  Fast per query
+  Granular update
+  Citation natural
+
+RAG weaknesses:
+  Retrieval miss
+  Multi-hop hard
+  Chunking fragility
+  Engineering complexity
+
+Decision tree:
+  Corpus &lt; 200K? → long-context
+  &lt; 1M + cost OK? → long-context
+  Multi-hop heavy? → hybrid
+  else → RAG
+
+Hybrid pattern:
+  RAG: 500M → top-10 docs (500K tokens)
+  Long-context: handle multi-hop within
+  Cost: ~$1.50/q vs $3/q full
+
+Cost scaling:
+  100 q/day pure long: $300/day, OK
+  100K q/day pure long: $300K/day, no
+  Hybrid sublinear with retrieval
+
+Citation:
+  RAG: chunk-id natural
+  Long-context: prompt + post-validate
+  Hybrid: best of both
+
+2026 trend:
+  Context grows but hybrid remains
+  RAG chunks wider as context cheaper
+  Both alive
+
+红线:
+  - 'Long-context killed RAG'
+  - Pure long for huge corpus
+  - Pure RAG for multi-hop
+  - Ignore cost math
+  - No citation strategy</code></pre>
   </section>
 
   
@@ -49,7 +218,334 @@
     <a href="gfde-t3-stateless-stateful.html">T3.1 · Stateless vs Stateful Agent 架构怎么选 →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "**Gemini 1.5 / Claude has 1M / 200K context now**. Some say 'long-context kills RAG' — just stuff everything in. Do you agree? When to use which?"
+
+或追问形态:
+
+> "Customer has 100K-page legal docs. Build a chatbot. Long context, RAG, or hybrid? Defend choice."
+
+**Round**: RAG Architecture / Trade-off (45 min)
+
+---
+
+## 这道题在考什么
+
+考你**modern (2026) understanding** of LLM landscape + production trade-offs:
+
+1. **Long-context truly available** but with caveats (cost, latency, lost-in-middle)
+2. **RAG NOT dead** — different sweet spot
+3. **Hybrid 是主流答案**
+4. **Cost math** — long-context $$$ per call
+5. **Update frequency** —— RAG natural, long-context needs reload
+
+---
+
+## 必问 clarifying
+
+**1. Corpus size**
+
+> "Total token count? 1M context window 大 doc OK; 100M? not even close."
+
+**2. Update frequency**
+
+> "Static (one-time legal corpus) or dynamic (daily news)? Affects feasibility."
+
+**3. Query pattern**
+
+> "1 user, 10 query/day or 1000 users, 10K query/day? Cost scaling differs."
+
+**4. Latency / cost tolerance**
+
+> "Each query $5 + 30s OK (research tool) or need $0.01 + 1s (consumer)?"
+
+**5. Precision需求**
+
+> "Citation traceability needed (legal)? RAG natural. Long-context needs special prompting."
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify corpus / volume / cost / precision |
+| 5-15 min | Long-context limits (cost / latency / lost-in-middle) |
+| 15-25 min | RAG limits (retrieval miss, multi-hop) |
+| 25-35 min | Hybrid pattern (RAG retrieval + long-context for chunks) |
+| 35-45 min | Decision tree + recommendation |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: 100K legal docs ~ 500M tokens total, monthly update, low-volume high-value queries ($5/q acceptable), citation required]*.
+>
+> Quick answer: **hybrid**. Pure long-context doesn't fit 500M tokens (1M max). Pure RAG can miss multi-page context. Use **RAG-retrieval + long-context-for-chunks**.
+>
+> Let me defend by walking trade-offs:
+>
+> **Long-context strengths**:
+> - **No retrieval miss** —— model sees everything
+> - **Multi-hop reasoning** without explicit retrieval planning
+> - **Implicit context** across distant pages handled
+>
+> **Long-context weaknesses**:
+> - **Token cost**: 1M tokens × $0.003/1K = $3 per call (1M context Gemini cost)
+> - **Latency**: 1M context ~30-60s per call
+> - **Lost-in-middle**: even with 1M, attention is U-shaped, middle pages worse recall
+> - **Doesn't scale to 500M corpus** — fits 1M max
+> - **No granular update**: change 1 doc → reload all
+>
+> **RAG strengths**:
+> - **Scales to billion-token corpus** (indexed once, query small)
+> - **Per-query cost cheap**: $0.01-0.10
+> - **Per-query latency low**: 100ms-2s
+> - **Granular update**: change 1 doc → re-embed that chunk
+> - **Citation natural**: retrieved chunks have provenance
+>
+> **RAG weaknesses**:
+> - **Retrieval miss**: if relevant info not in top-k, LLM can't see it
+> - **Multi-hop**: 'A relates to B which connects to C' — needs iterative retrieval
+> - **Chunking fragility**: bad chunking → broken context
+> - **Engineering complexity**: indexing pipeline, eval, reranker
+>
+> **Decision tree**:
+>
+> ```
+> Corpus total < 200K tokens?
+>   YES → Long-context (just stuff it)
+>   NO  ↓
+> 
+> Corpus < 1M tokens AND query budget > $1?
+>   YES → Long-context if Gemini/Claude
+>   NO  ↓
+> 
+> Multi-hop reasoning heavy?
+>   YES → Hybrid (RAG retrieve + agent-iterative)
+>   NO  → Pure RAG
+> ```
+>
+> **Hybrid pattern recommended for our case**:
+>
+> ```python
+> def hybrid_qa(query, corpus_index, long_context_model):
+>     # Stage 1: RAG retrieves top relevant docs (whole docs, not chunks)
+>     relevant_docs = retrieve_docs(query, corpus_index, top_k=10)
+>     # 10 docs × 50K tokens each = 500K tokens — fits Gemini 1.5
+>     
+>     # Stage 2: Long-context model reads all top-10
+>     context = '\n'.join([f'[Doc {d.id}]\n{d.full_text}' for d in relevant_docs])
+>     
+>     answer = long_context_model.generate(
+>         prompt=f"""
+>         Documents:
+>         {context}
+>         
+>         Question: {query}
+>         
+>         Answer with citations [Doc N].
+>         """,
+>     )
+>     return answer
+> ```
+>
+> Best of both:
+> - RAG narrows 500M → 500K
+> - Long-context handles within-500K with multi-hop, no chunking loss
+> - Cost per query: $1.50 (500K × $3) instead of $3 (1M)
+> - Latency: 15s instead of 60s
+>
+> **Cost math** for our case:
+>
+> | Approach | Cost/query | Latency | Feasibility |
+> |---|---|---|---|
+> | Pure long-context | N/A | N/A | Corpus 500M > 1M limit |
+> | Pure RAG | $0.05 | 2s | Misses multi-hop |
+> | **Hybrid (10 docs)** | **$1.50** | **15s** | **Fits + multi-hop OK** |
+> | Hybrid (3 docs, 150K) | $0.50 | 5s | Compromise |
+>
+> **Volume scaling**:
+>
+> If 100 queries/day, hybrid is $150/day → manageable
+> If 100K queries/day, $150K/day → must optimize: cache, smaller context, cheaper model
+>
+> **Citation / traceability**:
+>
+> Even with long-context, **enforce citation**:
+>
+> ```
+> Prompt: "...Answer with [Doc N, page M] citations for every factual claim."
+> Post-process: parse citations, validate against actual doc text.
+> ```
+>
+> RAG natural (retrieved chunk has ID). Long-context needs explicit prompt.
+>
+> **Update strategy for hybrid**:
+>
+> - Doc changes → re-embed only that doc (RAG-level update)
+> - Index searchable, query latency unchanged
+> - Long-context model sees fresh docs (loaded fresh each query)
+>
+> **When pure long-context wins**:
+> - Small corpus (< 200K tokens)
+> - Multi-hop with cross-doc reasoning
+> - Research / one-off analysis (cost less concern)
+> - No retrieval engineering team
+>
+> **When pure RAG wins**:
+> - Large corpus (> 10M tokens)
+> - High QPS, cost-sensitive
+> - Granular real-time updates
+> - Strong retrieval engineering team
+>
+> **Most production**: **hybrid**.
+>
+> **2026 trend**: as context windows grow (1M → 10M), the cutoff shifts, but hybrid remains optimal for scale-cost balance."
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| RAG (BNPL chatbot) | 你 + RAG 经验直接相关 |
+| ConvFinQA | 财务文档 multi-hop, hybrid 思路 |
+| Long-context awareness | Voice agent — multi-turn long history mgmt 你做过 |
+| Cost optimization | TikTok payment infra — cost-per-call always考虑 |
+| Citation | Compliance — refund / collection 必 citation |
+
+**Quote**:
+
+> "ConvFinQA was exactly this trade-off — financial reports avg 200K tokens each, multi-hop questions. We tried pure RAG (recall lost on cross-table joins) and pure long-context (cost prohibitive at scale, plus 200K Claude was slow). Final architecture: **RAG retrieves relevant tables + paragraphs**, **long-context (Claude 100K) handles within-retrieved-context multi-hop reasoning**. Latency 8s, cost $0.30/q, accuracy comparable to pure long-context at 1/5 cost."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "10M context — will RAG die?"
+**A**: No. Reasons:
+- **Corpus often > 10M** (enterprise data lakes)
+- **Cost** still $$$ at 10M tokens/query
+- **Latency** still slow
+- RAG just shifts to **wider chunks** (whole docs not paragraphs) when long-context cheap
+
+**Q2**: "Hybrid is complex. Can I just use long-context everywhere if cheap enough?"
+**A**: Cost is the gate:
+- 100K tokens × $0.003 = $0.30/q → 1M queries/day = $300K/day. Prohibitive.
+- 10K tokens (RAG-narrowed) × $0.003 = $0.03/q → $30K/day. Sustainable.
+- Always cheaper to retrieve first
+
+**Q3**: "Long-context is lost-in-middle. Is RAG immune?"
+**A**: Not immune, but better managed:
+- RAG retrieves **only relevant**, no middle to lose in
+- BUT if 50 chunks retrieved, middle ones in LLM context still lost-in-middle
+- Mitigation: rerank chunks by relevance order, put best at start/end
+
+**Q4**: "Citation precision — how compare?"
+**A**:
+- **RAG**: every claim mapped to retrieved chunk ID
+- **Long-context**: prompt-enforced citation, but model may hallucinate page reference
+- **Hybrid**: RAG-style citation (chunk → doc → page), validated post-LLM
+- RAG wins citation reliability
+
+**Q5**: "Customer prefers long-context for simplicity. Defend hybrid."
+**A**:
+- Pure long-context is **vendor lock-in** (only Gemini/Claude at 1M, no OpenAI parity)
+- Cost scales linearly with context size, hybrid sublinear with retrieval
+- Multi-tenancy: each customer's data isolated → RAG natural
+- Real-time updates: RAG re-embed delta, long-context full reload
+
+---
+
+## ❌ 易错点
+
+1. **'Long-context killed RAG'** — wrong, complementary
+2. **Pure long-context for huge corpus** — doesn't fit, $$$
+3. **Pure RAG for multi-hop** — retrieval miss across hops
+4. **Ignore cost math** — production economics
+5. **No citation strategy** — long-context hallucinates refs
+6. **Forget vendor lock-in** — 1M is Gemini/Claude only
+7. **Forget update frequency** — long-context bad for dynamic data
+
+---
+
+## ✅ 加分项
+
+1. **Hybrid 是默认答案** in production
+2. **Decision tree** by corpus size + cost + multi-hop
+3. **Cost math** explicit ($1.50/q vs $3 vs $0.05)
+4. **Lost-in-middle** both approaches
+5. **Citation strategy** comparison
+6. **Update frequency** consideration
+7. **Vendor lock-in** awareness
+8. **Quote ConvFinQA RAG+long-context architecture**
+
+---
+
+## Cheat Sheet
+
+```
+Long-context strengths:
+  No retrieval miss
+  Multi-hop natural
+  Implicit cross-doc context
+
+Long-context weaknesses:
+  Cost ($3/q at 1M tokens)
+  Latency (30-60s)
+  Lost-in-middle still real
+  Doesn't fit > 1M corpus
+  No granular update
+
+RAG strengths:
+  Scales to billion tokens
+  Cheap per query ($0.01-0.10)
+  Fast per query
+  Granular update
+  Citation natural
+
+RAG weaknesses:
+  Retrieval miss
+  Multi-hop hard
+  Chunking fragility
+  Engineering complexity
+
+Decision tree:
+  Corpus < 200K? → long-context
+  < 1M + cost OK? → long-context
+  Multi-hop heavy? → hybrid
+  else → RAG
+
+Hybrid pattern:
+  RAG: 500M → top-10 docs (500K tokens)
+  Long-context: handle multi-hop within
+  Cost: ~$1.50/q vs $3/q full
+
+Cost scaling:
+  100 q/day pure long: $300/day, OK
+  100K q/day pure long: $300K/day, no
+  Hybrid sublinear with retrieval
+
+Citation:
+  RAG: chunk-id natural
+  Long-context: prompt + post-validate
+  Hybrid: best of both
+
+2026 trend:
+  Context grows but hybrid remains
+  RAG chunks wider as context cheaper
+  Both alive
+
+红线:
+  - 'Long-context killed RAG'
+  - Pure long for huge corpus
+  - Pure RAG for multi-hop
+  - Ignore cost math
+  - No citation strategy
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

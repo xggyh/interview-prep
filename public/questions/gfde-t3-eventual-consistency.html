@@ -37,7 +37,257 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"Agent executes a <strong>5-step workflow</strong>: create_order → reserve_inventory → charge_payment → send_confirmation_email → schedule_shipping. <strong>Step 3 (charge_payment) times out</strong>. You don't know if charged. <strong>Step 4 + 5 didn't run yet</strong>. Design recovery."</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"Why is <strong>eventual consistency</strong> unavoidable for agentic workflows? Walk through Saga, Outbox, and when to use Temporal."</p></blockquote>
+<p><strong>Round</strong>: Distributed Systems / Agent Reliability (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>distributed transaction patterns</strong> applied to agent workflows:</p>
+<ol><li><strong>2PC 为什么不行</strong> —— 多 vendor, no global coordinator</li><li><strong>Saga pattern</strong> —— forward + compensating</li><li><strong>Outbox pattern</strong> —— transactional + reliable event</li><li><strong>Workflow engine</strong> —— Temporal / DBOS</li><li><strong>Idempotency</strong> —— retry-safe everywhere</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Reversibility</strong></p>
+<blockquote><p>"Each step — reversible (refund) or irreversible (email sent)?"</p></blockquote>
+<p><strong>2. Latency tolerance</strong></p>
+<blockquote><p>"Can finish workflow in 100ms / 10s / minutes / hours?"</p></blockquote>
+<p><strong>3. Failure rate</strong></p>
+<blockquote><p>"Each step success rate? 99% × 5 = 95% workflow success. Lower → need retry."</p></blockquote>
+<p><strong>4. Customer-visible</strong></p>
+<blockquote><p>"User waits for confirm or async background?"</p></blockquote>
+<p><strong>5. State store</strong></p>
+<blockquote><p>"Have a workflow engine (Temporal) or roll-your-own with DB?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify reversibility / latency / failure rate</td></tr><tr><td>5-15 min</td><td>Why 2PC fails, why eventual consistency</td></tr><tr><td>15-25 min</td><td>Saga pattern (forward + compensating)</td></tr><tr><td>25-35 min</td><td>Outbox pattern + idempotency</td></tr><tr><td>35-45 min</td><td>Temporal / workflow engine choice</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: charge reversible (refund), email irreversible (recall window 60s), latency tolerance minutes, ~99% per step, async background OK]</em>.</p>
+<p><strong>Why eventual consistency for this workflow</strong>:</p>
+<ul><li>Each step is a <strong>separate service</strong> (inventory, payment, email, shipping). No global transaction.</li><li>2PC requires all participants vote — but vendor APIs (payment provider) don't speak 2PC.</li><li>Latency to coordinate 2PC across vendors prohibitive.</li><li>Network partitions guaranteed at scale.</li></ul>
+<p>So: <strong>forward execution + compensating actions on failure</strong> = Saga pattern.</p>
+<p><strong>Saga design for our workflow</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Step 1: create_order              ← compensate: cancel_order
+Step 2: reserve_inventory          ← compensate: release_inventory
+Step 3: charge_payment             ← compensate: refund_payment
+Step 4: send_confirmation_email    ← compensate: recall_email (within 60s) or send_apology
+Step 5: schedule_shipping          ← compensate: cancel_shipping</code></pre>
+<p><strong>State machine</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">[Start]
+  → [Step 1 running] → success → [Step 2 running] → success → [Step 3 running]
+                                                                      ↓
+                                                                 timeout
+                                                                      ↓
+                                                             [Step 3 status uncertain]
+                                                                      ↓
+                                                         Verify (idempotent get_payment_status)
+                                                                      ↓
+                                                         ┌──────────────┐
+                                                         ↓              ↓
+                                                 charged: continue   not_charged: retry step 3</code></pre>
+<p><strong>For step 3 timeout specifically</strong>:</p>
+<pre class="language-python"><code class="language-python">async def step_3_charge(order, idem_key):
+    try:
+        result = await payment_api.charge(
+            amount=order.total,
+            account=order.account,
+            idempotency_key=idem_key,
+            timeout=30,
+        )
+        return result
+    except Timeout:
+        # DON'T retry blindly — first VERIFY state
+        await asyncio.sleep(5)  # give downstream time to settle
+        status = await payment_api.get_status(idem_key)
+        if status == 'completed':
+            return reconstruct_result(status)
+        elif status == 'failed' or status == 'not_found':
+            # Safe to retry
+            return await step_3_charge(order, idem_key)
+        else:
+            # Still uncertain → escalate
+            raise UncertainState(idem_key)</code></pre>
+<p><strong>Key</strong>: <code>idempotency_key</code> lets retries be safe + lets us <strong>query state</strong> to resolve uncertainty.</p>
+<p><strong>Outbox pattern</strong> (durable workflow state):</p>
+<pre class="language-python"><code class="language-python"># Each step writes intent + result to outbox table (in same DB transaction)
+
+# Step 3:
+async with db.transaction():
+    outbox.write({
+        'workflow_id': wf_id,
+        'step': 3,
+        'intent': {'tool': 'charge_payment', 'args': {...}, 'idem_key': key},
+        'state': 'pending',
+    })
+# outside transaction — actually execute
+result = await execute(...)
+# write result
+async with db.transaction():
+    outbox.update(wf_id, step=3, state='completed', result=result)</code></pre>
+<p><strong>Reliable worker</strong> picks up uncommitted intents on restart, completes them. Ensures no step lost.</p>
+<p><strong>Failure handling per step</strong>:</p>
+<pre class="language-python"><code class="language-python">async def execute_workflow(wf_id, steps):
+    completed = []
+    for step in steps:
+        try:
+            result = await execute_step(step, idem_key_for(wf_id, step))
+            completed.append((step, result))
+        except UnrecoverableError as e:
+            # Trigger compensation in reverse
+            await compensate(completed)
+            raise WorkflowFailed(wf_id, step, e)
+        except UncertainState as e:
+            # Escalate to human / pause workflow
+            await pause_for_review(wf_id, step, e)
+            return PausedForReview
+    return Success
+
+async def compensate(completed_steps):
+    # Reverse order
+    for step, result in reversed(completed_steps):
+        try:
+            await compensating_action(step, result)
+        except Exception as e:
+            # Compensation failed — alert, manual intervention
+            await alert(f'Compensation failed for {step}')</code></pre>
+<p><strong>Workflow engine (Temporal / DBOS) recommendation</strong>:</p>
+<p>Instead of roll-your-own:</p>
+<pre class="language-python"><code class="language-python">@workflow.defn
+class OrderWorkflow:
+    @workflow.run
+    async def run(self, order):
+        try:
+            await workflow.execute_activity(create_order, order, start_to_close=10s)
+            await workflow.execute_activity(reserve_inventory, order, start_to_close=10s)
+            charge = await workflow.execute_activity(
+                charge_payment, order,
+                start_to_close=30s,
+                retry_policy=RetryPolicy(max_attempts=3, ...),
+            )
+            await workflow.execute_activity(send_email, order, charge, start_to_close=10s)
+            await workflow.execute_activity(schedule_shipping, order, start_to_close=10s)
+        except ActivityError as e:
+            # Compensate in reverse
+            await compensate(...)
+            raise</code></pre>
+<p>Temporal handles:</p>
+<ul><li>Durable state (no in-memory loss)</li><li>Retries with backoff per activity</li><li>History replay (debug-friendly)</li><li>Compensating handlers built-in</li><li>Long-running (workflow can pause for hours / days)</li></ul>
+<p><strong>For LLM agent workflows specifically</strong>:</p>
+<p>Agent step often = LLM decides → tool call. Wrap as:</p>
+<pre class="language-python"><code class="language-python">@workflow.defn
+class AgentWorkflow:
+    @workflow.run
+    async def run(self, user_query):
+        conversation = []
+        while True:
+            # LLM decides next action
+            decision = await workflow.execute_activity(
+                call_llm, conversation,
+                start_to_close=30s,
+            )
+            if decision.action == 'reply':
+                return decision.content
+            if decision.action == 'tool':
+                # Execute tool as activity (idempotent, retried)
+                result = await workflow.execute_activity(
+                    execute_tool, decision.tool, decision.args,
+                    start_to_close=10s,
+                    retry_policy=RetryPolicy(...),
+                )
+                conversation.append((decision, result))</code></pre>
+<p>Benefits:</p>
+<ul><li>Workflow can pause when LLM context gets too big</li><li>Resume on different node (durable state)</li><li>Replay history for debugging</li><li>Per-activity retry / fallback</li></ul>
+<p><strong>What NOT to do</strong>:</p>
+<ul><li>In-memory workflow state (lost on crash)</li><li>Retry without idempotency</li><li>Skip verification on timeout</li><li>No compensating action defined per step</li><li>'It worked in test' for multi-step (didn't test failure modes)"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Saga / compensating</td><td>TikTok payment refund flow</td></tr><tr><td>Outbox</td><td>TikTok payment — transactional event pattern</td></tr><tr><td>Idempotency on retry</td><td>Voice agent SMS — you've done this</td></tr><tr><td>Multi-step state</td><td>BNPL chatbot — collection workflow</td></tr><tr><td>Verify on timeout</td><td>Payment integration — natural</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"Indonesia refund tier had this exact shape: 5-step refund workflow (verify → approve → charge → notify → audit). Each step had <strong>idempotency key per workflow_id</strong> + <strong>outbox table for state</strong>. On step 3 (charge) timeout, we'd call <code>get_payment_status(idem_key)</code> to verify before retry. The verify step prevented double-refund 100% in 6 months production. <strong>Compensating handlers</strong> for each step were defined upfront and tested in chaos mode. Saga &gt; 2PC for cross-vendor."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Email sent then payment refunded (compensation). User got email saying 'paid' but actually refunded. Bad UX. Handle?" <strong>A</strong>:</p>
+<ul><li><strong>Reorder</strong>: email LAST (after payment confirmed durable)</li><li>If reorder impossible: <strong>delay</strong> email by N seconds, check workflow state before sending</li><li><strong>Apology + recovery message</strong>: send follow-up explaining</li><li><strong>Quarantine</strong> if compensation in flight: hold downstream actions</li></ul>
+<p><strong>Q2</strong>: "Saga compensation also fails. Now what?" <strong>A</strong>:</p>
+<ul><li><strong>DLQ</strong> for failed compensations</li><li><strong>Alert</strong> human ops</li><li><strong>Manual reconciliation</strong> UI for ops to inspect + resolve</li><li><strong>Compensation must be more reliable than forward</strong> — design for it (retry-heavy, idempotent, all data captured)</li></ul>
+<p><strong>Q3</strong>: "Workflow engine adds operational complexity. When NOT use Temporal?" <strong>A</strong>:</p>
+<ul><li><strong>Simple workflows</strong> (&lt; 3 steps, all reversible) — direct DB + retries enough</li><li><strong>High-frequency</strong> (microsecond) — Temporal overhead too much</li><li><strong>Greenfield + small team</strong> — roll-your-own works initially</li><li><strong>Use Temporal when</strong>: &gt; 5 steps, long-running, multi-vendor, audit required, multiple workflows</li></ul>
+<p><strong>Q4</strong>: "Agent in middle of workflow — LLM service goes down. What user sees?" <strong>A</strong>:</p>
+<ul><li>Workflow paused (Temporal handles)</li><li>User notified: 'still processing'</li><li>LLM service recovers, workflow resumes from durable state</li><li>If LLM down &gt; 5 min: alert ops + customer</li><li>Eventually consistent — finish when service back</li></ul>
+<p><strong>Q5</strong>: "Multi-turn agent conversation — eventual consistency for state?" <strong>A</strong>:</p>
+<ul><li>Each turn: read state → LLM → tool calls → write state (all in 1 workflow execution)</li><li>State stored in DB + KV-cache</li><li>If race (user sends 2 msgs fast): serialize via lock per conversation_id</li><li>Workflow engine handles: per-conversation_id workflow instance, queued events</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>2PC</strong> for cross-vendor (impossible)</li><li><strong>In-memory state</strong> (lost on crash)</li><li><strong>Retry without idempotency</strong> (double execute)</li><li><strong>No verify on timeout</strong> (don't know if executed)</li><li><strong>No compensating action</strong> per step</li><li><strong>No DLQ for compensation failures</strong></li><li><strong>Email before payment confirmed</strong> (UX bug)</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Saga pattern</strong> explained explicitly</li><li><strong>Outbox</strong> for durable state</li><li><strong>Idempotency key + verify</strong> for timeout</li><li><strong>Temporal / workflow engine</strong> recommendation with rationale</li><li><strong>Compensating handlers</strong> designed per step</li><li><strong>DLQ for compensation failures</strong></li><li><strong>Order of operations</strong> considered (email last)</li><li><strong>Quote Indonesia refund tier</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Why eventual consistency:
+  Multi-vendor (no 2PC)
+  Network partitions
+  Latency prohibitive
+
+Saga pattern:
+  Forward steps with compensating actions
+  On failure: compensate in reverse
+  Per-step: idempotent + retryable
+
+Outbox pattern:
+  Each step writes intent + state to DB
+  In same transaction as work
+  Reliable worker picks up unfinished
+  Ensures no step lost
+
+Idempotency:
+  Per-step idempotency_key (workflow_id + step)
+  On retry: same key
+  On timeout: VERIFY first (get_status)
+  Only retry if confirmed not-executed
+
+Verify-on-timeout pattern:
+  try execute
+  catch timeout:
+    sleep, get_status(idem_key)
+    if completed: reconstruct
+    if failed: retry
+    if uncertain: escalate
+
+Compensating action design:
+  Per step defined upfront
+  Tested in chaos mode
+  Idempotent
+  More reliable than forward
+  DLQ for failures
+
+Workflow engine (Temporal / DBOS):
+  Durable state (replay history)
+  Per-activity retry
+  Compensating support
+  Long-running (hours/days)
+  Recommend when &gt; 5 steps
+
+Agent workflow shape:
+  LLM decides → tool call (as activity)
+  Each tool call retryable
+  Conversation state durable
+  Pause / resume across LLM calls
+
+Order matters:
+  Email/notify LAST (after all confirmed)
+  Reversible actions before irreversible
+  If irreversible early: queue + delayed
+
+红线:
+  - 2PC for cross-vendor
+  - In-memory state
+  - Retry without idem
+  - No verify on timeout
+  - No compensating action
+  - No DLQ for compensation
+  - Email before payment</code></pre>
   </section>
 
   
@@ -49,7 +299,409 @@
     <a href="gfde-t4-customer-scoping.html">T4.1 · Customer scoping playbook (模糊需求 → MVP) →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "Agent executes a **5-step workflow**: create_order → reserve_inventory → charge_payment → send_confirmation_email → schedule_shipping. **Step 3 (charge_payment) times out**. You don't know if charged. **Step 4 + 5 didn't run yet**. Design recovery."
+
+或追问形态:
+
+> "Why is **eventual consistency** unavoidable for agentic workflows? Walk through Saga, Outbox, and when to use Temporal."
+
+**Round**: Distributed Systems / Agent Reliability (45-60 min)
+
+---
+
+## 这道题在考什么
+
+考你**distributed transaction patterns** applied to agent workflows:
+
+1. **2PC 为什么不行** —— 多 vendor, no global coordinator
+2. **Saga pattern** —— forward + compensating
+3. **Outbox pattern** —— transactional + reliable event
+4. **Workflow engine** —— Temporal / DBOS
+5. **Idempotency** —— retry-safe everywhere
+
+---
+
+## 必问 clarifying
+
+**1. Reversibility**
+
+> "Each step — reversible (refund) or irreversible (email sent)?"
+
+**2. Latency tolerance**
+
+> "Can finish workflow in 100ms / 10s / minutes / hours?"
+
+**3. Failure rate**
+
+> "Each step success rate? 99% × 5 = 95% workflow success. Lower → need retry."
+
+**4. Customer-visible**
+
+> "User waits for confirm or async background?"
+
+**5. State store**
+
+> "Have a workflow engine (Temporal) or roll-your-own with DB?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify reversibility / latency / failure rate |
+| 5-15 min | Why 2PC fails, why eventual consistency |
+| 15-25 min | Saga pattern (forward + compensating) |
+| 25-35 min | Outbox pattern + idempotency |
+| 35-45 min | Temporal / workflow engine choice |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: charge reversible (refund), email irreversible (recall window 60s), latency tolerance minutes, ~99% per step, async background OK]*.
+>
+> **Why eventual consistency for this workflow**:
+>
+> - Each step is a **separate service** (inventory, payment, email, shipping). No global transaction.
+> - 2PC requires all participants vote — but vendor APIs (payment provider) don't speak 2PC.
+> - Latency to coordinate 2PC across vendors prohibitive.
+> - Network partitions guaranteed at scale.
+>
+> So: **forward execution + compensating actions on failure** = Saga pattern.
+>
+> **Saga design for our workflow**:
+>
+> ```
+> Step 1: create_order              ← compensate: cancel_order
+> Step 2: reserve_inventory          ← compensate: release_inventory
+> Step 3: charge_payment             ← compensate: refund_payment
+> Step 4: send_confirmation_email    ← compensate: recall_email (within 60s) or send_apology
+> Step 5: schedule_shipping          ← compensate: cancel_shipping
+> ```
+>
+> **State machine**:
+>
+> ```
+> [Start]
+>   → [Step 1 running] → success → [Step 2 running] → success → [Step 3 running]
+>                                                                       ↓
+>                                                                  timeout
+>                                                                       ↓
+>                                                              [Step 3 status uncertain]
+>                                                                       ↓
+>                                                          Verify (idempotent get_payment_status)
+>                                                                       ↓
+>                                                          ┌──────────────┐
+>                                                          ↓              ↓
+>                                                  charged: continue   not_charged: retry step 3
+> ```
+>
+> **For step 3 timeout specifically**:
+>
+> ```python
+> async def step_3_charge(order, idem_key):
+>     try:
+>         result = await payment_api.charge(
+>             amount=order.total,
+>             account=order.account,
+>             idempotency_key=idem_key,
+>             timeout=30,
+>         )
+>         return result
+>     except Timeout:
+>         # DON'T retry blindly — first VERIFY state
+>         await asyncio.sleep(5)  # give downstream time to settle
+>         status = await payment_api.get_status(idem_key)
+>         if status == 'completed':
+>             return reconstruct_result(status)
+>         elif status == 'failed' or status == 'not_found':
+>             # Safe to retry
+>             return await step_3_charge(order, idem_key)
+>         else:
+>             # Still uncertain → escalate
+>             raise UncertainState(idem_key)
+> ```
+>
+> **Key**: `idempotency_key` lets retries be safe + lets us **query state** to resolve uncertainty.
+>
+> **Outbox pattern** (durable workflow state):
+>
+> ```python
+> # Each step writes intent + result to outbox table (in same DB transaction)
+> 
+> # Step 3:
+> async with db.transaction():
+>     outbox.write({
+>         'workflow_id': wf_id,
+>         'step': 3,
+>         'intent': {'tool': 'charge_payment', 'args': {...}, 'idem_key': key},
+>         'state': 'pending',
+>     })
+> # outside transaction — actually execute
+> result = await execute(...)
+> # write result
+> async with db.transaction():
+>     outbox.update(wf_id, step=3, state='completed', result=result)
+> ```
+>
+> **Reliable worker** picks up uncommitted intents on restart, completes them. Ensures no step lost.
+>
+> **Failure handling per step**:
+>
+> ```python
+> async def execute_workflow(wf_id, steps):
+>     completed = []
+>     for step in steps:
+>         try:
+>             result = await execute_step(step, idem_key_for(wf_id, step))
+>             completed.append((step, result))
+>         except UnrecoverableError as e:
+>             # Trigger compensation in reverse
+>             await compensate(completed)
+>             raise WorkflowFailed(wf_id, step, e)
+>         except UncertainState as e:
+>             # Escalate to human / pause workflow
+>             await pause_for_review(wf_id, step, e)
+>             return PausedForReview
+>     return Success
+> 
+> async def compensate(completed_steps):
+>     # Reverse order
+>     for step, result in reversed(completed_steps):
+>         try:
+>             await compensating_action(step, result)
+>         except Exception as e:
+>             # Compensation failed — alert, manual intervention
+>             await alert(f'Compensation failed for {step}')
+> ```
+>
+> **Workflow engine (Temporal / DBOS) recommendation**:
+>
+> Instead of roll-your-own:
+>
+> ```python
+> @workflow.defn
+> class OrderWorkflow:
+>     @workflow.run
+>     async def run(self, order):
+>         try:
+>             await workflow.execute_activity(create_order, order, start_to_close=10s)
+>             await workflow.execute_activity(reserve_inventory, order, start_to_close=10s)
+>             charge = await workflow.execute_activity(
+>                 charge_payment, order,
+>                 start_to_close=30s,
+>                 retry_policy=RetryPolicy(max_attempts=3, ...),
+>             )
+>             await workflow.execute_activity(send_email, order, charge, start_to_close=10s)
+>             await workflow.execute_activity(schedule_shipping, order, start_to_close=10s)
+>         except ActivityError as e:
+>             # Compensate in reverse
+>             await compensate(...)
+>             raise
+> ```
+>
+> Temporal handles:
+> - Durable state (no in-memory loss)
+> - Retries with backoff per activity
+> - History replay (debug-friendly)
+> - Compensating handlers built-in
+> - Long-running (workflow can pause for hours / days)
+>
+> **For LLM agent workflows specifically**:
+>
+> Agent step often = LLM decides → tool call. Wrap as:
+>
+> ```python
+> @workflow.defn
+> class AgentWorkflow:
+>     @workflow.run
+>     async def run(self, user_query):
+>         conversation = []
+>         while True:
+>             # LLM decides next action
+>             decision = await workflow.execute_activity(
+>                 call_llm, conversation,
+>                 start_to_close=30s,
+>             )
+>             if decision.action == 'reply':
+>                 return decision.content
+>             if decision.action == 'tool':
+>                 # Execute tool as activity (idempotent, retried)
+>                 result = await workflow.execute_activity(
+>                     execute_tool, decision.tool, decision.args,
+>                     start_to_close=10s,
+>                     retry_policy=RetryPolicy(...),
+>                 )
+>                 conversation.append((decision, result))
+> ```
+>
+> Benefits:
+> - Workflow can pause when LLM context gets too big
+> - Resume on different node (durable state)
+> - Replay history for debugging
+> - Per-activity retry / fallback
+>
+> **What NOT to do**:
+> - In-memory workflow state (lost on crash)
+> - Retry without idempotency
+> - Skip verification on timeout
+> - No compensating action defined per step
+> - 'It worked in test' for multi-step (didn't test failure modes)"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| Saga / compensating | TikTok payment refund flow |
+| Outbox | TikTok payment — transactional event pattern |
+| Idempotency on retry | Voice agent SMS — you've done this |
+| Multi-step state | BNPL chatbot — collection workflow |
+| Verify on timeout | Payment integration — natural |
+
+**Quote**:
+
+> "Indonesia refund tier had this exact shape: 5-step refund workflow (verify → approve → charge → notify → audit). Each step had **idempotency key per workflow_id** + **outbox table for state**. On step 3 (charge) timeout, we'd call `get_payment_status(idem_key)` to verify before retry. The verify step prevented double-refund 100% in 6 months production. **Compensating handlers** for each step were defined upfront and tested in chaos mode. Saga > 2PC for cross-vendor."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "Email sent then payment refunded (compensation). User got email saying 'paid' but actually refunded. Bad UX. Handle?"
+**A**:
+- **Reorder**: email LAST (after payment confirmed durable)
+- If reorder impossible: **delay** email by N seconds, check workflow state before sending
+- **Apology + recovery message**: send follow-up explaining
+- **Quarantine** if compensation in flight: hold downstream actions
+
+**Q2**: "Saga compensation also fails. Now what?"
+**A**:
+- **DLQ** for failed compensations
+- **Alert** human ops
+- **Manual reconciliation** UI for ops to inspect + resolve
+- **Compensation must be more reliable than forward** — design for it (retry-heavy, idempotent, all data captured)
+
+**Q3**: "Workflow engine adds operational complexity. When NOT use Temporal?"
+**A**:
+- **Simple workflows** (< 3 steps, all reversible) — direct DB + retries enough
+- **High-frequency** (microsecond) — Temporal overhead too much
+- **Greenfield + small team** — roll-your-own works initially
+- **Use Temporal when**: > 5 steps, long-running, multi-vendor, audit required, multiple workflows
+
+**Q4**: "Agent in middle of workflow — LLM service goes down. What user sees?"
+**A**:
+- Workflow paused (Temporal handles)
+- User notified: 'still processing'
+- LLM service recovers, workflow resumes from durable state
+- If LLM down > 5 min: alert ops + customer
+- Eventually consistent — finish when service back
+
+**Q5**: "Multi-turn agent conversation — eventual consistency for state?"
+**A**:
+- Each turn: read state → LLM → tool calls → write state (all in 1 workflow execution)
+- State stored in DB + KV-cache
+- If race (user sends 2 msgs fast): serialize via lock per conversation_id
+- Workflow engine handles: per-conversation_id workflow instance, queued events
+
+---
+
+## ❌ 易错点
+
+1. **2PC** for cross-vendor (impossible)
+2. **In-memory state** (lost on crash)
+3. **Retry without idempotency** (double execute)
+4. **No verify on timeout** (don't know if executed)
+5. **No compensating action** per step
+6. **No DLQ for compensation failures**
+7. **Email before payment confirmed** (UX bug)
+
+---
+
+## ✅ 加分项
+
+1. **Saga pattern** explained explicitly
+2. **Outbox** for durable state
+3. **Idempotency key + verify** for timeout
+4. **Temporal / workflow engine** recommendation with rationale
+5. **Compensating handlers** designed per step
+6. **DLQ for compensation failures**
+7. **Order of operations** considered (email last)
+8. **Quote Indonesia refund tier**
+
+---
+
+## Cheat Sheet
+
+```
+Why eventual consistency:
+  Multi-vendor (no 2PC)
+  Network partitions
+  Latency prohibitive
+
+Saga pattern:
+  Forward steps with compensating actions
+  On failure: compensate in reverse
+  Per-step: idempotent + retryable
+
+Outbox pattern:
+  Each step writes intent + state to DB
+  In same transaction as work
+  Reliable worker picks up unfinished
+  Ensures no step lost
+
+Idempotency:
+  Per-step idempotency_key (workflow_id + step)
+  On retry: same key
+  On timeout: VERIFY first (get_status)
+  Only retry if confirmed not-executed
+
+Verify-on-timeout pattern:
+  try execute
+  catch timeout:
+    sleep, get_status(idem_key)
+    if completed: reconstruct
+    if failed: retry
+    if uncertain: escalate
+
+Compensating action design:
+  Per step defined upfront
+  Tested in chaos mode
+  Idempotent
+  More reliable than forward
+  DLQ for failures
+
+Workflow engine (Temporal / DBOS):
+  Durable state (replay history)
+  Per-activity retry
+  Compensating support
+  Long-running (hours/days)
+  Recommend when > 5 steps
+
+Agent workflow shape:
+  LLM decides → tool call (as activity)
+  Each tool call retryable
+  Conversation state durable
+  Pause / resume across LLM calls
+
+Order matters:
+  Email/notify LAST (after all confirmed)
+  Reversible actions before irreversible
+  If irreversible early: queue + delayed
+
+红线:
+  - 2PC for cross-vendor
+  - In-memory state
+  - Retry without idem
+  - No verify on timeout
+  - No compensating action
+  - No DLQ for compensation
+  - Email before payment
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

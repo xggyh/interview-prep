@@ -37,7 +37,220 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"Customer has <strong>50 internal microservices</strong>, each with own REST API + auth. They want an agent that can call any of them. Design the <strong>tool abstraction layer</strong>. Why is <strong>MCP</strong> (Model Context Protocol) relevant in 2026?"</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"What does MCP solve that you can't get from just OpenAI's function-calling API? When would you NOT use MCP?"</p></blockquote>
+<p><strong>Round</strong>: Tool / Integration Architecture (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>2026 modern integration architecture</strong>:</p>
+<ol><li><strong>Tool abstraction</strong> —— LLM-agnostic interface</li><li><strong>MCP 是 standard</strong> —— Anthropic propose, Google/OpenAI also adopting</li><li><strong>API proxy layer</strong> —— auth / rate-limit / observability 统一</li><li><strong>Schema versioning</strong> —— customer API changes don't break agent</li><li><strong>Discoverability</strong> —— LLM 怎么知道有哪些 tools</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. LLM vendor</strong></p>
+<blockquote><p>"Single vendor (Claude only) or multi-vendor? Affects design — MCP is vendor-neutral."</p></blockquote>
+<p><strong>2. Internal API contract stability</strong></p>
+<blockquote><p>"Internal APIs change quarterly or monthly? Affects need for versioned tool spec."</p></blockquote>
+<p><strong>3. Auth model</strong></p>
+<blockquote><p>"Per-API key, OAuth, custom token? Agent acts as itself or on-behalf-of user?"</p></blockquote>
+<p><strong>4. Tool catalog size</strong></p>
+<blockquote><p>"50 services × 10 endpoints each = 500 tools. LLM can't see all. Need scoping/routing."</p></blockquote>
+<p><strong>5. Latency target</strong></p>
+<blockquote><p>"Internal API latency + proxy overhead — budget OK?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify vendor / catalog size / auth</td></tr><tr><td>5-15 min</td><td>MCP overview + why fit</td></tr><tr><td>15-25 min</td><td>Proxy layer (auth / rate-limit / observability)</td></tr><tr><td>25-35 min</td><td>Tool discovery + scoping (500 tools problem)</td></tr><tr><td>35-45 min</td><td>Versioning + observability</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: multi-vendor (Claude + Gemini + GPT), APIs change quarterly, OAuth + on-behalf-of, 500 tools, latency 2s budget]</em>.</p>
+<p><strong>MCP overview</strong>:</p>
+<p>Anthropic's Model Context Protocol (open-source, adopted by major LLM vendors). Standardizes:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Resources   — read-only data (files, DB rows, search results)
+Tools       — callable functions
+Prompts     — reusable prompt templates</code></pre>
+<p>Servers expose these over JSON-RPC (stdio / HTTP / SSE). Clients (LLM apps) discover and consume uniformly.</p>
+<p><strong>Why MCP for this customer</strong>:</p>
+<ul><li><strong>Vendor-neutral</strong>: same MCP server consumed by Claude / Gemini / GPT</li><li><strong>Future-proof</strong>: spec evolves, customer not vendor-locked</li><li><strong>Tool discovery</strong>: clients query <code>list_tools</code> dynamically, no hardcode</li><li><strong>Standard auth</strong>: OAuth flow standardized</li></ul>
+<p><strong>Architecture for 50 services</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">            ┌─────────────────────────┐
+            │   Agent (any LLM)       │
+            └────────────┬────────────┘
+                         │ MCP protocol
+            ┌────────────┴────────────┐
+            │  MCP Gateway (proxy)    │
+            │  - Discovery / routing  │
+            │  - Auth / OBO           │
+            │  - Rate limit           │
+            │  - Observability        │
+            │  - Tool selection (RAG) │
+            └─────┬──────┬──────┬─────┘
+            ┌─────┴┐ ┌───┴───┐ ┌┴────┐
+            │MCP-1 │ │MCP-2  │ │... 50│
+            │(Salesforce)    │ │      │
+            └──┬───┘ └───┬───┘ └──┬───┘
+            ┌──┴────┐┌───┴────┐┌──┴────┐
+            │Cust API│Cust API ││Cust API│
+            │  #1   ││  #2    ││  #N   │
+            └───────┘└────────┘└───────┘</code></pre>
+<p><strong>MCP Gateway (proxy) responsibilities</strong>:</p>
+<p><strong>1. Tool discovery + scoping</strong></p>
+<p>With 500 tools, LLM context can't hold all definitions. Solution:</p>
+<pre class="language-python"><code class="language-python"># Tool catalog embedded
+tool_index = vector_index([tool.description for tool in all_tools])
+
+async def list_relevant_tools(user_query, user_role, top_k=20):
+    # 1. RAG: retrieve top tools by query
+    candidates = tool_index.search(user_query, top_k=50)
+    # 2. Filter by user permissions
+    allowed = [t for t in candidates if user_role.can_use(t)]
+    # 3. Return top-k
+    return allowed[:top_k]</code></pre>
+<p>LLM sees top-20 most relevant tools, not all 500.</p>
+<p><strong>2. Auth + OBO (on-behalf-of)</strong></p>
+<pre class="language-python"><code class="language-python">async def proxy_call(tool_name, args, user_token):
+    # Get OAuth token for target service, scoped to user
+    service_token = await oauth.exchange(
+        user_token=user_token,
+        scope=tool_registry[tool_name].required_scopes,
+    )
+    
+    # Call underlying MCP server with delegated auth
+    return await mcp_servers[tool.service].call(
+        tool_name, args,
+        auth=service_token,
+    )</code></pre>
+<p>Agent <strong>never has more perms than user</strong>.</p>
+<p><strong>3. Rate limit + quota</strong></p>
+<pre class="language-python"><code class="language-python">async def proxy_call(...):
+    if not rate_limit.allow(user, tool):
+        raise RateLimitExceeded
+    if user.session_quota_remaining(tool) &lt;= 0:
+        raise QuotaExceeded
+    ...</code></pre>
+<p><strong>4. Observability</strong></p>
+<ul><li>Per-call: tool, user, latency, status, cost</li><li>Aggregated: per-tool success rate, per-user usage</li><li>Traces propagate to underlying services (OpenTelemetry)</li></ul>
+<p><strong>5. Caching</strong></p>
+<pre class="language-python"><code class="language-python"># For idempotent reads
+async def proxy_call(tool, args):
+    if tool.is_idempotent_read:
+        cache_key = hash(tool, args)
+        cached = await cache.get(cache_key)
+        if cached: return cached
+    
+    result = await underlying_call(...)
+    
+    if tool.is_idempotent_read:
+        await cache.set(cache_key, result, ttl=tool.cache_ttl)
+    return result</code></pre>
+<p><strong>6. Versioning</strong></p>
+<pre class="language-python"><code class="language-python"># MCP descriptor includes version
+{
+  "name": "create_order",
+  "version": "2.0",
+  "schema": {...},
+  "deprecated_versions": ["1.0"],
+}
+
+# Agent specs which version (default latest)
+# Old agents pinned to v1 work until version EOL
+# Gradual migration on customer schedule</code></pre>
+<p><strong>Custom API → MCP server adapter</strong> (when underlying API isn't MCP-native):</p>
+<pre class="language-python"><code class="language-python"># Each microservice gets a thin adapter
+class SalesforceMCPServer:
+    async def list_tools(self):
+        return [
+            Tool(name='create_lead', schema=..., handler=self.create_lead),
+            Tool(name='get_account', schema=..., handler=self.get_account),
+        ]
+    
+    async def create_lead(self, args):
+        resp = await sf_rest.post('/leads', json=args, auth=...)
+        return self.translate_response(resp)</code></pre>
+<p>Adapter handles: REST → MCP mapping, error code translation, type coercion.</p>
+<p><strong>When NOT to use MCP</strong>:</p>
+<ul><li>Single LLM vendor + small tool count + greenfield → OpenAI function calling is simpler</li><li>High-frequency tools (microseconds) where MCP proxy overhead matters</li><li>Tools that don't fit MCP semantics (stateful long-running like SSH session)</li></ul>
+<p><strong>Implementation steps</strong>:</p>
+<ol><li>Identify customer's existing API surface (50 services)</li><li>Categorize: which need adapter, which natively MCP, which custom (e.g., GraphQL)</li><li>Build MCP gateway as the single point of contact for LLM</li><li>Per service: write adapter (~1 day each, 50 days for full coverage)</li><li>Tool discovery via vector index + role-based filter</li><li>OAuth + observability baked into gateway"</li></ol></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Tool abstraction</td><td>Internal Agent Platform — workflow/tool/memory abstraction 你 owned</td></tr><tr><td>API proxy</td><td>TikTok payment — gateway layer 自然有</td></tr><tr><td>OAuth / OBO</td><td>Voice agent multi-tenant — permission scoping</td></tr><tr><td>Tool discovery</td><td>BNPL chatbot — intent → tool routing</td></tr><tr><td>Rate limit / quota</td><td>TikTok payment — per-user QPS limits 必做</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"On Internal Agent Platform we built exactly this — though pre-MCP we rolled our own protocol. <strong>Tool registry</strong> with JSON-schema-defined inputs/outputs, <strong>gateway</strong> that did auth + rate-limit + observability + retry, and <strong>RAG-based tool discovery</strong> for agents with 200+ tool catalog. The big production lesson: <strong>without discovery</strong>, agents tried to call non-existent tools or use wrong tool for task. After adding RAG retrieval over tool descriptions, agent tool-selection accuracy went from 70% to 92%."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "MCP overhead — extra hop. Latency cost?" <strong>A</strong>:</p>
+<ul><li>Single proxy hop ~5-20ms</li><li>Auth check / rate limit ~1-2ms (Redis)</li><li>Observability instrumentation ~&lt; 1ms</li><li>Total ~10-25ms — acceptable for 2s budget</li><li>For sub-100ms hard cases: pre-fetch + cache aggressive</li></ul>
+<p><strong>Q2</strong>: "Customer API changes break agent. How handle?" <strong>A</strong>:</p>
+<ul><li><strong>Schema versioning</strong> in MCP spec</li><li><strong>Adapter layer</strong> handles old / new mapping</li><li><strong>Deprecation warning</strong> for old version, cap usage</li><li><strong>Eval suite</strong> runs daily against tools, alert on schema drift</li><li><strong>Customer notification</strong> before breaking change</li></ul>
+<p><strong>Q3</strong>: "500 tools — LLM context can't fit. Beyond RAG retrieval?" <strong>A</strong>:</p>
+<ul><li><strong>Hierarchical</strong>: domain → category → tool (LLM picks domain, then tool)</li><li><strong>Per-agent specialization</strong>: customer-support agent sees only support tools</li><li><strong>Dynamic loading</strong>: agent calls <code>list_tools(query)</code> then uses subset</li><li><strong>Tool meta-tools</strong>: a 'find_tool' tool that LLM uses to discover</li></ul>
+<p><strong>Q4</strong>: "MCP server crashes — gateway behavior?" <strong>A</strong>:</p>
+<ul><li>Circuit breaker per-MCP-server</li><li>Health check every 30s</li><li>If down: return ToolUnavailable to agent</li><li>Agent decides: alternative tool / fallback / fail user-visible</li><li>Reconnect attempt after 1 min</li></ul>
+<p><strong>Q5</strong>: "Compare MCP vs OpenAI function calling — when each?" <strong>A</strong>:</p>
+<ul><li><strong>OpenAI function calling</strong>: single-vendor, in-process, fast, simple</li><li><strong>MCP</strong>: vendor-neutral, distributed, has versioning, has discovery</li><li><strong>In practice</strong>: OpenAI function calling is the LLM-side protocol; MCP is the tool-side protocol. They're complementary — MCP tool defs map to OpenAI function defs</li><li><strong>Choose MCP</strong> when: multi-vendor, customer-owned tools, long-term</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>No abstraction</strong> — agent talks directly to each API</li><li><strong>Hardcode 500 tools</strong> in LLM context (won't fit)</li><li><strong>No OBO</strong> — agent has more perms than user</li><li><strong>No versioning</strong> — API change breaks agent</li><li><strong>No discovery</strong> — agent doesn't know which tool to use</li><li><strong>MCP as the LLM protocol</strong> (confusing with function calling)</li><li><strong>No circuit breaker per tool</strong></li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>MCP standard</strong> awareness + when/why</li><li><strong>Gateway responsibilities</strong> (auth / RL / obs / cache / version)</li><li><strong>Tool discovery via RAG</strong> for large catalog</li><li><strong>OBO</strong> authorization flow</li><li><strong>Adapter pattern</strong> for non-MCP-native APIs</li><li><strong>Versioning</strong> strategy with deprecation</li><li><strong>OpenTelemetry trace propagation</strong></li><li><strong>Quote Internal Agent Platform 70→92% tool accuracy</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">MCP (Model Context Protocol):
+  Anthropic open standard, adopted broadly 2026
+  Vendor-neutral
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio / HTTP / SSE
+
+Gateway responsibilities:
+  Tool discovery (RAG over descriptions)
+  Auth + OBO (OAuth scope exchange)
+  Rate limit + quota
+  Observability (OTel)
+  Caching (idempotent reads)
+  Versioning
+  Circuit breaker per server
+
+500 tools problem:
+  RAG-based discovery (top-20 relevant)
+  Hierarchical (domain → category → tool)
+  Per-agent specialization
+  Meta-tool 'find_tool'
+
+OBO (on-behalf-of):
+  User token → exchange for service token
+  Service token scope ≤ user's perms
+  Agent never has more perms than user
+
+Adapter pattern:
+  REST API → MCP server adapter
+  Handles: protocol map, type coerce, error translate
+  ~1 day per service
+
+Versioning:
+  Schema version in MCP spec
+  Adapter handles old/new map
+  Deprecation warning + EOL date
+  Eval suite catches drift
+
+When NOT MCP:
+  Single vendor, small tool count, greenfield
+  Sub-100ms latency hard
+  Stateful long-running (e.g., SSH)
+
+Compared to function-calling:
+  OpenAI FC: LLM-side protocol, in-process
+  MCP: tool-side protocol, distributed
+  Complementary, FC tools defined as MCP tools
+
+红线:
+  - No abstraction
+  - Hardcode all tools in context
+  - No OBO
+  - No versioning
+  - No discovery
+  - No circuit breaker</code></pre>
   </section>
 
   
@@ -49,7 +262,381 @@
     <a href="gfde-t3-high-throughput.html">T3.3 · High-throughput LLM serving (1M QPS architecture) →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "Customer has **50 internal microservices**, each with own REST API + auth. They want an agent that can call any of them. Design the **tool abstraction layer**. Why is **MCP** (Model Context Protocol) relevant in 2026?"
+
+或追问形态:
+
+> "What does MCP solve that you can't get from just OpenAI's function-calling API? When would you NOT use MCP?"
+
+**Round**: Tool / Integration Architecture (45 min)
+
+---
+
+## 这道题在考什么
+
+考你**2026 modern integration architecture**:
+
+1. **Tool abstraction** —— LLM-agnostic interface
+2. **MCP 是 standard** —— Anthropic propose, Google/OpenAI also adopting
+3. **API proxy layer** —— auth / rate-limit / observability 统一
+4. **Schema versioning** —— customer API changes don't break agent
+5. **Discoverability** —— LLM 怎么知道有哪些 tools
+
+---
+
+## 必问 clarifying
+
+**1. LLM vendor**
+
+> "Single vendor (Claude only) or multi-vendor? Affects design — MCP is vendor-neutral."
+
+**2. Internal API contract stability**
+
+> "Internal APIs change quarterly or monthly? Affects need for versioned tool spec."
+
+**3. Auth model**
+
+> "Per-API key, OAuth, custom token? Agent acts as itself or on-behalf-of user?"
+
+**4. Tool catalog size**
+
+> "50 services × 10 endpoints each = 500 tools. LLM can't see all. Need scoping/routing."
+
+**5. Latency target**
+
+> "Internal API latency + proxy overhead — budget OK?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify vendor / catalog size / auth |
+| 5-15 min | MCP overview + why fit |
+| 15-25 min | Proxy layer (auth / rate-limit / observability) |
+| 25-35 min | Tool discovery + scoping (500 tools problem) |
+| 35-45 min | Versioning + observability |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: multi-vendor (Claude + Gemini + GPT), APIs change quarterly, OAuth + on-behalf-of, 500 tools, latency 2s budget]*.
+>
+> **MCP overview**:
+>
+> Anthropic's Model Context Protocol (open-source, adopted by major LLM vendors). Standardizes:
+>
+> ```
+> Resources   — read-only data (files, DB rows, search results)
+> Tools       — callable functions
+> Prompts     — reusable prompt templates
+> ```
+>
+> Servers expose these over JSON-RPC (stdio / HTTP / SSE). Clients (LLM apps) discover and consume uniformly.
+>
+> **Why MCP for this customer**:
+>
+> - **Vendor-neutral**: same MCP server consumed by Claude / Gemini / GPT
+> - **Future-proof**: spec evolves, customer not vendor-locked
+> - **Tool discovery**: clients query `list_tools` dynamically, no hardcode
+> - **Standard auth**: OAuth flow standardized
+>
+> **Architecture for 50 services**:
+>
+> ```
+>             ┌─────────────────────────┐
+>             │   Agent (any LLM)       │
+>             └────────────┬────────────┘
+>                          │ MCP protocol
+>             ┌────────────┴────────────┐
+>             │  MCP Gateway (proxy)    │
+>             │  - Discovery / routing  │
+>             │  - Auth / OBO           │
+>             │  - Rate limit           │
+>             │  - Observability        │
+>             │  - Tool selection (RAG) │
+>             └─────┬──────┬──────┬─────┘
+>             ┌─────┴┐ ┌───┴───┐ ┌┴────┐
+>             │MCP-1 │ │MCP-2  │ │... 50│
+>             │(Salesforce)    │ │      │
+>             └──┬───┘ └───┬───┘ └──┬───┘
+>             ┌──┴────┐┌───┴────┐┌──┴────┐
+>             │Cust API│Cust API ││Cust API│
+>             │  #1   ││  #2    ││  #N   │
+>             └───────┘└────────┘└───────┘
+> ```
+>
+> **MCP Gateway (proxy) responsibilities**:
+>
+> **1. Tool discovery + scoping**
+>
+> With 500 tools, LLM context can't hold all definitions. Solution:
+>
+> ```python
+> # Tool catalog embedded
+> tool_index = vector_index([tool.description for tool in all_tools])
+>
+> async def list_relevant_tools(user_query, user_role, top_k=20):
+>     # 1. RAG: retrieve top tools by query
+>     candidates = tool_index.search(user_query, top_k=50)
+>     # 2. Filter by user permissions
+>     allowed = [t for t in candidates if user_role.can_use(t)]
+>     # 3. Return top-k
+>     return allowed[:top_k]
+> ```
+>
+> LLM sees top-20 most relevant tools, not all 500.
+>
+> **2. Auth + OBO (on-behalf-of)**
+>
+> ```python
+> async def proxy_call(tool_name, args, user_token):
+>     # Get OAuth token for target service, scoped to user
+>     service_token = await oauth.exchange(
+>         user_token=user_token,
+>         scope=tool_registry[tool_name].required_scopes,
+>     )
+>     
+>     # Call underlying MCP server with delegated auth
+>     return await mcp_servers[tool.service].call(
+>         tool_name, args,
+>         auth=service_token,
+>     )
+> ```
+>
+> Agent **never has more perms than user**.
+>
+> **3. Rate limit + quota**
+>
+> ```python
+> async def proxy_call(...):
+>     if not rate_limit.allow(user, tool):
+>         raise RateLimitExceeded
+>     if user.session_quota_remaining(tool) <= 0:
+>         raise QuotaExceeded
+>     ...
+> ```
+>
+> **4. Observability**
+>
+> - Per-call: tool, user, latency, status, cost
+> - Aggregated: per-tool success rate, per-user usage
+> - Traces propagate to underlying services (OpenTelemetry)
+>
+> **5. Caching**
+>
+> ```python
+> # For idempotent reads
+> async def proxy_call(tool, args):
+>     if tool.is_idempotent_read:
+>         cache_key = hash(tool, args)
+>         cached = await cache.get(cache_key)
+>         if cached: return cached
+>     
+>     result = await underlying_call(...)
+>     
+>     if tool.is_idempotent_read:
+>         await cache.set(cache_key, result, ttl=tool.cache_ttl)
+>     return result
+> ```
+>
+> **6. Versioning**
+>
+> ```python
+> # MCP descriptor includes version
+> {
+>   "name": "create_order",
+>   "version": "2.0",
+>   "schema": {...},
+>   "deprecated_versions": ["1.0"],
+> }
+>
+> # Agent specs which version (default latest)
+> # Old agents pinned to v1 work until version EOL
+> # Gradual migration on customer schedule
+> ```
+>
+> **Custom API → MCP server adapter** (when underlying API isn't MCP-native):
+>
+> ```python
+> # Each microservice gets a thin adapter
+> class SalesforceMCPServer:
+>     async def list_tools(self):
+>         return [
+>             Tool(name='create_lead', schema=..., handler=self.create_lead),
+>             Tool(name='get_account', schema=..., handler=self.get_account),
+>         ]
+>     
+>     async def create_lead(self, args):
+>         resp = await sf_rest.post('/leads', json=args, auth=...)
+>         return self.translate_response(resp)
+> ```
+>
+> Adapter handles: REST → MCP mapping, error code translation, type coercion.
+>
+> **When NOT to use MCP**:
+>
+> - Single LLM vendor + small tool count + greenfield → OpenAI function calling is simpler
+> - High-frequency tools (microseconds) where MCP proxy overhead matters
+> - Tools that don't fit MCP semantics (stateful long-running like SSH session)
+>
+> **Implementation steps**:
+>
+> 1. Identify customer's existing API surface (50 services)
+> 2. Categorize: which need adapter, which natively MCP, which custom (e.g., GraphQL)
+> 3. Build MCP gateway as the single point of contact for LLM
+> 4. Per service: write adapter (~1 day each, 50 days for full coverage)
+> 5. Tool discovery via vector index + role-based filter
+> 6. OAuth + observability baked into gateway"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| Tool abstraction | Internal Agent Platform — workflow/tool/memory abstraction 你 owned |
+| API proxy | TikTok payment — gateway layer 自然有 |
+| OAuth / OBO | Voice agent multi-tenant — permission scoping |
+| Tool discovery | BNPL chatbot — intent → tool routing |
+| Rate limit / quota | TikTok payment — per-user QPS limits 必做 |
+
+**Quote**:
+
+> "On Internal Agent Platform we built exactly this — though pre-MCP we rolled our own protocol. **Tool registry** with JSON-schema-defined inputs/outputs, **gateway** that did auth + rate-limit + observability + retry, and **RAG-based tool discovery** for agents with 200+ tool catalog. The big production lesson: **without discovery**, agents tried to call non-existent tools or use wrong tool for task. After adding RAG retrieval over tool descriptions, agent tool-selection accuracy went from 70% to 92%."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "MCP overhead — extra hop. Latency cost?"
+**A**:
+- Single proxy hop ~5-20ms
+- Auth check / rate limit ~1-2ms (Redis)
+- Observability instrumentation ~< 1ms
+- Total ~10-25ms — acceptable for 2s budget
+- For sub-100ms hard cases: pre-fetch + cache aggressive
+
+**Q2**: "Customer API changes break agent. How handle?"
+**A**:
+- **Schema versioning** in MCP spec
+- **Adapter layer** handles old / new mapping
+- **Deprecation warning** for old version, cap usage
+- **Eval suite** runs daily against tools, alert on schema drift
+- **Customer notification** before breaking change
+
+**Q3**: "500 tools — LLM context can't fit. Beyond RAG retrieval?"
+**A**:
+- **Hierarchical**: domain → category → tool (LLM picks domain, then tool)
+- **Per-agent specialization**: customer-support agent sees only support tools
+- **Dynamic loading**: agent calls `list_tools(query)` then uses subset
+- **Tool meta-tools**: a 'find_tool' tool that LLM uses to discover
+
+**Q4**: "MCP server crashes — gateway behavior?"
+**A**:
+- Circuit breaker per-MCP-server
+- Health check every 30s
+- If down: return ToolUnavailable to agent
+- Agent decides: alternative tool / fallback / fail user-visible
+- Reconnect attempt after 1 min
+
+**Q5**: "Compare MCP vs OpenAI function calling — when each?"
+**A**:
+- **OpenAI function calling**: single-vendor, in-process, fast, simple
+- **MCP**: vendor-neutral, distributed, has versioning, has discovery
+- **In practice**: OpenAI function calling is the LLM-side protocol; MCP is the tool-side protocol. They're complementary — MCP tool defs map to OpenAI function defs
+- **Choose MCP** when: multi-vendor, customer-owned tools, long-term
+
+---
+
+## ❌ 易错点
+
+1. **No abstraction** — agent talks directly to each API
+2. **Hardcode 500 tools** in LLM context (won't fit)
+3. **No OBO** — agent has more perms than user
+4. **No versioning** — API change breaks agent
+5. **No discovery** — agent doesn't know which tool to use
+6. **MCP as the LLM protocol** (confusing with function calling)
+7. **No circuit breaker per tool**
+
+---
+
+## ✅ 加分项
+
+1. **MCP standard** awareness + when/why
+2. **Gateway responsibilities** (auth / RL / obs / cache / version)
+3. **Tool discovery via RAG** for large catalog
+4. **OBO** authorization flow
+5. **Adapter pattern** for non-MCP-native APIs
+6. **Versioning** strategy with deprecation
+7. **OpenTelemetry trace propagation**
+8. **Quote Internal Agent Platform 70→92% tool accuracy**
+
+---
+
+## Cheat Sheet
+
+```
+MCP (Model Context Protocol):
+  Anthropic open standard, adopted broadly 2026
+  Vendor-neutral
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio / HTTP / SSE
+
+Gateway responsibilities:
+  Tool discovery (RAG over descriptions)
+  Auth + OBO (OAuth scope exchange)
+  Rate limit + quota
+  Observability (OTel)
+  Caching (idempotent reads)
+  Versioning
+  Circuit breaker per server
+
+500 tools problem:
+  RAG-based discovery (top-20 relevant)
+  Hierarchical (domain → category → tool)
+  Per-agent specialization
+  Meta-tool 'find_tool'
+
+OBO (on-behalf-of):
+  User token → exchange for service token
+  Service token scope ≤ user's perms
+  Agent never has more perms than user
+
+Adapter pattern:
+  REST API → MCP server adapter
+  Handles: protocol map, type coerce, error translate
+  ~1 day per service
+
+Versioning:
+  Schema version in MCP spec
+  Adapter handles old/new map
+  Deprecation warning + EOL date
+  Eval suite catches drift
+
+When NOT MCP:
+  Single vendor, small tool count, greenfield
+  Sub-100ms latency hard
+  Stateful long-running (e.g., SSH)
+
+Compared to function-calling:
+  OpenAI FC: LLM-side protocol, in-process
+  MCP: tool-side protocol, distributed
+  Complementary, FC tools defined as MCP tools
+
+红线:
+  - No abstraction
+  - Hardcode all tools in context
+  - No OBO
+  - No versioning
+  - No discovery
+  - No circuit breaker
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

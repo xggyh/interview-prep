@@ -37,7 +37,178 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"Your agent decides to call <strong>5 tools in parallel</strong>. How do you schedule them, detect race conditions, and decide which ones can be parallel vs sequential?"</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"Two parallel tool calls both want to update user_profile. Possible race. Walk me through how you'd prevent this AND how you'd debug it if you saw inconsistent state in production."</p></blockquote>
+<p><strong>Round</strong>: Tool Calling System Design (45-60 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>concurrency + correctness</strong> for agent systems:</p>
+<ol><li><strong>Read vs Write 区分</strong> —— 90% race condition 是写写冲突</li><li><strong>Locking strategy</strong> —— per-resource lock, deadlock 防御</li><li><strong>Speedup math</strong> —— parallel 不是 silver bullet</li><li><strong>Failure isolation</strong> —— 1 个 parallel call 挂别拖累 others</li><li><strong>Debug tools</strong> —— distributed trace, lock contention metrics</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Tool semantics</strong></p>
+<blockquote><p>"What do the 5 tools do — all reads, mix of read/write, or all writes? Determines what's safe to parallel."</p></blockquote>
+<p><strong>2. Dependency graph</strong></p>
+<blockquote><p>"Are they independent or does one's output feed into another? DAG vs flat?"</p></blockquote>
+<p><strong>3. Shared resources</strong></p>
+<blockquote><p>"Do they touch shared state — user profile, account balance, shared cache?"</p></blockquote>
+<p><strong>4. Speedup target</strong></p>
+<blockquote><p>"Why parallel — latency reduction (real-time chat) or throughput (batch)? Different optim."</p></blockquote>
+<p><strong>5. Failure handling</strong></p>
+<blockquote><p>"If 1 of 5 fails, abort all or continue with degraded?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify read/write + dependencies + shared state</td></tr><tr><td>5-15 min</td><td>Static scheduling (parallel-safe vs sequential set)</td></tr><tr><td>15-25 min</td><td>Race prevention (locks / serialize per resource)</td></tr><tr><td>25-35 min</td><td>Failure isolation + cancellation</td></tr><tr><td>35-45 min</td><td>Debugging + observability</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: 5 tools mix of read/write, 1 of them updates user_profile, latency-driven (chat), partial failure should not block useful results]</em>.</p>
+<p><strong>Static scheduling: classify tools at registration time</strong>:</p>
+<pre class="language-python"><code class="language-python">@tool(safety='read', side_effects=False)
+def get_user_profile(user_id): ...
+
+@tool(safety='write', side_effects=True, resources=['user_profile:{user_id}'])
+def update_user_email(user_id, email): ...
+
+@tool(safety='write', side_effects=True, resources=['account_balance:{user_id}'])
+def charge(user_id, amount): ...</code></pre>
+<p><strong>Scheduler rules</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. All reads → run in parallel (asyncio.gather)
+2. Writes touching DIFFERENT resources → also parallel
+3. Writes touching SAME resource → serialize (by resource lock)
+4. Read + Write on same resource → 
+     Option A: serialize (read after write)
+     Option B: parallel with stale-read accepted
+     → tool annotation determines</code></pre>
+<p><strong>Execution</strong>:</p>
+<pre class="language-python"><code class="language-python">async def execute_parallel(tool_calls):
+    # Group by resource for serialization
+    by_resource = group_by_resource(tool_calls)
+    
+    async def run_serial(group):
+        results = []
+        for tc in group:
+            try:
+                r = await call_with_timeout(tc, 10)
+                results.append(('ok', r))
+            except Exception as e:
+                results.append(('error', e))
+        return results
+    
+    # Run resource-groups in parallel, within-group serial
+    all_results = await asyncio.gather(
+        *[run_serial(group) for group in by_resource.values()],
+        return_exceptions=True
+    )
+    return all_results</code></pre>
+<p><strong>Race prevention</strong> — 3 layers:</p>
+<p><strong>L1: Static (compile time)</strong>: tool annotations declare resources, scheduler respects</p>
+<p><strong>L2: Runtime (per-request)</strong>: distributed lock per resource</p>
+<pre class="language-python"><code class="language-python">async def call_with_resource_lock(tool, args):
+    resources = tool.resources_for(args)  # e.g., ['user_profile:42']
+    locks = [redis_lock(r, ttl=30) for r in resources]
+    # Sort to prevent deadlock!
+    locks = sorted(locks, key=lambda l: l.key)
+    
+    async with acquire_all(locks):
+        return await tool(args)</code></pre>
+<p><strong>L3: Database (final safety net)</strong>: optimistic concurrency control (CAS with version)</p>
+<pre class="language-python"><code class="language-python"># In tool itself
+def update_user(user_id, **fields):
+    current = db.get(user_id)
+    fields['_version'] = current._version + 1
+    ok = db.update_if_version(user_id, fields, expect_version=current._version)
+    if not ok:
+        raise RaceConditionError  # caller decides retry / abort</code></pre>
+<p><strong>Deadlock prevention</strong>:</p>
+<ul><li><strong>Lock ordering</strong>: always acquire in sorted resource-key order. Prevents AB-BA deadlock.</li><li><strong>Timeout</strong>: lock TTL 30s, if can't acquire in 5s → fail fast</li><li><strong>Detection</strong>: monitor lock wait time, alert &gt; p99 5s</li></ul>
+<p><strong>Failure isolation</strong>:</p>
+<pre class="language-python"><code class="language-python"># `return_exceptions=True` keeps successes
+results = await asyncio.gather(*tasks, return_exceptions=True)
+
+success_results = [r for r in results if not isinstance(r, Exception)]
+failures = [(t, r) for t, r in zip(tasks, results) if isinstance(r, Exception)]
+
+if failures:
+    # Log + maybe notify agent so it can decide
+    log.warning("Partial failure: %s", failures)
+    return PartialResults(success_results, failures)</code></pre>
+<p>Agent sees partial → can decide:</p>
+<ul><li>Have enough info to proceed → continue</li><li>Critical failure → user-visible error</li></ul>
+<p><strong>Observability</strong>:</p>
+<p>Per-call: distributed trace span linked to parent agent step Per-resource: lock contention rate, average wait time Alert: deadlock (wait &gt; 30s + count &gt; 5)</p>
+<p><strong>Debug pattern when seeing inconsistent state</strong>:</p>
+<ol><li><strong>Distributed trace</strong> for the request — see exact tool call ordering</li><li><strong>Resource access log</strong> — who locked when</li><li><strong>Re-run with locks logged verbosely</strong></li><li><strong>Property-based test</strong>: generate random tool sequences, verify invariants</li></ol>
+<p><strong>What NOT to parallel</strong>:</p>
+<ul><li>Tools where order matters semantically (e.g., create_order → charge → confirm)</li><li>Tools that don't say so — annotate-or-default-serialize</li><li>Long-running (&gt;5s) bundled with fast ones — bottleneck whole batch"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Static classification (read/write)</td><td>BNPL chatbot intent routing — fanout to multiple sub-agents</td></tr><tr><td>Per-resource lock</td><td>Voice agent 多 turn shared session state</td></tr><tr><td>Distributed trace for debug</td><td>Voice agent multi-region debugging</td></tr><tr><td>Partial failure isolation</td><td>Voice agent ASR / TTS / LLM 任一挂不挂全栈</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"BNPL chatbot routed intent to N sub-agents in parallel — order lookup + refund check + product info. Same user_id shared across them. Used Redis distributed lock per user_id for <strong>write operations</strong> but reads ran fully parallel. Hit one production bug: agent for-loop bug caused 10 simultaneous lock acquires from same agent → deadlock. Fix was <strong>idempotent lock acquire</strong> (same caller can re-acquire its own lock)."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "What if you don't know tool semantics ahead of time (3rd party tool)?" <strong>A</strong>: Default to <strong>safe-serial</strong> policy:</p>
+<ul><li>Unknown tool → assume write, serialize</li><li>Optional: dry-run analysis — does tool seem to read or write?</li><li>Better: require tool authors to annotate semantics in spec / MCP descriptor</li></ul>
+<p><strong>Q2</strong>: "Parallel of 5 — 1 of them is slow (30s). Others finish in 100ms. Wait or partial-return?" <strong>A</strong>: Configurable per-agent:</p>
+<ul><li><strong>Chat use case</strong>: timeout at 5s, partial return + "still loading X..." async</li><li><strong>Batch use case</strong>: wait all</li><li><strong>Hybrid</strong>: race + first-N completion (return on first 3 succeed if those enough)</li></ul>
+<p><strong>Q3</strong>: "How do you avoid an agent triggering DDOS by parallelizing 100 calls?" <strong>A</strong>: Multi-layer:</p>
+<ul><li><strong>Per-agent-step</strong>: max 10 parallel calls per LLM step</li><li><strong>Per-tool</strong>: per-tool concurrency limit (10 concurrent gets to weather API)</li><li><strong>Per-tenant</strong>: rate limit total</li><li><strong>Budget</strong>: per-step token + dollar cap, hitting cap halts</li></ul>
+<p><strong>Q4</strong>: "Production race condition you can't reproduce locally?" <strong>A</strong>: Tools:</p>
+<ul><li><strong>Chaos engineering</strong>: inject artificial latency 0-500ms randomly</li><li><strong>Property test</strong>: pytest-asyncio + hypothesis for random tool sequences</li><li><strong>Production trace replay</strong>: capture real failure traces, replay locally with fault injection</li></ul>
+<p><strong>Q5</strong>: "MCP / tool catalog supports declaring resource scope?" <strong>A</strong>: Modern MCP allows tool metadata. Tool's input schema can include <code>@resource_lock_path</code> annotation. Runtime introspects and acquires.</p>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Parallel all without read/write distinction</strong> — race</li><li><strong>Lock without sorting</strong> — AB-BA deadlock</li><li><strong>Lock without timeout</strong> — stuck forever</li><li><strong>No partial-success handling</strong> — 1 fail kills all</li><li><strong>No per-tool concurrency limit</strong> — DDOS downstream</li><li><strong>Tools not annotated</strong> — scheduler can't decide</li><li><strong>No CAS / version on DB layer</strong> — silent override</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Static (annotation) + runtime (lock) + DB (CAS)</strong> 3 layers</li><li><strong>Sort locks before acquire</strong> anti-deadlock</li><li><strong>return_exceptions=True</strong> for partial-success</li><li><strong>Per-tool / per-tenant concurrency limit</strong></li><li><strong>MCP annotation-based scheduling</strong></li><li><strong>Property-based test</strong> awareness</li><li><strong>Quote BNPL deadlock incident</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Static classification (at tool registration):
+  safety: read | write | destructive
+  resources: ['user_profile:{user_id}']
+  parallel-safe: read | write-disjoint-resources
+
+Scheduling rules:
+  reads → all parallel
+  writes-disjoint → parallel  
+  writes-same-resource → serialize
+  read+write same → annotation decides
+
+Race prevention 3 layers:
+  L1 Static annotation
+  L2 Distributed lock per resource (sorted, TTL)
+  L3 DB optimistic concurrency (CAS + version)
+
+Deadlock prevention:
+  Acquire locks in sorted key order
+  TTL on each lock (30s)
+  Max wait 5s, fail fast
+  Monitor wait p99
+
+Failure isolation:
+  asyncio.gather(return_exceptions=True)
+  Partial success → log + return to agent
+  Agent decides continue or abort
+
+Concurrency limits:
+  Per-agent-step: 10 parallel max
+  Per-tool: 10 concurrent
+  Per-tenant: rate-limited
+
+Debug tools:
+  Distributed trace
+  Resource access log
+  Property-based test
+  Chaos latency injection
+
+红线:
+  - Parallel without read/write split
+  - Lock without sort (deadlock)
+  - No CAS at DB layer
+  - 1 failure aborts all</code></pre>
   </section>
 
   
@@ -49,7 +220,311 @@
     <a href="gfde-t1-destructive-tools.html">T1.4 · 非 idempotent / destructive 操作怎么 wrap (charge / send_email) →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "Your agent decides to call **5 tools in parallel**. How do you schedule them, detect race conditions, and decide which ones can be parallel vs sequential?"
+
+或追问形态:
+
+> "Two parallel tool calls both want to update user_profile. Possible race. Walk me through how you'd prevent this AND how you'd debug it if you saw inconsistent state in production."
+
+**Round**: Tool Calling System Design (45-60 min)
+
+---
+
+## 这道题在考什么
+
+考你**concurrency + correctness** for agent systems:
+
+1. **Read vs Write 区分** —— 90% race condition 是写写冲突
+2. **Locking strategy** —— per-resource lock, deadlock 防御
+3. **Speedup math** —— parallel 不是 silver bullet
+4. **Failure isolation** —— 1 个 parallel call 挂别拖累 others
+5. **Debug tools** —— distributed trace, lock contention metrics
+
+---
+
+## 必问 clarifying
+
+**1. Tool semantics**
+
+> "What do the 5 tools do — all reads, mix of read/write, or all writes? Determines what's safe to parallel."
+
+**2. Dependency graph**
+
+> "Are they independent or does one's output feed into another? DAG vs flat?"
+
+**3. Shared resources**
+
+> "Do they touch shared state — user profile, account balance, shared cache?"
+
+**4. Speedup target**
+
+> "Why parallel — latency reduction (real-time chat) or throughput (batch)? Different optim."
+
+**5. Failure handling**
+
+> "If 1 of 5 fails, abort all or continue with degraded?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify read/write + dependencies + shared state |
+| 5-15 min | Static scheduling (parallel-safe vs sequential set) |
+| 15-25 min | Race prevention (locks / serialize per resource) |
+| 25-35 min | Failure isolation + cancellation |
+| 35-45 min | Debugging + observability |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: 5 tools mix of read/write, 1 of them updates user_profile, latency-driven (chat), partial failure should not block useful results]*.
+>
+> **Static scheduling: classify tools at registration time**:
+>
+> ```python
+> @tool(safety='read', side_effects=False)
+> def get_user_profile(user_id): ...
+> 
+> @tool(safety='write', side_effects=True, resources=['user_profile:{user_id}'])
+> def update_user_email(user_id, email): ...
+> 
+> @tool(safety='write', side_effects=True, resources=['account_balance:{user_id}'])
+> def charge(user_id, amount): ...
+> ```
+>
+> **Scheduler rules**:
+>
+> ```
+> 1. All reads → run in parallel (asyncio.gather)
+> 2. Writes touching DIFFERENT resources → also parallel
+> 3. Writes touching SAME resource → serialize (by resource lock)
+> 4. Read + Write on same resource → 
+>      Option A: serialize (read after write)
+>      Option B: parallel with stale-read accepted
+>      → tool annotation determines
+> ```
+>
+> **Execution**:
+>
+> ```python
+> async def execute_parallel(tool_calls):
+>     # Group by resource for serialization
+>     by_resource = group_by_resource(tool_calls)
+>     
+>     async def run_serial(group):
+>         results = []
+>         for tc in group:
+>             try:
+>                 r = await call_with_timeout(tc, 10)
+>                 results.append(('ok', r))
+>             except Exception as e:
+>                 results.append(('error', e))
+>         return results
+>     
+>     # Run resource-groups in parallel, within-group serial
+>     all_results = await asyncio.gather(
+>         *[run_serial(group) for group in by_resource.values()],
+>         return_exceptions=True
+>     )
+>     return all_results
+> ```
+>
+> **Race prevention** — 3 layers:
+>
+> **L1: Static (compile time)**: tool annotations declare resources, scheduler respects
+>
+> **L2: Runtime (per-request)**: distributed lock per resource
+>
+> ```python
+> async def call_with_resource_lock(tool, args):
+>     resources = tool.resources_for(args)  # e.g., ['user_profile:42']
+>     locks = [redis_lock(r, ttl=30) for r in resources]
+>     # Sort to prevent deadlock!
+>     locks = sorted(locks, key=lambda l: l.key)
+>     
+>     async with acquire_all(locks):
+>         return await tool(args)
+> ```
+>
+> **L3: Database (final safety net)**: optimistic concurrency control (CAS with version)
+>
+> ```python
+> # In tool itself
+> def update_user(user_id, **fields):
+>     current = db.get(user_id)
+>     fields['_version'] = current._version + 1
+>     ok = db.update_if_version(user_id, fields, expect_version=current._version)
+>     if not ok:
+>         raise RaceConditionError  # caller decides retry / abort
+> ```
+>
+> **Deadlock prevention**:
+> - **Lock ordering**: always acquire in sorted resource-key order. Prevents AB-BA deadlock.
+> - **Timeout**: lock TTL 30s, if can't acquire in 5s → fail fast
+> - **Detection**: monitor lock wait time, alert > p99 5s
+>
+> **Failure isolation**:
+>
+> ```python
+> # `return_exceptions=True` keeps successes
+> results = await asyncio.gather(*tasks, return_exceptions=True)
+> 
+> success_results = [r for r in results if not isinstance(r, Exception)]
+> failures = [(t, r) for t, r in zip(tasks, results) if isinstance(r, Exception)]
+> 
+> if failures:
+>     # Log + maybe notify agent so it can decide
+>     log.warning("Partial failure: %s", failures)
+>     return PartialResults(success_results, failures)
+> ```
+>
+> Agent sees partial → can decide:
+> - Have enough info to proceed → continue
+> - Critical failure → user-visible error
+>
+> **Observability**:
+>
+> Per-call: distributed trace span linked to parent agent step
+> Per-resource: lock contention rate, average wait time
+> Alert: deadlock (wait > 30s + count > 5)
+>
+> **Debug pattern when seeing inconsistent state**:
+> 1. **Distributed trace** for the request — see exact tool call ordering
+> 2. **Resource access log** — who locked when
+> 3. **Re-run with locks logged verbosely**
+> 4. **Property-based test**: generate random tool sequences, verify invariants
+>
+> **What NOT to parallel**:
+> - Tools where order matters semantically (e.g., create_order → charge → confirm)
+> - Tools that don't say so — annotate-or-default-serialize
+> - Long-running (>5s) bundled with fast ones — bottleneck whole batch"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| Static classification (read/write) | BNPL chatbot intent routing — fanout to multiple sub-agents |
+| Per-resource lock | Voice agent 多 turn shared session state |
+| Distributed trace for debug | Voice agent multi-region debugging |
+| Partial failure isolation | Voice agent ASR / TTS / LLM 任一挂不挂全栈 |
+
+**Quote**:
+
+> "BNPL chatbot routed intent to N sub-agents in parallel — order lookup + refund check + product info. Same user_id shared across them. Used Redis distributed lock per user_id for **write operations** but reads ran fully parallel. Hit one production bug: agent for-loop bug caused 10 simultaneous lock acquires from same agent → deadlock. Fix was **idempotent lock acquire** (same caller can re-acquire its own lock)."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "What if you don't know tool semantics ahead of time (3rd party tool)?"
+**A**: Default to **safe-serial** policy:
+- Unknown tool → assume write, serialize
+- Optional: dry-run analysis — does tool seem to read or write?
+- Better: require tool authors to annotate semantics in spec / MCP descriptor
+
+**Q2**: "Parallel of 5 — 1 of them is slow (30s). Others finish in 100ms. Wait or partial-return?"
+**A**: Configurable per-agent:
+- **Chat use case**: timeout at 5s, partial return + "still loading X..." async
+- **Batch use case**: wait all
+- **Hybrid**: race + first-N completion (return on first 3 succeed if those enough)
+
+**Q3**: "How do you avoid an agent triggering DDOS by parallelizing 100 calls?"
+**A**: Multi-layer:
+- **Per-agent-step**: max 10 parallel calls per LLM step
+- **Per-tool**: per-tool concurrency limit (10 concurrent gets to weather API)
+- **Per-tenant**: rate limit total
+- **Budget**: per-step token + dollar cap, hitting cap halts
+
+**Q4**: "Production race condition you can't reproduce locally?"
+**A**: Tools:
+- **Chaos engineering**: inject artificial latency 0-500ms randomly
+- **Property test**: pytest-asyncio + hypothesis for random tool sequences
+- **Production trace replay**: capture real failure traces, replay locally with fault injection
+
+**Q5**: "MCP / tool catalog supports declaring resource scope?"
+**A**: Modern MCP allows tool metadata. Tool's input schema can include `@resource_lock_path` annotation. Runtime introspects and acquires.
+
+---
+
+## ❌ 易错点
+
+1. **Parallel all without read/write distinction** — race
+2. **Lock without sorting** — AB-BA deadlock
+3. **Lock without timeout** — stuck forever
+4. **No partial-success handling** — 1 fail kills all
+5. **No per-tool concurrency limit** — DDOS downstream
+6. **Tools not annotated** — scheduler can't decide
+7. **No CAS / version on DB layer** — silent override
+
+---
+
+## ✅ 加分项
+
+1. **Static (annotation) + runtime (lock) + DB (CAS)** 3 layers
+2. **Sort locks before acquire** anti-deadlock
+3. **return_exceptions=True** for partial-success
+4. **Per-tool / per-tenant concurrency limit**
+5. **MCP annotation-based scheduling**
+6. **Property-based test** awareness
+7. **Quote BNPL deadlock incident**
+
+---
+
+## Cheat Sheet
+
+```
+Static classification (at tool registration):
+  safety: read | write | destructive
+  resources: ['user_profile:{user_id}']
+  parallel-safe: read | write-disjoint-resources
+
+Scheduling rules:
+  reads → all parallel
+  writes-disjoint → parallel  
+  writes-same-resource → serialize
+  read+write same → annotation decides
+
+Race prevention 3 layers:
+  L1 Static annotation
+  L2 Distributed lock per resource (sorted, TTL)
+  L3 DB optimistic concurrency (CAS + version)
+
+Deadlock prevention:
+  Acquire locks in sorted key order
+  TTL on each lock (30s)
+  Max wait 5s, fail fast
+  Monitor wait p99
+
+Failure isolation:
+  asyncio.gather(return_exceptions=True)
+  Partial success → log + return to agent
+  Agent decides continue or abort
+
+Concurrency limits:
+  Per-agent-step: 10 parallel max
+  Per-tool: 10 concurrent
+  Per-tenant: rate-limited
+
+Debug tools:
+  Distributed trace
+  Resource access log
+  Property-based test
+  Chaos latency injection
+
+红线:
+  - Parallel without read/write split
+  - Lock without sort (deadlock)
+  - No CAS at DB layer
+  - 1 failure aborts all
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

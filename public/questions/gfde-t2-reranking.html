@@ -37,7 +37,159 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"First-pass retrieval gives you top-50 candidates. <strong>Reranker</strong> picks top-10. Explain why you need it, the tradeoffs, and how you'd evaluate."</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"Cohere rerank vs cross-encoder vs LLM-as-judge for reranking — when each?"</p></blockquote>
+<p><strong>Round</strong>: RAG Quality / Reranking (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>bi-encoder ≠ cross-encoder</strong> 区别 + production reranker engineering:</p>
+<ol><li><strong>First-stage vs second-stage</strong> retrieval 不同 model class</li><li><strong>Cross-encoder mechanics</strong> —— 为什么 slower 但 accurate</li><li><strong>Latency-accuracy trade-off</strong> —— tune k 平衡</li><li><strong>Reranker options</strong> —— Cohere / bge / LLM-judge / custom finetune</li><li><strong>Eval methodology</strong> —— NDCG &gt; recall</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. First-stage 质量</strong></p>
+<blockquote><p>"Top-50 recall — what% of expected relevant in top-50? If already 95%, reranker just reorders. If 60%, reranker can't fix what's missing."</p></blockquote>
+<p><strong>2. Latency budget</strong></p>
+<blockquote><p>"Per-query budget — 100ms / 1s / 10s? Affects k size and reranker class."</p></blockquote>
+<p><strong>3. Quality target</strong></p>
+<blockquote><p>"Looking for top-1 accuracy (single best) or top-3 / top-10 (set of good)?"</p></blockquote>
+<p><strong>4. Volume / cost</strong></p>
+<blockquote><p>"QPS expected. Per-query reranker cost compounds."</p></blockquote>
+<p><strong>5. Domain</strong></p>
+<blockquote><p>"Generic web / e-commerce / legal / code? Domain-specific reranker available?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify first-stage recall + latency / cost / quality target</td></tr><tr><td>5-15 min</td><td>Why reranker (bi vs cross encoder math)</td></tr><tr><td>15-25 min</td><td>Reranker options trade-off</td></tr><tr><td>25-35 min</td><td>Latency / cost optimization (cascade)</td></tr><tr><td>35-45 min</td><td>Eval methodology</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Clarify — <em>[假设: first-stage recall@50 = 92%, latency 1s budget, top-3 accuracy target, 100 QPS, technical doc domain]</em>.</p>
+<p><strong>Why reranker</strong> — bi-encoder limitation:</p>
+<p>First-stage (dense ANN search) uses <strong>bi-encoder</strong>:</p>
+<ul><li>Embed query: q_emb = encoder(query)</li><li>Embed each doc once at index time: d_emb = encoder(doc)</li><li>Score = cosine(q_emb, d_emb)</li></ul>
+<p><strong>Limitation</strong>: query and doc embedded <strong>independently</strong>. Embedding model never sees them together. So can't learn 'this query word is asking about that doc term'.</p>
+<p><strong>Cross-encoder</strong>:</p>
+<ul><li>Concatenate: input = [CLS] query [SEP] doc [SEP]</li><li>Model sees both jointly, attention can cross</li><li>Single forward pass → relevance score</li></ul>
+<p>Cross attention catches subtle relevance that bi-encoder misses. <strong>+15-30% NDCG</strong> typically.</p>
+<p><strong>Cost trade-off</strong>:</p>
+<ul><li>Bi-encoder: index once, query embedding once → ANN search ~ms</li><li>Cross-encoder: per query, must run forward pass for <strong>each candidate</strong>. 50 candidates × 100ms = 5s. Too slow for k=1M.</li></ul>
+<p>Hence pipeline: bi-encoder narrow to top-50 → cross-encoder rerank to top-10.</p>
+<p><strong>Reranker options — decision matrix</strong>:</p>
+<table class="md-table"><thead><tr><th>Option</th><th>Latency (50 docs)</th><th>Cost</th><th>Quality</th><th>When</th></tr></thead><tbody><tr><td><strong>bge-reranker-base</strong></td><td>~200ms (CPU)</td><td>Free (self-host)</td><td>Good</td><td>Default, latency-sensitive</td></tr><tr><td><strong>bge-reranker-large</strong></td><td>~500ms (GPU)</td><td>GPU $</td><td>Better</td><td>Quality &gt; latency</td></tr><tr><td><strong>Cohere rerank API</strong></td><td>~200ms</td><td>$1/1K calls</td><td>Excellent</td><td>Easy, no infra</td></tr><tr><td><strong>mxbai-rerank-large</strong></td><td>~400ms (GPU)</td><td>GPU $</td><td>Excellent</td><td>Self-hosted Cohere-class</td></tr><tr><td><strong>LLM-as-judge</strong> (GPT-4)</td><td>5-10s</td><td>$$$</td><td>Best</td><td>Top-3 final pass, expensive</td></tr><tr><td><strong>Domain-finetuned</strong></td><td>varies</td><td>training cost</td><td>Best for that domain</td><td>Have labeled data</td></tr></tbody></table>
+<p><strong>My recommendation for this case</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Stage 1: BM25 + dense → top-50 (50ms)
+Stage 2: bge-reranker-large → top-10 (500ms)
+Stage 3 (optional): LLM-as-judge → top-3 (3s) for high-stakes only
+Total: ~600ms, fits 1s budget</code></pre>
+<p><strong>Cascade for cost / latency optimization</strong>:</p>
+<pre class="language-python"><code class="language-python">def cascade_rerank(query, candidates, target_top_k=10):
+    # Stage A: cheap reranker (bge-base) on top-50
+    scores_a = bge_base.predict([(query, c.text) for c in candidates])
+    top_25 = top_k_by_score(candidates, scores_a, 25)
+    
+    # Stage B: expensive reranker (bge-large) on top-25
+    scores_b = bge_large.predict([(query, c.text) for c in top_25])
+    top_10 = top_k_by_score(top_25, scores_b, target_top_k)
+    
+    return top_10</code></pre>
+<p>Cuts cost ~50% with minimal accuracy loss.</p>
+<p><strong>Reranker prompt for LLM-as-judge</strong> (when used):</p>
+<pre class="language-python"><code class="language-python">prompt = f"""
+Query: {query}
+
+Doc A: {doc_a}
+Doc B: {doc_b}
+
+Which doc better answers the query? Respond with just A or B.
+"""</code></pre>
+<p>Pairwise + sort by win-count. Slower but uses LLM's nuanced understanding. Good for <strong>top-3 final pass</strong> only.</p>
+<p><strong>Eval methodology</strong>:</p>
+<pre class="language-python"><code class="language-python">for query, expected_graded in eval_set:
+    reranked = pipeline.retrieve_and_rerank(query, top_k=10)
+    ndcg = compute_ndcg(reranked, expected_graded, k=10)
+    mrr = compute_mrr(reranked, expected_graded)
+    # Pair recall@k with NDCG — recall captures 'in set', NDCG captures 'position-aware'</code></pre>
+<p>Key insight: reranker doesn't improve recall (set is same), improves <strong>NDCG / MRR</strong> (ordering within set).</p>
+<p><strong>A/B test in production</strong>:</p>
+<ul><li>50% with reranker, 50% without</li><li>Compare: CTR, time-to-answer, user thumbs</li><li>Latency monitoring: alert if reranker p99 &gt; budget</li></ul>
+<p><strong>Latency optimization</strong>:</p>
+<ul><li><strong>Batching</strong>: 50 (q, doc) pairs in single forward pass</li><li><strong>GPU</strong>: 5-10x speedup over CPU</li><li><strong>Distillation</strong>: large reranker → small reranker via knowledge distillation</li><li><strong>Quantization</strong>: INT8 / FP16 for inference</li><li><strong>TensorRT / vLLM</strong>: production inference engine</li></ul>
+<p><strong>What NOT to do</strong>:</p>
+<ul><li>Rerank top-1000 (latency blow)</li><li>Use bi-encoder for reranking (no cross-attention)</li><li>Skip eval set ('feels better')</li><li>Replace bi-encoder retrieval with reranker alone (impossible at scale)</li><li>Same reranker for all query types (some domains need domain-finetuned)"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Cross-encoder reranker</td><td>BNPL chatbot RAG — added bge-reranker, recall@5 → @3 mapping improved</td></tr><tr><td>Cascade</td><td>Voice agent — multi-stage ASR (fast model → expensive verifier)</td></tr><tr><td>LLM-as-judge</td><td>ConvFinQA — your ablation evaluator was LLM-judge style</td></tr><tr><td>Latency engineering</td><td>Voice agent p99 &lt; 800ms streaming — naturally optimized for this</td></tr><tr><td>Eval set</td><td>ConvFinQA — annotated eval set methodology you've done</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"BNPL chatbot added bge-reranker-large in the top-50 → top-5 stage. NDCG@5 jumped from 0.71 to 0.83. Latency cost +180ms (GPU batched), within our 1.5s budget. The single biggest win was on <strong>acronym queries</strong> — bi-encoder gave 'phone' for 'iPhone Pro' query, reranker correctly preferred the iPhone-specific doc. We A/B tested 1 week, user thumbs-up rate +12%."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "Reranker latency too high (1s). Need &lt; 200ms total. Options?" <strong>A</strong>:</p>
+<ul><li><strong>Cheaper reranker</strong>: bge-reranker-base or distilled small</li><li><strong>Fewer candidates</strong>: top-20 instead of top-50</li><li><strong>No reranker, better first stage</strong>: invest in HyDE / multi-query / better embeddings</li><li><strong>Caching</strong>: cache (query, top-k) for common queries</li></ul>
+<p><strong>Q2</strong>: "LLM-as-judge sounds best — why not always?" <strong>A</strong>:</p>
+<ul><li><strong>Cost</strong>: GPT-4 pair-rank 50 candidates ≈ $0.50/query</li><li><strong>Latency</strong>: 5-10s</li><li><strong>Consistency</strong>: LLM judgment varies, calibration drift</li><li><strong>Use case</strong>: top-3 final pass only, high-stakes ✓</li><li><strong>Mass deployment</strong>: too expensive</li></ul>
+<p><strong>Q3</strong>: "Reranker has its own biases (favors longer docs). How detect?" <strong>A</strong>:</p>
+<ul><li><strong>Slice eval by doc length</strong>: NDCG by length quartile</li><li><strong>Calibration test</strong>: synthesize known-relevant short docs, check still surfaces</li><li><strong>Diversity in eval set</strong>: span all doc length distributions</li><li><strong>Compare multiple rerankers</strong>: best per-slice may differ</li></ul>
+<p><strong>Q4</strong>: "Domain-specific (medical, legal). Generic reranker not enough?" <strong>A</strong>:</p>
+<ul><li><strong>Finetune</strong> on domain pairs: pre-train + fine-tune on 1K-10K labeled query-doc pairs</li><li><strong>Hard-negative mining</strong>: include top-ranked-but-wrong as negatives</li><li><strong>Synthetic data</strong>: LLM generate query-doc pairs for training</li><li><strong>Cost</strong>: 1 GPU-day to fine-tune, big quality gain in narrow domain</li></ul>
+<p><strong>Q5</strong>: "Reranker performance flat for 6 months. How improve?" <strong>A</strong>:</p>
+<ul><li><strong>Data</strong>: add more training pairs from production user feedback</li><li><strong>Hard negatives</strong>: 'almost-right' docs that reranker mis-orders</li><li><strong>Newer model</strong>: bge → mxbai → next-gen</li><li><strong>Eval drift</strong>: ensure eval set reflects current query distribution</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Bi-encoder used for reranking</strong> — no cross-attention</li><li><strong>Rerank top-1000</strong> — latency blow</li><li><strong>No first-stage to narrow</strong> — try to cross-encode 1M docs</li><li><strong>No eval</strong> — 'feels better'</li><li><strong>Single reranker for all</strong> — domain mismatch</li><li><strong>LLM-as-judge for everything</strong> — cost blow</li><li><strong>No cascade</strong> — pay expensive on every</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Bi vs cross encoder math</strong> explanation</li><li><strong>Cascade rerank</strong> (cheap → expensive)</li><li><strong>Per-domain finetuning</strong> awareness</li><li><strong>GPU + batching + quantization</strong> for latency</li><li><strong>NDCG / MRR &gt; recall</strong> for reranker eval</li><li><strong>A/B test framework</strong></li><li><strong>LLM-as-judge</strong> as final pass for high-stakes</li><li><strong>Quote BNPL bge-reranker +12% thumbs</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Bi-encoder vs Cross-encoder:
+  Bi: independent embed, cosine score, fast, scale to 1M
+  Cross: joint forward pass, accurate, slow, top-50 max
+  Use bi for first stage, cross for rerank
+
+Reranker options:
+  bge-base: free, fast, good
+  bge-large: GPU, slower, better
+  Cohere rerank API: $1/1K, excellent
+  mxbai-rerank: self-host Cohere-class
+  LLM-judge: $$$, slow, top-3 only
+  Domain-finetune: best in narrow
+
+Cascade pattern:
+  bi-encoder → top-50 (50ms)
+  bge-base → top-25 (200ms)
+  bge-large → top-10 (500ms)
+  LLM-judge → top-3 (optional, slow)
+
+Latency optimization:
+  Batching (50 pairs single fwd)
+  GPU (5-10x CPU)
+  Distillation (large → small)
+  Quantization (INT8/FP16)
+  TensorRT / vLLM
+
+Eval metrics for reranker:
+  NDCG@k (position-aware)
+  MRR (first relevant rank)
+  Recall stays same (set unchanged)
+
+A/B test in prod:
+  CTR
+  Time-to-answer
+  Thumbs up
+  Latency p99
+
+Domain finetune:
+  1K-10K labeled (q, doc, score)
+  Hard-negative mining
+  Synthetic from LLM
+
+红线:
+  - Bi for reranking
+  - Top-1000 cross
+  - No first stage narrow
+  - No eval
+  - LLM-judge mass
+  - No cascade</code></pre>
   </section>
 
   
@@ -49,7 +201,312 @@
     <a href="gfde-t2-long-context-vs-rag.html">T2.6 · Long-context model 出现后 RAG 还要不要？ →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "First-pass retrieval gives you top-50 candidates. **Reranker** picks top-10. Explain why you need it, the tradeoffs, and how you'd evaluate."
+
+或追问形态:
+
+> "Cohere rerank vs cross-encoder vs LLM-as-judge for reranking — when each?"
+
+**Round**: RAG Quality / Reranking (45 min)
+
+---
+
+## 这道题在考什么
+
+考你**bi-encoder ≠ cross-encoder** 区别 + production reranker engineering:
+
+1. **First-stage vs second-stage** retrieval 不同 model class
+2. **Cross-encoder mechanics** —— 为什么 slower 但 accurate
+3. **Latency-accuracy trade-off** —— tune k 平衡
+4. **Reranker options** —— Cohere / bge / LLM-judge / custom finetune
+5. **Eval methodology** —— NDCG > recall
+
+---
+
+## 必问 clarifying
+
+**1. First-stage 质量**
+
+> "Top-50 recall — what% of expected relevant in top-50? If already 95%, reranker just reorders. If 60%, reranker can't fix what's missing."
+
+**2. Latency budget**
+
+> "Per-query budget — 100ms / 1s / 10s? Affects k size and reranker class."
+
+**3. Quality target**
+
+> "Looking for top-1 accuracy (single best) or top-3 / top-10 (set of good)?"
+
+**4. Volume / cost**
+
+> "QPS expected. Per-query reranker cost compounds."
+
+**5. Domain**
+
+> "Generic web / e-commerce / legal / code? Domain-specific reranker available?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify first-stage recall + latency / cost / quality target |
+| 5-15 min | Why reranker (bi vs cross encoder math) |
+| 15-25 min | Reranker options trade-off |
+| 25-35 min | Latency / cost optimization (cascade) |
+| 35-45 min | Eval methodology |
+
+---
+
+## 我会这样答（sample）
+
+> "Clarify — *[假设: first-stage recall@50 = 92%, latency 1s budget, top-3 accuracy target, 100 QPS, technical doc domain]*.
+>
+> **Why reranker** — bi-encoder limitation:
+>
+> First-stage (dense ANN search) uses **bi-encoder**:
+> - Embed query: q_emb = encoder(query)
+> - Embed each doc once at index time: d_emb = encoder(doc)
+> - Score = cosine(q_emb, d_emb)
+>
+> **Limitation**: query and doc embedded **independently**. Embedding model never sees them together. So can't learn 'this query word is asking about that doc term'.
+>
+> **Cross-encoder**:
+> - Concatenate: input = [CLS] query [SEP] doc [SEP]
+> - Model sees both jointly, attention can cross
+> - Single forward pass → relevance score
+>
+> Cross attention catches subtle relevance that bi-encoder misses. **+15-30% NDCG** typically.
+>
+> **Cost trade-off**:
+> - Bi-encoder: index once, query embedding once → ANN search ~ms
+> - Cross-encoder: per query, must run forward pass for **each candidate**. 50 candidates × 100ms = 5s. Too slow for k=1M.
+>
+> Hence pipeline: bi-encoder narrow to top-50 → cross-encoder rerank to top-10.
+>
+> **Reranker options — decision matrix**:
+>
+> | Option | Latency (50 docs) | Cost | Quality | When |
+> |---|---|---|---|---|
+> | **bge-reranker-base** | ~200ms (CPU) | Free (self-host) | Good | Default, latency-sensitive |
+> | **bge-reranker-large** | ~500ms (GPU) | GPU $ | Better | Quality > latency |
+> | **Cohere rerank API** | ~200ms | $1/1K calls | Excellent | Easy, no infra |
+> | **mxbai-rerank-large** | ~400ms (GPU) | GPU $ | Excellent | Self-hosted Cohere-class |
+> | **LLM-as-judge** (GPT-4) | 5-10s | $$$ | Best | Top-3 final pass, expensive |
+> | **Domain-finetuned** | varies | training cost | Best for that domain | Have labeled data |
+>
+> **My recommendation for this case**:
+>
+> ```
+> Stage 1: BM25 + dense → top-50 (50ms)
+> Stage 2: bge-reranker-large → top-10 (500ms)
+> Stage 3 (optional): LLM-as-judge → top-3 (3s) for high-stakes only
+> Total: ~600ms, fits 1s budget
+> ```
+>
+> **Cascade for cost / latency optimization**:
+>
+> ```python
+> def cascade_rerank(query, candidates, target_top_k=10):
+>     # Stage A: cheap reranker (bge-base) on top-50
+>     scores_a = bge_base.predict([(query, c.text) for c in candidates])
+>     top_25 = top_k_by_score(candidates, scores_a, 25)
+>     
+>     # Stage B: expensive reranker (bge-large) on top-25
+>     scores_b = bge_large.predict([(query, c.text) for c in top_25])
+>     top_10 = top_k_by_score(top_25, scores_b, target_top_k)
+>     
+>     return top_10
+> ```
+>
+> Cuts cost ~50% with minimal accuracy loss.
+>
+> **Reranker prompt for LLM-as-judge** (when used):
+>
+> ```python
+> prompt = f"""
+> Query: {query}
+> 
+> Doc A: {doc_a}
+> Doc B: {doc_b}
+> 
+> Which doc better answers the query? Respond with just A or B.
+> """
+> ```
+>
+> Pairwise + sort by win-count. Slower but uses LLM's nuanced understanding. Good for **top-3 final pass** only.
+>
+> **Eval methodology**:
+>
+> ```python
+> for query, expected_graded in eval_set:
+>     reranked = pipeline.retrieve_and_rerank(query, top_k=10)
+>     ndcg = compute_ndcg(reranked, expected_graded, k=10)
+>     mrr = compute_mrr(reranked, expected_graded)
+>     # Pair recall@k with NDCG — recall captures 'in set', NDCG captures 'position-aware'
+> ```
+>
+> Key insight: reranker doesn't improve recall (set is same), improves **NDCG / MRR** (ordering within set).
+>
+> **A/B test in production**:
+> - 50% with reranker, 50% without
+> - Compare: CTR, time-to-answer, user thumbs
+> - Latency monitoring: alert if reranker p99 > budget
+>
+> **Latency optimization**:
+> - **Batching**: 50 (q, doc) pairs in single forward pass
+> - **GPU**: 5-10x speedup over CPU
+> - **Distillation**: large reranker → small reranker via knowledge distillation
+> - **Quantization**: INT8 / FP16 for inference
+> - **TensorRT / vLLM**: production inference engine
+>
+> **What NOT to do**:
+> - Rerank top-1000 (latency blow)
+> - Use bi-encoder for reranking (no cross-attention)
+> - Skip eval set ('feels better')
+> - Replace bi-encoder retrieval with reranker alone (impossible at scale)
+> - Same reranker for all query types (some domains need domain-finetuned)"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| Cross-encoder reranker | BNPL chatbot RAG — added bge-reranker, recall@5 → @3 mapping improved |
+| Cascade | Voice agent — multi-stage ASR (fast model → expensive verifier) |
+| LLM-as-judge | ConvFinQA — your ablation evaluator was LLM-judge style |
+| Latency engineering | Voice agent p99 < 800ms streaming — naturally optimized for this |
+| Eval set | ConvFinQA — annotated eval set methodology you've done |
+
+**Quote**:
+
+> "BNPL chatbot added bge-reranker-large in the top-50 → top-5 stage. NDCG@5 jumped from 0.71 to 0.83. Latency cost +180ms (GPU batched), within our 1.5s budget. The single biggest win was on **acronym queries** — bi-encoder gave 'phone' for 'iPhone Pro' query, reranker correctly preferred the iPhone-specific doc. We A/B tested 1 week, user thumbs-up rate +12%."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "Reranker latency too high (1s). Need < 200ms total. Options?"
+**A**:
+- **Cheaper reranker**: bge-reranker-base or distilled small
+- **Fewer candidates**: top-20 instead of top-50
+- **No reranker, better first stage**: invest in HyDE / multi-query / better embeddings
+- **Caching**: cache (query, top-k) for common queries
+
+**Q2**: "LLM-as-judge sounds best — why not always?"
+**A**:
+- **Cost**: GPT-4 pair-rank 50 candidates ≈ $0.50/query
+- **Latency**: 5-10s
+- **Consistency**: LLM judgment varies, calibration drift
+- **Use case**: top-3 final pass only, high-stakes ✓
+- **Mass deployment**: too expensive
+
+**Q3**: "Reranker has its own biases (favors longer docs). How detect?"
+**A**:
+- **Slice eval by doc length**: NDCG by length quartile
+- **Calibration test**: synthesize known-relevant short docs, check still surfaces
+- **Diversity in eval set**: span all doc length distributions
+- **Compare multiple rerankers**: best per-slice may differ
+
+**Q4**: "Domain-specific (medical, legal). Generic reranker not enough?"
+**A**:
+- **Finetune** on domain pairs: pre-train + fine-tune on 1K-10K labeled query-doc pairs
+- **Hard-negative mining**: include top-ranked-but-wrong as negatives
+- **Synthetic data**: LLM generate query-doc pairs for training
+- **Cost**: 1 GPU-day to fine-tune, big quality gain in narrow domain
+
+**Q5**: "Reranker performance flat for 6 months. How improve?"
+**A**:
+- **Data**: add more training pairs from production user feedback
+- **Hard negatives**: 'almost-right' docs that reranker mis-orders
+- **Newer model**: bge → mxbai → next-gen
+- **Eval drift**: ensure eval set reflects current query distribution
+
+---
+
+## ❌ 易错点
+
+1. **Bi-encoder used for reranking** — no cross-attention
+2. **Rerank top-1000** — latency blow
+3. **No first-stage to narrow** — try to cross-encode 1M docs
+4. **No eval** — 'feels better'
+5. **Single reranker for all** — domain mismatch
+6. **LLM-as-judge for everything** — cost blow
+7. **No cascade** — pay expensive on every
+
+---
+
+## ✅ 加分项
+
+1. **Bi vs cross encoder math** explanation
+2. **Cascade rerank** (cheap → expensive)
+3. **Per-domain finetuning** awareness
+4. **GPU + batching + quantization** for latency
+5. **NDCG / MRR > recall** for reranker eval
+6. **A/B test framework**
+7. **LLM-as-judge** as final pass for high-stakes
+8. **Quote BNPL bge-reranker +12% thumbs**
+
+---
+
+## Cheat Sheet
+
+```
+Bi-encoder vs Cross-encoder:
+  Bi: independent embed, cosine score, fast, scale to 1M
+  Cross: joint forward pass, accurate, slow, top-50 max
+  Use bi for first stage, cross for rerank
+
+Reranker options:
+  bge-base: free, fast, good
+  bge-large: GPU, slower, better
+  Cohere rerank API: $1/1K, excellent
+  mxbai-rerank: self-host Cohere-class
+  LLM-judge: $$$, slow, top-3 only
+  Domain-finetune: best in narrow
+
+Cascade pattern:
+  bi-encoder → top-50 (50ms)
+  bge-base → top-25 (200ms)
+  bge-large → top-10 (500ms)
+  LLM-judge → top-3 (optional, slow)
+
+Latency optimization:
+  Batching (50 pairs single fwd)
+  GPU (5-10x CPU)
+  Distillation (large → small)
+  Quantization (INT8/FP16)
+  TensorRT / vLLM
+
+Eval metrics for reranker:
+  NDCG@k (position-aware)
+  MRR (first relevant rank)
+  Recall stays same (set unchanged)
+
+A/B test in prod:
+  CTR
+  Time-to-answer
+  Thumbs up
+  Latency p99
+
+Domain finetune:
+  1K-10K labeled (q, doc, score)
+  Hard-negative mining
+  Synthetic from LLM
+
+红线:
+  - Bi for reranking
+  - Top-1000 cross
+  - No first stage narrow
+  - No eval
+  - LLM-judge mass
+  - No cascade
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');

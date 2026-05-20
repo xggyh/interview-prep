@@ -37,7 +37,178 @@
 
   <section class="section">
     <h2>我的思路与解法</h2>
-    <p><em>分析尚未撰写。</em></p>
+    <h3>题目</h3>
+<blockquote><p>"You're designing the API for an agent service. Should the <strong>agent itself be stateless or stateful</strong>? Walk through the trade-offs, and recommend for: (a) a customer-support chatbot, (b) a long-running coding agent, (c) a voice agent."</p></blockquote>
+<p>或追问形态:</p>
+<blockquote><p>"OpenAI's API is stateless (you pass full history each call). Why? When would you choose differently?"</p></blockquote>
+<p><strong>Round</strong>: System Design (45 min)</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>考你<strong>production architecture trade-off</strong> 理解:</p>
+<ol><li><strong>Stateless 优势</strong> —— scale, failover, simplicity</li><li><strong>Stateful 优势</strong> —— latency, cost (context cached), state proximity</li><li><strong>Per-use-case 选择</strong> —— 同一个产品里可能 mix</li><li><strong>Hybrid pattern</strong> —— server-side cache + client-passes-conversation-id</li></ol>
+<hr />
+<h3>必问 clarifying</h3>
+<p><strong>1. Latency target</strong></p>
+<blockquote><p>"Per-request — &lt; 500ms (voice) or 5s (batch) OK? Stateless adds context reload overhead."</p></blockquote>
+<p><strong>2. State 大小</strong></p>
+<blockquote><p>"Per-session state how big — 1KB (chat) or 1MB (coding agent file edits)?"</p></blockquote>
+<p><strong>3. Multi-tenant</strong></p>
+<blockquote><p>"Same instance serves N users or partitioned?"</p></blockquote>
+<p><strong>4. Cost sensitivity</strong></p>
+<blockquote><p>"Per-token cost matters? Stateless re-sends full context every call."</p></blockquote>
+<p><strong>5. Failover requirement</strong></p>
+<blockquote><p>"Single-node failure should preserve session or OK to start fresh?"</p></blockquote>
+<hr />
+<h3>5 步框架</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify latency / state size / cost / failover</td></tr><tr><td>5-15 min</td><td>Definitions + 4 axes of comparison</td></tr><tr><td>15-25 min</td><td>Per-use-case recommendation (a/b/c)</td></tr><tr><td>25-35 min</td><td>Hybrid: server-cache + client-id</td></tr><tr><td>35-45 min</td><td>Implementation details + observability</td></tr></tbody></table>
+<hr />
+<h3>我会这样答（sample）</h3>
+<blockquote><p>"Defining first:</p>
+<p><strong>Stateless</strong>: Each request carries all state. Server has no per-session memory.</p>
+<p><strong>Stateful</strong>: Server remembers per-session state across requests.</p>
+<p><strong>4 axes of comparison</strong>:</p>
+<table class="md-table"><thead><tr><th>Axis</th><th>Stateless</th><th>Stateful</th></tr></thead><tbody><tr><td><strong>Latency</strong></td><td>+ Context rebuild every call</td><td>Low (state cached)</td></tr><tr><td><strong>Scalability</strong></td><td>Horizontal trivial</td><td>Sticky session / state replication</td></tr><tr><td><strong>Cost (tokens)</strong></td><td>Re-send context every call</td><td>Send only delta</td></tr><tr><td><strong>Failover</strong></td><td>Any node can serve next request</td><td>Need state replication or re-warm</td></tr><tr><td><strong>Multi-tenant</strong></td><td>Easy (no per-tenant state on server)</td><td>Per-tenant memory mgmt</td></tr><tr><td><strong>Debugging</strong></td><td>Reproducible (all in 1 request)</td><td>State must be snapshotted</td></tr></tbody></table>
+<p><strong>OpenAI / Anthropic / Google chose stateless</strong> because:</p>
+<ul><li>Scale to 10M+ concurrent users</li><li>Horizontal scale without sticky session</li><li>Idempotent: same input → same output (debug-friendly)</li><li>Failover trivial</li><li>Cost: with KV-cache, partial state cached on server side anyway (hybrid in practice)</li></ul>
+<p><strong>Recommendations per use case</strong>:</p>
+<p><strong>(a) Customer-support chatbot</strong>:</p>
+<p>✅ <strong>Stateless</strong> (default)</p>
+<ul><li>Conversation 5-15 turns avg</li><li>Concurrent users 10K+</li><li>Per-request 200ms acceptable</li><li>User can resume from any device → state in DB not in-memory</li></ul>
+<pre class="language-python"><code class="language-python"># Client sends full history (or refers to conversation_id)
+POST /chat
+{
+  "conversation_id": "abc",
+  "user_message": "...",
+}
+
+# Server (stateless):
+1. Load conversation history from DB by conversation_id
+2. Append user message
+3. Call LLM with full context (with KV cache hit)
+4. Save response to DB
+5. Return response</code></pre>
+<p><strong>(b) Long-running coding agent (Cursor-like)</strong>:</p>
+<p>⚠️ <strong>Hybrid</strong>:</p>
+<ul><li>Session lives hours, many edits</li><li>State (open files, working dir) large</li><li>Per-request latency sensitive (&lt; 1s for autocomplete)</li><li>Failover OK to restart session on new node</li></ul>
+<pre class="language-python"><code class="language-python"># Stateful working memory + stateless API surface
+# Sticky session by conversation_id
+# State (open files, history) cached in-process, backed up to DB every 30s
+# On node failure, next request goes to any node, reloads from DB checkpoint</code></pre>
+<p><strong>(c) Voice agent</strong>:</p>
+<p>✅ <strong>Stateful with WebSocket / streaming</strong></p>
+<ul><li>Per-turn latency &lt; 300ms hard</li><li>Audio + ASR + LLM + TTS pipeline shares state</li><li>Connection-bound (WebSocket)</li><li>Failover means dropped call (acceptable cost)</li></ul>
+<pre class="language-python"><code class="language-python"># WebSocket connection per call
+# Audio streamed in, response streamed out
+# State (transcript, user_id, conversation) lives in connection-handling actor
+# On disconnect: clean up; on reconnect: new session</code></pre>
+<p><strong>Hybrid pattern (most common in production)</strong>:</p>
+<p>Server is <strong>logically stateless</strong> (any node serves any request) but uses <strong>caching layers</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. Client passes `conversation_id`
+2. API gateway routes to any backend node
+3. Node looks up state from:
+   a. In-process LRU cache (last 1000 active conversations)
+   b. Redis cache (last 10K, TTL 1h)
+   c. Postgres (source of truth)
+4. Process request, update cache + persist
+5. KV cache for LLM prefix: server-side cached, reused across requests</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul><li>Logically stateless: horizontal scale + failover</li><li>Practically fast: 95% in-process cache hit</li><li>KV-cache: LLM prefix reused</li></ul>
+<p><strong>KV-cache critical</strong>: with conversation history same prefix turns, LLM serving (vLLM / OpenAI internal) caches the KV computation. <strong>Same conversation re-uses cache</strong>, even if 'stateless' API.</p>
+<p><strong>Concrete implementation</strong>:</p>
+<pre class="language-python"><code class="language-python">async def chat_handler(request):
+    conv_id = request.conversation_id
+    
+    # Cache-tier lookup
+    state = await conv_cache.get(conv_id)  # in-process → Redis → DB
+    
+    # Append new turn
+    state.add_user_message(request.message)
+    
+    # LLM call (server-side KV cache by prefix)
+    response = await llm.generate(
+        messages=state.messages,
+        conversation_id=conv_id,  # hint to LLM serving for KV reuse
+    )
+    
+    state.add_assistant_message(response)
+    await conv_cache.set(conv_id, state)  # write-back
+    await db.persist_async(conv_id, state)  # async durable
+    
+    return response</code></pre>
+<p><strong>Observability differs</strong>:</p>
+<table class="md-table"><thead><tr><th>Aspect</th><th>Stateless</th><th>Stateful</th></tr></thead><tbody><tr><td>Trace</td><td>Per-request</td><td>Per-session + per-request</td></tr><tr><td>Replay</td><td>Trivial (input → output)</td><td>Need state snapshot</td></tr><tr><td>Cost track</td><td>Per-call tokens</td><td>Per-call delta tokens</td></tr></tbody></table>
+<p><strong>What NOT to do</strong>:</p>
+<ul><li>Make stateless API but require sticky session (worst of both)</li><li>Make stateful but no failover plan</li><li>Skip KV cache opportunity (huge cost win)</li><li>Mix model semantics within product without explicit contract"</li></ul></blockquote>
+<hr />
+<h3>简历专属 reframe</h3>
+<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Stateful voice agent</td><td>Voice agent over WebSocket — you've done this</td></tr><tr><td>Stateless chat</td><td>BNPL chatbot likely stateless or hybrid</td></tr><tr><td>KV cache opt</td><td>vLLM / SGLang infra — KV-cache is your area</td></tr><tr><td>Cache hierarchy</td><td>TikTok payment — in-process + Redis + DB pattern</td></tr><tr><td>Multi-tenant</td><td>Voice agent 7 markets — per-tenant isolation</td></tr></tbody></table>
+<p><strong>Quote</strong>:</p>
+<blockquote><p>"Voice agent had hard stateful constraint — WebSocket-bound, audio streaming. State per call in connection-handling actor. Designed for <strong>single-call failover acceptable</strong> — if a call dropped, retry was OK UX-wise. But the BNPL chatbot we designed stateless: each REST call rebuilds context from DB. Latency overhead acceptable (~200ms) vs scale benefit (horizontal). Same team, two paradigms, by use-case shape."</p></blockquote>
+<hr />
+<h3>5 follow-ups</h3>
+<p><strong>Q1</strong>: "KV-cache — how big a win in real numbers?" <strong>A</strong>:</p>
+<ul><li>1 conversation, 10 turns, avg 1K tokens history. Without KV cache: 10K tokens prefill compute × 10 turns.</li><li>With cache: 1K (turn 1) + 1K each turn (just new content). 5-10x faster.</li><li>Real cost: prefill is the expensive part of LLM serving. Cache hit means most cost saved.</li></ul>
+<p><strong>Q2</strong>: "Conversation 100 turns, history 50K tokens. Stateless re-sends 50K every turn — wasteful?" <strong>A</strong>:</p>
+<ul><li>Yes wasteful <strong>network-bandwidth</strong>-wise</li><li>BUT LLM cost-wise: KV cache on server hides this (server doesn't re-compute)</li><li>Real waste: network bytes shipped</li><li>Optimization: client sends conversation_id only, server reconstructs (server-side cache)</li></ul>
+<p><strong>Q3</strong>: "Conversation across multiple devices. State sync?" <strong>A</strong>: DB is source of truth:</p>
+<ul><li>Conversation persisted on every turn</li><li>Device A loads state on connect</li><li>Device B reads from DB on connect → sees A's recent turns</li><li>Real-time sync: WebSocket push from server when state updated</li></ul>
+<p><strong>Q4</strong>: "Failover scenario — node serving session crashes mid-LLM-call. State?" <strong>A</strong>:</p>
+<ul><li>Pre-write user message to DB before LLM call → no loss</li><li>LLM call in-flight: idempotency key allows retry (different node)</li><li>Response: stream replays via durable queue (or just retry)</li><li>Cost: 1 wasted partial LLM call, &lt; 1s recovery</li></ul>
+<p><strong>Q5</strong>: "Latency-sensitive (voice) but want failover. Possible?" <strong>A</strong>: Hard but doable:</p>
+<ul><li>Replicate state to 2-3 nodes (active-active or active-passive)</li><li>Per-turn state sync (small delta)</li><li>On failure: failover node has near-current state</li><li>Some packets / utterances may be lost during failover (~200ms gap)</li><li>Not zero-loss, but near-seamless</li></ul>
+<hr />
+<h3>❌ 易错点</h3>
+<ol><li><strong>Stateless = no state anywhere</strong> — wrong, server cache fine</li><li><strong>Stateful = single-node</strong> — wrong, can replicate</li><li><strong>Sticky session for stateless API</strong> — worst of both</li><li><strong>No KV cache awareness</strong> — leave money on table</li><li><strong>Mix paradigms in 1 product without contract</strong></li><li><strong>Stateful without failover plan</strong></li><li><strong>Re-send 50K tokens every call</strong> — bandwidth waste</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>4-axis comparison</strong> (latency / scale / cost / failover)</li><li><strong>Hybrid pattern</strong> (logically stateless + cache hierarchy)</li><li><strong>KV-cache</strong> as cost-saving mechanism</li><li><strong>Per-use-case recommendations</strong> with rationale</li><li><strong>DB as source of truth</strong>, in-process + Redis cache</li><li><strong>Failover patterns</strong> by use case</li><li><strong>Voice WebSocket</strong> vs <strong>chat REST</strong> contrast</li><li><strong>Quote voice agent + BNPL contrast</strong></li></ol>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Stateless:
+  + Horizontal scale trivial
+  + Failover trivial
+  + Reproducible debug
+  - Context rebuild latency
+  - More tokens sent
+
+Stateful:
+  + Low latency
+  + Less tokens
+  - Sticky session / replication
+  - Per-tenant state mgmt
+  - Debug needs snapshot
+
+Decision matrix:
+  Chat (10-15 turns, 10K users) → Stateless
+  Long agent (hours, large state) → Hybrid sticky+failover
+  Voice (&lt; 300ms, WebSocket) → Stateful per-conn
+
+Hybrid pattern (most prod):
+  Stateless API surface
+  In-process LRU (active 1K)
+  Redis (active 10K, 1h TTL)
+  Postgres (source of truth)
+  KV-cache server-side
+
+KV cache critical:
+  Without: prefill cost × every turn
+  With: 5-10x speedup
+  Server-side, transparent to client
+
+Failover plans:
+  Stateless: any node serves next
+  Stateful chat: state in DB, reload on new node
+  Voice: drop call, accept lost session
+
+Observability:
+  Stateless: per-request trace
+  Stateful: per-session + per-request
+
+红线:
+  - Sticky session for stateless API
+  - Stateful without failover
+  - No KV cache awareness
+  - Mix paradigms no contract</code></pre>
   </section>
 
   
@@ -49,7 +220,343 @@
     <a href="gfde-t3-mcp-api-proxy.html">T3.2 · MCP (Model Context Protocol) 设计 / API proxy 抽象 →</a>
   </div>
 </main>
-<script id="md-source" type="text/markdown"></script>
+<script id="md-source" type="text/markdown">## 题目
+
+> "You're designing the API for an agent service. Should the **agent itself be stateless or stateful**? Walk through the trade-offs, and recommend for: (a) a customer-support chatbot, (b) a long-running coding agent, (c) a voice agent."
+
+或追问形态:
+
+> "OpenAI's API is stateless (you pass full history each call). Why? When would you choose differently?"
+
+**Round**: System Design (45 min)
+
+---
+
+## 这道题在考什么
+
+考你**production architecture trade-off** 理解:
+
+1. **Stateless 优势** —— scale, failover, simplicity
+2. **Stateful 优势** —— latency, cost (context cached), state proximity
+3. **Per-use-case 选择** —— 同一个产品里可能 mix
+4. **Hybrid pattern** —— server-side cache + client-passes-conversation-id
+
+---
+
+## 必问 clarifying
+
+**1. Latency target**
+
+> "Per-request — < 500ms (voice) or 5s (batch) OK? Stateless adds context reload overhead."
+
+**2. State 大小**
+
+> "Per-session state how big — 1KB (chat) or 1MB (coding agent file edits)?"
+
+**3. Multi-tenant**
+
+> "Same instance serves N users or partitioned?"
+
+**4. Cost sensitivity**
+
+> "Per-token cost matters? Stateless re-sends full context every call."
+
+**5. Failover requirement**
+
+> "Single-node failure should preserve session or OK to start fresh?"
+
+---
+
+## 5 步框架
+
+| 时长 | 阶段 |
+|---|---|
+| 0-5 min | Clarify latency / state size / cost / failover |
+| 5-15 min | Definitions + 4 axes of comparison |
+| 15-25 min | Per-use-case recommendation (a/b/c) |
+| 25-35 min | Hybrid: server-cache + client-id |
+| 35-45 min | Implementation details + observability |
+
+---
+
+## 我会这样答（sample）
+
+> "Defining first:
+>
+> **Stateless**: Each request carries all state. Server has no per-session memory.
+>
+> **Stateful**: Server remembers per-session state across requests.
+>
+> **4 axes of comparison**:
+>
+> | Axis | Stateless | Stateful |
+> |---|---|---|
+> | **Latency** | + Context rebuild every call | Low (state cached) |
+> | **Scalability** | Horizontal trivial | Sticky session / state replication |
+> | **Cost (tokens)** | Re-send context every call | Send only delta |
+> | **Failover** | Any node can serve next request | Need state replication or re-warm |
+> | **Multi-tenant** | Easy (no per-tenant state on server) | Per-tenant memory mgmt |
+> | **Debugging** | Reproducible (all in 1 request) | State must be snapshotted |
+>
+> **OpenAI / Anthropic / Google chose stateless** because:
+> - Scale to 10M+ concurrent users
+> - Horizontal scale without sticky session
+> - Idempotent: same input → same output (debug-friendly)
+> - Failover trivial
+> - Cost: with KV-cache, partial state cached on server side anyway (hybrid in practice)
+>
+> **Recommendations per use case**:
+>
+> **(a) Customer-support chatbot**:
+>
+> ✅ **Stateless** (default)
+>
+> - Conversation 5-15 turns avg
+> - Concurrent users 10K+
+> - Per-request 200ms acceptable
+> - User can resume from any device → state in DB not in-memory
+>
+> ```python
+> # Client sends full history (or refers to conversation_id)
+> POST /chat
+> {
+>   "conversation_id": "abc",
+>   "user_message": "...",
+> }
+> 
+> # Server (stateless):
+> 1. Load conversation history from DB by conversation_id
+> 2. Append user message
+> 3. Call LLM with full context (with KV cache hit)
+> 4. Save response to DB
+> 5. Return response
+> ```
+>
+> **(b) Long-running coding agent (Cursor-like)**:
+>
+> ⚠️ **Hybrid**:
+>
+> - Session lives hours, many edits
+> - State (open files, working dir) large
+> - Per-request latency sensitive (< 1s for autocomplete)
+> - Failover OK to restart session on new node
+>
+> ```python
+> # Stateful working memory + stateless API surface
+> # Sticky session by conversation_id
+> # State (open files, history) cached in-process, backed up to DB every 30s
+> # On node failure, next request goes to any node, reloads from DB checkpoint
+> ```
+>
+> **(c) Voice agent**:
+>
+> ✅ **Stateful with WebSocket / streaming**
+>
+> - Per-turn latency < 300ms hard
+> - Audio + ASR + LLM + TTS pipeline shares state
+> - Connection-bound (WebSocket)
+> - Failover means dropped call (acceptable cost)
+>
+> ```python
+> # WebSocket connection per call
+> # Audio streamed in, response streamed out
+> # State (transcript, user_id, conversation) lives in connection-handling actor
+> # On disconnect: clean up; on reconnect: new session
+> ```
+>
+> **Hybrid pattern (most common in production)**:
+>
+> Server is **logically stateless** (any node serves any request) but uses **caching layers**:
+>
+> ```
+> 1. Client passes `conversation_id`
+> 2. API gateway routes to any backend node
+> 3. Node looks up state from:
+>    a. In-process LRU cache (last 1000 active conversations)
+>    b. Redis cache (last 10K, TTL 1h)
+>    c. Postgres (source of truth)
+> 4. Process request, update cache + persist
+> 5. KV cache for LLM prefix: server-side cached, reused across requests
+> ```
+>
+> **Benefits**:
+> - Logically stateless: horizontal scale + failover
+> - Practically fast: 95% in-process cache hit
+> - KV-cache: LLM prefix reused
+>
+> **KV-cache critical**: with conversation history same prefix turns, LLM serving (vLLM / OpenAI internal) caches the KV computation. **Same conversation re-uses cache**, even if 'stateless' API.
+>
+> **Concrete implementation**:
+>
+> ```python
+> async def chat_handler(request):
+>     conv_id = request.conversation_id
+>     
+>     # Cache-tier lookup
+>     state = await conv_cache.get(conv_id)  # in-process → Redis → DB
+>     
+>     # Append new turn
+>     state.add_user_message(request.message)
+>     
+>     # LLM call (server-side KV cache by prefix)
+>     response = await llm.generate(
+>         messages=state.messages,
+>         conversation_id=conv_id,  # hint to LLM serving for KV reuse
+>     )
+>     
+>     state.add_assistant_message(response)
+>     await conv_cache.set(conv_id, state)  # write-back
+>     await db.persist_async(conv_id, state)  # async durable
+>     
+>     return response
+> ```
+>
+> **Observability differs**:
+>
+> | Aspect | Stateless | Stateful |
+> |---|---|---|
+> | Trace | Per-request | Per-session + per-request |
+> | Replay | Trivial (input → output) | Need state snapshot |
+> | Cost track | Per-call tokens | Per-call delta tokens |
+>
+> **What NOT to do**:
+> - Make stateless API but require sticky session (worst of both)
+> - Make stateful but no failover plan
+> - Skip KV cache opportunity (huge cost win)
+> - Mix model semantics within product without explicit contract"
+
+---
+
+## 简历专属 reframe
+
+| 题 | 你做过 |
+|---|---|
+| Stateful voice agent | Voice agent over WebSocket — you've done this |
+| Stateless chat | BNPL chatbot likely stateless or hybrid |
+| KV cache opt | vLLM / SGLang infra — KV-cache is your area |
+| Cache hierarchy | TikTok payment — in-process + Redis + DB pattern |
+| Multi-tenant | Voice agent 7 markets — per-tenant isolation |
+
+**Quote**:
+
+> "Voice agent had hard stateful constraint — WebSocket-bound, audio streaming. State per call in connection-handling actor. Designed for **single-call failover acceptable** — if a call dropped, retry was OK UX-wise. But the BNPL chatbot we designed stateless: each REST call rebuilds context from DB. Latency overhead acceptable (~200ms) vs scale benefit (horizontal). Same team, two paradigms, by use-case shape."
+
+---
+
+## 5 follow-ups
+
+**Q1**: "KV-cache — how big a win in real numbers?"
+**A**:
+- 1 conversation, 10 turns, avg 1K tokens history. Without KV cache: 10K tokens prefill compute × 10 turns.
+- With cache: 1K (turn 1) + 1K each turn (just new content). 5-10x faster.
+- Real cost: prefill is the expensive part of LLM serving. Cache hit means most cost saved.
+
+**Q2**: "Conversation 100 turns, history 50K tokens. Stateless re-sends 50K every turn — wasteful?"
+**A**:
+- Yes wasteful **network-bandwidth**-wise
+- BUT LLM cost-wise: KV cache on server hides this (server doesn't re-compute)
+- Real waste: network bytes shipped
+- Optimization: client sends conversation_id only, server reconstructs (server-side cache)
+
+**Q3**: "Conversation across multiple devices. State sync?"
+**A**: DB is source of truth:
+- Conversation persisted on every turn
+- Device A loads state on connect
+- Device B reads from DB on connect → sees A's recent turns
+- Real-time sync: WebSocket push from server when state updated
+
+**Q4**: "Failover scenario — node serving session crashes mid-LLM-call. State?"
+**A**:
+- Pre-write user message to DB before LLM call → no loss
+- LLM call in-flight: idempotency key allows retry (different node)
+- Response: stream replays via durable queue (or just retry)
+- Cost: 1 wasted partial LLM call, < 1s recovery
+
+**Q5**: "Latency-sensitive (voice) but want failover. Possible?"
+**A**: Hard but doable:
+- Replicate state to 2-3 nodes (active-active or active-passive)
+- Per-turn state sync (small delta)
+- On failure: failover node has near-current state
+- Some packets / utterances may be lost during failover (~200ms gap)
+- Not zero-loss, but near-seamless
+
+---
+
+## ❌ 易错点
+
+1. **Stateless = no state anywhere** — wrong, server cache fine
+2. **Stateful = single-node** — wrong, can replicate
+3. **Sticky session for stateless API** — worst of both
+4. **No KV cache awareness** — leave money on table
+5. **Mix paradigms in 1 product without contract**
+6. **Stateful without failover plan**
+7. **Re-send 50K tokens every call** — bandwidth waste
+
+---
+
+## ✅ 加分项
+
+1. **4-axis comparison** (latency / scale / cost / failover)
+2. **Hybrid pattern** (logically stateless + cache hierarchy)
+3. **KV-cache** as cost-saving mechanism
+4. **Per-use-case recommendations** with rationale
+5. **DB as source of truth**, in-process + Redis cache
+6. **Failover patterns** by use case
+7. **Voice WebSocket** vs **chat REST** contrast
+8. **Quote voice agent + BNPL contrast**
+
+---
+
+## Cheat Sheet
+
+```
+Stateless:
+  + Horizontal scale trivial
+  + Failover trivial
+  + Reproducible debug
+  - Context rebuild latency
+  - More tokens sent
+
+Stateful:
+  + Low latency
+  + Less tokens
+  - Sticky session / replication
+  - Per-tenant state mgmt
+  - Debug needs snapshot
+
+Decision matrix:
+  Chat (10-15 turns, 10K users) → Stateless
+  Long agent (hours, large state) → Hybrid sticky+failover
+  Voice (< 300ms, WebSocket) → Stateful per-conn
+
+Hybrid pattern (most prod):
+  Stateless API surface
+  In-process LRU (active 1K)
+  Redis (active 10K, 1h TTL)
+  Postgres (source of truth)
+  KV-cache server-side
+
+KV cache critical:
+  Without: prefill cost × every turn
+  With: 5-10x speedup
+  Server-side, transparent to client
+
+Failover plans:
+  Stateless: any node serves next
+  Stateful chat: state in DB, reload on new node
+  Voice: drop call, accept lost session
+
+Observability:
+  Stateless: per-request trace
+  Stateful: per-session + per-request
+
+红线:
+  - Sticky session for stateless API
+  - Stateful without failover
+  - No KV cache awareness
+  - Mix paradigms no contract
+```
+</script>
 <script>
 (function(){
   const btn = document.getElementById('md-copy-btn');
