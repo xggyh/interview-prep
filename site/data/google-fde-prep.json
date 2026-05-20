@@ -1,0 +1,281 @@
+[
+  {
+    "title": "🎯 [Overview] T1 · Agent Tool Calling 全景",
+    "slug": "/google-fde/gfde-t1-overview",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Tool calling 完整知识树：调用流程、idempotency、retry/timeout/fallback、race condition、parallel execution。 包含 5 个 production pattern + 你简历对应的 voice agent / BNPL 故事映射。",
+    "url": "",
+    "reportedUsers": 10,
+    "lastAsked": "Mid May, 2026",
+    "round": "Topic Overview"
+  },
+  {
+    "title": "🎯 [Overview] T2 · RAG / Context Management 全景",
+    "slug": "/google-fde/gfde-t2-overview",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Chunking、embedding、semantic search、hybrid search、reranking、context window 管理、tool output → prompt 注入。涵盖 5 种 chunking + 5 种 retrieval + 完整 RAG pipeline。",
+    "url": "",
+    "reportedUsers": 10,
+    "lastAsked": "Mid May, 2026",
+    "round": "Topic Overview"
+  },
+  {
+    "title": "🎯 [Overview] T3 · LLM Engineering System Design",
+    "slug": "/google-fde/gfde-t3-overview",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Stateless vs stateful、MCP / API proxy、高吞吐、eventual consistency、observability、rate limit / queue / cache。LLM 应用系统设计完整 framework。",
+    "url": "",
+    "reportedUsers": 10,
+    "lastAsked": "Mid May, 2026",
+    "round": "Topic Overview"
+  },
+  {
+    "title": "🎯 [Overview] T4 · FDE Scenario Delivery",
+    "slug": "/google-fde/gfde-t4-overview",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "客户需求拆解、快速 prototype、业务流程 → agent workflow 抽象、权限 / 安全 / 失败恢复。FDE 真实交付能力的完整 framework。",
+    "url": "",
+    "reportedUsers": 10,
+    "lastAsked": "Mid May, 2026",
+    "round": "Topic Overview"
+  },
+
+  {
+    "title": "T1.1 · 设计一个 idempotent tool 接口（agent 反复调用不出事）",
+    "slug": "/google-fde/gfde-t1-idempotency",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 自动 retry → 同一 tool 可能被调 3 次。设计 tool 接口让重复调用安全（idempotency key、deduplication window、natural idempotency）。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "Tool Calling (45 min)"
+  },
+  {
+    "title": "T1.2 · Tool 调用的 retry / timeout / fallback 策略",
+    "slug": "/google-fde/gfde-t1-retry-fallback",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "外部 API 调用失败时 agent 怎么办？分层 retry (exponential backoff + jitter)、circuit breaker、graceful degradation、user-visible fallback。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "Tool Calling (45 min)"
+  },
+  {
+    "title": "T1.3 · Parallel tool calls 调度 + race condition",
+    "slug": "/google-fde/gfde-t1-parallel-race",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 同时调 5 个 tool — 怎么调度？哪些可以 parallel、哪些必须 sequential？Race condition 怎么 detect / prevent？常见 deadlock pattern。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "Tool Calling (45-60 min)"
+  },
+  {
+    "title": "T1.4 · 非 idempotent / destructive 操作怎么 wrap (charge / send_email)",
+    "slug": "/google-fde/gfde-t1-destructive-tools",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Tool 包含 charge customer、send email、create order 这种 destructive 操作。Agent 调错就是事故。Confirm-required tools、2-phase commit、saga pattern、cancellation。",
+    "url": "",
+    "reportedUsers": 6,
+    "lastAsked": "Mid May, 2026",
+    "round": "Tool Calling (45 min)"
+  },
+  {
+    "title": "T1.5 · Tool output validation + 注入 prompt 前的清洗",
+    "slug": "/google-fde/gfde-t1-tool-output-validation",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Tool 返回 untrusted data，可能含 prompt injection / PII / 错误数据。在喂给 LLM 之前怎么验证、清洗、限制 size。Schema 验证、prompt injection 防御、PII 脱敏。",
+    "url": "",
+    "reportedUsers": 5,
+    "lastAsked": "Mid May, 2026",
+    "round": "Tool Calling (45 min)"
+  },
+
+  {
+    "title": "T2.1 · Hybrid search 设计 (dense + sparse + rerank)",
+    "slug": "/google-fde/gfde-t2-hybrid-search",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Dense embedding miss exact terms (产品代号、API 名)；BM25 miss semantic。两者怎么 weighted combine + cross-encoder rerank。α 怎么 tune。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG (45-60 min)"
+  },
+  {
+    "title": "T2.2 · Chunking 策略决策树（按文档类型选择）",
+    "slug": "/google-fde/gfde-t2-chunking-decision",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Fixed token / recursive / semantic / structure-aware / late chunking — 怎么基于文档类型 + 查询模式 + 延迟预算选择。Overlap 多少。chunk size 给 prompt budget。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG (45 min)"
+  },
+  {
+    "title": "T2.3 · Context window 管理：什么留 / 什么压缩 / 什么扔",
+    "slug": "/google-fde/gfde-t2-context-window-mgmt",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "多轮 agent loop 累积 history、tool outputs、retrieved docs — context 爆炸。Summarization / sliding window / RAG-on-history / 重要性分级。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG / Context (45 min)"
+  },
+  {
+    "title": "T2.4 · Tool output → prompt 注入的 best practice",
+    "slug": "/google-fde/gfde-t2-tool-output-prompt",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Tool 返回 10KB JSON / SQL query result / code execution stdout — 怎么 format 给 LLM 用？XML tag / JSON / code fence。Truncation strategy。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG / Context (45 min)"
+  },
+  {
+    "title": "T2.5 · Reranking 何时加 / 用什么 model / 怎么 cache",
+    "slug": "/google-fde/gfde-t2-reranking",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Cross-encoder reranking 提升 recall@10 20pp 但 + 3x latency。何时值得加。Cohere Rerank / ms-marco-MiniLM / 自训。Cache 策略。",
+    "url": "",
+    "reportedUsers": 6,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG (45 min)"
+  },
+  {
+    "title": "T2.6 · Long-context model 出现后 RAG 还要不要？",
+    "slug": "/google-fde/gfde-t2-long-context-vs-rag",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Gemini 1.5 Pro 1M / Claude 200k — 整个 corpus 塞 context 行不行？RAG 何时还赢、何时输。Hybrid: RAG 选 top-K → long-context model 看全部。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "RAG (45 min)"
+  },
+
+  {
+    "title": "T3.1 · Stateless vs Stateful Agent 架构怎么选",
+    "slug": "/google-fde/gfde-t3-stateless-stateful",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Stateless: 每 request 重建 context，可扩展性好。Stateful: server 持有 session, low-latency 但 sticky session 限制。何时哪个、怎么混合。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (45-60 min)"
+  },
+  {
+    "title": "T3.2 · MCP (Model Context Protocol) 设计 / API proxy 抽象",
+    "slug": "/google-fde/gfde-t3-mcp-api-proxy",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Anthropic 提的 MCP 是什么、解决什么 problem。怎么设计 API proxy 抽象 N 个不同 LLM provider + tool ecosystem。Tool discovery、versioning、permissioning。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (60 min)"
+  },
+  {
+    "title": "T3.3 · High-throughput LLM serving (1M QPS architecture)",
+    "slug": "/google-fde/gfde-t3-high-throughput",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "1M QPS agent calls 怎么扛？Routing、queueing、batching (continuous batching in vLLM)、GPU sharding (TP/PP)、cache 层、failover。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (60 min)"
+  },
+  {
+    "title": "T3.4 · Observability for Agent System (tracing / logging / metrics)",
+    "slug": "/google-fde/gfde-t3-observability",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 多 turn + 多 tool call — 怎么 trace 一个用户请求的完整执行链。LangSmith / Phoenix / OpenTelemetry。Metrics 该 instrument 哪些。Cost tracking。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (45-60 min)"
+  },
+  {
+    "title": "T3.5 · Rate limit / queue / cache layer 设计",
+    "slug": "/google-fde/gfde-t3-rate-limit-queue-cache",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "LLM API 是 rate-limited + 贵 + 慢。怎么设计：token bucket + priority queue + semantic cache + result cache + cost-aware routing。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (45-60 min)"
+  },
+  {
+    "title": "T3.6 · Eventual consistency for agent state（multi-step workflow）",
+    "slug": "/google-fde/gfde-t3-eventual-consistency",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 多 step：调 A 改了 DB / 调 B 发了 email / 调 C 失败。State partial committed。怎么处理：saga pattern、compensating transaction、outbox pattern、idempotency。",
+    "url": "",
+    "reportedUsers": 6,
+    "lastAsked": "Mid May, 2026",
+    "round": "System Design (60 min)"
+  },
+
+  {
+    "title": "T4.1 · Customer scoping playbook (模糊需求 → MVP)",
+    "slug": "/google-fde/gfde-t4-customer-scoping",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "客户说 'we want AI for our customer service'。怎么 3 周从模糊话到 demo？clarifying → KPI → 数据可用性 → 最小 vertical slice → 时间 box。",
+    "url": "",
+    "reportedUsers": 9,
+    "lastAsked": "Mid May, 2026",
+    "round": "Scenario / FDE Delivery (45-60 min)"
+  },
+  {
+    "title": "T4.2 · 业务流程 → Agent Workflow 抽象",
+    "slug": "/google-fde/gfde-t4-workflow-abstraction",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "客户的 12-step manual process — 哪些可以 agent automate、哪些必须 human、哪些 hybrid。State machine vs DAG vs ReAct loop 选择。Workflow versioning。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "Scenario / FDE Delivery (45-60 min)"
+  },
+  {
+    "title": "T4.3 · Human-agent interaction 设计 (什么时候找人 / 怎么找)",
+    "slug": "/google-fde/gfde-t4-human-agent-interaction",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 何时升级人？Confidence threshold / explicit confirm-required / scheduled review / escalation paths。Human-in-loop 不只是 fallback —— 也是 training data source。",
+    "url": "",
+    "reportedUsers": 8,
+    "lastAsked": "Mid May, 2026",
+    "round": "Scenario / FDE Delivery (45 min)"
+  },
+  {
+    "title": "T4.4 · 权限 / 安全边界 / 失败恢复",
+    "slug": "/google-fde/gfde-t4-permissions-recovery",
+    "type": "Google FDE",
+    "level": "Senior+",
+    "description": "Agent 代用户操作 — IAM token scoping、prompt injection 防御、audit trail、partial failure recovery、rollback safety。",
+    "url": "",
+    "reportedUsers": 7,
+    "lastAsked": "Mid May, 2026",
+    "round": "Scenario / FDE Delivery (45-60 min)"
+  }
+]

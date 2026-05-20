@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎯 [Overview] T3 · LLM Engineering System Design · 面试题准备</title>
+<link rel="stylesheet" href="../assets/style.css?v=81aab5cf">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🧠 面试题准备</a></h1>
+    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE / 🎯 [Overview] T3 · LLM Engineering System Design</div>
+  <h1>🎯 [Overview] T3 · LLM Engineering System Design</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde">Google FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#1a73e8"><strong>Google FDE</strong> · Senior+ · 📋 10 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t3-overview.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t3-overview.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Stateless vs stateful、MCP / API proxy、高吞吐、eventual consistency、observability、rate limit / queue / cache。LLM 应用系统设计完整 framework。</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>🎯 T3 主题：LLM Engineering System Design 全景</h3>
+<blockquote><p>HR 提示原话："<strong>系统设计方面可能会问高吞吐、高可用、架构一致性、eventual consistency、stateless/stateful 的取舍</strong>；<strong>协议和工程集成上可能会问 MCP、API proxy、工具抽象、权限/安全边界</strong>；<strong>rate limit / queue / cache、observability / logging / tracing</strong>。"</p></blockquote>
+<hr />
+<h3>1. 心智模型 — LLM application 是 distributed system + AI failure modes</h3>
+<p>不是 traditional web service：</p>
+<ul><li>单 request 可能 30s + (vs 100ms)</li><li>Per-request cost $0.01 - $1 (vs ~free)</li><li>Output non-deterministic</li><li>Tool calls 让 1 request → 多 downstream call</li><li>Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota</li></ul>
+<p><strong>Google FDE 在 T3 考的是</strong>: 你能不能 design a production-grade LLM app considering all these.</p>
+<hr />
+<h3>2. 6 个核心子主题（对应场景题）</h3>
+<table class="md-table"><thead><tr><th>#</th><th>Sub-topic</th><th>核心 question</th><th>场景页</th></tr></thead><tbody><tr><td><strong>T3.1</strong></td><td><strong>Stateless vs Stateful</strong></td><td>哪个 architecture 选哪个</td><td><a href="gfde-t3-stateless-stateful.html">独立页</a></td></tr><tr><td><strong>T3.2</strong></td><td><strong>MCP / API Proxy</strong></td><td>怎么抽象 N 个 LLM + tool ecosystem</td><td><a href="gfde-t3-mcp-api-proxy.html">独立页</a></td></tr><tr><td><strong>T3.3</strong></td><td><strong>High Throughput</strong></td><td>1M QPS LLM serving</td><td><a href="gfde-t3-high-throughput.html">独立页</a></td></tr><tr><td><strong>T3.4</strong></td><td><strong>Observability</strong></td><td>Trace / log / metric 怎么做</td><td><a href="gfde-t3-observability.html">独立页</a></td></tr><tr><td><strong>T3.5</strong></td><td><strong>Rate Limit / Queue / Cache</strong></td><td>LLM API 慢 + 贵 + rate-limited, 怎么扛</td><td><a href="gfde-t3-rate-limit-queue-cache.html">独立页</a></td></tr><tr><td><strong>T3.6</strong></td><td><strong>Eventual Consistency</strong></td><td>Multi-step agent workflow partial commit</td><td><a href="gfde-t3-eventual-consistency.html">独立页</a></td></tr></tbody></table>
+<hr />
+<h3>3. Stateless vs Stateful — 决策矩阵</h3>
+<table class="md-table"><thead><tr><th>Aspect</th><th>Stateless</th><th>Stateful</th></tr></thead><tbody><tr><td><strong>Per-request</strong></td><td>重建全 context</td><td>Server-side session</td></tr><tr><td><strong>Scalability</strong></td><td>Horizontal trivially</td><td>Sticky session required</td></tr><tr><td><strong>Latency</strong></td><td>+ context rebuild cost (~100ms)</td><td>Low (memory cached)</td></tr><tr><td><strong>Failover</strong></td><td>Trivial (request to any node)</td><td>Need state replication / re-warm</td></tr><tr><td><strong>Cost</strong></td><td>More tokens per request</td><td>Less tokens (state cached)</td></tr><tr><td><strong>Best for</strong></td><td>OpenAI ChatGPT (default!)</td><td>Real-time multi-turn, low-latency</td></tr></tbody></table>
+<p><strong>Production 默认 stateless</strong> + <strong>client maintains conversation_id</strong>. Server side rebuilds context from KV cache + DB on each call. 这是 OpenAI / Google API 标准 model.</p>
+<p><strong>Stateful 例外</strong>: voice agent (latency sensitive, &lt; 500ms), gaming bot, low-volume high-engagement.</p>
+<hr />
+<h3>4. MCP (Model Context Protocol) — 必须知道</h3>
+<p><strong>What</strong>: Anthropic 2024 末 propose 的 open standard. 把 tool / context / data source 都标准化为 MCP servers, LLM client 通过统一 protocol invoke.</p>
+<p><strong>Why it matters for Google FDE</strong>:</p>
+<ul><li>Customer 的 internal API → 包成 MCP server → 任何 LLM 都能用</li><li>Tool discovery / versioning / permissioning 标准化</li><li>Vendor-neutral (Claude / GPT / Gemini 都能 consume)</li></ul>
+<p><strong>Core 3 primitives</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Resources   (data the LLM can read, like files, DB rows)
+Tools       (functions the LLM can call, like APIs)
+Prompts     (reusable prompt templates)</code></pre>
+<p><strong>典型架构</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">LLM Client (Claude Desktop / VSCode / 任何 app)
+        ↓ MCP protocol (JSON-RPC over stdio / HTTP / SSE)
+    ┌─────────────┬─────────────┬─────────────┐
+    │ MCP Server  │ MCP Server  │ MCP Server  │
+    │ (Salesforce)│ (GitHub)    │ (PostgreSQL)│
+    └─────────────┴─────────────┴─────────────┘</code></pre>
+<p>每个 MCP server 是独立 process / container, 暴露 resources/tools/prompts.</p>
+<p><strong>Google FDE 现实</strong>: 大量工作是把客户的 internal stack tool-ify, 多数会用 MCP 形态.</p>
+<hr />
+<h3>5. High Throughput LLM Serving — 6 个 lever</h3>
+<table class="md-table"><thead><tr><th>Lever</th><th>What</th><th>Speedup</th></tr></thead><tbody><tr><td><strong>Continuous batching (vLLM)</strong></td><td>Dynamic batch size, no padding</td><td>5-10x throughput vs static batch</td></tr><tr><td><strong>PagedAttention (vLLM)</strong></td><td>KV cache in pages, like OS paging</td><td>24x more concurrent requests</td></tr><tr><td><strong>Prefix caching</strong></td><td>Common system prompt cached</td><td>2-3x for repeated prefixes</td></tr><tr><td><strong>Speculative decoding</strong></td><td>Smaller draft model + bigger verifier</td><td>2-3x latency reduction</td></tr><tr><td><strong>Tensor parallelism (TP)</strong></td><td>Model split across GPUs</td><td>More compute available</td></tr><tr><td><strong>Pipeline parallelism (PP)</strong></td><td>Stages of model on different GPUs</td><td>More throughput</td></tr></tbody></table>
+<p><strong>你简历</strong>: "GPU-accelerated inference with vLLM, SGLang" → 这是你的强 match.</p>
+<hr />
+<h3>6. Observability for Agent Systems — 4 个 layer</h3>
+<table class="md-table"><thead><tr><th>Layer</th><th>What</th><th>Tools</th></tr></thead><tbody><tr><td><strong>Distributed tracing</strong></td><td>1 user request → N LLM calls / M tools — full trace</td><td>OpenTelemetry + Jaeger</td></tr><tr><td><strong>LLM-specific tracing</strong></td><td>Prompts / completions / token usage / cost per step</td><td>LangSmith, Phoenix (Arize), Helicone</td></tr><tr><td><strong>Cost tracking</strong></td><td>Per-user / per-feature dollar spent</td><td>Custom (sum tokens × price per model)</td></tr><tr><td><strong>Quality monitoring</strong></td><td>Eval-in-prod, drift detection</td><td>Braintrust, Phoenix, Langfuse</td></tr></tbody></table>
+<p><strong>Critical metric to instrument</strong>:</p>
+<ul><li>Per-tool latency p50/p99</li><li>LLM call count + token count per turn</li><li>Tool error rate (4xx / 5xx / timeout)</li><li>Cost per user-session</li><li>Eval pass rate sampled in prod</li><li>Cache hit rate (semantic + result)</li></ul>
+<hr />
+<h3>7. Rate Limit / Queue / Cache — 4 个 layer</h3>
+<h4>Layer 1: Caching (cheapest)</h4>
+<ul><li><strong>Result cache</strong> (exact query hash → response): Redis 1h TTL</li><li><strong>Semantic cache</strong> (similar query → reuse response): embedding similarity &gt; 0.95 threshold</li></ul>
+<p><strong>Hit rate target</strong>: 30-50% for FAQ-like workloads. Saves $$$.</p>
+<h4>Layer 2: Queue (smooth burst)</h4>
+<ul><li><strong>Priority queue</strong> by user tier (gold ahead of bronze)</li><li><strong>Per-tenant</strong>: max N concurrent</li><li><strong>Cost-aware</strong>: cheaper model first, escalate to expensive if needed</li></ul>
+<h4>Layer 3: Rate limit (defense)</h4>
+<ul><li><strong>Per-user</strong>: token bucket 100 req/min</li><li><strong>Per-API-key</strong>: total quota (e.g., $100/day)</li><li><strong>Per-tenant</strong>: tier-based limits</li></ul>
+<h4>Layer 4: Cost-aware routing</h4>
+<pre class="language-python"><code class="language-python">def route(request, complexity_score):
+    if complexity_score &lt; 0.3:
+        return "gpt-4o-mini"  # 90% cases
+    elif complexity_score &lt; 0.7:
+        return "gpt-4o"
+    else:
+        return "gpt-4-turbo"  # hard cases only</code></pre>
+<p>Cost optimization 10-50% without quality loss.</p>
+<hr />
+<h3>8. Eventual Consistency — Agent multi-step state</h3>
+<p>Agent 跑 5 步：</p>
+<ul><li>Step 1: call create_order → DB write OK</li><li>Step 2: call charge_payment → API timeout (unknown if charged)</li><li>Step 3: ?</li></ul>
+<p>3 patterns to handle:</p>
+<h4>Pattern A: Saga (forward + compensating)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Step 1 ✓ → Step 2 ✗ → Compensate Step 1 (cancel order)</code></pre>
+<h4>Pattern B: Outbox / 2PC-light</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Each step writes intent to outbox table
+Reliable worker picks up + executes + marks done
+Retry until success or escalate</code></pre>
+<h4>Pattern C: Workflow engine (Temporal / DBOS)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Agent workflow as code, Temporal handles retries / state / recovery</code></pre>
+<p><strong>Google FDE 高级答</strong>: Use Temporal for complex agentic workflows. Don't reinvent.</p>
+<hr />
+<h3>9. 你简历对应 hook</h3>
+<table class="md-table"><thead><tr><th>Sub-topic</th><th>你简历 hook</th></tr></thead><tbody><tr><td><strong>Stateless vs Stateful</strong></td><td>Voice agent (stateful WebSocket) + BNPL chatbot (mostly stateless) — 你有两面</td></tr><tr><td><strong>MCP / Proxy</strong></td><td>Internal Agent Platform — workflow / tool / memory 抽象</td></tr><tr><td><strong>High Throughput</strong></td><td>vLLM / SGLang / Megatron / DeepSpeed — 你简历全列了</td></tr><tr><td><strong>Observability</strong></td><td>Voice agent 7 markets weekly metric review</td></tr><tr><td><strong>Rate Limit / Queue / Cache</strong></td><td>TikTok scale — payment is rate-limit aware</td></tr><tr><td><strong>Eventual Consistency</strong></td><td>Refund tier — tier 3 必须 transactional</td></tr></tbody></table>
+<hr />
+<h3>10. Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Stateless vs Stateful:
+  Default stateless (OpenAI / Google API model)
+  Stateful only for: latency-sensitive multi-turn (voice)
+
+MCP (Model Context Protocol):
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio/HTTP/SSE
+  Standardizes tool ecosystem across LLM providers
+  Google FDE: customer API → MCP server
+
+High throughput 6 levers:
+  Continuous batching (vLLM) — 5-10x
+  PagedAttention — 24x concurrency
+  Prefix caching — 2-3x
+  Speculative decoding — 2-3x latency
+  TP — more compute
+  PP — more throughput
+
+Observability 4 layers:
+  Distributed tracing (OTel)
+  LLM-specific (LangSmith / Phoenix)
+  Cost tracking
+  Quality monitoring (eval in prod)
+
+Rate limit / Queue / Cache:
+  L1: Result cache + semantic cache (30-50% hit)
+  L2: Priority queue per tenant
+  L3: Token bucket (per-user / per-tenant)
+  L4: Cost-aware model routing
+
+Eventual consistency:
+  Saga (forward + compensate)
+  Outbox / 2PC-light
+  Workflow engine (Temporal / DBOS) — recommend
+
+Your resume hooks:
+  vLLM/SGLang (T3.3)
+  Internal Agent Platform (T3.2)
+  Voice agent stateful WebSocket (T3.1)
+  TikTok payment rate-limit (T3.5)
+  Refund tier transactional (T3.6)</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t2-overview.html">← 🎯 [Overview] T2 · RAG / Context Management 全景</a>
+    <a href="gfde-t4-overview.html">🎯 [Overview] T4 · FDE Scenario Delivery →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## 🎯 T3 主题：LLM Engineering System Design 全景
+
+> HR 提示原话："**系统设计方面可能会问高吞吐、高可用、架构一致性、eventual consistency、stateless/stateful 的取舍**；**协议和工程集成上可能会问 MCP、API proxy、工具抽象、权限/安全边界**；**rate limit / queue / cache、observability / logging / tracing**。"
+
+---
+
+## 1. 心智模型 — LLM application 是 distributed system + AI failure modes
+
+不是 traditional web service：
+- 单 request 可能 30s + (vs 100ms)
+- Per-request cost $0.01 - $1 (vs ~free)
+- Output non-deterministic
+- Tool calls 让 1 request → 多 downstream call
+- Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota
+
+**Google FDE 在 T3 考的是**: 你能不能 design a production-grade LLM app considering all these.
+
+---
+
+## 2. 6 个核心子主题（对应场景题）
+
+| # | Sub-topic | 核心 question | 场景页 |
+|---|---|---|---|
+| **T3.1** | **Stateless vs Stateful** | 哪个 architecture 选哪个 | [独立页](gfde-t3-stateless-stateful.html) |
+| **T3.2** | **MCP / API Proxy** | 怎么抽象 N 个 LLM + tool ecosystem | [独立页](gfde-t3-mcp-api-proxy.html) |
+| **T3.3** | **High Throughput** | 1M QPS LLM serving | [独立页](gfde-t3-high-throughput.html) |
+| **T3.4** | **Observability** | Trace / log / metric 怎么做 | [独立页](gfde-t3-observability.html) |
+| **T3.5** | **Rate Limit / Queue / Cache** | LLM API 慢 + 贵 + rate-limited, 怎么扛 | [独立页](gfde-t3-rate-limit-queue-cache.html) |
+| **T3.6** | **Eventual Consistency** | Multi-step agent workflow partial commit | [独立页](gfde-t3-eventual-consistency.html) |
+
+---
+
+## 3. Stateless vs Stateful — 决策矩阵
+
+| Aspect | Stateless | Stateful |
+|---|---|---|
+| **Per-request** | 重建全 context | Server-side session |
+| **Scalability** | Horizontal trivially | Sticky session required |
+| **Latency** | + context rebuild cost (~100ms) | Low (memory cached) |
+| **Failover** | Trivial (request to any node) | Need state replication / re-warm |
+| **Cost** | More tokens per request | Less tokens (state cached) |
+| **Best for** | OpenAI ChatGPT (default!) | Real-time multi-turn, low-latency |
+
+**Production 默认 stateless** + **client maintains conversation_id**. Server side rebuilds context from KV cache + DB on each call. 这是 OpenAI / Google API 标准 model.
+
+**Stateful 例外**: voice agent (latency sensitive, < 500ms), gaming bot, low-volume high-engagement.
+
+---
+
+## 4. MCP (Model Context Protocol) — 必须知道
+
+**What**: Anthropic 2024 末 propose 的 open standard. 把 tool / context / data source 都标准化为 MCP servers, LLM client 通过统一 protocol invoke.
+
+**Why it matters for Google FDE**:
+- Customer 的 internal API → 包成 MCP server → 任何 LLM 都能用
+- Tool discovery / versioning / permissioning 标准化
+- Vendor-neutral (Claude / GPT / Gemini 都能 consume)
+
+**Core 3 primitives**:
+
+```
+Resources   (data the LLM can read, like files, DB rows)
+Tools       (functions the LLM can call, like APIs)
+Prompts     (reusable prompt templates)
+```
+
+**典型架构**:
+
+```
+LLM Client (Claude Desktop / VSCode / 任何 app)
+        ↓ MCP protocol (JSON-RPC over stdio / HTTP / SSE)
+    ┌─────────────┬─────────────┬─────────────┐
+    │ MCP Server  │ MCP Server  │ MCP Server  │
+    │ (Salesforce)│ (GitHub)    │ (PostgreSQL)│
+    └─────────────┴─────────────┴─────────────┘
+```
+
+每个 MCP server 是独立 process / container, 暴露 resources/tools/prompts.
+
+**Google FDE 现实**: 大量工作是把客户的 internal stack tool-ify, 多数会用 MCP 形态.
+
+---
+
+## 5. High Throughput LLM Serving — 6 个 lever
+
+| Lever | What | Speedup |
+|---|---|---|
+| **Continuous batching (vLLM)** | Dynamic batch size, no padding | 5-10x throughput vs static batch |
+| **PagedAttention (vLLM)** | KV cache in pages, like OS paging | 24x more concurrent requests |
+| **Prefix caching** | Common system prompt cached | 2-3x for repeated prefixes |
+| **Speculative decoding** | Smaller draft model + bigger verifier | 2-3x latency reduction |
+| **Tensor parallelism (TP)** | Model split across GPUs | More compute available |
+| **Pipeline parallelism (PP)** | Stages of model on different GPUs | More throughput |
+
+**你简历**: "GPU-accelerated inference with vLLM, SGLang" → 这是你的强 match.
+
+---
+
+## 6. Observability for Agent Systems — 4 个 layer
+
+| Layer | What | Tools |
+|---|---|---|
+| **Distributed tracing** | 1 user request → N LLM calls / M tools — full trace | OpenTelemetry + Jaeger |
+| **LLM-specific tracing** | Prompts / completions / token usage / cost per step | LangSmith, Phoenix (Arize), Helicone |
+| **Cost tracking** | Per-user / per-feature dollar spent | Custom (sum tokens × price per model) |
+| **Quality monitoring** | Eval-in-prod, drift detection | Braintrust, Phoenix, Langfuse |
+
+**Critical metric to instrument**:
+- Per-tool latency p50/p99
+- LLM call count + token count per turn
+- Tool error rate (4xx / 5xx / timeout)
+- Cost per user-session
+- Eval pass rate sampled in prod
+- Cache hit rate (semantic + result)
+
+---
+
+## 7. Rate Limit / Queue / Cache — 4 个 layer
+
+### Layer 1: Caching (cheapest)
+
+- **Result cache** (exact query hash → response): Redis 1h TTL
+- **Semantic cache** (similar query → reuse response): embedding similarity > 0.95 threshold
+
+**Hit rate target**: 30-50% for FAQ-like workloads. Saves $$$.
+
+### Layer 2: Queue (smooth burst)
+
+- **Priority queue** by user tier (gold ahead of bronze)
+- **Per-tenant**: max N concurrent
+- **Cost-aware**: cheaper model first, escalate to expensive if needed
+
+### Layer 3: Rate limit (defense)
+
+- **Per-user**: token bucket 100 req/min
+- **Per-API-key**: total quota (e.g., $100/day)
+- **Per-tenant**: tier-based limits
+
+### Layer 4: Cost-aware routing
+
+```python
+def route(request, complexity_score):
+    if complexity_score < 0.3:
+        return "gpt-4o-mini"  # 90% cases
+    elif complexity_score < 0.7:
+        return "gpt-4o"
+    else:
+        return "gpt-4-turbo"  # hard cases only
+```
+
+Cost optimization 10-50% without quality loss.
+
+---
+
+## 8. Eventual Consistency — Agent multi-step state
+
+Agent 跑 5 步：
+- Step 1: call create_order → DB write OK
+- Step 2: call charge_payment → API timeout (unknown if charged)
+- Step 3: ?
+
+3 patterns to handle:
+
+### Pattern A: Saga (forward + compensating)
+
+```
+Step 1 ✓ → Step 2 ✗ → Compensate Step 1 (cancel order)
+```
+
+### Pattern B: Outbox / 2PC-light
+
+```
+Each step writes intent to outbox table
+Reliable worker picks up + executes + marks done
+Retry until success or escalate
+```
+
+### Pattern C: Workflow engine (Temporal / DBOS)
+
+```
+Agent workflow as code, Temporal handles retries / state / recovery
+```
+
+**Google FDE 高级答**: Use Temporal for complex agentic workflows. Don't reinvent.
+
+---
+
+## 9. 你简历对应 hook
+
+| Sub-topic | 你简历 hook |
+|---|---|
+| **Stateless vs Stateful** | Voice agent (stateful WebSocket) + BNPL chatbot (mostly stateless) — 你有两面 |
+| **MCP / Proxy** | Internal Agent Platform — workflow / tool / memory 抽象 |
+| **High Throughput** | vLLM / SGLang / Megatron / DeepSpeed — 你简历全列了 |
+| **Observability** | Voice agent 7 markets weekly metric review |
+| **Rate Limit / Queue / Cache** | TikTok scale — payment is rate-limit aware |
+| **Eventual Consistency** | Refund tier — tier 3 必须 transactional |
+
+---
+
+## 10. Cheat Sheet
+
+```
+Stateless vs Stateful:
+  Default stateless (OpenAI / Google API model)
+  Stateful only for: latency-sensitive multi-turn (voice)
+
+MCP (Model Context Protocol):
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio/HTTP/SSE
+  Standardizes tool ecosystem across LLM providers
+  Google FDE: customer API → MCP server
+
+High throughput 6 levers:
+  Continuous batching (vLLM) — 5-10x
+  PagedAttention — 24x concurrency
+  Prefix caching — 2-3x
+  Speculative decoding — 2-3x latency
+  TP — more compute
+  PP — more throughput
+
+Observability 4 layers:
+  Distributed tracing (OTel)
+  LLM-specific (LangSmith / Phoenix)
+  Cost tracking
+  Quality monitoring (eval in prod)
+
+Rate limit / Queue / Cache:
+  L1: Result cache + semantic cache (30-50% hit)
+  L2: Priority queue per tenant
+  L3: Token bucket (per-user / per-tenant)
+  L4: Cost-aware model routing
+
+Eventual consistency:
+  Saga (forward + compensate)
+  Outbox / 2PC-light
+  Workflow engine (Temporal / DBOS) — recommend
+
+Your resume hooks:
+  vLLM/SGLang (T3.3)
+  Internal Agent Platform (T3.2)
+  Voice agent stateful WebSocket (T3.1)
+  TikTok payment rate-limit (T3.5)
+  Refund tier transactional (T3.6)
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

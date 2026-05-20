@@ -18,10 +18,11 @@ LEGACY_JSON = ROOT / "openai-interview-questions.json"
 QUESTIONS_JSON = UNIFIED_JSON if UNIFIED_JSON.exists() else LEGACY_JSON
 
 # Company display order on the index page
-COMPANY_ORDER = ["FDE", "OpenAI", "Google"]
+COMPANY_ORDER = ["Google FDE", "FDE", "OpenAI", "Google"]
 
 # Per-company brand color (used for the company badge tint)
 COMPANY_COLOR = {
+    "Google FDE": "#1a73e8",  # Google FDE — Google brand blue
     "FDE":    "#dc2626",   # FDE red (Palantir/OpenAI/Google composite)
     "OpenAI": "#10a37f",   # OpenAI green
     "Google": "#4285f4",   # Google blue
@@ -337,6 +338,7 @@ def parse_comments(comments_raw: str):
 def render_index(questions, type_groups, company_groups, recency_sorted):
     """Render index.html with company + type filters."""
     types_meta = [
+        ("Google FDE", "🎯 Google FDE 专项（HR 提示主题：tool calling / RAG / LLM 工程 / 落地）"),
         ("FDE", "FDE（Forward Deployed Engineer 真题 + reframe）"),
         ("Guide", "Guide（专题文章）"),
         ("Coding", "Coding 题（算法 / LLD 编码）"),

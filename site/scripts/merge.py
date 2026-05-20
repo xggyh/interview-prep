@@ -39,6 +39,8 @@ SOURCES = [
     # FDE (Forward Deployed Engineer) curated real interview questions
     # from Palantir / OpenAI / ElevenLabs / Google FDE reports
     ("FDE", ROOT / "site" / "data" / "fde-questions.json"),
+    # Google FDE prep — HR-tipped topic areas (Tool calling / RAG / LLM eng / Delivery)
+    ("Google FDE", ROOT / "site" / "data" / "google-fde-prep.json"),
 ]
 
 def main():
