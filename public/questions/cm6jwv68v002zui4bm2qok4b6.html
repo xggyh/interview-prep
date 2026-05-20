@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Find Root Node in Colored Tree with Pattern Constraints · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/colored-tree-root/cm6jwv68v002zui4bm2qok4b6" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 3 · 🕒 Early January, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm6jwv68v002zui4bm2qok4b6.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm6jwv68v002zui4bm2qok4b6.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -108,6 +114,111 @@ def find_root_multi_pattern(n, edges, colors):
     <a href="cm5eguhaf03el838orjk694tw.html">Leetcode 1807. Evaluate the Bracket Pairs of a String →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**Find Root Node in Colored Tree with Pattern Constraints**：与 `Convert Graph to Binary Tree with Alternating Colors` 同类，更强约束 —— 颜色按 **6 种可能 3-color permutation** 中之一循环（如 R→W→B→R→W→B 或 R→B→W 或...）。返回任一 valid root，没有返回 -1。
+
+## 解法
+
+同前题，但试**所有 6 种 pattern 排列**：
+
+```python
+from itertools import permutations
+from collections import defaultdict, deque
+
+def find_root_multi_pattern(n, edges, colors):
+    adj = defaultdict(set)
+    for u, v in edges:
+        adj[u].add(v); adj[v].add(u)
+
+    def check(r: int, pattern: tuple) -> bool:
+        if len(adj[r]) > 2: return False
+        depth = {r: 0}
+        q = deque([r])
+        while q:
+            u = q.popleft()
+            if colors[u] != pattern[depth[u] % 3]:
+                return False
+            for v in adj[u]:
+                if v in depth: continue
+                depth[v] = depth[u] + 1
+                q.append(v)
+        return True
+
+    color_set = sorted(set(colors))  # 假设有 3 个颜色
+    if len(color_set) > 3: return -1   # 超过 3 色不在此变种范围
+    for pattern in permutations(color_set):   # 6 种排列
+        for r in range(n):
+            if check(r, pattern):
+                return r
+    return -1
+```
+
+## 复杂度
+
+- 时间：**O(P × V × (V + E))**，P = 6 (color permutations)。
+- 空间：O(V + E)
+
+## 关键技术点
+
+### 1. 枚举所有 pattern
+
+3 色有 3! = 6 个循环排列。如果题目允许 2 色变种或 4 色，pattern 数变。
+
+### 2. Adjacent layer 颜色不同
+
+pattern 用 list of distinct colors → adjacent layer 自然不同色。如果用 `[R, R, B]`（同色相邻）则违反"adjacent must differ"约束 → 排除。
+
+### 3. 6 种 of 3-color cycle
+
+- (R, B, W), (R, W, B), (B, R, W), (B, W, R), (W, R, B), (W, B, R)
+- 这 6 种 cycle 是 3! 排列，每个对应不同 root 选择
+
+实际可能等价（如 (R,B,W) 起点不同 == (B,W,R) 起点偏移），但代码遍历安全。
+
+### 4. 仅当颜色全有时尝试 3-pattern
+
+如果图里只 2 色，pattern 退化为 2-cycle。代码动态用 `set(colors)`。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 假设只一种 pattern —— 漏 valid root；
+> ❌ 没排除"同色相邻"违法 pattern（如 (R, R, B)）；
+> ❌ permutations 会产生 size > 3 的；需限制 size 3；
+> ❌ check 函数没限制 root degree ≤ 2。
+
+> [!key]
+> "找满足复杂模式的 root" 通过**枚举模式 + 验证**解决。常数因子大但 V³ 不爆。
+
+> [!followup]
+> "K 色 K-cycle？" → permutations 数 = K!，V 大时不可行；优化：观察"layer 0 颜色 = root 颜色"，固定后 pattern[1], pattern[2] 等也固定 → 减为 (K-1)! 或更少；"动态加节点？" → incremental check 难，全图重算；"返回所有 valid root？" → 收集而非 return first，注意可能多个 root 各自有不同 valid pattern。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

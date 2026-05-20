@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 1807. Evaluate the Bracket Pairs of a String · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/evaluate-bracket-pairs/cm5eguhaf03el838orjk694tw" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Junior · 📋 1 · 🕒 Early January, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhaf03el838orjk694tw.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhaf03el838orjk694tw.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -84,6 +90,90 @@ class Solution:
     <a href="cm5eh7nri04wr838o909fw8eh.html">Leetcode 351. Android Unlock Patterns →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 1807 Evaluate the Bracket Pairs of a String**：字符串 s 含 `(key)` 形式的占位符。给一组 (key, value) 映射，把所有 `(key)` 替换为 value；找不到 key 替换为 `"?"`。
+
+## Python 实现
+
+```python
+from typing import List
+
+class Solution:
+    def evaluate(self, s: str, knowledge: List[List[str]]) -> str:
+        kv = dict(knowledge)
+        result = []
+        i = 0
+        while i < len(s):
+            if s[i] == '(':
+                j = s.index(')', i)
+                key = s[i+1:j]
+                result.append(kv.get(key, "?"))
+                i = j + 1
+            else:
+                result.append(s[i])
+                i += 1
+        return "".join(result)
+```
+
+## 复杂度
+
+- 时间：**O(N)**，N = len(s)
+- 空间：O(K + N) 字典 + 输出
+
+## 关键点
+
+### 1. dict lookup
+
+`dict.get(key, "?")` 优雅处理"找不到"。
+
+### 2. 切片找闭括号
+
+`s.index(')', i)` 从位置 i 开始找下一个 ')'。题目保证括号匹配且无嵌套。
+
+### 3. 嵌套？
+
+LC 1807 不嵌套。如果嵌套要递归 / 栈处理（类似 Decode String LC 394）。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 用正则 `re.sub` 配 lambda：可行但 import 重；
+> ❌ 用 `s.replace(f"({k})", v)` 多次替换：O(N × K) 慢 + 替换后产生新 `(key)` 风险；
+> ❌ 没处理 unknown key（应替 "?" 不是空）；
+> ❌ 嵌套 `((a))` 情况不在题目内但要意识到。
+
+> [!key]
+> 字符串模板替换的最简形式 = 单次扫描 + dict lookup。这是工业级模板引擎（Jinja, Mustache）的内核简化版。
+
+> [!followup]
+> "嵌套占位符 `(a(b)c)`？" → 栈或递归（参考 Decode String）；"value 自身可能含 `(key)`？" → iterative substitution until 不变（类似 Lisp let）；"如何流式？" → 状态机逐字符。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

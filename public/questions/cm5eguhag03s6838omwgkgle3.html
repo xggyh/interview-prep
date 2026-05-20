@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 2296. Design a Text Editor · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/text-editor-design/cm5eguhag03s6838omwgkgle3" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Principal · 📋 1 · 🕒 Late December, 2024</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhag03s6838omwgkgle3.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhag03s6838omwgkgle3.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -106,6 +112,129 @@
     <a href="cm5eguhae0370838ohe83yfdd.html">Leetcode 1534. Count Good Triplets →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 2296 Design a Text Editor**：实现 cursor-based 文本编辑器：
+- `addText(s)`：在光标位置插入 s，光标右移
+- `deleteText(k)`：删除光标左侧 k 个字符，返回实际删除数
+- `cursorLeft(k)` / `cursorRight(k)`：光标移动；返回光标左侧最多 10 个字符
+
+## 解法
+
+**双栈 / 双向 deque** 模拟光标：
+- `left`：光标左侧字符栈（top = 光标紧邻左）
+- `right`：光标右侧字符栈（top = 光标紧邻右）
+
+光标移动 = 字符从一栈移到另一栈。
+
+## Python 实现
+
+```python
+class TextEditor:
+    def __init__(self):
+        self.left: list[str] = []
+        self.right: list[str] = []
+
+    def addText(self, text: str) -> None:
+        for ch in text:
+            self.left.append(ch)
+
+    def deleteText(self, k: int) -> int:
+        to_del = min(k, len(self.left))
+        for _ in range(to_del):
+            self.left.pop()
+        return to_del
+
+    def cursorLeft(self, k: int) -> str:
+        for _ in range(min(k, len(self.left))):
+            self.right.append(self.left.pop())
+        return self._last10()
+
+    def cursorRight(self, k: int) -> str:
+        for _ in range(min(k, len(self.right))):
+            self.left.append(self.right.pop())
+        return self._last10()
+
+    def _last10(self) -> str:
+        if len(self.left) >= 10:
+            return ''.join(self.left[-10:])
+        return ''.join(self.left)
+```
+
+## 复杂度
+
+| 操作 | 时间 |
+|---|---|
+| addText | O(L)，L = text 长度 |
+| deleteText | O(K) 摊销 |
+| cursorLeft/Right | O(K) 移动 |
+| _last10 | O(1) 切片（最多 10 字符） |
+
+## 关键技术点
+
+### 1. 双栈表示光标位置
+
+`left` 末尾 = 光标紧左字符；`right` 末尾 = 光标紧右字符。移动光标 = pop 一栈 push 另一栈。
+
+### 2. 删除从 left pop
+
+`deleteText` 只影响光标左侧字符（删的是光标左边）。
+
+### 3. 返回光标左 10 字符
+
+```python
+return ''.join(self.left[-10:])
+```
+
+切片自动处理 < 10 的情况。
+
+### 4. 为什么不用单 string + index
+
+可以但 string 插入 / 删除是 O(N)。双栈让每个 char 最多在两栈间转移 2 次（push + pop），摊销 O(1)。
+
+## 替代：Doubly Linked List
+
+更"通用"但实现复杂。双栈对这题足够且更快。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 单栈 / 单 list 模拟 —— 光标移动 O(N)；
+> ❌ deleteText 删 right 栈 —— 题目是删光标左；
+> ❌ cursorLeft 直接修改 cursor 数字而不动数据 —— 光标位置和数据不一致；
+> ❌ _last10 没处理 < 10 字符。
+
+> [!key]
+> 双栈 / 双 deque 表示游标位置是文本编辑器的标准技巧。同思想：LC 1472 Browser History、LC 705 Design HashSet、LC 1670 Design Front Middle Back Queue。
+
+> [!followup]
+> "支持 undo？" → 加 operation stack，每 op 记反操作；"支持 selection？" → 维护 anchor index；"多用户协作？" → CRDT（参考 CoderPad 题）；"大文档分页加载？" → linked list of chunks 而非全字符栈。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

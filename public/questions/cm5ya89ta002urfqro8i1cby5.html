@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tell me about a time when you uncovered a significant problem in your team. · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/team-problem-discovery/cm5ya89ta002urfqro8i1cby5" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Senior · 📋 1 · 🕒 Mid December, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5ya89ta002urfqro8i1cby5.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5ya89ta002urfqro8i1cby5.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -90,6 +96,101 @@
     <a href="cm6jzrva4000gyis4tbslkc0q.html">Count Islands in Binary Trees →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**"Tell me about a time when you uncovered a significant problem in your team"** —— Googlyness。考察：**洞察力 + ownership + 触发改变的能力**。
+
+类似"proactive change" 但更聚焦"problem discovery"。
+
+## STAR 框架
+
+## 故事：team 的"silent failures"
+
+**S**：加入 team 3 个月后，我开始 oncall。发现一个奇怪现象：每周 page 量正常，但用户 support tickets 量在涨。Manager 没注意，team 也没人提。
+
+**T**：我没被让 investigate。但我作为 oncall 应该 understand。
+
+**A**：
+1. **Cross-correlate 数据**：写脚本对比 last-90-days：oncall pages 数 vs support tickets 数。发现 tickets 涨了 40%，pages 没涨。
+2. **挖出 root cause**：sample 100 个 tickets，发现 60% 是"data delay" 投诉 —— 用户看到 stale data 但**没有 alert 触发** 因为 pipeline 是 best-effort 没设 SLO。
+3. **私下 1:1 manager**：先不抛 "我发现 problem" 而是问 "我注意到 ticket 量涨，你有顾虑吗?"。Manager 表示没仔细看。
+4. **写 short doc**：(a) 现象数据 (b) root cause hypothesis (c) 提议 fix (add SLO alerts + data freshness monitor)。
+5. **跟 team 公开**：在 weekly meeting 上 share。但 framing 是 "I found this curious pattern" 而不是"You all missed this"。
+6. **认领 fix**：自己花 2 周做 monitoring + 设 SLO。然后跟 staff 工程师共同 review。
+
+**R**：1 个月后 stale data ticket 量降 80%（因为 alert 提早发现 + 修复）。Manager 之后 perf review 提到 "high signal hire"。我也 build 起在 team 里 trust。
+
+## 关键展示点
+
+### 1. Curiosity from observable signal
+
+ticket 量涨 → 你 cared enough to look。Many people would ignore。
+
+### 2. Data correlation 而非 anecdotal
+
+不是"我感觉有问题"，是真做 cross-correlation 数据。
+
+### 3. Diplomatic surfacing
+
+Manager 漏看你不 blame。Framing as "I found something curious"。
+
+### 4. Own the fix
+
+不是"指出问题让别人 fix"。自己花 2 周做 monitoring。
+
+### 5. Long-term trust
+
+建立 reputation 而不仅仅是单次 fix。
+
+## 加分项
+
+- 提到 **你也 worried about 是否 overstepping**（new joiner finding 老问题）
+- 提到 **结果让 manager 主动 thank you**（不是你 self-promote）
+- 提到 **这件事改变 team 的 culture**（monitoring 文化）
+
+## 易错点
+
+> [!pitfall]
+> ❌ "我发现 team 都在做错事，所以..." —— 显得 arrogant；
+> ❌ "我跟管理层 escalate 让他们处理" —— 越过 team；
+> ❌ Problem 是 obvious 的（任何人能发现）—— 缺信号；
+> ❌ 没自己 own fix —— 显得只 critic；
+> ❌ 没数据 —— problem discovery 必须 data-driven。
+
+> [!key]
+> "Problem discovery" 信号：**curiosity → data → diplomatic surfacing → ownership of fix**。Senior+ 必备。Junior 抱怨，Senior 改正。
+
+> [!followup]
+> - "Why didn't anyone else notice?"
+> - "What if your manager had brushed it off?"
+> - "How did you handle people who felt called out?"
+> - "What's a problem you've spotted recently?"
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

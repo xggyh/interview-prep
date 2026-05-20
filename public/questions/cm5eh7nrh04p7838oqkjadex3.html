@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 79. Word Search · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/word-search-board/cm5eh7nrh04p7838oqkjadex3" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 2 · 🕒 Late December, 2024</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eh7nrh04p7838oqkjadex3.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eh7nrh04p7838oqkjadex3.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -112,6 +118,100 @@ class Solution:
     <a href="cm5eh7nrh04s7838o0yeutvb3.html">Leetcode 187. Repeated DNA Sequences →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 79 Word Search**：m×n 网格能否拼出给定 word。相邻（4 方向）连接，**不能重用同一 cell**。返回 True/False。
+
+## 解法
+
+DFS 从每个 cell 起点 + 回溯。Visited 用 in-place mark。
+
+## Python 实现
+
+```python
+from typing import List
+
+class Solution:
+    def exist(self, board: List[List[str]], word: str) -> bool:
+        R, C = len(board), len(board[0])
+
+        def dfs(r: int, c: int, i: int) -> bool:
+            if i == len(word):
+                return True
+            if not (0 <= r < R and 0 <= c < C) or board[r][c] != word[i]:
+                return False
+            ch = board[r][c]
+            board[r][c] = "#"
+            found = (dfs(r-1, c, i+1) or dfs(r+1, c, i+1)
+                  or dfs(r, c-1, i+1) or dfs(r, c+1, i+1))
+            board[r][c] = ch
+            return found
+
+        for r in range(R):
+            for c in range(C):
+                if board[r][c] == word[0] and dfs(r, c, 0):
+                    return True
+        return False
+```
+
+## 复杂度
+
+- 时间：**O(R × C × 4^L)**，L = word length
+- 空间：O(L) 递归栈
+
+## 关键点
+
+### 1. In-place visited
+
+`board[r][c] = "#"` 节省空间；回溯时恢复 `board[r][c] = ch`。
+
+### 2. 早期剪枝
+
+`board[r][c] != word[i]` 立即 return False，不必继续递归。
+
+### 3. 起点优化
+
+只在 `board[r][c] == word[0]` 时启动 DFS。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 回溯不恢复 board —— 下一起点搜索失败；
+> ❌ visited 用 set 但忘了 remove —— 跨起点污染；
+> ❌ DFS 顺序检查 (out of bounds + char match) —— 用 short-circuit `or` 自然处理；
+> ❌ word 为空时返回 False —— 应返回 True（空 word trivially matches）。
+
+> [!key]
+> Backtracking + grid search 的经典入门题。Word Search II (LC 212) 是这题的多模式扩展（用 Trie）。
+
+> [!followup]
+> "8 方向？" → DIRS 加对角线；"允许重用 cell？" → 不再 mark visited，但要限制 word length 防死循环；"输出路径？" → DFS 累积坐标 list；"多 word 同时找？" → 用 Trie，参考 LC 212。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

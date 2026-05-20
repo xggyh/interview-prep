@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 2162. Minimum Cost to Set Cooking Time · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/minimum-cost-cooking-time/cm5eguhag03og838o1xo4leeg" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 2 · 🕒 Late December, 2024</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhag03og838o1xo4leeg.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhag03og838o1xo4leeg.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -106,6 +112,117 @@
     <a href="cm5eh7nrh04p7838oqkjadex3.html">Leetcode 79. Word Search →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 2162 Minimum Cost to Set Cooking Time**：微波炉只接受 4 位数字。要设定一个时间（秒数 targetSeconds）。**输入方式**：分别按数字键，最多 4 位组成 `mmss` 或更短。`mm × 60 + ss = targetSeconds`。每按一次键有成本：
+- 移动到新数字成本 `moveCost`
+- 按下数字成本 `pushCost`
+
+从初始位置（startAt 数字）开始。求最小总成本。
+
+## 解法
+
+枚举两种合法的 (mm, ss) 组合：
+- (target // 60, target % 60)
+- (target // 60 - 1, target % 60 + 60)（当 ss < 100 且 mm > 0 时也是合法表示，可能更便宜）
+
+`mm` 必须 ≤ 99，`ss` 必须 ≤ 99。对每组合法 (mm, ss)，构造 4 位字符串（去前导 0）算成本。
+
+## Python 实现
+
+```python
+class Solution:
+    def minCostSetTime(self, startAt: int, moveCost: int, pushCost: int,
+                       targetSeconds: int) -> int:
+        def cost_of(mm: int, ss: int) -> int:
+            if not (0 <= mm <= 99 and 0 <= ss <= 99):
+                return float('inf')
+            digits = []
+            if mm > 0:
+                digits.extend([mm // 10, mm % 10])
+            digits.extend([ss // 10, ss % 10])
+            # 去掉前导 0
+            while digits and digits[0] == 0:
+                digits.pop(0)
+            cost = 0
+            cur = startAt
+            for d in digits:
+                if d != cur:
+                    cost += moveCost
+                    cur = d
+                cost += pushCost
+            return cost
+
+        mm, ss = divmod(targetSeconds, 60)
+        cost1 = cost_of(mm, ss)
+        cost2 = cost_of(mm - 1, ss + 60)
+        return min(cost1, cost2)
+```
+
+## 复杂度
+
+- 时间：**O(1)**（最多 4 位数字两组合）
+- 空间：O(1)
+
+## 关键技术点
+
+### 1. 两种合法表示
+
+`70 秒` = `0:70` (但 ss=70 合法吗？仍 ≤ 99，OK) = `1:10`。两个都可能，比较成本。
+
+### 2. 前导 0 跳过
+
+`mm = 0, ss = 5` → 输入 "5"（1 位），不是 "0005"。规则：mm == 0 时不输入 mm 那两位，且 ss 的高位 0 也可以省。
+
+我代码先 push mm 两位（如果 mm>0），再 push ss 两位，最后剥掉前导 0。
+
+### 3. 起点 startAt
+
+第一个数字也需要算"是否需要 move"。如果第一位 != startAt，加 moveCost；按下加 pushCost。
+
+### 4. 边界 mm = -1 或 ss > 99
+
+`cost_of` 用 inf 排除非法。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 只考虑 (mm = target//60, ss = target%60) 一种 → 漏掉 (mm-1, ss+60) 可能更便宜；
+> ❌ 不去前导 0 —— 输入 4 位永远，浪费 push；
+> ❌ 没算起点 startAt 的初始 move 成本；
+> ❌ mm > 99 时仍计算 → 输入超过 4 位非法。
+
+> [!key]
+> "枚举所有合法表示" + 模拟成本。同思路：表盘 / 按键代码生成、字典序最小输入序列。
+
+> [!followup]
+> "微波炉支持 ":99" 之外的 ss？" → 改约束；"5 位时间显示？" → 加 (hh, mm, ss) 维度；"成本与按键的物理距离相关？" → 改 moveCost 为函数 cost(from, to)。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

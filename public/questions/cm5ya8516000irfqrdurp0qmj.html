@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Describe a time when you brought different perspectives together to solve a problem. · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/perspectives-problem-solution/cm5ya8516000irfqrdurp0qmj" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 1 · 🕒 Mid March, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5ya8516000irfqrdurp0qmj.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5ya8516000irfqrdurp0qmj.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -82,6 +88,89 @@
     <a href="cm6zh0pli00063b6qv9jqq5hv.html">Tell me something about yourself I won't find on your resume →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**"Describe a time when you brought different perspectives together to solve a problem"** —— Googlyness。考察：**facilitation + synthesis + cross-functional leadership**。
+
+不是"我 + 一同事 disagree"。是**多方 (3+) 不同视角**你 facilitate 找到 unified solution。
+
+## 故事：跨 4 组的 mobile app perf 战役
+
+**S**：mobile app 启动时间 P95 从 1.8s 涨到 3.2s 用户 retention 下降 5%。涉及 4 个 team：
+- iOS team：app cold start
+- Backend：API latency  
+- ML team：on-device model load
+- DevOps：CDN / network
+
+每个 team 都说"不是我的问题"。
+
+**T**：我作为 cross-team Tech Lead，被指派 driving 这个问题。
+
+**A**：
+1. **召集 unified meeting**：所有 4 team 的 senior + tech lead 一起。我用 1 小时把所有"已知问题"画在一张 flow 图上：cold start → API call → model load → 渲染。
+2. **共建 metrics**：之前每 team 用自己的 metrics。我们一起定 unified end-to-end latency breakdown：每段时间打 distributed trace。
+3. **数据破 silos**：trace 显示瓶颈 60% 是 model load + 30% 是 API + 10% 是 cold start。这分配让每 team 知道自己 share。
+4. **每周 sync 把 progress 公开**：dashboard 每 team 该有的目标 + 当前。Public commitment 提升 accountability。
+5. **庆祝小胜**：每段时间降 10% 就在 team chat 公开庆祝。让协作有正反馈。
+
+**R**：6 周 P95 降到 2.1s。Retention 回升。最重要：**4 个 team 之后有了共同 trace + dashboard**，跨组 perf 工作变 routine。
+
+## 关键展示点
+
+- **画图 unify mental model**：每 team 之前看局部，我画 end-to-end 让他们看到全图
+- **共建 metrics**：避免"我家指标 vs 你家指标"
+- **数据破 finger-pointing**：让每 team 看到自己客观贡献了多少 latency
+- **Sync rhythm + public commitment**：从 ad-hoc 到 systematic
+- **正反馈循环**：庆祝小胜让 team 愿意 continue
+
+## 加分项
+
+- 提到**会前准备**（你不是开会才开始，你提前跟每 team 1:1 了解他们的 perspective）
+- 提到**自己是 outsider** 反而是优势（没 silos bias）
+- 提到 **遗留的 process**（建立的 dashboard / sync 之后仍在用）
+
+## 易错点
+
+> [!pitfall]
+> ❌ "我让 manager 来 align" —— 没体现你的 facilitation；
+> ❌ 故事中你最有专长 —— 不是 cross-functional 是 individual lead；
+> ❌ 没数据 —— "我们 align 了" 但没 outcome 数字；
+> ❌ 没说会后 sustained 改善 —— 一次性 fix 不算。
+
+> [!key]
+> Senior+ 跨组协作信号：**facilitator that produces shared understanding through artifacts (diagrams, metrics, dashboards), not authority**。
+
+> [!followup]
+> - "What if one team refused to participate?"
+> - "How did you build credibility with teams that didn't know you?"
+> - "Did anyone resist the new metrics?"
+> - "Have you ever failed at unifying perspectives?"
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

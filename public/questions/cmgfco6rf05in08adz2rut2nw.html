@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design Twitter · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/twitter-clone-feed/cmgfco6rf05in08adz2rut2nw" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Senior · 📋 1 · 🕒 Early October, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cmgfco6rf05in08adz2rut2nw.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cmgfco6rf05in08adz2rut2nw.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -183,6 +189,206 @@ class Gif(Media): ...</code></pre>
     <a href="cmbskxz3y004n07adimbogre1.html">Unix Cd Command with Symbolic Link Resolution →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**Design Twitter (LLD version)** —— Low Level Design (OOP)：实现 Twitter core feature 的 class diagram + interface。区别于 System Design 的架构，重点是**类设计 + 模式 + extensibility**。
+
+## 核心实体
+
+```python
+class User:
+    user_id: UUID
+    name: str
+    followers: set[User]    # who follows me
+    following: set[User]    # who I follow
+    tweets: list[Tweet]
+    feed: 'NewsFeed'
+
+class Tweet:
+    tweet_id: UUID
+    author: User
+    text: str
+    media: list[Media]
+    created_at: datetime
+    likes: set[User]
+    retweets: set['Tweet']     # retweeted_by tweets
+    parent: 'Tweet' | None     # for replies / retweets
+
+class NewsFeed:
+    user: User
+    cached_tweets: list[Tweet]   # paginated
+
+class TwitterService:
+    users: dict[UUID, User]
+    tweets: dict[UUID, Tweet]
+
+    def post_tweet(self, user_id, text, media) -> Tweet
+    def follow(self, follower, followee)
+    def unfollow(self, follower, followee)
+    def like(self, user, tweet)
+    def get_feed(self, user_id, limit) -> list[Tweet]
+    def search(self, query) -> list[Tweet]
+```
+
+## 设计 patterns
+
+### 1. Strategy: Feed generation
+
+```python
+class FeedStrategy(ABC):
+    @abstractmethod
+    def get_feed(user, limit) -> list[Tweet]: ...
+
+class PullModelStrategy(FeedStrategy):
+    """Query 所有 followed users' tweets, sort, top-K"""
+    def get_feed(user, limit):
+        all_tweets = []
+        for followed in user.following:
+            all_tweets.extend(followed.tweets[-100:])
+        return sorted(all_tweets, key=lambda t: -t.created_at.timestamp())[:limit]
+
+class PushModelStrategy(FeedStrategy):
+    """Each tweet upon post fan-out to followers' feed cache"""
+    def get_feed(user, limit):
+        return user.feed.cached_tweets[:limit]
+
+class HybridStrategy(FeedStrategy):
+    """Push for normal user, pull for celebrities (avoid fan-out爆)"""
+    def get_feed(user, limit):
+        merged = list(user.feed.cached_tweets)
+        for celeb in user.following_celebs:
+            merged.extend(celeb.tweets[-20:])
+        return sorted(merged, key=...)[:limit]
+```
+
+### 2. Observer: Notification
+
+User likes tweet → tweet author receives notification。Observer pattern：
+
+```python
+class TweetObserver(ABC):
+    def on_like(tweet, user): ...
+    def on_retweet(tweet, user): ...
+
+class NotificationObserver(TweetObserver):
+    def on_like(tweet, user):
+        notify(tweet.author, f"{user.name} liked your tweet")
+```
+
+### 3. Decorator / Composite: Media
+
+Tweet can have text + image + video. Composite media:
+
+```python
+class Media(ABC): ...
+class Image(Media): ...
+class Video(Media): ...
+class Gif(Media): ...
+```
+
+### 4. Factory: Tweet creation
+
+```python
+class TweetFactory:
+    @staticmethod
+    def create(text, author, media=None, parent=None) -> Tweet:
+        t = Tweet(uuid4(), author, text, media or [], now(), set(), set(), parent)
+        # validation
+        if len(text) > 280:
+            raise ValueError
+        # extract mentions, hashtags
+        for mention in extract_mentions(text):
+            notify(mention)
+        return t
+```
+
+## Code 关键
+
+```python
+class TwitterService:
+    def __init__(self, feed_strategy: FeedStrategy):
+        self.users: dict[UUID, User] = {}
+        self.tweets: dict[UUID, Tweet] = {}
+        self.feed_strategy = feed_strategy
+        self.observers: list[TweetObserver] = []
+
+    def post_tweet(self, user_id: UUID, text: str, media: list[Media] = None):
+        user = self.users[user_id]
+        tweet = TweetFactory.create(text, user, media)
+        self.tweets[tweet.tweet_id] = tweet
+        user.tweets.append(tweet)
+        # Push model: fan-out
+        if isinstance(self.feed_strategy, PushModelStrategy):
+            for follower in user.followers:
+                follower.feed.cached_tweets.insert(0, tweet)
+                if len(follower.feed.cached_tweets) > 100:
+                    follower.feed.cached_tweets.pop()
+        return tweet
+
+    def follow(self, follower_id, followee_id):
+        f = self.users[follower_id]
+        ft = self.users[followee_id]
+        f.following.add(ft)
+        ft.followers.add(f)
+
+    def get_feed(self, user_id, limit=20):
+        return self.feed_strategy.get_feed(self.users[user_id], limit)
+```
+
+## 关键设计点
+
+### 1. Pull vs Push vs Hybrid
+
+参考 System Design Twitter。**Strategy pattern** 让 service 切换。
+
+### 2. 数据集中 vs 分布
+
+LLD focus on objects + relationships，不深入 storage。但要注意 **不要把所有 tweet 放 User 类里** —— 用单独 dict + reference。
+
+### 3. Lazy loading
+
+Tweet detail（media URL, likes count）lazy load。Don't preload everything。
+
+## 易错点
+
+> [!pitfall]
+> ❌ User 类 own all tweets → memory model 错；
+> ❌ Followers / Following 互相 reference → cycle，hard for serialization。用 ID 而非 object reference；
+> ❌ 不用 Strategy → feed algorithm hardcode；
+> ❌ 不用 Observer → coupling tight；
+> ❌ Composite media 不抽象 → 新 media type 改 Tweet 类。
+
+> [!key]
+> Twitter LLD = **User / Tweet / NewsFeed entities + Strategy (feed) + Observer (notif) + Factory (validation)**。展示 design pattern 熟练度。
+
+> [!followup]
+> "如何实现 search？" → ES integration + tweet indexing；"Reply tree 深嵌套？" → parent_id pointer + Tree traversal；"Media moderation？" → 加 moderation service queue，async processing；"如何 unit test？" → mock observers + inject strategy。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

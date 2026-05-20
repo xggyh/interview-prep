@@ -702,6 +702,12 @@ def render_detail(q, raw, analysis_md, prev_q, next_q):
   </div>
   <div class="company-chips">{''.join(company_chips)}</div>
 
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/{esc(slug_id)}.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/{esc(slug_id)}.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
   <section class="section">
     <h2>Problem Statement</h2>
     <p class="problem-statement">{esc(desc)}</p>
@@ -721,6 +727,32 @@ def render_detail(q, raw, analysis_md, prev_q, next_q):
     {nav_next}
   </div>
 </main>
+<script id="md-source" type="text/markdown">{analysis_md.replace('</script', '<\\/script')}</script>
+<script>
+(function(){{
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {{
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {{
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => {{ btn.textContent = orig; }}, 2500);
+    }} catch (e) {{
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try {{ document.execCommand('copy'); btn.textContent = '✓ 已复制'; }}
+      finally {{ ta.remove(); setTimeout(() => location.reload(), 1500); }}
+    }}
+  }});
+}})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
@@ -777,6 +809,10 @@ def main():
     (PUBLIC_DIR / "index.html").write_text(idx_html, encoding="utf-8")
     print(f"wrote {PUBLIC_DIR / 'index.html'}")
 
+    # Ensure raw .md mirror dir exists (for the "raw .md" link + VSCode users)
+    raw_md_dir = PUBLIC_DIR / "raw"
+    raw_md_dir.mkdir(parents=True, exist_ok=True)
+
     # Write detail pages — order them by recency, with prev/next nav linking
     for i, q in enumerate(recency_sorted):
         slug_id = q["slug"].rsplit("/", 1)[-1]
@@ -789,6 +825,10 @@ def main():
             raw = {}
         analysis_path = ANALYSES_DIR / f"{slug_id}.md"
         analysis_md = analysis_path.read_text(encoding="utf-8") if analysis_path.exists() else ""
+        # Mirror raw .md to public/raw/ so users can View Raw / Save Link As /
+        # open in VSCode with full markdown features.
+        if analysis_md:
+            (raw_md_dir / f"{slug_id}.md").write_text(analysis_md, encoding="utf-8")
         prev_q = recency_sorted[i - 1] if i > 0 else None
         next_q = recency_sorted[i + 1] if i + 1 < len(recency_sorted) else None
         detail_html = render_detail(q, raw, analysis_md, prev_q, next_q)

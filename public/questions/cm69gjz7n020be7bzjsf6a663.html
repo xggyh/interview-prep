@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design Google Docs · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/realtime-collaborative-docs/cm69gjz7n020be7bzjsf6a663" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Manager · 📋 1 · 🕒 Mid August, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm69gjz7n020be7bzjsf6a663.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm69gjz7n020be7bzjsf6a663.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -210,6 +216,169 @@ Server  → transform op against ops since client's revision
     <a href="cm7w828yv00sejmejlmofwtvp.html">Design a Job Scheduler →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+设计 **Google Docs**：实时多人协作文档编辑。N 用户同时改同 doc，所有 change 自动 sync + 不冲突。
+
+参考 [[cmhi1hhbh05wt08ad2knqdyh2]] (CoderPad) 的协作 framework。Google Docs 是 OT (Operational Transformation) 经典。
+
+## 与 CoderPad 区别
+
+- **Doc 更复杂**：富文本（bold, italic, list, image, table），不只是 char
+- **更大规模**：几千 user 同 doc 同 edit (Google Docs comment 上百人)
+- **Offline + sync**：网络断后回来要 reconcile
+
+## 核心算法
+
+### OT (Operational Transformation)
+
+经典：Google Wave / Docs。每 op 由 server transform against concurrent ops，保证最终所有 client 看到同结果。
+
+```
+op_a (insert "X" at 5)
+op_b (insert "Y" at 3, concurrent)
+After server transform:
+  op_a' = insert "X" at 6 (shifted because b inserted before)
+  op_b' = unchanged
+```
+
+复杂：转换函数对 each op type pair 需 prove correctness。
+
+### CRDT (Conflict-free Replicated Data Type)
+
+每 char 有 global unique ID (vector clock / lamport)。Operations commutative + idempotent，无需 transform。
+
+CRDT 优势：implementation 简单，offline-friendly。
+劣势：metadata overhead，doc 增长 (deleted chars 留 tombstone)。
+
+**Google Docs 用 OT**（历史决定）。**Yjs / Automerge 是现代 CRDT**。
+
+## 整体架构
+
+```ascii
+   Client (browser)
+       │ WebSocket / long-poll
+       ▼
+  ┌──────────────┐
+  │ Doc Server   │  per-doc session state
+  │ (sticky by   │  applies & broadcasts ops
+  │ doc_id)      │
+  └──────┬───────┘
+         │
+         ▼
+  ┌──────────────┐
+  │ Storage      │  doc state + op log
+  │ (Spanner)    │
+  └──────────────┘
+```
+
+## 核心组件
+
+### 1. Doc state
+
+```
+Document = sequence of styled segments + comments + revisions
+op = insert/delete/style/comment
+op log = persisted ordered sequence
+```
+
+每 doc 内存里维护 current state + op log。
+
+### 2. Sync protocol
+
+```
+Client →[op]→ Server  (with revision number)
+Server  → transform op against ops since client's revision
+        → apply
+        → append to op log
+        → return ack with new revision
+        → broadcast to other clients
+```
+
+### 3. Operational Transformation rules
+
+每种 (op_type, op_type) 组合定义 transform function。例：
+
+```python
+def transform(local_op, remote_op):
+    # remote_op already applied; local must adjust
+    if both insert and local.pos > remote.pos:
+        local.pos += len(remote.text)
+    if local.delete and remote.delete overlap:
+        ...
+```
+
+Combinatorial 复杂度高 (rich text 操作多)。
+
+### 4. Cursor / Selection sync
+
+Cursor 不是 op，是 ephemeral state。Server 周期 broadcast 每 user cursor 位置。
+
+### 5. Comments
+
+Comment 关联 anchor (char range)。Range shift as document edits。
+
+### 6. Versioning + revision history
+
+每 op 写 op log → 完整历史。User 可 view "1 hour ago" state by replaying log to that point。
+
+### 7. Offline editing
+
+Client 离线时 edit 本地 op queue → reconnect 时 transform against server intermediate ops → apply。
+
+### 8. 大 doc 优化
+
+10k-page doc 不全 load。Lazy load sections + virtual scroll。
+
+## 取舍
+
+| 决策 | 选择 | 替代 |
+|---|---|---|
+| Algorithm | OT (历史) / CRDT (现代) | Locking：blocks user |
+| Sync | WebSocket + sticky session | REST polling：高延迟 |
+| Storage | Spanner（strong consistency for ops） | Eventual：op 顺序乱 |
+| Offline | Op queue + sync on reconnect | Disable offline：UX 差 |
+
+## 易错点
+
+> [!pitfall]
+> ❌ Naïve last-write-wins → lost edits；
+> ❌ OT transform function bug → divergence；
+> ❌ 没 sticky routing → 跨 server op log 乱；
+> ❌ Cursor 走 op log → 太多 noise；分开 ephemeral；
+> ❌ Comment anchor 不跟随编辑 → comment 偏。
+
+> [!key]
+> 三大要点：(1) **OT 或 CRDT** 实时协作；(2) **WebSocket + sticky session**；(3) **Op log 持久 + replay enable versioning + offline**。
+
+> [!followup]
+> "如何 prevent 恶意 client 假 ops？" → server authoritative + auth check；"How handle 1000+ concurrent editor？" → ops 减频 (batched + LWW for low-priority changes)；"AI suggestions in doc？" → 单独 layer，suggestion = special op type pending user accept。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

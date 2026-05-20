@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 346. Moving Average from Data Stream · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/moving-average-stream/cm5eh7nri04wm838ohohaia3c" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 2 · 🕒 Late January, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eh7nri04wm838ohohaia3c.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eh7nri04wm838ohohaia3c.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -135,6 +141,91 @@ class MovingAverage:
     <a href="cm5eh7nrh04vo838okqn1o6mb.html">Leetcode 312. Burst Balloons →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 346 Moving Average from Data Stream**：实现固定窗口大小的移动平均。`next(val)` 返回当前窗口的均值。
+
+## 解法
+
+队列 + 累计和（避免每次重算）。
+
+## Python 实现
+
+```python
+from collections import deque
+
+class MovingAverage:
+    def __init__(self, size: int):
+        self.size = size
+        self.q: deque[int] = deque()
+        self.total = 0
+
+    def next(self, val: int) -> float:
+        self.q.append(val)
+        self.total += val
+        if len(self.q) > self.size:
+            self.total -= self.q.popleft()
+        return self.total / len(self.q)
+```
+
+## 复杂度
+
+- `next`: **O(1)** 摊销
+- 空间: O(size)
+
+## 关键点
+
+### 1. 累计和增量更新
+
+不要每次 `sum(self.q) / len(self.q)` —— 那是 O(size) per call。增量维护 total，O(1)。
+
+### 2. 浮点除 vs 整除
+
+Python 3 `/` 是浮点除。如果用 `//` 会截断。题目要 float 返回。
+
+### 3. 窗口未满时
+
+题目语义：窗口未满直接均值（用当前所有元素）。代码自然处理。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 用 list 而非 deque —— `pop(0)` O(N)；
+> ❌ 不维护 running sum —— next O(size)；
+> ❌ size = 0 边界：题目通常保证 size ≥ 1；
+> ❌ 返回 int 除以 int 时用 `/` 不是 `//`。
+
+> [!key]
+> 滑动窗口固定大小 + 增量统计 = O(1) per op。同模板用于：滚动 max/min（用 monotonic deque）、滚动 median（用 two heaps）、滚动 variance。
+
+> [!followup]
+> "动态调整 window size？" → 重置或 shrink；"窗口内 max/min？" → 单调 deque 维护；"加权移动平均？" → 维护加权和 + 加权 count（注意 popleft 的权重）；"如果数据流可重放？" → 不需要 queue，索引访问。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

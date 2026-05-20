@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 759. Employee Free Time · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/employee-free-time/cm5eguhac02lh838otstq4n40" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Junior-Mid-level · 📋 2 · 🕒 Late December, 2024</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhac02lh838otstq4n40.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhac02lh838otstq4n40.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -129,6 +135,132 @@ class Solution:
     <a href="cm5eh7nrh04rd838oagyvu2zw.html">Leetcode 157. Read N Characters Given Read4 →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 759 Employee Free Time**：N 个员工各自 schedule（list of busy intervals）。所有员工**共同空闲**的时间段（即没有任何人 busy 的时段）。返回排序的 free intervals。
+
+## 解法
+
+**Sweep line + min-heap**：所有 busy intervals 合并起来，找 gap。
+
+### 方法 A：扁平化 + 合并
+
+把所有员工的 intervals 拼成一个 list，按 start 排序，merge 重叠区间。剩下的 gap 就是 free time。
+
+```python
+from typing import List
+
+class Interval:
+    def __init__(self, start: int = 0, end: int = 0):
+        self.start = start; self.end = end
+
+class Solution:
+    def employeeFreeTime(self, schedule: List[List[Interval]]) -> List[Interval]:
+        all_iv = []
+        for emp in schedule:
+            for iv in emp:
+                all_iv.append((iv.start, iv.end))
+        all_iv.sort()
+        merged = []
+        for s, e in all_iv:
+            if merged and s <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+            else:
+                merged.append((s, e))
+        # Gap between consecutive merged intervals
+        free = []
+        for i in range(1, len(merged)):
+            if merged[i][0] > merged[i-1][1]:
+                free.append(Interval(merged[i-1][1], merged[i][0]))
+        return free
+```
+
+### 方法 B：min-heap（K-way merge，更优雅）
+
+利用每个员工的 schedule 已**按 start 排序**这一前提（题目通常保证）。用 min-heap K-way merge。
+
+```python
+import heapq
+
+class Solution:
+    def employeeFreeTime(self, schedule: List[List[Interval]]) -> List[Interval]:
+        heap = []  # (start, emp_idx, interval_idx)
+        for i, emp in enumerate(schedule):
+            if emp:
+                heapq.heappush(heap, (emp[0].start, i, 0))
+        free = []
+        prev_end = None
+        while heap:
+            start, ei, ii = heapq.heappop(heap)
+            iv = schedule[ei][ii]
+            if prev_end is not None and start > prev_end:
+                free.append(Interval(prev_end, start))
+            prev_end = max(prev_end or 0, iv.end)
+            if ii + 1 < len(schedule[ei]):
+                nxt = schedule[ei][ii + 1]
+                heapq.heappush(heap, (nxt.start, ei, ii + 1))
+        return free
+```
+
+## 复杂度
+
+- 方法 A：O(N log N)，N = 总 intervals
+- 方法 B：O(N log K)，K = 员工数（heap size）
+
+## 关键技术点
+
+### 1. 利用 sorted-per-employee
+
+如果每员工自己已排序，K-way merge 利用这点，整体只需 O(N log K)。
+
+### 2. 合并重叠（gap > 0 才算 free）
+
+`prev_end` 永远是已合并区间的右端点。只有新区间 start > prev_end 时才有 gap。
+
+### 3. 边界
+
+- 单员工：无 free time（除非他没 schedule，返回空）
+- 完全无交集的员工：方法 A merge 后 = 各自原区间，gap 就是相邻空隙
+
+## 易错点
+
+> [!pitfall]
+> ❌ 没合并重叠 —— 把重叠 interval 的"gap"误算成 free（实际仍 busy）；
+> ❌ `prev_end = max(prev_end, iv.end)` 在 `prev_end == None` 时报错 —— 用 `or 0` 或 `if prev_end is None`；
+> ❌ 用 list.append 后没排序 —— gap 检测错；方法 A 必须先 sort；
+> ❌ 把 list of Interval 当成 list of [s,e]：题目用 Interval class，注意 attribute 访问。
+
+> [!key]
+> Interval 题三板斧：(1) 排序 + 单调扫；(2) min-heap K-way merge；(3) 扫描线 +1/-1。LC 759 是 (1)(2) 的混合。
+
+> [!followup]
+> "找所有员工都 free 的最长时段？" → 同样算 free，取 max length；"找 K 个员工 free 的时段（不要求全部）？" → 扫描线 + busy count <= N-K 时算 free；"动态 schedule 变更？" → SortedList / interval tree。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

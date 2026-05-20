@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design Uber · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/rideshare-architecture/cm6u9yzg000y87oi9k1oi7qx8" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Junior, Senior Manager · 📋 2 · 🕒 Mid March, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm6u9yzg000y87oi9k1oi7qx8.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm6u9yzg000y87oi9k1oi7qx8.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -193,6 +199,160 @@ nearby = redis.geosearch('drivers', longitude, latitude, radius=2, unit='km')</c
     <a href="cm5ehcf6e0599838oop9wivfq.html">Tell me about a time you had a conflict with a coworker. How did you resolve it? →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+设计 **Uber** 级 ride-hailing 平台：乘客 → 匹配司机 → 实时定位 → 计价 + 支付。1B+ users，多 region。
+
+## 需求
+
+- 乘客 request ride（pickup + drop-off）
+- 系统匹配最近 driver
+- 实时跟踪 location + ETA
+- 完成后计费
+
+## 整体架构
+
+```ascii
+   Rider App           Driver App
+       │                  │
+       │ location          │ location ping (5s)
+       │ ride request      │ status (online/onroute/busy)
+       ▼                  ▼
+  ┌─────────────────────────────┐
+  │   Location Service          │  S2 cell / geohash index
+  │   (driver geo index)        │
+  └──────────┬──────────────────┘
+             │ nearby query
+             ▼
+  ┌─────────────────────────────┐
+  │   Matching Service          │  优化 ride-driver pair
+  └──────────┬──────────────────┘
+             │
+             ▼
+  ┌─────────────────────────────┐
+  │   Ride Service              │  ride lifecycle state
+  └──────────┬──────────────────┘
+             │
+             ▼
+  ┌─────────────────────────────┐
+  │   Pricing + Payment         │
+  └─────────────────────────────┘
+```
+
+## 核心组件
+
+### 1. Location Service：地理索引
+
+司机每 5 秒 push 位置。1M 在线司机 → 200k QPS。
+
+数据结构：**S2 cells / H3 hexagon**（Uber 实际用 H3）：
+- 把地球分成 hex cells (各 resolution)
+- 司机 located at cell ID
+- "附近 driver" 查询 = 取中心 cell + k-ring 邻居 → union 出 candidates
+
+```python
+# Redis GEO 或自建 H3 + Redis Set per cell
+redis.geoadd('drivers', longitude, latitude, driver_id)
+nearby = redis.geosearch('drivers', longitude, latitude, radius=2, unit='km')
+```
+
+### 2. Matching 算法
+
+**朴素**：取最近的 K driver，选 ETA 最小者。问题：同时多 rider 抢同一 driver。
+
+**Batched matching**：每 5 秒 batch all pending rides + all available drivers，跑**Hungarian / minimum-cost bipartite matching** 全局最优。
+
+```
+cost(rider, driver) = ETA(driver_pos → rider_pos) + driver_rating_penalty
+```
+
+batched 让全局更优（减少空驶 + 更短 wait）。
+
+### 3. Ride state machine
+
+```
+requested → matched → en_route_pickup → in_progress → completed
+             ↓ no driver
+           cancelled
+```
+
+每 transition 写 DB + emit event。State stored in **strongly consistent DB**（Spanner / CockroachDB）。
+
+### 4. Realtime tracking
+
+WebSocket / SSE 把 driver 位置 push 给 rider。每 5 秒一次（不需要更高频）。
+
+```
+driver pings location → server → push to (rider in this ride)
+```
+
+### 5. Pricing
+
+- Base fare + per-km + per-min
+- **Surge pricing**：实时 demand / supply ratio per zone → 乘倍数
+- 出发前 give estimate（用 Maps API ETA + distance）
+
+### 6. Payment
+
+完成后调 payment gateway。前 5 秒可 dispute（cancel before charge）。
+
+## 取舍
+
+| 决策 | 选择 | 替代 |
+|---|---|---|
+| Geo index | H3 + Redis | DB B-tree on (lat, lng)：慢 |
+| Matching | Batched bipartite | Greedy per request：局部最优 |
+| State | Strong consistency DB | Eventual：state confusion |
+| Tracking | WebSocket 5s | Polling 1s：浪费电池 |
+| Pricing | Real-time surge | Static：失 elasticity |
+
+## 容量估算
+
+- 1M concurrent rider + 500k driver
+- Location ping QPS: 500k / 5s = 100k QPS
+- Match QPS: peak 10k rides / sec
+- DB writes: ride state changes, ~30k QPS peak
+
+## 易错点
+
+> [!pitfall]
+> ❌ Greedy matching → 全局次优；
+> ❌ Strong consistency 不重要 (state confusion 导致用户体验差)；
+> ❌ Location 用 (lat, lng) DB query —— 慢；
+> ❌ 每秒 ping —— 电池 + 流量爆；
+> ❌ 不做 surge pricing —— supply / demand 失衡。
+
+> [!key]
+> 三大要点：(1) **H3 / S2 geo index** 处理大规模 nearby query；(2) **Batched bipartite matching** 全局最优；(3) **Strong consistency state machine** 防 race。
+
+> [!followup]
+> "Uber Pool (carpool)？" → multi-stop TSP，detour ≤ threshold；"自动驾驶 driver？" → driver pool 加 robotaxi subset，dispatch 算法区分；"国际 + 多 currency？" → per-region pricing engine + currency convert；"如何 prevent fraud (假乘客 / 假司机)？" → ML risk score + manual review。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

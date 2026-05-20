@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 1534. Count Good Triplets · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/count-good-triplets/cm5eguhae0370838ohe83yfdd" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 3 · 🕒 Late December, 2024</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhae0370838ohe83yfdd.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhae0370838ohe83yfdd.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -103,6 +109,103 @@ class Solution:
     <a href="cm5eguhac02lh838otstq4n40.html">Leetcode 759. Employee Free Time →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 1534 Count Good Triplets**：给数组 arr 和阈值 a, b, c。求三元组 (i, j, k) 数量，满足 i<j<k 且 |arr[i]-arr[j]|<=a 且 |arr[j]-arr[k]|<=b 且 |arr[i]-arr[k]|<=c。
+
+## 解法
+
+N ≤ 100 → O(N³) 直接暴力。
+
+## Python 实现
+
+```python
+from typing import List
+
+class Solution:
+    def countGoodTriplets(self, arr: List[int], a: int, b: int, c: int) -> int:
+        n = len(arr)
+        count = 0
+        for i in range(n - 2):
+            for j in range(i + 1, n - 1):
+                if abs(arr[i] - arr[j]) > a: continue   # 提早剪枝
+                for k in range(j + 1, n):
+                    if abs(arr[j] - arr[k]) <= b and abs(arr[i] - arr[k]) <= c:
+                        count += 1
+        return count
+```
+
+## 复杂度
+
+- 时间：**O(N³)**，最坏 1e6 操作
+- 空间：O(1)
+
+## 关键技术点
+
+### 1. 早期剪枝
+
+外层 i, j 检查第一个条件 |arr[i]-arr[j]| > a 时 continue，避免内层 k 浪费。
+
+### 2. 小 N 优化无必要
+
+LC 数据 n ≤ 100，1e6 直接过。生产场景大 N 用 prefix BIT 等优化但面试不期望。
+
+## 进阶 O(N²) 优化（大 N）
+
+固定 j。算 valid i 的集合 和 valid k 的集合：
+
+```python
+# 固定 j：
+# valid i: |arr[i] - arr[j]| <= a, i < j
+# valid k: |arr[j] - arr[k]| <= b, k > j
+
+# 还需 |arr[i] - arr[k]| <= c
+
+# 朴素 O(N) per (i, k) 组合 → 总 O(N²)
+# 进阶：BIT 记 arr[i] 的频率分布，查 [arr[k]-c, arr[k]+c] 范围内 count
+```
+
+总 O(N² log V)，V = value range。LC 不需。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 顺序循环 i < j < k 写错为 0 ≤ i,j,k < n —— 重复 + 顺序错；
+> ❌ 三条件用 `or` 而非 `and` —— 错；
+> ❌ 范围 i, j 上限错（应 j < n-1，k < n）；
+> ❌ a/b/c 是 ≤ 还是 < —— 题面是 ≤。
+
+> [!key]
+> 三重循环加剪枝是 N 小时的最简方案。要展示**剪枝意识**（外层不满足条件就 skip 内层）。
+
+> [!followup]
+> "K 元组（更高维）？" → 增加 loop 维度；"N=1e5？" → 优化：BIT/segment tree 维护 prefix count，按 j 扫并查区间；"加权三元组（满足条件的 sum）？" → 同 BIT 改求和。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>

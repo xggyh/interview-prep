@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 1481. Least Number of Unique Integers after K Removals · 面试题准备</title>
-<link rel="stylesheet" href="../assets/style.css?v=a7ab1f11">
+<link rel="stylesheet" href="../assets/style.css?v=efa4b42d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -23,6 +23,12 @@
     <span class="external"><a href="https://www.hellointerview.com/community/questions/least-unique-integers/cm5eguhae035j838oyf44h695" target="_blank" rel="noopener">原题 ↗</a></span>
   </div>
   <div class="company-chips"><span class="company-chip" style="--c:#4285f4"><strong>Google</strong> · Mid-level · 📋 1 · 🕒 Early January, 2025</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/cm5eguhae035j838oyf44h695.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/cm5eguhae035j838oyf44h695.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
 
   <section class="section">
     <h2>Problem Statement</h2>
@@ -98,6 +104,113 @@ return unique</code></pre>
     <a href="cm6jwxvny00juui4b1f03avuw.html">String Template Substitution with Variable Replacement →</a>
   </div>
 </main>
+<script id="md-source" type="text/markdown">## 题目本质
+
+**LC 1481 Least Number of Unique Integers after K Removals**：移除恰好 k 个元素后，剩下数组的 unique 元素数量最小。
+
+## 解法
+
+贪心：优先删除**频率最小的整数**（一次性把它清空，比把同一高频整数砍一半更划算）。
+
+1. Count freq
+2. 按 freq 升序排序
+3. 顺序消耗 k：每删除一种 (freq 个) ，k 减 freq，unique-- ；如果 k 不够删完整种，则停止
+
+## Python 实现
+
+```python
+from collections import Counter
+from typing import List
+
+class Solution:
+    def findLeastNumOfUniqueInts(self, arr: List[int], k: int) -> int:
+        freq = Counter(arr).values()
+        sorted_freq = sorted(freq)
+        unique = len(sorted_freq)
+        for f in sorted_freq:
+            if k >= f:
+                k -= f
+                unique -= 1
+            else:
+                break
+        return unique
+```
+
+## 复杂度
+
+- 时间：**O(N + U log U)**，U = unique count
+- 空间：O(U)
+
+## 关键点
+
+### 1. 贪心正确性
+
+要让 unique 最小 → 尽可能多地完全删掉某些整数。删掉一个 freq=f 的整数花 f 次操作，让 unique 减 1。**优先选 f 最小的**（性价比最高）。
+
+### 2. 处理 k 用完
+
+如果 `k < f`，删不完这种整数，但它仍然存在于数组里 → unique 不减。break。
+
+### 3. Bucket sort 优化
+
+如果想做 O(N) 而非 O(U log U)：
+
+```python
+freq = Counter(arr)
+buckets = [0] * (len(arr) + 1)
+for f in freq.values():
+    buckets[f] += 1
+unique = sum(buckets)
+for f in range(1, len(arr) + 1):
+    if buckets[f] == 0: continue
+    can_remove = min(buckets[f], k // f)
+    unique -= can_remove
+    k -= can_remove * f
+    if k < f: break
+return unique
+```
+
+复杂度 O(N)。LC 数据下 sort 也 OK。
+
+## 易错点
+
+> [!pitfall]
+> ❌ 删除最高频的 —— 一次操作只减 1 个，浪费；
+> ❌ k=0 时返回 0 —— 错，应返回 unique 总数；
+> ❌ k 大于总和时返回 0 —— 题目通常保证 k ≤ len(arr)；
+> ❌ 用 list 频繁 sort —— 一次 sort 后顺序固定。
+
+> [!key]
+> 经典贪心 "选最便宜的购买" 模式。性价比 = "unique 减少量 / 操作数" → 选 f 最小的 ratio = 1/f 最大。
+
+> [!followup]
+> "最大化 unique（保留 k 个）？" → 反过来：保留 freq 最低的，相当于答案 = 多少种 freq 能塞进 k；"加权 unique？" → 改为 1/(f × weight) 排序；"分布式数据？" → MapReduce: count → 全局 sort by freq。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+</script>
 <script src="../assets/prism/prism-core.min.js"></script>
 <script src="../assets/prism/prism-autoloader.min.js"></script>
 <script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
