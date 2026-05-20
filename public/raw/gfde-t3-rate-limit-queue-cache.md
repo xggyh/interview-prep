@@ -275,6 +275,69 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: 新客户 launch 带来突发流量
+
+> "客户 launch 一个产品, 流量从 100 QPS 暴涨到 10K QPS"
+
+**解法**:
+- **Pre-launch capacity plan**: 跟客户 sync launch 时间, 提前 pre-warm
+- **Burst absorber queue**: 队列容量 = 5 min × peak QPS, 容量内 'normal', 超过 fail fast
+- **Tier-based**: launch 客户 gold-tier, 优先, 但仍有 cap
+- **Spillover**: 自有 LLM 容量打满 → spillover 到 OpenAI API (贵但能扛)
+- **Communicate**: 'high traffic, expected delay 30s' 给用户透明
+- **Post-launch**: 24h 后 scale down
+
+### 变体 2: FAQ-heavy workload
+
+> "用户重复问类似 question, 50% query 是 5 个 FAQ 变体"
+
+**解法**:
+- **Semantic cache 极度激进**: threshold 0.88 (低), 命中率拉高
+- **Cache 'gold list'**: 5 个 FAQ 手动配 canonical answer, 直 serve, 不走 LLM
+- **Personalization layer**: cached canonical + per-user param substitute
+- **Cache hit telemetry**: monitor 哪 5 个最热, 优化它们答案
+- **A/B canned vs LLM**: canned 答案是否真和 LLM 同质 → eval
+
+### 变体 3: Multi-tenant noisy neighbor
+
+> "Tenant A 突发 10x 流量, 把 tenant B (gold) 拖慢"
+
+**解法**:
+- **Per-tenant quota**: tenant A 有 quota 上限, 超了被 rate-limit
+- **Per-tenant concurrency**: tenant A 最多 100 concurrent, 不抢 GPU
+- **Tier priority**: gold tier 永远先 dispatch, bronze 排队
+- **Backpressure visible**: tenant A 看到 429, 知道自己被限
+- **Isolated pool**: gold tier 独立 replica (不与 bronze 共享)
+- **Cost transparency**: tenant A 看自己 cost 涨, 自我约束
+
+### 变体 4: Per-user budget 用完
+
+> "免费用户 $5/month budget, 用完了。Agent 怎么办？"
+
+**解法**:
+- **Hard stop at limit**: 不能继续无脑 serve (亏钱)
+- **Graceful UX**: 'monthly limit reached, upgrade or wait until next month'
+- **Cached only mode**: 限额后, 仅命中 cache 时 serve, 不走 LLM
+- **Cheap model fallback**: 限额客户走 gpt-4o-mini (5x cheaper)
+- **Show usage**: progress bar '4 of 5 USD used'
+- **Upsell trigger**: 80% 时推 upgrade
+
+### 变体 5: LLM vendor 突然 cut quota
+
+> "OpenAI 把我们配额从 100K TPM 砍到 50K, 还能扛吗？"
+
+**解法**:
+- **多 vendor 早就接上**: Claude + Gemini + Llama 都接, 立即 spillover
+- **Aggressive cache**: 临时把 cache threshold 调松到 0.85, 命中翻倍
+- **Cheaper model 主力**: gpt-4 → gpt-4o-mini 临时降级
+- **Queue + delay**: < SLA 影响下推后部分非紧急
+- **Notify customer**: SLA breach 风险预警
+- **Long-term**: 加 self-host (vLLM 自托管) 减依赖
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

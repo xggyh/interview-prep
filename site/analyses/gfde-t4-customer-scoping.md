@@ -219,6 +219,68 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Customer support automation
+
+> "客户说: 'AI 接管我们的客服, 70% 自动'"
+
+**解法**:
+- **Discovery**: 看 top-N intent (probably 80% 是 5-10 intents)
+- **KPI**: deflection rate (% 不转人工) / CSAT / handle time
+- **MVP**: 1 个最常 intent (e.g., 'where is my order') 端到端
+- **Trust ladder**: 先 suggest-only (人 review), 再渐 auto, 再 fully autonomous
+- **Anti-pattern**: 一上来就 100% 自动, 砸品牌
+
+### 变体 2: 内部 IT helpdesk agent
+
+> "员工 IT 问题 (Wi-Fi / VPN / 密码 reset), 用 AI 接"
+
+**解法**:
+- **Discovery**: ticket 历史 mining, top intents
+- **KPI**: avg resolution time (人 30 min → 目标 5 min)
+- **MVP**: 密码 reset (high volume, automatable) 一键解决
+- **Integration**: SSO / AD / MDM 接口
+- **Risk lower than customer-facing**: 内部 user 更容忍 试错
+- **Self-serve docs**: agent 先 retrieve KB, 答 + 提供 link
+
+### 变体 3: Marketing content gen
+
+> "1 marketing team 想用 AI 加速 content (blog / social / ad copy)"
+
+**解法**:
+- **KPI**: time per post (8h → 2h), quality (engagement metric)
+- **MVP**: 1 个 channel (e.g., LinkedIn post) 端到端 — brief → draft → human edit
+- **Brand voice**: brand guide → system prompt + few-shot 例子
+- **Workflow**: agent 出 3 个 variant, human 选 + 改
+- **不是 full auto**: 创意 / brand voice 难全自动, 人在 loop
+- **Reuse mechanism**: 高效 prompt template 沉淀成组织资产
+
+### 变体 4: Data analyst assistant
+
+> "Non-tech 业务想 ask data question in English"
+
+**解法**:
+- **KPI**: questions answered / day, accuracy on labeled set
+- **MVP**: 1 个 specific dashboard / schema (不是 'all data')
+- **Text2SQL**: agent 出 SQL + run + plot
+- **Confirm-required for expensive query**: 'this will scan 10TB, confirm?'
+- **Verifier**: SQL result 给 LLM 校验语义合理 (sanity check)
+- **Iterative**: user 改问题, agent 改 SQL, 不是 1-shot
+
+### 变体 5: Engineer code assistant
+
+> "Internal dev tooling — 帮 engineer 写 code"
+
+**解法**:
+- **KPI**: tickets closed / day, code review iteration count, dev satisfaction
+- **MVP**: 1 specific task (test generation? boilerplate refactor?)
+- **Trust ladder**: PR suggestion → PR auto-create-review-required → ...
+- **Repo-aware**: AST + symbol graph + recent commits 作 context
+- **Eval**: 历史 PR replay 看 agent 解法对不对
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

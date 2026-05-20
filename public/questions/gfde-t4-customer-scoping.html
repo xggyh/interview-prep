@@ -139,6 +139,28 @@ Confidence + audit data builds trust over weeks."</code></pre>
 <p><strong>Anti-patterns I'd avoid</strong>:</p>
 <ul><li>Spending weeks 1-2 on perfect architecture</li><li>Building multi-tenancy / scalability features pre-validation</li><li>Promising 100% automation</li><li>Skipping stakeholder interviews</li><li>Doing it in isolation (not showing customer until week 3 = no early feedback)"</li></ul></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: Customer support automation</h4>
+<blockquote><p>"客户说: 'AI 接管我们的客服, 70% 自动'"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Discovery</strong>: 看 top-N intent (probably 80% 是 5-10 intents)</li><li><strong>KPI</strong>: deflection rate (% 不转人工) / CSAT / handle time</li><li><strong>MVP</strong>: 1 个最常 intent (e.g., 'where is my order') 端到端</li><li><strong>Trust ladder</strong>: 先 suggest-only (人 review), 再渐 auto, 再 fully autonomous</li><li><strong>Anti-pattern</strong>: 一上来就 100% 自动, 砸品牌</li></ul>
+<h4>变体 2: 内部 IT helpdesk agent</h4>
+<blockquote><p>"员工 IT 问题 (Wi-Fi / VPN / 密码 reset), 用 AI 接"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Discovery</strong>: ticket 历史 mining, top intents</li><li><strong>KPI</strong>: avg resolution time (人 30 min → 目标 5 min)</li><li><strong>MVP</strong>: 密码 reset (high volume, automatable) 一键解决</li><li><strong>Integration</strong>: SSO / AD / MDM 接口</li><li><strong>Risk lower than customer-facing</strong>: 内部 user 更容忍 试错</li><li><strong>Self-serve docs</strong>: agent 先 retrieve KB, 答 + 提供 link</li></ul>
+<h4>变体 3: Marketing content gen</h4>
+<blockquote><p>"1 marketing team 想用 AI 加速 content (blog / social / ad copy)"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>KPI</strong>: time per post (8h → 2h), quality (engagement metric)</li><li><strong>MVP</strong>: 1 个 channel (e.g., LinkedIn post) 端到端 — brief → draft → human edit</li><li><strong>Brand voice</strong>: brand guide → system prompt + few-shot 例子</li><li><strong>Workflow</strong>: agent 出 3 个 variant, human 选 + 改</li><li><strong>不是 full auto</strong>: 创意 / brand voice 难全自动, 人在 loop</li><li><strong>Reuse mechanism</strong>: 高效 prompt template 沉淀成组织资产</li></ul>
+<h4>变体 4: Data analyst assistant</h4>
+<blockquote><p>"Non-tech 业务想 ask data question in English"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>KPI</strong>: questions answered / day, accuracy on labeled set</li><li><strong>MVP</strong>: 1 个 specific dashboard / schema (不是 'all data')</li><li><strong>Text2SQL</strong>: agent 出 SQL + run + plot</li><li><strong>Confirm-required for expensive query</strong>: 'this will scan 10TB, confirm?'</li><li><strong>Verifier</strong>: SQL result 给 LLM 校验语义合理 (sanity check)</li><li><strong>Iterative</strong>: user 改问题, agent 改 SQL, 不是 1-shot</li></ul>
+<h4>变体 5: Engineer code assistant</h4>
+<blockquote><p>"Internal dev tooling — 帮 engineer 写 code"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>KPI</strong>: tickets closed / day, code review iteration count, dev satisfaction</li><li><strong>MVP</strong>: 1 specific task (test generation? boilerplate refactor?)</li><li><strong>Trust ladder</strong>: PR suggestion → PR auto-create-review-required → ...</li><li><strong>Repo-aware</strong>: AST + symbol graph + recent commits 作 context</li><li><strong>Eval</strong>: 历史 PR replay 看 agent 解法对不对</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Customer scoping</td><td>Voice agent 7 markets — every market needed scoping</td></tr><tr><td>Stakeholder map</td><td>TikTok payment — multi-stakeholder (ops / finance / engineering)</td></tr><tr><td>KPI lock</td><td>Indonesia refund tier — refund rate / approval time / accuracy 单一 KPI</td></tr><tr><td>MVP in 3 weeks</td><td>Voice agent expansion — each market 3-4 week MVP</td></tr><tr><td>Scope creep mgmt</td><td>Internal Agent Platform — customer requests filtered into roadmap</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -460,6 +482,68 @@ Anti-patterns:
 > - Promising 100% automation
 > - Skipping stakeholder interviews
 > - Doing it in isolation (not showing customer until week 3 = no early feedback)"
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: Customer support automation
+
+> "客户说: 'AI 接管我们的客服, 70% 自动'"
+
+**解法**:
+- **Discovery**: 看 top-N intent (probably 80% 是 5-10 intents)
+- **KPI**: deflection rate (% 不转人工) / CSAT / handle time
+- **MVP**: 1 个最常 intent (e.g., 'where is my order') 端到端
+- **Trust ladder**: 先 suggest-only (人 review), 再渐 auto, 再 fully autonomous
+- **Anti-pattern**: 一上来就 100% 自动, 砸品牌
+
+### 变体 2: 内部 IT helpdesk agent
+
+> "员工 IT 问题 (Wi-Fi / VPN / 密码 reset), 用 AI 接"
+
+**解法**:
+- **Discovery**: ticket 历史 mining, top intents
+- **KPI**: avg resolution time (人 30 min → 目标 5 min)
+- **MVP**: 密码 reset (high volume, automatable) 一键解决
+- **Integration**: SSO / AD / MDM 接口
+- **Risk lower than customer-facing**: 内部 user 更容忍 试错
+- **Self-serve docs**: agent 先 retrieve KB, 答 + 提供 link
+
+### 变体 3: Marketing content gen
+
+> "1 marketing team 想用 AI 加速 content (blog / social / ad copy)"
+
+**解法**:
+- **KPI**: time per post (8h → 2h), quality (engagement metric)
+- **MVP**: 1 个 channel (e.g., LinkedIn post) 端到端 — brief → draft → human edit
+- **Brand voice**: brand guide → system prompt + few-shot 例子
+- **Workflow**: agent 出 3 个 variant, human 选 + 改
+- **不是 full auto**: 创意 / brand voice 难全自动, 人在 loop
+- **Reuse mechanism**: 高效 prompt template 沉淀成组织资产
+
+### 变体 4: Data analyst assistant
+
+> "Non-tech 业务想 ask data question in English"
+
+**解法**:
+- **KPI**: questions answered / day, accuracy on labeled set
+- **MVP**: 1 个 specific dashboard / schema (不是 'all data')
+- **Text2SQL**: agent 出 SQL + run + plot
+- **Confirm-required for expensive query**: 'this will scan 10TB, confirm?'
+- **Verifier**: SQL result 给 LLM 校验语义合理 (sanity check)
+- **Iterative**: user 改问题, agent 改 SQL, 不是 1-shot
+
+### 变体 5: Engineer code assistant
+
+> "Internal dev tooling — 帮 engineer 写 code"
+
+**解法**:
+- **KPI**: tickets closed / day, code review iteration count, dev satisfaction
+- **MVP**: 1 specific task (test generation? boilerplate refactor?)
+- **Trust ladder**: PR suggestion → PR auto-create-review-required → ...
+- **Repo-aware**: AST + symbol graph + recent commits 作 context
+- **Eval**: 历史 PR replay 看 agent 解法对不对
 
 ---
 

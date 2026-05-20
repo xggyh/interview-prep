@@ -223,6 +223,71 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Insurance claims
+
+> "保险理赔 workflow: 报案 → 资料收集 → 评估 → 决定 → 支付"
+
+**解法**:
+- **报案 (1)**: agent 接收 + parse, auto
+- **资料收集 (2)**: agent draft list + reminder, hybrid (user upload)
+- **评估 (3)**: 简单 case (车祸轻微) agent 决, 复杂 (健康 / 大额) 必人
+- **欺诈 detection**: ML model + 异常 → 强制人工 review
+- **决定 (4)**: 小额 < $X 自动, 大额 always 人
+- **支付 (5)**: confirm-required, payment 流出口必 audit
+
+### 变体 2: HR onboarding
+
+> "新员工 onboarding: offer → 入职手续 → 设备 → 培训 → 30 天 check-in"
+
+**解法**:
+- **Offer (1)**: agent draft offer letter, HR human approve send
+- **入职手续 (2)**: agent guide self-serve (填表 / 上传 ID), 异常 → 人工
+- **设备 (3)**: agent ticket to IT, IT 仓库领, 人工 deliver
+- **培训 (4)**: agent push course assignment, 进度跟踪自动, 答疑混合
+- **30 天 check-in (5)**: agent schedule + 收集 feedback, 人工 1-on-1
+- **整体**: 30+ 步 workflow, agent 减 HR 30% 时间
+
+### 变体 3: Software release process
+
+> "代码 release: commit → CI → review → staging → canary → production"
+
+**解法**:
+- **Commit (1)**: dev 触发, no agent
+- **CI (2)**: agent 自动 run, fail 通知
+- **Review (3)**: agent 提 reviewer (基于 file owner), 也可 'AI review draft' 提建议
+- **Staging (4)**: agent auto-deploy, 监控 health
+- **Canary (5)**: 5% traffic, agent 监控 error / latency, 异常 auto-rollback
+- **Production (6)**: 渐进 ramp, agent 全程监控
+- **Trust**: 一开始 canary auto-rollback 需 human 确认, 稳定后纯 auto
+
+### 变体 4: B2B SaaS 客户 onboarding
+
+> "新企业客户 onboarding: signup → setup → data import → training → go-live"
+
+**解法**:
+- **Signup (1)**: agent 自动 verify (email / company)
+- **Setup (2)**: agent guide via wizard, hybrid 引导
+- **Data import (3)**: agent map fields auto, 复杂 schema 需 CSM 人工
+- **Training (4)**: agent 跑 personalized walkthrough (基于 user role), 答 Q
+- **Go-live (5)**: CSM 主导 + agent 准备 checklist
+- **Track**: agent monitor user engagement, churn 风险预警 CSM
+
+### 变体 5: 投诉处理 workflow
+
+> "Customer 投诉: 接收 → 分类 → 调查 → 回应 → 跟进"
+
+**解法**:
+- **接收 (1)**: 多渠道 (email / chat / phone) agent 统一接
+- **分类 (2)**: agent 分 priority + topic
+- **调查 (3)**: 简单 (查订单) agent auto; 复杂 (责任划分) 人
+- **回应 (4)**: agent draft, 高 priority human approve, 低 auto send
+- **跟进 (5)**: agent 跟踪 resolution + customer satisfaction
+- **Escalation matrix**: SLA breach / 高 value customer / 法律风险 → 人
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

@@ -227,6 +227,71 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Customer support agent — 50 prior tickets context
+
+> "Agent 接手 user 50 个历史 ticket。Context 全塞进去就爆。怎么管？"
+
+**解法**:
+- **Per-ticket gist**: cheap LLM 每 ticket → 1 段 summary (50 × 100 tokens = 5K)
+- **Hot context**: 仅最近 5 tickets full text
+- **On-demand expand**: agent 想看具体某 ticket → `get_ticket_full(id)` 拿全文
+- **Cross-ticket pattern**: '这 user 反复抱怨 billing' 这种聚合放 'user profile' 区
+- **Embedded retrieval**: query-relevant tickets 优先 surface
+
+### 变体 2: Code review agent — 100s of files in scope
+
+> "PR 改了 200 个 file，agent 要 review。全 load 不可能。"
+
+**解法**:
+- **Diff-only first**: load patch (改动行 + N 行 context), 不全文件
+- **File-level summary**: full file 太大 → 'this is utility lib for X' summary
+- **Dependency expansion**: 改动函数 + 其调用方 + 被调方 (1-hop)
+- **Hierarchical**: project README → module README → file → function
+- **Targeted load**: agent decides 'I need full file X' → `read_file(x)` tool
+- **Avoid load-all**: 200 file × 500 tokens = 100K, 还没 review 已经满
+- **Per-file checkpoint**: review 完 file_i → drop full text, 留 summary
+
+### 变体 3: Research agent — 累积 100 个 web pages
+
+> "Agent 做 deep research, 已访问 100 个网页, context 80K tokens。再访问就爆。"
+
+**解法**:
+- **Web page → notes**: 每访问完 1 页, LLM cheap pass 抽 'key findings'
+- **Discard raw page** after notes extracted
+- **Notes accumulated**: notes 也分层 (week 1 notes → compressed monthly summary)
+- **Citation 保留**: 即使 raw discarded, citation (URL + quote) 保留
+- **Working memory file**: 'research_notes.md' 持久化, agent 显式 read/write 这个 file 而不是堆 context
+- **Final report mode**: 写 report 时 'load all notes' (notes 比 raw 小 10x)
+
+### 变体 4: Legal agent — 500-page contract
+
+> "1 个 500-page 合同, 客户问 N 个 question。每个 question reload 全 contract 不现实。"
+
+**解法**:
+- **Hybrid: long-context + RAG**:
+  - 一次性 load → long-context model 答 (但 cost 大)
+  - Per-question RAG → 取相关 clause + nearby (cheap)
+- **Index once**: chunk 合同, build index, 后续 query 用 RAG
+- **Question router**: 'overview' 类问题用 long-context (需要全局), 'specific clause' 用 RAG
+- **Cached LLM prefix**: 同一合同多个 query 共享 prefix, 用 prefix-caching
+- **Decision tree**: cost-aware — first cheap RAG, low confidence → escalate long-context
+
+### 变体 5: Real-time dashboard agent — 每 turn data 都变
+
+> "Agent 监控 dashboard, 每 30s data update。Context 累积旧 data 没用。"
+
+**解法**:
+- **Drop stale aggressively**: 30s 前 data 就 outdated, drop
+- **Per-turn delta only**: 每次只送 'changes since last turn' 不全状态
+- **Snapshot + delta pattern**: 周期性 snapshot, 期间 delta append
+- **TTL-tagged context**: 每条 data 有 TTL, 过期自动 prune
+- **Aggregation as state**: 不存 raw events 存 'last hour stats' (count/avg/p99)
+- **Anomaly memory**: 只 retain 异常事件 (signal-to-noise)
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

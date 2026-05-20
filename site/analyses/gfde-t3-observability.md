@@ -219,6 +219,76 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: 生产 agent silent quality drop
+
+> "用户开始抱怨 'agent 最近答得差'。Metric 都正常 (latency, error)。怎么 debug?"
+
+**解法**:
+- **Eval-in-prod 抽样**: 5% LLM-as-judge 评分, plot trend
+- **Slice by**: model version / tenant / query type / time → 找异常 slice
+- **Diff vs baseline**: 抽 100 'bad' + 100 'good', 看 prompt template / model 是否动过
+- **User feedback signal**: thumbs down trend, sentiment shift
+- **A/B with control**: 5% 流量到旧版, 比当前
+- **Recent deploys**: 上次 prompt template change / model upgrade 时间对齐
+- **Root cause 多 layer**: 看 retrieval (recall 降?), reranker (NDCG 降?), LLM (eval pass 降?), tool (error rate 升?)
+
+### 变体 2: Cost spike investigation
+
+> "本周 LLM bill 突然 5x。怎么查？"
+
+**解法**:
+- **Per-tenant attribution**: dashboard 看哪 tenant 涨
+- **Per-feature attribution**: 哪 product feature 触发了多 LLM call
+- **Token analysis**: input token 变长 (context bloat?) or output (response 变啰嗦?)
+- **Model mix change**: routing 把更多流量送给 expensive model
+- **Loop bug**: agent retry 失控 (per-session call count 异常)
+- **Cache miss spike**: cache hit rate 降 → 更多真 LLM call
+- **Jailbreak attack**: 攻击者疯狂打高 token, anomaly detect
+- **Postmortem**: identify + fix + budget alert tuning
+
+### 变体 3: P99 latency alert fired
+
+> "P99 latency 突 2s → 5s。怎么 debug？"
+
+**解法**:
+- **Trace slow 请求**: tail-sampling 抓 p95+ trace, 看 span breakdown
+- **By layer**: LLM call slow? Tool call slow? DB slow? Network slow?
+- **By tenant / model**: 某 tenant 量大占资源 / 某 model serving 抖动
+- **Queue depth**: backpressure → 排队 → 总延迟涨
+- **KV cache hit rate**: 突降 → prefill 多 → 慢
+- **GPU util**: 接近 100% saturate → 加 replica
+- **Downstream**: 上游 API slow → 慢
+
+### 变体 4: Jailbreak attempt detection
+
+> "怎么知道有人试图越狱 agent?"
+
+**解法**:
+- **Pattern detection on input**: 'ignore previous', 'pretend you are', 'developer mode'
+- **LLM-classifier**: 小 model 实时分类 input '是否疑似越狱'
+- **Response pattern**: agent 输出 'I cannot' / 'as an AI' 反常增多 → 攻击者尝试中
+- **Per-user 频率**: 单 user 短时间高频 → 异常
+- **Honeypot**: 故意放些 'secrets' 看是否被 'leak' → 检测越狱成功
+- **Forensics**: 完整 input + output 存安全存储 (单独 retention)
+- **Alert + block**: > N 次/min → 临时 ban + 升级安全 team
+
+### 变体 5: Per-tenant SLA verification
+
+> "卖 agent 给 enterprise, 承诺 99.9% / p99 < 2s。怎么证明做到了？"
+
+**解法**:
+- **Per-tenant SLI dashboard**: availability, latency, error rate
+- **Synthetic probes**: 每分钟模拟 1 tenant request, 长期可用性测量
+- **Monthly report**: auto-generate, 给 customer 看
+- **Error budget**: 99.9% = 43min downtime/month, 用了多少
+- **Incident attribution**: 哪次 outage 算入 tenant 的 SLA breach
+- **Compensation policy**: 触发 breach 自动给 credit (consumed budget 通知 customer)
+- **Independent audit**: 第三方 monitoring (Datadog Synthetics) 可信
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

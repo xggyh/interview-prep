@@ -126,6 +126,28 @@ Post-process: parse citations, validate against actual doc text.</code></pre>
 <p><strong>Most production</strong>: <strong>hybrid</strong>.</p>
 <p><strong>2026 trend</strong>: as context windows grow (1M → 10M), the cutoff shifts, but hybrid remains optimal for scale-cost balance."</p></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: 法律合同问答 (500-page 合同)</h4>
+<blockquote><p>"1 个 500-page 合同, 律师问 50 个 question。选 long-context / RAG / hybrid?"</p></blockquote>
+<p><strong>解法</strong>: <strong>Hybrid 最佳</strong></p>
+<ul><li>单文件 ~150K tokens → fit 200K-context model (Claude / Gemini)</li><li>但 50 questions × 150K = 7.5M tokens, $$$</li><li><strong>方案</strong>: 一次性 long-context "load + index", 后续 question 用 RAG 取相关 clause + 上下文段</li><li>Cost: $1.50 一次 indexing + $0.05/q × 50 = $4 vs pure long-context $50+</li></ul>
+<h4>变体 2: Coding agent — 大 repo</h4>
+<blockquote><p>"Repo 50K files, agent 帮改 bug。"</p></blockquote>
+<p><strong>解法</strong>: <strong>RAG 必须</strong></p>
+<ul><li>Repo 总 token 远超 long-context (~50M tokens)</li><li><strong>Code-aware RAG</strong>: AST chunks, symbol graph</li><li><strong>Iterative</strong>: agent first asks 'where is auth handled' → search → narrow → 'read these 5 files'</li><li>Long-context <strong>不能</strong> load 全 repo</li><li>但 single file 内部用 long-context (一次 read whole file fine)</li></ul>
+<h4>变体 3: 医疗病史</h4>
+<blockquote><p>"Patient 历史 30 年 records, doctor 问诊。"</p></blockquote>
+<p><strong>解法</strong>: <strong>RAG + temporal index</strong></p>
+<ul><li>总 records 1M+ tokens, long-context 装不下</li><li><strong>Time-indexed retrieval</strong>: 'last 5 years' / 'around 2019' 这种 temporal filter</li><li><strong>Critical record always-in-context</strong>: 过敏 / 慢性病 / 当前药 这种永远在 context</li><li><strong>Episode-level summary</strong>: 每次就诊 1 段 summary, retrieve 后展开 detail</li><li><strong>PHI 合规</strong>: 检索结果不能 leak 给 unauth 角色</li></ul>
+<h4>变体 4: Daily news / dynamic data</h4>
+<blockquote><p>"News 每秒更新, agent 给 user briefing。"</p></blockquote>
+<p><strong>解法</strong>: <strong>RAG 唯一选项</strong></p>
+<ul><li>数据每秒变, long-context 装载就过时</li><li><strong>Hot index</strong> (last 24h, refresh 5 min) + warm (1 month, daily) + cold (archive)</li><li><strong>Recency-weighted</strong>: time decay (newer &gt; older), 配合 relevance</li><li><strong>Diversity</strong>: 同事件多 source dedup</li><li><strong>Personalize</strong>: user 关注的 topic / region 加 weight</li></ul>
+<h4>变体 5: 多轮对话历史</h4>
+<blockquote><p>"Agent 跟同 user 累计聊了 6 个月 (10K 轮对话)。Context 怎么管？"</p></blockquote>
+<p><strong>解法</strong>: <strong>Hybrid (mostly RAG + recent context)</strong></p>
+<ul><li>Recent 20 turns 永远 verbatim</li><li>30-100 轮前 → hierarchical summary</li><li>100+ 轮前 → fully RAG'd (vector index of all turns)</li><li><strong>Memory categories</strong>: facts (用户偏好) / events (重要事件) / preferences (沟通风格) — 不同存储策略</li><li><strong>Episodic vs semantic memory</strong> 区分: 具体某次对话 vs 用户的'我喜欢简洁回答'这种归纳</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>RAG (BNPL chatbot)</td><td>你 + RAG 经验直接相关</td></tr><tr><td>ConvFinQA</td><td>财务文档 multi-hop, hybrid 思路</td></tr><tr><td>Long-context awareness</td><td>Voice agent — multi-turn long history mgmt 你做过</td></tr><tr><td>Cost optimization</td><td>TikTok payment infra — cost-per-call always考虑</td></tr><tr><td>Citation</td><td>Compliance — refund / collection 必 citation</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -403,6 +425,64 @@ Citation:
 > **Most production**: **hybrid**.
 >
 > **2026 trend**: as context windows grow (1M → 10M), the cutoff shifts, but hybrid remains optimal for scale-cost balance."
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: 法律合同问答 (500-page 合同)
+
+> "1 个 500-page 合同, 律师问 50 个 question。选 long-context / RAG / hybrid?"
+
+**解法**: **Hybrid 最佳**
+- 单文件 ~150K tokens → fit 200K-context model (Claude / Gemini)
+- 但 50 questions × 150K = 7.5M tokens, $$$
+- **方案**: 一次性 long-context "load + index", 后续 question 用 RAG 取相关 clause + 上下文段
+- Cost: $1.50 一次 indexing + $0.05/q × 50 = $4 vs pure long-context $50+
+
+### 变体 2: Coding agent — 大 repo
+
+> "Repo 50K files, agent 帮改 bug。"
+
+**解法**: **RAG 必须**
+- Repo 总 token 远超 long-context (~50M tokens)
+- **Code-aware RAG**: AST chunks, symbol graph
+- **Iterative**: agent first asks 'where is auth handled' → search → narrow → 'read these 5 files'
+- Long-context **不能** load 全 repo
+- 但 single file 内部用 long-context (一次 read whole file fine)
+
+### 变体 3: 医疗病史
+
+> "Patient 历史 30 年 records, doctor 问诊。"
+
+**解法**: **RAG + temporal index**
+- 总 records 1M+ tokens, long-context 装不下
+- **Time-indexed retrieval**: 'last 5 years' / 'around 2019' 这种 temporal filter
+- **Critical record always-in-context**: 过敏 / 慢性病 / 当前药 这种永远在 context
+- **Episode-level summary**: 每次就诊 1 段 summary, retrieve 后展开 detail
+- **PHI 合规**: 检索结果不能 leak 给 unauth 角色
+
+### 变体 4: Daily news / dynamic data
+
+> "News 每秒更新, agent 给 user briefing。"
+
+**解法**: **RAG 唯一选项**
+- 数据每秒变, long-context 装载就过时
+- **Hot index** (last 24h, refresh 5 min) + warm (1 month, daily) + cold (archive)
+- **Recency-weighted**: time decay (newer > older), 配合 relevance
+- **Diversity**: 同事件多 source dedup
+- **Personalize**: user 关注的 topic / region 加 weight
+
+### 变体 5: 多轮对话历史
+
+> "Agent 跟同 user 累计聊了 6 个月 (10K 轮对话)。Context 怎么管？"
+
+**解法**: **Hybrid (mostly RAG + recent context)**
+- Recent 20 turns 永远 verbatim
+- 30-100 轮前 → hierarchical summary
+- 100+ 轮前 → fully RAG'd (vector index of all turns)
+- **Memory categories**: facts (用户偏好) / events (重要事件) / preferences (沟通风格) — 不同存储策略
+- **Episodic vs semantic memory** 区分: 具体某次对话 vs 用户的'我喜欢简洁回答'这种归纳
 
 ---
 

@@ -165,6 +165,28 @@ conf &lt; 0.5 → preempt: 'let me get a human for this'</code></pre>
 <p><strong>What NOT to do</strong>:</p>
 <ul><li>Trust raw LLM confidence (uncalibrated)</li><li>Sudden escalation without context transfer</li><li>Always human (no automation value)</li><li>Always auto (no safety net)</li><li>No threshold tuning (one-size-fits-all)</li><li>No user-initiated takeover option"</li></ul></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: Coding agent (Cursor / Copilot-style)</h4>
+<blockquote><p>"Coding agent 写代码 + apply diff。何时停下问 dev?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Auto-apply</strong> for small / non-destructive (单文件 &lt; 20 行 + 在 git working tree 内)</li><li><strong>Confirm-required</strong> for: &gt; 1 文件 / &gt; 100 行 / delete file / 改 config (CI / deploy)</li><li><strong>Test gate</strong>: agent 跑 test, fail 时 必 dev review (不强 apply)</li><li><strong>Diff preview UI</strong>: dev 能 inspect, accept / reject 部分 hunk</li><li><strong>Branch isolation</strong>: agent 在 agent/* 分支, main 永远 PR</li><li><strong>Takeover</strong>: dev 改 file 直接覆盖, agent 不 fight</li></ul>
+<h4>变体 2: 医疗 triage</h4>
+<blockquote><p>"AI triage 助手 — patient 描述症状, 决定急诊 / 普通门诊 / 家庭医生"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>保守 default</strong>: 不确定 → 上调到更严重 tier (false positive 比 false negative 好)</li><li><strong>Confirm-required</strong> for downgrade: 'symptoms mild → primary care' 需 nurse 确认</li><li><strong>Red flags 永远人</strong>: 胸痛 / 呼吸困难 / neurological → 不 triage, 直接 ER</li><li><strong>Confidence + explainability</strong>: 不只给决定, 给 reasoning, nurse 能 sanity check</li><li><strong>Doctor takeover trivial</strong>: 任何时候 nurse / doctor 可 override agent</li><li><strong>Audit + outcome track</strong>: triage → 实际 outcome 对账, miss 严重的 root cause</li></ul>
+<h4>变体 3: Sales agent</h4>
+<blockquote><p>"AI sales 跟客户 chat。何时 handoff 到真 sales?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>High-value signal</strong>: deal size estimate &gt; $X → 立即 human sales</li><li><strong>Decision-maker signal</strong>: 客户提企业 / 角色高 → human</li><li><strong>Stuck signal</strong>: 多轮 user 重复同 question → agent 答不到 → 转人</li><li><strong>Emotion / negative</strong>: sentiment → 不愉快 → 转人</li><li><strong>Buying signal</strong>: '想试用' / '价格几何' → 转 human close</li><li><strong>Agent 默默学</strong>: 每次 handoff 后, sales 看 transcript, feedback 给 agent</li></ul>
+<h4>变体 4: Internal IT helpdesk</h4>
+<blockquote><p>"AI 接 IT ticket, 何时转 IT engineer?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>L1 vs L2/L3</strong>: 密码 / 软件安装 / Wi-Fi (L1) — auto/self-serve; 硬件 / 网络 / 权限 (L2+) → 人</li><li><strong>VIP user fast path</strong>: CEO / VP 永远 priority + human</li><li><strong>Repeat ticket</strong>: 同 user 同 issue 第二次 → 直接转人 (前次没解决)</li><li><strong>Knowledge gap</strong>: agent KB 没覆盖 → 转 + 同时建议 KB update</li><li><strong>Hardware needed</strong>: 实物动作 → 必人</li><li><strong>Audit</strong>: 每 ticket 解决方案归档, 用于 KB / agent training</li></ul>
+<h4>变体 5: Trading / financial agent</h4>
+<blockquote><p>"AI trading 助手 (建议 / 执行 trade)。何时必人?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Threshold by amount</strong>: &lt; $X agent auto, &gt; 人 confirm</li><li><strong>Per-asset risk</strong>: 流动性低 / 波动大 → 必人</li><li><strong>Regulatory</strong>: 某些 trade type (大宗 / cross-border) 法规要求人审</li><li><strong>Algorithm 异常</strong>: agent 信号 vs market move 大背离 → pause + human</li><li><strong>Day-trading limit</strong>: per-day 最多 N 笔 auto</li><li><strong>Audit + 可解释</strong>: 每 trade 决策附理由, 后续审查能复盘</li><li><strong>Kill switch</strong>: 一键停所有 agent, 风控团队随时可触发</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Confidence threshold</td><td>BNPL chatbot — confidence-based routing to live agent</td></tr><tr><td>Confirm-required</td><td>Indonesia refund tier 2 — agent draft + human approve</td></tr><tr><td>Scheduled review</td><td>Voice agent — weekly metric review of agent decisions</td></tr><tr><td>User takeover</td><td>Voice agent — 'speak to human' option always available</td></tr><tr><td>State handoff</td><td>Voice agent — when transferred to live agent, transcript shared</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -516,6 +538,71 @@ User-initiated takeover:
 > - Always auto (no safety net)
 > - No threshold tuning (one-size-fits-all)
 > - No user-initiated takeover option"
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: Coding agent (Cursor / Copilot-style)
+
+> "Coding agent 写代码 + apply diff。何时停下问 dev?"
+
+**解法**:
+- **Auto-apply** for small / non-destructive (单文件 < 20 行 + 在 git working tree 内)
+- **Confirm-required** for: > 1 文件 / > 100 行 / delete file / 改 config (CI / deploy)
+- **Test gate**: agent 跑 test, fail 时 必 dev review (不强 apply)
+- **Diff preview UI**: dev 能 inspect, accept / reject 部分 hunk
+- **Branch isolation**: agent 在 agent/* 分支, main 永远 PR
+- **Takeover**: dev 改 file 直接覆盖, agent 不 fight
+
+### 变体 2: 医疗 triage
+
+> "AI triage 助手 — patient 描述症状, 决定急诊 / 普通门诊 / 家庭医生"
+
+**解法**:
+- **保守 default**: 不确定 → 上调到更严重 tier (false positive 比 false negative 好)
+- **Confirm-required** for downgrade: 'symptoms mild → primary care' 需 nurse 确认
+- **Red flags 永远人**: 胸痛 / 呼吸困难 / neurological → 不 triage, 直接 ER
+- **Confidence + explainability**: 不只给决定, 给 reasoning, nurse 能 sanity check
+- **Doctor takeover trivial**: 任何时候 nurse / doctor 可 override agent
+- **Audit + outcome track**: triage → 实际 outcome 对账, miss 严重的 root cause
+
+### 变体 3: Sales agent
+
+> "AI sales 跟客户 chat。何时 handoff 到真 sales?"
+
+**解法**:
+- **High-value signal**: deal size estimate > $X → 立即 human sales
+- **Decision-maker signal**: 客户提企业 / 角色高 → human
+- **Stuck signal**: 多轮 user 重复同 question → agent 答不到 → 转人
+- **Emotion / negative**: sentiment → 不愉快 → 转人
+- **Buying signal**: '想试用' / '价格几何' → 转 human close
+- **Agent 默默学**: 每次 handoff 后, sales 看 transcript, feedback 给 agent
+
+### 变体 4: Internal IT helpdesk
+
+> "AI 接 IT ticket, 何时转 IT engineer?"
+
+**解法**:
+- **L1 vs L2/L3**: 密码 / 软件安装 / Wi-Fi (L1) — auto/self-serve; 硬件 / 网络 / 权限 (L2+) → 人
+- **VIP user fast path**: CEO / VP 永远 priority + human
+- **Repeat ticket**: 同 user 同 issue 第二次 → 直接转人 (前次没解决)
+- **Knowledge gap**: agent KB 没覆盖 → 转 + 同时建议 KB update
+- **Hardware needed**: 实物动作 → 必人
+- **Audit**: 每 ticket 解决方案归档, 用于 KB / agent training
+
+### 变体 5: Trading / financial agent
+
+> "AI trading 助手 (建议 / 执行 trade)。何时必人?"
+
+**解法**:
+- **Threshold by amount**: < $X agent auto, > 人 confirm
+- **Per-asset risk**: 流动性低 / 波动大 → 必人
+- **Regulatory**: 某些 trade type (大宗 / cross-border) 法规要求人审
+- **Algorithm 异常**: agent 信号 vs market move 大背离 → pause + human
+- **Day-trading limit**: per-day 最多 N 笔 auto
+- **Audit + 可解释**: 每 trade 决策附理由, 后续审查能复盘
+- **Kill switch**: 一键停所有 agent, 风控团队随时可触发
 
 ---
 

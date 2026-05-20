@@ -249,6 +249,79 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Coding agent 有 `git push --force` 能力
+
+> "Agent 能改代码 + push。如果 push --force 到 main，几小时工作就丢了。怎么 wrap？"
+
+**关键差异**: Repo state 完全不可逆 (commits 真的没了)。
+
+**解法**:
+- **Branch scoping**: agent 只能 push 到 `agent/*` 分支，main 永远要 PR
+- **No force push**: 工具层禁用 `--force` flag (whitelist arg)
+- **Local backup**: 任何 destructive git op 前 `git bundle create` 保留快照 (7 days)
+- **Sandbox first**: 在 ephemeral worktree 跑，commit 通过 PR-style review
+- **Pre-commit hook**: agent commit 必须 pass test, 自动 add `[agent]` tag 便审查
+- **Revert ready**: agent 知道 `git revert` 是 first-choice 而不是 `--amend`
+
+### 变体 2: Agent 能 drop database tables (data analyst use case)
+
+> "Data analyst agent 能 run 任意 SQL，包括 DROP / DELETE。怎么 sandbox？"
+
+**解法**:
+- **Read-only by default**: agent 用 read-only DB user, 没 DDL/DML 权限
+- **2 tools**: `query(sql)` 只读, `mutate(sql)` 写 — mutate 必须 confirm
+- **Sandbox tier**: `dev` schema 写自由, `prod` 严禁
+- **Statement type whitelist**: parse SQL, 只允许 SELECT (拒绝其他)
+- **Row limit**: 自动加 `LIMIT 10000` 防 full scan
+- **Audit + replay**: 所有 mutate 记 audit; 灾难发生可从 audit replay
+- **PITR**: DB 开 point-in-time-recovery 7 天兜底
+
+### 变体 3: Agent 发 Slack — typo 发错 channel 给 5000 人
+
+> "Agent draft message, click send, 发到了 #all-company 而不是 #engineering。怎么防？"
+
+**关键差异**: Reach scope (1 vs 5000) 区别巨大。
+
+**解法**:
+- **Channel scope check**: 发送前判断 channel size, > 100 人触发 confirm
+- **Whitelisted channels**: agent 默认只能发 N 个白名单 channel
+- **Preview UI**: '发送到 #all-company (5000 人), 内容如下: ... [Confirm / Cancel]'
+- **Slack 60s recall**: 集成 'delete message' tool 立即可撤回
+- **Dry-run**: 'preview where I would send'，user 确认后实 send
+- **Audit**: 大 channel 发送 24h 内强制 human review
+
+### 变体 4: Agent 转账 — user 打错收款人账号 (typo)
+
+> "User: 'pay to account 12345'. 用户真的输错了一位, 应该是 1245。Agent 转出去了。"
+
+**关键差异**: **agent 没错，user 错了**。怎么 catch user error?
+
+**解法**:
+- **Confirm 含 enrichment**: 不只 show '账号 12345', show '账号 12345 = Acme Corp Ltd' (用户能 spot)
+- **Name match**: 让 user 输入收款人名字, 跟账号查 lookup 对比, 不 match 警告
+- **First-time recipient pause**: 没转过的账号需要额外 verify (smaller test transfer)
+- **Anomaly**: 金额异常 (> 99% past transfers) 二次 confirm
+- **Reversal window**: 1h 内可 cancel (业务上 hold 不立即 settle)
+- **Audit + recovery**: 已 settle 的转账走 dispute / reverse 流程
+
+### 变体 5: Agent 发 SMS - bug 导致给 100K 用户群发
+
+> "Agent for-loop bug 给所有 active user 群发了一个 typo'd promo。怎么防, 怎么 recover？"
+
+**关键差异**: **Scale-out blast**, blast radius limit 是核心。
+
+**解法**:
+- **Per-tool rate limit**: send_sms 每 user 每 24h max 3 条, 全局 1000/min
+- **Cardinality limit**: 'mass-send' 是独立 tool 需特殊 confirm
+- **Anomaly detect**: send_sms 调用频率 > p99 × 3 → 自动 pause + alert
+- **Audit + cancel queue**: SMS 先入 60s delay queue, 异常可批量取消
+- **DLQ**: 已发 SMS 不可撤但 'apology + correction' 自动跟发
+- **Postmortem**: bug fix + 加 regression test + circuit breaker tune
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

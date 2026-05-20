@@ -205,6 +205,66 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Customer service chatbot
+
+> "电商 chatbot, 10K 并发用户, 每对话 15 turn。"
+
+**解法**: **Stateless + DB-backed**
+- REST API, client 传 `conversation_id`
+- Server 每 turn 从 Postgres load 历史, 调 LLM, 写回
+- KV-cache server-side 复用 prefix (vLLM 自动)
+- 上 in-process LRU (1000 hot conversation) 减 DB hit
+- Failover: any node 任意 request — Postgres 是 source of truth
+
+### 变体 2: Code-completion agent (Copilot-like)
+
+> "IDE 内 auto-complete, 每 keystroke 触发。<200ms latency budget。"
+
+**解法**: **Stateful per IDE session (WebSocket)**
+- 长连接 sticky session
+- Per-session state: open files, recent edits, cursor position
+- 高频小 request (auto-complete) 不能每次重传 100 个文件 context
+- Failover: 断连 → 客户端重连, 短期 client-side state 也可重 init
+- Cache: file content hash, 改动小时重用
+
+### 变体 3: Voice agent
+
+> "电话客服 voice agent, 全程 WebSocket, < 300ms latency"
+
+**解法**: **Strict stateful**
+- Per-call actor 持有: ASR transcript, LLM context, TTS queue
+- Single-node, connection-bound
+- Failover ≈ drop call (acceptable, retry call)
+- 不写 DB on every turn (太慢) — checkpoint every 10s
+- 通话结束 final transcript 落库
+
+### 变体 4: Long-running data pipeline agent
+
+> "Agent 跑数据 ETL, 每个 job 几小时 ~ 几天。"
+
+**解法**: **Stateful via workflow engine (Temporal/DBOS)**
+- Workflow_id 是 logical state
+- Execution 可跨多 worker node (workflow engine 接管 state)
+- Per-step durable checkpoint
+- Failover: workflow 在新 worker 继续从最后 checkpoint
+- 不需 sticky session — workflow engine routing
+
+### 变体 5: Multi-user collaborative agent (Notion AI / Figma)
+
+> "多用户同协作, agent 看所有人的 edit"
+
+**解法**: **Hybrid, document-bound**
+- Per-document agent 实例 (state = doc state)
+- 多 user 看同一 agent (broadcast 决策)
+- CRDT / OT 处理 user 编辑 race
+- Agent 输出广播给所有在线 user (publish/subscribe)
+- Persist: document state 持久, agent 'memory' 周期 snapshot
+- 离开后归档, 重新打开 reload
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

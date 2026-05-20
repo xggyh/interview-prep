@@ -219,6 +219,70 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: `read_file` 返回 100K 行代码
+
+> "Agent 调 read_file, 文件 100K lines. 怎么给 LLM？"
+
+**解法**:
+- **Line-number 强制**: `1| import os\n2| ...` 格式 — 后续 LLM 可 reference line
+- **Truncate w/ TOC**: 给前 200 行 + outline (class/function 名字) + 'use read_file(start, end) for more'
+- **AST summary**: 'this file has classes A, B, C; functions x, y, z' 摘要
+- **Iterative read**: agent 提 read_file(file, lines=[120,150]) 拿精确段
+- **Diff mode**: 改动场景给 diff 不给全文
+- **Symbol jump tool**: `goto_def(symbol)` 跳定义, 不堆 context
+
+### 变体 2: `web_search` 返回 50 个结果
+
+> "Web search 给 50 个 (url, title, snippet)。"
+
+**解法**:
+- **Snippet first**: 不 fetch 全页, 给 50 个 snippet (每个 100 tokens, 总 5K)
+- **LLM picks top-N**: 让 LLM 看 snippet, 决定哪几个 worth deep dive
+- **Then fetch chosen**: agent emits `fetch_url(url)` for 3-5 个
+- **Snippet 含 timestamp**: 'published 2024-03-15' — LLM 知道 freshness
+- **Domain credibility tag**: '[official-doc]' '[blog]' '[reddit]' — LLM 加权
+- **Dedup by domain**: 同一域名最多 3 个结果 (避免 1 个 site 占满)
+
+### 变体 3: 知识图谱 query 返回密集关系
+
+> "KG query 返回 entity + 100 relations。"
+
+**解法**:
+- **Triple format**: `(subject, predicate, object)` list 比 nested JSON 易读
+- **Relation type 分组**: 按 predicate (`born_in / works_at / married_to`) 分块展示
+- **Top-N by edge weight**: 100 relations 太多, top-20 by importance
+- **Path-finding mode**: 用户问 'how is A related to B' → 返回 path 不是 dump 全图
+- **Visualize 用 Mermaid**: ```mermaid graph 给 LLM (LLM 训练见过, 能 '读懂')
+- **Iterative**: agent emits `expand(entity, depth=1)` 按需扩展
+
+### 变体 4: 时间序列查询返回 10K 数据点
+
+> "`query_metrics(start, end)` 返回 10K (timestamp, value)。"
+
+**解法**:
+- **Aggregate first**: 不给 raw, 给 'min/max/avg/p50/p99 over period'
+- **Anomaly bullets**: 'spike at 14:23 (5x baseline)', '15-min outage at 10:05'
+- **Downsample**: 10K 点 → 100 点 (LTTB 或类似) for visualization
+- **Trend description**: LLM cheap pass 描述 'rising trend, peaked at X, dropping since'
+- **Buckets**: 按 hour / day aggregate, LLM 能 reason
+- **Plot ref**: 'data plotted at blob://abc; query with sql for specific window'
+
+### 变体 5: 图片搜索返回 100 张图
+
+> "`image_search` 返回 100 张图 (multimodal use case)。"
+
+**解法**:
+- **Caption only first**: 100 caption + thumbnail-id, 不 inline 全图
+- **Top-N visual**: LLM 看 caption, 选 3-5 张进 vision model 实际看
+- **Caption + features**: 'product photo, white background, contains logo' 这种 attribute extract
+- **Visual dedup**: perceptual hash, 相似图保留 1 张
+- **Metadata**: source URL, dimension, format, NSFW flag
+- **Cost-aware**: vision API 比 text 贵, 严控调用次数
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

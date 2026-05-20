@@ -156,6 +156,86 @@
 
 ---
 
+## 多场景变体 + 解法
+
+同一个 idempotency 主题，面试官可能换 4 种 framing 来考你：
+
+### 变体 1: Webhook idempotency (incoming)
+
+> "Stripe / Slack / GitHub 给你发 webhook，他们会 retry 直到 200。你的处理器**怎么保证一个 event 只 process 一次**？"
+
+**关键差异**: 你是 receiver，控制权在 sender。Sender 重试不可避免。
+
+**解法**:
+- Sender 应该传 `Stripe-Signature` / `X-GitHub-Delivery` 这种 unique event_id
+- Receiver: `INSERT ... ON CONFLICT DO NOTHING` 把 event_id 入库
+- 如果 conflict (已处理过) → 立即 return 200 (不重复 process)
+- 如果 insert 成功 → process + 标记 done + return 200
+- **Race**: 2 个并发 retry 同时到达 → DB unique constraint 兜底
+- TTL: 7 天 (超过则 webhook 不会再 retry 了)
+
+### 变体 2: 用户在 UI 上**连点 submit 2 次**
+
+> "User 点了 'Place order' 按钮 2 次，network 慢以为没响应。两个 request 都到达 server。怎么办？"
+
+**关键差异**: idempotency key 来源不是 retry，是**用户行为**。
+
+**解法**:
+- **前端**: 点击后 disable 按钮 + show loading spinner（first defense）
+- **请求级**: client 生成 `request_id` (UUID v4) on first click; 第二次点用同一个 ID
+- **Server**: `request_id` 作为 idempotency key
+- **DB**: orders table 加 `(user_id, request_id)` unique index
+- Second insert fails → 返回 first order 的 result，UX 上看就是 "你已经下单了"
+- Edge: 用户真的想下 2 个 (双胞胎礼物) → 不同 request_id by browser session
+
+### 变体 3: Multi-step booking — book seat → charge → confirm
+
+> "Booking flow 3 step。中间任意一步失败重试，**怎么保证不会 double-book 或 double-charge**？"
+
+**关键差异**: 不是单 tool，是**workflow-level idempotency**。
+
+**解法**:
+- **Workflow_id**: 1 booking = 1 workflow_id (UUID)
+- **Per-step idempotency key**: `sha256(workflow_id + step_name)`
+- **Step 1 (seat hold)**: idempotent — 同 key 重试拿到同一 hold_id
+- **Step 2 (charge)**: 用同一 workflow_id 作为 Stripe `idempotency_key` header
+- **Step 3 (confirm)**: 写 booking 表 with `(workflow_id)` unique
+- **State machine**: 每步完成写 outbox `(workflow_id, step, state, result)`
+- **Resume**: 任何 step 失败，新 worker pick up workflow_id，从最后 completed step 继续
+- **Saga compensate**: 全失败时按反顺序补偿
+
+### 变体 4: 我们调用对方的 API，**对方不支持 idempotency**
+
+> "3rd-party 没有 idempotency_key 接口。我们 retry 风险 double 执行。怎么 wrap 这个不安全的 API？"
+
+**关键差异**: 不能依赖下游配合，得自己加一层。
+
+**解法**:
+- **Wrapper 服务** + Redis state machine: `pending` → `inflight` → `completed | failed`
+- 第一次调用: `set NX` 拿锁 → call API → save result
+- 重试: `get` 看 state，如果 `inflight` → 等 (poll) 或 return 409
+- 如果 `completed` → 直接 return cached result
+- **真正风险**: API call 中途网络断 → 我们不知道对方是否执行
+  - 如果对方有 `GET /transactions/by_my_ref/{key}` 查询接口 → 用它查
+  - 否则: 标记 `unknown`, 人工介入或定时 reconcile
+- **Reconciliation job**: 定时 (e.g., 每小时) 跟对方对账，纠正 `unknown`
+
+### 变体 5: LLM **错误地以为**第一次调用失败，自己 retry
+
+> "Agent 调 tool, tool 实际成功了但返回慢。LLM 等不及 timeout 自己重新生成了一个 tool call。怎么阻止双花？"
+
+**关键差异**: 不是 runtime 重试，是 **LLM-level retry** with potentially **different args**.
+
+**解法**:
+- **Runtime-side idempotency key** (NOT LLM-side): 如前文，runtime 哈希 args 生成 key
+- 即使 LLM 重新发 tool_call，相同 args → 相同 key → dedup ✓
+- **但**: LLM 可能微改 args ("oh maybe I should try amount=$110") → 不同 key → 新 transaction
+- **Prompt-level guidance**: "If a tool call timed out, you can ASK STATUS — don't retry with adjusted args until confirmed."
+- **Tool 提供 `get_status(transaction_id)` companion tool** → LLM 可以查不是直接 retry
+- **Audit**: 这种 case 日志记 'LLM-initiated retry with adjusted args' 告警
+
+---
+
 ## 简历专属 reframe
 
 | 题角度 | 你的项目 |

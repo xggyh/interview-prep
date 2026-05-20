@@ -168,6 +168,83 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: DB connection pool exhaustion
+
+> "你的 agent 调 internal DB tool。某段时间所有 query 都 timeout。Pool 已满，新 request queue 等连接。怎么 retry？"
+
+**关键差异**: Bottleneck 不在 downstream service 而在我们自己的资源。
+
+**解法**:
+- **不要 retry on connection-pool-full** — 你 retry 也是排队抢同一个池子
+- **Backpressure**: 直接 return 429 给 caller (上层 agent 看到 'busy, try later')
+- **Pool 监控**: alert pool > 80% 持续 1 min
+- **根因**: pool size 太小 / slow query 拖死连接 / N+1 query bug
+- **临时**: 加 pool size + tune timeout
+- **长期**: query plan, slow-query log, batch where possible
+
+### 变体 2: LLM API 返回 NaN / 空字符串 / malformed JSON
+
+> "Tool 调 ML serving，response 200 OK 但 content 是 NaN 或者 schema 不匹配。重试吗？"
+
+**关键差异**: 不是 HTTP error 是 **content error**。
+
+**解法**:
+- **Schema 验证 first**: 5xx 当然 retry，但 200 也得 validate output
+- **Validation fail** → retry **一次** with same input (transient corruption)
+- 第二次还 fail → **不是 transient**: 模型本身遇到 corner case
+- **Diff 策略**:
+  - Retry with different sampling params (temp + 0.2)
+  - Retry with different model version (cascade fallback)
+  - Truncate input / re-prompt
+- **Don't infinite retry** on validation fail — wastes tokens
+- **Observability**: track per-tool validation-fail rate
+
+### 变体 3: 上游 API 返回 "service in maintenance, ETA 2h"
+
+> "Tool API 200 OK 但 body 说 'maintenance window, retry after 2h'。Agent 怎么 fallback？"
+
+**关键差异**: Failure 是 **structured business signal**, 不是 network error。
+
+**解法**:
+- Tool wrapper parse maintenance signal → raise `ServiceUnavailable(retry_after=7200)`
+- **Don't keep retrying** in agent loop (2h > user latency budget)
+- **Cache 兜底**: 如果有 stale data, mark 'as of 1h ago' return
+- **告知用户**: "Service X is down for maintenance until 4pm, here's cached data" — UX 透明
+- **Workflow-level**: 写 outbox, 2h 后自动 resume
+- **Avoid**: silent 'sorry could not fetch'，用户不知道为啥
+
+### 变体 4: Cascade failure — primary 挂了 fallback 也被打挂
+
+> "Primary API down，你 fallback 到 secondary。但所有人都 fallback 过去，secondary 也被挂了。怎么防？"
+
+**关键差异**: Fallback 不是免费的，**有 capacity 边界**。
+
+**解法**:
+- **Bulkhead pattern**: secondary 设独立 rate limit (e.g., 只接 100 QPS)
+- **Backpressure**: 超过 → 给 caller 'all variants overloaded, try later'
+- **Probabilistic fallback**: 50% 直接 fail, 50% 试 secondary (减少 fallback 流量)
+- **Pre-arrange**: 跟 secondary vendor 预先签 burst quota，提前通知
+- **Graceful degradation as final layer**: 缓存 / 简单默认值
+- **Postmortem**: cascade 一旦发生，capacity plan 要重做
+
+### 变体 5: 429 with `Retry-After: 60s` — 60s 比 user budget 还长
+
+> "LLM vendor 突然限流, 让我们等 60s。但用户 chat 体验等 5s 都嫌长。怎么办？"
+
+**关键差异**: 限流时间 > 用户 latency budget。
+
+**解法**:
+- **Multi-vendor failover**: GPT-4 限流 → 立即试 Claude / Gemini
+- **降级到更小 model**: gpt-4 → gpt-4o-mini (10x rate limit)
+- **告诉用户排队**: "high traffic, position 12 of 50" — 非 chat 场景可接受
+- **预测性 throttle**: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical
+- **Cache hit**: 限流期间 cache hit rate 拉满，semantic cache 降阈值
+- **跟 vendor 谈**: 长期 quota 提升，但 short-term 还是要软兜底
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

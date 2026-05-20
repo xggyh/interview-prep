@@ -252,6 +252,71 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: E-commerce 下单 workflow
+
+> "Order workflow: 库存预留 → 支付 → 发货 → 邮件确认。任意步出错怎么办？"
+
+**解法**:
+- **Saga compensate**: 库存预留 → 释放, 支付 → 退款, 发货 → 取消, 邮件 → 不发或道歉信
+- **Order state machine**: pending → paid → shipped → completed, 不允许逆转
+- **Outbox**: 每步状态变化 outbox event, 下游 (analytics / customer email) 异步 consume
+- **Inventory pre-reserve TTL**: 预留 15 min 后未支付自动释放 (防长 hold)
+- **Idempotency keys**: order_id 贯穿全链路
+- **Customer comms 最后**: 邮件确认 在 shipped 之后才发, 避免 'paid' 邮件后才发现库存其实没了
+
+### 变体 2: Multi-step research agent
+
+> "Agent: search → read → summarize → draft → review → finalize。中间步骤 LLM 出错了"
+
+**解法**:
+- **Persistent intermediate state**: 每步 output 写文件 (research_notes.md / draft.md)
+- **Resumable**: 失败重启从最后 checkpoint
+- **Idempotent steps**: search 同 query 同结果 (除非 web 变), summarize 同 input 同 output (low temp)
+- **Compensating optional**: research 步骤多是 read-only, 失败不需 compensate (重做即可)
+- **Quality gate**: 每步完成跑 sanity check (output length / format), fail 时 retry 不进下步
+- **Long-running tolerance**: 几小时 / 几天 OK, 走 Temporal workflow
+
+### 变体 3: 旅行订票 (flight + hotel + car)
+
+> "1 个 trip 订 3 个独立 vendor (flight, hotel, rental)。flight 成功, hotel 失败"
+
+**解法**:
+- **Saga**: hotel 失败 → 取消 flight (compensating)
+- **Hold-and-confirm**: 先 hold 3 个 (preauth), 全 hold 成功才 commit-charge
+- **Two-phase booking**: similar 2PC but with timeout (hold 24h auto release)
+- **User-visible UX**: 'still searching hotel, your flight is held for 5 min...'
+- **Refund 不等值**: flight 退款可能 fee, hotel free 取消 — 退款边界要透明
+- **Reconciliation**: 24h 后 audit 'all bookings in trip consistent?'
+
+### 变体 4: User profile update 传播到 5 个 service
+
+> "User 改 email, 要同步给 CRM, Marketing, Auth, Billing, Notification"
+
+**解法**:
+- **Event bus**: profile.updated event → 5 consumer 各自处理
+- **At-least-once delivery**: consumer 必须 idempotent (用 event_id dedup)
+- **Eventually consistent**: 不保证所有 service 同时更新, 数秒延迟可接受
+- **Saga 不适用 here**: 不是 transactional, 是 propagation; 失败的 consumer retry 即可
+- **Dead-letter queue**: 重试 N 次仍失败 → DLQ + alert ops
+- **User-facing 期望管理**: 'email update may take a few minutes to apply across all services'
+
+### 变体 5: Agent training loop with checkpoint
+
+> "Fine-tune agent 跑 100 epoch, 第 67 个 crash"
+
+**解法**:
+- **Per-N-step checkpoint**: every 1000 step 写 weight + optimizer state
+- **Resume from last checkpoint**: crash 后从 epoch 67 step 65000 继续
+- **Deterministic seed + dataset position**: 重启同 batch 顺序 (reproducibility)
+- **Data loader checkpoint**: shuffle seed + epoch position + sample index
+- **Gradient accumulation 也要 save**: mid-step crash
+- **Distributed**: 多 GPU 上 checkpoint 协调 (DeepSpeed / FSDP)
+- **Eval 中间 checkpoint**: 万一最后 epoch 反而变差, 早期 checkpoint 是 best
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

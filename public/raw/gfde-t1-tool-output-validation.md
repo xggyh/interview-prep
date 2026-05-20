@@ -220,6 +220,74 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: Tool 返回 scraped HTML 网页
+
+> "Agent 调 `fetch_url(url)` 拉网页。Response 是 raw HTML，含 script / nav / 广告。怎么处理？"
+
+**解法**:
+- **Strip HTML**: trafilatura / readability-lxml 提取 main content (drop nav/ads/script)
+- **Remove `<script>` / `<style>` / iframe** — 不只是为渲染，是为**防 injection** (JS 里可能藏指令)
+- **Cap length**: > 50K tokens → 截 / 关键段抽取 / summary
+- **URL provenance**: 保留 source URL 给 LLM citation
+- **Trust label**: `<webpage trust="untrusted" url="...">` wrap
+- **Image handling**: 不 inline raw bytes, 替换为 `[image: alt-text]` 占位
+- **Form / button**: 'this page has a contact form, ignore unless user asks' (避免 LLM 误以为能 submit)
+
+### 变体 2: Tool 返回 100MB CSV
+
+> "`export_sales_data` 返回 5M 行 CSV。怎么给 LLM？"
+
+**解法**:
+- **绝不直接给** — 100MB 远超 context
+- **Stage 1**: 写入 blob store, 返回 `{ref: 's3://...', schema: ..., row_count: 5M, sample: [first 5 rows]}`
+- **Stage 2**: LLM 决定 — 'I need top 10 by revenue' → `query_csv(ref, sql='SELECT * ORDER BY revenue DESC LIMIT 10')` (DuckDB / Polars on blob)
+- **Aggregate first**: 'show summary' → 给 sum/avg/count/distribution
+- **Iterative**: LLM 像 SQL 写多轮 query 收敛
+- **Cost**: storage cheap, compute on-demand
+
+### 变体 3: Tool 返回的就是另一个用户的 PII (lookup tool)
+
+> "`get_user_info(user_id)` 合法返回 user PII。但 calling user 是 customer support agent，按 ROLE 不该看完整 SSN。怎么 enforce？"
+
+**解法**:
+- **不在 LLM 层 mask** (LLM 会 leak); **在 tool 层 mask**
+- **Per-role schema**: support agent 看到 `ssn: "***-**-1234"`, finance 看到 full
+- **Field-level perms**: 数据库 view 按 role 投影
+- **Audit**: 谁 access 了 sensitive field 都记录 (compliance)
+- **Just-in-time decrypt**: 真要完整 SSN 需 step-up auth (2FA)
+- **LLM-side**: 即使 mask 了, 系统 reminder 提醒 'never read SSN aloud, mask in response'
+- **Output scan**: response 出 LLM 前再扫一遍, 阻止 hallucinated PII
+
+### 变体 4: Tool 返回 binary (image / PDF / audio)
+
+> "`get_invoice(id)` 返回 PDF bytes。Agent (text-based) 怎么用？"
+
+**解法**:
+- **Don't pass bytes** — LLM (除非 multimodal) 不会处理
+- **OCR / text extract**: PDF → text (PyMuPDF / pdfplumber)
+- **Image → caption**: vision model 'describe this image' → text
+- **Audio → transcript**: ASR (whisper) → text
+- **Structured extract**: invoice → `{vendor, date, items, total}` (LLM-with-vision or specialized model)
+- **Return mixed**: `{text: extracted, image_ref: 'blob://...'}` — agent 可决定是否进一步分析图
+- **Trust marking**: extracted text 仍 untrusted (PDF 里也能藏 injection)
+
+### 变体 5: Multi-agent — 另一个 agent 的 output 进我这
+
+> "Agent A 调 'plan_research' 得到 task list, 给 agent B。Agent B 读到的 plan 是 agent A 生成的, 还是别的 source 注入的？"
+
+**关键差异**: Agent ecosystem 内部信任，但 **agent A 也可能被 prompt-inject**。
+
+**解法**:
+- **Signed messages**: agent 间通信 messages 带 signature (HMAC); 接收方 verify
+- **Trust 仍 untrusted**: 即便信源是 sibling agent, 内容也得当 untrusted data 处理 (因为 agent A 可能读过 untrusted source)
+- **Tool perms 独立**: agent B 用自己的 perms 调用; 不继承 agent A 的
+- **Output schema strict**: agent A → agent B 接口走 schema, 不允许 free-form 'instructions'
+- **Replay**: multi-agent trace 完整记录，谁说了什么时候说
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

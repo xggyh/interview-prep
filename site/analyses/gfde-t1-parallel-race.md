@@ -184,6 +184,79 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: 同 agent 1 turn 内 2 个 tool 都改 wallet
+
+> "Agent 一个 turn 内 emit 了 [debit_wallet(amount=100), debit_wallet(amount=50)]。这俩是 fanout parallel 还是必须 serialize？"
+
+**关键差异**: 同 user 同 resource, 同 agent 同 turn。
+
+**解法**:
+- **Resource declarative**: tool 注册时声明 `resources=['wallet:{user_id}']`
+- Scheduler 看到两个 tool 同 resource → **自动 serialize**
+- LLM 不需要知道这事 — runtime 处理
+- **Order**: 按 LLM 输出顺序 (LLM 隐含意图)
+- **All-or-nothing**: outbox + saga，若第二个失败补偿第一个
+- **Visible to LLM**: 两个 result 都送回 LLM 完整 context
+
+### 变体 2: 多用户共享一个 backend connection pool
+
+> "Agent 给 5 user serving。每个 user 5 个 parallel tool。25 个并发查 DB，pool 只 10 connection。怎么调度？"
+
+**关键差异**: Resource 边界不是 user 而是 **shared infra**。
+
+**解法**:
+- **Per-pool semaphore**: 最多 10 concurrent
+- **Per-user concurrency limit**: 每 user 最多 3，防 1 user 独占
+- **Priority queue**: gold tenant 优先
+- **Tool-level**: read-only query 可走 read replica (扩 pool)
+- **Latency budget propagation**: 排队过久的 task 主动 abort (上层 agent 重 plan)
+- **Observability**: pool wait time p99 alert
+
+### 变体 3: 同 user 2 个设备同时 active
+
+> "User 手机 + laptop 都开着 chat。两边都给 agent 发指令，可能同时改 profile。"
+
+**关键差异**: **跨 session race**, agent 不知道有 sibling。
+
+**解法**:
+- **Per-user advisory lock** (Redis): 写操作必须拿
+- **Conversation_id 不同** but **user_id 同** → 锁是 user-level 不是 conv-level
+- **CAS at DB**: profile.version 每写 +1; 写时检查 version, 不一致 retry
+- **冲突 UI**: 'profile changed by other session, refresh' 提示
+- **Last-write-wins** 业务上常见但要 audit; 必要时**操作合并** (additive ops 不冲突)
+- **Worst case**: read-modify-write 用 DB transaction + row lock
+
+### 变体 4: Parallel LLM calls (multi-query RAG)
+
+> "RAG 用 3 个 paraphrase 并发查 vector DB。这是 race condition 吗？怎么 coordinate?"
+
+**关键差异**: 全 read-only, no shared write state。
+
+**解法**:
+- **完全独立 parallel** 没 race — 都是 read
+- **聚合后处理**: results 拿到后做 RRF / dedup
+- **Cost concern**: 3x LLM cost (paraphrase generation) + 3x vector query
+- **Cancellation**: 主 query 已经 hit 阈值 → cancel 多余 paraphrase
+- **Timeout per branch**: 1 个 paraphrase 慢，其他不等
+- **Observability**: paraphrase 各自命中 chunk 集合差异度 (overlap < 50% 才有意义)
+
+### 变体 5: Agent action vs incoming webhook race
+
+> "Agent 读了 order.status='pending'。同时 payment webhook 进来把 status 改成 'paid'。Agent 接下来基于 stale 'pending' 写新状态，覆盖了 'paid'。"
+
+**关键差异**: 不是 agent 内部 race, 是 **agent vs external event**。
+
+**解法**:
+- **Read-modify-write with CAS**: 写时检查读取时的 version
+- **Event sourcing**: 不直接写 status, 写 action ('user_clicked_confirm'), reducer 决定 final state
+- **Optimistic lock**: 写时 `WHERE status='pending'`, 0 rows affected → 退出 + re-read
+- **Webhook race awareness**: agent 在长操作前重新读 latest state
+- **状态机校验**: 'pending → paid' OK, 'paid → pending' 拒绝 (业务规则)
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

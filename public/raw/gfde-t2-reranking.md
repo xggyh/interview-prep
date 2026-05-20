@@ -169,6 +169,70 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: E-commerce relevance — product ranking
+
+> "User 搜 'red running shoes size 9'. Top-50 候选, 怎么 rerank?"
+
+**解法**:
+- **Multi-objective**: relevance + price + stock + delivery time
+- **Learning-to-rank** (LTR): XGBoost / LightGBM with features (semantic_score, BM25, price_diff, has_stock, review_score)
+- **Personalization signals**: user history (买过 brand X) 作 feature
+- **Diversity penalty**: top-10 都是 Nike → 加多样性
+- **Business rule overlay**: promo / margin / inventory clearance 单独 boost (transparent)
+- **A/B with revenue**: 不只 NDCG, 看 GMV / CVR
+
+### 变体 2: Q&A passage selection
+
+> "RAG 返回 50 段, 选哪 3 段 feed LLM 答题？"
+
+**解法**:
+- **Cross-encoder rerank** with QA-finetune (Cohere rerank, mxbai-rerank)
+- **Span-level extract**: 不只选 passage, 用 QA 模型抽出 answer span
+- **Multi-passage fusion**: 答案跨段 → 选 complementary 段 (不是冗余)
+- **Citation-aware**: 每段加 source ID, 后续 LLM 答时 cite
+- **Confidence gating**: top-1 score 低 → 'no good answer found, escalate' 不强答
+- **Eval**: SQuAD-style EM/F1 on subsample
+
+### 变体 3: Code search — function from repo
+
+> "Dev agent 搜 'function that parses JWT'. 候选 50 个函数 chunk."
+
+**解法**:
+- **Signature match**: 'parse_jwt(token)' 命名 → exact match 优先
+- **Symbol-aware reranker**: fine-tune on (query, function) pairs from PR descriptions
+- **Test pair boost**: 有对应 test 的函数 > 无 test
+- **Usage signal**: 高被调用次数函数 > 孤儿函数 (说明它经过 production 验证)
+- **Recency**: 1 月前改的 > 5 年前未改 (后者可能 deprecated)
+- **Language-specific**: Python 用 Python-aware encoder, 不是通用
+
+### 变体 4: Multi-modal rerank — image + text query
+
+> "User search 'similar to this dress, but in black'. Image + text query."
+
+**解法**:
+- **CLIP-class embedding**: image + text 进同空间, 直接 cosine
+- **Reranker**: 大 multimodal model (Cohere multimodal / GPT-4V) 看 query image + candidate image 评分
+- **Attribute extraction**: query image → 'red, A-line, knee-length' attribute; combine with 'black' modifier
+- **Visual diff penalty**: 太相似的 (perceptual hash) 去重
+- **Style transfer aware**: 'similar style, different color' → 颜色 feature 单独 swap
+- **Cost**: vision API 贵, 不要 rerank 50 张, narrow to 10 先
+
+### 变体 5: Personalized rerank — user history factored in
+
+> "Top-50 候选, user 看过 / buy 过 / dismiss 过的 history 怎么用？"
+
+**解法**:
+- **User embedding**: aggregate 历史 interaction → 1 个 user vector
+- **Re-score**: relevance × (1 + α × cos(user_vector, item_vector))
+- **Negative signals**: dismissed item 减分 (但不是永久 ban, 时间 decay)
+- **Exploration**: 80% personalized, 20% novel (avoid filter bubble)
+- **Cold-start fallback**: 新 user 没 history → popularity-based + onboarding 问题
+- **Privacy**: user vector 本地化或 federated (隐私敏感场景)
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

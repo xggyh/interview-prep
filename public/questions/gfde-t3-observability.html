@@ -139,6 +139,28 @@
 <p><strong>What NOT to do</strong>:</p>
 <ul><li>Log raw PII (compliance violation)</li><li>100% sample everything (cost blow)</li><li>No correlation between trace and LLM call</li><li>Skip eval-in-prod (quality drift invisible)</li><li>No tool-specific spans (root cause hidden)</li><li>No alerting (waiting for users to complain)"</li></ul></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: 生产 agent silent quality drop</h4>
+<blockquote><p>"用户开始抱怨 'agent 最近答得差'。Metric 都正常 (latency, error)。怎么 debug?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Eval-in-prod 抽样</strong>: 5% LLM-as-judge 评分, plot trend</li><li><strong>Slice by</strong>: model version / tenant / query type / time → 找异常 slice</li><li><strong>Diff vs baseline</strong>: 抽 100 'bad' + 100 'good', 看 prompt template / model 是否动过</li><li><strong>User feedback signal</strong>: thumbs down trend, sentiment shift</li><li><strong>A/B with control</strong>: 5% 流量到旧版, 比当前</li><li><strong>Recent deploys</strong>: 上次 prompt template change / model upgrade 时间对齐</li><li><strong>Root cause 多 layer</strong>: 看 retrieval (recall 降?), reranker (NDCG 降?), LLM (eval pass 降?), tool (error rate 升?)</li></ul>
+<h4>变体 2: Cost spike investigation</h4>
+<blockquote><p>"本周 LLM bill 突然 5x。怎么查？"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Per-tenant attribution</strong>: dashboard 看哪 tenant 涨</li><li><strong>Per-feature attribution</strong>: 哪 product feature 触发了多 LLM call</li><li><strong>Token analysis</strong>: input token 变长 (context bloat?) or output (response 变啰嗦?)</li><li><strong>Model mix change</strong>: routing 把更多流量送给 expensive model</li><li><strong>Loop bug</strong>: agent retry 失控 (per-session call count 异常)</li><li><strong>Cache miss spike</strong>: cache hit rate 降 → 更多真 LLM call</li><li><strong>Jailbreak attack</strong>: 攻击者疯狂打高 token, anomaly detect</li><li><strong>Postmortem</strong>: identify + fix + budget alert tuning</li></ul>
+<h4>变体 3: P99 latency alert fired</h4>
+<blockquote><p>"P99 latency 突 2s → 5s。怎么 debug？"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Trace slow 请求</strong>: tail-sampling 抓 p95+ trace, 看 span breakdown</li><li><strong>By layer</strong>: LLM call slow? Tool call slow? DB slow? Network slow?</li><li><strong>By tenant / model</strong>: 某 tenant 量大占资源 / 某 model serving 抖动</li><li><strong>Queue depth</strong>: backpressure → 排队 → 总延迟涨</li><li><strong>KV cache hit rate</strong>: 突降 → prefill 多 → 慢</li><li><strong>GPU util</strong>: 接近 100% saturate → 加 replica</li><li><strong>Downstream</strong>: 上游 API slow → 慢</li></ul>
+<h4>变体 4: Jailbreak attempt detection</h4>
+<blockquote><p>"怎么知道有人试图越狱 agent?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Pattern detection on input</strong>: 'ignore previous', 'pretend you are', 'developer mode'</li><li><strong>LLM-classifier</strong>: 小 model 实时分类 input '是否疑似越狱'</li><li><strong>Response pattern</strong>: agent 输出 'I cannot' / 'as an AI' 反常增多 → 攻击者尝试中</li><li><strong>Per-user 频率</strong>: 单 user 短时间高频 → 异常</li><li><strong>Honeypot</strong>: 故意放些 'secrets' 看是否被 'leak' → 检测越狱成功</li><li><strong>Forensics</strong>: 完整 input + output 存安全存储 (单独 retention)</li><li><strong>Alert + block</strong>: &gt; N 次/min → 临时 ban + 升级安全 team</li></ul>
+<h4>变体 5: Per-tenant SLA verification</h4>
+<blockquote><p>"卖 agent 给 enterprise, 承诺 99.9% / p99 &lt; 2s。怎么证明做到了？"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Per-tenant SLI dashboard</strong>: availability, latency, error rate</li><li><strong>Synthetic probes</strong>: 每分钟模拟 1 tenant request, 长期可用性测量</li><li><strong>Monthly report</strong>: auto-generate, 给 customer 看</li><li><strong>Error budget</strong>: 99.9% = 43min downtime/month, 用了多少</li><li><strong>Incident attribution</strong>: 哪次 outage 算入 tenant 的 SLA breach</li><li><strong>Compensation policy</strong>: 触发 breach 自动给 credit (consumed budget 通知 customer)</li><li><strong>Independent audit</strong>: 第三方 monitoring (Datadog Synthetics) 可信</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Distributed tracing</td><td>Voice agent — multi-region debugging 必 trace</td></tr><tr><td>LLM-specific logs</td><td>BNPL chatbot — prompt versioning + token tracking</td></tr><tr><td>Eval-in-prod</td><td>ConvFinQA — eval methodology you've done at scale</td></tr><tr><td>PII redaction</td><td>Compliance for debt collection — log redaction必</td></tr><tr><td>Alerting</td><td>Voice agent SLA weekly review</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -468,6 +490,76 @@ Cost attribution:
 > - Skip eval-in-prod (quality drift invisible)
 > - No tool-specific spans (root cause hidden)
 > - No alerting (waiting for users to complain)"
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: 生产 agent silent quality drop
+
+> "用户开始抱怨 'agent 最近答得差'。Metric 都正常 (latency, error)。怎么 debug?"
+
+**解法**:
+- **Eval-in-prod 抽样**: 5% LLM-as-judge 评分, plot trend
+- **Slice by**: model version / tenant / query type / time → 找异常 slice
+- **Diff vs baseline**: 抽 100 'bad' + 100 'good', 看 prompt template / model 是否动过
+- **User feedback signal**: thumbs down trend, sentiment shift
+- **A/B with control**: 5% 流量到旧版, 比当前
+- **Recent deploys**: 上次 prompt template change / model upgrade 时间对齐
+- **Root cause 多 layer**: 看 retrieval (recall 降?), reranker (NDCG 降?), LLM (eval pass 降?), tool (error rate 升?)
+
+### 变体 2: Cost spike investigation
+
+> "本周 LLM bill 突然 5x。怎么查？"
+
+**解法**:
+- **Per-tenant attribution**: dashboard 看哪 tenant 涨
+- **Per-feature attribution**: 哪 product feature 触发了多 LLM call
+- **Token analysis**: input token 变长 (context bloat?) or output (response 变啰嗦?)
+- **Model mix change**: routing 把更多流量送给 expensive model
+- **Loop bug**: agent retry 失控 (per-session call count 异常)
+- **Cache miss spike**: cache hit rate 降 → 更多真 LLM call
+- **Jailbreak attack**: 攻击者疯狂打高 token, anomaly detect
+- **Postmortem**: identify + fix + budget alert tuning
+
+### 变体 3: P99 latency alert fired
+
+> "P99 latency 突 2s → 5s。怎么 debug？"
+
+**解法**:
+- **Trace slow 请求**: tail-sampling 抓 p95+ trace, 看 span breakdown
+- **By layer**: LLM call slow? Tool call slow? DB slow? Network slow?
+- **By tenant / model**: 某 tenant 量大占资源 / 某 model serving 抖动
+- **Queue depth**: backpressure → 排队 → 总延迟涨
+- **KV cache hit rate**: 突降 → prefill 多 → 慢
+- **GPU util**: 接近 100% saturate → 加 replica
+- **Downstream**: 上游 API slow → 慢
+
+### 变体 4: Jailbreak attempt detection
+
+> "怎么知道有人试图越狱 agent?"
+
+**解法**:
+- **Pattern detection on input**: 'ignore previous', 'pretend you are', 'developer mode'
+- **LLM-classifier**: 小 model 实时分类 input '是否疑似越狱'
+- **Response pattern**: agent 输出 'I cannot' / 'as an AI' 反常增多 → 攻击者尝试中
+- **Per-user 频率**: 单 user 短时间高频 → 异常
+- **Honeypot**: 故意放些 'secrets' 看是否被 'leak' → 检测越狱成功
+- **Forensics**: 完整 input + output 存安全存储 (单独 retention)
+- **Alert + block**: > N 次/min → 临时 ban + 升级安全 team
+
+### 变体 5: Per-tenant SLA verification
+
+> "卖 agent 给 enterprise, 承诺 99.9% / p99 < 2s。怎么证明做到了？"
+
+**解法**:
+- **Per-tenant SLI dashboard**: availability, latency, error rate
+- **Synthetic probes**: 每分钟模拟 1 tenant request, 长期可用性测量
+- **Monthly report**: auto-generate, 给 customer 看
+- **Error budget**: 99.9% = 43min downtime/month, 用了多少
+- **Incident attribution**: 哪次 outage 算入 tenant 的 SLA breach
+- **Compensation policy**: 触发 breach 自动给 credit (consumed budget 通知 customer)
+- **Independent audit**: 第三方 monitoring (Datadog Synthetics) 可信
 
 ---
 

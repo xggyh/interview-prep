@@ -207,6 +207,70 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: 消费 chatbot — 高 QPS, low value per query
+
+> "100K QPS chatbot, 每 query $0.001 都贵。怎么 serving？"
+
+**解法**:
+- **小 model 主力**: 90% 用 Llama-8B / Mistral-7B (自托管 vLLM)
+- **Aggressive batching**: continuous batch + PagedAttention 拉满
+- **Semantic cache**: FAQ-heavy → cache hit 50%+
+- **Quantization**: INT8 / INT4 极致
+- **Cost-aware routing**: 复杂 query 才升级到 GPT-4 (5% 流量)
+- **Multi-tenant 1 model**: 不为每客户独立部署, S-LoRA 服务多 LoRA
+
+### 变体 2: 代码助手 — 高 QPS 但 query 复杂
+
+> "1M dev 用 Copilot-like 服务, 高 QPS + 大 context (open files)"
+
+**解法**:
+- **Edge deploy**: 用户 IDE 跟 region edge 节点近 (latency-critical)
+- **Per-language model**: Python user / JS user 路由不同优化模型
+- **Streaming**: 首 token 越快越好 (typing UX)
+- **Speculative decoding**: smaller draft + bigger verify (latency 关键)
+- **Prefix cache**: 同 user 同 file context 反复 prefill 浪费, 重用
+- **Cost amortize**: 月费用户, peak 时 graceful degrade (smaller model)
+
+### 变体 3: Batch processing — 高 TPM, 不在乎 latency
+
+> "Overnight 跑 1M document summarize, latency 不 care, throughput 第一"
+
+**解法**:
+- **Async batch API** (OpenAI batch 50% discount, 24h 内出结果)
+- **Self-host**: 大 batch + 极大 KV reuse + 满 GPU 利用
+- **Pipeline parallelism**: 多 stage 并行 (embed → LLM → store)
+- **Spot instances**: 容灾的 batch, 抢 cheaper GPU
+- **Retry / partial success**: 失败 task DLQ, 不阻塞整 batch
+- **Cost target**: per-1K-tokens 直接和 raw GPU rental 比
+
+### 变体 4: Voice — low latency hard
+
+> "Voice agent < 300ms first-token, throughput 第二"
+
+**解法**:
+- **Continuous batching off** (or smaller batch): latency 优先于 throughput
+- **Speculative decoding**: 小 draft 模型并行, 拿 latency
+- **Streaming TTS**: LLM 首 token 一出立即 TTS, 不等全句
+- **Edge / region affinity**: 用户 geographic-close GPU
+- **Pre-warm**: 来电时 ASR/LLM/TTS 立即 ready (don't lazy load)
+- **Sentence-level chunking**: LLM 输出 1 句 → TTS 立刻 → next sentence 并行
+
+### 变体 5: Multi-LoRA serving — N fine-tunes
+
+> "100 个 fine-tuned 客户模型, 不能每个 1 个 replica"
+
+**解法**:
+- **S-LoRA / Punica**: base model 共享 GPU, LoRA adapter (~MB) 动态加载
+- **Per-request LoRA select**: routing 时按 tenant 加载对应 adapter
+- **Cold LoRA cache**: hot adapters 常驻 GPU, cold ones 从 disk lazy load
+- **vLLM 0.6+** 内置支持
+- **A/B**: same query, base vs LoRA, eval LoRA 是否真有提升
+- **LoRA fine-tune pipeline**: 自动化, 客户上传 data → train → eval → deploy
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

@@ -231,6 +231,68 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: SaaS 集成客户内部 stack
+
+> "我们 SaaS 给企业用, 客户有自己的 Salesforce / Workday / Jira。怎么集成？"
+
+**解法**:
+- **MCP 适配器 per 客户系统**: 写一次 Salesforce-MCP adapter, 所有客户复用
+- **Per-tenant config**: 客户的 endpoint / token 存 secret manager, MCP server 启动注入
+- **Customer-hosted MCP server option**: data sensitive 客户自己 host MCP server, 我们的 agent 远程调
+- **Network boundary**: VPC peering / VPN tunnel / OAuth bridge
+- **Schema discovery**: agent first call `list_tools()` 适应客户 SF 自定义 field
+
+### 变体 2: Multi-tenant agent platform
+
+> "1 平台服务 100 客户, 每客户工具 catalog 不同。"
+
+**解法**:
+- **Per-tenant tool registry**: 路由时按 tenant 加载工具子集
+- **Shared MCP infrastructure**: 1 套 MCP gateway, multiplex
+- **Quota per tenant**: tool call rate, cost budget
+- **Isolation**: tenant A 不能看到 tenant B 的 tool/data
+- **Per-tenant fine-tune**: 工具描述可能 per-tenant 微调 (业务术语不同)
+- **Centralized observability** 但 per-tenant 视图
+
+### 变体 3: Cross-cloud (GCP + AWS + Azure)
+
+> "Agent 要操作 3 个 cloud 资源。"
+
+**解法**:
+- **每 cloud 1 个 MCP server**: gcp-mcp / aws-mcp / azure-mcp
+- **统一 tool naming**: `cloud:gcp:gcs:upload` / `cloud:aws:s3:upload` 但 schema 相似
+- **Cross-cloud workflow**: agent 决定 'copy from gcs to s3' 编排两个 tool
+- **Auth**: 各自 cloud IAM, agent 用 OBO 或 service account
+- **Cost-tag**: 每 tool call 标 cloud, 成本归属
+- **Egress 警告**: 跨云转数据贵, tool wrapper warn
+
+### 变体 4: LLM 厂家可移植性
+
+> "今天用 Claude, 明天可能换 Gemini。Tool spec 不要绑死。"
+
+**解法**:
+- **MCP 是 vendor-neutral**: 同 MCP server 对接 Claude / GPT / Gemini
+- **Adapter layer**: MCP tool → OpenAI function calling 格式 / Anthropic tool_use / Google function spec
+- **Prompt template 抽象**: 'tool calling instruction' per vendor 不同, 用模板
+- **测试矩阵**: 同套 eval 在 N 个 LLM 跑, 防 vendor-lock-in regression
+- **Routing logic**: 不同 query 走不同 LLM (cost / quality 优化)
+
+### 变体 5: Legacy system 集成 (mainframe / COBOL)
+
+> "客户核心系统是 mainframe, 没 modern API。怎么 agent 化？"
+
+**解法**:
+- **Adapter heavy lifting**: REST wrapper around CICS / COBOL screen-scrape
+- **CDC (change data capture)**: 不直接调 legacy, read 改动 stream
+- **Read-only first**: legacy 改造慢, 先把 query 能力 expose
+- **Per-screen mock**: legacy unavailable → mock for dev
+- **Latency expect**: legacy 慢 (500ms-5s), agent 超 timeout 要 graceful handle
+- **Vendor relationship**: 跟 legacy team 谈, 加 idempotency / audit hook
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

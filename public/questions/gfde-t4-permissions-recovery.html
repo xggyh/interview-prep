@@ -197,6 +197,28 @@ def detect_anomaly(action, user):
 <p><strong>What NOT to do</strong>:</p>
 <ul><li>Service account with super perms (massive blast)</li><li>Trust LLM-controlled action without scope check</li><li>No audit log (forensics impossible)</li><li>No compensating action (recovery impossible)</li><li>No rate limit (incident-at-scale)</li><li>No prompt injection defense (1 email = compromised agent)</li><li>Single-tenant code accessing all tenants (worst case)"</li></ul></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: DevOps agent (kubectl / terraform)</h4>
+<blockquote><p>"Agent 能 deploy 服务、改 K8s config、跑 terraform apply。怎么 wrap?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>IAM</strong>: agent 用 narrow ServiceAccount, 不是 cluster-admin</li><li><strong>Namespace scoping</strong>: agent 只能动 <code>agent-*</code> namespace, 不能动 <code>prod-payments</code></li><li><strong>Terraform plan first</strong>: 永远 dry-run 给 human review; apply 才 destructive</li><li><strong>Tag everything</strong>: agent-created resources tagged, 易批量回收</li><li><strong>Drift detection</strong>: agent 改完后 reconcile loop 监控 prod 漂移</li><li><strong>Rollback</strong>: GitOps (ArgoCD) — revert commit → 自动 rollback</li><li><strong>Disaster prevention</strong>: 不能 delete cluster / drop StorageClass, 这些 hardcoded blocklist</li></ul>
+<h4>变体 2: 金融 trading agent</h4>
+<blockquote><p>"Agent 能下单买卖证券。安全设计？"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Per-trade dollar limit</strong>: agent auto &lt; $X, &gt; 必 human approve</li><li><strong>Per-day notional limit</strong>: 总额 cap</li><li><strong>Asset whitelist</strong>: 只能 trade 预批准 symbols, 不能新加</li><li><strong>Pre-trade risk check</strong>: position / leverage / VaR check</li><li><strong>Audit immutable</strong>: SEC compliance, 7-yr retention, hash-chain</li><li><strong>Kill switch</strong>: 风控可一键暂停 agent</li><li><strong>Independent review</strong>: separate team 审 agent decisions weekly</li></ul>
+<h4>变体 3: 医疗 agent (PHI 处理)</h4>
+<blockquote><p>"Agent 看 / 处理 patient PHI。HIPAA 怎么落地?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>BAA with LLM vendor</strong>: 必签 Business Associate Agreement</li><li><strong>Minimum necessary</strong>: agent 看 PHI 仅当当前任务必需; 其他时候 masked</li><li><strong>Encryption</strong>: at-rest + in-transit + LLM API request body 加密</li><li><strong>No training on PHI</strong>: vendor 必承诺不用 PHI 训练</li><li><strong>Audit</strong>: every PHI access logged, who/when/what</li><li><strong>Patient access right</strong>: GDPR/HIPAA — patient 可申请删除, 自己数据</li><li><strong>De-identification</strong>: 非临床用途 (eval / analytics) 用 de-identified data</li></ul>
+<h4>变体 4: Cross-tenant SaaS isolation</h4>
+<blockquote><p>"1 套 agent 服务 1000 customer, 怎么防 cross-tenant leak?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>tenant_id 强制注入</strong>: ORM / API client 层自动加, 程序员忘不了</li><li><strong>DB row-level security</strong>: Postgres RLS policy</li><li><strong>Per-tenant encryption key</strong>: 物理 isolate (KMS key per tenant)</li><li><strong>Vector index per-tenant</strong> OR shared with strict filter</li><li><strong>LLM context never cross</strong>: tenant A 的 prompt 不到 tenant B 调用</li><li><strong>Eval</strong>: red-team 测试 prompt injection 'show me tenant X data'</li><li><strong>Audit anomaly</strong>: cross-tenant access pattern alarm</li></ul>
+<h4>变体 5: External-facing agent (公开 chatbot)</h4>
+<blockquote><p>"公司官网放个 chatbot, 谁都能用。安全?"</p></blockquote>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Anonymous user, narrow scope</strong>: 不需 auth 但只能问公开信息</li><li><strong>Rate limit by IP</strong>: 防 abuse</li><li><strong>Prompt injection 公开攻击面大</strong>: 多层 defense (pattern + LLM-classifier + output validate)</li><li><strong>No write tools</strong>: 不接 internal DB write, 只读 marketing content</li><li><strong>Hallucination guard</strong>: 'I'm not sure, contact support' fallback 强训</li><li><strong>Brand safety</strong>: output 不能 inappropriate (LLM filter)</li><li><strong>Cost cap</strong>: 单 IP / day 限额, 防 LLM-bill 攻击</li><li><strong>Compliance</strong>: data residency, GDPR consent</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>IAM OBO</td><td>TikTok payment — user OAuth scoping</td></tr><tr><td>Multi-tenant isolation</td><td>Voice agent 7 markets, BNPL chatbot — natural multi-tenant</td></tr><tr><td>Prompt injection</td><td>Voice agent — user adversarial input testing</td></tr><tr><td>Audit trail</td><td>Compliance for debt collection — every action audited</td></tr><tr><td>Recovery / compensating</td><td>Refund flow — natural compensation logic</td></tr><tr><td>Rate limit + anomaly</td><td>TikTok payment — fraud detection signal layered</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -591,6 +613,76 @@ Regulatory layers:
 > - No rate limit (incident-at-scale)
 > - No prompt injection defense (1 email = compromised agent)
 > - Single-tenant code accessing all tenants (worst case)"
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: DevOps agent (kubectl / terraform)
+
+> "Agent 能 deploy 服务、改 K8s config、跑 terraform apply。怎么 wrap?"
+
+**解法**:
+- **IAM**: agent 用 narrow ServiceAccount, 不是 cluster-admin
+- **Namespace scoping**: agent 只能动 `agent-*` namespace, 不能动 `prod-payments`
+- **Terraform plan first**: 永远 dry-run 给 human review; apply 才 destructive
+- **Tag everything**: agent-created resources tagged, 易批量回收
+- **Drift detection**: agent 改完后 reconcile loop 监控 prod 漂移
+- **Rollback**: GitOps (ArgoCD) — revert commit → 自动 rollback
+- **Disaster prevention**: 不能 delete cluster / drop StorageClass, 这些 hardcoded blocklist
+
+### 变体 2: 金融 trading agent
+
+> "Agent 能下单买卖证券。安全设计？"
+
+**解法**:
+- **Per-trade dollar limit**: agent auto < $X, > 必 human approve
+- **Per-day notional limit**: 总额 cap
+- **Asset whitelist**: 只能 trade 预批准 symbols, 不能新加
+- **Pre-trade risk check**: position / leverage / VaR check
+- **Audit immutable**: SEC compliance, 7-yr retention, hash-chain
+- **Kill switch**: 风控可一键暂停 agent
+- **Independent review**: separate team 审 agent decisions weekly
+
+### 变体 3: 医疗 agent (PHI 处理)
+
+> "Agent 看 / 处理 patient PHI。HIPAA 怎么落地?"
+
+**解法**:
+- **BAA with LLM vendor**: 必签 Business Associate Agreement
+- **Minimum necessary**: agent 看 PHI 仅当当前任务必需; 其他时候 masked
+- **Encryption**: at-rest + in-transit + LLM API request body 加密
+- **No training on PHI**: vendor 必承诺不用 PHI 训练
+- **Audit**: every PHI access logged, who/when/what
+- **Patient access right**: GDPR/HIPAA — patient 可申请删除, 自己数据
+- **De-identification**: 非临床用途 (eval / analytics) 用 de-identified data
+
+### 变体 4: Cross-tenant SaaS isolation
+
+> "1 套 agent 服务 1000 customer, 怎么防 cross-tenant leak?"
+
+**解法**:
+- **tenant_id 强制注入**: ORM / API client 层自动加, 程序员忘不了
+- **DB row-level security**: Postgres RLS policy
+- **Per-tenant encryption key**: 物理 isolate (KMS key per tenant)
+- **Vector index per-tenant** OR shared with strict filter
+- **LLM context never cross**: tenant A 的 prompt 不到 tenant B 调用
+- **Eval**: red-team 测试 prompt injection 'show me tenant X data'
+- **Audit anomaly**: cross-tenant access pattern alarm
+
+### 变体 5: External-facing agent (公开 chatbot)
+
+> "公司官网放个 chatbot, 谁都能用。安全?"
+
+**解法**:
+- **Anonymous user, narrow scope**: 不需 auth 但只能问公开信息
+- **Rate limit by IP**: 防 abuse
+- **Prompt injection 公开攻击面大**: 多层 defense (pattern + LLM-classifier + output validate)
+- **No write tools**: 不接 internal DB write, 只读 marketing content
+- **Hallucination guard**: 'I'm not sure, contact support' fallback 强训
+- **Brand safety**: output 不能 inappropriate (LLM filter)
+- **Cost cap**: 单 IP / day 限额, 防 LLM-bill 攻击
+- **Compliance**: data residency, GDPR consent
 
 ---
 

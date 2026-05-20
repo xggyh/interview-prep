@@ -194,6 +194,76 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: YouTube transcripts (口语 + 无结构)
+
+> "10K hours of YouTube videos → searchable. Transcripts 是口语 + 无 heading。"
+
+**解法**:
+- **时间窗口 chunking**: 每 2 min 一个 chunk + 30s overlap (口语没固定段落)
+- **Speaker turn boundary** if diarization 可得 (说话人转换是天然 break)
+- **Topic segmentation**: TopicTiling / TextTiling 算法找 topic shift point
+- **Metadata**: video_id, timestamp, channel, length — 用户能跳到具体时间
+- **Caption-aware**: 标点 / capitalization 信号微弱, 用 LLM cheap pass 修正
+- **检索 → video deep link** with `?t=125s` 跳具体秒数
+- **Multi-modal v2**: 配合 keyframe / OCR 多模态搜索
+
+### 变体 2: Codebase (functions / classes)
+
+> "怎么 chunk 1M LOC 代码库？"
+
+**解法**:
+- **AST-based**: tree-sitter 解析, **function / method / class** 为 chunk 单位
+- **不切函数内部** — 一个函数永远是 1 chunk (即便 500 行)
+- **Import + signature 嵌入**: chunk content = `import context + signature + body`
+- **Metadata**: file_path, language, symbol_name, line_range, calls (依赖)
+- **Cross-file 关系**: 单独存 call-graph, retrieve 后扩展 1-hop
+- **Comments / docstrings** 单独 index — 自然语言 query 命中
+- **Test pairs**: function + 其 test 一起 retrieve 增加 context
+- **Update cost**: 单文件改 → 重 embed 该文件 chunks (delta), 不重建全 index
+
+### 变体 3: Research papers (含公式 / 引用 / 图)
+
+> "Index 100K arXiv papers。"
+
+**解法**:
+- **Section-aware**: abstract / intro / method / experiments / conclusion 各自 chunk
+- **Equation 保留 LaTeX**: 不 OCR 截图, parse PDF 拿 LaTeX
+- **Figure caption** 单独 index (caption 信息密度最高)
+- **Citation graph**: paper → cited papers → 1-hop retrieve
+- **Metadata**: authors, year, venue, citation count (boost)
+- **Domain-aware**: physics / CS / bio 不同 embedding 模型 (SciBERT)
+- **Equation-as-text**: `E=mc^2` → text rep + LaTeX, 用户 query "energy mass equivalence" 命中
+
+### 变体 4: 对话历史 (chat logs)
+
+> "千万对话 log, 客服 agent 查 'similar conversation'。"
+
+**解法**:
+- **Conversation-level chunk**: 整段对话 1 chunk (能看上下文)
+- **太长 (>2K tokens)**: 按 turn boundary 切, 但每 chunk include 前 1-2 turn
+- **Metadata**: 用户 segment, 解决/未解决, 满意度, time, agent_id
+- **Embedding strategy**: 'gist' 提取 — LLM cheap pass 总结对话, embed 总结
+- **Per-side embed**: customer side + agent side 分开 embed (用户问的什么 vs agent 怎么答)
+- **Outcome 信号**: 仅 index 高满意度对话 (低质量过滤)
+- **PII redact at index time** — 不只 retrieve 时
+
+### 变体 5: SQL schema + 文档 (结构化 + prose mix)
+
+> "DB schema + docs. Analyst agent 查 'how to compute MRR'."
+
+**解法**:
+- **Schema as chunk**: 每 table 一个 chunk (table_name + columns + comments + sample row)
+- **Doc + linked schema**: 'MRR 计算' 文档 chunk 自动 link 到 `subscriptions` table
+- **Cross-link**: chunk metadata 含 `related_tables: [...]`, retrieve 1-hop expand
+- **Sample row 隐私**: 不能用真用户数据, 用 synthesized sample
+- **ER diagram OCR**: 图表也 index (caption + OCR'd text)
+- **Query examples**: 历史成功 SQL query 也 index (LLM 学怎么写)
+- **Update**: schema migration → 自动 re-index 改动表 (CI hook)
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |

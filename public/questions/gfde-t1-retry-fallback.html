@@ -129,6 +129,33 @@ for tool_call in tool_calls:
 <p><strong>What NOT to do</strong>:</p>
 <ul><li>Retry on 4xx (other than 408, 429): client error, retry won't help</li><li>Retry without backoff: stampede on downstream</li><li>Retry destructive without idempotency: double execute</li><li>Unlimited retry: budget burn through</li><li>Silent fallback: user doesn't know answer is degraded"</li></ul></blockquote>
 <hr />
+<h3>多场景变体 + 解法</h3>
+<h4>变体 1: DB connection pool exhaustion</h4>
+<blockquote><p>"你的 agent 调 internal DB tool。某段时间所有 query 都 timeout。Pool 已满，新 request queue 等连接。怎么 retry？"</p></blockquote>
+<p><strong>关键差异</strong>: Bottleneck 不在 downstream service 而在我们自己的资源。</p>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>不要 retry on connection-pool-full</strong> — 你 retry 也是排队抢同一个池子</li><li><strong>Backpressure</strong>: 直接 return 429 给 caller (上层 agent 看到 'busy, try later')</li><li><strong>Pool 监控</strong>: alert pool &gt; 80% 持续 1 min</li><li><strong>根因</strong>: pool size 太小 / slow query 拖死连接 / N+1 query bug</li><li><strong>临时</strong>: 加 pool size + tune timeout</li><li><strong>长期</strong>: query plan, slow-query log, batch where possible</li></ul>
+<h4>变体 2: LLM API 返回 NaN / 空字符串 / malformed JSON</h4>
+<blockquote><p>"Tool 调 ML serving，response 200 OK 但 content 是 NaN 或者 schema 不匹配。重试吗？"</p></blockquote>
+<p><strong>关键差异</strong>: 不是 HTTP error 是 <strong>content error</strong>。</p>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Schema 验证 first</strong>: 5xx 当然 retry，但 200 也得 validate output</li><li><strong>Validation fail</strong> → retry <strong>一次</strong> with same input (transient corruption)</li><li>第二次还 fail → <strong>不是 transient</strong>: 模型本身遇到 corner case</li><li><strong>Diff 策略</strong>:</li><li>Retry with different sampling params (temp + 0.2)</li><li>Retry with different model version (cascade fallback)</li><li>Truncate input / re-prompt</li><li><strong>Don't infinite retry</strong> on validation fail — wastes tokens</li><li><strong>Observability</strong>: track per-tool validation-fail rate</li></ul>
+<h4>变体 3: 上游 API 返回 "service in maintenance, ETA 2h"</h4>
+<blockquote><p>"Tool API 200 OK 但 body 说 'maintenance window, retry after 2h'。Agent 怎么 fallback？"</p></blockquote>
+<p><strong>关键差异</strong>: Failure 是 <strong>structured business signal</strong>, 不是 network error。</p>
+<p><strong>解法</strong>:</p>
+<ul><li>Tool wrapper parse maintenance signal → raise <code>ServiceUnavailable(retry_after=7200)</code></li><li><strong>Don't keep retrying</strong> in agent loop (2h &gt; user latency budget)</li><li><strong>Cache 兜底</strong>: 如果有 stale data, mark 'as of 1h ago' return</li><li><strong>告知用户</strong>: "Service X is down for maintenance until 4pm, here's cached data" — UX 透明</li><li><strong>Workflow-level</strong>: 写 outbox, 2h 后自动 resume</li><li><strong>Avoid</strong>: silent 'sorry could not fetch'，用户不知道为啥</li></ul>
+<h4>变体 4: Cascade failure — primary 挂了 fallback 也被打挂</h4>
+<blockquote><p>"Primary API down，你 fallback 到 secondary。但所有人都 fallback 过去，secondary 也被挂了。怎么防？"</p></blockquote>
+<p><strong>关键差异</strong>: Fallback 不是免费的，<strong>有 capacity 边界</strong>。</p>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Bulkhead pattern</strong>: secondary 设独立 rate limit (e.g., 只接 100 QPS)</li><li><strong>Backpressure</strong>: 超过 → 给 caller 'all variants overloaded, try later'</li><li><strong>Probabilistic fallback</strong>: 50% 直接 fail, 50% 试 secondary (减少 fallback 流量)</li><li><strong>Pre-arrange</strong>: 跟 secondary vendor 预先签 burst quota，提前通知</li><li><strong>Graceful degradation as final layer</strong>: 缓存 / 简单默认值</li><li><strong>Postmortem</strong>: cascade 一旦发生，capacity plan 要重做</li></ul>
+<h4>变体 5: 429 with <code>Retry-After: 60s</code> — 60s 比 user budget 还长</h4>
+<blockquote><p>"LLM vendor 突然限流, 让我们等 60s。但用户 chat 体验等 5s 都嫌长。怎么办？"</p></blockquote>
+<p><strong>关键差异</strong>: 限流时间 &gt; 用户 latency budget。</p>
+<p><strong>解法</strong>:</p>
+<ul><li><strong>Multi-vendor failover</strong>: GPT-4 限流 → 立即试 Claude / Gemini</li><li><strong>降级到更小 model</strong>: gpt-4 → gpt-4o-mini (10x rate limit)</li><li><strong>告诉用户排队</strong>: "high traffic, position 12 of 50" — 非 chat 场景可接受</li><li><strong>预测性 throttle</strong>: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical</li><li><strong>Cache hit</strong>: 限流期间 cache hit rate 拉满，semantic cache 降阈值</li><li><strong>跟 vendor 谈</strong>: 长期 quota 提升，但 short-term 还是要软兜底</li></ul>
+<hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>3-layer retry</td><td>Voice agent ASR / TTS / LLM 都有</td></tr><tr><td>Circuit breaker</td><td>Multi-tenant SLA monitoring 你做过</td></tr><tr><td>Fallback ladder</td><td>Voice agent 7 markets — 某 market 挂了 fallback English voice</td></tr><tr><td>Latency budget</td><td>Streaming voice p99 &lt; 800ms</td></tr><tr><td>Observability</td><td>Voice agent weekly metrics</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
@@ -369,6 +396,83 @@ Observability:
 > - Retry destructive without idempotency: double execute
 > - Unlimited retry: budget burn through
 > - Silent fallback: user doesn't know answer is degraded"
+
+---
+
+## 多场景变体 + 解法
+
+### 变体 1: DB connection pool exhaustion
+
+> "你的 agent 调 internal DB tool。某段时间所有 query 都 timeout。Pool 已满，新 request queue 等连接。怎么 retry？"
+
+**关键差异**: Bottleneck 不在 downstream service 而在我们自己的资源。
+
+**解法**:
+- **不要 retry on connection-pool-full** — 你 retry 也是排队抢同一个池子
+- **Backpressure**: 直接 return 429 给 caller (上层 agent 看到 'busy, try later')
+- **Pool 监控**: alert pool > 80% 持续 1 min
+- **根因**: pool size 太小 / slow query 拖死连接 / N+1 query bug
+- **临时**: 加 pool size + tune timeout
+- **长期**: query plan, slow-query log, batch where possible
+
+### 变体 2: LLM API 返回 NaN / 空字符串 / malformed JSON
+
+> "Tool 调 ML serving，response 200 OK 但 content 是 NaN 或者 schema 不匹配。重试吗？"
+
+**关键差异**: 不是 HTTP error 是 **content error**。
+
+**解法**:
+- **Schema 验证 first**: 5xx 当然 retry，但 200 也得 validate output
+- **Validation fail** → retry **一次** with same input (transient corruption)
+- 第二次还 fail → **不是 transient**: 模型本身遇到 corner case
+- **Diff 策略**:
+  - Retry with different sampling params (temp + 0.2)
+  - Retry with different model version (cascade fallback)
+  - Truncate input / re-prompt
+- **Don't infinite retry** on validation fail — wastes tokens
+- **Observability**: track per-tool validation-fail rate
+
+### 变体 3: 上游 API 返回 "service in maintenance, ETA 2h"
+
+> "Tool API 200 OK 但 body 说 'maintenance window, retry after 2h'。Agent 怎么 fallback？"
+
+**关键差异**: Failure 是 **structured business signal**, 不是 network error。
+
+**解法**:
+- Tool wrapper parse maintenance signal → raise `ServiceUnavailable(retry_after=7200)`
+- **Don't keep retrying** in agent loop (2h > user latency budget)
+- **Cache 兜底**: 如果有 stale data, mark 'as of 1h ago' return
+- **告知用户**: "Service X is down for maintenance until 4pm, here's cached data" — UX 透明
+- **Workflow-level**: 写 outbox, 2h 后自动 resume
+- **Avoid**: silent 'sorry could not fetch'，用户不知道为啥
+
+### 变体 4: Cascade failure — primary 挂了 fallback 也被打挂
+
+> "Primary API down，你 fallback 到 secondary。但所有人都 fallback 过去，secondary 也被挂了。怎么防？"
+
+**关键差异**: Fallback 不是免费的，**有 capacity 边界**。
+
+**解法**:
+- **Bulkhead pattern**: secondary 设独立 rate limit (e.g., 只接 100 QPS)
+- **Backpressure**: 超过 → 给 caller 'all variants overloaded, try later'
+- **Probabilistic fallback**: 50% 直接 fail, 50% 试 secondary (减少 fallback 流量)
+- **Pre-arrange**: 跟 secondary vendor 预先签 burst quota，提前通知
+- **Graceful degradation as final layer**: 缓存 / 简单默认值
+- **Postmortem**: cascade 一旦发生，capacity plan 要重做
+
+### 变体 5: 429 with `Retry-After: 60s` — 60s 比 user budget 还长
+
+> "LLM vendor 突然限流, 让我们等 60s。但用户 chat 体验等 5s 都嫌长。怎么办？"
+
+**关键差异**: 限流时间 > 用户 latency budget。
+
+**解法**:
+- **Multi-vendor failover**: GPT-4 限流 → 立即试 Claude / Gemini
+- **降级到更小 model**: gpt-4 → gpt-4o-mini (10x rate limit)
+- **告诉用户排队**: "high traffic, position 12 of 50" — 非 chat 场景可接受
+- **预测性 throttle**: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical
+- **Cache hit**: 限流期间 cache hit rate 拉满，semantic cache 降阈值
+- **跟 vendor 谈**: 长期 quota 提升，但 short-term 还是要软兜底
 
 ---
 

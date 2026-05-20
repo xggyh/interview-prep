@@ -192,6 +192,83 @@
 
 ---
 
+## 多场景变体 + 解法
+
+### 变体 1: E-commerce product search
+
+> "Shopify-style 商城，用户搜 'iPhone 15 Pro Max 256GB Titanium'。怎么 search？"
+
+**关键差异**: 强 keyword (SKU/型号), 又有 semantic (相似产品), 用户期待精确。
+
+**解法**:
+- **BM25 weight 高**: SKU / 品牌 / 容量 这些是结构化字段, exact match 比 semantic 重要
+- **结构化 filter**: parse 'iPhone 15 Pro Max 256GB' → `{brand: Apple, model: iPhone 15 Pro Max, storage: 256GB}`, 应用为 hard filter
+- **Dense fallback**: 完全 match 0 结果时, 退到 semantic ('similar 旗舰手机')
+- **Personalize**: 用户历史 (买过/看过) 加 boost
+- **Price-aware reranker**: 同款 price ASC, 不同款 relevance ASC
+- **Diversity**: 别 10 个 iPhone 15 占满, 混进 Pro / Plus 变体
+
+### 变体 2: Codebase search (代码库 / monorepo)
+
+> "Dev agent 在 1M LOC monorepo 找函数。Query: 'how do we authenticate users in the payment service'"
+
+**关键差异**: 既要 **symbol match** (函数名/类名) 又要 **semantic** (注释/文档/调用模式)。
+
+**解法**:
+- **AST-based index**: function/class 抽出来作为 chunk, metadata 含 `file_path, language, symbol, signature, callsites`
+- **Path-based filter**: 'in payment service' → filter `file_path LIKE '%/payment/%'`
+- **3 indexes 并查**: code (BM25 on identifier), comment (dense), doc (dense)
+- **GitHub-style search**: `lang:python path:auth/ "verify_token"` 这种 grammar
+- **Definition vs usage**: rerank 时 definition 优先 (但展示 usage 作为 context)
+- **Symbol graph**: 'who calls X' 走 call-graph 不是 vector search (用 tree-sitter / LSP)
+
+### 变体 3: 法律 / 合同检索
+
+> "Lawyer agent 查 1000 份合同。Query: 'find clauses about IP assignment in vendor agreements'."
+
+**关键差异**: **clause-level** retrieval, **legal jargon**, **section reference** important。
+
+**解法**:
+- **Clause-level chunking**: 不是 paragraph, 是 clause boundary (section 4.2, 5.1 等)
+- **Metadata**: contract_type, parties, effective_date, jurisdiction, section_number
+- **Pre-filter**: 'vendor agreements' → contract_type=='vendor' (hard filter)
+- **Hybrid**: BM25 on 'IP assignment' (legal term, exact match 重要) + dense (similar concepts)
+- **Reranker fine-tuned on legal corpus** (mxbai legal or train your own)
+- **Citation 强制**: '[Contract 42, §4.2]' 格式, post-process validate
+- **Aggregate view**: 同种 clause 跨多份合同对比 (group by section_type)
+
+### 变体 4: Customer support — past tickets + KB
+
+> "Support agent 查 100K past tickets + 5K KB articles。混合 source。"
+
+**关键差异**: **Source diversity** — KB 是 canonical, ticket 是 noisy real-world。
+
+**解法**:
+- **2 indexes**: KB 高 weight (高质量), tickets 低 weight (高量低质)
+- **Per-source rerank**: 先各自 top-10, fusion 时 KB 优先 (除非 tickets 给出更细具体场景)
+- **Ticket 质量信号**: 用 resolved-with-positive-feedback ticket > unresolved (作为 boost)
+- **Recency boost**: 6 个月前 ticket 跟政策可能过期, 加 time decay
+- **PII 必 scrub** (ticket 含 user 数据)
+- **Outcome surfaced**: '5 similar tickets, 4 resolved by X action' — actionable
+- **Auto-summarize**: 多个相似 ticket → 1 段总结 + links, 不 dump 全部
+
+### 变体 5: 医学 — drug + symptom search
+
+> "Medical agent — patient symptoms + drug info 检索"
+
+**关键差异**: **High accuracy requirement**, **synonyms** (药名), **safety critical**。
+
+**解法**:
+- **Medical ontology**: UMLS / SNOMED — 'acetaminophen' = 'paracetamol' = 'Tylenol' 归一
+- **Hybrid 必须**: 药名 exact match (BM25) + 症状 semantic (dense)
+- **Negation handling**: 'NOT taking aspirin' → semantic 容易丢 'not', BM25 也丢; 需 NER + negation detection
+- **Multiple sources weighted**: peer-reviewed > guideline > forum
+- **Confidence + uncertainty**: 检索 low confidence → 必 escalate to doctor (这是 medical, 不能瞎答)
+- **Audit + 合规**: HIPAA, retrieval log + access control
+- **Specialized embedding model**: BiomedBERT / SciBERT 而非通用模型
+
+---
+
 ## 简历专属 reframe
 
 | 题 | 你做过 |
