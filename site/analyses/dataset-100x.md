@@ -2,184 +2,1220 @@
 
 > **[OpenAI Technical Screen, post take-home]**
 >
-> "Take-home was on small dataset. **What would you change architecturally if the dataset was 100x larger**?"
+> "Take-home was on small dataset. **What would you change architecturally if the dataset were 100x larger**? Walk me through ingest, storage, training, serving, eval, and cost."
 
-**出处**：OpenAI FDE 真题. Google Cloud FDE 必问 (Gemini + Vertex AI scaling).
+**出处**: OpenAI FDE 真题. Google Cloud FDE 必问 (Gemini + Vertex AI scaling). Anthropic / Databricks FDE 也都问过 scaling-thought-experiment.
 
-**Round**：Technical Screen (60 min)
+**Round**: Technical Screen (60 min)
 
 ---
 
 ## 这道题在考什么
 
-考你**scaling 思维**——take-home 是 toy problem, production 是另一回事:
+考你 **scaling 思维** —— take-home 是 toy problem, production 是另一回事:
 
-1. **What breaks first at 100x** —— bottleneck 识别
-2. **5 dimensions of scale** —— ingest / storage / index / query / cost
-3. **trade-offs at scale** —— precision vs latency vs cost
-4. **graceful degradation** —— 哪些 feature 在 scale 下牺牲
-5. **knowing the platform** —— 用 Vertex AI / Pinecone / OpenSearch 的限制
+1. **What breaks first at 100x** — bottleneck 识别能力
+2. **5 维度 of scale** — ingest / storage / training / serving / eval / cost
+3. **Trade-offs at scale** — precision vs latency vs cost vs labeling-budget
+4. **Graceful degradation** — 哪些 feature 在 scale 下牺牲
+5. **Migration strategy** — 不是 big-bang, 是 dual-system + cutover
+6. **Knowing platform limits** — Spark / Ray / Dask / Pinecone / Vertex AI 的特性
+
+不考「100x 就是 100 倍」, 考「100x 时**架构会换、成本结构会变、组织 / process 会变**, 你能不能识别这些拐点」.
 
 ---
 
-## 5 个 scale dimensions
+# Part 1 · 教学讲解 — 先把概念讲透
 
-| Dim | 100x impact | What breaks |
+## 1. 四个术语先解释
+
+**Distributed processing**: 数据量超单机能处理时, 切片 + 多节点并行. 主流 framework:
+
+- **Spark**: 老牌, batch 处理强, SQL + Python 都行. 适合 ETL / feature engineering. 不适合实时 / 小延迟
+- **Ray**: ML-native, Python 原生 API, 适合分布式训练 + 推理. 学习曲线低
+- **Dask**: Pandas-like API 扩展到分布式, 适合 data scientist 渐进上手. 没 Spark 那么 production-grade
+
+**Sharding** (分片): 把一份数据按 key 拆到多个存储节点. **Sharding key 选错是 SaaS 公司最经典事故** (hot shard, 80% 流量打到 20% 节点).
+
+**Weak supervision**: 没人工标的情况下, 用 heuristic / rules / 弱信号生成 noisy labels. 关键 framework: Snorkel (labeling functions), Programmatic Weak Supervision (PWS). 在 100M+ unlabeled 场景下不可或缺.
+
+**Statistical power**: 一个 A/B test / eval 需要多少 sample 才能 detect 真实差异. 公式 `n ≈ (1.96 + 0.84)² · σ² / Δ²`. 100x 大数据 ≠ 100x 大 sample size — 通常 cap 在 30k-100k 已经够.
+
+---
+
+## 2. 这个问题的核心是什么
+
+设想 **不做架构调整, 直接 100x** 的灾难场景:
+
+```
+Take-home (1k docs):
+  ETL:    单 Python script, 5 min
+  Train:  单卡 GPU, 30 min
+  Index:  单节点 HNSW, 200MB RAM
+  Serve:  Flask + 1 GPU, p99 100ms
+  Eval:   Jupyter notebook, 100 sample, manual review
+
+100x (100k docs):
+  ETL:    单 script 跑 8h, 中途 OOM, 没断点续跑   ❌
+  Train:  单卡跑 50h, batch size 装不下           ❌
+  Index:  HNSW 20GB, 单节点装不下 / 重建 6h        ❌
+  Serve:  p99 500ms, GPU OOM under load           ❌
+  Eval:   notebook 跑不完, sample size 不够       ❌
+
+1000x (1M docs):
+  全部炸 + 钱包炸 + 时间炸
+```
+
+**核心矛盾**:
+
+- 单机 / 单 script 假设不再成立
+- 顺序处理时间不可接受
+- 内存 / 存储拐点变化
+- 一次性 batch 处理变 incremental + streaming
+- 标注成本 / 时间不可线性扩展 (1k 人工标 1 周, 100k 不能 100 周)
+- 服务延迟拐点变化 (HNSW recall 在 10M+ 下降)
+
+**100x 解法核心**:
+
+```
+数据层:        Spark / Ray ETL pipeline, 持久 + 可断点
+训练层:        分布式训练 (DDP / FSDP / DeepSpeed), 数据并行 + 模型并行
+存储层:        分片 + 冷热分层 (S3 cold + Redis hot), 量化压缩
+serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
+标注层:        weak supervision + active learning (人工只标边界)
+评估层:        sampling-based + statistical power 验证
+成本层:        Pareto curve 上找点, 不追求 absolute best
+```
+
+---
+
+## 3. 决策树: 数据规模拐点
+
+```
+                    [数据规模 N]
+                         ↓
+        ┌────────────┬───────────┬───────────┬─────────────┐
+        ▼            ▼           ▼           ▼             ▼
+     < 10k        10k-1M       1M-100M    100M-10B     > 10B
+        │           │           │           │             │
+        ▼           ▼           ▼           ▼             ▼
+    Notebook   单机 Python   Spark/Ray    Spark         BigQuery /
+    Pandas     + Postgres    + Postgres   + Vespa /     Snowflake /
+    + SQLite                 + HNSW       Milvus        Iceberg
+                                                        分区
+        │           │           │           │             │
+        ▼           ▼           ▼           ▼             ▼
+    Single     Single GPU   Multi-GPU    Multi-node    Distributed
+    GPU CPU    + LoRA       single-node   FSDP / DS     training
+                            DDP                         (DeepSpeed)
+        │           │           │           │             │
+        ▼           ▼           ▼           ▼             ▼
+    Manual    Manual +     LLM-judge +  Stratified    Sampled +
+    eval      LLM-judge    stratified   sample +      streaming
+              all          sample       statistical   eval
+                                        power
+```
+
+**拐点 = 架构必须换**:
+
+- 10k → 1M (我们 take-home 是这个 case): **批处理 → 分布式批处理**
+- 1M → 100M: **单节点 vector DB → 分片 vector DB**, **单 GPU → 多 GPU**
+- 100M → 10B: **batch → streaming**, **HNSW → IVF/disk-based**, **manual eval → sampling-eval**
+- 10B+: **集中存储 → 分布式 lakehouse**, **per-batch train → continuous learning**
+
+---
+
+## 4. 5 维度 × 100x impact 对比表
+
+| 维度 | 1k baseline | 100k (100x) | 10M (10000x) | What breaks first |
+|---|---|---|---|---|
+| **Ingest** | Single script 5min | Distributed ETL 1h | Streaming + Spark cluster 24/7 | Embedding API rate limit / cost |
+| **Storage** | 100MB local | 10GB Postgres + S3 | 1TB sharded vector DB | RAM budget, index rebuild time |
+| **Indexing** | HNSW in-memory | Multi-node HNSW | DiskANN / IVF-Disk | Single-node index build time |
+| **Training** | Single GPU 30min | DDP 4 GPU 2h | FSDP 32 GPU 1 day | GPU memory for batch size |
+| **Inference** | Single GPU < 100ms | Multi-replica 50ms | Tiered cache + distributed 80ms | KV cache pressure, hot shard |
+| **Labeling** | 100% manual 1 day | 10% manual + weak sup 1 week | < 1% manual + active learning | Human attention budget |
+| **Eval** | Run all in notebook | Stratified sample 5k | Sampled + statistical power | Eval compute cost |
+| **Cost** | $5 total | $500/month | $50k/month | Embedding + GPU + storage |
+
+---
+
+## 5. 具体业务场景 (4 类 100x 实战)
+
+### 场景 A: TikTok BNPL 7-market voice agent 扩展到 30+ market (你的工作背景)
+
+**当前**: 7 个市场 (东南亚 + 巴西), ~1M 用户对话 / 月, 6 语言.
+
+**100x**: 假设拓展到 30 个市场, 每市场 5M 用户, 总 ~150M 对话 / 月, 20+ 语言.
+
+**架构变化**:
+
+```
+数据层:
+  - ASR / TTS recording 存储: S3 per-region (合规 + 延迟)
+  - 训练数据 lakehouse: Iceberg on S3
+  - PII redaction pipeline: 每条 inbound 都跑
+
+训练层:
+  - per-language SFT (6 lang → 20 lang, 数据少的用 cross-lingual transfer)
+  - DPO data: 每 language 5k preference pair 起步, 用 LLM-as-judge 半自动生成
+  - 中心化 trainer (Anyscale Ray on AWS p4d / GCP H100)
+
+Serving:
+  - per-region serving (亚太 / 美洲 / EMEA 各 1 set)
+  - 模型 routing: 简单 query → 小模型, 复杂 → Claude Sonnet 4.6
+  - vLLM with prefix caching (system prompt 共享)
+
+eval:
+  - per-language eval set (各 500 example)
+  - market-specific business KPI (repayment rate, complaint rate)
+  - drift detection: 入境语言分布 KL divergence
+```
+
+**Cost growth**: $50k → $5M / 年 (训练 + 推理 + 标注 + 存储).
+
+### 场景 B: BNPL FAQ RAG 从 1k FAQ → 100k FAQ (跨产品 + 跨地区)
+
+**当前**: 1k FAQ, 单 PostgreSQL + pgvector, recall@10 = 85%.
+
+**100x**: 100k FAQ + 实时更新, 多产品 line (PayLater / Pay-in-4 / 商家贷 / 转账).
+
+**架构变化**:
+
+```
+Storage:
+  - pgvector → Qdrant / Pinecone (cluster mode)
+  - 按 product_line + language sharding
+  - 冷热分层: 最近 30 天 FAQ in Redis (查询 90% 命中), 其他 in vector DB
+
+Embedding:
+  - 100k × 500 token × 1024 dim × 4 byte = 200MB vectors (小)
+  - 一次重新 embed 全部: $0.13 / M token × 100k × 500 = $6.5 (cheap)
+  - 模型升级时 dual-index 跑 1 周 A/B
+
+Index:
+  - HNSW per-shard, M=32, efConstruction=200
+  - 跨 shard query fan-out, top-100 from each → rerank top-10
+
+Eval:
+  - 200 stratified golden queries (按 product / lang / difficulty)
+  - 每日 sample 1000 production queries 跑 LLM-judge
+  - 周报 + 告警 (recall 跌 > 3pp)
+```
+
+### 场景 C: ConvFinQA-style 多跳财报 → 1M 公司 historical 数据
+
+**当前**: 数百公司, 10-K 文档, multi-hop reasoning.
+
+**100x**: 全美国 + 欧 + 亚 1M 公司, 季度更新, 历史 20 年.
+
+**架构变化**:
+
+```
+Ingest:
+  - PDF → Markdown / structured (Marker / Nougat OCR)
+  - 表格 extract (Camelot + LLM verification)
+  - 增量 ingest: SEC EDGAR webhook, 新 filing 1h 内 indexed
+
+Storage:
+  - 文档 in S3 (raw + parsed)
+  - Chunks 中 hot 1 年 in vector DB, 老 in DiskANN on EBS
+  - Tabular numbers separate columnar store (DuckDB / ClickHouse)
+
+Query:
+  - Query understanding: LLM 拆分 multi-hop (1 query → 3 sub-query)
+  - 数字 query → ClickHouse SQL
+  - 自然语言 query → vector retrieve
+  - 融合 + reason via Claude Opus 4.7
+
+Eval:
+  - Stratified 1k question set (per industry / time / question type)
+  - Statistical power: 1k 足够 detect 2pp difference at 95% confidence
+```
+
+### 场景 D: TikTok PayLater fraud detection 从 1M user → 100M user
+
+**当前**: 1M user, daily transaction ~10M, 已 deploy XGBoost + 简单 LLM 异常检测.
+
+**100x**: 100M user, daily ~1B transaction.
+
+**架构变化**:
+
+```
+Feature pipeline:
+  - Spark Structured Streaming (每 5 min compute features)
+  - Feast feature store (online + offline 一致)
+
+Model:
+  - 主 model: XGBoost (1B feature) → 升级 LightGBM / CatBoost
+  - 二级 model: LLM 检测 chat fraud / social engineering
+  - Cascade: XGBoost score > 0.7 → LLM verify (节省 99% LLM 调用)
+
+Serving:
+  - Real-time scoring < 50ms
+  - per-region feature store cache
+  - Hot user (high-risk) 5-min refresh, normal 1h
+
+Labeling:
+  - 1M → 100M means manual labeling impossible
+  - Weak supervision via Snorkel: rules + LLM auto-label
+  - Active learning: model uncertain → human review (top 1%)
+```
+
+---
+
+## 6. 工程上要做什么 — 100x scaling playbook
+
+### Phase 1: Baseline + bottleneck identification (1 week)
+
+```bash
+# 1. Profile current system at current scale
+$ python profile_pipeline.py --measure ingest,storage,query,eval
+
+# Output 类似
+# ingest:    5 min for 1k docs  (throughput: 200 docs/min)
+# storage:   100 MB total
+# query:     p99 = 80ms
+# eval:      manual 1 day
+# cost:      $5 / week
+```
+
+### Phase 2: Project to 100x, identify breakpoints (1 day)
+
+```python
+# Project linearly + identify cliffs
+breakpoints = {
+    'ingest_time_at_100x_naive': '500 min = 8 hours (OK or BREAK?)',
+    'storage_at_100x': '10GB (OK)',
+    'query_p99_at_100x_naive': '~80ms (probably OK if HNSW)',
+    'eval_at_100x_manual': '100 days (BREAK - need automation)',
+    'cost_at_100x_naive': '$500/week (BREAK depending on budget)',
+}
+```
+
+### Phase 3: Architecture changes per layer
+
+Each layer 单独设计 (后面 5 个 Part 2 problem 详细讲).
+
+### Phase 4: Migration plan (4-6 week)
+
+```
+Week 1-2:  Build new infrastructure in parallel (shadow mode)
+Week 3:    Dual-write to old + new
+Week 4:    A/B test: 1% traffic to new, monitor metrics
+Week 5:    50% / 100% gradual cutover
+Week 6:    Sunset old, keep readable for rollback (30 day)
+```
+
+### Phase 5: Operational maturity
+
+- SLO + alerting per layer
+- Cost monitoring (daily / weekly review)
+- Capacity planning (predict 6-month需求)
+- Disaster recovery (region failover, snapshot 频率)
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
 |---|---|---|
-| **1. Ingestion** | 100x docs to embed | Embedding API rate / cost / time |
-| **2. Storage** | 100x vectors | Memory budget, cluster size |
-| **3. Index build** | 100x indexing time | Single-node infeasible |
-| **4. Query latency** | More vectors to search | ANN recall degrades, p99 grows |
-| **5. Cost** | 100x compute + storage | Budget |
+| 1 | **Linear projection** (100x docs = 100x cost) | 实际有 step function — 拐点突变 |
+| 2 | **忽略 embedding 迁移成本** | 模型升级要重新 embed 全部, 100M docs = $1000s + 几小时 |
+| 3 | **没 incremental ingest** | 每天全量重建 → 几小时 down |
+| 4 | **Hot shard** | sharding key 不均, 80% 流量到 20% 节点 |
+| 5 | **Single point of failure** in eval pipeline | 一个 notebook crash, 一周 eval 没了 |
+| 6 | **Labeling 假设线性扩展** | 1k 人标 1 周, 100k 不是 100 周, 是「不可能」 |
+| 7 | **Statistical power 不够** | 100M dataset 不代表 100M sample size, sample 还是要 30k-100k |
+| 8 | **没 cost monitoring** | 月底账单 $50k 才发现 |
+| 9 | **没 dual-index migration** | 模型升级 big-bang reload → 全网 5 min down |
+| 10 | **Sync 阻塞调用** | 100x query 都 sync 等待 → thread pool 耗尽 → OOM |
 
 ---
 
-## 5 步框架
+## 一句话总结 (Part 1)
+
+> **100x 不是「跑 100 倍循环」, 是「换架构 + 换成本结构 + 换运维模式」**.
+>
+> Take-home 心态: 「只要正确」. Production 心态: 「正确 + 可断点 + 可降级 + 可控成本 + 可演进」.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: Data Infrastructure — Storage + Distributed Processing
+
+### 1.1 Storage 选型 (按规模)
+
+```
+< 10 GB:     SQLite / local Parquet           (笔记本就够)
+10 GB-1 TB:  Postgres + S3 backup            (单机管理)
+1-100 TB:    Iceberg / Delta Lake on S3       (lakehouse)
+> 100 TB:    BigQuery / Snowflake / Databricks (managed warehouse)
+```
+
+**Take-home (1k docs ≈ 50MB)** vs **100x (5GB)** — 还在「单机管理」区间, 不需要 lakehouse.
+
+**1000x (50GB)** → 进入「需要 partitioning」区间. **10000x (500GB)** → 必须 lakehouse.
+
+### 1.2 Spark vs Ray vs Dask — 选哪个
+
+| Framework | 强项 | 弱项 | 100x 场景适用 |
+|---|---|---|---|
+| **Spark** | SQL + Scala/Python, batch ETL 王者, broad ecosystem | 启动开销大, 实时弱 | ETL / feature engineering |
+| **Ray** | Python-native, ML 友好, 分布式训练 + 推理 + serve | 生态新, ops 工具弱 | 训练 / inference / 复杂 ML workflow |
+| **Dask** | Pandas-like API, scientist-friendly | Production scale 不如 Spark | 数据分析 / 小规模 ETL |
+
+**Decision matrix**:
+
+```python
+def choose_framework(workload_type, scale, team_skill):
+    if workload_type == 'batch_etl' and scale > 100GB:
+        return 'Spark'  # Battle-tested, SQL
+    if workload_type == 'ml_training' and scale > 10GB:
+        return 'Ray'  # Best ML support
+    if workload_type == 'data_science_exploration':
+        return 'Dask'  # Lowest barrier
+    if team_skill == 'sql_only':
+        return 'BigQuery / Snowflake'  # No code
+    return 'Spark'  # Safe default
+```
+
+### 1.3 实操: Spark Pipeline for 100M docs ingest
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import udf, col
+from pyspark.sql.types import ArrayType, FloatType
+
+spark = SparkSession.builder \
+    .appName("doc-embed-pipeline") \
+    .config("spark.sql.shuffle.partitions", 400) \
+    .config("spark.executor.memory", "8g") \
+    .config("spark.executor.cores", "4") \
+    .getOrCreate()
+
+# 1. Read docs (partitioned by date)
+docs = spark.read.parquet("s3://corp/raw-docs/year=2026/").repartition(400)
+
+# 2. Chunk in parallel
+@udf(ArrayType(StringType()))
+def chunk_doc(text):
+    return structure_aware_chunk(text, max_tokens=500, overlap=0.3)
+
+chunks = docs.withColumn("chunks", chunk_doc(col("text"))) \
+    .selectExpr("doc_id", "explode(chunks) as chunk_text")
+
+# 3. Embed in batches (call vLLM embedding endpoint)
+@udf(ArrayType(FloatType()))
+def embed(text):
+    return embedding_client.embed([text])[0]
+
+embedded = chunks.repartition(1000) \
+    .withColumn("vector", embed(col("chunk_text")))
+
+# 4. Write to Iceberg + push to vector DB
+embedded.write.format("iceberg") \
+    .mode("append") \
+    .save("warehouse.embeddings")
+```
+
+**Throughput math**:
+- 100M chunks × 30ms embed = 3M seconds serial = 35 days
+- 1000 parallel workers × 30ms = 50 min total (assuming embed API can handle)
+- **Bottleneck shifts from compute to embed API rate limit**
+
+### 1.4 Ingestion: Batch vs Streaming
+
+```
+Batch (适合 stable corpus, daily refresh):
+  - Spark cron daily 2am
+  - 全量 / 增量
+  - Cheaper, simpler ops
+
+Streaming (适合实时变化, e.g., user-generated):
+  - Kafka → Flink / Spark Streaming
+  - Sub-minute freshness
+  - Complex ops, harder debug
+```
+
+**Pragmatic 2026 architecture**:
+
+```
+Kafka → Spark Structured Streaming (micro-batch 1 min)
+  → embed in batch (every 1 min, 1000 chunks)
+  → write to Iceberg (Bronze layer raw)
+  → daily Silver job (PII redaction + chunking)
+  → daily Gold job (embedding + index update)
+```
+
+### 1.5 Backup + DR
+
+- S3 cross-region replication (Asia + US)
+- Iceberg snapshots: keep 30 day, point-in-time recovery
+- Vector DB: incremental snapshot 每 6h to S3
+- Test restore quarterly (90% 公司没做, 真实事故时崩)
+
+---
+
+## ⚙️ Problem 2: Training & Serving Impact — Batch Size, Sharding, Distributed
+
+### 2.1 单 GPU → 多 GPU → 多节点 拐点
+
+```
+Single GPU (8B model, A100 80GB):
+  - Batch size 16, sequence 2048
+  - Train 100k examples: 4h
+  - Fine
+
+Multi-GPU single-node (8 × A100):
+  - DDP (data parallel): each GPU has full model copy, batches split
+  - Batch size 128 effective, sequence 2048
+  - Train 1M examples: 6h
+  - Works up to ~13B model with FSDP
+
+Multi-node (4 nodes × 8 GPU = 32):
+  - DDP + FSDP (model sharding)
+  - Or ZeRO-3 (DeepSpeed)
+  - 70B+ model trainable
+  - Inter-node networking (NVLink + InfiniBand) critical
+
+Beyond (1000 GPU):
+  - 3D parallelism: data + tensor + pipeline
+  - Megatron-LM / DeepSpeed
+  - Communications becomes complex
+```
+
+### 2.2 三种并行 vs 选型
+
+| Strategy | Memory | Comm | When |
+|---|---|---|---|
+| **Data Parallel (DDP)** | Each GPU has full model | Gradient sync after backward | Model fits single GPU |
+| **Tensor Parallel (TP)** | Layer split across GPUs | Activations every layer | Model doesn't fit, layer-by-layer |
+| **Pipeline Parallel (PP)** | Sequential layer groups on different GPUs | Activations between groups | Very deep model |
+| **FSDP (ZeRO-3)** | Shard params + grads + opt state | All-gather params before each layer | Mid-large model on commodity hw |
+| **3D parallelism** | All three | All combined | 100B+ model training |
+
+### 2.3 实操: PyTorch FSDP 训 13B model
+
+```python
+import torch.distributed as dist
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+# 1. Init distributed
+dist.init_process_group(backend="nccl")
+local_rank = int(os.environ['LOCAL_RANK'])
+torch.cuda.set_device(local_rank)
+
+# 2. Load model
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3-13B")
+
+# 3. Wrap with FSDP
+auto_wrap_policy = functools.partial(
+    transformer_auto_wrap_policy,
+    transformer_layer_cls={LlamaDecoderLayer},
+)
+
+model = FSDP(
+    model,
+    auto_wrap_policy=auto_wrap_policy,
+    mixed_precision=MixedPrecision(
+        param_dtype=torch.bfloat16,
+        reduce_dtype=torch.bfloat16,
+    ),
+    sharding_strategy=ShardingStrategy.FULL_SHARD,  # ZeRO-3 equivalent
+    device_id=local_rank,
+)
+
+# 4. Train (standard PyTorch loop)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
+
+for batch in dataloader:
+    outputs = model(**batch)
+    loss = outputs.loss
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+### 2.4 Serving Sharding 策略
+
+```
+Sharding by user_id (hash):
+  + 均匀分布
+  - 失去局部性 (同 tenant 数据散落)
+
+Sharding by tenant_id:
+  + 多租户隔离, 同 tenant 在同节点
+  + 易于 ACL
+  - Hot tenant 问题 (1 个大客户占 80%)
+
+Sharding by content type:
+  + 按 query type 路由, 只查相关 shard
+  - 需要 query classifier
+  - 不均匀
+
+Sharding by language / region:
+  + 合规友好 (数据驻留)
+  + Latency 好 (region 内查询)
+  - 跨 region 查询代价高
+```
+
+**实战**: TikTok PayLater 用 **region + language sharding** (合规驱动), 同时支持 **tenant_id 二级分区** (大客户).
+
+### 2.5 Inference 优化 (100x QPS)
+
+```
+1x QPS:    Single replica, naive batching
+10x QPS:   Continuous batching (vLLM)
+100x QPS:
+  - Multiple replicas behind LB
+  - Prefix caching (system prompt 共享)
+  - Speculative decoding (draft model 加速)
+  - Quantization (INT8 / FP8 weight)
+  - KV cache offload to CPU (long context)
+  - Multi-region serving + affinity routing
+```
+
+### 2.6 Cost: training vs serving
+
+```
+Take-home (1k example):
+  Training:  $1 (1 GPU x 1h)
+  Serving:   $10/month (1 GPU)
+
+100k example:
+  Training:  $50 (8 GPU x 6h)
+  Serving:   $50/month (1 GPU + cache)
+
+10M example:
+  Training:  $5k (32 GPU x 1 day, multi-round)
+  Serving:   $5k/month (replicas + cache)
+
+100M example:
+  Training:  $50k (continual training, post-training rounds)
+  Serving:   $50k/month (multi-region + multi-replica)
+```
+
+**关键观察**: serving cost 通常超过 training (持续 vs 一次性), 优化 serving > 优化 training, 除非你 train 频繁.
+
+---
+
+## ⚙️ Problem 3: Quality at Scale — Sampling, Weak Supervision, Active Learning
+
+### 3.1 Labeling 困境
+
+```
+1k examples:    100% human label, 1 person × 1 week = $2k
+100k examples:  100% manual impossible — 200 people-weeks
+                Solution: 10% manual + 90% weak/auto label
+10M examples:   1% manual + 99% weak/auto/synthetic
+1B examples:    < 0.1% manual + active learning + synthetic
+```
+
+### 3.2 Sampling 策略 (for labeling)
+
+```python
+def stratified_sample_for_labeling(data, n=5000):
+    """从 100M 里选 5k 关键 examples 人工标"""
+
+    # 1. Uncertainty sampling (model 不确定的)
+    uncertain = model.predict_uncertainty(data)
+    uncertainty_pool = data[uncertain > 0.7]
+    sample1 = random.sample(uncertainty_pool, n // 3)
+
+    # 2. Diversity sampling (覆盖各 slice)
+    sample2 = stratified_by_slice(data, slices=['language', 'domain', 'difficulty'], n=n//3)
+
+    # 3. Error analysis sampling (production errors)
+    sample3 = sample_from(production_errors, n=n//3)
+
+    return list(set(sample1 + sample2 + sample3))
+```
+
+### 3.3 Weak Supervision (Snorkel-style)
+
+不用人手标, 用 labeling functions 自动生成 noisy labels:
+
+```python
+from snorkel.labeling import labeling_function
+
+@labeling_function()
+def has_refund_keyword(x):
+    """Refund queries usually mention these terms"""
+    if any(word in x.text.lower() for word in ['refund', 'return', 'money back']):
+        return REFUND
+    return ABSTAIN
+
+@labeling_function()
+def llm_classify(x):
+    """Cheap LLM classifies — agree if confident"""
+    result = haiku_45.classify(x.text, labels=LABELS, confidence_threshold=0.9)
+    return result.label if result.confident else ABSTAIN
+
+@labeling_function()
+def has_payment_pattern(x):
+    """Regex pattern for payment-related"""
+    if re.search(r'\$\d+|payment|installment', x.text):
+        return PAYMENT
+    return ABSTAIN
+
+# 一堆 LFs combined via majority vote / generative model
+applier = PandasLFApplier(lfs=[has_refund_keyword, llm_classify, has_payment_pattern])
+L_train = applier.apply(df=data)
+
+# Train label model (no human labels needed)
+label_model = LabelModel(cardinality=N_CLASSES)
+label_model.fit(L_train)
+predictions = label_model.predict_proba(L_train)
+```
+
+**Snorkel cost**: 几个 LF × 100M docs ≈ $0 (本地 regex) + LLM cost.
+
+**Quality**: F1 typical 0.6-0.8 vs human 0.9. 但对训练 model 来说**够了** (model 自己有降噪能力).
+
+### 3.4 Active Learning Loop
+
+```python
+def active_learning_loop(unlabeled_pool, model, budget_per_iter=500):
+    labeled = []
+    while budget_remaining():
+        # 1. Score uncertainty
+        uncertainty_scores = model.predict_uncertainty(unlabeled_pool)
+
+        # 2. Pick top-N uncertain
+        to_label = pick_top_n(unlabeled_pool, uncertainty_scores, n=budget_per_iter)
+
+        # 3. Human label
+        new_labels = human_labelers.label(to_label)
+
+        # 4. Add to training set
+        labeled.extend(new_labels)
+
+        # 5. Retrain
+        model.train(labeled)
+
+        # 6. Evaluate
+        score = model.eval(holdout_set)
+        log({'iteration': iter_n, 'labeled_count': len(labeled), 'score': score})
+
+        if score plateau:
+            break
+
+    return model
+```
+
+**核心**: 不是 random 标, 是「标了对 model 最有用」的.
+
+### 3.5 Synthetic Data (LLM-generated)
+
+```python
+# 用 Claude Opus 4.7 / GPT-5.5 生成 synthetic training data
+def generate_synthetic(prompt_template, seed_examples, n=10000):
+    examples = []
+    for _ in range(n):
+        seed = random.sample(seed_examples, 3)
+        prompt = prompt_template.format(seed=seed)
+        new_example = opus_47.generate(prompt, temperature=0.8)
+        examples.append(new_example)
+    return examples
+
+# Cost: 10k × 500 token × $25/M = $125
+# vs human labeling: 10k × $1.5 = $15k
+# Quality: 70-80% as good as human, but 100x cheaper
+```
+
+**Caveat**: synthetic data 有 distribution bias, 必须 mix 真实数据训练.
+
+### 3.6 Quality Validation
+
+```python
+# 即使用 weak / synthetic, 必须 hold out 真实 human-labeled set
+human_test_set = random.sample(data, 1000)  # 真人标
+human_test_labels = human_labelers.label(human_test_set)
+
+# Train on weak / synthetic, eval on human
+model.train(weak_labeled_data)
+eval_score = model.eval(human_test_set, human_test_labels)
+
+# 必须 eval score > threshold (e.g., 0.85) 才能上线
+```
+
+---
+
+## ⚙️ Problem 4: Cost Economics — Training $ vs Serving $ vs Labeling $
+
+### 4.1 三类 cost 的不同 scaling 曲线
+
+```
+Training cost:    一次性大开销, 后续小开销 (model upgrade)
+  Take-home:       $1
+  100x:            $50
+  10000x:          $5k
+  → scales sub-linearly with data (经验法则: O(N^0.7))
+
+Serving cost:     持续 monthly, 与 QPS 线性
+  Take-home:       $5/month
+  100x:            $500/month
+  10000x:          $50k/month
+  → scales linearly with traffic (一旦 utilization > 60%)
+
+Labeling cost:    Hybrid
+  Take-home:       $200 (100% manual)
+  100x:            $5k (10% manual)
+  10000x:          $20k (1% manual + active)
+  → scales sub-linearly because automation
+```
+
+**结论**: **Serving cost 通常最大**, 优化 serving 收益最大.
+
+### 4.2 2026 LLM Pricing Reference
+
+```
+Provider / Model         Input $/M   Output $/M   Context   Use case
+─────────────────────────────────────────────────────────────────
+Gemini 3 Pro             $2.00      $12.00       2M        Multi-modal, long context
+Gemini 3 Flash           $0.50      $3.00        2M        Fast, cheap
+Claude Opus 4.7          $5.00      $25.00       1M        Highest quality reasoning
+Claude Sonnet 4.6        $3.00      $15.00       400k      Balanced (production default)
+Claude Haiku 4.5         $1.00      $5.00        200k      Cheap, fast
+GPT-5.5                  $5.00      $30.00       512k      Latest GPT
+GPT-5.4                  $2.50      $15.00       512k      Mid-tier GPT
+
+vLLM / open-source self-hosted:
+  Llama 3 70B:           ~$0.50/M total on H100 spot
+  Qwen 2.5 72B:          ~$0.40/M total
+```
+
+### 4.3 Cost calc: 100M queries / day
+
+```
+Naive (all to GPT-5.5):
+  100M × 1k input × $5/M = $500/day input
+  100M × 200 output × $30/M = $600/day output
+  Total: $1.1M / day = $400M / year ❌
+
+Tiered routing (most common 2026):
+  90% Haiku 4.5:    90M × 1k × $1 + 90M × 200 × $5 = $180k/day
+  9% Sonnet 4.6:    9M × 1k × $3 + 9M × 200 × $15 = $54k/day
+  1% Opus 4.7:      1M × 1k × $5 + 1M × 200 × $25 = $10k/day
+  Total: $244k/day = $89M / year (4x cheaper)
+
+Self-hosted Llama 3 70B for 90% + Opus 4.7 for 10%:
+  90% on vLLM cluster:  90M × 1k × $0.5 + 90M × 200 × $0.5 = $54k/day
+  10% Opus 4.7:         10M × 1k × $5 + 10M × 200 × $25 = $100k/day
+  Total: $154k/day = $56M / year (但需要 10-20 H100 cluster 投资)
+```
+
+### 4.4 Cost reduction levers (按效益 ranking)
+
+| Lever | Saving | 实现成本 |
+|---|---|---|
+| **Prompt caching** (Claude / GPT) | 70-90% input cost on long system prompts | 几行代码 |
+| **Smaller model tiering** (Haiku for easy) | 5-10x | Need router + eval |
+| **Self-host open model** | 5-10x at scale | Need infra team |
+| **Quantization** (INT8 / FP8) | 2-4x | vLLM 自带 |
+| **Speculative decoding** | 2-3x latency, no quality loss | Need draft model |
+| **Request batching** | 2-5x throughput | vLLM continuous batching |
+| **Result caching** (hot queries) | 30-90% depending on hit rate | Redis + cache key design |
+
+### 4.5 实战: BNPL chatbot cost optimization 案例
+
+```
+Before:
+  100k queries / day, all to GPT-5.5
+  Cost: $5k / month
+  P99 latency: 800ms
+
+After cascade:
+  - 80% intent routing (Haiku 4.5):    $400 / month
+  - 15% RAG queries (Sonnet 4.6):      $700 / month
+  - 5% complex multi-hop (Opus 4.7):   $500 / month
+  - Result cache (40% hit):            -30% from above
+  - Total: ~$1.1k / month (5x reduction)
+  - P99 latency: 600ms (cache helped)
+```
+
+### 4.6 Embedding migration cost
+
+```
+100M docs × 500 token = 50B tokens
+
+text-embedding-3-large @ $0.13/M = $6.5k one-time
+text-embedding-3-small @ $0.02/M = $1k one-time
+
+每次 model upgrade re-embed:  same cost
+每次重建 index:                     compute time + storage
+
+Lesson: pick embedding model carefully, migration is $1k+
+```
+
+---
+
+## ⚙️ Problem 5: Evaluation at Scale — Sampling, Statistical Power, Slice
+
+### 5.1 Statistical Power 基础
+
+**不是 dataset 越大 sample size 越大**. Sample size 由要 detect 的 effect size 决定:
+
+```python
+import statsmodels.stats.power as smp
+
+# 我要 detect 2pp 差异 (90% recall → 88% recall), at 95% confidence, 80% power
+analysis = smp.zt_ind_solve_power(
+    effect_size=0.02,  # 2pp absolute
+    alpha=0.05,
+    power=0.80,
+    alternative='two-sided',
+)
+print(f"Required sample size per group: {analysis:.0f}")
+# ~4900 per group, 9800 total
+```
+
+**对照表**:
+
+| Effect to detect | Min sample size |
+|---|---|
+| 10pp | 200 |
+| 5pp | 800 |
+| 2pp | 5000 |
+| 1pp | 20000 |
+| 0.5pp | 80000 |
+
+**实践**: 大多数情况 5-10k sample 足够. 100M dataset 不需要 100M eval.
+
+### 5.2 Stratified Sampling
+
+```python
+def stratified_eval_sample(corpus, n_total=5000):
+    """按多维 slice 均衡 sample"""
+    strata = {
+        'easy_factoid_en':       0.20,  # 1000 samples
+        'medium_multi_hop_en':   0.15,
+        'hard_multi_hop_en':     0.10,
+        'easy_factoid_id':       0.10,  # Indonesian
+        'medium_multi_hop_id':   0.05,
+        'easy_factoid_vi':       0.10,  # Vietnamese
+        'edge_cases':            0.10,
+        'production_errors':     0.10,  # 真实失败 case
+        'adversarial':           0.10,  # 红队样本
+    }
+
+    sampled = []
+    for slice_name, fraction in strata.items():
+        n = int(n_total * fraction)
+        pool = corpus.filter(slice=slice_name)
+        sampled.extend(random.sample(pool, n))
+    return sampled
+```
+
+### 5.3 Eval pipeline at 100x scale
+
+```python
+async def eval_pipeline(model, eval_set):
+    """Eval 5000 sample 同时, fan-out 控制"""
+
+    semaphore = asyncio.Semaphore(20)  # 限制并发, 避免打爆 LLM API
+
+    async def eval_one(sample):
+        async with semaphore:
+            output = await model.generate(sample.input)
+            judge_score = await llm_judge.score(sample.expected, output)
+            return {'id': sample.id, 'output': output, 'score': judge_score}
+
+    results = await asyncio.gather(*[eval_one(s) for s in eval_set])
+    return results
+
+# Cost: 5k samples × 2 LLM calls (model + judge) × $0.01 = $100 per eval run
+# Time: 5k / 20 concurrent × 2s/call = 500s ≈ 10 min
+```
+
+### 5.4 Online + Offline 双 eval
+
+```
+Offline (CI / pre-deploy):
+  - 5k stratified golden set
+  - LLM-judge + automated metrics
+  - Trigger: every PR + nightly
+
+Online (production sampling):
+  - 0.1% of production queries sampled
+  - LLM-judge async on sample
+  - Drift detection on input distribution
+  - Trigger: continuous
+
+Online A/B:
+  - 5% traffic to new variant
+  - Compare key business metric (resolve rate, csat)
+  - Statistical significance check
+  - Auto rollback on SLO breach
+```
+
+### 5.5 Drift Detection at scale
+
+```python
+from scipy.stats import wasserstein_distance
+
+def detect_drift(current_window, baseline_window):
+    """Compare query distribution shifts"""
+
+    # Embed both windows
+    current_emb = mean_embedding(current_window)
+    baseline_emb = mean_embedding(baseline_window)
+
+    # Cosine distance
+    drift_score = 1 - cosine(current_emb, baseline_emb)
+
+    # Length distribution
+    length_drift = wasserstein_distance(
+        [len(q) for q in current_window],
+        [len(q) for q in baseline_window],
+    )
+
+    # Topic distribution (using topic model)
+    current_topics = topic_model.transform(current_window)
+    baseline_topics = topic_model.transform(baseline_window)
+    topic_drift = wasserstein_distance(current_topics, baseline_topics)
+
+    return {
+        'embedding_drift': drift_score,
+        'length_drift': length_drift,
+        'topic_drift': topic_drift,
+    }
+
+# Alert if any > threshold
+```
+
+### 5.6 LLM-as-judge at scale
+
+```python
+# 一个 judge 5k sample = $50, fine
+# 但 production 持续 eval 100k sample/day:
+#   100k × 2 LLM call × $0.01 = $2000/day = $60k/month  ❌
+
+# Optimizations:
+# 1. Use Haiku 4.5 as judge (1/5 cost vs Sonnet)
+# 2. Only eval failures / low-confidence (sample by uncertainty)
+# 3. Cache judge results for repeated queries
+# 4. Batch judge prompts (1 call evaluates 10 samples)
+
+class BatchedJudge:
+    def __init__(self, batch_size=10):
+        self.batch_size = batch_size
+
+    async def judge_batch(self, samples):
+        prompt = self.format_batch_prompt(samples)
+        result = await haiku_45.generate(prompt, output_schema=BatchJudgeOutput)
+        return result.scores
+
+# Cost: 100k / 10 batch × $0.005 = $50/day = $1.5k/month (40x reduction)
+```
+
+### 5.7 Slice-aware regression detection
+
+```python
+def detect_regression(current_eval, baseline_eval, slices):
+    """不止 overall, 每个 slice 比较"""
+
+    regressions = []
+    for slice_name in slices:
+        current_score = current_eval.score_by_slice(slice_name)
+        baseline_score = baseline_eval.score_by_slice(slice_name)
+        delta = current_score - baseline_score
+
+        # Statistical test (not just delta > X)
+        is_significant = ttest(current_eval[slice_name], baseline_eval[slice_name]).pvalue < 0.05
+
+        if delta < -0.02 and is_significant:
+            regressions.append({
+                'slice': slice_name,
+                'delta_pp': delta * 100,
+                'p_value': is_significant,
+            })
+
+    return regressions
+
+# Output:
+# Overall: -0.5pp (not significant)
+# Slice 'multi_hop_indonesian': -8pp (significant) ← 这是 real issue
+```
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+这 5 个问题是 100x 时 **5 个不会自然 scale 的层**:
+
+1. **Data infra** 决定「数据流能不能跑通」
+2. **Training / serving** 决定「模型能不能训出来 + 服务得起」
+3. **Quality at scale** 决定「100M 数据怎么标」
+4. **Cost** 决定「能不能 sustained 运营」
+5. **Evaluation at scale** 决定「能不能确认还在 working」
+
+每一层 100x 都有 **拐点**, 需要换架构 / 换工具 / 换 process. 面试场把这 5 个拐点都讲出来, 加上「我在 TikTok 见过 X→100X 的真实情况」, 就是 staff-level scaling 水准.
+
+---
+
+## 必问 clarifying questions
+
+**1. 100x in which dimension**
+
+> "100x 是数据量 (docs/users), QPS (queries/sec), 还是 model size (params)? 各自架构变化不同."
+
+**2. Take-home baseline shape**
+
+> "Take-home 现状: 多少 docs, 什么 model, 什么 storage, 什么 latency? 这影响起点."
+
+**3. Timeline + budget**
+
+> "100x within 6 months vs 2 years 差别巨大. Budget cap?"
+
+**4. Quality bar at 100x**
+
+> "Quality 保持还是提升? 100x scale 时通常有 5pp 的 inherent regression, 是否可接受?"
+
+**5. Real-time vs batch**
+
+> "Inference real-time (<200ms) or batch acceptable? 决定 architecture choice."
+
+---
+
+## 5 步框架 (sample 60-min answer)
 
 | 时长 | 阶段 |
 |---|---|
-| 0-3 min | Frame: assume 1M docs → 100M docs |
-| 3-10 min | Walk through 5 scale dimensions, what breaks |
-| 10-25 min | Architecture changes for each |
-| 25-40 min | Cost / latency tradeoffs |
-| 40-60 min | Deep dive on chosen change |
-
----
-
-## 我会这样答（sample）
-
-> "Assume take-home was 1k docs, 100x = 100k. Or if take-home was 1M, 100x = 100M docs. Walk through both since architecture changes are different.
->
-> **For 100k docs** (1k → 100k):
-> - **Ingestion**: 100k embeds @ 50ms/doc = 1.4h serial → batch parallel + OpenAI batch API → 30 min
-> - **Storage**: 100k × 1.5KB = 150MB → still fits in RAM, no infra change
-> - **Index**: rebuild on every add infeasible → switch to **incremental index** (HNSW supports add)
-> - **Query**: HNSW p99 < 50ms at 100k → fine
-> - **Cost**: 100k × $0.0001 embed = $10 one-time, $0.001/query — cheap
->
-> Most changes are **operational**, not architectural.
->
-> **For 100M docs** (1M → 100M):
-> - **Ingestion**: 100M @ 50ms = 1400h serial → MUST batch + parallel + distributed → 10 days even with 100 workers
-> - **Storage**: 100M × 1.5KB = 150GB — RAM-tight. **Switch to disk-backed ANN** (DiskANN / FAISS IVF-Disk) or **per-shard cluster**
-> - **Index**: 100M HNSW won't fit single-node. **Sharded index** (10 shards × 10M each) with parallel query
-> - **Query**: HNSW recall degrades at scale → **2-stage retrieve**: cheap shard 1 (recall@100), expensive rerank top-10
-> - **Cost**: $10k+ one-time embed, $0.05/query — material
->
-> **Architecture diff**:
->
-> ```
-> 1k - 1M docs:        Single-node HNSW + bi-encoder rerank
-> 1M - 100M docs:      Sharded HNSW (or IVF) + 2-stage rerank
-> > 100M docs:         Distributed cluster (Vespa / Milvus) + tiered hot/cold
-> ```
->
-> **At 100M I'd specifically change**:
-> 1. **Embedding model**: maybe distill to smaller (768→256 dim) to save 3x storage
-> 2. **Vector quantization**: PQ (Product Quantization) on cold tier, full precision on hot
-> 3. **Sharding strategy**: by topic/category for query routing → only hit relevant shard
-> 4. **Cache layer**: top-1000 common queries cached in Redis, 90% hit rate at 5ms
-> 5. **Async indexing**: docs queued, indexed within 5 min, eventually consistent
-> 6. **Cold tier**: docs not accessed in 30 days → moved to S3 (still retrievable but with latency premium)
->
-> **What breaks first** in my experience: **embedding cost + ingestion time**, not query speed. People underestimate this:
-> - 100M docs × $0.0001 = $10k for first embed
-> - On every model upgrade, re-embed → $10k each time
-> - **Lesson**: pick embedding model carefully because migration is expensive
->
-> **Tradeoffs at 100M I'd accept**:
-> - **Recall@10 drops 5pp** (from 92% to 87%) for 50% latency reduction
-> - **5-min indexing lag** for 10x cost reduction
-> - **Cold queries slower** (200ms vs 50ms) for 90% storage cost reduction
->
-> **What I'd NOT change** at 100M:
-> - Reranking (still cheap relative to retrieval)
-> - Embedding model (consistency across vectors > cost)
-> - Hybrid retrieval (BM25 scales fine)"
+| 0-5 min | Clarify which dimension + baseline + timeline + quality bar |
+| 5-10 min | Project breakpoints — what breaks first naive |
+| 10-25 min | 5-layer architecture changes (ingest, train, serve, label, eval) |
+| 25-35 min | Cost economics — show concrete $ math |
+| 35-45 min | Migration plan — dual-system + A/B + cutover |
+| 45-55 min | Operational concerns — SLO, drift, DR |
+| 55-60 min | Honest gaps + when I'd push back on 100x ambition |
 
 ---
 
 ## 简历专属 reframe
 
-你的 **TikTok scale (1B users)** + **vLLM/SGLang infra**:
+你的 **TikTok scale + voice agent 7 markets + vLLM/SGLang infra**:
 
 | 题 | 你做过 |
 |---|---|
 | 100x scale planning | TikTok payment scale — 你 daily 想 |
-| Distributed inference | vLLM / SGLang you optimized |
-| Cost-aware architecture | Voice agent 7 markets 你必 cost-tune |
-| Sharding strategy | 你处理过多 region routing |
+| Distributed training | Voice agent post-training (SFT/DPO/RL) — 你 own |
+| Distributed inference | vLLM / SGLang you optimized in prod |
+| Per-region sharding | Voice agent 7 markets per-region |
+| Cost optimization | Voice agent cost tiering |
+| Weak supervision | BNPL fraud labeling pipeline (likely) |
+| Eval at scale | ConvFinQA stratified 300 sample methodology |
+| Drift detection | Voice agent per-market metric monitoring |
 
-**主动说**:
+**主动 quote**:
 
-> "At TikTok we constantly think about 100x — what was per-region in Singapore at 10M users becomes per-region across 7 markets at 100M users. The pattern I learned: **embedding cost + ingestion time hit first, not query speed**. We had to switch to distilled embedding (768→384) + per-region sharding by language to control cost. The trick: **never re-embed entire corpus on model upgrade — embed delta, run dual-index during migration, cutover when new is faster**."
+> "I lived through 1→7 market scaling at TikTok PayLater — which is 10x at the data level but really 100x at the operations level (each new market is its own compliance + language + business rules). The pattern I learned: **embedding cost + ingestion time hit first, not query speed**. We had to:
+>
+> 1. **Switch to distilled embedding** (768 → 384 dim) when storage hit $20k/month
+> 2. **Per-region sharding by language** for both latency and compliance
+> 3. **Tiered model routing** — Haiku 4.5 for 80% intents, Sonnet 4.6 for RAG, Opus 4.7 for multi-hop. 5x cost saving.
+> 4. **Never re-embed entire corpus on model upgrade** — embed delta, dual-index migration, cutover when new is provably better
+> 5. **Per-market eval sets** (each language 500 stratified) + **drift detection on input distribution** — catching Indonesia distribution shift in week 1 saved 2 weeks of bad metrics
+>
+> The hardest part wasn't engineering, it was **convincing PM to accept 5pp recall regression in trade for 50% cost reduction** — at 100x scale, Pareto-optimal is the only sane operating point."
 
 ---
 
 ## 5 follow-ups
 
-**Q1**: "Cold tier queries — how slow is acceptable?"
-**A**: Depends on user expectation:
-- Interactive query (user waiting): < 500ms total budget
-- Background / async (e.g., batch reports): < 30s
-- For cold queries that miss hot tier, **partial result fast** (top-10 from hot) + **full result async** (top-100 from hot + cold)
-- User UX: "showing top results now, full results refreshing..."
+**Q1**: "Cold-tier queries — how slow is acceptable?"
+
+**A**: Tiered by user expectation:
+- Interactive (user waiting): < 500ms total budget
+- Background / async (e.g., daily report): < 30s
+- For cold queries that miss hot tier:
+  - **Partial result fast** (top-10 from hot, 50ms)
+  - **Full result async** (top-100 from hot+cold, 2s)
+  - UX: "showing top results, refreshing for completeness..."
+- DiskANN / IVF-Disk can give 80% of HNSW recall at 5x throughput.
 
 **Q2**: "How do you migrate embeddings on model upgrade?"
-**A**: **Dual-index pattern**:
-- Build new index in shadow (read v2 while serving v1)
-- Run **A/B for 1 week** — same query, return both v1 + v2 results, measure recall + user metrics
-- If v2 is better on user metrics, cutover
-- Keep v1 readable for 1 month (rollback safety)
+
+**A**: **Dual-index pattern, no downtime**:
+1. **Build new index in shadow** (read v2 while serving v1, 1-2 weeks)
+2. **Run A/B for 1 week** — same query, return both v1+v2 results, measure user metrics + offline eval
+3. If v2 wins on **both** offline + user metrics, gradual cutover (1% → 50% → 100% over 1 week)
+4. **Keep v1 readable for 1 month** (rollback safety)
+5. **Cost**: $6.5k re-embed + 2x storage during transition + engineering 2-3 weeks
 
 **Q3**: "Cost is bigger concern than latency. What changes?"
-**A**: Aggressively:
-- Distilled embedding (50% storage save)
-- Aggressive PQ quantization (8x compression, 5pp recall loss)
-- Smaller rerank model
-- Aggressive cache (24h TTL on results)
-- Cold tier earlier (after 7 days idle)
+
+**A**: Aggressive cost-first design:
+- **Smaller embedding** (384 dim, 50% storage)
+- **Aggressive PQ quantization** (8x compression, 5pp recall loss)
+- **Smaller rerank** (distilled to MiniLM-L2)
+- **Aggressive result cache** (24h TTL, 50% hit at scale)
+- **Cold tier early** (7d idle → DiskANN)
+- **Self-host open model** (Llama 3 70B on H100 spot, 5-10x cheaper than API)
+- **Speculative decoding** (2-3x latency improvement free)
+- **Drop reranker** if recall acceptable without (often 5-8pp lower but 50% cheaper)
 
 **Q4**: "Distributed system means new failure modes. How handle?"
-**A**:
-- **Query fan-out**: ask all shards, merge top-K. If a shard fails, **degraded result** (top-K from N-1 shards) rather than 5xx
-- **Shard rebalancing**: hot shard detected → split. Live, no downtime
-- **Re-index after failure**: shard goes down + comes back → reads from replica, no service interruption
-- **End-to-end SLO**: degraded vs failed, alert on degraded but don't page
 
-**Q5**: "Customer wants real-time index. Embed in < 1s after upload."
 **A**:
-- 1s embed feasible for single doc (50ms embed + 100ms HNSW add + 100ms commit)
-- Batch ingest > 100 docs/s breaks single-node ingest queue
-- Mitigations:
-  - **Write-ahead log** (Kafka) for ingest events
+- **Query fan-out**: ask all shards in parallel, merge top-K. If 1 shard fails, **return degraded** (top-K from N-1 shards) not 5xx
+- **Replica reads**: every shard has 2-3 replica, read from any. Reduce blast radius.
+- **Circuit breaker per shard**: if shard error rate > 10%, route around for 60s, then test
+- **Shard rebalancing**: hot shard detected (P99 latency / error rate) → online split (Vespa supports). No downtime.
+- **End-to-end SLO**: alert on degraded but don't page. Page on > 1% query失败.
+- **Chaos engineering**: monthly kill 1 shard in production, verify failover works
+
+**Q5**: "Customer wants real-time index — < 1s after upload, results retrievable."
+
+**A**:
+- 1s embed feasible for single doc: 50ms embed + 100ms HNSW add + 100ms commit + 200ms cache invalidate ≈ 450ms
+- Batch ingest > 100 docs/s saturates single-node ingest. Mitigation:
+  - **Write-ahead log** (Kafka, 1 partition per shard)
   - **Multi-shard parallel ingest**
-  - **Tiered ingest priority**: VIP customer ingests prioritized
+  - **Tiered ingest priority** — VIP / paid customers ingested first
+  - **Index lag SLO**: 99% of uploads searchable within 30s
+- Trade-off: 真正实时索引 cost 3-5x normal batch indexing. Often **5-min batch is fine for 90%, real-time on opt-in**.
 
 ---
 
-## ❌ 易错点
+## ❌ 易错点 (top 10)
 
-1. **Just "use Pinecone scaling"** — vendor lock-in answer
+1. **"Just use Pinecone scaling"** — vendor lock-in, no architectural thinking
 2. **Same architecture for 100x** — 1M vs 100M needs different design
-3. **Ignore cost** — 100x docs = 100x embed cost
-4. **Reranking 不 scale** assumption — 实际 reranks scale fine
-5. **Single-node HNSW for 100M** — won't fit
-6. **No graceful degradation** — fail loud > degrade quiet
-7. **Forget operational** (rate limits, batch APIs)
+3. **Ignore cost** — 100x docs = 100x embed cost = $$$ migration each model upgrade
+4. **Reranking 不 scale assumption** — actually reranks scale fine
+5. **Single-node HNSW for 100M** — won't fit, need sharded / DiskANN
+6. **No graceful degradation** — fail loud > degrade silent
+7. **Forget operational** (rate limits, batch APIs, monitoring)
+8. **Linear projection** — bigger N = breakpoints, not just multiplication
+9. **No statistical power thinking** — 100M dataset ≠ 100M eval samples
+10. **Manual labeling assumption** — 100x labels = 100x people = impossible
 
 ---
 
-## ✅ 加分项
+## ✅ 加分项 (top 10)
 
-1. **5-dimension scale framework**
-2. **Different architecture for 100k vs 100M**
+1. **5-dimension scale framework** (ingest/storage/train/serve/label/eval)
+2. **Different architecture for 100k vs 100M** (拐点意识)
 3. **Embedding cost + migration as #1 concern**
-4. **Dual-index migration pattern**
+4. **Dual-index migration pattern** (no downtime)
 5. **PQ quantization + distilled embed** for cost
-6. **Graceful degradation** (return partial top-K)
-7. **Quote TikTok 1B user experience**
-8. **Tradeoff transparency** (5pp recall for 50% latency)
+6. **Weak supervision + active learning** for labels
+7. **Statistical power** for eval sizing
+8. **Graceful degradation** (partial results)
+9. **Cost-Quality Pareto** thinking
+10. **Quote TikTok 7-market scaling experience**
+
+---
+
+## 一句话总结
+
+> **100x scaling = 「换架构 + 换 process + 换 cost 结构 + 换 quality measurement 方式」, 不是「跑 100 倍循环」**.
+>
+> Take-home 是 single-machine + manual + intuition; 100x 是 distributed + automated + statistical.
 
 ---
 
@@ -187,34 +1223,76 @@
 
 ```
 5 scale dimensions:
-  Ingest / Storage / Index build / Query latency / Cost
+  Ingest / Storage / Train / Serve / Label / Eval / Cost
 
-Architecture by scale:
-  1k - 1M: single-node HNSW + bi-encoder + cross-encoder rerank
-  1M - 100M: sharded HNSW or IVF + 2-stage rerank
-  >100M: distributed Vespa/Milvus + tiered hot/cold
+Breakpoints (架构必须换):
+  10k → 1M:     单机 → 分布式 batch (Spark/Ray)
+  1M → 100M:    单节点 → 分片 + 多 GPU
+  100M → 10B:   batch → streaming, HNSW → DiskANN
+  10B+:         集中 → lakehouse, train per-batch → continual
 
-At 100M changes:
-  - Distilled embedding (50% storage)
-  - PQ quantization (8x compression)
-  - Sharding by topic/category (query routing)
-  - 5-min async indexing
-  - Cache top-1000 queries
-  - Cold tier after 30d idle
+Framework picks:
+  Spark: batch ETL, broad ecosystem, ops-mature
+  Ray: ML-native, distributed train/serve, Python-friendly
+  Dask: data science Pandas-like, smaller scale
 
-What breaks first:
-  - Embedding cost (not query speed)
-  - Re-embed on model upgrade ($10k+ each time)
-  - Index build time on single node
+Distributed training:
+  DDP: model fits single GPU, just batch parallel
+  FSDP / ZeRO-3: model doesn't fit, shard params
+  3D parallelism (TP+PP+DP): 100B+ model
 
-Migration pattern:
-  Dual-index v1 + v2 in parallel
-  A/B for 1 week with metrics
-  Cutover only on win
-  Keep v1 readable 1 month
+Sharding:
+  hash(user_id): uniform but loses locality
+  tenant_id: multi-tenant but hot-shard risk
+  region+language: compliance + latency (we used at TikTok)
 
-Tradeoffs accept:
-  - 5pp recall for 50% latency
-  - 5-min indexing lag for 10x cost down
-  - Cold query 4x slower for 90% storage save
+Cost optimization (priority):
+  1. Prompt caching (70-90% input save)
+  2. Smaller model tiering (5-10x)
+  3. Self-host open model (5-10x at scale)
+  4. Quantization (2-4x)
+  5. Result caching (30-90% by hit rate)
+  6. Speculative decoding (2-3x latency)
+
+Labeling at scale:
+  < 10k: 100% manual ($2k)
+  100k: 10% manual + 90% weak/auto
+  10M+: 1% manual + active learning + synthetic
+  Snorkel labeling functions: rules + cheap LLM (Haiku) + regex
+
+Eval at scale:
+  Sample size by effect size (5-10k usually enough)
+  Stratified by slice (language / difficulty / domain)
+  Online sampling + LLM-judge (Haiku batched)
+  Drift detection (KL / Wasserstein on input dist)
+  Statistical significance test per slice
+
+Migration pattern (no big-bang):
+  Week 1-2: Build new in shadow
+  Week 3: Dual-write old + new
+  Week 4: A/B 1% traffic, monitor
+  Week 5: 50% → 100% gradual
+  Week 6: Sunset old (keep readable 30d)
+
+What breaks first (in order):
+  1. Embedding cost (not query speed) — re-embed on model upgrade $1k+
+  2. Index build time on single node
+  3. KV cache pressure under load
+  4. Labeling people-hours
+  5. Eval pipeline compute
+
+Tradeoffs acceptable at 100x:
+  5pp recall loss for 50% latency improvement
+  5-min indexing lag for 10x cost reduction
+  Cold query 4x slower for 90% storage save
+  Self-host: 5-10x cheaper but 3-month infra build
+
+红线:
+  - Linear projection (100x = 100 倍)
+  - 单机 architecture for > 100M
+  - Embed in same model after upgrade (must re-embed)
+  - 没 incremental ingest
+  - 假设 manual labeling scale
+  - 没 graceful degradation
+  - 没 cost monitoring
 ```

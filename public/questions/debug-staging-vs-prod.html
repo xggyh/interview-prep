@@ -41,103 +41,648 @@
     <h2>我的思路与解法</h2>
     <h3>题目（verbatim）</h3>
 <blockquote><p>"An <strong>AI agent returns inconsistent results in production</strong> compared to staging. Walk through your debugging approach end-to-end."</p></blockquote>
-<p><strong>出处</strong>：fde.academy 列出的高频技术 round 题。OpenAI / Anthropic / Google FDE 都问过。</p>
-<p><strong>Round</strong>：Technical Integration / Debug (45-60 min)</p>
+<p><strong>出处</strong>: fde.academy 列出的高频技术 round 题. OpenAI / Anthropic / Google FDE 都问过.</p>
+<p><strong>Round</strong>: Technical Integration / Debug (45-60 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
-<p>考你<strong>production deployment 的诊断套路</strong>。AI deployment 大多数失败都是这个 shape：</p>
-<ol><li><strong>5 类典型 root cause</strong> —— 你知道几个？</li><li><strong>诊断顺序</strong> —— 先 cheap 后 expensive</li><li><strong>能不能 reproduce</strong> —— production-only bug 是最难的</li><li><strong>Don't blame the model first</strong> —— 9/10 root cause 不是 model</li></ol>
+<p>考你 <strong>production deployment 的诊断套路</strong>. AI deployment 大多数失败都是这个 shape:</p>
+<ol><li><strong>能不能 reproduce</strong> — production-only bug 是最难的, 没 reproduce 就没 fix</li><li><strong>诊断顺序对不对</strong> — cheap 先于 expensive, hash diff 先于 GPU profile</li><li><strong>7 类 diff sources 知道几个</strong> — data / config / model / dep / scale / state / time</li><li><strong>Don't blame the model first</strong> — 9/10 root cause 不是 model 本身</li><li><strong>有没有 instrumentation 让你能 trace</strong> — 没 trace_id 一切都靠猜</li></ol>
+<p>考的不是「OpenAI bug 长啥样」, 是「你 production 用 LLM 部署过, 解决过几个 silent failure」.</p>
+<hr />
+<h1>Part 1 · 教学讲解 — 先把概念讲透</h1>
+<h3>1. 四个术语先解释</h3>
+<p><strong>Staging vs Production</strong>: 两个<strong>环境</strong> (environment). Staging 是 prod 的镜像 — 同样代码、同样架构、同样 deploy pipeline, 但流量是合成的、数据是 sanitized 的. <strong>理想情况</strong>它们一模一样, <strong>实际</strong>永远存在 drift. 这道题考的就是: 当 drift 显现成 bug 时, 怎么定位.</p>
+<p><strong>Inconsistency</strong> (不一致): 一个 ambiguous 的词, 必须先 clarify. 有 3 种含义:</p>
+<ul><li><strong>Wrong</strong>: 输出错误 (staging "对" → prod "错")</li><li><strong>Different</strong>: 同一个 input, prod 多次跑结果不一样 (non-determinism)</li><li><strong>Slower</strong>: 输出正确, 但 latency / timeout 引发 truncation</li></ul>
+<p>90% 的初学者直接开始 debug "wrong", 但很多 production bug 其实是 "slower → truncated → wrong".</p>
+<p><strong>Reproducibility</strong> (可复现性): 给定一个 production failure case, 能不能在 staging 或本地原样再跑出同样错. <strong>能 reproduce 等于成功了 80%</strong>.</p>
+<p><strong>Trace_id propagation</strong> (链路追踪 ID 传递): 每个请求一个 unique trace_id, 在所有 service / log / DB 操作里都带上. 没有这个, 你就只能靠时间戳 + IP 猜哪条 log 对应哪个请求, 在 high-QPS prod 里就是 garbage.</p>
+<hr />
+<h3>2. 这个问题的核心是什么</h3>
+<p>设想一个<strong>没有 trace / 没 hash 校验 / 没 shadow eval</strong> 的 AI deployment 灾难:</p>
+<pre class="language-plaintext"><code class="language-plaintext">14:32  客户反馈: "你们的 agent 今天回复全是乱的"
+14:35  你: "我刚 staging 跑了一遍, 都好啊?"
+14:50  你看 prod log: 一堆 "I can't help with that" — 但同样 prompt 在 staging 是正常回复
+15:00  你: "应该是 model 版本? 配置? GPU? 还是用户输入变了?"
+15:30  你 hypothesize 之一然后试着 fix, 改坏了另一个 dimension
+16:00  事态扩散, customer escalate 到 VP
+17:00  你 emergency rollback. Postmortem: 4h MTTR, root cause unclear.</code></pre>
+<p><strong>问题</strong>:</p>
+<ul><li>没 trace 没法找到具体 failing request 的全部 context</li><li>没 deploy artifact hash 不知道两边到底跑的是不是同一个 model + tokenizer + system prompt</li><li>没 distribution monitor 不知道 prod 输入是不是真的和 staging 不一样</li><li>没 canary 一次性 deploy 100%, 出问题影响所有用户</li><li>没 shadow eval 不知道 silent drift 已经累积多久</li></ul>
+<p><strong>Production-grade debug 解法</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. trace_id 端到端 (每个 service / log / DB 都带)
+2. Deploy artifact 全 hash 校验 (model + tokenizer + prompt + dep + image)
+3. Per-request observability (region, GPU, batch_size, seed, temperature)
+4. Shadow eval 每天对比 prod vs staging 同 input 输出
+5. Canary deploy + auto-rollback on error budget breach
+6. Replay tool: 任意 prod trace_id 一键在 staging 复现</code></pre>
+<hr />
+<h3>3. 7 类 diff source 决策树</h3>
+<p><code>Staging</code> 和 <code>Production</code> 可能在以下 7 个维度 drift, <strong>诊断顺序按 cheap → expensive</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">请求出现 inconsistency
+         ↓
+   ┌─────┴─────┐
+   是否能 reproduce?
+   ├─ 能 ─→ 找 1 个 minimal failing input
+   └─ 不能 ─→ 先加 trace + per-request log, 等 24h 收样本
+         ↓
+   ┌────────────────────────────────────────┐
+   │  D1 Data        — 输入数据本身变了?       │
+   │  D2 Config      — 模型 / 提示词 / 参数差? │
+   │  D3 Model       — checkpoint hash 差?    │
+   │  D4 Dependency  — vLLM / torch 版本差?   │
+   │  D5 Scale       — prod 100x QPS, 触发 batch / KV cache? │
+   │  D6 State       — cache warm / cold? Multi-replica state divergent? │
+   │  D7 Time        — DST / timezone / token expire / data freshness? │
+   └────────────────────────────────────────┘
+         ↓
+   按 cheap → expensive 依次排除:
+   D2 (1h diff) → D3 (1h hash) → D4 (2h dep list) →
+   D1 (4h distribution) → D7 (4h time audit) →
+   D6 (1d state introspect) → D5 (3d load test)</code></pre>
+<p><strong>关键</strong>: <strong>不要跳到最后一类去查</strong>. 30% 的人直接怀疑 GPU 非确定性, 但 90% 的真实 root cause 在 D2/D3 (config / model hash).</p>
+<hr />
+<h3>4. 关键 diff source 分类表</h3>
+<table class="md-table"><thead><tr><th>Class</th><th>含义</th><th>典型表现</th><th>诊断成本</th></tr></thead><tbody><tr><td><strong>D1 Data</strong></td><td>Prod 用户输入分布偏离 staging</td><td>某类长 prompt / 罕见语言失败</td><td>中 (需要 distribution compare)</td></tr><tr><td><strong>D2 Config</strong></td><td>model_id / system_prompt / temperature / top_p / max_tokens 不同</td><td>"今天换了 system prompt 没人告诉我"</td><td>低 (1h <code>diff</code> 配置)</td></tr><tr><td><strong>D3 Model version</strong></td><td>Checkpoint / LoRA / tokenizer hash 不同</td><td>Prod 跑的是上周的 checkpoint</td><td>低 (hash compare)</td></tr><tr><td><strong>D4 Dependency</strong></td><td>vLLM / torch / transformers / cuBLAS 版本</td><td>"我们升级了 vLLM"</td><td>中 (<code>pip freeze</code> diff)</td></tr><tr><td><strong>D5 Scale</strong></td><td>High QPS 触发 batch / paged attention / KV cache eviction</td><td>只在 peak 期间复现</td><td>高 (load test)</td></tr><tr><td><strong>D6 State</strong></td><td>Cache warm-up / in-memory state / multi-replica divergence</td><td>Restart prod 就恢复, 再过 1h 又坏</td><td>高 (state dump)</td></tr><tr><td><strong>D7 Time</strong></td><td>DST / timezone / token expire / data staleness</td><td>只在某天 / 某小时复现</td><td>中 (time audit)</td></tr></tbody></table>
+<p><strong>真实世界统计</strong> (我个人 voice agent 7 markets 复盘的占比):</p>
+<ul><li>D2 (config drift) 35%</li><li>D3 (model version) 20%</li><li>D7 (time) 15%</li><li>D1 (data) 12%</li><li>D6 (state) 10%</li><li>D4 (dependency) 5%</li><li>D5 (scale) 3%</li></ul>
+<p><strong>先查 D2/D3</strong> 不是迷信, 是基于真实分布的策略.</p>
+<hr />
+<h3>5. 具体业务场景</h3>
+<h4>场景 A: 你的 TikTok Voice Agent 7 markets (你工作背景)</h4>
+<p><strong>症状</strong>: 周一早上, 你的 BD 同事在群里说 "印尼客户反馈 agent 突然听不懂 Bahasa, 回复全是英文了". 但你 staging 测试 Bahasa Indonesia 完全正常.</p>
+<p><strong>真实 root cause</strong> (D2 + D7 复合):</p>
+<ul><li>周末 release: system prompt 加了一句 "Respond only in English unless explicitly asked otherwise"</li><li>这句 deploy 到 prod 但<strong>没在 staging eval suite 里跑过</strong></li><li>+ 印尼周一是 public holiday, 流量比平时高 3 倍, 触发了更多 batch 路径</li><li>双重作用下 30% 印尼用户看到英文回复</li></ul>
+<p><strong>怎么发现</strong>: prod log 里 system_prompt 没有版本号, 你<strong>靠对比 staging git 和 prod deploy 配置 diff</strong> 才看到差异.</p>
+<h4>场景 B: ConvFinQA RL Alignment (你的研究项目)</h4>
+<p><strong>症状</strong>: 你训练了一个 RL-aligned model, eval 在 staging 上准确率 78%, deploy 到 prod 同样 eval set 跑出来 71%.</p>
+<p><strong>真实 root cause</strong> (D3):</p>
+<ul><li>你 deploy 用的是 <code>model_v2.bin</code></li><li>你 eval 用的是 <code>model_v2_quantized.bin</code> (FP16 → INT8 量化版)</li><li>量化引入 ~7% 准确率损失, 但你没注意 <code>.bin</code> 文件名差异</li></ul>
+<p><strong>教训</strong>: 部署必须 hash 校验, 不能信文件名.</p>
+<h4>场景 C: 跨区域 deploy 不一致</h4>
+<p><strong>症状</strong>: Singapore region 准确率 OK, India region 同一个 query 准确率掉 15%.</p>
+<p><strong>真实 root cause</strong> (D4 + D6):</p>
+<ul><li>Singapore vLLM 是 v0.5.0, India 是 v0.4.8 (运维不同步)</li><li>v0.5.0 默认 <code>enable_prefix_caching=True</code>, v0.4.8 默认 False</li><li>长上下文 query 在 India 因为没 prefix cache, 每次重新跑 attention, KV cache fragment 更严重 → 偶发 quality drop</li></ul>
+<h4>场景 D: BNPL Chatbot tool calling 错乱</h4>
+<p><strong>症状</strong>: 用户问 "我的下个还款是多少", staging 永远调 <code>get_next_payment(user_id)</code> 工具, prod 偶尔会调 <code>get_payment_history(user_id)</code> 然后总结错.</p>
+<p><strong>真实 root cause</strong> (D1 + D5):</p>
+<ul><li>Staging 测试 prompt 都比较短 (&lt; 100 tokens)</li><li>Prod 用户实际会带很长的对话历史 (&gt; 2000 tokens) 进入 router</li><li>长上下文下 tool selection 的 next-token distribution 被稀释, 偶发选错 tool</li><li>在 staging 永远复现不出来, 只在 prod long-context tail 出现</li></ul>
+<h4>场景 E: Indonesia refund tier confirmation broken</h4>
+<p><strong>症状</strong>: 你的 Indonesia refund tier 系统 (按金额触发 confirmation), 周二开始 staging 一切正常, prod 大额 refund 不弹 confirmation.</p>
+<p><strong>真实 root cause</strong> (D7):</p>
+<ul><li>Confirmation logic 依赖一个 <code>feature_flag_service</code> 拉的 flag</li><li>Flag 的 cache TTL 是 24h</li><li>Staging 每天 redeploy 自动 invalidate cache</li><li>Prod 不 redeploy, cache 一直拿的是周一改过期的 flag</li><li>"时间 + cache" 双 victim</li></ul>
+<hr />
+<h3>6. 工程上要做什么 — 诊断 checklist</h3>
+<p><strong>Stage 0: Stabilize (&lt; 30 min)</strong></p>
+<ol><li>评估 blast radius: 多少 % 流量受影响? 用户体感是 "wrong / different / slower"?</li><li>如果 &gt; 50% → <strong>immediate rollback</strong> to last known good (LKG)</li><li>如果 &lt; 5% 但持续 → 不 rollback, 收 sample 找 RCA</li><li>Set up war room: incident channel, ICs assigned, status page updated</li><li>Pause downstream automation (e.g., auto-billing based on agent output)</li></ol>
+<p><strong>Stage 1: Reproduce (&lt; 2 hours)</strong></p>
+<ol><li>捞 10 个 prod failing trace_id, 拿到完整 request payload + headers + timestamps</li><li>在 staging 一字不差 replay 同样 input — 能复现就跳 Stage 2, 不能复现就跳 Stage 3</li><li>如果 staging 100% 复现 → 是<strong>input-driven</strong>, D1 / D2 嫌疑大</li><li>如果 staging 0% 复现 → 是<strong>env-driven</strong>, D3-D7 嫌疑大</li></ol>
+<p><strong>Stage 2: Cheap diffs first (&lt; 4 hours)</strong></p>
+<ol><li><strong>D2 config diff</strong>: <code>diff &lt;(prod config get) &lt;(staging config get)</code></li></ol>
+<ul><li>model_id, system_prompt, temperature, top_p, max_tokens, stop sequences, tool definitions</li></ul>
+<ol><li><strong>D3 artifact hash</strong>: deploy log 里抓 model SHA, tokenizer SHA, image SHA, 两边对比</li><li><strong>D4 dependency</strong>: <code>diff &lt;(prod pip freeze) &lt;(staging pip freeze)</code>, 特别盯 vLLM / torch / transformers</li><li>配置 / hash / dep 全对得上 → 进 Stage 3</li></ol>
+<p><strong>Stage 3: Expensive diffs (4-24 hours)</strong></p>
+<ol><li><strong>D1 distribution</strong>: 过去 24h prod input 的 length / language / topic 分布 vs staging eval 分布. 找 staging 没覆盖的 segment</li><li><strong>D7 time audit</strong>: 检查 token expire, cache TTL, scheduled job, DST window, data freshness SLA</li><li><strong>D6 state</strong>: dump prod replica 内存 vs staging, 看 cache / counter / 任何 stateful counter</li><li><strong>D5 load</strong>: 把 staging QPS 拉到 prod 同等水平, 看是否复现</li></ol>
+<p><strong>Stage 4: Fix + Prevent</strong></p>
+<ol><li>写 minimal repro test, 加进 regression suite</li><li>写 postmortem (Five Whys), 至少 1 个 prevent action</li><li>部署 fix 走 canary (1% → 10% → 50% → 100%)</li></ol>
+<hr />
+<h3>7. 几个容易踩的坑</h3>
+<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>立刻怀疑 model</strong></td><td>90% root cause 不是 model 本身, 是 config / version / env. 先 cheap diff</td></tr><tr><td>2</td><td><strong>没 trace_id 就开始 debug</strong></td><td>在 high QPS prod 里你根本找不到 specific failing request 的完整上下文</td></tr><tr><td>3</td><td><strong>没 reproduce 就开始 fix</strong></td><td>改完一个 dimension, 引入另一个, 修不完. <strong>No repro = no fix</strong></td></tr><tr><td>4</td><td><strong>跳过 cheap diffs</strong></td><td>直接怀疑 GPU 非确定性, 但配置文件 1 行不一样</td></tr><tr><td>5</td><td><strong>Ship fix without RCA</strong></td><td>临时 patch 经常 mask 真因, 1 周后另一个 manifest 又出</td></tr><tr><td>6</td><td><strong>Customer 压力下 cave</strong></td><td>"立刻 fix" 比 "1h 内 rollback + 24h 找 RCA" 通常错. Negotiate workaround</td></tr><tr><td>7</td><td><strong>忽略 "recently changed"</strong></td><td>Recent change = recent break. 最近 deploy / config update / 依赖升级永远先查</td></tr><tr><td>8</td><td><strong>盯个例不看 segment</strong></td><td>Aggregate metric 看不到 5% 用户 100% 失败 (per-segment 才能看到)</td></tr></tbody></table>
+<hr />
+<h3>一句话总结 (Part 1)</h3>
+<blockquote><p><strong>Staging vs Prod inconsistency debug = "先 reproduce, 再按 cheap → expensive 顺序排查 7 类 diff source, 最后用 hash + canary + shadow eval 防 recurrence"</strong>.</p>
+<p>这道题考的不是某个具体技巧, 是<strong>你有没有真的部署过 LLM 产品, 解决过 silent failure</strong>.</p></blockquote>
+<hr />
+<h1>Part 2 · 5 个深度工程问题</h1>
+<h3>⚙️ Problem 1: 7 类 diff source 怎么系统排查</h3>
+<p><strong>Diff sources</strong> 是这道题的骨架. 系统讲清楚每一类的<strong>诊断手段 + 自动化方式</strong>.</p>
+<h4>1.1 D1 Data Drift — 用户输入变了</h4>
+<p><strong>症状</strong>: 同样 model, 同样 config, 但 prod 输入分布和 staging eval 不一样.</p>
+<p><strong>诊断</strong>:</p>
+<pre class="language-python"><code class="language-python"># 简化版 distribution monitor
+from collections import Counter
+from scipy.stats import ks_2samp
+
+def compare_distributions(prod_inputs, staging_inputs):
+    """对比关键维度的 distribution drift."""
+    report = {}
+
+    # Length distribution
+    prod_len = [len(x) for x in prod_inputs]
+    staging_len = [len(x) for x in staging_inputs]
+    stat, p = ks_2samp(prod_len, staging_len)
+    report['length_ks_p'] = p  # p &lt; 0.05 → significantly different
+
+    # Language distribution
+    prod_lang = Counter(detect_lang(x) for x in prod_inputs)
+    staging_lang = Counter(detect_lang(x) for x in staging_inputs)
+    report['lang_diff'] = {
+        lang: prod_lang.get(lang, 0) / sum(prod_lang.values()) -
+              staging_lang.get(lang, 0) / sum(staging_lang.values())
+        for lang in set(prod_lang) | set(staging_lang)
+    }
+
+    # Token-level: PSI (Population Stability Index)
+    report['psi'] = compute_psi(prod_inputs, staging_inputs)
+
+    return report</code></pre>
+<p><strong>生产细节</strong>:</p>
+<ul><li><strong>PSI &gt; 0.25</strong> → significant drift, 调查</li><li><strong>Tail 维度</strong> 经常被忽略: 99th percentile length, 罕见 character set, 特殊 emoji</li><li><strong>多语言场景</strong> 尤其难: staging 只测 English, prod 用户 30% 是 Bahasa</li></ul>
+<h4>1.2 D2 Config Drift — 配置不一样</h4>
+<p><strong>最常见</strong>, 也最容易查:</p>
+<pre class="language-bash"><code class="language-bash"># 一键 diff
+diff &lt;(kubectl get cm prod-agent-config -o yaml) \
+     &lt;(kubectl get cm staging-agent-config -o yaml)</code></pre>
+<p><strong>自动化</strong>: 每次 deploy 出报告:</p>
+<pre class="language-yaml"><code class="language-yaml">deploy_diff_report:
+  changes:
+    - field: system_prompt
+      old_hash: abc123
+      new_hash: def456
+      diff: |
+        +Respond only in English unless explicitly asked otherwise
+    - field: temperature
+      old: 0.0
+      new: 0.7
+      blast_radius: HIGH  # temperature 0 → 0.7 是大事</code></pre>
+<p><strong>用工具</strong>:</p>
+<ul><li><strong>Argo CD / Flux</strong> 自动 audit deploy diff</li><li><strong>OpenFeature / LaunchDarkly</strong> flag changes 走变更管理</li><li><strong>Git</strong> 任何 prompt / config 走 PR + eval-on-merge</li></ul>
+<h4>1.3 D3 Model Version</h4>
+<p><strong>最常见 silent bug</strong>:</p>
+<pre class="language-python"><code class="language-python"># Deploy 时强制 assert hash 一致
+def assert_artifact_consistency():
+    declared = config['model_sha256']
+    actual = sha256_of_file('/models/current/checkpoint.bin')
+    if declared != actual:
+        raise DeployError(f"Model hash mismatch: declared {declared}, actual {actual}")
+
+    # 同样校验 tokenizer
+    declared_tok = config['tokenizer_sha256']
+    actual_tok = sha256_of_file('/models/current/tokenizer.json')
+    if declared_tok != actual_tok:
+        raise DeployError("Tokenizer hash mismatch")</code></pre>
+<p><strong>真实 trap</strong>: model file 用了 symlink, symlink 没更新, 文件名对了但内容不对.</p>
+<h4>1.4 D4 Dependency</h4>
+<pre class="language-bash"><code class="language-bash"># Image-level diff
+docker run --rm prod-agent:latest pip freeze &gt; /tmp/prod.txt
+docker run --rm staging-agent:latest pip freeze &gt; /tmp/staging.txt
+diff /tmp/prod.txt /tmp/staging.txt</code></pre>
+<p><strong>特别盯</strong>:</p>
+<ul><li><code>vllm</code>, <code>sglang</code>, <code>transformers</code>, <code>torch</code>, <code>torchvision</code></li><li>CUDA driver / cuDNN 版本 (<code>nvidia-smi</code>)</li><li>系统库 (<code>libssl</code>, <code>libstdc++</code>)</li></ul>
+<h4>1.5 D5 Scale — Concurrency 触发的 bug</h4>
+<p>只在 production 高 QPS 下复现, 罕见但真实:</p>
+<ul><li><strong>vLLM batch size</strong>: 同 input 在 batch=1 和 batch=32 下输出可能不一样 (paged attention 实现细节)</li><li><strong>KV cache eviction</strong>: prod 内存压力下 cache 频繁 evict, 导致 prefix recompute, FP16 rounding 累积</li><li><strong>Request scheduling order</strong>: 请求顺序影响 batch composition</li></ul>
+<p><strong>复现工具</strong>:</p>
+<ul><li><code>vegeta</code> / <code>wrk</code> 打 staging 模拟 prod 流量</li><li>把 staging instance 缩容到 prod 同等内存压力</li></ul>
+<h4>1.6 D6 State</h4>
+<pre class="language-python"><code class="language-python"># Per-replica state dump
+def snapshot_state(replica):
+    return {
+        'kv_cache_used_bytes': replica.gpu_kv_cache.used,
+        'prefix_cache_entries': len(replica.prefix_cache),
+        'open_sessions': len(replica.sessions),
+        'feature_flag_snapshot_age_sec': time.time() - replica.flags_loaded_at,
+        'uptime_sec': time.time() - replica.started_at,
+    }
+
+# 不同 replica state divergence
+for r in replicas:
+    print(r.id, snapshot_state(r))</code></pre>
+<p><strong>典型 bug</strong>: 1 个 replica 卡了 stale flag, 25% 流量行为不一样.</p>
+<h4>1.7 D7 Time</h4>
+<pre class="language-python"><code class="language-python"># Time-sensitive things audit
+def audit_time_dependencies():
+    checks = []
+    # Token expire
+    for token in active_tokens():
+        checks.append(('token_expire', token.id, token.expires_at - now()))
+    # Cache TTL
+    for key in cache.scan():
+        checks.append(('cache_ttl', key, cache.ttl(key)))
+    # Scheduled jobs
+    checks.append(('scheduler_next_run', scheduler.next_run()))
+    # Data freshness
+    checks.append(('data_max_updated_at', db.max_updated_at('orders')))
+    return checks</code></pre>
+<p><strong>真实事故</strong>: Vault token 12h TTL, prod 高峰期一直没 idle 触发 refresh, 12:01 同时过期, 大量 401.</p>
+<hr />
+<h3>⚙️ Problem 2: Reproducibility Instrumentation — trace_id / Snapshot / Replay</h3>
+<p>没 reproducibility 就是盲人摸象. 三件套缺一不可.</p>
+<h4>2.1 trace_id Propagation (端到端追踪)</h4>
+<p><strong>目标</strong>: 任何 prod request, 给一个 trace_id, 能在所有 log / DB / metric / blob storage 里找到所有相关记录.</p>
+<pre class="language-python"><code class="language-python"># 用 OpenTelemetry 标准
+from opentelemetry import trace
+from opentelemetry.propagate import inject, extract
+
+tracer = trace.get_tracer(__name__)
+
+@app.middleware
+async def trace_middleware(req, call_next):
+    # 从 header 提取或新建
+    ctx = extract(req.headers)
+    with tracer.start_as_current_span("http_request", context=ctx) as span:
+        trace_id = format(span.get_span_context().trace_id, '032x')
+        req.state.trace_id = trace_id
+        response = await call_next(req)
+        response.headers['X-Trace-Id'] = trace_id
+        return response
+
+# 所有 log 自动带 trace_id
+import structlog
+log = structlog.get_logger()
+
+def agent_handler(req):
+    log.info("agent_invoked", trace_id=req.state.trace_id, user_id=req.user_id)
+    # 调 LLM
+    log.info("llm_request",
+             trace_id=req.state.trace_id,
+             model=cfg.model_id,
+             prompt_hash=sha256(prompt))</code></pre>
+<p><strong>关键</strong>:</p>
+<ul><li>trace_id 一定要进 LLM API call 的 <code>metadata</code> 字段, 这样 OpenAI / Anthropic 的 dashboard 也能查</li><li>trace_id 进 response header, 让 client 错误报告能带上</li><li>trace_id 进 audit log (合规)</li></ul>
+<h4>2.2 Snapshot Capture (快照捕获)</h4>
+<p><strong>目标</strong>: 任何 request 失败时, 自动 snapshot 完整 reproduce context.</p>
+<pre class="language-python"><code class="language-python">@dataclass
+class RequestSnapshot:
+    trace_id: str
+    timestamp: int
+    user_id: str
+    region: str
+    request_body: dict
+    request_headers: dict
+
+    # Environment
+    model_id: str
+    model_sha: str
+    tokenizer_sha: str
+    image_sha: str
+    pod_id: str
+    gpu_type: str
+
+    # Runtime
+    feature_flags: dict
+    config_snapshot_sha: str
+
+    # LLM-specific
+    system_prompt_hash: str
+    temperature: float
+    top_p: float
+    max_tokens: int
+    seed: Optional[int]
+
+    # Result
+    response_body: dict
+    latency_ms: int
+    error: Optional[str]
+
+def capture_snapshot(req, resp, err):
+    snap = RequestSnapshot(
+        trace_id=req.trace_id,
+        # ... fill all fields
+    )
+    # 失败的全存, 成功的 1% 抽样
+    if err or random() &lt; 0.01:
+        s3.put(f'snapshots/{req.trace_id}.json', snap.to_json())</code></pre>
+<p><strong>存储</strong>:</p>
+<ul><li>失败请求 100% 存, 保留 30 天 (合规)</li><li>成功请求 1% 抽样, 保留 7 天 (debug 用)</li><li>敏感字段 (PII) 加密或 hash</li></ul>
+<h4>2.3 Replay Tool</h4>
+<pre class="language-python"><code class="language-python"># 一键 replay
+class ReplayTool:
+    def __init__(self, target_env='staging'):
+        self.target = target_env
+
+    def replay(self, trace_id):
+        snap = s3.get(f'snapshots/{trace_id}.json')
+
+        # 用 prod 当时的 config 调 staging
+        cfg = self.fetch_config(snap.config_snapshot_sha)
+
+        # 在 staging 重放, 用 prod 的 system prompt / temperature
+        result = self.target_env.invoke_agent(
+            request_body=snap.request_body,
+            override_config=cfg,
+            override_seed=snap.seed,
+        )
+
+        return {
+            'prod_response': snap.response_body,
+            'staging_response': result,
+            'match': snap.response_body == result,
+            'env_diff': self.diff_env(snap),
+        }
+
+# Usage
+tool = ReplayTool('staging')
+result = tool.replay('abc123def456')
+print(result['match'])  # True/False
+print(result['env_diff'])  # what's different</code></pre>
+<p><strong>自动化</strong>: 每天 cron 拿前一天的 prod failing traces, 在 staging replay, 算 reproduce rate. 如果 &lt; 50% 一致 → "我们的 staging 已经不能代表 prod 了, 需要修复 parity".</p>
+<hr />
+<h3>⚙️ Problem 3: Environment Parity Strategies</h3>
+<p>让 staging "更像" prod 的三个策略:</p>
+<h4>3.1 Golden Traces (黄金样本集)</h4>
+<p><strong>思想</strong>: 维护一组 representative prod requests + expected outputs, 每次 deploy 必须先跑过.</p>
+<pre class="language-python"><code class="language-python"># Golden trace 数据集
+golden_traces = [
+    {
+        'name': 'indonesia_refund_above_threshold',
+        'request': {...},  # 一个真实的印尼大额退款请求
+        'expected_response_contains': ['请确认', 'Indonesia rules require'],
+        'last_updated': '2026-04-15',
+        'business_owner': 'wei@bytedance',
+    },
+    # ... 200-500 个 case
+]
+
+# CI gate
+def gate_deploy(candidate_image):
+    fails = []
+    for trace in golden_traces:
+        actual = candidate_image.invoke(trace.request)
+        if not match(actual, trace.expected_response_contains):
+            fails.append(trace.name)
+    if fails:
+        block_deploy(f"Golden trace failures: {fails}")</code></pre>
+<p><strong>维护</strong>:</p>
+<ul><li>每个 production incident → 加 1 个 golden trace 防 regression</li><li>季度 review, 删除过时的 case</li><li>Cover all segment (per market, per user type, per topic)</li></ul>
+<h4>3.2 Shadow Mode (影子模式)</h4>
+<p><strong>思想</strong>: Prod 请求<strong>同时</strong>发给 prod 和 staging, 对比输出, 只用 prod 的, 但记录 staging 的 diff.</p>
+<pre class="language-plaintext"><code class="language-plaintext">User → API Gateway → Fork
+                       ├──► Prod Agent  → Return to user (used)
+                       └──► Staging Agent → Compare, log diff (shadow)</code></pre>
+<p><strong>实现要点</strong>:</p>
+<ul><li>Shadow path <strong>必须 async</strong>, 不能阻塞 user</li><li>Diff 用 semantic similarity, 不要 exact match (LLM 输出有合理变化)</li><li>抽样 1-10% 流量做 shadow, 不要 100% (cost)</li><li>Shadow diff 日报: "今日 staging 和 prod 的 disagreement rate: 3.2%"</li></ul>
+<pre class="language-python"><code class="language-python">async def shadow_invoke(req):
+    # 真正服务
+    prod_task = asyncio.create_task(prod_agent.invoke(req))
+    # 影子
+    if random() &lt; shadow_sample_rate:
+        staging_task = asyncio.create_task(staging_agent.invoke(req))
+    else:
+        staging_task = None
+
+    prod_resp = await prod_task
+
+    if staging_task:
+        try:
+            staging_resp = await asyncio.wait_for(staging_task, timeout=5)
+            log_shadow_diff(req, prod_resp, staging_resp)
+        except asyncio.TimeoutError:
+            pass
+
+    return prod_resp</code></pre>
+<h4>3.3 Canary Deployment + Auto Rollback</h4>
+<p><strong>思想</strong>: 新版本先 1% 流量, 没问题再 10%, 再 50%, 再 100%. 同时监控错误预算, 一旦超就自动 rollback.</p>
+<pre class="language-yaml"><code class="language-yaml"># Argo Rollouts spec
+strategy:
+  canary:
+    steps:
+    - setWeight: 1
+    - pause: { duration: 10m }
+    - analysis:
+        templates:
+        - templateName: error-rate
+        - templateName: latency-p99
+        - templateName: agent-success-rate
+    - setWeight: 10
+    - pause: { duration: 30m }
+    - analysis: [...]
+    - setWeight: 50
+    - pause: { duration: 1h }
+    - setWeight: 100</code></pre>
+<p><strong>自动 rollback 条件</strong> (示例):</p>
+<ul><li>error rate &gt; 1% (vs baseline 0.1%)</li><li>p99 latency &gt; 2x baseline</li><li>agent_success_rate &lt; 95%</li><li>5xx &gt; 0.5%</li></ul>
+<p>工具: Argo Rollouts / Flagger / 自研.</p>
+<hr />
+<h3>⚙️ Problem 4: Stateful vs Stateless Differences</h3>
+<p>很多 inconsistency 来自 <strong>state</strong>, 不是 logic.</p>
+<h4>4.1 Cache Warm-up</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Staging:    Cache 总是 cold (低流量, 经常 LRU 驱逐)
+Production: Cache 永远 hot (高流量, 重复 query 多)
+
+→ Prod 大量 cache hit, 走 fast path
+→ Staging 大量 cache miss, 走 slow path  
+→ Slow path 有个 bug, staging 永远看不到 (因为 hot path 把 bug 绕过去了)
+→ 或反过来: hot path 有 race condition, staging 因为 cold 永远不触发</code></pre>
+<p><strong>应对</strong>: 测试时主动 warm up cache 或主动 invalidate, 两种状态都跑.</p>
+<h4>4.2 In-memory State Divergence</h4>
+<pre class="language-python"><code class="language-python"># Reproducibility killer: 单例 / 全局变量随时间累积
+class AgentMetrics:
+    """单例, 每个 replica 各一份, 状态随时间 drift."""
+    _instance = None
+
+    def __init__(self):
+        self.total_requests = 0
+        self.consecutive_failures = 0  # ← 这个会影响 retry 策略!
+
+# Replica A 累积 1000 个 consecutive_failures (因为 down 过), 进入降级模式
+# Replica B 永远 0, 正常模式
+# 同样 input 到 A 走降级, 到 B 走正常, "inconsistency"</code></pre>
+<p><strong>应对</strong>:</p>
+<ul><li>状态外置到 Redis / DB</li><li>或定期 reset 全局状态</li><li>Per-replica health endpoint 暴露状态</li></ul>
+<h4>4.3 KV Cache Effects (vLLM / SGLang)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">LLM inference 的 KV cache 是 stateful 的:
+
+Request 1: "今天天气怎么样" → prefix [今天, 天气, 怎么样] 进 KV cache
+Request 2: "今天我心情很差" → prefix [今天] 复用上次 cache 的 K/V
+                                ↓
+                            如果上次 cache 计算时 batch size = 32
+                            这次 cache 复用时 batch size = 1
+                            FP16 rounding 微妙不同
+                            → 同 input 不同输出 (罕见但真实)</code></pre>
+<p><strong>应对</strong>:</p>
+<ul><li>关键场景禁用 prefix cache (<code>enable_prefix_caching=False</code>)</li><li>或接受非确定性, 在 eval 用 multiple-runs + 取中位</li><li>实际生产: 99% 用户不在乎这点差异, 但 audit / regression test 要注意</li></ul>
+<h4>4.4 Multi-replica State Divergence</h4>
+<pre class="language-python"><code class="language-python"># 监控 replica 之间状态差
+def replica_consistency_check():
+    snapshots = []
+    for r in replicas:
+        snapshots.append(r.fetch_state())
+
+    # 找出 outlier
+    medians = {}
+    for key in snapshots[0]:
+        values = [s[key] for s in snapshots]
+        medians[key] = statistics.median(values)
+
+    outliers = []
+    for r, snap in zip(replicas, snapshots):
+        for key, val in snap.items():
+            if isinstance(val, (int, float)) and val &gt; 3 * medians[key]:
+                outliers.append((r.id, key, val))
+
+    if outliers:
+        alert(f"Replica state outliers: {outliers}")</code></pre>
+<hr />
+<h3>⚙️ Problem 5: Time-Dependent Bugs</h3>
+<p>时间相关 bug 是<strong>最难复现</strong>的一类, 因为它们只在特定时间窗口出现.</p>
+<h4>5.1 DST (Daylight Saving Time)</h4>
+<p><strong>症状</strong>: 每年 3 月、11 月美国 DST 切换那天系统全坏.</p>
+<p><strong>典型 bug</strong>:</p>
+<pre class="language-python"><code class="language-python"># 错: 用 local time 做调度
+schedule = "0 2 * * *"  # 每天凌晨 2 点
+# DST 切换日, 凌晨 2 点跳过了 (spring forward) 或重复 (fall back)
+# → 这一天任务跑 0 次或 2 次
+
+# 对: 用 UTC
+schedule = "0 6 * * *"  # UTC 6:00, 对应美东标准时间 1:00 (永远存在)
+# 显示给用户时再转换 local</code></pre>
+<p><strong>预防</strong>: 所有内部 timestamp 用 UTC, 用户显示再转 local.</p>
+<h4>5.2 Timezone</h4>
+<p><strong>症状</strong>: 印尼用户在 23:30 提交一个 "明天还款", system 解析成下下周 (because server 算的是 UTC 的明天).</p>
+<p><strong>典型 bug</strong>:</p>
+<pre class="language-python"><code class="language-python"># 错: 服务端 datetime.now() 不带 tz
+deadline = datetime.now() + timedelta(days=1)
+
+# 对: 显式传 user timezone
+def parse_relative(user_input, user_tz):
+    user_now = datetime.now(tz=ZoneInfo(user_tz))
+    if "明天" in user_input:
+        return user_now + timedelta(days=1)</code></pre>
+<h4>5.3 Data Freshness</h4>
+<p><strong>症状</strong>: Agent 拉用户余额 API, prod 缓存 1h, staging 缓存 1min, prod 经常给过时数据.</p>
+<pre class="language-python"><code class="language-python"># Cache TTL parity 校验
+def assert_cache_parity():
+    for cache_name in ['user_balance', 'user_status', 'loan_terms']:
+        prod_ttl = prod_redis.config_get(f'ttl_{cache_name}')
+        staging_ttl = staging_redis.config_get(f'ttl_{cache_name}')
+        assert prod_ttl == staging_ttl, f"{cache_name} TTL mismatch"</code></pre>
+<h4>5.4 Expired Tokens (你 OAuth 题的延续)</h4>
+<p><strong>症状</strong>: 第三方 API token 12h TTL, prod 在 12h 那一刻所有 worker 同时刷新, 触发 thundering herd, 部分请求超时.</p>
+<pre class="language-python"><code class="language-python"># 预过期 + 分布式锁 (前面 OAuth 题讲过)
+def get_token(tenant_id):
+    cached = cache.get(f"token:{tenant_id}")
+    # 提前 5 min 视为过期, 避免边界
+    if cached and cached.expires_at - now() &gt; 300:
+        return cached.token
+
+    with distributed_lock(f"refresh:{tenant_id}"):
+        # 再查一次 (singleflight)
+        cached = cache.get(f"token:{tenant_id}")
+        if cached and cached.expires_at - now() &gt; 300:
+            return cached.token
+
+        new = oauth.refresh(cached.refresh_token)
+        cache.set(f"token:{tenant_id}", new, ttl=new.expires_in - 600)
+        return new.token</code></pre>
+<h4>5.5 Scheduled Job / Cron Misalignment</h4>
+<p><strong>典型 bug</strong>: data pipeline 每天 02:00 跑, agent 每天 02:30 启动, 但 pipeline 因为依赖 03:00 才 ready, agent 在 02:30-03:00 拿到 stale data, 给错误答案.</p>
+<p><strong>预防</strong>:</p>
+<ul><li>数据 freshness signal: agent 启动前 check <code>MAX(updated_at)</code> 是不是足够新</li><li>如果不够新, <strong>fail loudly</strong>, 不要默默用 stale</li></ul>
+<hr />
+<h1>Part 3 · 把 5 个问题串起来看</h1>
+<p>这 5 个问题是<strong>同一件事的 5 个 viewpoint</strong>:</p>
+<ol><li><strong>7 类 diff source</strong> 是「<strong>root cause 空间</strong>」</li><li><strong>Reproducibility instrumentation</strong> 是「<strong>搜索这个空间的工具</strong>」</li><li><strong>Environment parity</strong> 是「<strong>让搜索空间变小的预防</strong>」</li><li><strong>State</strong> 是「<strong>搜索空间中最隐蔽的一片暗区</strong>」</li><li><strong>Time</strong> 是「<strong>搜索空间中第二隐蔽的一片暗区</strong>」</li></ol>
+<p>面试场或事故复盘上, 能讲出这套<strong>系统化诊断方法</strong>, 而不是只讲「我看 log 然后 fix」, 是 staff-level 工程师的标志.</p>
 <hr />
 <h3>必问 clarifying questions</h3>
 <p><strong>1. Define "inconsistent"</strong></p>
-<blockquote><p>"What kind of inconsistency — <strong>wrong</strong> answers, <strong>different</strong> answers each time (non-determinism), or <strong>slower</strong> answers?"</p></blockquote>
+<blockquote><p>"What kind of inconsistency — <strong>wrong</strong> answers, <strong>different</strong> answers each time (non-determinism), or <strong>slower</strong> answers that get truncated? They have completely different RCA paths."</p></blockquote>
 <p><strong>2. Frequency</strong></p>
-<blockquote><p>"All requests, or specific ones? Percentage? Same input always reproduces?"</p></blockquote>
-<p><strong>3. Same model artifact</strong></p>
-<blockquote><p>"Are staging and prod running the <strong>identical model checkpoint</strong>? Same model version + system prompt + tokenizer?"</p></blockquote>
-<p><strong>4. Same input data</strong></p>
-<blockquote><p>"Are users in prod sending the <strong>same shape</strong> of input? Could distribution have shifted?"</p></blockquote>
+<blockquote><p>"All requests, or specific ones? Percentage? Same input always reproduces, or stochastic?"</p></blockquote>
+<p><strong>3. Same artifact?</strong></p>
+<blockquote><p>"Are staging and prod running the <strong>identical model + tokenizer + system_prompt + image SHA</strong>? Has anyone verified by hash?"</p></blockquote>
+<p><strong>4. Same input shape?</strong></p>
+<blockquote><p>"Are users in prod sending the <strong>same distribution</strong> of input as staging eval? Length, language, topic, edge cases?"</p></blockquote>
 <p><strong>5. Recent change</strong></p>
-<blockquote><p>"Has anything changed recently — new release, new feature flag, upstream API changes, infrastructure migration?"</p></blockquote>
-<hr />
-<h3>5 类典型 root cause</h3>
-<table class="md-table"><thead><tr><th>Class</th><th>What</th><th>Diagnosis cost</th></tr></thead><tbody><tr><td><strong>C1: Config drift</strong></td><td>model version / system prompt / temperature differ</td><td>低 (1h diff configs)</td></tr><tr><td><strong>C2: Feature pipeline drift</strong></td><td>prod features are stale / missing / encoded differently</td><td>中 (need trace)</td></tr><tr><td><strong>C3: Input distribution shift</strong></td><td>real users send things staging tests didn't cover</td><td>中 (need distribution compare)</td></tr><tr><td><strong>C4: Non-determinism</strong></td><td>temperature &gt; 0, batch size affects sampling, multi-replica state</td><td>中</td></tr><tr><td><strong>C5: Infrastructure</strong></td><td>timeout differences, GPU vs CPU, library version, region latency triggering shorter response</td><td>中-高</td></tr></tbody></table>
+<blockquote><p>"Has anything changed in last 7 days — new release, feature flag, upstream API, infra migration, model upgrade, deps?"</p></blockquote>
+<p><strong>6. Time/segment pattern</strong></p>
+<blockquote><p>"Does inconsistency cluster by region, time-of-day, user segment, request length? Pattern guides hypothesis."</p></blockquote>
 <hr />
 <h3>5 步框架</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify + reproduce attempt</td></tr><tr><td>5-15 min</td><td>C1 cheapest checks first (config diff)</td></tr><tr><td>15-25 min</td><td>C2/C3 — feature + input distribution</td></tr><tr><td>25-40 min</td><td>C4/C5 — non-determinism + infra</td></tr><tr><td>40-50 min</td><td>Fix + add observability so it doesn't happen again</td></tr><tr><td>50-60 min</td><td>Roll out fix safely</td></tr></tbody></table>
-<hr />
-<h3>我会这样答（sample monologue）</h3>
-<blockquote><p>"First clarify — <em>[假设：30% of requests, same input不一定 reproduce, configs claim identical, no recent release, infrastructure migrated last week from us-east to multi-region]</em>.</p>
-<p>Last clue is gold: <strong>infrastructure migrated</strong> → C5 candidate.</p>
-<p>But I'd still go systematic, cheapest first:</p>
-<p><strong>Step 1: Reproduce on prod with controlled input</strong> (1 hour)</p>
-<ul><li>Capture <strong>10 prod requests + responses</strong> with full context</li><li>Replay each on staging with same request</li><li>See if outputs match. If yes → environmental. If no → input or pipeline.</li></ul>
-<p><strong>Step 2: C1 config diff</strong> (30 min)</p>
-<ul><li><code>diff staging_config prod_config</code>: model ID, system prompt, temperature, top_p, max_tokens, stop sequences</li><li>Check <strong>deployed model artifact hash</strong> matches</li><li>Check <strong>tokenizer version</strong></li><li>Check <strong>feature flags</strong> active on prod vs staging</li></ul>
-<p><strong>Step 3: C2 feature pipeline trace</strong> (2 hours)</p>
-<ul><li>For one failing request: trace every input feature value end-to-end</li><li>Are all features present? Same range / encoding as training?</li><li>Common bug: <strong>missing feature defaults to wrong sentinel</strong> (e.g., <code>-1</code> instead of <code>null</code> → model interprets as "very low score")</li></ul>
-<p><strong>Step 4: C3 input distribution</strong> (1 hour)</p>
-<ul><li>Compute distribution of input features over last 24h prod vs 24h staging</li><li>Look for <strong>categories never seen in staging</strong></li><li><strong>Length distribution</strong>: prod might have 99th percentile request 10x longer than staging</li></ul>
-<p><strong>Step 5: C4 non-determinism</strong> (1 hour)</p>
-<ul><li>If temperature &gt; 0: same input should produce different output. Is that the inconsistency?</li><li><strong>Batching</strong>: vLLM / SGLang batch size affects sampling. Compare batch size statistics.</li><li>Multi-replica: any state per-replica that varies?</li></ul>
-<p><strong>Step 6: C5 infrastructure</strong> (most likely given migration clue)</p>
-<ul><li><strong>Timeout</strong>: prod may have shorter timeout → model truncates output mid-generation</li><li><strong>Concurrency</strong>: prod under load → models may share KV cache improperly</li><li><strong>GPU vs CPU</strong> (or different GPU types): rare but real, FP16 rounding differs</li><li><strong>Region latency</strong>: client timeout causes early disconnection, model returns partial</li><li><strong>DNS / TLS handshake</strong>: degraded prod path adds 200ms, but doesn't change output... unless triggers shorter max_tokens</li><li><strong>Library mismatch</strong>: different transformers / torch version between staging and prod</li></ul>
-<p><strong>Given the 'multi-region migration' clue, my top 2 hypotheses</strong>:</p>
-<ul><li><strong>Region routing inconsistency</strong>: 30% of traffic goes to a region with subtly different infra (e.g., older GPU type, library version, env variable)</li><li><strong>Timeout truncation</strong>: cross-region call to LLM service has higher latency, downstream timeout truncates response</li></ul>
-<p><strong>Immediate diagnostic</strong>:</p>
-<ul><li>Tag every prod request with <strong>region</strong>, <strong>GPU type</strong>, <strong>library hash</strong></li><li>Aggregate inconsistency rate by region</li><li>If 30% inconsistency clusters in 1 region, <strong>prove the hypothesis</strong></li></ul>
-<p><strong>Fix path</strong>:</p>
-<ul><li>Short-term: <strong>route 100% to known-good region</strong>, accept higher latency from non-local users</li><li>Mid-term: align library versions / infra across regions (idempotent rebuild)</li><li>Long-term: <strong>per-request artifact provenance log</strong> so we always know which model+infra+config served each response</li></ul>
-<p><strong>What I'd add to prevent recurrence</strong>:</p>
-<ul><li><strong>Hash-versioned deployment artifacts</strong>: every deploy logs SHA of model + tokenizer + system prompt + every dependency. <code>prod_hash == staging_hash</code> is invariant.</li><li><strong>Per-request observability</strong>: log temperature, model_id, region, GPU type per request. <strong>Without this, we'd never know.</strong></li><li><strong>Shadow eval pipeline</strong>: 1% of prod traffic goes to staging-mirror, daily diff alerts on drift</li><li><strong>Canary on every deploy</strong>: 1% → 10% → 100% with auto-rollback on error budget breach"</li></ul></blockquote>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify + reproduce attempt</td></tr><tr><td>5-15 min</td><td>D2/D3 cheap diffs (config + artifact hash)</td></tr><tr><td>15-25 min</td><td>D4/D1 medium (dep diff + input distribution)</td></tr><tr><td>25-40 min</td><td>D6/D7 hard (state introspect + time audit)</td></tr><tr><td>40-50 min</td><td>D5 expensive (load test if all else fails)</td></tr><tr><td>50-60 min</td><td>Fix + Prevent (golden trace + canary + shadow)</td></tr></tbody></table>
 <hr />
 <h3>简历专属 reframe</h3>
-<p>你的 <strong>voice agent multi-region</strong> + <strong>ConvFinQA RL alignment</strong> 都涉及 production debug：</p>
-<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Multi-region inconsistency</td><td>Voice agent 跨 7 markets 不同 region</td></tr><tr><td>Library / artifact hash mismatch</td><td>vLLM / SGLang upgrade 你做过</td></tr><tr><td>Per-request observability</td><td>Voice agent 端到端 latency tracing 你 own</td></tr><tr><td>Canary on every deploy</td><td>7 markets phased rollout</td></tr><tr><td>Shadow eval</td><td>ConvFinQA stratified 300 eval 类似</td></tr></tbody></table>
-<p><strong>主动说</strong>：</p>
-<blockquote><p>"I've literally lived this. When we rolled out the voice agent from Singapore-only to multi-region, we got 25% inconsistency rate on Thai customers. We traced it to a <strong>library mismatch</strong> — the Thai region's vLLM was on an older version with different default sampling. We instituted <strong>hash-versioned deploy artifacts</strong> across all regions after that incident — every release we log SHA of model + tokenizer + library and assert equivalence pre-deploy. Saved us 3 more incidents in the year."</p></blockquote>
+<p>你的 <strong>voice agent 7 markets</strong> + <strong>ConvFinQA RL alignment</strong> + <strong>BNPL chatbot</strong> 都是 production debug 实战:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Multi-region inconsistency</td><td>Voice agent 跨 7 markets 不同 region, 处理过 Bahasa drift</td></tr><tr><td>Library / artifact hash mismatch</td><td>vLLM / SGLang upgrade 你做过</td></tr><tr><td>Per-request observability</td><td>Voice agent 端到端 latency tracing 你 own</td></tr><tr><td>Canary on every deploy</td><td>7 markets phased rollout</td></tr><tr><td>Shadow eval</td><td>ConvFinQA stratified 300 eval 类似</td></tr><tr><td>Time-dependent bug (DST/token)</td><td>Vault token 12h, market-level holiday triggered</td></tr><tr><td>Reproduce + replay tool</td><td>Voice agent failed call replay</td></tr></tbody></table>
+<p><strong>主动 quote</strong>:</p>
+<blockquote><p>"I've debugged exactly this shape. Rolling our voice agent from Singapore-only to multi-region, we got 25% inconsistency rate on Thai customers — Bahasa replies were defaulting to English. I went cheap-first: D2 config diff caught it immediately — the release before added <code>Respond only in English unless explicitly asked otherwise</code> to the system prompt, and that change had <strong>never been in our staging eval suite</strong>. Fix took 10 minutes; the <strong>process change</strong> (system prompt diff → mandatory eval suite run) was the real fix. After that we instituted <strong>hash-versioned deploy artifacts</strong> + <strong>golden trace gate</strong> + <strong>per-region canary</strong> across all 7 markets — caught 3 more would-be incidents that year."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
-<p><strong>Q1</strong>: "We've checked configs identical, reproduces 30% of time, but staging doesn't show it. What now?" <strong>A</strong>: Look at <strong>load</strong>: production has 100x traffic. Bug surfaces under <strong>concurrency or batching</strong>. Solutions:</p>
-<ul><li>Simulate prod load on staging with synthetic traffic</li><li>Profile vLLM batching: high concurrency triggers paged-attention re-use, can produce subtly different outputs</li><li>Check <strong>KV cache eviction</strong> under memory pressure</li></ul>
-<p><strong>Q2</strong>: "We can't reproduce even with same input on prod replay. Is it a ghost?" <strong>A</strong>: Non-determinism likely. Audit:</p>
-<ul><li>Is <code>temperature=0</code> enforced? Top-p &gt; 0 still has limited non-det</li><li>Is model <strong>deterministic seed</strong> set? OpenAI's <code>seed</code> parameter</li><li>Tokenizer order: BPE merges might differ between versions</li><li>GPU kernel non-det: cuBLAS GEMM has known reproducibility issues; force <code>torch.backends.cudnn.deterministic = True</code></li></ul>
-<p><strong>Q3</strong>: "Bug is intermittent and we can't catch it in staging. Just ship fix?" <strong>A</strong>: 不行. Without root cause:</p>
-<ul><li>High chance fix doesn't address actual bug</li><li>High chance fix introduces new bug</li></ul>
-<p><strong>Workaround</strong>: ship <strong>observability first</strong> (per-request logs + region tags), then wait 24h for <strong>enough samples to find pattern</strong>. Patience beats hasty patch.</p>
-<p><strong>Q4</strong>: "Customer demands immediate fix. We don't know root cause." <strong>A</strong>: Negotiate:</p>
-<ul><li>"We can <strong>roll back to last-known-good infra</strong> in 4 hours — restores consistency at cost of feature X. Acceptable?"</li><li>"Or <strong>disable agent for these specific input types</strong> that fail — partial coverage but 100% consistent"</li><li>"Or <strong>A/B with 0% prod traffic for 2 days</strong> while we get root cause from observability instrumented now"</li></ul>
-<p>The honest "we'll patch blindly" path almost always extends the incident.</p>
-<p><strong>Q5</strong>: "If it's prompt change ourselves silently made, how do we prevent next time?" <strong>A</strong>:</p>
-<ul><li><strong>System prompt as code</strong>: stored in git with version + commit hash, deployed via CI</li><li><strong>Prompt evals on PR</strong>: every prompt change must pass eval suite before merge</li><li><strong>Audit log + diff</strong>: every prompt change emits diff to a team channel</li><li><strong>Per-request prompt SHA</strong> logged so we can reconstruct what was in effect</li></ul>
+<p><strong>Q1</strong>: "We've checked configs identical, can't reproduce on staging, but it reproduces 30% on prod. What now?"</p>
+<p><strong>A</strong>: 这是经典 D5/D6 嫌疑. Steps:</p>
+<ul><li>加 trace_id + per-request snapshot, 收 24h 样本</li><li>Bucket failing traces by: region, GPU type, replica_id, batch_size, time_of_day, request_length</li><li>看哪个 bucket 失败率显著高 → 是 hypothesis</li><li>典型 finding: 某个 replica 状态 stale / 某个 GPU type 库版本不同 / 某个 batch_size 触发 paged attention bug</li><li>不能反过来 "我猜 GPU 然后试着 fix", 必须<strong>让数据说话</strong></li></ul>
+<p><strong>Q2</strong>: "We can't reproduce even with same input on prod replay. Is it a ghost?"</p>
+<p><strong>A</strong>: Non-determinism 是 prime suspect:</p>
+<ul><li><code>temperature=0</code> enforced? top_p &lt; 1? top_k 设了吗?</li><li><code>seed</code> 参数固定了吗? (OpenAI API 有 seed, vLLM 也有)</li><li>Tokenizer 顺序: BPE merges might differ between versions</li><li>GPU kernel non-det: <code>torch.use_deterministic_algorithms(True)</code>, set <code>CUBLAS_WORKSPACE_CONFIG=:4096:8</code></li><li>Batch composition: vLLM 在 batch 内的 attention 是 deterministic 但和 batch_size 有关</li><li>实战: <strong>接受 5% 输出有合理变化</strong>, 用 semantic similarity 而不是 exact match 衡量</li></ul>
+<p><strong>Q3</strong>: "Bug is intermittent. Just ship a fix?"</p>
+<p><strong>A</strong>: 不行. Without RCA:</p>
+<ul><li>高概率 fix 不 address actual bug</li><li>高概率 fix 引入 new bug</li><li><strong>Workaround</strong>: ship <strong>observability first</strong> (trace + snapshot + region tags), 等 24h 收 sample 找 pattern. Patience &gt; hasty patch.</li><li>如果客户压力大: temporary rollback to LKG, 给自己时间找 RCA</li></ul>
+<p><strong>Q4</strong>: "Customer demands immediate fix. We don't know root cause."</p>
+<p><strong>A</strong>: Negotiate workaround:</p>
+<ul><li>"Roll back to last-known-good (4h MTTR) — restores consistency at cost of new feature X. Acceptable?"</li><li>"Disable agent for input types that fail — partial coverage but 100% consistent"</li><li>"Move 100% traffic to known-good region, accept higher latency for non-local users"</li><li>诚实的 workaround 永远好过盲 fix. <strong>盲 fix 通常延长事故</strong>.</li></ul>
+<p><strong>Q5</strong>: "If staging is so unreliable a predictor of prod, why have it?"</p>
+<p><strong>A</strong>: Staging 不是 prod 的 100% mirror, 它是:</p>
+<ul><li>Catch <strong>catastrophic</strong> bugs (语法错, 服务起不来, API 不兼容) — staging 抓 70%</li><li>提供 <strong>regression test</strong> harness</li><li>给 PM / QA review 新 feature 的地方</li><li><strong>The remaining 30%</strong> 要靠 canary + shadow + golden traces + per-request observability 兜底</li><li>"Staging unreliable" 不是放弃 staging 的理由, 是<strong>升级到 staging + canary + shadow 三件套</strong>的理由</li></ul>
 <hr />
 <h3>❌ 易错点</h3>
-<ol><li><strong>立刻 blame model</strong> — 90% root cause 不是 model</li><li><strong>没尝试 reproduce</strong> — 直接 hypothesize</li><li><strong>跳过 C1 config diff</strong> — 最 cheap, 最 common 原因</li><li><strong>忽略 infra migration clue</strong> — recently-changed = recently-broken</li><li><strong>Ship fix without root cause</strong> — 通常 reverberate</li><li><strong>没 observability instrumentation 先</strong> — 没 tag region/GPU/lib version 啥都 trace 不到</li><li><strong>Customer 给 immediate pressure 就 cave</strong> — negotiate workaround 时间换 quality</li></ol>
+<ol><li><strong>立刻怀疑 model</strong> — 90% root cause 不是 model 本身</li><li><strong>没 trace_id 就 debug</strong> — 在 high QPS 里找不到 specific failing request</li><li><strong>没 reproduce 就 fix</strong> — 改完一个 dimension, 引入另一个</li><li><strong>跳过 cheap diffs</strong> — 直接怀疑 GPU 非确定性, 但配置 1 行不同</li><li><strong>Ship fix without RCA</strong> — temporary patch 通常 mask 真因</li><li><strong>没 instrumentation 就 deploy</strong> — 没 region tag / GPU tag / version tag, 一切靠猜</li><li><strong>Customer 压力下盲 fix</strong> — 通常延长事故</li><li><strong>忽略 "recently changed"</strong> — recent change = recent break</li></ol>
 <hr />
 <h3>✅ 加分项</h3>
-<ol><li><strong>5 root cause classes</strong> 清晰列</li><li><strong>Cheapest-first 诊断顺序</strong></li><li><strong>Per-request artifact provenance log</strong> as preventive</li><li><strong>Shadow eval at 1% traffic</strong> 防 future drift</li><li><strong>Canary auto-rollback on error budget</strong> standard SRE</li><li><strong>GPU non-determinism</strong> awareness (cuBLAS GEMM)</li><li><strong>System prompt as code + eval-on-PR</strong></li><li><strong>Negotiate workaround for time</strong> 不 cave under pressure</li></ol>
+<ol><li><strong>7 类 diff source</strong> 清晰分类</li><li><strong>Cheap-first 诊断顺序</strong></li><li><strong>trace_id + snapshot + replay</strong> 三件套</li><li><strong>Per-request artifact provenance log</strong> as preventive</li><li><strong>Shadow eval at 1-10% traffic</strong> 防 future drift</li><li><strong>Canary auto-rollback on error budget</strong> standard SRE</li><li><strong>GPU non-determinism</strong> awareness (cuBLAS, paged attention)</li><li><strong>Golden trace gate</strong> at deploy</li><li><strong>State divergence monitoring</strong> across replicas</li><li><strong>Time / timezone / DST awareness</strong></li><li><strong>System prompt as code + eval-on-PR</strong></li><li><strong>Negotiate workaround under pressure</strong> instead of blind fix</li></ol>
 <hr />
-<h3>Cheat Sheet</h3>
-<pre class="language-plaintext"><code class="language-plaintext">5 root cause classes (cheapest first):
-  C1 Config drift (model / prompt / temp)
-  C2 Feature pipeline drift
-  C3 Input distribution shift
-  C4 Non-determinism (temp, batch, multi-replica)
-  C5 Infrastructure (region / GPU / lib)
+<h3>一句话总结</h3>
+<blockquote><p><strong>Staging vs Prod inconsistency debug = "先 reproduce (trace + snapshot + replay), 再按 cheap → expensive 排查 7 类 diff source (config / version / dep / data / time / state / scale), 然后用 hash + canary + shadow + golden trace 防 recurrence"</strong>.</p>
+<p>这道题考的不是「我会用 Datadog 看 log」, 是「我有没有真的 own 过一个 LLM 产品的 production lifecycle」.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (印 1 页)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">7 diff sources (cheap → expensive):
+  D2 Config drift     (model_id / prompt / temp / top_p)
+  D3 Model version    (artifact + tokenizer SHA)
+  D4 Dependency       (vLLM / torch / cuDNN / lib)
+  D1 Data             (input distribution shift)
+  D7 Time             (DST / TZ / token expire / freshness)
+  D6 State            (cache warm / in-mem / KV cache / replica)
+  D5 Scale            (batch / concurrency / KV evict)
+
+Real-world distribution of root cause:
+  D2  35% — recently-changed config
+  D3  20% — wrong artifact deployed
+  D7  15% — time/cache TTL
+  D1  12% — long-tail input
+  D6  10% — replica state divergence
+  D4   5% — dep upgrade silent
+  D5   3% — only at peak QPS
 
 Diagnostic flow:
-  1. Reproduce on prod, replay on staging
-  2. diff configs (model + prompt + dep versions)
-  3. Trace 1 feature pipeline end-to-end
-  4. Distribution compare (last 24h prod vs staging)
-  5. Check non-determinism (seed, batch, replica)
-  6. Tag region + GPU + lib hash, aggregate
+  1. Clarify "inconsistent" (wrong / different / slow)
+  2. Stabilize (rollback if &gt; 50% impact)
+  3. Reproduce (10 prod traces → replay staging)
+  4. Cheap diff (config + hash + dep) ← 60% RC here
+  5. Medium diff (data dist + time audit) ← 27% here
+  6. Hard diff (state introspect + load test) ← 13%
+  7. Fix + golden trace + prevent
 
-Quick wins:
+Reproducibility 三件套:
+  trace_id propagation (OpenTelemetry)
+  Per-failure snapshot (S3, 30d retain)
+  Replay tool (prod trace → staging run)
+
+Env parity strategies:
+  Golden traces (200-500 case CI gate)
+  Shadow mode (1-10% fork to staging)
+  Canary + auto-rollback (1→10→50→100%)
+
+State traps:
+  Cache warm vs cold (test both)
+  In-memory singleton drift (externalize state)
+  vLLM KV cache + batch_size (FP16 rounding)
+  Per-replica divergence (monitor outliers)
+
+Time traps:
+  DST (use UTC everywhere)
+  Timezone (per-user tz, not server tz)
+  Token expire (preempt 5min + dlock)
+  Data freshness (assert MAX(updated_at) recent)
+  Cron misalignment (depend on signal, not clock)
+
+Quick wins (deploy hardening):
   - Per-request observability (region/gpu/lib SHA)
-  - Hash-versioned deploy artifacts
-  - Shadow 1% prod to staging-mirror
-  - Canary + auto-rollback on every deploy
+  - Hash-versioned deploy artifacts (assert pre-deploy)
+  - Shadow 1% prod → staging-mirror
+  - Canary + auto-rollback every deploy
+  - Golden trace CI gate
+  - System prompt as code + eval-on-PR
 
 Workarounds while diagnosing:
   - Route 100% to known-good region
@@ -148,7 +693,9 @@ Workarounds while diagnosing:
 红线:
   - Don't blame model first
   - Don't ship fix without RC
-  - Don't ignore "recently changed"</code></pre>
+  - Don't ignore "recently changed"
+  - Don't debug without trace_id
+  - Don't trust file names (use SHA)</code></pre>
   </section>
 
   
@@ -164,20 +711,872 @@ Workarounds while diagnosing:
 
 > "An **AI agent returns inconsistent results in production** compared to staging. Walk through your debugging approach end-to-end."
 
-**出处**：fde.academy 列出的高频技术 round 题。OpenAI / Anthropic / Google FDE 都问过。
+**出处**: fde.academy 列出的高频技术 round 题. OpenAI / Anthropic / Google FDE 都问过.
 
-**Round**：Technical Integration / Debug (45-60 min)
+**Round**: Technical Integration / Debug (45-60 min)
 
 ---
 
 ## 这道题在考什么
 
-考你**production deployment 的诊断套路**。AI deployment 大多数失败都是这个 shape：
+考你 **production deployment 的诊断套路**. AI deployment 大多数失败都是这个 shape:
 
-1. **5 类典型 root cause** —— 你知道几个？
-2. **诊断顺序** —— 先 cheap 后 expensive
-3. **能不能 reproduce** —— production-only bug 是最难的
-4. **Don't blame the model first** —— 9/10 root cause 不是 model
+1. **能不能 reproduce** — production-only bug 是最难的, 没 reproduce 就没 fix
+2. **诊断顺序对不对** — cheap 先于 expensive, hash diff 先于 GPU profile
+3. **7 类 diff sources 知道几个** — data / config / model / dep / scale / state / time
+4. **Don't blame the model first** — 9/10 root cause 不是 model 本身
+5. **有没有 instrumentation 让你能 trace** — 没 trace_id 一切都靠猜
+
+考的不是「OpenAI bug 长啥样」, 是「你 production 用 LLM 部署过, 解决过几个 silent failure」.
+
+---
+
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 四个术语先解释
+
+**Staging vs Production**: 两个**环境** (environment). Staging 是 prod 的镜像 — 同样代码、同样架构、同样 deploy pipeline, 但流量是合成的、数据是 sanitized 的. **理想情况**它们一模一样, **实际**永远存在 drift. 这道题考的就是: 当 drift 显现成 bug 时, 怎么定位.
+
+**Inconsistency** (不一致): 一个 ambiguous 的词, 必须先 clarify. 有 3 种含义:
+
+- **Wrong**: 输出错误 (staging "对" → prod "错")
+- **Different**: 同一个 input, prod 多次跑结果不一样 (non-determinism)
+- **Slower**: 输出正确, 但 latency / timeout 引发 truncation
+
+90% 的初学者直接开始 debug "wrong", 但很多 production bug 其实是 "slower → truncated → wrong".
+
+**Reproducibility** (可复现性): 给定一个 production failure case, 能不能在 staging 或本地原样再跑出同样错. **能 reproduce 等于成功了 80%**.
+
+**Trace_id propagation** (链路追踪 ID 传递): 每个请求一个 unique trace_id, 在所有 service / log / DB 操作里都带上. 没有这个, 你就只能靠时间戳 + IP 猜哪条 log 对应哪个请求, 在 high-QPS prod 里就是 garbage.
+
+---
+
+## 2. 这个问题的核心是什么
+
+设想一个**没有 trace / 没 hash 校验 / 没 shadow eval** 的 AI deployment 灾难:
+
+```
+14:32  客户反馈: "你们的 agent 今天回复全是乱的"
+14:35  你: "我刚 staging 跑了一遍, 都好啊?"
+14:50  你看 prod log: 一堆 "I can't help with that" — 但同样 prompt 在 staging 是正常回复
+15:00  你: "应该是 model 版本? 配置? GPU? 还是用户输入变了?"
+15:30  你 hypothesize 之一然后试着 fix, 改坏了另一个 dimension
+16:00  事态扩散, customer escalate 到 VP
+17:00  你 emergency rollback. Postmortem: 4h MTTR, root cause unclear.
+```
+
+**问题**:
+
+- 没 trace 没法找到具体 failing request 的全部 context
+- 没 deploy artifact hash 不知道两边到底跑的是不是同一个 model + tokenizer + system prompt
+- 没 distribution monitor 不知道 prod 输入是不是真的和 staging 不一样
+- 没 canary 一次性 deploy 100%, 出问题影响所有用户
+- 没 shadow eval 不知道 silent drift 已经累积多久
+
+**Production-grade debug 解法**:
+
+```
+1. trace_id 端到端 (每个 service / log / DB 都带)
+2. Deploy artifact 全 hash 校验 (model + tokenizer + prompt + dep + image)
+3. Per-request observability (region, GPU, batch_size, seed, temperature)
+4. Shadow eval 每天对比 prod vs staging 同 input 输出
+5. Canary deploy + auto-rollback on error budget breach
+6. Replay tool: 任意 prod trace_id 一键在 staging 复现
+```
+
+---
+
+## 3. 7 类 diff source 决策树
+
+`Staging` 和 `Production` 可能在以下 7 个维度 drift, **诊断顺序按 cheap → expensive**:
+
+```
+请求出现 inconsistency
+         ↓
+   ┌─────┴─────┐
+   是否能 reproduce?
+   ├─ 能 ─→ 找 1 个 minimal failing input
+   └─ 不能 ─→ 先加 trace + per-request log, 等 24h 收样本
+         ↓
+   ┌────────────────────────────────────────┐
+   │  D1 Data        — 输入数据本身变了?       │
+   │  D2 Config      — 模型 / 提示词 / 参数差? │
+   │  D3 Model       — checkpoint hash 差?    │
+   │  D4 Dependency  — vLLM / torch 版本差?   │
+   │  D5 Scale       — prod 100x QPS, 触发 batch / KV cache? │
+   │  D6 State       — cache warm / cold? Multi-replica state divergent? │
+   │  D7 Time        — DST / timezone / token expire / data freshness? │
+   └────────────────────────────────────────┘
+         ↓
+   按 cheap → expensive 依次排除:
+   D2 (1h diff) → D3 (1h hash) → D4 (2h dep list) →
+   D1 (4h distribution) → D7 (4h time audit) →
+   D6 (1d state introspect) → D5 (3d load test)
+```
+
+**关键**: **不要跳到最后一类去查**. 30% 的人直接怀疑 GPU 非确定性, 但 90% 的真实 root cause 在 D2/D3 (config / model hash).
+
+---
+
+## 4. 关键 diff source 分类表
+
+| Class | 含义 | 典型表现 | 诊断成本 |
+|---|---|---|---|
+| **D1 Data** | Prod 用户输入分布偏离 staging | 某类长 prompt / 罕见语言失败 | 中 (需要 distribution compare) |
+| **D2 Config** | model_id / system_prompt / temperature / top_p / max_tokens 不同 | "今天换了 system prompt 没人告诉我" | 低 (1h `diff` 配置) |
+| **D3 Model version** | Checkpoint / LoRA / tokenizer hash 不同 | Prod 跑的是上周的 checkpoint | 低 (hash compare) |
+| **D4 Dependency** | vLLM / torch / transformers / cuBLAS 版本 | "我们升级了 vLLM" | 中 (`pip freeze` diff) |
+| **D5 Scale** | High QPS 触发 batch / paged attention / KV cache eviction | 只在 peak 期间复现 | 高 (load test) |
+| **D6 State** | Cache warm-up / in-memory state / multi-replica divergence | Restart prod 就恢复, 再过 1h 又坏 | 高 (state dump) |
+| **D7 Time** | DST / timezone / token expire / data staleness | 只在某天 / 某小时复现 | 中 (time audit) |
+
+**真实世界统计** (我个人 voice agent 7 markets 复盘的占比):
+
+- D2 (config drift) 35%
+- D3 (model version) 20%
+- D7 (time) 15%
+- D1 (data) 12%
+- D6 (state) 10%
+- D4 (dependency) 5%
+- D5 (scale) 3%
+
+**先查 D2/D3** 不是迷信, 是基于真实分布的策略.
+
+---
+
+## 5. 具体业务场景
+
+### 场景 A: 你的 TikTok Voice Agent 7 markets (你工作背景)
+
+**症状**: 周一早上, 你的 BD 同事在群里说 "印尼客户反馈 agent 突然听不懂 Bahasa, 回复全是英文了". 但你 staging 测试 Bahasa Indonesia 完全正常.
+
+**真实 root cause** (D2 + D7 复合):
+
+- 周末 release: system prompt 加了一句 "Respond only in English unless explicitly asked otherwise"
+- 这句 deploy 到 prod 但**没在 staging eval suite 里跑过**
+- + 印尼周一是 public holiday, 流量比平时高 3 倍, 触发了更多 batch 路径
+- 双重作用下 30% 印尼用户看到英文回复
+
+**怎么发现**: prod log 里 system_prompt 没有版本号, 你**靠对比 staging git 和 prod deploy 配置 diff** 才看到差异.
+
+### 场景 B: ConvFinQA RL Alignment (你的研究项目)
+
+**症状**: 你训练了一个 RL-aligned model, eval 在 staging 上准确率 78%, deploy 到 prod 同样 eval set 跑出来 71%.
+
+**真实 root cause** (D3):
+
+- 你 deploy 用的是 `model_v2.bin`
+- 你 eval 用的是 `model_v2_quantized.bin` (FP16 → INT8 量化版)
+- 量化引入 ~7% 准确率损失, 但你没注意 `.bin` 文件名差异
+
+**教训**: 部署必须 hash 校验, 不能信文件名.
+
+### 场景 C: 跨区域 deploy 不一致
+
+**症状**: Singapore region 准确率 OK, India region 同一个 query 准确率掉 15%.
+
+**真实 root cause** (D4 + D6):
+
+- Singapore vLLM 是 v0.5.0, India 是 v0.4.8 (运维不同步)
+- v0.5.0 默认 `enable_prefix_caching=True`, v0.4.8 默认 False
+- 长上下文 query 在 India 因为没 prefix cache, 每次重新跑 attention, KV cache fragment 更严重 → 偶发 quality drop
+
+### 场景 D: BNPL Chatbot tool calling 错乱
+
+**症状**: 用户问 "我的下个还款是多少", staging 永远调 `get_next_payment(user_id)` 工具, prod 偶尔会调 `get_payment_history(user_id)` 然后总结错.
+
+**真实 root cause** (D1 + D5):
+
+- Staging 测试 prompt 都比较短 (< 100 tokens)
+- Prod 用户实际会带很长的对话历史 (> 2000 tokens) 进入 router
+- 长上下文下 tool selection 的 next-token distribution 被稀释, 偶发选错 tool
+- 在 staging 永远复现不出来, 只在 prod long-context tail 出现
+
+### 场景 E: Indonesia refund tier confirmation broken
+
+**症状**: 你的 Indonesia refund tier 系统 (按金额触发 confirmation), 周二开始 staging 一切正常, prod 大额 refund 不弹 confirmation.
+
+**真实 root cause** (D7):
+
+- Confirmation logic 依赖一个 `feature_flag_service` 拉的 flag
+- Flag 的 cache TTL 是 24h
+- Staging 每天 redeploy 自动 invalidate cache
+- Prod 不 redeploy, cache 一直拿的是周一改过期的 flag
+- "时间 + cache" 双 victim
+
+---
+
+## 6. 工程上要做什么 — 诊断 checklist
+
+**Stage 0: Stabilize (< 30 min)**
+
+1. 评估 blast radius: 多少 % 流量受影响? 用户体感是 "wrong / different / slower"?
+2. 如果 > 50% → **immediate rollback** to last known good (LKG)
+3. 如果 < 5% 但持续 → 不 rollback, 收 sample 找 RCA
+4. Set up war room: incident channel, ICs assigned, status page updated
+5. Pause downstream automation (e.g., auto-billing based on agent output)
+
+**Stage 1: Reproduce (< 2 hours)**
+
+6. 捞 10 个 prod failing trace_id, 拿到完整 request payload + headers + timestamps
+7. 在 staging 一字不差 replay 同样 input — 能复现就跳 Stage 2, 不能复现就跳 Stage 3
+8. 如果 staging 100% 复现 → 是**input-driven**, D1 / D2 嫌疑大
+9. 如果 staging 0% 复现 → 是**env-driven**, D3-D7 嫌疑大
+
+**Stage 2: Cheap diffs first (< 4 hours)**
+
+10. **D2 config diff**: `diff <(prod config get) <(staging config get)`
+    - model_id, system_prompt, temperature, top_p, max_tokens, stop sequences, tool definitions
+11. **D3 artifact hash**: deploy log 里抓 model SHA, tokenizer SHA, image SHA, 两边对比
+12. **D4 dependency**: `diff <(prod pip freeze) <(staging pip freeze)`, 特别盯 vLLM / torch / transformers
+13. 配置 / hash / dep 全对得上 → 进 Stage 3
+
+**Stage 3: Expensive diffs (4-24 hours)**
+
+14. **D1 distribution**: 过去 24h prod input 的 length / language / topic 分布 vs staging eval 分布. 找 staging 没覆盖的 segment
+15. **D7 time audit**: 检查 token expire, cache TTL, scheduled job, DST window, data freshness SLA
+16. **D6 state**: dump prod replica 内存 vs staging, 看 cache / counter / 任何 stateful counter
+17. **D5 load**: 把 staging QPS 拉到 prod 同等水平, 看是否复现
+
+**Stage 4: Fix + Prevent**
+
+18. 写 minimal repro test, 加进 regression suite
+19. 写 postmortem (Five Whys), 至少 1 个 prevent action
+20. 部署 fix 走 canary (1% → 10% → 50% → 100%)
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **立刻怀疑 model** | 90% root cause 不是 model 本身, 是 config / version / env. 先 cheap diff |
+| 2 | **没 trace_id 就开始 debug** | 在 high QPS prod 里你根本找不到 specific failing request 的完整上下文 |
+| 3 | **没 reproduce 就开始 fix** | 改完一个 dimension, 引入另一个, 修不完. **No repro = no fix** |
+| 4 | **跳过 cheap diffs** | 直接怀疑 GPU 非确定性, 但配置文件 1 行不一样 |
+| 5 | **Ship fix without RCA** | 临时 patch 经常 mask 真因, 1 周后另一个 manifest 又出 |
+| 6 | **Customer 压力下 cave** | "立刻 fix" 比 "1h 内 rollback + 24h 找 RCA" 通常错. Negotiate workaround |
+| 7 | **忽略 "recently changed"** | Recent change = recent break. 最近 deploy / config update / 依赖升级永远先查 |
+| 8 | **盯个例不看 segment** | Aggregate metric 看不到 5% 用户 100% 失败 (per-segment 才能看到) |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **Staging vs Prod inconsistency debug = "先 reproduce, 再按 cheap → expensive 顺序排查 7 类 diff source, 最后用 hash + canary + shadow eval 防 recurrence"**.
+>
+> 这道题考的不是某个具体技巧, 是**你有没有真的部署过 LLM 产品, 解决过 silent failure**.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: 7 类 diff source 怎么系统排查
+
+**Diff sources** 是这道题的骨架. 系统讲清楚每一类的**诊断手段 + 自动化方式**.
+
+### 1.1 D1 Data Drift — 用户输入变了
+
+**症状**: 同样 model, 同样 config, 但 prod 输入分布和 staging eval 不一样.
+
+**诊断**:
+
+```python
+# 简化版 distribution monitor
+from collections import Counter
+from scipy.stats import ks_2samp
+
+def compare_distributions(prod_inputs, staging_inputs):
+    """对比关键维度的 distribution drift."""
+    report = {}
+
+    # Length distribution
+    prod_len = [len(x) for x in prod_inputs]
+    staging_len = [len(x) for x in staging_inputs]
+    stat, p = ks_2samp(prod_len, staging_len)
+    report['length_ks_p'] = p  # p < 0.05 → significantly different
+
+    # Language distribution
+    prod_lang = Counter(detect_lang(x) for x in prod_inputs)
+    staging_lang = Counter(detect_lang(x) for x in staging_inputs)
+    report['lang_diff'] = {
+        lang: prod_lang.get(lang, 0) / sum(prod_lang.values()) -
+              staging_lang.get(lang, 0) / sum(staging_lang.values())
+        for lang in set(prod_lang) | set(staging_lang)
+    }
+
+    # Token-level: PSI (Population Stability Index)
+    report['psi'] = compute_psi(prod_inputs, staging_inputs)
+
+    return report
+```
+
+**生产细节**:
+
+- **PSI > 0.25** → significant drift, 调查
+- **Tail 维度** 经常被忽略: 99th percentile length, 罕见 character set, 特殊 emoji
+- **多语言场景** 尤其难: staging 只测 English, prod 用户 30% 是 Bahasa
+
+### 1.2 D2 Config Drift — 配置不一样
+
+**最常见**, 也最容易查:
+
+```bash
+# 一键 diff
+diff <(kubectl get cm prod-agent-config -o yaml) \
+     <(kubectl get cm staging-agent-config -o yaml)
+```
+
+**自动化**: 每次 deploy 出报告:
+
+```yaml
+deploy_diff_report:
+  changes:
+    - field: system_prompt
+      old_hash: abc123
+      new_hash: def456
+      diff: |
+        +Respond only in English unless explicitly asked otherwise
+    - field: temperature
+      old: 0.0
+      new: 0.7
+      blast_radius: HIGH  # temperature 0 → 0.7 是大事
+```
+
+**用工具**:
+
+- **Argo CD / Flux** 自动 audit deploy diff
+- **OpenFeature / LaunchDarkly** flag changes 走变更管理
+- **Git** 任何 prompt / config 走 PR + eval-on-merge
+
+### 1.3 D3 Model Version
+
+**最常见 silent bug**:
+
+```python
+# Deploy 时强制 assert hash 一致
+def assert_artifact_consistency():
+    declared = config['model_sha256']
+    actual = sha256_of_file('/models/current/checkpoint.bin')
+    if declared != actual:
+        raise DeployError(f"Model hash mismatch: declared {declared}, actual {actual}")
+
+    # 同样校验 tokenizer
+    declared_tok = config['tokenizer_sha256']
+    actual_tok = sha256_of_file('/models/current/tokenizer.json')
+    if declared_tok != actual_tok:
+        raise DeployError("Tokenizer hash mismatch")
+```
+
+**真实 trap**: model file 用了 symlink, symlink 没更新, 文件名对了但内容不对.
+
+### 1.4 D4 Dependency
+
+```bash
+# Image-level diff
+docker run --rm prod-agent:latest pip freeze > /tmp/prod.txt
+docker run --rm staging-agent:latest pip freeze > /tmp/staging.txt
+diff /tmp/prod.txt /tmp/staging.txt
+```
+
+**特别盯**:
+
+- `vllm`, `sglang`, `transformers`, `torch`, `torchvision`
+- CUDA driver / cuDNN 版本 (`nvidia-smi`)
+- 系统库 (`libssl`, `libstdc++`)
+
+### 1.5 D5 Scale — Concurrency 触发的 bug
+
+只在 production 高 QPS 下复现, 罕见但真实:
+
+- **vLLM batch size**: 同 input 在 batch=1 和 batch=32 下输出可能不一样 (paged attention 实现细节)
+- **KV cache eviction**: prod 内存压力下 cache 频繁 evict, 导致 prefix recompute, FP16 rounding 累积
+- **Request scheduling order**: 请求顺序影响 batch composition
+
+**复现工具**:
+
+- `vegeta` / `wrk` 打 staging 模拟 prod 流量
+- 把 staging instance 缩容到 prod 同等内存压力
+
+### 1.6 D6 State
+
+```python
+# Per-replica state dump
+def snapshot_state(replica):
+    return {
+        'kv_cache_used_bytes': replica.gpu_kv_cache.used,
+        'prefix_cache_entries': len(replica.prefix_cache),
+        'open_sessions': len(replica.sessions),
+        'feature_flag_snapshot_age_sec': time.time() - replica.flags_loaded_at,
+        'uptime_sec': time.time() - replica.started_at,
+    }
+
+# 不同 replica state divergence
+for r in replicas:
+    print(r.id, snapshot_state(r))
+```
+
+**典型 bug**: 1 个 replica 卡了 stale flag, 25% 流量行为不一样.
+
+### 1.7 D7 Time
+
+```python
+# Time-sensitive things audit
+def audit_time_dependencies():
+    checks = []
+    # Token expire
+    for token in active_tokens():
+        checks.append(('token_expire', token.id, token.expires_at - now()))
+    # Cache TTL
+    for key in cache.scan():
+        checks.append(('cache_ttl', key, cache.ttl(key)))
+    # Scheduled jobs
+    checks.append(('scheduler_next_run', scheduler.next_run()))
+    # Data freshness
+    checks.append(('data_max_updated_at', db.max_updated_at('orders')))
+    return checks
+```
+
+**真实事故**: Vault token 12h TTL, prod 高峰期一直没 idle 触发 refresh, 12:01 同时过期, 大量 401.
+
+---
+
+## ⚙️ Problem 2: Reproducibility Instrumentation — trace_id / Snapshot / Replay
+
+没 reproducibility 就是盲人摸象. 三件套缺一不可.
+
+### 2.1 trace_id Propagation (端到端追踪)
+
+**目标**: 任何 prod request, 给一个 trace_id, 能在所有 log / DB / metric / blob storage 里找到所有相关记录.
+
+```python
+# 用 OpenTelemetry 标准
+from opentelemetry import trace
+from opentelemetry.propagate import inject, extract
+
+tracer = trace.get_tracer(__name__)
+
+@app.middleware
+async def trace_middleware(req, call_next):
+    # 从 header 提取或新建
+    ctx = extract(req.headers)
+    with tracer.start_as_current_span("http_request", context=ctx) as span:
+        trace_id = format(span.get_span_context().trace_id, '032x')
+        req.state.trace_id = trace_id
+        response = await call_next(req)
+        response.headers['X-Trace-Id'] = trace_id
+        return response
+
+# 所有 log 自动带 trace_id
+import structlog
+log = structlog.get_logger()
+
+def agent_handler(req):
+    log.info("agent_invoked", trace_id=req.state.trace_id, user_id=req.user_id)
+    # 调 LLM
+    log.info("llm_request",
+             trace_id=req.state.trace_id,
+             model=cfg.model_id,
+             prompt_hash=sha256(prompt))
+```
+
+**关键**:
+
+- trace_id 一定要进 LLM API call 的 `metadata` 字段, 这样 OpenAI / Anthropic 的 dashboard 也能查
+- trace_id 进 response header, 让 client 错误报告能带上
+- trace_id 进 audit log (合规)
+
+### 2.2 Snapshot Capture (快照捕获)
+
+**目标**: 任何 request 失败时, 自动 snapshot 完整 reproduce context.
+
+```python
+@dataclass
+class RequestSnapshot:
+    trace_id: str
+    timestamp: int
+    user_id: str
+    region: str
+    request_body: dict
+    request_headers: dict
+
+    # Environment
+    model_id: str
+    model_sha: str
+    tokenizer_sha: str
+    image_sha: str
+    pod_id: str
+    gpu_type: str
+
+    # Runtime
+    feature_flags: dict
+    config_snapshot_sha: str
+
+    # LLM-specific
+    system_prompt_hash: str
+    temperature: float
+    top_p: float
+    max_tokens: int
+    seed: Optional[int]
+
+    # Result
+    response_body: dict
+    latency_ms: int
+    error: Optional[str]
+
+def capture_snapshot(req, resp, err):
+    snap = RequestSnapshot(
+        trace_id=req.trace_id,
+        # ... fill all fields
+    )
+    # 失败的全存, 成功的 1% 抽样
+    if err or random() < 0.01:
+        s3.put(f'snapshots/{req.trace_id}.json', snap.to_json())
+```
+
+**存储**:
+
+- 失败请求 100% 存, 保留 30 天 (合规)
+- 成功请求 1% 抽样, 保留 7 天 (debug 用)
+- 敏感字段 (PII) 加密或 hash
+
+### 2.3 Replay Tool
+
+```python
+# 一键 replay
+class ReplayTool:
+    def __init__(self, target_env='staging'):
+        self.target = target_env
+
+    def replay(self, trace_id):
+        snap = s3.get(f'snapshots/{trace_id}.json')
+
+        # 用 prod 当时的 config 调 staging
+        cfg = self.fetch_config(snap.config_snapshot_sha)
+
+        # 在 staging 重放, 用 prod 的 system prompt / temperature
+        result = self.target_env.invoke_agent(
+            request_body=snap.request_body,
+            override_config=cfg,
+            override_seed=snap.seed,
+        )
+
+        return {
+            'prod_response': snap.response_body,
+            'staging_response': result,
+            'match': snap.response_body == result,
+            'env_diff': self.diff_env(snap),
+        }
+
+# Usage
+tool = ReplayTool('staging')
+result = tool.replay('abc123def456')
+print(result['match'])  # True/False
+print(result['env_diff'])  # what's different
+```
+
+**自动化**: 每天 cron 拿前一天的 prod failing traces, 在 staging replay, 算 reproduce rate. 如果 < 50% 一致 → "我们的 staging 已经不能代表 prod 了, 需要修复 parity".
+
+---
+
+## ⚙️ Problem 3: Environment Parity Strategies
+
+让 staging "更像" prod 的三个策略:
+
+### 3.1 Golden Traces (黄金样本集)
+
+**思想**: 维护一组 representative prod requests + expected outputs, 每次 deploy 必须先跑过.
+
+```python
+# Golden trace 数据集
+golden_traces = [
+    {
+        'name': 'indonesia_refund_above_threshold',
+        'request': {...},  # 一个真实的印尼大额退款请求
+        'expected_response_contains': ['请确认', 'Indonesia rules require'],
+        'last_updated': '2026-04-15',
+        'business_owner': 'wei@bytedance',
+    },
+    # ... 200-500 个 case
+]
+
+# CI gate
+def gate_deploy(candidate_image):
+    fails = []
+    for trace in golden_traces:
+        actual = candidate_image.invoke(trace.request)
+        if not match(actual, trace.expected_response_contains):
+            fails.append(trace.name)
+    if fails:
+        block_deploy(f"Golden trace failures: {fails}")
+```
+
+**维护**:
+
+- 每个 production incident → 加 1 个 golden trace 防 regression
+- 季度 review, 删除过时的 case
+- Cover all segment (per market, per user type, per topic)
+
+### 3.2 Shadow Mode (影子模式)
+
+**思想**: Prod 请求**同时**发给 prod 和 staging, 对比输出, 只用 prod 的, 但记录 staging 的 diff.
+
+```
+User → API Gateway → Fork
+                       ├──► Prod Agent  → Return to user (used)
+                       └──► Staging Agent → Compare, log diff (shadow)
+```
+
+**实现要点**:
+
+- Shadow path **必须 async**, 不能阻塞 user
+- Diff 用 semantic similarity, 不要 exact match (LLM 输出有合理变化)
+- 抽样 1-10% 流量做 shadow, 不要 100% (cost)
+- Shadow diff 日报: "今日 staging 和 prod 的 disagreement rate: 3.2%"
+
+```python
+async def shadow_invoke(req):
+    # 真正服务
+    prod_task = asyncio.create_task(prod_agent.invoke(req))
+    # 影子
+    if random() < shadow_sample_rate:
+        staging_task = asyncio.create_task(staging_agent.invoke(req))
+    else:
+        staging_task = None
+
+    prod_resp = await prod_task
+
+    if staging_task:
+        try:
+            staging_resp = await asyncio.wait_for(staging_task, timeout=5)
+            log_shadow_diff(req, prod_resp, staging_resp)
+        except asyncio.TimeoutError:
+            pass
+
+    return prod_resp
+```
+
+### 3.3 Canary Deployment + Auto Rollback
+
+**思想**: 新版本先 1% 流量, 没问题再 10%, 再 50%, 再 100%. 同时监控错误预算, 一旦超就自动 rollback.
+
+```yaml
+# Argo Rollouts spec
+strategy:
+  canary:
+    steps:
+    - setWeight: 1
+    - pause: { duration: 10m }
+    - analysis:
+        templates:
+        - templateName: error-rate
+        - templateName: latency-p99
+        - templateName: agent-success-rate
+    - setWeight: 10
+    - pause: { duration: 30m }
+    - analysis: [...]
+    - setWeight: 50
+    - pause: { duration: 1h }
+    - setWeight: 100
+```
+
+**自动 rollback 条件** (示例):
+
+- error rate > 1% (vs baseline 0.1%)
+- p99 latency > 2x baseline
+- agent_success_rate < 95%
+- 5xx > 0.5%
+
+工具: Argo Rollouts / Flagger / 自研.
+
+---
+
+## ⚙️ Problem 4: Stateful vs Stateless Differences
+
+很多 inconsistency 来自 **state**, 不是 logic.
+
+### 4.1 Cache Warm-up
+
+```
+Staging:    Cache 总是 cold (低流量, 经常 LRU 驱逐)
+Production: Cache 永远 hot (高流量, 重复 query 多)
+
+→ Prod 大量 cache hit, 走 fast path
+→ Staging 大量 cache miss, 走 slow path  
+→ Slow path 有个 bug, staging 永远看不到 (因为 hot path 把 bug 绕过去了)
+→ 或反过来: hot path 有 race condition, staging 因为 cold 永远不触发
+```
+
+**应对**: 测试时主动 warm up cache 或主动 invalidate, 两种状态都跑.
+
+### 4.2 In-memory State Divergence
+
+```python
+# Reproducibility killer: 单例 / 全局变量随时间累积
+class AgentMetrics:
+    """单例, 每个 replica 各一份, 状态随时间 drift."""
+    _instance = None
+
+    def __init__(self):
+        self.total_requests = 0
+        self.consecutive_failures = 0  # ← 这个会影响 retry 策略!
+
+# Replica A 累积 1000 个 consecutive_failures (因为 down 过), 进入降级模式
+# Replica B 永远 0, 正常模式
+# 同样 input 到 A 走降级, 到 B 走正常, "inconsistency"
+```
+
+**应对**:
+
+- 状态外置到 Redis / DB
+- 或定期 reset 全局状态
+- Per-replica health endpoint 暴露状态
+
+### 4.3 KV Cache Effects (vLLM / SGLang)
+
+```
+LLM inference 的 KV cache 是 stateful 的:
+
+Request 1: "今天天气怎么样" → prefix [今天, 天气, 怎么样] 进 KV cache
+Request 2: "今天我心情很差" → prefix [今天] 复用上次 cache 的 K/V
+                                ↓
+                            如果上次 cache 计算时 batch size = 32
+                            这次 cache 复用时 batch size = 1
+                            FP16 rounding 微妙不同
+                            → 同 input 不同输出 (罕见但真实)
+```
+
+**应对**:
+
+- 关键场景禁用 prefix cache (`enable_prefix_caching=False`)
+- 或接受非确定性, 在 eval 用 multiple-runs + 取中位
+- 实际生产: 99% 用户不在乎这点差异, 但 audit / regression test 要注意
+
+### 4.4 Multi-replica State Divergence
+
+```python
+# 监控 replica 之间状态差
+def replica_consistency_check():
+    snapshots = []
+    for r in replicas:
+        snapshots.append(r.fetch_state())
+
+    # 找出 outlier
+    medians = {}
+    for key in snapshots[0]:
+        values = [s[key] for s in snapshots]
+        medians[key] = statistics.median(values)
+
+    outliers = []
+    for r, snap in zip(replicas, snapshots):
+        for key, val in snap.items():
+            if isinstance(val, (int, float)) and val > 3 * medians[key]:
+                outliers.append((r.id, key, val))
+
+    if outliers:
+        alert(f"Replica state outliers: {outliers}")
+```
+
+---
+
+## ⚙️ Problem 5: Time-Dependent Bugs
+
+时间相关 bug 是**最难复现**的一类, 因为它们只在特定时间窗口出现.
+
+### 5.1 DST (Daylight Saving Time)
+
+**症状**: 每年 3 月、11 月美国 DST 切换那天系统全坏.
+
+**典型 bug**:
+
+```python
+# 错: 用 local time 做调度
+schedule = "0 2 * * *"  # 每天凌晨 2 点
+# DST 切换日, 凌晨 2 点跳过了 (spring forward) 或重复 (fall back)
+# → 这一天任务跑 0 次或 2 次
+
+# 对: 用 UTC
+schedule = "0 6 * * *"  # UTC 6:00, 对应美东标准时间 1:00 (永远存在)
+# 显示给用户时再转换 local
+```
+
+**预防**: 所有内部 timestamp 用 UTC, 用户显示再转 local.
+
+### 5.2 Timezone
+
+**症状**: 印尼用户在 23:30 提交一个 "明天还款", system 解析成下下周 (because server 算的是 UTC 的明天).
+
+**典型 bug**:
+
+```python
+# 错: 服务端 datetime.now() 不带 tz
+deadline = datetime.now() + timedelta(days=1)
+
+# 对: 显式传 user timezone
+def parse_relative(user_input, user_tz):
+    user_now = datetime.now(tz=ZoneInfo(user_tz))
+    if "明天" in user_input:
+        return user_now + timedelta(days=1)
+```
+
+### 5.3 Data Freshness
+
+**症状**: Agent 拉用户余额 API, prod 缓存 1h, staging 缓存 1min, prod 经常给过时数据.
+
+```python
+# Cache TTL parity 校验
+def assert_cache_parity():
+    for cache_name in ['user_balance', 'user_status', 'loan_terms']:
+        prod_ttl = prod_redis.config_get(f'ttl_{cache_name}')
+        staging_ttl = staging_redis.config_get(f'ttl_{cache_name}')
+        assert prod_ttl == staging_ttl, f"{cache_name} TTL mismatch"
+```
+
+### 5.4 Expired Tokens (你 OAuth 题的延续)
+
+**症状**: 第三方 API token 12h TTL, prod 在 12h 那一刻所有 worker 同时刷新, 触发 thundering herd, 部分请求超时.
+
+```python
+# 预过期 + 分布式锁 (前面 OAuth 题讲过)
+def get_token(tenant_id):
+    cached = cache.get(f"token:{tenant_id}")
+    # 提前 5 min 视为过期, 避免边界
+    if cached and cached.expires_at - now() > 300:
+        return cached.token
+
+    with distributed_lock(f"refresh:{tenant_id}"):
+        # 再查一次 (singleflight)
+        cached = cache.get(f"token:{tenant_id}")
+        if cached and cached.expires_at - now() > 300:
+            return cached.token
+
+        new = oauth.refresh(cached.refresh_token)
+        cache.set(f"token:{tenant_id}", new, ttl=new.expires_in - 600)
+        return new.token
+```
+
+### 5.5 Scheduled Job / Cron Misalignment
+
+**典型 bug**: data pipeline 每天 02:00 跑, agent 每天 02:30 启动, 但 pipeline 因为依赖 03:00 才 ready, agent 在 02:30-03:00 拿到 stale data, 给错误答案.
+
+**预防**:
+
+- 数据 freshness signal: agent 启动前 check `MAX(updated_at)` 是不是足够新
+- 如果不够新, **fail loudly**, 不要默默用 stale
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+这 5 个问题是**同一件事的 5 个 viewpoint**:
+
+1. **7 类 diff source** 是「**root cause 空间**」
+2. **Reproducibility instrumentation** 是「**搜索这个空间的工具**」
+3. **Environment parity** 是「**让搜索空间变小的预防**」
+4. **State** 是「**搜索空间中最隐蔽的一片暗区**」
+5. **Time** 是「**搜索空间中第二隐蔽的一片暗区**」
+
+面试场或事故复盘上, 能讲出这套**系统化诊断方法**, 而不是只讲「我看 log 然后 fix」, 是 staff-level 工程师的标志.
 
 ---
 
@@ -185,35 +1584,27 @@ Workarounds while diagnosing:
 
 **1. Define "inconsistent"**
 
-> "What kind of inconsistency — **wrong** answers, **different** answers each time (non-determinism), or **slower** answers?"
+> "What kind of inconsistency — **wrong** answers, **different** answers each time (non-determinism), or **slower** answers that get truncated? They have completely different RCA paths."
 
 **2. Frequency**
 
-> "All requests, or specific ones? Percentage? Same input always reproduces?"
+> "All requests, or specific ones? Percentage? Same input always reproduces, or stochastic?"
 
-**3. Same model artifact**
+**3. Same artifact?**
 
-> "Are staging and prod running the **identical model checkpoint**? Same model version + system prompt + tokenizer?"
+> "Are staging and prod running the **identical model + tokenizer + system_prompt + image SHA**? Has anyone verified by hash?"
 
-**4. Same input data**
+**4. Same input shape?**
 
-> "Are users in prod sending the **same shape** of input? Could distribution have shifted?"
+> "Are users in prod sending the **same distribution** of input as staging eval? Length, language, topic, edge cases?"
 
 **5. Recent change**
 
-> "Has anything changed recently — new release, new feature flag, upstream API changes, infrastructure migration?"
+> "Has anything changed in last 7 days — new release, feature flag, upstream API, infra migration, model upgrade, deps?"
 
----
+**6. Time/segment pattern**
 
-## 5 类典型 root cause
-
-| Class | What | Diagnosis cost |
-|---|---|---|
-| **C1: Config drift** | model version / system prompt / temperature differ | 低 (1h diff configs) |
-| **C2: Feature pipeline drift** | prod features are stale / missing / encoded differently | 中 (need trace) |
-| **C3: Input distribution shift** | real users send things staging tests didn't cover | 中 (need distribution compare) |
-| **C4: Non-determinism** | temperature > 0, batch size affects sampling, multi-replica state | 中 |
-| **C5: Infrastructure** | timeout differences, GPU vs CPU, library version, region latency triggering shorter response | 中-高 |
+> "Does inconsistency cluster by region, time-of-day, user segment, request length? Pattern guides hypothesis."
 
 ---
 
@@ -222,181 +1613,180 @@ Workarounds while diagnosing:
 | 时长 | 阶段 |
 |---|---|
 | 0-5 min | Clarify + reproduce attempt |
-| 5-15 min | C1 cheapest checks first (config diff) |
-| 15-25 min | C2/C3 — feature + input distribution |
-| 25-40 min | C4/C5 — non-determinism + infra |
-| 40-50 min | Fix + add observability so it doesn't happen again |
-| 50-60 min | Roll out fix safely |
-
----
-
-## 我会这样答（sample monologue）
-
-> "First clarify — *[假设：30% of requests, same input不一定 reproduce, configs claim identical, no recent release, infrastructure migrated last week from us-east to multi-region]*.
->
-> Last clue is gold: **infrastructure migrated** → C5 candidate.
->
-> But I'd still go systematic, cheapest first:
->
-> **Step 1: Reproduce on prod with controlled input** (1 hour)
-> - Capture **10 prod requests + responses** with full context
-> - Replay each on staging with same request
-> - See if outputs match. If yes → environmental. If no → input or pipeline.
->
-> **Step 2: C1 config diff** (30 min)
-> - `diff staging_config prod_config`: model ID, system prompt, temperature, top_p, max_tokens, stop sequences
-> - Check **deployed model artifact hash** matches
-> - Check **tokenizer version**
-> - Check **feature flags** active on prod vs staging
->
-> **Step 3: C2 feature pipeline trace** (2 hours)
-> - For one failing request: trace every input feature value end-to-end
-> - Are all features present? Same range / encoding as training?
-> - Common bug: **missing feature defaults to wrong sentinel** (e.g., `-1` instead of `null` → model interprets as "very low score")
->
-> **Step 4: C3 input distribution** (1 hour)
-> - Compute distribution of input features over last 24h prod vs 24h staging
-> - Look for **categories never seen in staging**
-> - **Length distribution**: prod might have 99th percentile request 10x longer than staging
->
-> **Step 5: C4 non-determinism** (1 hour)
-> - If temperature > 0: same input should produce different output. Is that the inconsistency?
-> - **Batching**: vLLM / SGLang batch size affects sampling. Compare batch size statistics.
-> - Multi-replica: any state per-replica that varies?
->
-> **Step 6: C5 infrastructure** (most likely given migration clue)
-> - **Timeout**: prod may have shorter timeout → model truncates output mid-generation
-> - **Concurrency**: prod under load → models may share KV cache improperly
-> - **GPU vs CPU** (or different GPU types): rare but real, FP16 rounding differs
-> - **Region latency**: client timeout causes early disconnection, model returns partial
-> - **DNS / TLS handshake**: degraded prod path adds 200ms, but doesn't change output... unless triggers shorter max_tokens
-> - **Library mismatch**: different transformers / torch version between staging and prod
->
-> **Given the 'multi-region migration' clue, my top 2 hypotheses**:
-> - **Region routing inconsistency**: 30% of traffic goes to a region with subtly different infra (e.g., older GPU type, library version, env variable)
-> - **Timeout truncation**: cross-region call to LLM service has higher latency, downstream timeout truncates response
->
-> **Immediate diagnostic**:
-> - Tag every prod request with **region**, **GPU type**, **library hash**
-> - Aggregate inconsistency rate by region
-> - If 30% inconsistency clusters in 1 region, **prove the hypothesis**
->
-> **Fix path**:
-> - Short-term: **route 100% to known-good region**, accept higher latency from non-local users
-> - Mid-term: align library versions / infra across regions (idempotent rebuild)
-> - Long-term: **per-request artifact provenance log** so we always know which model+infra+config served each response
->
-> **What I'd add to prevent recurrence**:
-> - **Hash-versioned deployment artifacts**: every deploy logs SHA of model + tokenizer + system prompt + every dependency. `prod_hash == staging_hash` is invariant.
-> - **Per-request observability**: log temperature, model_id, region, GPU type per request. **Without this, we'd never know.**
-> - **Shadow eval pipeline**: 1% of prod traffic goes to staging-mirror, daily diff alerts on drift
-> - **Canary on every deploy**: 1% → 10% → 100% with auto-rollback on error budget breach"
+| 5-15 min | D2/D3 cheap diffs (config + artifact hash) |
+| 15-25 min | D4/D1 medium (dep diff + input distribution) |
+| 25-40 min | D6/D7 hard (state introspect + time audit) |
+| 40-50 min | D5 expensive (load test if all else fails) |
+| 50-60 min | Fix + Prevent (golden trace + canary + shadow) |
 
 ---
 
 ## 简历专属 reframe
 
-你的 **voice agent multi-region** + **ConvFinQA RL alignment** 都涉及 production debug：
+你的 **voice agent 7 markets** + **ConvFinQA RL alignment** + **BNPL chatbot** 都是 production debug 实战:
 
 | 题 | 你的经验 |
 |---|---|
-| Multi-region inconsistency | Voice agent 跨 7 markets 不同 region |
+| Multi-region inconsistency | Voice agent 跨 7 markets 不同 region, 处理过 Bahasa drift |
 | Library / artifact hash mismatch | vLLM / SGLang upgrade 你做过 |
 | Per-request observability | Voice agent 端到端 latency tracing 你 own |
 | Canary on every deploy | 7 markets phased rollout |
 | Shadow eval | ConvFinQA stratified 300 eval 类似 |
+| Time-dependent bug (DST/token) | Vault token 12h, market-level holiday triggered |
+| Reproduce + replay tool | Voice agent failed call replay |
 
-**主动说**：
+**主动 quote**:
 
-> "I've literally lived this. When we rolled out the voice agent from Singapore-only to multi-region, we got 25% inconsistency rate on Thai customers. We traced it to a **library mismatch** — the Thai region's vLLM was on an older version with different default sampling. We instituted **hash-versioned deploy artifacts** across all regions after that incident — every release we log SHA of model + tokenizer + library and assert equivalence pre-deploy. Saved us 3 more incidents in the year."
+> "I've debugged exactly this shape. Rolling our voice agent from Singapore-only to multi-region, we got 25% inconsistency rate on Thai customers — Bahasa replies were defaulting to English. I went cheap-first: D2 config diff caught it immediately — the release before added `Respond only in English unless explicitly asked otherwise` to the system prompt, and that change had **never been in our staging eval suite**. Fix took 10 minutes; the **process change** (system prompt diff → mandatory eval suite run) was the real fix. After that we instituted **hash-versioned deploy artifacts** + **golden trace gate** + **per-region canary** across all 7 markets — caught 3 more would-be incidents that year."
 
 ---
 
 ## 5 follow-ups
 
-**Q1**: "We've checked configs identical, reproduces 30% of time, but staging doesn't show it. What now?"
-**A**: Look at **load**: production has 100x traffic. Bug surfaces under **concurrency or batching**. Solutions:
-- Simulate prod load on staging with synthetic traffic
-- Profile vLLM batching: high concurrency triggers paged-attention re-use, can produce subtly different outputs
-- Check **KV cache eviction** under memory pressure
+**Q1**: "We've checked configs identical, can't reproduce on staging, but it reproduces 30% on prod. What now?"
+
+**A**: 这是经典 D5/D6 嫌疑. Steps:
+- 加 trace_id + per-request snapshot, 收 24h 样本
+- Bucket failing traces by: region, GPU type, replica_id, batch_size, time_of_day, request_length
+- 看哪个 bucket 失败率显著高 → 是 hypothesis
+- 典型 finding: 某个 replica 状态 stale / 某个 GPU type 库版本不同 / 某个 batch_size 触发 paged attention bug
+- 不能反过来 "我猜 GPU 然后试着 fix", 必须**让数据说话**
 
 **Q2**: "We can't reproduce even with same input on prod replay. Is it a ghost?"
-**A**: Non-determinism likely. Audit:
-- Is `temperature=0` enforced? Top-p > 0 still has limited non-det
-- Is model **deterministic seed** set? OpenAI's `seed` parameter
-- Tokenizer order: BPE merges might differ between versions
-- GPU kernel non-det: cuBLAS GEMM has known reproducibility issues; force `torch.backends.cudnn.deterministic = True`
 
-**Q3**: "Bug is intermittent and we can't catch it in staging. Just ship fix?"
-**A**: 不行. Without root cause:
-- High chance fix doesn't address actual bug
-- High chance fix introduces new bug
-**Workaround**: ship **observability first** (per-request logs + region tags), then wait 24h for **enough samples to find pattern**. Patience beats hasty patch.
+**A**: Non-determinism 是 prime suspect:
+- `temperature=0` enforced? top_p < 1? top_k 设了吗?
+- `seed` 参数固定了吗? (OpenAI API 有 seed, vLLM 也有)
+- Tokenizer 顺序: BPE merges might differ between versions
+- GPU kernel non-det: `torch.use_deterministic_algorithms(True)`, set `CUBLAS_WORKSPACE_CONFIG=:4096:8`
+- Batch composition: vLLM 在 batch 内的 attention 是 deterministic 但和 batch_size 有关
+- 实战: **接受 5% 输出有合理变化**, 用 semantic similarity 而不是 exact match 衡量
+
+**Q3**: "Bug is intermittent. Just ship a fix?"
+
+**A**: 不行. Without RCA:
+- 高概率 fix 不 address actual bug
+- 高概率 fix 引入 new bug
+- **Workaround**: ship **observability first** (trace + snapshot + region tags), 等 24h 收 sample 找 pattern. Patience > hasty patch.
+- 如果客户压力大: temporary rollback to LKG, 给自己时间找 RCA
 
 **Q4**: "Customer demands immediate fix. We don't know root cause."
-**A**: Negotiate:
-- "We can **roll back to last-known-good infra** in 4 hours — restores consistency at cost of feature X. Acceptable?"
-- "Or **disable agent for these specific input types** that fail — partial coverage but 100% consistent"
-- "Or **A/B with 0% prod traffic for 2 days** while we get root cause from observability instrumented now"
-The honest "we'll patch blindly" path almost always extends the incident.
 
-**Q5**: "If it's prompt change ourselves silently made, how do we prevent next time?"
-**A**:
-- **System prompt as code**: stored in git with version + commit hash, deployed via CI
-- **Prompt evals on PR**: every prompt change must pass eval suite before merge
-- **Audit log + diff**: every prompt change emits diff to a team channel
-- **Per-request prompt SHA** logged so we can reconstruct what was in effect
+**A**: Negotiate workaround:
+- "Roll back to last-known-good (4h MTTR) — restores consistency at cost of new feature X. Acceptable?"
+- "Disable agent for input types that fail — partial coverage but 100% consistent"
+- "Move 100% traffic to known-good region, accept higher latency for non-local users"
+- 诚实的 workaround 永远好过盲 fix. **盲 fix 通常延长事故**.
+
+**Q5**: "If staging is so unreliable a predictor of prod, why have it?"
+
+**A**: Staging 不是 prod 的 100% mirror, 它是:
+- Catch **catastrophic** bugs (语法错, 服务起不来, API 不兼容) — staging 抓 70%
+- 提供 **regression test** harness
+- 给 PM / QA review 新 feature 的地方
+- **The remaining 30%** 要靠 canary + shadow + golden traces + per-request observability 兜底
+- "Staging unreliable" 不是放弃 staging 的理由, 是**升级到 staging + canary + shadow 三件套**的理由
 
 ---
 
 ## ❌ 易错点
 
-1. **立刻 blame model** — 90% root cause 不是 model
-2. **没尝试 reproduce** — 直接 hypothesize
-3. **跳过 C1 config diff** — 最 cheap, 最 common 原因
-4. **忽略 infra migration clue** — recently-changed = recently-broken
-5. **Ship fix without root cause** — 通常 reverberate
-6. **没 observability instrumentation 先** — 没 tag region/GPU/lib version 啥都 trace 不到
-7. **Customer 给 immediate pressure 就 cave** — negotiate workaround 时间换 quality
+1. **立刻怀疑 model** — 90% root cause 不是 model 本身
+2. **没 trace_id 就 debug** — 在 high QPS 里找不到 specific failing request
+3. **没 reproduce 就 fix** — 改完一个 dimension, 引入另一个
+4. **跳过 cheap diffs** — 直接怀疑 GPU 非确定性, 但配置 1 行不同
+5. **Ship fix without RCA** — temporary patch 通常 mask 真因
+6. **没 instrumentation 就 deploy** — 没 region tag / GPU tag / version tag, 一切靠猜
+7. **Customer 压力下盲 fix** — 通常延长事故
+8. **忽略 "recently changed"** — recent change = recent break
 
 ---
 
 ## ✅ 加分项
 
-1. **5 root cause classes** 清晰列
-2. **Cheapest-first 诊断顺序**
-3. **Per-request artifact provenance log** as preventive
-4. **Shadow eval at 1% traffic** 防 future drift
-5. **Canary auto-rollback on error budget** standard SRE
-6. **GPU non-determinism** awareness (cuBLAS GEMM)
-7. **System prompt as code + eval-on-PR**
-8. **Negotiate workaround for time** 不 cave under pressure
+1. **7 类 diff source** 清晰分类
+2. **Cheap-first 诊断顺序**
+3. **trace_id + snapshot + replay** 三件套
+4. **Per-request artifact provenance log** as preventive
+5. **Shadow eval at 1-10% traffic** 防 future drift
+6. **Canary auto-rollback on error budget** standard SRE
+7. **GPU non-determinism** awareness (cuBLAS, paged attention)
+8. **Golden trace gate** at deploy
+9. **State divergence monitoring** across replicas
+10. **Time / timezone / DST awareness**
+11. **System prompt as code + eval-on-PR**
+12. **Negotiate workaround under pressure** instead of blind fix
 
 ---
 
-## Cheat Sheet
+## 一句话总结
+
+> **Staging vs Prod inconsistency debug = "先 reproduce (trace + snapshot + replay), 再按 cheap → expensive 排查 7 类 diff source (config / version / dep / data / time / state / scale), 然后用 hash + canary + shadow + golden trace 防 recurrence"**.
+>
+> 这道题考的不是「我会用 Datadog 看 log」, 是「我有没有真的 own 过一个 LLM 产品的 production lifecycle」.
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
-5 root cause classes (cheapest first):
-  C1 Config drift (model / prompt / temp)
-  C2 Feature pipeline drift
-  C3 Input distribution shift
-  C4 Non-determinism (temp, batch, multi-replica)
-  C5 Infrastructure (region / GPU / lib)
+7 diff sources (cheap → expensive):
+  D2 Config drift     (model_id / prompt / temp / top_p)
+  D3 Model version    (artifact + tokenizer SHA)
+  D4 Dependency       (vLLM / torch / cuDNN / lib)
+  D1 Data             (input distribution shift)
+  D7 Time             (DST / TZ / token expire / freshness)
+  D6 State            (cache warm / in-mem / KV cache / replica)
+  D5 Scale            (batch / concurrency / KV evict)
+
+Real-world distribution of root cause:
+  D2  35% — recently-changed config
+  D3  20% — wrong artifact deployed
+  D7  15% — time/cache TTL
+  D1  12% — long-tail input
+  D6  10% — replica state divergence
+  D4   5% — dep upgrade silent
+  D5   3% — only at peak QPS
 
 Diagnostic flow:
-  1. Reproduce on prod, replay on staging
-  2. diff configs (model + prompt + dep versions)
-  3. Trace 1 feature pipeline end-to-end
-  4. Distribution compare (last 24h prod vs staging)
-  5. Check non-determinism (seed, batch, replica)
-  6. Tag region + GPU + lib hash, aggregate
+  1. Clarify "inconsistent" (wrong / different / slow)
+  2. Stabilize (rollback if > 50% impact)
+  3. Reproduce (10 prod traces → replay staging)
+  4. Cheap diff (config + hash + dep) ← 60% RC here
+  5. Medium diff (data dist + time audit) ← 27% here
+  6. Hard diff (state introspect + load test) ← 13%
+  7. Fix + golden trace + prevent
 
-Quick wins:
+Reproducibility 三件套:
+  trace_id propagation (OpenTelemetry)
+  Per-failure snapshot (S3, 30d retain)
+  Replay tool (prod trace → staging run)
+
+Env parity strategies:
+  Golden traces (200-500 case CI gate)
+  Shadow mode (1-10% fork to staging)
+  Canary + auto-rollback (1→10→50→100%)
+
+State traps:
+  Cache warm vs cold (test both)
+  In-memory singleton drift (externalize state)
+  vLLM KV cache + batch_size (FP16 rounding)
+  Per-replica divergence (monitor outliers)
+
+Time traps:
+  DST (use UTC everywhere)
+  Timezone (per-user tz, not server tz)
+  Token expire (preempt 5min + dlock)
+  Data freshness (assert MAX(updated_at) recent)
+  Cron misalignment (depend on signal, not clock)
+
+Quick wins (deploy hardening):
   - Per-request observability (region/gpu/lib SHA)
-  - Hash-versioned deploy artifacts
-  - Shadow 1% prod to staging-mirror
-  - Canary + auto-rollback on every deploy
+  - Hash-versioned deploy artifacts (assert pre-deploy)
+  - Shadow 1% prod → staging-mirror
+  - Canary + auto-rollback every deploy
+  - Golden trace CI gate
+  - System prompt as code + eval-on-PR
 
 Workarounds while diagnosing:
   - Route 100% to known-good region
@@ -408,6 +1798,8 @@ Workarounds while diagnosing:
   - Don't blame model first
   - Don't ship fix without RC
   - Don't ignore "recently changed"
+  - Don't debug without trace_id
+  - Don't trust file names (use SHA)
 ```
 </script>
 <script>

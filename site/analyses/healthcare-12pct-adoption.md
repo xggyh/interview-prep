@@ -2,24 +2,943 @@
 
 > "Healthcare client shows **12% adoption after 90 days**. **Diagnose root cause** and propose remediation."
 
-**出处**：fde.academy 列出的 deployment scenario 经典款。Salesforce / Palantir / Google Cloud FDE 都见过。
+**出处**: fde.academy 列出的 deployment scenario 经典款. Salesforce / Palantir / Google Cloud FDE 都见过.
 
-**Round**：Case Study / Deployment Scenario (45 min)
+**Round**: Case Study / Deployment Scenario (45 min)
 
 ---
 
 ## 这道题在考什么
 
-**不是技术题** —— 是**deployment 失败诊断**题。考你能不能：
+**不是技术题** — 是**deployment 失败诊断**题. 考你能不能:
 
-1. **不预设原因** —— "肯定是 UI 难用"、"肯定是 model 不准"都是失分。一上来就有 hypothesis = 你没见过真实部署
-2. **结构化拆 funnel** —— 12% adoption 是个 aggregate metric。它在 funnel 的哪一段崩？
-3. **区分 product issue vs adoption issue vs change-management issue** —— 这三种是完全不同的 fix
-4. **跟 customer co-investigate** —— FDE 不是 vendor on site，是 customer's extended team
+1. **不预设原因** — "肯定是 UI 难用"、"肯定是 model 不准" 都是失分. 一上来就有 hypothesis = 你没见过真实部署
+2. **结构化拆 funnel** — 12% adoption 是个 aggregate metric. 它在 funnel 的哪一段崩
+3. **区分 product issue vs adoption issue vs change-management issue** — 这三种是完全不同的 fix
+4. **跟 customer co-investigate** — FDE 不是 vendor on site, 是 customer's extended team
+5. **诚实区分 product fit vs deployment fit** — 这是 FDE 是否成熟的关键判断
 
 ---
 
-## 5 个 clarifying questions
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 四个术语先解释
+
+**Adoption rate**: 「采用率」, 但**关键是定义清楚**. 通常的层级:
+- **Provisioning**: 账号已开通的人 (denominator 通常是 target user 总数)
+- **Activation**: 至少登录过 1 次
+- **First task**: 第一次完成核心动作 (在医院场景: 完成 1 次 diagnostic query)
+- **Recurring**: 过去 7 / 30 天有使用
+- **Habitual**: DAU / MAU > 0.5 (Aha! moment 内化为习惯)
+
+**12% adoption 是**哪一层? 是 provisioned 的 12% 还是 target 总数的 12% — denominator 决定了对话方向. 必须先 clarify.
+
+**Funnel**: 「漏斗」 — 从 awareness 一路到 habitual 每一层的转化率. **adoption 是 aggregate, funnel 才是 actionable**. 12% aggregate 可能来自:
+- 90% provisioned, 80% logged in, 15% first task → product 没找到价值 (产品问题)
+- 30% provisioned, 90% logged in 那 30% → SSO / IT 集成挂了 (IT 问题)
+- 80% provisioned, 90% logged in, 50% first task, 12% recurring → 流失问题 (workflow fit)
+
+**EHR Integration** (Electronic Health Record): 医院 IT 的核心系统 (Epic, Cerner, Athenahealth, AllScripts). 任何医生端工具如果**没和 EHR 深度集成**, 医生要重复在两套系统输入信息 = adoption 死刑. 这是医疗 AI 部署的最大杀手.
+
+**Champion / Sponsor**: 客户内部支持你的关键人物. Healthcare 场景通常:
+- **CMIO** (Chief Medical Information Officer): 决策购买的人
+- **Floor manager / nurse manager**: 决定一线是否真用
+- **CFO / CMO**: 决定续约的人
+
+3 个角色, 3 套 metric, 3 套话术. 失去任何 1 个 sponsor = 项目危险.
+
+---
+
+## 2. 这个问题的核心是什么
+
+设想没有 funnel 思维的诊断灾难:
+
+```
+12% adoption, 救火心态:
+   PM: "肯定是 UI 难用, 我们重新设计"
+   ENG: "肯定是 model 不准, 我们 retrain"
+   SALES: "肯定是医生不懂, 加培训"
+   3 周后: 重新设计 + retrain + 加 training -- 12% 没变
+
+为什么? 因为真正的瓶颈是 SSO 没配好, 80% 医生根本登不进来.
+所有 fix 都对着空气挥拳.
+```
+
+**问题**:
+- 不知道 funnel 在哪一段崩 → 所有 fix 都是猜测
+- 看 aggregate metric → 看不到原因
+- 预设 root cause → 把 PM / ENG / Sales 资源耗在错误 hypothesis 上
+- 没和 customer 一起诊断 → customer 觉得「你们只想卖, 不想解决」
+
+**Funnel-first 解法**:
+```
+Step 1: 定义 funnel 4-5 层
+Step 2: 拉 telemetry, 看每层 drop
+Step 3: 在最大 drop 那层针对性 hypothesize
+Step 4: 上 customer 站点观察 + 访谈, 验证 hypothesis
+Step 5: 跟 customer 一起 jointly own 行动项
+```
+
+---
+
+## 3. Adoption Funnel 决策树
+
+```
+                ┌─────────────────────────┐
+                │ Target users (denominator)│
+                └────────────┬────────────┘
+                             │ 90%   ← 健康: > 95%
+                             ↓ < 90%? → IT / provisioning issue (Hyp A)
+                ┌─────────────────────────┐
+                │   Provisioned access     │
+                └────────────┬────────────┘
+                             │ 80%   ← 健康: > 80%
+                             ↓ 大 drop? → Onboarding issue, IT bottleneck
+                ┌─────────────────────────┐
+                │   Activated (logged in)  │
+                └────────────┬────────────┘
+                             │ 50%   ← 健康: > 60%
+                             ↓ 大 drop? → First-task friction, UX issue (Hyp B)
+                ┌─────────────────────────┐
+                │   Completed first task   │
+                └────────────┬────────────┘
+                             │ 25%   ← 健康: > 40%
+                             ↓ 大 drop? → Workflow fit, value perception
+                ┌─────────────────────────┐
+                │   Returned in 7 days     │
+                └────────────┬────────────┘
+                             │ 12%   ← 这是报上来的
+                             ↓
+                ┌─────────────────────────┐
+                │   Habitual (DAU/MAU>0.5) │
+                └─────────────────────────┘
+
+诊断逻辑:
+- 任何一段 drop > 30% 都是异常
+- 4 个典型 hypothesis 对应不同 drop 位置
+```
+
+---
+
+## 4. 4 个 hypothesis 分类表
+
+| Hypothesis | Funnel drop 在哪 | 根因 | Fix 类型 | Fix 时长 |
+|---|---|---|---|---|
+| **A. Provisioning failure** | Target → Provisioned | IT / SSO 集成挂 | IT bulk action + admin support | 2-4 周 |
+| **B. UX / training gap** | Logged in → First task | 不会用 / 找不到入口 | In-app onboarding + 现场培训 | 4-8 周 |
+| **C. Workflow fit** | First task → Recurring | 工具不在工作流里 / 价值不明显 | 深度 EHR 集成 / 流程重设计 | 3-6 月 |
+| **D. Change management** | 任何阶段 | Champion 走 / 政治阻力 | 重启 sponsor + 重设期望 | 6-12 周 |
+| **E. Product-market fit (worst)** | First task → Recurring + 反馈差 | 产品本身不适合该 use case | Graceful retreat / 重新 scope | 6+ 月 |
+
+**FDE 实战**: 80% 真实案例是 **A + B + D** 的混合, **10% 是 C**, **10% 是 E**. 不要轻易判 E.
+
+---
+
+## 5. 具体业务场景
+
+### 场景 A: AI Diagnostic Assistant 部署给 1000 名护士
+
+**Setup**: 你的产品是 LLM-based 诊断 assistant, 给 ICU 护士用. 90 天后 adoption 12%.
+
+**Funnel data 拉出来**:
+```
+Target nurses:              1000
+Provisioned:                 320  (32%)  ← 大 drop, 异常
+Logged in once:              280
+Completed first task:        240
+Used in past 7 days:         120  (12%)
+```
+
+**诊断**: provisioning 大 drop. SSO 跟医院 Active Directory 集成挂了, 70% 护士的账号没自动创建. **这不是产品问题, 是 IT 集成问题**.
+
+**Fix**: 跟医院 IT 一起 bulk 批量 provisioning, 1 周内 90% 完成. Adoption 跳到 38% 一个月内.
+
+### 场景 B: EHR-integrated AI 给 ER 医生
+
+**Setup**: AI 工具集成 Epic, 给 ER 医生用. 90 天 adoption 12%.
+
+**Funnel data**:
+```
+Target ER doctors:           150
+Provisioned:                 145  (97%)  ✓
+Logged in once:              140
+Completed first task:         80  (53%)  ← 大 drop, 异常
+Used in past 7 days:          18  (12%)
+```
+
+**诊断**: 大 drop 在 first task. 进入 UI 后医生找不到该如何用 / 不知道哪个按钮触发 AI. **UX / 入口问题**.
+
+**Fix**:
+- 在 Epic 里加 deep link, 医生看患者档案时一键唤起 AI
+- 1 周做 in-app tutorial
+- ER 主任带头每天展示 1 个 use case
+
+效果: first task → recurring 转化从 22% 跳到 65%.
+
+### 场景 C: 给医生用了, 但每天还要在 EHR 里抄一遍 — 你的工作背景类比
+
+类似你 BNPL chatbot 跨 ByteDance internal 系统的痛: agent 决策完客户的还款方案后, 还得**手动** copy 到 internal CRM. Manager 自然不用.
+
+**Fix 在 healthcare 场景**: 深度 EHR 集成, AI 输出**自动写回**患者档案 (with 医生 1 键 confirm). 1 个月内 first task → recurring 跳两倍.
+
+### 场景 D: CMIO 离职, 新 CMIO 反对 AI
+
+**Setup**: 第 30 天 CMIO 离职. 新 CMIO 来自传统派, 看 AI 是「风险」. 30 → 90 天 adoption 从 35% 跌到 12%.
+
+**诊断**: Change management failure (Hypothesis D). 没问题是产品, 是失去 top-down sponsor.
+
+**Fix**:
+- 重新 onboard 新 CMIO, 用具体数据展示 (减少了多少 charting time, 提升了多少 diagnosis accuracy)
+- 找到 mid-level champion (chief resident) 自下而上推
+- 跟 CFO 重新对话, 用经济语言: "已经在岗的 35% 用户每月节省 $80K 人力, 我们要保护这个 ROI"
+
+### 场景 E: 产品真的不适合 ICU 高强度场景 (Hypothesis E)
+
+**Setup**: AI 响应慢 (8s) — 在 ICU 没人有耐心等. 90 天 adoption 12%, 已 plateau.
+
+**诚实判断**: 这是 H5 (product fit). 不要假装训练 + UI 改能解决.
+
+**Fix**:
+- 内部升级: 跟 product 谈, ICU 场景需要 < 1s 响应, 当前架构做不到
+- 客户对话: 「我们认错, 这个场景目前不适配. 我们建议 scope down 到 non-acute 病房, 那里 8s 没问题」
+- 商业 reframe: 「ICU 重新规划, 6 个月里上低耦合 v2; 我们退一部分 fee」
+
+→ **诚实退让保留长期关系**, 比死磕 1000 个不愿用的 ICU 护士强 10 倍.
+
+---
+
+## 6. 诊断 checklist (具体执行)
+
+**Week 1: Data pulling**
+
+1. 拉 telemetry: target / provisioned / activated / first task / 7day active 这 5 个数字
+2. 按 site (3 家医院) + role (nurse / doctor / pharmacist) stratify
+3. 时间序列: 90 天每周的 adoption trajectory — 是渐增、plateau、还是 spike-then-drop?
+4. NPS / CSAT / support ticket data — qualitative 信号
+5. Active user 的 stickiness ratio (DAU/MAU)
+
+**Week 2: On-site shadow**
+
+6. **FDE 必须去 customer site** — 跟 5 个 active user 各 shadow 半天
+7. 跟 10 个 non-user 各 30 分钟访谈: 「描述你的一天, 这工具在哪里能进入」
+8. 跟 CMIO + 2 个 floor manager 各 1h 谈话: 期望、阻力、政治
+9. 跟 IT team 谈集成现状
+
+**Week 3: Synthesis**
+
+10. 画 funnel + 4 个 hypothesis 排序 by likelihood × impact
+11. 写一页 root cause + recommendation, share with CMIO 对齐
+12. **跟 customer joint own** action items: 我们做 3 件, 你们做 2 件, 各有 owner
+
+**Week 4-12: Execute**
+
+13. 周复盘 funnel 变化
+14. **不预设 90 天恢复 80%** — 真实目标是 funnel 阶段性改善
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **预设 root cause** — "肯定是 UI 难用" | 把 PM / Eng 资源砸错地方 |
+| 2 | **跳过 funnel 直接救火** | 跑全套 training 后才发现 SSO 没通 |
+| 3 | **甩锅 customer** | "你们 change mgmt 没做好" — FDE joint own |
+| 4 | **跳过 on-site** | 远程看 dashboard 看不到真实工作流 |
+| 5 | **不区分 product fit vs deployment fit** | 把 Hypothesis E 当 B 死磕 |
+| 6 | **承诺数字** — "90 天回到 80%" | 没 funnel 数据, 不能 commit |
+| 7 | **当 training problem** | Training 是 H2 局部 fix, 不是万能药 |
+| 8 | **忽略 EHR 深集成** | 没集成 EHR 在医院 = 死刑, 1 个月内别上 |
+| 9 | **没量化 stickiness** | 看 7-day active 而不看 DAU/MAU, 误判健康 |
+| 10 | **没 CFO-language 准备** | 续约时只讲 adoption %, CFO 听不懂 |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **Adoption 诊断 = 「先看 funnel 不预设、上 customer 站点 shadow 5 个、qualitative + quantitative 三角、4 hypothesis 排序、jointly own 行动项」**.
+>
+> 12% adoption 这数字本身没意义, 重要的是它**在 funnel 哪段断**. 找到那一段, 80% 的 fix 都很简单. 找不到, 砸再多钱也白搭.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: Adoption Funnel Framework — 从 Awareness 到 Habit
+
+**核心**: Adoption 是一个 multi-stage funnel. 单一 metric 是症状, funnel 才是诊断.
+
+### 1.1 5-7 阶段经典 funnel
+
+不同行业 funnel stages 略有差异, healthcare AI 我们用 7 阶:
+
+```python
+class AdoptionFunnel:
+    stages = [
+        'awareness',          # 听说过该工具
+        'consideration',      # 主动了解 / 看 demo
+        'provisioning',       # 账号被开通
+        'activation',         # 首次登录
+        'first_value',        # 第一次完成核心动作 (e.g., 完成 AI-assisted diagnosis)
+        'recurring',          # 30 天内重复使用
+        'habitual',           # DAU/MAU > 0.5
+    ]
+
+    def measure(self, target_population, time_window):
+        return {
+            stage: count_at_stage(target_population, stage, time_window)
+            for stage in self.stages
+        }
+
+    def conversion_rates(self, measurements):
+        rates = {}
+        for i in range(1, len(self.stages)):
+            prev = self.stages[i-1]
+            curr = self.stages[i]
+            rates[f'{prev}_to_{curr}'] = measurements[curr] / measurements[prev]
+        return rates
+```
+
+### 1.2 健康 conversion rate benchmark
+
+```
+Awareness → Consideration: 60-80%
+Consideration → Provisioning: 70-90% (取决于 IT)
+Provisioning → Activation: 80-95% (健康)
+Activation → First Value: 50-70%
+First Value → Recurring: 40-60%
+Recurring → Habitual: 30-50%
+
+Total awareness → habitual: 5-15% 是健康范围
+
+12% recurring 不一定差, 关键看 funnel 形状.
+```
+
+### 1.3 Time-to-value (TTV) 是 adoption 关键
+
+```python
+def ttv_analysis():
+    """从 activation 到 first_value 的时间分布"""
+    users = users_who_reached('first_value')
+    ttv = [user.first_value_ts - user.activation_ts for user in users]
+    return {
+        'p50_ttv_days': median(ttv),
+        'p90_ttv_days': p90(ttv),
+        'within_1_session_pct': pct(ttv < 1_hour),  # 关键 metric
+    }
+```
+
+**研究表明**: 一次会话内不能找到第一价值的工具, **80% 永远不回来**. Healthcare AI 必须 in-session 给到价值.
+
+### 1.4 Cohort retention
+
+```python
+def cohort_retention():
+    """按 onboarding 周做 cohort, 看 retention 衰减"""
+    cohorts = {}
+    for week in range(12):
+        cohort = users_onboarded_in_week(week)
+        cohorts[week] = {
+            'size': len(cohort),
+            'wk1_retention': retention_at(cohort, weeks=1),
+            'wk4_retention': retention_at(cohort, weeks=4),
+            'wk12_retention': retention_at(cohort, weeks=12),
+        }
+    return cohorts
+
+# 信号:
+# - 早期 cohort retention 比晚期好 → 产品在退步 (反常)
+# - 晚期 cohort retention 比早期好 → 产品在进化 (正常)
+# - retention 在某 cohort 突然崩 → 那周发生了什么 (产品 release / 客户事件)
+```
+
+### 1.5 Stickiness (DAU/MAU)
+
+**DAU/MAU > 0.5 = 工具进入日常工作流的标志**. 其他 metric 可以骗, 这个骗不了.
+
+```
+12% recurring + 0.4 stickiness:
+   12% 在用, 用的人不上瘾
+   → 价值不够强 / 工作流不顺
+
+12% recurring + 0.8 stickiness:
+   只有 12% 在用, 但用的人天天用
+   → 真实价值给了 small segment
+   → 可能是 niche 工具, 不是 broad-base AI
+```
+
+---
+
+## ⚙️ Problem 2: Friction Analysis — UI / Workflow / Trust / EHR Integration
+
+**核心**: Friction 是 funnel drop 的原子. 拆出来后, 每种 friction 有不同 fix 模式.
+
+### 2.1 5 类 friction 分类
+
+| Type | 例子 | Fix 类型 | Cost |
+|---|---|---|---|
+| **Access friction** | SSO 没通, 账号没开 | IT bulk action | Low |
+| **Discovery friction** | 不知道哪里能找到工具 | In-app onboarding, dashboard 加入口 | Low |
+| **Cognitive friction** | UI 复杂, 不知道下一步 | 简化 UI, 增加 micro-instruction | Mid |
+| **Workflow friction** | 用工具要打断主流程 | 深度集成主系统 (EHR) | High |
+| **Trust friction** | 不确定 AI 输出对不对 | Confidence display, explainability | High |
+
+### 2.2 EHR integration friction (Healthcare 特有)
+
+```python
+# 没集成 EHR 的体验:
+def without_ehr_integration():
+    """医生看到 ICU patient X, 想问 AI"""
+    1. switch_tab_to_ai_tool()
+    2. paste_patient_id()
+    3. wait_3s_for_data_load()
+    4. ask_question()
+    5. wait_for_response()
+    6. copy_answer()
+    7. switch_tab_back_to_ehr()
+    8. paste_into_clinical_note()
+    # Total: 90 seconds. 没人会用第二次.
+
+# 集成 EHR 的体验:
+def with_deep_ehr_integration():
+    """医生看到 ICU patient X, 想问 AI"""
+    1. click_ai_button_in_patient_pane()   # in-EHR widget
+    2. ai_loads_with_patient_context()      # FHIR data auto-loaded
+    3. ask_question()
+    4. answer_appears_in_pane()
+    5. confirm_to_write_back()              # 1-click append to chart
+    # Total: 12 seconds.
+```
+
+**集成层次**:
+
+```
+Level 1: Standalone web tool (worst)
+  → 必须 switch context, 抄数据
+
+Level 2: SMART on FHIR app (better)
+  → 在 EHR 里启动, 但是独立 iframe
+
+Level 3: Deep integration via SDK
+  → AI widget 直接在患者 chart pane
+
+Level 4: AI 嵌入到 default workflow (best)
+  → 医生写 note 时 AI 自动建议下一句
+  → 与 native UX 不可区分
+```
+
+### 2.3 Trust friction (LLM 特有)
+
+```python
+def display_with_confidence(ai_output):
+    return {
+        'answer': ai_output.text,
+        'confidence': ai_output.confidence,            # 0-100
+        'sources': ai_output.cited_documents,          # RAG sources
+        'reasoning': ai_output.chain_of_thought,       # 可点开看
+        'caveat': "AI suggestion, please verify with clinical judgment",
+        'disagree_button': True,                        # 简易反馈
+    }
+
+# UX 设计:
+# - confidence > 90%: 绿色, 简洁显示
+# - confidence 70-90%: 黄色, "double check recommended"
+# - confidence < 70%: 红色, "consult specialist"
+```
+
+**Calibration 比 accuracy 重要**:
+
+```python
+# 不可接受的 model:
+# accuracy 88%, confidence 一律报 99%
+# → 医生 12% 时间被骗
+
+# 可接受的 model:
+# accuracy 88%, confidence 平均 88%, calibrated
+# → 医生学会信任 high-confidence 输出
+```
+
+ECE (Expected Calibration Error) < 0.05 是 healthcare AI 部署的 hard requirement.
+
+### 2.4 Friction audit 工具
+
+```python
+class FrictionAudit:
+    def __init__(self, user_session_log):
+        self.session_log = user_session_log
+
+    def detect_friction(self):
+        return {
+            'time_to_first_click': self.measure_initial_hesitation(),
+            'rage_clicks': self.detect_rage_clicks(),       # 同一按钮 3 次 < 1s
+            'context_switches': self.count_tab_switches(),
+            'session_duration': self.session_log.total_seconds,
+            'task_completion_rate': self.completed_tasks / self.started_tasks,
+            'help_button_clicks': self.help_clicks,
+            'abandonment_points': self.abandonment_step,
+        }
+
+def cohort_friction_report(cohort_id):
+    """对 cohort 跑 friction audit"""
+    sessions = sessions_in_cohort(cohort_id)
+    audits = [FrictionAudit(s).detect_friction() for s in sessions]
+    return aggregate(audits)
+```
+
+实际部署在医院, 看到的典型 friction:
+- `rage_clicks` on 「Generate」 button → 工具响应慢 (但 UI 没 spinner)
+- `context_switches` > 5 per session → 没集成 EHR
+- `time_to_first_click` > 20s → discovery friction
+- `abandonment_points` 集中在 step 3 → 那步有 bug 或不直观
+
+---
+
+## ⚙️ Problem 3: Trust Building — Calibrated Confidence + Explainability + Peer Endorsement
+
+**核心**: AI 在 healthcare 落地的最大障碍是 trust, 不是 accuracy. 三个并行 lever 同时投入.
+
+### 3.1 Calibrated confidence 显示
+
+```python
+# 标准 LLM 输出没有 reliable confidence
+# 需要额外的 calibration layer:
+
+def calibrated_output(query):
+    raw_answer = llm.complete(query)
+
+    # Method 1: Self-consistency
+    # 同问题问 5 次, 答案 agreement 反映 confidence
+    answers = [llm.complete(query) for _ in range(5)]
+    agreement = compute_agreement(answers)
+
+    # Method 2: Logprob-based
+    # 看 token-level logprob
+    logprob_confidence = mean_logprob_of_answer_tokens(raw_answer)
+
+    # Method 3: Probe model
+    # 训过的小模型预测 "这答案对不对"
+    probe_confidence = confidence_probe(raw_answer, query)
+
+    final_confidence = weighted_combine(agreement, logprob_confidence, probe_confidence)
+
+    return {
+        'answer': raw_answer,
+        'confidence': final_confidence,
+        'method': 'multi-signal'
+    }
+```
+
+校准目标:
+```
+对 confidence 80% 的输出, 实际 accuracy 应该是 80%
+对 confidence 60% 的输出, 实际 accuracy 应该是 60%
+
+ECE = sum over buckets of |actual_acc - mean_confidence| × bucket_weight
+ECE < 0.05 是部署门槛
+```
+
+### 3.2 Explainability — 不止「source citations」
+
+3 层 explainability:
+
+```python
+def explain_decision(ai_output):
+    return {
+        # Layer 1: Source citations (RAG)
+        'sources': [
+            {'doc_id': '...', 'snippet': '...', 'similarity': 0.92},
+            ...
+        ],
+
+        # Layer 2: Chain of thought
+        'reasoning_steps': [
+            'Patient presents with X',
+            'Lab values suggest Y',
+            'Differential diagnosis: A (40%), B (30%), C (20%)',
+            'Recommend test Z to differentiate'
+        ],
+
+        # Layer 3: Counterfactual
+        'what_if': {
+            'if_temp_higher': 'would shift toward A',
+            'if_no_history_of_X': 'would consider D',
+        },
+
+        # Layer 4: Limitation 自报
+        'limitations': [
+            'Trained on adult data, pediatric accuracy lower',
+            'Has not been validated for Y demographic'
+        ]
+    }
+```
+
+医生看到 explanation 后**学习模型**, 不只是用模型. 这是 long-term trust 的核心.
+
+### 3.3 Peer endorsement (社会信号)
+
+**研究表明**: 医生 trust AI 取决于**同事是否在用**, 不是 vendor pitch.
+
+部署策略:
+
+```
+Phase 1: Identify 5 "diffusion of innovation" early adopters
+  - top 10% in seniority + open to new tech
+  - typically chief residents, ICU directors
+  - 给他们 1-on-1 onboarding + premium support
+
+Phase 2: 让 early adopter 内部 demo
+  - 30-min lunch session
+  - 「Yesterday I used this on a case where...」
+  - 同事看到具体 use case 比 demo 强 10x
+
+Phase 3: Champion-led peer training
+  - early adopter 教 next 20 个
+  - vendor 只 facilitate, 不主导
+
+Phase 4: Bottom-up demand
+  - non-users 开始问 "how do I get this"
+  - 这时 IT bulk provisioning
+```
+
+### 3.4 Visible failure handling
+
+**反直觉**: 让 AI 主动承认错误比一直对更建立信任.
+
+```python
+def transparent_failure(query, ai_output):
+    if ai_output.confidence < 0.6:
+        return {
+            'answer': None,
+            'message': "I don't have high confidence on this case. "
+                       "Recommend specialist consult.",
+            'why': 'rare presentation, limited training data',
+        }
+
+    if detects_out_of_distribution(query):
+        return {
+            'answer': ai_output.text,
+            'warning': "This case is unusual for my training. "
+                       "Higher error rate expected.",
+            'confidence': ai_output.confidence * 0.5  # 自降
+        }
+
+    return ai_output
+```
+
+医生看到 AI 「我不确定」, **信任度反而上升**. 一直自信 → 一次错 → 信任崩塌.
+
+### 3.5 Outcome tracking with consent
+
+```python
+def post_decision_outcome():
+    # 7 天后随访
+    """跟踪 AI suggestion 的实际 outcome"""
+    decisions_last_week = ai_decisions(window='7d_ago')
+    for d in decisions_last_week:
+        actual = look_up_clinical_outcome(d.patient_id)
+        outcome_log.append({
+            'decision_id': d.id,
+            'ai_predicted': d.predicted,
+            'actual': actual,
+            'doctor_followed_ai': d.doctor_accepted,
+        })
+
+    # Dashboard 显示给 CMIO + active users:
+    "Last 30 days: 1,247 AI suggestions used.
+     843 with measurable outcome.
+     85% led to confirmed correct diagnosis.
+     5% required revision.
+     10% inconclusive."
+```
+
+可见的 outcome data 是续约的最大武器.
+
+---
+
+## ⚙️ Problem 4: Change Management — Champion Model + Training + Incentives
+
+**核心**: Adoption 60% 看技术, 40% 看人. Change management 失败 = product 再好也死.
+
+### 4.1 Champion / sponsor 三层架构
+
+```
+Top: Executive Sponsor (CMIO / CMO)
+  - 决策购买 + 续约
+  - 你需要每月 1 次 30 分钟 update
+  - 关注: ROI, 总体 adoption, risk
+
+Mid: Functional Champion (Chief Resident, ICU Director)
+  - 决策日常推广
+  - 你需要每周 sync, 帮他准备 talking point
+  - 关注: peer-to-peer adoption, 具体 use case
+
+Floor: End-user Champion (Top 5% active user)
+  - 同事的 trust bridge
+  - 你需要 monthly 1-on-1, 知道 frustration
+  - 关注: workflow detail, missing feature
+```
+
+任何一层缺 = 项目 stall:
+- 没 Executive: 续约死
+- 没 Functional: 推广死  
+- 没 Floor: 日常使用死
+
+### 4.2 Champion 转移 (轮岗 / 离职)
+
+**Healthcare 特点**: CMIO 任期 2-3 年, chief resident 1 年. 必须**永远在培养 next sponsor**.
+
+```python
+def sponsor_succession_plan():
+    return {
+        'current_sponsors': {
+            'cmio': 'Dr. Smith, expected tenure remaining: 18 months',
+            'chief_resident': 'Dr. Jones, rotating off in 6 months',
+        },
+        'next_sponsors': {
+            'cmio_likely_successor': 'Dr. Chen, currently CIO',
+            'chief_resident_successors': ['Dr. Lee', 'Dr. Park'],
+        },
+        'engagement_plan': {
+            'Dr. Chen': 'Monthly informal coffee, share quarterly outcome report',
+            'Dr. Lee': 'Co-author case study on AI use',
+            'Dr. Park': 'Beta test next feature',
+        }
+    }
+```
+
+### 4.3 Training program 设计
+
+3 层 training:
+
+**Layer 1: Self-serve onboarding (10 minute)**
+- In-app tutorial on first login
+- Video showing 3 core use cases
+- Sandbox where they can practice on dummy data
+
+**Layer 2: Cohort training (30 minute)**
+- 8-12 人 group session led by champion
+- Real-world cases from the hospital
+- Q&A
+
+**Layer 3: 1-on-1 coaching (top users)**
+- 30 min/month for top 10%
+- Custom feature request channel
+- Beta access
+
+```python
+def training_completion_metrics():
+    return {
+        'self_serve_completion': pct(users.completed_tutorial),
+        'cohort_attendance': cohort_attendance_rate(),
+        '1on1_engagement': avg_sessions_per_top_user(),
+        # 重要: training completion vs adoption correlation
+        'correlation_to_adoption': pearson(training_score, days_used),
+    }
+```
+
+### 4.4 Incentive design
+
+**重要**: 在医院**金钱激励通常 doesn't work** (医生收入已经很高). 用其他 lever:
+
+```
+社会认可:
+  - Monthly "AI Champion" 表彰
+  - 内部 newsletter 表彰 use case
+  - Conference 发言机会
+
+时间节省 (最有效):
+  - 「This week you saved 4.2 hours via AI assist」personal dashboard
+  - 量化告诉医生 "你少加班了"
+
+学术 credit:
+  - 帮 active user 写 case study / 协助发 paper
+
+减少痛点:
+  - 给 active user 升级 EHR access
+  - 优先处理 IT support ticket
+```
+
+### 4.5 跟你 voice agent 7-market rollout 的类比
+
+你在 ByteDance 跨 7 markets 推 voice agent. 不同 markets 文化差异巨大:
+- Indonesia: 强 top-down, CMIO 类似的 country head 一句话定生死
+- Brazil: 必须 grass-root, 找到 5 个 collection rep 当 champion
+- Mexico: 中间, 平衡 top-down + bottom-up
+
+直接 reframe 到 healthcare 题:
+
+| Healthcare | Your TikTok 7-market |
+|---|---|
+| CMIO sponsor model | country head sponsor |
+| Champion network | regional ops lead |
+| 1-on-1 coaching | local rep onboarding |
+| Cultural difference (US 医院风格) | 7 markets cultural difference |
+
+---
+
+## ⚙️ Problem 5: Measurement — Adoption Metrics vs Outcome Metrics
+
+**核心**: Adoption % 是 leading indicator. 真正决定续约的是 outcome metric. 这一节深入 measurement.
+
+### 5.1 双层 metric 架构
+
+```
+Layer 1: Leading (adoption metric, daily)
+  - Funnel conversion rates
+  - DAU, WAU, MAU
+  - Stickiness (DAU/MAU)
+  - Session frequency, duration
+  - Feature usage breakdown
+
+Layer 2: Lagging (outcome metric, weekly/monthly)
+  - Time saved per user (charting hours)
+  - Clinical outcome change (readmission rate, length of stay)
+  - Error reduction (medication errors, missed diagnoses)
+  - Patient satisfaction (HCAHPS)
+  - Provider satisfaction
+  - Financial: cost per encounter, FTE-hours saved
+```
+
+### 5.2 Leading → Lagging 因果链 (theory of change)
+
+```
+Increased adoption →
+  More AI-assisted decisions →
+    Better information at decision point →
+      Better diagnosis accuracy →
+        Better treatment plans →
+          Better patient outcomes →
+            Lower readmission rate →
+              Lower cost per encounter →
+                Better hospital margin
+
+每个箭头都需要数据验证, 不能假设.
+```
+
+### 5.3 Outcome metric measurement design
+
+```python
+def measure_outcome_change():
+    # Pre-post analysis
+    pre_period = '6 months before AI rollout'
+    post_period = '6 months after AI rollout, adoption > 40%'
+
+    metrics = {}
+    for m in OUTCOME_METRICS:
+        pre = aggregate_metric(m, pre_period)
+        post = aggregate_metric(m, post_period)
+
+        # Statistical significance
+        pval = ttest(pre.samples, post.samples)
+
+        # Effect size
+        effect = (post.mean - pre.mean) / pre.std
+
+        # Confounder control
+        adjusted = adjust_for_confounders(post, [
+            'patient_acuity_mix',
+            'season',
+            'staff_turnover',
+            'covid_phase'
+        ])
+
+        metrics[m] = {
+            'pre': pre.mean,
+            'post': post.mean,
+            'change_pct': (post.mean - pre.mean) / pre.mean,
+            'p_value': pval,
+            'adjusted_change': adjusted,
+        }
+
+    return metrics
+```
+
+### 5.4 ROI calculation (CFO language)
+
+```python
+def roi_calculation():
+    # Active user cohort
+    active_users = 280  # 28% of 1000 nurses
+    avg_time_saved_per_user_per_day = 0.85  # hours, from time-on-task analysis
+    work_days_per_year = 220
+    nurse_loaded_cost_per_hour = 80  # USD
+
+    annual_value = (
+        active_users * avg_time_saved_per_user_per_day *
+        work_days_per_year * nurse_loaded_cost_per_hour
+    )
+    # = 280 × 0.85 × 220 × 80 = $4.19M/year
+
+    # AI cost
+    annual_subscription = 500_000  # $500K
+    integration_amortized = 100_000
+    total_cost = 600_000
+
+    roi = (annual_value - total_cost) / total_cost
+    return {
+        'annual_value': annual_value,
+        'annual_cost': total_cost,
+        'roi_pct': roi * 100,
+        'payback_months': 12 * total_cost / annual_value,
+    }
+    # ROI = 597%, payback = 1.7 months
+    # 注意: 这只算了 active 28%. 如果 adoption 升到 80%, ROI 3x.
+```
+
+**CFO 看到 ROI 597% 不会卡续约**.
+
+### 5.5 公平性 / equity metric
+
+Healthcare AI 特有的 risk: bias.
+
+```python
+def equity_metrics():
+    return {
+        # Provider equity
+        'adoption_by_role': adoption_pct(stratify_by='role'),
+        # nurse 30%, doctor 15%, pharmacist 60% — 大差异要解释
+
+        # Patient equity
+        'ai_use_by_patient_race': stratify_by_patient_demographic(),
+        # 警惕: AI 可能在某 demographic 表现差 → 医生不用 → 该群体得不到 benefit
+
+        # Outcome equity
+        'outcome_improvement_by_demographic': stratify_outcomes(),
+    }
+```
+
+如果 AI 对白人患者 accuracy 90%, 黑人患者 75%, 医生不用了 → **AI 反而加剧不平等**. 必须 stratify monitor.
+
+### 5.6 跟你 voice agent metric 的类比
+
+你 voice agent 7 markets, 同样的 leading vs lagging:
+
+| Voice agent | Healthcare AI |
+|---|---|
+| Daily call count | DAU |
+| Call success rate | Task completion rate |
+| Repayment recovery rate (lagging) | Clinical outcome (lagging) |
+| Cross-market stratify | Cross-demographic stratify |
+| 7 markets ROI math | Hospital ROI math |
+| Compliance metric (Indonesia) | Equity metric (US) |
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+这 5 个 layer 拼起来就是一个完整的 deployment adoption 工程视野:
+
+1. **Funnel framework** (Problem 1) — 不预设, 用 funnel 找真问题
+2. **Friction analysis** (Problem 2) — 5 类 friction 各有 fix 路径
+3. **Trust building** (Problem 3) — calibrated confidence + explainability + peer
+4. **Change management** (Problem 4) — Champion 三层 + training + incentive
+5. **Measurement** (Problem 5) — leading adoption + lagging outcome + ROI 给 CFO
+
+面试场把这 5 个 layer 系统讲清楚 + 配你 voice agent / BNPL chatbot 跨 7 markets adoption 经验, 就是 **真正的 FDE-level 答题**.
+
+---
+
+## 必问 clarifying questions
 
 **1. Define "adoption"**
 
@@ -33,7 +952,7 @@
 
 > "Of all eligible users, what % were **provisioned access**? Of those, what % **logged in once**? Of those, what % **completed first task**? Of those, what % **used in past 7 days**?"
 
-→ 这一个问题暴露 root cause 80% 时间。
+→ 这一个问题暴露 root cause 80% 时间.
 
 **4. Customer's previous workflow**
 
@@ -50,91 +969,43 @@
 | 时长 | 阶段 |
 |---|---|
 | 0-10 min | Define adoption + ask for funnel breakdown |
-| 10-20 min | Hypothesize 3-5 root causes from funnel data, **rank by likelihood + impact** |
-| 20-30 min | Pick top 1-2 hypotheses, propose **investigation plan** (not solution yet) |
-| 30-40 min | Based on hypothesis, propose **remediation** with phasing |
-| 40-45 min | Failure modes + how to know it worked |
-
----
-
-## 我会这样答（sample monologue）
-
-> "First, let me make sure I understand 'adoption' — *[问 clarifying]*. Assume **denominator = 1000 nurses across 3 hospitals, 'adopted' = used in past 7 days, 12% = 120 nurses, target was 80%**.
->
-> Before hypothesizing, I want to see the **funnel**:
->
-> - Provisioned access: ?
-> - Logged in at least once: ?
-> - Completed first task: ?
-> - Used in past 7 days: 12% (the reported number)
->
-> Each drop tells different story. Let me hypothesize what I'd see in each scenario:
->
-> **Hypothesis A: Provisioning failure** (only 30% provisioned)
->   → IT integration with their HR system is broken. Fix: triage with their IT team, get bulk SSO setup.
->
-> **Hypothesis B: Login but no first-task** (90% provisioned, 80% logged in, 20% completed task)
->   → UX / training gap. Fix: in-app onboarding flow, 30-min coach session at each shift handoff.
->
-> **Hypothesis C: First-task but not retained** (80% logged in, 60% completed task, 12% in past 7d)
->   → Our product loses to incumbent workflow. **This is the worst case** because it's product-market fit, not deployment. Fix: hard product conversation with their CMIO.
->
-> **Hypothesis D: Change management failure** (any stage)
->   → Champion left / political pushback / floor manager not enforcing. Fix: re-engage executive sponsor.
->
-> **Investigation plan, week 1-2**:
-> 1. Pull funnel data from telemetry (1 day)
-> 2. **Shadow 5 nurses for a shift** — actually see what they do (2 days). FDE 必须 to the customer site.
-> 3. Interview 10 non-adopters: "Walk me through your day, when would you use this?" (3 days)
-> 4. Interview 5 active adopters: "What made you stick?" (1 day)
-> 5. Talk to CMIO + 2 floor managers (2 days)
->
-> Output: a **1-pager** with root cause + concrete remediation.
->
-> **Most likely outcome (based on FDE experience)**: it's **Hypothesis B mixed with D** — the product is OK but training was rushed + champion lost focus. That's actually **good news** because both are fixable in 60 days.
->
-> **Remediation if B+D**:
-> - Week 1-4: **embedded floor training** — FDE physically sits with 3 nurses per shift, 2 hospitals, rotate
-> - Week 4-8: **champion re-engagement** — weekly review with CMIO showing micro-improvements
-> - Week 8-12: **adoption challenge** — internal leaderboard, recognition, gamification (works in healthcare)
->
-> **Target**: 40% in 90 days, 70% in 6 months. Honest, not 80% in 30 days fantasy.
->
-> **How we know it worked**:
-> - Funnel improves stage-by-stage (not just top number)
-> - **Stickiness ratio (DAU/MAU)** grows above 0.5
-> - Drop in support tickets per active user (people aren't fighting the tool)
->
-> **Two risks to flag**:
-> - If after 4 weeks of embedded training adoption is still flat, it's actually **Hypothesis C** (product-fit), and we have to have the hard conversation. Don't avoid it.
-> - **Don't blame the customer**. Even if it's their change management, the FDE owns the joint outcome."
+| 10-20 min | Hypothesize 4-5 root causes from funnel, rank by likelihood × impact |
+| 20-30 min | Pick top 1-2 hypotheses, propose investigation plan |
+| 30-40 min | Based on hypothesis, propose remediation with phasing |
+| 40-45 min | Failure modes + how to know it worked + escalation plan |
 
 ---
 
 ## 简历专属 reframe
 
-你的 **voice agent 7 markets** 项目 + **BNPL chatbot adoption** 都有 deployment ramp 经验：
+你的 **voice agent 7 markets** + **BNPL chatbot adoption** 都有 deployment ramp 经验:
 
 | Healthcare 题 | 你的经验 |
 |---|---|
-| Funnel diagnosis | 你跨 7 markets 不同 adoption rate，肯定 diagnose 过 |
+| Funnel diagnosis | 你跨 7 markets 不同 adoption rate, 肯定 diagnose 过 |
 | Embedded floor training | Voice agent 你 weekly 跟 regional ops 跑 |
 | Champion management | 7 markets 每个有 regional champion |
 | Product fit vs deployment fit 区分 | 你做过的 refund tier scoping 就是这个判断 |
 | Stickiness ratio | BNPL chatbot 你 measure 过 |
+| Cultural difference (US 医院风格) | 7 markets cultural difference |
+| Calibrated confidence | Voice agent 也要做 confidence routing |
+| EHR-deep integration | BNPL 跨多 internal system, 类似深集成挑战 |
 
-**主动说**：
+**主动说**:
 
-> "Actually one of my 7 markets, Indonesia, had this exact shape — initial adoption around 15% after 60 days. We did the funnel diagnostic and it turned out the issue was 70% provisioning failure (their HR feed wasn't syncing), not product fit at all. Once we fixed the SSO integration, adoption jumped to 60% in 4 weeks. The general lesson: **always diagnose the funnel first, never assume product issue**."
-
-→ 真实经验, 巨加分.
+> "Actually one of my 7 markets, Indonesia, had this exact shape — initial adoption around 15% after 60 days. We did the funnel diagnostic and it turned out the issue was 70% provisioning failure (their HR feed wasn't syncing), not product fit at all. Once we fixed the SSO integration, adoption jumped to 60% in 4 weeks.
+>
+> The general lesson: **always diagnose the funnel first, never assume product issue**. The expensive mistake is racing to retrain a model or redesign UI based on 'we feel adoption is bad', when the real problem is something boring like 70% of users can't log in.
+>
+> The Indonesia case also taught me that cultural difference matters — what works in Singapore (top-down rollout) didn't work in Brazil where collection reps needed peer-to-peer demos before they'd try the agent. I'd carry that into US healthcare: **let early-adopter doctors evangelize, don't push from vendor side**."
 
 ---
 
 ## 5 个常见 follow-ups
 
 **Q1**: "What if the CMIO says it's all our fault?"
-**A**: Don't defensive. Three moves:
+
+**A**: Don't get defensive. Three moves:
 1. **Acknowledge**: "I hear you, you're frustrated, and we owe you a turnaround plan."
 2. **Diagnose together**: "Can we spend 30 min on the funnel data? I want to make sure we're fixing the right thing, not just adding training."
 3. **Joint action items**: "Of these 5 actions, 3 are on us, 2 require your team's help — can your floor managers commit to 15-min adoption huddles every shift for 4 weeks?"
@@ -142,25 +1013,29 @@
 Don't unilaterally promise outcomes you can't control.
 
 **Q2**: "Active users say tool is great. Non-users won't try. How to convert?"
+
 **A**: This is classic **diffusion of innovation** problem. Active users = your early-adopters / champions. Two levers:
 1. **Champion-led conversion**: have active users do **30-min lunch sessions** for their peers. Way more credible than vendor training.
 2. **Friction removal**: interview 5 non-users specifically. Often it's a single dumb thing (e.g., they have to log in twice, app is on wrong screen of their workstation). Fix that, **conversion is free**.
 
 **Q3**: "Adoption is OK but renewal at risk because CFO says no measurable outcome."
+
 **A**: This is **business case re-anchoring**. The CFO sees cost but no value. 2-step:
 1. **Find existing internal metric you can move** — e.g., "we noticed your charting time decreased 18% for active users. At $80/hr × 3000 nurses, that's $X/year."
 2. **Convert to language CFO uses** — they don't care about adoption, they care about cost-per-encounter, FTE-hours-saved, readmission-rate.
 
 You can't make a CFO care about adoption. You can make them care about adoption's economic equivalent.
 
-**Q4**: "Hypothesis C is the case (product-market fit). What now?"
+**Q4**: "Hypothesis E is the case (product-market fit). What now?"
+
 **A**: Have the **honest conversation up the chain at our side first**:
 - If the product is wrong for healthcare nursing, escalate to product leadership: "We need workflow X added or we won't win healthcare. Roadmap commitment?"
 - Don't promise client we'll fix in 60 days when product team can't ship in 12 months.
 - Worst case: **negotiate a graceful exit / scope reduction** — only serve admin staff (where adoption is fine), not bedside nurses. Save the relationship.
 
 **Q5**: "Customer wants you to interview EVERY nurse to find the issue. Time impossible."
-**A**: 推回去得 surgical：
+
+**A**: 推回去得 surgical:
 - "I can talk to 15 non-users in 5 days. That's statistically meaningful and 80% of the signal."
 - Offer **survey for the rest**: 5-question 2-min survey, target 200 responses.
 - Don't waste 6 weeks on 1000 interviews.
@@ -169,25 +1044,39 @@ You can't make a CFO care about adoption. You can make them care about adoption'
 
 ## ❌ 易错点
 
-1. **预设 root cause** — 一上来"肯定是 UI 难用" = 失分
+1. **预设 root cause** — 一上来 "肯定是 UI 难用" = 失分
 2. **跳过 funnel** — adoption 是 aggregate, funnel 才是 actionable
 3. **当 "training problem"** — 用 training 解决一切是 cop-out
 4. **不区分 product 和 deployment 问题** — 这是 FDE 是否成熟的关键判断
 5. **不去 customer site** — FDE 必须 on-site shadow
 6. **承诺数字** — 80% 30 天不可能
 7. **甩锅给 customer** — 即使是他们的 change mgmt, FDE 拥有 joint outcome
+8. **忽略 EHR 集成** — 在 healthcare 必须深集成
+9. **没 calibrated confidence** — LLM 输出无 confidence 在 healthcare 灾难
+10. **没 ROI math** — 续约时只讲 adoption %, CFO 听不懂
 
 ---
 
 ## ✅ 加分项
 
-1. **Funnel-based diagnosis** 主动列出 4 个 hypothesis 对应每段 funnel
+1. **Funnel-based diagnosis** 主动列出 4-5 个 hypothesis 对应每段 funnel
 2. **On-site shadow + 15 interviews** 具体行动
 3. **Stickiness ratio (DAU/MAU)** 作为 leading indicator
 4. **CFO-language re-anchoring** 应对 renewal 风险
 5. **Champion-led peer training** > vendor training
-6. **诚实区分 hypothesis C** (product fit) 不回避
+6. **诚实区分 hypothesis E** (product fit) 不回避
 7. **Joint action items** 让 customer 也有 commitment
+8. **Calibrated confidence + explainability** trust building
+9. **Equity metric** (avoid AI bias in healthcare)
+10. **Quote your 7-market voice agent Indonesia case**
+
+---
+
+## 一句话总结
+
+> **Healthcare AI adoption diagnosis = 「先 funnel 不预设、上 site shadow 5 个 active + 10 non-user、4-5 hypothesis ranked、CMIO + champion + floor 三层 sponsor、leading metric daily + lagging outcome monthly + ROI math 给 CFO」**.
+>
+> 12% 不是终点, funnel 哪段断才是答案. 找到那一段, 大部分 fix 都是 boring engineering, 不是 AI magic.
 
 ---
 
@@ -195,34 +1084,60 @@ You can't make a CFO care about adoption. You can make them care about adoption'
 
 ```
 绝不预设根因, 永远先看 funnel:
-  Provisioned → Login → First-task → Past 7d active
-  
-4 hypothesis 对应 4 段 drop:
-  A: Provisioning broken (IT)
-  B: UX / training gap
-  C: Product-market fit (worst)
-  D: Change management / champion loss
+  Awareness → Consider → Provision → Activate → First-Value → Recurring → Habitual
 
-Investigation tools:
-  - Funnel telemetry
-  - On-site shadow 5 users
-  - 10 non-user interviews
-  - 5 adopter interviews
+5 hypothesis 对应 funnel 各段 drop:
+  A: Provisioning broken (IT) — 2-4 wk fix
+  B: UX / training gap — 4-8 wk fix
+  C: Workflow fit (EHR 集成) — 3-6 mo fix
+  D: Change management / champion loss — 6-12 wk
+  E: Product-market fit (worst) — 6+ mo, may need graceful retreat
+
+Investigation tools (week 1-3):
+  - Funnel telemetry (5 stage)
+  - Stickiness (DAU/MAU)
+  - Cohort retention
+  - On-site shadow 5 active + 10 non-user
   - CMIO + manager talks
+  - Equity stratification
 
-Remediation if B+D (most common):
-  Wk 1-4: embedded floor training
+Healthcare-specific:
+  - EHR 深集成是 must (Level 4 in-EHR widget)
+  - Calibrated confidence (ECE < 0.05)
+  - Explainability 4 layer
+  - Peer endorsement > vendor pitch
+  - Equity metric (race, role)
+
+Trust building 3 lever:
+  - Calibrated confidence display
+  - Explainability (source, CoT, counterfactual, limitation)
+  - Peer endorsement (champion network)
+
+Change mgmt:
+  - 3-tier sponsor (CMIO / chief resident / top user)
+  - Always grooming next sponsor (turnover)
+  - Training 3-level (self / cohort / 1-on-1)
+  - Incentive: 时间节省 dashboard, not money
+
+Measurement:
+  Leading (daily): funnel, DAU, stickiness, session metric
+  Lagging (monthly): time saved, outcome, ROI
+  ROI math for CFO: active × hours × rate
+
+Phasing if B+D (common):
+  Wk 1-4: funnel + on-site + embedded training
   Wk 4-8: champion re-engagement
-  Wk 8-12: gamified rollout
+  Wk 8-12: gamified rollout, peer training
   Target: 40% in 90d, 70% in 6mo
-
-Success metrics:
-  - Funnel improves stage-by-stage
-  - Stickiness (DAU/MAU) > 0.5
-  - Support tickets / active user ↓
 
 红线:
   - Don't blame customer
   - Don't promise unilateral
-  - Don't avoid Hypothesis C if data shows it
+  - Don't avoid Hypothesis E if data shows it
+  - Don't ignore EHR integration in healthcare
+  - Don't use uncalibrated LLM in clinical
+
+Quote opportunity:
+  "Indonesia voice agent had same shape — 15% adoption,
+   funnel showed 70% provisioning failure, not product..."
 ```

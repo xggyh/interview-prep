@@ -40,95 +40,450 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>题目（verbatim）</h3>
-<blockquote><p><strong>[OpenAI Hiring Manager Round]</strong></p>
-<p>"How do you <strong>handle ambiguity</strong>? Tell me a story where requirements were unclear and you had to make calls without complete information."</p></blockquote>
-<p><strong>出处</strong>：OpenAI / Google FDE hiring manager 必问. Palantir/Salesforce 也问.</p>
-<p><strong>Round</strong>：Hiring Manager (60 min)</p>
+<blockquote><p><strong>[OpenAI / Anthropic Hiring Manager Round — 60 min]</strong></p>
+<p>"How do you <strong>handle ambiguity</strong>? Tell me a story where requirements were unclear and you had to make calls without complete information.</p>
+<p>Follow-up: What kind of ambiguity gives you the most trouble? How do you push back when someone asks for the impossible?"</p></blockquote>
+<p><strong>出处</strong>: OpenAI / Anthropic / Google FDE hiring manager 必问. Palantir / Salesforce / Databricks 也常问. 几乎所有 FDE / staff-level engineering role 都会问.</p>
+<p><strong>Round</strong>: Hiring Manager (60 min, 通常作为 round 中段问题)</p>
 <hr />
 <h3>这道题在考什么</h3>
-<p>FDE 工作 90% 时间在 ambiguity 里:</p>
-<ol><li><strong>Process</strong> —— 有 framework 处理还是 panic</li><li><strong>Decision-making</strong> —— 在不完整信息下 commit</li><li><strong>Reversibility awareness</strong> —— 知道 one-way vs two-way doors</li><li><strong>Communication</strong> —— 用 stakeholder 验证 vs 自己 silo</li><li><strong>Story quality</strong> —— STAR + 具体 metrics</li></ol>
+<p>FDE 工作 <strong>90% 时间在 ambiguity 里</strong>. Recruiter / HM 想验证 5 件事:</p>
+<ol><li><strong>Process</strong> —— 面对模糊, 你有 framework 还是 panic</li><li><strong>Decision-making</strong> —— 在不完整信息下能不能 commit, 还是 paralysis</li><li><strong>Reversibility awareness</strong> —— 知不知道 one-way vs two-way doors</li><li><strong>Communication</strong> —— 用 stakeholder 验证 vs 自己 silo</li><li><strong>Story quality</strong> —— STAR + 具体 metrics + 真实细节</li></ol>
+<p><strong>没说出口的 anti-signal</strong>:</p>
+<ul><li>"I just ship and iterate" → no thoughtfulness, HM 担心你乱来</li><li>"I align with my manager and ask them" → 显示没 judgment</li><li>"I do a lot of research first" → 字面理解 = analysis paralysis</li><li>"It depends" without follow-through → wishy-washy</li><li>故事没 metric → 显得不真实</li></ul>
 <hr />
-<h3>黄金 framework：D·D·D·V</h3>
-<table class="md-table"><thead><tr><th>Step</th><th>What</th></tr></thead><tbody><tr><td><strong>D</strong></td><td><strong>Diagnose ambiguity type</strong> (info-missing vs decision-required vs unknown-unknown)</td></tr><tr><td><strong>D</strong></td><td><strong>Decompose</strong> into known + unknown + assumption</td></tr><tr><td><strong>D</strong></td><td><strong>Decide</strong> by reversibility (one-way: slow + investigate; two-way: ship + measure)</td></tr><tr><td><strong>V</strong></td><td><strong>Validate</strong> with stakeholder + ship + learn</td></tr></tbody></table>
+<h1>Part 1 · 教学讲解</h1>
+<h3>1. 5 种 ambiguity 类型先讲清</h3>
+<p>不是所有 ambiguity 一样. 不同类型应对方式完全不同. <strong>会区分</strong>本身就是一个 senior 信号.</p>
+<table class="md-table"><thead><tr><th>Type</th><th>含义</th><th>典型 trigger</th><th>应对原则</th></tr></thead><tbody><tr><td><strong>Goal ambiguity</strong></td><td>客户不知道想要什么</td><td>"我想要 AI" / "make it better"</td><td>用 discovery 帮客户决定</td></tr><tr><td><strong>Technical ambiguity</strong></td><td>多个 viable 架构都能做</td><td>"VectorDB 选 Pinecone 还是 Qdrant?"</td><td>用 trade-off matrix + reversibility</td></tr><tr><td><strong>Data ambiguity</strong></td><td>数据稀疏 / 矛盾 / 噪声</td><td>"我们的 retention 数据有 3 个 source 对不上"</td><td>用 hypothesis-driven exploration</td></tr><tr><td><strong>Organizational ambiguity</strong></td><td>多 stakeholder 优先级冲突</td><td>"Ops 想自动化, Legal 想 audit, Product 要速度"</td><td>用 stakeholder map + escalation</td></tr><tr><td><strong>Outcome / metric ambiguity</strong></td><td>成功标准没定义</td><td>"增加 efficiency"</td><td>用 KPI lock framework</td></tr></tbody></table>
+<p><strong>关键 insight</strong>: 每次面对模糊先 <strong>classify type</strong>, 再选 framework. 这是 SR/Staff 跟 Junior 的区别 — Junior 把所有 ambiguity 当 "需要更多信息".</p>
+<h3>2. 这道题在考你什么 (深入)</h3>
+<h4>表面 vs 深层 signal</h4>
+<p><strong>表面</strong>: 听你讲一个故事, 看叙事是否清晰</p>
+<p><strong>深层</strong> (HM 真正在筛):</p>
+<table class="md-table"><thead><tr><th>信号</th><th>权重</th><th>怎么 demonstrate</th></tr></thead><tbody><tr><td><strong>有 framework 处理 ambiguity</strong></td><td>★★★★★</td><td>不是 case-by-case 反应, 是有 D·D·D·V 这种 reusable 结构</td></tr><tr><td><strong>Reversibility awareness</strong></td><td>★★★★★</td><td>One-way door 跟 two-way door 自动 distinguish</td></tr><tr><td><strong>数据驱动 push back</strong></td><td>★★★★</td><td>不是直觉拒绝, 是用 pilot data 反驳</td></tr><tr><td><strong>Stakeholder collaboration</strong></td><td>★★★★</td><td>不是自己 silo 决定, 是把 ambiguity 拉到 stakeholder 一起 resolve</td></tr><tr><td><strong>故事 specificity + metrics</strong></td><td>★★★★</td><td>"70% throughput, 0% wrong call, 6 weeks" 这种具体数字</td></tr><tr><td><strong>承认错误判断</strong></td><td>★★★</td><td>follow up 时能讲一个真实的 wrong call</td></tr><tr><td><strong>Speed-quality trade-off 自觉</strong></td><td>★★★</td><td>两个都不偏废</td></tr></tbody></table>
+<h3>3. 黄金 framework: D·D·D·V</h3>
+<p><strong>这个 framework 是这道题的核心 takeaway</strong>. 当你说 "I have a framework for ambiguity called D·D·D·V" 时, HM 立刻 update 你的 seniority.</p>
+<table class="md-table"><thead><tr><th>Step</th><th>含义</th><th>关键问题</th></tr></thead><tbody><tr><td><strong>D</strong> — Diagnose</td><td>识别 ambiguity type (上面 5 类)</td><td>"这是哪种 ambiguity?"</td></tr><tr><td><strong>D</strong> — Decompose</td><td>拆分 已知 / 未知 / 假设</td><td>"什么是 fact, 什么是 belief?"</td></tr><tr><td><strong>D</strong> — Decide</td><td>按 reversibility 决策</td><td>"这是 one-way 还是 two-way door?"</td></tr><tr><td><strong>V</strong> — Validate</td><td>用 stakeholder + pilot data 验证</td><td>"我的 decomposition 错了怎么办?"</td></tr></tbody></table>
+<h4>为什么是这个顺序</h4>
+<p><strong>Diagnose first</strong> — 不知道是哪种 ambiguity, 选错 framework 浪费时间.</p>
+<p><strong>Decompose 比 Decide 先</strong> — 没拆分清楚就 decide, 是赌博. 拆开后看到 "其实 80% 已知, 20% 未知" 跟 "其实 30% 已知, 70% 未知" 应对完全不同.</p>
+<p><strong>Decide 用 reversibility</strong> — Bezos 的 Type 1 (one-way) vs Type 2 (two-way) decision 经典 framework. Two-way door 可以 fast + iterate, one-way door 必须 slow + investigate. 这个区分本身是 senior 标志.</p>
+<p><strong>Validate 收尾</strong> — 防止 silo. 你的 decomposition 是 hypothesis, 不是 commandment, 必须跟 stakeholder verify.</p>
+<h3>4. Reversibility 决策框架 (Bezos Door Model + FDE 改造)</h3>
+<p>经典 Bezos:</p>
+<ul><li><strong>Type 1 / One-way door</strong>: 错了改不回来 (e.g., 公司 IPO, 决定退出市场)</li><li><strong>Type 2 / Two-way door</strong>: 错了易撤 (e.g., 试一个新功能, A/B test)</li></ul>
+<p>FDE 改造 (加 2 个 axis):</p>
+<table class="md-table"><thead><tr><th>Axis</th><th>One-way 增强</th><th>Two-way 减弱</th></tr></thead><tbody><tr><td><strong>Reversibility</strong></td><td>错了不能撤</td><td>错了能撤</td></tr><tr><td><strong>Blast radius</strong></td><td>影响多 stakeholder / 多客户</td><td>影响小 / 隔离</td></tr><tr><td><strong>Time to detect</strong></td><td>错了 6 个月后才发现</td><td>错了下周看到</td></tr><tr><td><strong>Recovery cost</strong></td><td>$100k+ / monthly liability</td><td>&lt; 1 week eng time</td></tr></tbody></table>
+<h4>FDE Reversibility Decision Matrix</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                One-way (slow + investigate)
+                        │
+                        │
+   High blast radius    │   Pure one-way: 12 weeks scoping
+                        │
+        ◆ Indonesia tier 3 refund decisions
+        ◆ Production model swap (Llama 2 → 3)
+        ◆ Pricing change to customer
+                        │
+   ─────────────────────┼──────────────────────
+                        │
+        ◇ Add new tier 1 FAQ                ◇ Two-week pilot
+        ◇ Adjust retry logic                ◇ A/B test new prompt
+        ◇ Add observability metric          ◇ Toggle feature flag
+                        │
+   Low blast radius     │   Pure two-way: ship + measure
+                        │
+                        │
+                Two-way (fast + measure)</code></pre>
+<p><strong>FDE 应用</strong>:</p>
+<ul><li>One-way + high blast → invest 8-12 weeks scoping (Indonesia tier 3)</li><li>One-way + low blast → 2-4 weeks scoping (production single-customer change)</li><li>Two-way + high blast → 1-2 weeks pilot then scale (multi-market rollout)</li><li>Two-way + low blast → ship + measure same day (prompt tuning)</li></ul>
+<h3>5. 不同 ambiguity 类型的 角色对照表</h3>
+<table class="md-table"><thead><tr><th>Type</th><th>你的 role</th><th>Stakeholder role</th></tr></thead><tbody><tr><td>Goal ambiguity</td><td>帮客户 articulate (you ask)</td><td>客户 commit (they decide)</td></tr><tr><td>Technical ambiguity</td><td>主导决策 (you decide)</td><td>Stakeholder review (they ratify)</td></tr><tr><td>Data ambiguity</td><td>探索 + 报告 (you investigate)</td><td>Stakeholder consume (they read)</td></tr><tr><td>Organizational ambiguity</td><td>映射 + escalate (you map)</td><td>Exec resolve (they decide)</td></tr><tr><td>Outcome ambiguity</td><td>提议 + benchmark (you propose)</td><td>客户 lock (they sign)</td></tr></tbody></table>
+<p><strong>核心 insight</strong>: 不是所有 ambiguity 都是 "你 decide". Goal / organizational / outcome ambiguity, FDE role 是 <strong>帮客户 / stakeholder decide</strong>, 不是替他们 decide.</p>
+<h3>6. 4 个真实场景演示</h3>
+<h4>场景 A: Goal ambiguity — Indonesia ops 想 "automate refunds"</h4>
+<p><strong>Trigger</strong>: Friday Slack — "we want full automation by next quarter, can you do it?"</p>
+<p><strong>Ambiguity content</strong>:</p>
+<ul><li>什么 refunds (full / partial / dispute)?</li><li>多大 amount limit?</li><li>"Next quarter" 是 8 周还是 13 周?</li><li>Wrong call 谁 accountable?</li><li>8% error rate 接受吗?</li></ul>
+<p><strong>Diagnose</strong>: Goal ambiguity (客户没拆分自己的 ask) + Outcome ambiguity (没 lock 接受的 error rate)</p>
+<p><strong>Action</strong>: 2 周 pilot tier 1+2, 跟 ops 用 data reframe.</p>
+<p><strong>Outcome</strong>: 70% throughput, 0% wrong call, 6 weeks. Tier 3 6 个月后 0 wrong refund.</p>
+<h4>场景 B: Technical ambiguity — Voice agent ASR provider 选择</h4>
+<p><strong>Trigger</strong>: "We need ASR for Pakistan launch in 4 weeks. Which provider?"</p>
+<p><strong>Ambiguity content</strong>:</p>
+<ul><li>Azure / Google / AWS / self-host Whisper 都能 cover Urdu</li><li>价格差 5×, accuracy 差 ~2%, latency 差 ~200ms</li><li>没 single source of truth comparison data</li></ul>
+<p><strong>Diagnose</strong>: Technical ambiguity (多 viable 选项)</p>
+<p><strong>Decompose</strong>:</p>
+<ul><li>已知: 4 weeks deadline, 业务需 &lt; 500ms latency</li><li>未知: 真实 Urdu accuracy (vendor benchmark 不可信)</li><li>假设: 用户口音分布跟 vendor test set 类似</li></ul>
+<p><strong>Decide by reversibility</strong>:</p>
+<ul><li>这是 two-way door (provider 可以换, integration layer 是 abstraction)</li><li>但 high blast radius (生产事故影响整个 Pakistan)</li><li>应对: <strong>3-day quick eval</strong> — 用真实 Pakistan 客户录音 (脱敏) 测 3 个 provider</li><li>结果: Google 在 Urdu 上 +3% accuracy 但 latency 高, Azure latency 好但 accuracy 一般, Whisper 慢但 controllable</li><li><strong>Cascade design</strong> — Azure primary, Google fallback, Whisper local last-resort</li></ul>
+<p><strong>Outcome</strong>: Pakistan launch 按时, ASR 0 incident 第一个月.</p>
+<p><strong>Reflection</strong>: Technical ambiguity 关键不是 "选哪个", 是 "怎么设计架构让 wrong choice 易撤". Cascade fallback 让 provider 选择从 one-way 变 two-way.</p>
+<h4>场景 C: Data ambiguity — BNPL chatbot routing 70% accuracy</h4>
+<p><strong>Trigger</strong>: Launch month 1, routing accuracy 70%, 远低于预期 90%.</p>
+<p><strong>Ambiguity content</strong>:</p>
+<ul><li>Confusion matrix 没看</li><li>60% 错在哪类 intent 不知道</li><li>是模型 capacity 不够 vs prompt 模糊 vs tool description 烂 vs 用户表达不清?</li></ul>
+<p><strong>Diagnose</strong>: Data ambiguity (root cause 不明) — 跟 goal / technical 不一样, 需要 hypothesis-driven exploration</p>
+<p><strong>Decompose</strong> (hypothesis list):</p>
+<ul><li>H1: 模型 capacity 不够 → 需要 fine-tune</li><li>H2: Prompt 模糊 → 重写 prompt</li><li>H3: Tool description 烂 → 用 RAG-based discovery</li><li>H4: 用户表达问题 → 加 disambiguation 提问</li><li>H5: 数据分布偏 → 训练数据 augment</li></ul>
+<p><strong>Action</strong>: 优先 cheap 的 hypothesis. 先看 confusion matrix 数据 (1 天) → 排除 H1 (模型 capacity 够). 看 mis-route 案例 (2 天) → 60% 是 H3 (tool description 模糊). 重写 12 个 tool description + RAG-based discovery.</p>
+<p><strong>Outcome</strong>: 70 → 92% in 6 weeks. <strong>关键</strong>: 没花时间 fine-tune (省 3-4 周).</p>
+<p><strong>Reflection</strong>: Data ambiguity 的处理原则 — <strong>不要从最贵的 hypothesis 开始</strong>. Cheap experiments first. MLE 第一反应是训模型 (贵), FDE 第一反应是看数据 (便宜).</p>
+<h4>场景 D: Organizational ambiguity — BNPL chatbot 的 4 个 stakeholder</h4>
+<p><strong>Trigger</strong>: Product + Compliance + CS + Risk 4 个 stakeholder 各自有诉求.</p>
+<p><strong>Ambiguity content</strong>:</p>
+<ul><li>Product: 越多 chatbot 越好 (UX)</li><li>Compliance: chatbot 不能 promise specific 额度</li><li>CS: 别抢 CS 的 job</li><li>Risk: 不能泄漏信用数据</li></ul>
+<p><strong>Diagnose</strong>: Organizational ambiguity (优先级冲突)</p>
+<p><strong>Decompose</strong> (stakeholder map): | Stakeholder | 真实诉求 | 红线 | 妥协空间 | |---|---|---|---| | Product | UX 好 | 不能慢 &gt; 3s | tier 2/3 可以慢 | | Compliance | 不踩监管线 | 任何具体数字 promise | tier 1 通用 FAQ 可放 | | CS | 不被替代 | 复杂 case 要给 CS | 简单 FAQ 可 chatbot | | Risk | 用户数据不泄漏 | 不能 surface PII | 不含 PII 的 query 可 |</p>
+<p><strong>Decide</strong>: 这是 organizational ambiguity, FDE role 是 <strong>map + escalate</strong>, 不是 unilateral decide. 我做了 tier-based design 让 4 个 stakeholder 各自的红线都不被踩.</p>
+<p><strong>Outcome</strong>:</p>
+<ul><li>Tier 1 (通用 FAQ) — Product + Compliance 都 happy</li><li>Tier 2 (账户信息, 限制 surface) — Risk + Compliance 一起 review schema</li><li>Tier 3 (复杂 case) — CS 接, 反而拿到 high-value case 提升 satisfaction</li></ul>
+<p><strong>Reflection</strong>: Organizational ambiguity 不能 unilateral decide. <strong>FDE 的工作是把 ambiguity 显性化, 帮 stakeholder 一起达成 consensus</strong>. Tier-based design 是工具, 不是答案.</p>
+<h3>7. 几个容易踩的坑</h3>
+<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td>把所有 ambiguity 当一类</td><td>用错 framework, 浪费时间</td></tr><tr><td>2</td><td>没 Diagnose 直接 Decide</td><td>拍脑袋, 经常 wrong</td></tr><tr><td>3</td><td>Decompose 太久 (&gt; 20% 总时长)</td><td>analysis paralysis</td></tr><tr><td>4</td><td>One-way door 当 two-way ship</td><td>灾难性 wrong call</td></tr><tr><td>5</td><td>Two-way door 当 one-way over-scope</td><td>浪费几周</td></tr><tr><td>6</td><td>Solo decide 不 validate</td><td>跟 stakeholder 错位</td></tr><tr><td>7</td><td>"I'll get back to you" 拖延</td><td>信任下降</td></tr><tr><td>8</td><td>Push back 不带 data</td><td>显得 "你不愿意做" 不是 "数据说不该做"</td></tr><tr><td>9</td><td>Discovery 没 timebox</td><td>永远在 discovery</td></tr><tr><td>10</td><td>没 follow up 验证 hypothesis</td><td>decomposition 错了不知道</td></tr></tbody></table>
+<h3>一句话总结 (Part 1)</h3>
+<blockquote><p><strong>Handle ambiguity 不是 "我能 ship 没 spec 的项目", 是 "我能 classify ambiguity 类型, decompose 成已知/未知/假设, 按 reversibility 决策, 用 stakeholder 验证假设"</strong>.</p>
+<p>D·D·D·V framework + reversibility classification + stakeholder validation = senior FDE handling of ambiguity.</p></blockquote>
 <hr />
-<h3>你专属 STAR story（用 Indonesia refund tier）</h3>
-<p><strong>Situation</strong>:</p>
-<blockquote><p>"On the voice agent project, the Indonesia regional ops team asked us to <strong>automate refund decisions</strong> — agent could approve or deny refunds without a human. The ask came as a Friday Slack message: 'we want full automation by next quarter, can you do it?'</p>
-<p>There was huge ambiguity: what kinds of refunds, what amount limits, who's accountable for wrong calls, what's the cost of a wrong call, what does 'next quarter' mean."</p></blockquote>
-<p><strong>Task</strong>:</p>
-<blockquote><p>"I had to either commit to a timeline I couldn't actually verify, or push back without scope information, or <strong>find a way to commit conditionally</strong> with information learned along the way."</p></blockquote>
-<p><strong>Action</strong>:</p>
-<blockquote><p>"I did 3 things:</p>
-<p><strong>1. Diagnose</strong> the ambiguity. This was 'decision-required without enough info' — not 'unknown unknown'. The right move was <strong>structured discovery, not pause</strong>.</p>
-<p><strong>2. Decompose</strong>: I broke 'automate refunds' into 3 tiers:</p>
-<ul><li>Tier 1: info lookup (look up policy, balance — agent says read-only facts)</li><li>Tier 2: structured tasks (calculate fees, look up case status)</li><li>Tier 3: refund decisions (approve / deny — the real ask)</li></ul>
-<p>Each tier has different <strong>risk profile</strong> and <strong>decision reversibility</strong>.</p>
-<p><strong>3. Decide by reversibility</strong>:</p>
-<ul><li>Tier 1: <strong>two-way door</strong> (wrong info bot says easy to correct, low cost). Ship in 2 weeks, measure.</li><li>Tier 2: <strong>mostly two-way</strong> (some financial calc, but human reviews). Ship in 4 weeks.</li><li>Tier 3: <strong>one-way door</strong> (wrong refund = direct financial loss, customer trust impact, regulatory). Need 12+ weeks investigation before committing.</li></ul>
-<p><strong>4. Validate</strong>: I went back to ops team with 'here are 3 things I can commit to and timelines, here's why tier 3 needs more time'. They initially pushed for full tier 3 in 8 weeks. <strong>I ran a 2-week pilot showing tier 1 + 2 covered 70% of volume at 0% wrong-call rate, vs full automation projected at 8% wrong-call rate</strong>.</p>
-<p>Data made the call obvious. We shipped tier 1+2 first."</p></blockquote>
-<p><strong>Result</strong>:</p>
-<blockquote><p>"Ops got 70% of throughput at 0% risk in 6 weeks. Tier 3 came online 6 months later <strong>after we had policy + monitoring + human-in-loop infrastructure</strong>. <strong>Zero wrong refunds in production for tier 3 in first 90 days</strong>.</p>
-<p>What I learned: <strong>scope ambiguity is rarely about timeline — it's about the asker not having decomposed the problem yet</strong>. When you decompose for them with reversibility analysis, they often realize their own ask was too broad. Then they thank you."</p></blockquote>
-<p>⏱️ ~3 min spoken. HM can ask deep follow-ups for another 10 min.</p>
+<h1>Part 2 · 5 个深度子问题</h1>
+<h3>⚙️ Problem 1: Goal Ambiguity — 客户不知道想要什么</h3>
+<h4>1.1 这种 ambiguity 长什么样</h4>
+<p>典型表达 (注意捕捉):</p>
+<ul><li>"We want AI."</li><li>"Make it better."</li><li>"Automate this."</li><li>"Reduce cost."</li><li>"Use GPT for our customer support."</li></ul>
+<p>特征:</p>
+<ul><li>抽象 verb (better / more / less)</li><li>没有 specific metric</li><li>没说 baseline</li><li>没说 budget / timeline / constraint</li></ul>
+<h4>1.2 Discovery framework (FDE 帮客户拆 goal)</h4>
+<p>不是问 "你想要什么" — 这会 trigger 客户 defensive ("你 vendor 怎么不知道?"). 是 <strong>帮客户 articulate</strong>.</p>
+<p><strong>5-question discovery sequence</strong>:</p>
+<ol><li><strong>What's the ONE metric</strong> that would tell you in 6 months 'this worked'?</li></ol>
+<blockquote><p>Sample dialog: 客户: "We want AI to improve customer support." 你: "如果 6 个月后我们 review 这个项目, 一个 metric 能告诉你 'this worked', 你会看什么 number?" 客户: "Hmm... ticket resolution time?" 你: "OK, 'ticket resolution time'. 目前平均多少?" 客户: "我 actually 不知道, 我得问 CS team." 你: "Great. 这就是 step 1 — 我们 lock 这个 metric 作为 success criteria, 现 baseline 我们 next week 一起确认."</p></blockquote>
+<ol><li><strong>What's the current baseline</strong> without our system?</li></ol>
+<blockquote><p>关键: 客户经常不知道 baseline. 这是 discovery 第一个 actionable next step.</p></blockquote>
+<ol><li><strong>Who's the loser</strong> if we succeed?</li></ol>
+<blockquote><p>Sample dialog: 客户: "我们要 AI 自动化客服." 你: "如果 chatbot 自动化 80% inbound query, 谁的 job description 会变?" 客户: "CS team 的人会处理 less ticket, 但也可能 reorg 到更难的 case..." 你: "OK, 这是 organizational impact. 我们 design 的时候要把 CS team 拉进来, 不然他们会 silently sabotage 项目."</p></blockquote>
+<ol><li><strong>What's an outcome</strong> that would make us look stupid (instead of successful)?</li></ol>
+<blockquote><p>Sample dialog: 你: "想象 6 个月后, 项目上线了, 但 outcome 是 disastrous. 最可能的 disaster scenario 是什么?" 客户: "Chatbot 给错信息, customer 投诉到 social media." 你: "Got it. 这告诉我 'accuracy + reversibility' 比 'speed' 重要. 我们 design 一个 tier 系统, tier 3 让 human 兜底."</p></blockquote>
+<ol><li><strong>What does week-1 look like?</strong></li></ol>
+<blockquote><p>Sample dialog: 你: "如果项目 launch week 1, 你看 dashboard 上想看到什么?" 客户: "Volume served by chatbot? Customer satisfaction?" 你: "OK. 这两个 metric 我们 week 1 一定 instrument. 那 week 1 的 'pass' threshold 是多少?" 客户: "至少 50% volume served, satisfaction &gt; baseline." 你: "Locked. 这是我们 launch criteria."</p></blockquote>
+<h4>1.3 Goal ambiguity 的 STAR (Indonesia tier 3 refund)</h4>
+<p><strong>S</strong>: Indonesia ops "我们想 automate refund, 下季度 done"</p>
+<p><strong>T</strong>: 把 abstract "automate refund" 拆成可 commit 的 specific scope</p>
+<p><strong>A</strong>:</p>
+<ol><li>Discovery — "What's the ONE metric?" → wrong-call rate</li><li>Discovery — "Baseline?" → 当前 manual 0.3% wrong-call</li><li>Discovery — "Loser?" → CS team 怕被替代; ops 要保留 oversight</li><li>Discovery — "Disaster?" → wrong refund 导致 customer 投诉到 OJK (监管机构)</li><li>Discovery — "Week 1 success?" → tier 1+2 throughput, 不 touch tier 3</li><li>Decompose → tier 1/2/3, 不同 reversibility</li><li>Pilot 2 weeks → tier 1+2 = 70% volume, 0% wrong, vs tier 3 projected 8% wrong</li><li>Reframe → "give you right answer faster, not wrong on time"</li></ol>
+<p><strong>R</strong>: 6 weeks tier 1+2 上线, 70% throughput at 0% risk. Tier 3 6 个月后, 90 day 0 wrong refund.</p>
+<p><strong>Key takeaway</strong>: Goal ambiguity 不是 "客户 lazy 不告诉我", 是 <strong>客户自己没拆开 think</strong>. FDE 工作是帮他们 articulate.</p>
+<h4>1.4 Push-back dialog</h4>
+<p>如果客户拒绝 discovery, 想直接 ship:</p>
+<blockquote><p>客户: "Don't ask so many questions, just build it." 你: "Fair. 我可以 sketch 一个 strawman design in 10 minutes, 但我想 flag <strong>3 assumptions</strong> I'm making. 如果任一 assumption 错, design 就 invalid.</p>
+<p>Assumption 1: success metric 是 ticket resolution time Assumption 2: 接受 &lt; 1% wrong-answer rate Assumption 3: 必须 integrate with ServiceNow (而不是 self-hosted)</p>
+<p>你想我先 sketch, 还是先 confirm 这 3 个?"</p></blockquote>
+<p>90% 情况客户会 say "先 confirm 这 3 个".</p>
 <hr />
-<h3>5 个 "what to NOT say"</h3>
-<p>❌ "I just ship and iterate" → no thoughtfulness, scares hiring manager ❌ "I align with my manager and ask them to decide" → no judgment ❌ "I do a lot of research first" → if literal, can mean analysis paralysis ❌ "It depends" without follow-through → wishy-washy ❌ Generic story without metrics → not memorable</p>
+<h3>⚙️ Problem 2: Technical Ambiguity — 多个 viable 架构</h3>
+<h4>2.1 这种 ambiguity 长什么样</h4>
+<ul><li>"VectorDB 选 Pinecone 还是 Qdrant 还是 pgvector?"</li><li>"Streaming 用 Kafka 还是 Pulsar?"</li><li>"Voice agent ASR 选 Azure 还是 Google?"</li><li>"Agent orchestration 用 LangGraph 还是自研?"</li></ul>
+<p>特征:</p>
+<ul><li>N 个 viable options</li><li>每个 option 都能 work</li><li>Trade-off 真实但不致命</li><li>决策 reversibility 不一致</li></ul>
+<h4>2.2 Trade-off matrix framework</h4>
+<p><strong>Step 1</strong>: 列出 options (2-5 个, 多了无意义) <strong>Step 2</strong>: 列出 axes (5-7 个 dimension) <strong>Step 3</strong>: 给每个 axis weight (重要性) <strong>Step 4</strong>: 评分每个 (option, axis) cell <strong>Step 5</strong>: 计算 weighted score <strong>Step 6</strong>: 检查最高分是否 robust (敏感度分析)</p>
+<h4>2.3 例子: Voice agent ASR provider (Pakistan launch)</h4>
+<table class="md-table"><thead><tr><th>Axis</th><th>Weight</th><th>Azure</th><th>Google</th><th>AWS</th><th>Whisper local</th></tr></thead><tbody><tr><td>Urdu accuracy</td><td>30%</td><td>92</td><td>95</td><td>88</td><td>91</td></tr><tr><td>Latency (ms)</td><td>25%</td><td>250</td><td>400</td><td>280</td><td>600</td></tr><tr><td>Cost ($/min)</td><td>15%</td><td>0.016</td><td>0.024</td><td>0.018</td><td>0.005</td></tr><tr><td>Reliability (uptime)</td><td>15%</td><td>99.9</td><td>99.95</td><td>99.9</td><td>99.5</td></tr><tr><td>Lock-in risk</td><td>10%</td><td>medium</td><td>medium</td><td>medium</td><td>low</td></tr><tr><td>Integration time</td><td>5%</td><td>1d</td><td>1d</td><td>2d</td><td>1w</td></tr><tr><td><strong>Weighted score</strong></td><td></td><td><strong>3.7</strong></td><td><strong>3.9</strong></td><td><strong>3.5</strong></td><td><strong>3.2</strong></td></tr></tbody></table>
+<p>Google 微胜. 但敏感度分析: 如果 latency weight 从 25% 提到 35% (业务 strict 要求 &lt; 500ms), Azure 反超.</p>
+<p><strong>Decision</strong>: 不 single-pick, <strong>cascade</strong>: Azure primary, Google fallback, Whisper local last-resort. 把 trade-off 从 single choice 变 architectural design.</p>
+<h4>2.4 Reversibility check</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Decision: ASR provider 选哪个
+- One-way 吗? No — provider 可换 (有 abstraction layer)
+- Blast radius? High — production 用户调用
+- Time to detect? Day 1 (latency / accuracy 立刻看)
+- Recovery cost? 1 week eng to swap provider
+
+→ Two-way door + high blast → 1-2 weeks pilot, then commit
+→ 加 cascade design 把 single provider risk 进一步降低</code></pre>
+<h4>2.5 Technical ambiguity 的 STAR (BNPL agent orchestration)</h4>
+<p><strong>S</strong>: BNPL chatbot 要做 agentic orchestration. 选项: LangChain / LangGraph / Semantic Kernel / 自研.</p>
+<p><strong>T</strong>: 在 4 周内 ship MVP, 选一个 framework.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Decompose</strong>: 已知 (4 周 deadline, 10 个 tool, 支持 multi-turn). 未知 (framework 稳定性, 中文 documentation). 假设 (我们的 use case 不需要 framework 自带的复杂 graph orchestration).</li><li><strong>Trade-off matrix</strong>:</li></ol>
+<ul><li>LangChain: 生态广, 但当时 stability 差, 频繁 breaking change</li><li>LangGraph: 表达力强, 但 learning curve</li><li>Semantic Kernel: 微软栈, 与 Azure 集成好</li><li>自研: 灵活, 但 4 周不够</li></ul>
+<ol><li><strong>Reversibility check</strong>: 框架可换 (我们写 thin wrapper), 但 4 周 deadline 严</li><li><strong>Decide</strong>: 自研 minimal orchestration (workflow / tool / memory 三层), 后续可替换为成熟框架</li></ol>
+<p><strong>R</strong>: 4 周 MVP 上线, 92% routing accuracy. 6 个月后这个 minimal orchestration 成为内部 Agent Platform 雏形.</p>
+<p><strong>Reflection</strong>: Technical ambiguity 没有 "best choice", 只有 "given constraints, best choice". 选了之后立刻设计 abstraction 让 reversibility 提高.</p>
+<h4>2.6 Push-back dialog (技术决策被质疑)</h4>
+<blockquote><p>Tech lead: "为什么自研而不是 LangChain?" 你: "三个原因.</p>
+<p>One: LangChain 当时 (2024) 频繁 breaking change. 我们 4 周 deadline 不能花 1 周追新版本.</p>
+<p>Two: 我们的 use case 简单 (10 tool, 单 turn, 没 graph) — LangChain 90% 功能我们用不到, 带来 overhead.</p>
+<p>Three: 我们写 thin wrapper, 后续如果生态稳定可以替换. Reversibility 保留.</p>
+<p>但你的 concern 我接受 — 如果 use case 复杂化, 比如要 graph orchestration, 我们 6 个月内会 reevaluate. 我们设 quarterly check-in 看是否换."</p></blockquote>
 <hr />
-<h3>5 个 "do say" formulas</h3>
-<p>✅ <strong>"I diagnose what kind of ambiguity it is"</strong> → process signal ✅ <strong>"I decompose into known / unknown / assumption"</strong> → clarity ✅ <strong>"For reversible decisions, I ship fast and measure"</strong> → bias to action ✅ <strong>"For irreversible decisions, I invest in investigation"</strong> → judgment ✅ <strong>"I validate with the stakeholder before final commit"</strong> → collaboration</p>
+<h3>⚙️ Problem 3: Data Ambiguity — 稀疏 / 矛盾 / 噪声</h3>
+<h4>3.1 这种 ambiguity 长什么样</h4>
+<ul><li>"Routing accuracy 70%, 不知道为什么"</li><li>"Conversion rate 三个 dashboard 数字不一样"</li><li>"用户投诉激增, 但 metric 没变化"</li><li>"Pilot 数据看上去 promising, 但 sample 太小"</li></ul>
+<p>特征:</p>
+<ul><li>数据有但模糊 / 矛盾 / 不够</li><li>用 intuition 选 hypothesis 风险大</li><li>需要 systematic exploration</li></ul>
+<h4>3.2 Hypothesis-driven exploration framework</h4>
+<p><strong>Step 1</strong>: List all hypotheses (5-10 个), include "boring" ones <strong>Step 2</strong>: For each hypothesis, list cost-to-verify <strong>Step 3</strong>: Sort by cost ascending, run cheapest first <strong>Step 4</strong>: 每个 experiment 设 success/fail criteria 前置 <strong>Step 5</strong>: Stop when explanation found, document</p>
+<p><strong>关键 trap</strong>: 不要从最贵 hypothesis 开始. MLE 第一反应是 "训模型", 经常是最贵 hypothesis. 应该 cheap 的先排除.</p>
+<h4>3.3 例子: BNPL routing 70% accuracy 诊断</h4>
+<p><strong>Hypotheses + cost</strong>:</p>
+<table class="md-table"><thead><tr><th>H</th><th>Hypothesis</th><th>Cost to verify</th></tr></thead><tbody><tr><td>H1</td><td>模型 capacity 不够</td><td>High (fine-tune 1 周)</td></tr><tr><td>H2</td><td>Prompt 模糊</td><td>Low (1 天 read + manual rewrite)</td></tr><tr><td>H3</td><td>Tool description 模糊</td><td>Low (1 天 read confusion matrix)</td></tr><tr><td>H4</td><td>用户表达不清</td><td>Low (1 天 sample real query)</td></tr><tr><td>H5</td><td>数据分布偏</td><td>Med (3 天 distribution analysis)</td></tr><tr><td>H6</td><td>Embedding model 不够好</td><td>Med (2 天 swap embedding)</td></tr><tr><td>H7</td><td>Routing 阈值 wrong</td><td>Low (半天 tune threshold)</td></tr></tbody></table>
+<p><strong>Run order</strong>: H7 → H3 → H2 → H4 → H6 → H5 → H1</p>
+<p><strong>Reality</strong>: H3 在 day 2 confirmed (60% mis-route 是 tool description 模糊). H1 (fine-tune) never needed.</p>
+<p><strong>Saved</strong>: 3-4 weeks of unnecessary fine-tuning.</p>
+<h4>3.4 Data ambiguity 的 STAR (Voice agent ASR 准确率诊断)</h4>
+<p><strong>S</strong>: Voice agent 在巴西上线第二周, ASR 准确率从 95% (test data) 掉到 87% (production).</p>
+<p><strong>T</strong>: 找 root cause, fix within 1 week.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Hypotheses</strong> + <strong>cost</strong>:</li></ol>
+<ul><li>H1: Vendor 服务降级 (low cost, 1h - 检查 vendor status)</li><li>H2: 客户口音分布与 test set 不同 (med cost, 1 day - 分析 audio sample)</li><li>H3: 网络延迟导致 audio frame drop (low cost, 2h - 检查 streaming)</li><li>H4: 客户使用环境噪音大 (med cost, 1 day - manual listen)</li><li>H5: ASR model 在某 dialect 表现差 (high cost, 1 week - per-dialect eval)</li></ul>
+<ol><li><strong>Run</strong>:</li></ol>
+<ul><li>H1 1h → ruled out, vendor normal</li><li>H3 2h → ruled out, no frame drop</li><li>H4 1 day → partially confirmed, 60% calls have moderate background noise</li><li>H2 1 day → confirmed, 巴西北部口音占比 30% (vs test set 5%)</li></ul>
+<ol><li><strong>Fix</strong>: 加 audio preprocessing (noise reduction) + 针对北部口音 fine-tune 一个 lightweight adapter</li></ol>
+<p><strong>R</strong>: 87% → 93% in 1 week. Test set 重新 sample 包含北部口音.</p>
+<p><strong>Reflection</strong>: Data ambiguity 的核心是 <strong>不要 jump to conclusion</strong>. 列出所有 hypothesis, 按 cost 排序, 系统排除. ConvFinQA 项目教会我这个 — 用 ablation 替代直觉.</p>
+<h4>3.5 Push-back dialog (急于结论)</h4>
+<blockquote><p>Manager: "Just retrain the model, accuracy 一定能上去." 你: "Retrain 1 周成本. 我能不能先用 1 天看 confusion matrix? 如果 root cause 在 data side (e.g., tool description 模糊), retrain 也救不了. 如果 1 天后 confirm 是 model capacity, 我立刻 retrain."</p></blockquote>
+<p>90% 情况, 1 天 cheap exploration 能避免 1 周贵的 retrain.</p>
 <hr />
-<h3>简历专属 reframe</h3>
-<p>Indonesia refund tier story 是 <strong>黄金叙事</strong> for this question. 但你可以扩展：</p>
-<table class="md-table"><thead><tr><th>Question variant</th><th>Best story</th></tr></thead><tbody><tr><td>"Handle ambiguity"</td><td>Indonesia refund tier (decompose + reversibility)</td></tr><tr><td>"Make decision without info"</td><td>Voice agent multi-region rollout (phased + measured)</td></tr><tr><td>"Push back on stakeholder"</td><td>Same — refund tier</td></tr><tr><td>"Bias to action vs caution"</td><td>ConvFinQA — bias to ship, measured, found negative result, <strong>published it honestly</strong></td></tr></tbody></table>
+<h3>⚙️ Problem 4: Organizational Ambiguity — 多 stakeholder 冲突</h3>
+<h4>4.1 这种 ambiguity 长什么样</h4>
+<ul><li>"Ops 想自动化, Legal 要 audit trail, Product 要速度"</li><li>"Sponsor 是 Product VP, 但 IT 才能批 deployment"</li><li>"几个 team 各自 sponsor 一部分, 没人 own end-to-end"</li><li>"Customer 说一件事, 实际 user 说另一件"</li></ul>
+<p>特征:</p>
+<ul><li>多人各自 valid 诉求</li><li>没有 single decision maker</li><li>优先级冲突</li><li>不是技术问题, 是 organizational</li></ul>
+<h4>4.2 Stakeholder map framework</h4>
+<p><strong>5 column</strong>: | Stakeholder | 真实诉求 | 红线 (不能踩) | 妥协空间 | Veto power? | |---|---|---|---|---| | ... | ... | ... | ... | ... |</p>
+<p><strong>关键问题</strong>:</p>
+<ol><li>Who's the decision maker?</li><li>Who funds it?</li><li>Who blocks deployment?</li><li>Who uses it?</li><li>Who's the loser if it succeeds?</li></ol>
+<p>经常: decision maker ≠ funder ≠ blocker ≠ user ≠ loser. 5 个 hat 5 个人.</p>
+<h4>4.3 例子: BNPL chatbot 的 4 stakeholder</h4>
+<table class="md-table"><thead><tr><th>Stakeholder</th><th>真实诉求</th><th>红线</th><th>妥协空间</th><th>Veto?</th></tr></thead><tbody><tr><td>Product VP</td><td>UX 好, 上线快</td><td>不能 break user flow</td><td>可接受 phase rollout</td><td>部分</td></tr><tr><td>Compliance</td><td>不踩监管</td><td>任何具体 promise (额度/利率)</td><td>tier 1 FAQ 可放</td><td><strong>是</strong></td></tr><tr><td>CS Manager</td><td>CS team 不被替代</td><td>复杂 case 必给 CS</td><td>简单 FAQ 可 chatbot</td><td>部分</td></tr><tr><td>Risk</td><td>不泄漏 PII</td><td>不能 surface 用户信用数据</td><td>不含 PII 可</td><td><strong>是</strong></td></tr></tbody></table>
+<p><strong>Conflict</strong>:</p>
+<ul><li>Product 要快, Compliance 要 careful</li><li>CS 要保留, Product 要自动化最大化</li><li>Risk 要严, Product 要 surface 多</li></ul>
+<p><strong>Resolution</strong>:</p>
+<ul><li><strong>Tier-based design</strong> — 把 ambiguity 显性化, 让每个 stakeholder 在自己 tier 红线内决定</li><li>Tier 1 (通用 FAQ, no PII, no promise) — Compliance + Risk 都批</li><li>Tier 2 (账户信息 limited) — Risk + Compliance 一起 review schema</li><li>Tier 3 (复杂 case) — 转 CS, CS 保留 + 拿到更难 case</li></ul>
+<h4>4.4 Escalation framework</h4>
+<p>当 stakeholder 冲突无法在你 layer resolve, <strong>不要硬撑</strong>. Escalate to 共同 owner.</p>
+<p><strong>Escalation script</strong>:</p>
+<blockquote><p>"Hey [manager], I've talked to Product (wants speed) + Compliance (wants careful review) + CS (wants to keep human role). 三方 valid 诉求, 我 layer 无法 fully reconcile. 我提议 tier-based 方案, 但需要 [you / exec] 来确认 priority. 我下周三 10am 跟 3 方一起 review, 你能否参与做最终 call?"</p></blockquote>
+<p><strong>关键</strong>: escalate 时带 proposal + invite 决策, 不是 dump 问题.</p>
+<h4>4.5 Organizational ambiguity 的 STAR (Voice agent 多市场 stakeholder)</h4>
+<p><strong>S</strong>: Voice agent 扩展到 6 个市场, 每个市场 ops / product / compliance 各 1 个 stakeholder = 18 stakeholders.</p>
+<p><strong>T</strong>: 设计架构 + scope 让 18 个 stakeholder 都 align.</p>
+<p><strong>A</strong>:</p>
+<ol><li>Per-market stakeholder map (18 行)</li><li>找共性 — LLM backbone, ASR pipeline, RAG framework 是 shared</li><li>找差异 — persona, TTS voice, escalation rules, compliance prompt 是 per-market</li><li><strong>Workshop</strong>: 每市场 1 day kickoff, 3 个 stakeholder 同时 in room, 当场决定 per-market layer</li><li><strong>Decision log</strong>: 每个市场的决定 written down, sign-off</li></ol>
+<p><strong>R</strong>: 6 个月内 6 个市场上线, 0 个市场上线后大改架构. <strong>关键</strong>: 上线前 align 比上线后 fix 快 10×.</p>
+<p><strong>Reflection</strong>: Organizational ambiguity 的最大错误是 <strong>silo build, late align</strong>. 反过来 — <strong>early align, then build</strong> — 慢一点 start, 但 finish 快很多.</p>
+<h4>4.6 Push-back dialog (stakeholder 让步)</h4>
+<blockquote><p>你 to Product VP: "I hear you want to launch in 8 weeks. Compliance 需要 12 weeks for review. 选项: A) 12 weeks 完整 launch B) 8 weeks 只 launch tier 1 (Compliance can pre-approve tier 1 in 4 weeks) C) 8 weeks pilot 100 user, full launch 14 weeks</p>
+<p>我建议 B — 8 weeks tier 1 是 60% volume, 你的 KPI 第一阶段满足. Tier 2/3 在 12-14 周 follow up."</p></blockquote>
+<p><strong>给 option, 不 dump 问题</strong>. Stakeholder 通常感谢 trade-off framing.</p>
 <hr />
-<h3>5 follow-ups (recruiter / HM 会追问)</h3>
-<p><strong>Q1</strong>: "What if your decomposition is wrong — turn out tier 3 actually fine to automate quickly?" <strong>A</strong>: "Then I learn and reshape. The 2-week pilot was specifically designed to <strong>stress-test my assumption</strong>. If pilot showed 0% wrong-call on tier 3 difficult cases, I'd accelerate. <strong>Decomposition is a hypothesis, not a commandment</strong> — the eval is the truth."</p>
-<p><strong>Q2</strong>: "What if the ops team got angry at the pushback?" <strong>A</strong>: "They were initially frustrated — 'we asked for 8 weeks, why 12 weeks for tier 3'. The reframe that worked: <strong>'I want to give you the right answer faster, not the wrong answer on time'</strong>. Showed them the cost-of-wrong-call analysis (estimated 8% wrong rate × $X per refund = $Y monthly liability). Numbers diffused the emotional ask."</p>
-<p><strong>Q3</strong>: "How do you know when 'decompose more' becomes procrastination?" <strong>A</strong>: "Pragmatic rule: <strong>decomposition that takes longer than 10% of the implementation timeline is over-decomposition</strong>. For a 12-week project, &gt; 1 week of scoping is procrastination. <strong>At some point, ship a small piece and learn from data</strong>. I'd rather over-decompose by 1 day than under-ship for 4 weeks."</p>
-<p><strong>Q4</strong>: "Have you ever made a wrong call under ambiguity?" <strong>A</strong>: Have a real one ready:</p>
-<blockquote><p>"Yes. On the voice agent, I initially scoped the multi-region rollout as 'translate prompts per language, ship'. Turns out <strong>debt-collection cultural norms differ wildly</strong> — what's polite in Thailand is rude in Korea. We had to redo the persona + escalation logic per market. <strong>Cost: 4 extra weeks</strong>. <strong>Lesson: 'localization' for AI means more than translation; I now scope cultural review as part of multi-market projects</strong>."</p></blockquote>
-<p><strong>Q5</strong>: "How do you balance speed and quality under ambiguity?" <strong>A</strong>: "By <strong>reversibility classification</strong>: two-way doors → speed. One-way doors → quality. I explicitly tag every decision when scoping. <strong>Most decisions are two-way and can be reversed cheaply</strong> — over-optimizing for quality on those is waste."</p>
+<h3>⚙️ Problem 5: Outcome / Metric Ambiguity — 成功标准没定义</h3>
+<h4>5.1 这种 ambiguity 长什么样</h4>
+<ul><li>"Increase efficiency"</li><li>"Improve customer experience"</li><li>"Reduce cost"</li><li>"Make it better"</li><li>"Be like ChatGPT but for our business"</li></ul>
+<p>特征:</p>
+<ul><li>没 specific metric</li><li>没 baseline</li><li>没 threshold</li><li>没 measurement plan</li></ul>
+<h4>5.2 KPI Lock framework</h4>
+<p><strong>4 step</strong>:</p>
+<ol><li><strong>Convert vague to specific</strong>: "Efficiency" → "Tickets per hour" or "Cost per ticket" or "First-call resolution rate"?</li><li><strong>Establish baseline</strong>: 当前 number 是多少?</li><li><strong>Set threshold</strong>: 多少算 success? "10% improvement", "20% improvement", "match human"?</li><li><strong>Define measurement</strong>: 怎么 measure? 谁 collect? 多频?</li></ol>
+<h4>5.3 Reference-point framing</h4>
+<p>如果客户答 "I don't know", 给 reference:</p>
+<blockquote><p>"Let me give you 3 reference points so you can decide:</p>
+<p>(a) <strong>Consumer search engine</strong> — wrong result annoying, retry free. Acceptable error 5-10%. (b) <strong>Credit decision</strong> — wrong call has financial + regulatory impact. Acceptable error &lt; 1%. (c) <strong>Medical diagnosis</strong> — wrong call life-threatening. Acceptable error &lt; 0.01%.</p>
+<p>你的 use case 落在 spectrum 哪里?"</p></blockquote>
+<p>客户通常能 anchor 到某点, 然后 lock metric.</p>
+<h4>5.4 例子: BNPL chatbot KPI lock</h4>
+<p><strong>初始</strong>: "Improve customer support."</p>
+<p><strong>Discovery</strong>:</p>
+<ul><li>Specific? → "Reduce ticket resolution time" or "Increase deflection rate"? 客户选 deflection rate.</li><li>Baseline? → 当前 0% (无 chatbot). 客户原目标 50%.</li><li>Threshold? → 客户答 "as high as possible". 反问 "如果 50% 就 done, 60% 是 stretch, 70% 是 stretch goal?" 客户接受.</li><li>Measurement? → Daily dashboard, 周三 weekly review.</li></ul>
+<p><strong>Lock</strong>: 50% deflection in 3 months as success, 60% as stretch, 70% as stretch goal. Measured daily, reviewed weekly.</p>
+<p><strong>Result</strong>: 上线 3 个月达到 65% (between target and stretch). 双方 happy.</p>
+<h4>5.5 Outcome ambiguity 的 STAR (Internal Agent Platform metric lock)</h4>
+<p><strong>S</strong>: 做 Internal Agent Platform, leadership 问 "platform 算 success 的标准是什么?"</p>
+<p><strong>T</strong>: 把 vague "make agents easier" 锁成 measurable.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Reference points</strong>:</li></ol>
+<ul><li>Internal infra usually measured by # of teams adopting</li><li>Or by build cost reduction</li><li>Or by quality of agents built</li></ul>
+<ol><li><strong>Stakeholder workshop</strong> (leadership + 5 种子 team lead)</li><li><strong>Lock</strong>: 6 个月内 5 → 10 teams onboard, build time per agent 50% reduce, 0 P0 incident</li><li><strong>Measurement plan</strong>: monthly adoption review, per-team survey on build time, on-call rotation tracking incident</li></ol>
+<p><strong>R</strong>: 6 个月 5 → 14 teams (140% of target), avg build time -65%, 0 P0. Stretch goals 都过.</p>
+<p><strong>Reflection</strong>: Outcome ambiguity 是 FDE 工作最常见. 把 vague 锁成 measurable 是 FDE core skill. 没 lock 的 outcome = 6 个月后双方对 "成功" 定义不一致 = 失败.</p>
+<h4>5.6 Push-back dialog (客户拒绝 lock metric)</h4>
+<blockquote><p>客户: "I don't want to commit to a specific number. Just do your best." 你: "I hear you. But 'best' 不可 measurable, 6 个月后我们无法 evaluate 是否成功. 我提议这样:</p>
+<p>我提一个 number based on industry benchmark, 你 push back. 比如 50% deflection rate in 3 months. 你觉得 ambitious / conservative / 完全不对?</p>
+<p>如果 ambitious → 我调整 architecture more aggressive 如果 conservative → 我们 lock 60% 如果不对 → 你 propose 一个 alternative metric</p>
+<p>Lock metric 不是 contract, 是 alignment tool. 我们 quarterly review 可以 update."</p></blockquote>
+<p>90% 情况, 客户能 react 到一个 strawman number 比 "from scratch propose" 容易很多.</p>
 <hr />
-<h3>❌ 易错点</h3>
-<ol><li><strong>No structured framework</strong> — just narrative</li><li><strong>Pure speed/pure caution</strong> — no nuance</li><li><strong>Story without metrics</strong> (70% / 0% / 6 weeks)</li><li><strong>Blame stakeholder</strong> for ambiguity</li><li><strong>Solo decision</strong> without stakeholder validation</li><li><strong>Generic story</strong> — sounds rehearsed</li><li><strong>Doesn't tie to what FDE does</strong> (deployment ambiguity)</li></ol>
+<h1>Part 3 · 串起来看</h1>
+<p>这 5 种 ambiguity 是 FDE 工作的 5 个不同维度:</p>
+<ol><li><strong>Goal ambiguity</strong> — "客户不知道要啥" — 用 discovery 帮客户拆</li><li><strong>Technical ambiguity</strong> — "多个架构都行" — 用 trade-off matrix + reversibility</li><li><strong>Data ambiguity</strong> — "数据不清" — 用 hypothesis-driven 系统排除</li><li><strong>Organizational ambiguity</strong> — "stakeholder 冲突" — 用 stakeholder map + escalate</li><li><strong>Outcome ambiguity</strong> — "成功没定义" — 用 KPI lock + reference points</li></ol>
+<p><strong>核心 mental model</strong>: 每次面对 ambiguity 先 <strong>classify type</strong>, 再选 framework. 不要把所有 ambiguity 当一类处理.</p>
 <hr />
-<h3>✅ 加分项</h3>
-<ol><li><strong>D·D·D·V framework</strong> explicit</li><li><strong>Reversibility classification</strong> (one-way vs two-way doors)</li><li><strong>"Decomposition is hypothesis" awareness</strong></li><li><strong>Specific metrics in story</strong> (70% / 0% / 8 weeks)</li><li><strong>Acknowledge wrong call you made</strong> in follow-up</li><li><strong>Tie to FDE day-to-day</strong> (customer deployment ambiguity is universal)</li><li><strong>Quote business-language framing</strong> ("right answer faster vs wrong answer on time")</li></ol>
+<h3>必问 clarifying questions</h3>
+<p>如果 HM 给一个具体场景问 "你会怎么 handle", 你可以反问 clarifying:</p>
+<p><strong>1. 哪种 ambiguity?</strong></p>
+<blockquote><p>"你描述的场景里, ambiguity 是关于 [goal / technical / data / org / outcome], 还是几种混合?"</p></blockquote>
+<p><strong>2. Reversibility</strong></p>
+<blockquote><p>"这是 one-way 还是 two-way door? 我的 framework 不一样."</p></blockquote>
+<p><strong>3. Stakeholder count</strong></p>
+<blockquote><p>"牵涉几个 stakeholder? 有没有 single decision maker?"</p></blockquote>
+<p><strong>4. Timeline pressure</strong></p>
+<blockquote><p>"Timeline 是 days / weeks / months? 短 timeline 我 prioritize ship-and-measure, 长 timeline 我 invest 更多 discovery."</p></blockquote>
+<p><strong>5. Blast radius</strong></p>
+<blockquote><p>"Wrong call 的 blast radius? 单一客户 vs 多客户 vs 公司层面? 影响 scoping 投入."</p></blockquote>
 <hr />
-<h3>Cheat Sheet</h3>
+<h3>5 步框架 (回答这道题的 60 秒结构 + STAR)</h3>
+<table class="md-table"><thead><tr><th>段</th><th>时长</th><th>内容</th></tr></thead><tbody><tr><td>Setup</td><td>15s</td><td>"FDE 工作 90% 在 ambiguity 里, 我有 D·D·D·V framework"</td></tr><tr><td>Framework</td><td>20s</td><td>Diagnose type / Decompose / Decide by reversibility / Validate</td></tr><tr><td>Story setup</td><td>30s</td><td>"举一个 example — Indonesia tier 3 refund"</td></tr><tr><td>Story action</td><td>60s</td><td>详细讲 4 个 D + 数据</td></tr><tr><td>Story result</td><td>20s</td><td>70% throughput, 0% risk, 6 weeks</td></tr><tr><td>Takeaway</td><td>15s</td><td>"Decomposition is hypothesis, not commandment"</td></tr></tbody></table>
+<p>Total: ~2.5 min. HM 通常会 follow up.</p>
+<hr />
+<h3>简历专属 reframe — MANY STAR stories</h3>
+<h4>STAR 1: Indonesia Refund Tier (★ PRIMARY)</h4>
+<p><strong>Use for</strong>: Goal ambiguity + Outcome ambiguity (most behavioral questions)</p>
+<p><strong>S</strong>: Ops "auto refund 下季度" <strong>T</strong>: 不完整信息下 commit conditionally <strong>A</strong>: 3-tier decomp by reversibility, 2-week pilot, data-driven reframe <strong>R</strong>: 70% throughput, 0% risk, 6 weeks; tier 3 0 wrong refund</p>
+<p><strong>FDE framing</strong>: "Decomposition is hypothesis. Pilot validates. Data reframes ask."</p>
+<h4>STAR 2: Pakistan ASR Provider (Technical Ambiguity)</h4>
+<p><strong>S</strong>: 4 weeks deadline, ASR vendor 选择 (Azure / Google / AWS / Whisper) <strong>T</strong>: Choose without single source of truth <strong>A</strong>: Trade-off matrix, 3-day quick eval, cascade design instead of single-pick <strong>R</strong>: Pakistan launch on time, 0 ASR incident month 1</p>
+<p><strong>FDE framing</strong>: "Don't pick the best. Design architecture so wrong choice is reversible."</p>
+<h4>STAR 3: BNPL Routing 70 → 92% (Data Ambiguity)</h4>
+<p><strong>S</strong>: Launch month 1, routing 70%, 不知道 why <strong>T</strong>: Diagnose root cause without disabling <strong>A</strong>: Hypothesis list ordered by cost, confusion matrix Day 2 → H3 confirmed (tool desc 模糊), rewrite + RAG discovery <strong>R</strong>: 70 → 92% in 6 weeks. Saved 3-4 weeks of unnecessary fine-tuning.</p>
+<p><strong>FDE framing</strong>: "Cheap hypotheses first. MLE wants to train, FDE looks at data first."</p>
+<h4>STAR 4: BNPL 4-Stakeholder Conflict (Organizational Ambiguity)</h4>
+<p><strong>S</strong>: Product / Compliance / CS / Risk 4 个 stakeholder, 优先级冲突 <strong>T</strong>: Design 满足 4 方红线 <strong>A</strong>: Stakeholder map (5 col), tier-based design (tier 1/2/3 各 stakeholder 红线内决定) <strong>R</strong>: 0 compliance incident, CS satisfaction 提升 (拿到 high-value case), Product VP renew project</p>
+<p><strong>FDE framing</strong>: "Make ambiguity explicit, help stakeholders reach consensus, don't unilateral decide."</p>
+<h4>STAR 5: ConvFinQA Ablation (Data Ambiguity + Honesty)</h4>
+<p><strong>S</strong>: 6-stage pipeline ablation, 2 stages negative lift <strong>T</strong>: Diagnose which stage really matters, decide on publication <strong>A</strong>: Per-stage ablation, publish all results including negative <strong>R</strong>: Paper accepted with reviewer praise for honesty; principle transferred to production retros</p>
+<p><strong>FDE framing</strong>: "Ablation is the systematic way to handle data ambiguity. Honest reporting builds trust."</p>
+<h4>STAR 6: Voice Agent 7-Market Stakeholder Workshop (Organizational)</h4>
+<p><strong>S</strong>: Voice agent 扩展 6 个市场, 18 个 stakeholder <strong>T</strong>: Align 18 个 stakeholder 不 silo build then late align <strong>A</strong>: Per-market 1-day kickoff workshop, 3 stakeholder in room, shared/per-market layer 设计 <strong>R</strong>: 6 markets 6 months, 0 markets 上线后大改</p>
+<p><strong>FDE framing</strong>: "Early align then build, not silo build then align. 10× faster."</p>
+<h4>STAR 7: Internal Agent Platform KPI Lock (Outcome Ambiguity)</h4>
+<p><strong>S</strong>: Leadership "platform success criteria?" <strong>T</strong>: Vague → measurable <strong>A</strong>: Reference points + workshop, lock teams adoption count + build time + incident count <strong>R</strong>: 5 → 14 teams (140% target), -65% build time, 0 P0</p>
+<p><strong>FDE framing</strong>: "Lock metric 不是 contract, 是 alignment tool. Without it, 6 月后双方定义不一致."</p>
+<h4>STAR 8: Wrong Call I Made (Show Vulnerability)</h4>
+<p><strong>S</strong>: Voice agent multi-region 我初始 scope 成 "translate prompts per language, ship" <strong>T</strong>: Multi-market localization <strong>A</strong> (wrong): 没 scope cultural review <strong>R</strong> (wrong): 上线后发现债务沟通文化差异 (Thailand 礼貌, Korea 直接), 4 周 redo persona + escalation logic <strong>Lesson</strong>: "Localization for AI &gt; translation. 我现在 scope multi-market 必包含 cultural review."</p>
+<p><strong>FDE framing</strong>: HM 想听一个真实 wrong call. 这是关键 trust signal. Don't fake humble — show genuine learning.</p>
+<hr />
+<h3>5 follow-ups (HM 会追问)</h3>
+<p><strong>Q1</strong>: "What if your decomposition turns out wrong — tier 3 actually fine to automate quickly?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"Then I learn and reshape. 2-week pilot 是专门 stress-test 我的 assumption. 如果 pilot 显示 tier 3 difficult case 0% wrong, 我会 accelerate.</p>
+<p><strong>Decomposition is hypothesis, not commandment</strong>. Eval 是 truth. 我 explicitly 留 pilot 检测我自己 wrong 的可能."</p></blockquote>
+<p><strong>Q2</strong>: "What if ops got angry at the pushback?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"They were initially 不爽 — 'we asked 8 weeks, 你 12 weeks for tier 3'.</p>
+<p>Reframe 帮助: 'I want to give you the <strong>right answer faster, not the wrong answer on time</strong>'. 加上 cost-of-wrong-call 估算 (projected 8% wrong rate × $X per refund × monthly volume = $Y monthly liability). 数字 diffuse emotion.</p>
+<p>Ops 最终 thank me. 后来跟 my manager 反馈 'Gao 是少数 push back 但能让我感谢的 vendor.'"</p></blockquote>
+<p><strong>Q3</strong>: "How do you know when 'decompose more' becomes procrastination?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"Pragmatic rule: <strong>decomposition &gt; 10% of total project timeline = over-decomposition</strong>.</p>
+<p>12-week project, &gt; 1 week scoping 是 procrastination. <strong>At some point, ship small piece and learn from data</strong>.</p>
+<p>我 prefer over-decompose by 1 day 不是 under-ship by 4 weeks. Two-way door 决定可以 quick ship + measure; one-way door 才需要长 scoping."</p></blockquote>
+<p><strong>Q4</strong>: "Have you ever made a wrong call under ambiguity?"</p>
+<p><strong>A</strong> (use STAR 8 above):</p>
+<blockquote><p>"Yes. Voice agent multi-region rollout 我 initial scope 是 'translate prompts per language, ship'.</p>
+<p>Turns out 债务沟通文化差异巨大 — Thailand 礼貌 framing 是 polite, 直接说 'pay your debt' 是 rude. Korea 反过来, 礼貌过头反而 less credible.</p>
+<p>我 redo persona + escalation logic per market, cost 4 extra weeks.</p>
+<p>Lesson: <strong>'Localization' for AI &gt; translation</strong>. Cultural review 现在是 multi-market project 的 scope item, not optional."</p></blockquote>
+<p><strong>Q5</strong>: "How do you balance speed vs quality under ambiguity?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"By <strong>reversibility classification</strong>:</p>
+<ul><li>Two-way doors → speed (ship + measure)</li><li>One-way doors → quality (invest in scoping)</li></ul>
+<p>我 explicitly tag every decision at scoping time. <strong>Most decisions are two-way and can be reversed cheaply</strong> — over-optimizing quality on those is waste.</p>
+<p>但 one-way doors (e.g., tier 3 refund, production model swap, pricing) — 我 explicitly slow down 投资 scoping. 错了 12 个月才发现的 decision 不应该 1 周决定."</p></blockquote>
+<hr />
+<h3>❌ 易错点 (top 10)</h3>
+<ol><li><strong>No structured framework</strong> — 纯 narrative, 没 framework signal</li><li><strong>Pure speed or pure caution</strong> — 没 nuance</li><li><strong>Story 没 metrics</strong> — 70% / 0% / 6 weeks 数字必须有</li><li><strong>Blame stakeholder</strong> for ambiguity — 显得 immature</li><li><strong>Solo decide</strong> 不 validate — 显示 silo 倾向</li><li><strong>Generic story</strong> — 听起来 rehearsed</li><li><strong>Doesn't tie to FDE</strong> — 没 connect 到 deployment ambiguity</li><li><strong>Push back without data</strong> — 显得 "你不愿意做"</li><li><strong>不承认 wrong call</strong> — 显示不 self-aware</li><li><strong>没 reversibility 区分</strong> — One-way / Two-way 不 distinguish</li></ol>
+<hr />
+<h3>✅ 加分项 (top 10)</h3>
+<ol><li><strong>D·D·D·V framework</strong> explicit, named, reusable</li><li><strong>5 types of ambiguity</strong> classification (goal / technical / data / org / outcome)</li><li><strong>Reversibility classification</strong> (one-way vs two-way doors)</li><li><strong>"Decomposition is hypothesis"</strong> awareness</li><li><strong>Specific metrics</strong> (70% / 0% / 8 weeks)</li><li><strong>Acknowledge wrong call</strong> with genuine learning</li><li><strong>Tie to FDE day-to-day</strong> (deployment ambiguity is universal)</li><li><strong>Business-language reframe</strong> ("right answer faster vs wrong on time")</li><li><strong>Stakeholder validation</strong> explicit</li><li><strong>Cheap hypothesis first</strong> in data ambiguity</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>Handle ambiguity 不是 "我能 ship 没 spec 的项目", 是 "我能 classify ambiguity 5 类, decompose 成已知/未知/假设, 按 reversibility 决策, 用 stakeholder + data validate"</strong>.</p>
+<p>D·D·D·V framework + reversibility classification + cheap hypothesis first + early stakeholder align = senior FDE.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (印 1 页)</h3>
 <pre class="language-plaintext"><code class="language-plaintext">D·D·D·V framework:
-  Diagnose ambiguity type
-  Decompose into known / unknown / assumption
-  Decide by reversibility (one-way slow, two-way fast)
-  Validate with stakeholder
+  Diagnose      — 哪种 ambiguity (goal/tech/data/org/outcome)
+  Decompose     — 已知/未知/假设
+  Decide        — by reversibility (one-way slow, two-way fast)
+  Validate      — stakeholder + pilot data
 
-Reversibility classifier:
-  Two-way doors → ship + measure (most decisions)
-  One-way doors → investigate first
-  ID at scoping time, not after
+5 ambiguity types + 应对:
+  Goal       — 客户不知道想要啥     → Discovery 帮拆
+  Technical  — 多架构 viable        → Trade-off matrix + reversibility
+  Data       — 稀疏/矛盾/噪声       → Hypothesis-driven, cheap first
+  Org        — Stakeholder 冲突     → Stakeholder map + escalate
+  Outcome    — 成功没定义           → KPI lock + reference points
 
-Indonesia refund tier story:
-  S: ops wants auto refund "next quarter"
-  T: scope + timeline conflict
-  A: 3-tier decomposition by reversibility,
-     pilot 2 weeks, data-driven reframe
-  R: 70% throughput, 0% risk, 6 weeks
+Reversibility matrix:
+  One-way + high blast → 8-12 wk scoping (tier 3 refund)
+  One-way + low blast  → 2-4 wk scoping (single-customer change)
+  Two-way + high blast → 1-2 wk pilot then scale (multi-market)
+  Two-way + low blast  → ship + measure same day (prompt tune)
 
-Phrases:
-  "I diagnose what kind of ambiguity"
-  "Reversibility classification"
-  "Two-way doors → ship + measure"
-  "Decomposition is hypothesis"
+5-question discovery (Goal ambiguity):
+  1. The ONE metric in 6 months?
+  2. Current baseline?
+  3. Who's the loser if we succeed?
+  4. What outcome makes us look stupid?
+  5. What does week-1 success look like?
+
+Hypothesis order (Data ambiguity):
+  - List 5-10 hypotheses including "boring" ones
+  - Order by cost-to-verify (ascending)
+  - Run cheapest first
+  - Stop when explanation found
+  ❌ Don't start with "let's retrain" (most expensive usually)
+
+Stakeholder map (Org ambiguity, 5 col):
+  Stakeholder | 真实诉求 | 红线 | 妥协空间 | Veto power
+
+Reference points (Outcome ambiguity):
+  Consumer search (5-10% error OK)
+  Credit decision (&lt; 1% error)
+  Medical (&lt; 0.01% error)
+
+8 ready STAR stories:
+  1. Indonesia refund tier (★ goal + outcome)
+  2. Pakistan ASR cascade (technical)
+  3. BNPL routing 70→92% (data)
+  4. BNPL 4-stakeholder (org)
+  5. ConvFinQA ablation (data + honesty)
+  6. Voice agent 7-market workshop (org)
+  7. Internal Platform KPI lock (outcome)
+  8. Multi-region wrong call (vulnerability)
+
+Phrases to use:
+  "Decomposition is hypothesis, not commandment"
   "Right answer faster, not wrong on time"
+  "Two-way door → ship + measure"
+  "Cheap hypothesis first"
+  "Make ambiguity explicit, help stakeholders consensus"
 
-Anti-patterns:
+Phrases to NEVER use:
   "I just ship"
-  "I ask manager"
-  "I research first"
-  "It depends" without follow-up
-  No metrics</code></pre>
+  "I ask my manager"
+  "I research first" (alone, no concrete)
+  "It depends" (no follow through)
+
+Push-back dialog templates:
+  Customer impatient → "Sketch + flag 3 assumptions, or confirm first?"
+  Vague KPI → "Reference 3 industry anchors"
+  Solo lock metric refused → "I propose strawman, you push back"
+  Stakeholder conflict → "Give option A/B/C with trade-offs"
+
+5 follow-ups ready:
+  Q1: Decomp wrong? → Pilot stress-tests, learn + reshape
+  Q2: Stakeholder angry? → Reframe + cost data
+  Q3: Decompose vs procrastinate? → 10% rule
+  Q4: Wrong call story? → Multi-region localization (cultural)
+  Q5: Speed vs quality? → Reversibility classification
+
+Red lines:
+  - No framework signal
+  - No metrics in story
+  - No wrong call acknowledged
+  - No reversibility distinction
+  - Solo silo decision</code></pre>
   </section>
 
   
@@ -142,190 +497,1027 @@ Anti-patterns:
 </main>
 <script id="md-source" type="text/markdown">## 题目（verbatim）
 
-> **[OpenAI Hiring Manager Round]**
+> **[OpenAI / Anthropic Hiring Manager Round — 60 min]**
 >
-> "How do you **handle ambiguity**? Tell me a story where requirements were unclear and you had to make calls without complete information."
+> "How do you **handle ambiguity**? Tell me a story where requirements were unclear and you had to make calls without complete information.
+>
+> Follow-up: What kind of ambiguity gives you the most trouble? How do you push back when someone asks for the impossible?"
 
-**出处**：OpenAI / Google FDE hiring manager 必问. Palantir/Salesforce 也问.
+**出处**: OpenAI / Anthropic / Google FDE hiring manager 必问. Palantir / Salesforce / Databricks 也常问. 几乎所有 FDE / staff-level engineering role 都会问.
 
-**Round**：Hiring Manager (60 min)
+**Round**: Hiring Manager (60 min, 通常作为 round 中段问题)
 
 ---
 
 ## 这道题在考什么
 
-FDE 工作 90% 时间在 ambiguity 里:
+FDE 工作 **90% 时间在 ambiguity 里**. Recruiter / HM 想验证 5 件事:
 
-1. **Process** —— 有 framework 处理还是 panic
-2. **Decision-making** —— 在不完整信息下 commit
-3. **Reversibility awareness** —— 知道 one-way vs two-way doors
+1. **Process** —— 面对模糊, 你有 framework 还是 panic
+2. **Decision-making** —— 在不完整信息下能不能 commit, 还是 paralysis
+3. **Reversibility awareness** —— 知不知道 one-way vs two-way doors
 4. **Communication** —— 用 stakeholder 验证 vs 自己 silo
-5. **Story quality** —— STAR + 具体 metrics
+5. **Story quality** —— STAR + 具体 metrics + 真实细节
+
+**没说出口的 anti-signal**:
+
+- "I just ship and iterate" → no thoughtfulness, HM 担心你乱来
+- "I align with my manager and ask them" → 显示没 judgment
+- "I do a lot of research first" → 字面理解 = analysis paralysis
+- "It depends" without follow-through → wishy-washy
+- 故事没 metric → 显得不真实
 
 ---
 
-## 黄金 framework：D·D·D·V
+# Part 1 · 教学讲解
 
-| Step | What |
-|---|---|
-| **D** | **Diagnose ambiguity type** (info-missing vs decision-required vs unknown-unknown) |
-| **D** | **Decompose** into known + unknown + assumption |
-| **D** | **Decide** by reversibility (one-way: slow + investigate; two-way: ship + measure) |
-| **V** | **Validate** with stakeholder + ship + learn |
+## 1. 5 种 ambiguity 类型先讲清
+
+不是所有 ambiguity 一样. 不同类型应对方式完全不同. **会区分**本身就是一个 senior 信号.
+
+| Type | 含义 | 典型 trigger | 应对原则 |
+|---|---|---|---|
+| **Goal ambiguity** | 客户不知道想要什么 | "我想要 AI" / "make it better" | 用 discovery 帮客户决定 |
+| **Technical ambiguity** | 多个 viable 架构都能做 | "VectorDB 选 Pinecone 还是 Qdrant?" | 用 trade-off matrix + reversibility |
+| **Data ambiguity** | 数据稀疏 / 矛盾 / 噪声 | "我们的 retention 数据有 3 个 source 对不上" | 用 hypothesis-driven exploration |
+| **Organizational ambiguity** | 多 stakeholder 优先级冲突 | "Ops 想自动化, Legal 想 audit, Product 要速度" | 用 stakeholder map + escalation |
+| **Outcome / metric ambiguity** | 成功标准没定义 | "增加 efficiency" | 用 KPI lock framework |
+
+**关键 insight**: 每次面对模糊先 **classify type**, 再选 framework. 这是 SR/Staff 跟 Junior 的区别 — Junior 把所有 ambiguity 当 "需要更多信息".
+
+## 2. 这道题在考你什么 (深入)
+
+### 表面 vs 深层 signal
+
+**表面**: 听你讲一个故事, 看叙事是否清晰
+
+**深层** (HM 真正在筛):
+
+| 信号 | 权重 | 怎么 demonstrate |
+|---|---|---|
+| **有 framework 处理 ambiguity** | ★★★★★ | 不是 case-by-case 反应, 是有 D·D·D·V 这种 reusable 结构 |
+| **Reversibility awareness** | ★★★★★ | One-way door 跟 two-way door 自动 distinguish |
+| **数据驱动 push back** | ★★★★ | 不是直觉拒绝, 是用 pilot data 反驳 |
+| **Stakeholder collaboration** | ★★★★ | 不是自己 silo 决定, 是把 ambiguity 拉到 stakeholder 一起 resolve |
+| **故事 specificity + metrics** | ★★★★ | "70% throughput, 0% wrong call, 6 weeks" 这种具体数字 |
+| **承认错误判断** | ★★★ | follow up 时能讲一个真实的 wrong call |
+| **Speed-quality trade-off 自觉** | ★★★ | 两个都不偏废 |
+
+## 3. 黄金 framework: D·D·D·V
+
+**这个 framework 是这道题的核心 takeaway**. 当你说 "I have a framework for ambiguity called D·D·D·V" 时, HM 立刻 update 你的 seniority.
+
+| Step | 含义 | 关键问题 |
+|---|---|---|
+| **D** — Diagnose | 识别 ambiguity type (上面 5 类) | "这是哪种 ambiguity?" |
+| **D** — Decompose | 拆分 已知 / 未知 / 假设 | "什么是 fact, 什么是 belief?" |
+| **D** — Decide | 按 reversibility 决策 | "这是 one-way 还是 two-way door?" |
+| **V** — Validate | 用 stakeholder + pilot data 验证 | "我的 decomposition 错了怎么办?" |
+
+### 为什么是这个顺序
+
+**Diagnose first** — 不知道是哪种 ambiguity, 选错 framework 浪费时间.
+
+**Decompose 比 Decide 先** — 没拆分清楚就 decide, 是赌博. 拆开后看到 "其实 80% 已知, 20% 未知" 跟 "其实 30% 已知, 70% 未知" 应对完全不同.
+
+**Decide 用 reversibility** — Bezos 的 Type 1 (one-way) vs Type 2 (two-way) decision 经典 framework. Two-way door 可以 fast + iterate, one-way door 必须 slow + investigate. 这个区分本身是 senior 标志.
+
+**Validate 收尾** — 防止 silo. 你的 decomposition 是 hypothesis, 不是 commandment, 必须跟 stakeholder verify.
+
+## 4. Reversibility 决策框架 (Bezos Door Model + FDE 改造)
+
+经典 Bezos:
+- **Type 1 / One-way door**: 错了改不回来 (e.g., 公司 IPO, 决定退出市场)
+- **Type 2 / Two-way door**: 错了易撤 (e.g., 试一个新功能, A/B test)
+
+FDE 改造 (加 2 个 axis):
+
+| Axis | One-way 增强 | Two-way 减弱 |
+|---|---|---|
+| **Reversibility** | 错了不能撤 | 错了能撤 |
+| **Blast radius** | 影响多 stakeholder / 多客户 | 影响小 / 隔离 |
+| **Time to detect** | 错了 6 个月后才发现 | 错了下周看到 |
+| **Recovery cost** | $100k+ / monthly liability | < 1 week eng time |
+
+### FDE Reversibility Decision Matrix
+
+```
+                One-way (slow + investigate)
+                        │
+                        │
+   High blast radius    │   Pure one-way: 12 weeks scoping
+                        │
+        ◆ Indonesia tier 3 refund decisions
+        ◆ Production model swap (Llama 2 → 3)
+        ◆ Pricing change to customer
+                        │
+   ─────────────────────┼──────────────────────
+                        │
+        ◇ Add new tier 1 FAQ                ◇ Two-week pilot
+        ◇ Adjust retry logic                ◇ A/B test new prompt
+        ◇ Add observability metric          ◇ Toggle feature flag
+                        │
+   Low blast radius     │   Pure two-way: ship + measure
+                        │
+                        │
+                Two-way (fast + measure)
+```
+
+**FDE 应用**:
+
+- One-way + high blast → invest 8-12 weeks scoping (Indonesia tier 3)
+- One-way + low blast → 2-4 weeks scoping (production single-customer change)
+- Two-way + high blast → 1-2 weeks pilot then scale (multi-market rollout)
+- Two-way + low blast → ship + measure same day (prompt tuning)
+
+## 5. 不同 ambiguity 类型的 角色对照表
+
+| Type | 你的 role | Stakeholder role |
+|---|---|---|
+| Goal ambiguity | 帮客户 articulate (you ask) | 客户 commit (they decide) |
+| Technical ambiguity | 主导决策 (you decide) | Stakeholder review (they ratify) |
+| Data ambiguity | 探索 + 报告 (you investigate) | Stakeholder consume (they read) |
+| Organizational ambiguity | 映射 + escalate (you map) | Exec resolve (they decide) |
+| Outcome ambiguity | 提议 + benchmark (you propose) | 客户 lock (they sign) |
+
+**核心 insight**: 不是所有 ambiguity 都是 "你 decide". Goal / organizational / outcome ambiguity, FDE role 是 **帮客户 / stakeholder decide**, 不是替他们 decide.
+
+## 6. 4 个真实场景演示
+
+### 场景 A: Goal ambiguity — Indonesia ops 想 "automate refunds"
+
+**Trigger**: Friday Slack — "we want full automation by next quarter, can you do it?"
+
+**Ambiguity content**:
+- 什么 refunds (full / partial / dispute)?
+- 多大 amount limit?
+- "Next quarter" 是 8 周还是 13 周?
+- Wrong call 谁 accountable?
+- 8% error rate 接受吗?
+
+**Diagnose**: Goal ambiguity (客户没拆分自己的 ask) + Outcome ambiguity (没 lock 接受的 error rate)
+
+**Action**: 2 周 pilot tier 1+2, 跟 ops 用 data reframe.
+
+**Outcome**: 70% throughput, 0% wrong call, 6 weeks. Tier 3 6 个月后 0 wrong refund.
+
+### 场景 B: Technical ambiguity — Voice agent ASR provider 选择
+
+**Trigger**: "We need ASR for Pakistan launch in 4 weeks. Which provider?"
+
+**Ambiguity content**:
+- Azure / Google / AWS / self-host Whisper 都能 cover Urdu
+- 价格差 5×, accuracy 差 ~2%, latency 差 ~200ms
+- 没 single source of truth comparison data
+
+**Diagnose**: Technical ambiguity (多 viable 选项)
+
+**Decompose**:
+- 已知: 4 weeks deadline, 业务需 < 500ms latency
+- 未知: 真实 Urdu accuracy (vendor benchmark 不可信)
+- 假设: 用户口音分布跟 vendor test set 类似
+
+**Decide by reversibility**:
+- 这是 two-way door (provider 可以换, integration layer 是 abstraction)
+- 但 high blast radius (生产事故影响整个 Pakistan)
+- 应对: **3-day quick eval** — 用真实 Pakistan 客户录音 (脱敏) 测 3 个 provider
+- 结果: Google 在 Urdu 上 +3% accuracy 但 latency 高, Azure latency 好但 accuracy 一般, Whisper 慢但 controllable
+- **Cascade design** — Azure primary, Google fallback, Whisper local last-resort
+
+**Outcome**: Pakistan launch 按时, ASR 0 incident 第一个月.
+
+**Reflection**: Technical ambiguity 关键不是 "选哪个", 是 "怎么设计架构让 wrong choice 易撤". Cascade fallback 让 provider 选择从 one-way 变 two-way.
+
+### 场景 C: Data ambiguity — BNPL chatbot routing 70% accuracy
+
+**Trigger**: Launch month 1, routing accuracy 70%, 远低于预期 90%.
+
+**Ambiguity content**:
+- Confusion matrix 没看
+- 60% 错在哪类 intent 不知道
+- 是模型 capacity 不够 vs prompt 模糊 vs tool description 烂 vs 用户表达不清?
+
+**Diagnose**: Data ambiguity (root cause 不明) — 跟 goal / technical 不一样, 需要 hypothesis-driven exploration
+
+**Decompose** (hypothesis list):
+- H1: 模型 capacity 不够 → 需要 fine-tune
+- H2: Prompt 模糊 → 重写 prompt
+- H3: Tool description 烂 → 用 RAG-based discovery
+- H4: 用户表达问题 → 加 disambiguation 提问
+- H5: 数据分布偏 → 训练数据 augment
+
+**Action**: 优先 cheap 的 hypothesis. 先看 confusion matrix 数据 (1 天) → 排除 H1 (模型 capacity 够). 看 mis-route 案例 (2 天) → 60% 是 H3 (tool description 模糊). 重写 12 个 tool description + RAG-based discovery.
+
+**Outcome**: 70 → 92% in 6 weeks. **关键**: 没花时间 fine-tune (省 3-4 周).
+
+**Reflection**: Data ambiguity 的处理原则 — **不要从最贵的 hypothesis 开始**. Cheap experiments first. MLE 第一反应是训模型 (贵), FDE 第一反应是看数据 (便宜).
+
+### 场景 D: Organizational ambiguity — BNPL chatbot 的 4 个 stakeholder
+
+**Trigger**: Product + Compliance + CS + Risk 4 个 stakeholder 各自有诉求.
+
+**Ambiguity content**:
+- Product: 越多 chatbot 越好 (UX)
+- Compliance: chatbot 不能 promise specific 额度
+- CS: 别抢 CS 的 job
+- Risk: 不能泄漏信用数据
+
+**Diagnose**: Organizational ambiguity (优先级冲突)
+
+**Decompose** (stakeholder map):
+| Stakeholder | 真实诉求 | 红线 | 妥协空间 |
+|---|---|---|---|
+| Product | UX 好 | 不能慢 > 3s | tier 2/3 可以慢 |
+| Compliance | 不踩监管线 | 任何具体数字 promise | tier 1 通用 FAQ 可放 |
+| CS | 不被替代 | 复杂 case 要给 CS | 简单 FAQ 可 chatbot |
+| Risk | 用户数据不泄漏 | 不能 surface PII | 不含 PII 的 query 可 |
+
+**Decide**: 这是 organizational ambiguity, FDE role 是 **map + escalate**, 不是 unilateral decide. 我做了 tier-based design 让 4 个 stakeholder 各自的红线都不被踩.
+
+**Outcome**:
+- Tier 1 (通用 FAQ) — Product + Compliance 都 happy
+- Tier 2 (账户信息, 限制 surface) — Risk + Compliance 一起 review schema
+- Tier 3 (复杂 case) — CS 接, 反而拿到 high-value case 提升 satisfaction
+
+**Reflection**: Organizational ambiguity 不能 unilateral decide. **FDE 的工作是把 ambiguity 显性化, 帮 stakeholder 一起达成 consensus**. Tier-based design 是工具, 不是答案.
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | 把所有 ambiguity 当一类 | 用错 framework, 浪费时间 |
+| 2 | 没 Diagnose 直接 Decide | 拍脑袋, 经常 wrong |
+| 3 | Decompose 太久 (> 20% 总时长) | analysis paralysis |
+| 4 | One-way door 当 two-way ship | 灾难性 wrong call |
+| 5 | Two-way door 当 one-way over-scope | 浪费几周 |
+| 6 | Solo decide 不 validate | 跟 stakeholder 错位 |
+| 7 | "I'll get back to you" 拖延 | 信任下降 |
+| 8 | Push back 不带 data | 显得 "你不愿意做" 不是 "数据说不该做" |
+| 9 | Discovery 没 timebox | 永远在 discovery |
+| 10 | 没 follow up 验证 hypothesis | decomposition 错了不知道 |
+
+## 一句话总结 (Part 1)
+
+> **Handle ambiguity 不是 "我能 ship 没 spec 的项目", 是 "我能 classify ambiguity 类型, decompose 成已知/未知/假设, 按 reversibility 决策, 用 stakeholder 验证假设"**.
+>
+> D·D·D·V framework + reversibility classification + stakeholder validation = senior FDE handling of ambiguity.
 
 ---
 
-## 你专属 STAR story（用 Indonesia refund tier）
+# Part 2 · 5 个深度子问题
 
-**Situation**:
-> "On the voice agent project, the Indonesia regional ops team asked us to **automate refund decisions** — agent could approve or deny refunds without a human. The ask came as a Friday Slack message: 'we want full automation by next quarter, can you do it?'
->
-> There was huge ambiguity: what kinds of refunds, what amount limits, who's accountable for wrong calls, what's the cost of a wrong call, what does 'next quarter' mean."
+## ⚙️ Problem 1: Goal Ambiguity — 客户不知道想要什么
 
-**Task**:
-> "I had to either commit to a timeline I couldn't actually verify, or push back without scope information, or **find a way to commit conditionally** with information learned along the way."
+### 1.1 这种 ambiguity 长什么样
 
-**Action**:
-> "I did 3 things:
->
-> **1. Diagnose** the ambiguity. This was 'decision-required without enough info' — not 'unknown unknown'. The right move was **structured discovery, not pause**.
->
-> **2. Decompose**: I broke 'automate refunds' into 3 tiers:
-> - Tier 1: info lookup (look up policy, balance — agent says read-only facts)
-> - Tier 2: structured tasks (calculate fees, look up case status)
-> - Tier 3: refund decisions (approve / deny — the real ask)
->
-> Each tier has different **risk profile** and **decision reversibility**.
->
-> **3. Decide by reversibility**:
-> - Tier 1: **two-way door** (wrong info bot says easy to correct, low cost). Ship in 2 weeks, measure.
-> - Tier 2: **mostly two-way** (some financial calc, but human reviews). Ship in 4 weeks.
-> - Tier 3: **one-way door** (wrong refund = direct financial loss, customer trust impact, regulatory). Need 12+ weeks investigation before committing.
->
-> **4. Validate**: I went back to ops team with 'here are 3 things I can commit to and timelines, here's why tier 3 needs more time'. They initially pushed for full tier 3 in 8 weeks. **I ran a 2-week pilot showing tier 1 + 2 covered 70% of volume at 0% wrong-call rate, vs full automation projected at 8% wrong-call rate**.
->
-> Data made the call obvious. We shipped tier 1+2 first."
+典型表达 (注意捕捉):
+- "We want AI."
+- "Make it better."
+- "Automate this."
+- "Reduce cost."
+- "Use GPT for our customer support."
 
-**Result**:
-> "Ops got 70% of throughput at 0% risk in 6 weeks. Tier 3 came online 6 months later **after we had policy + monitoring + human-in-loop infrastructure**. **Zero wrong refunds in production for tier 3 in first 90 days**.
->
-> What I learned: **scope ambiguity is rarely about timeline — it's about the asker not having decomposed the problem yet**. When you decompose for them with reversibility analysis, they often realize their own ask was too broad. Then they thank you."
+特征:
+- 抽象 verb (better / more / less)
+- 没有 specific metric
+- 没说 baseline
+- 没说 budget / timeline / constraint
 
-⏱️ ~3 min spoken. HM can ask deep follow-ups for another 10 min.
+### 1.2 Discovery framework (FDE 帮客户拆 goal)
+
+不是问 "你想要什么" — 这会 trigger 客户 defensive ("你 vendor 怎么不知道?"). 是 **帮客户 articulate**.
+
+**5-question discovery sequence**:
+
+1. **What's the ONE metric** that would tell you in 6 months 'this worked'?
+
+   > Sample dialog:
+   > 客户: "We want AI to improve customer support."
+   > 你: "如果 6 个月后我们 review 这个项目, 一个 metric 能告诉你 'this worked', 你会看什么 number?"
+   > 客户: "Hmm... ticket resolution time?"
+   > 你: "OK, 'ticket resolution time'. 目前平均多少?"
+   > 客户: "我 actually 不知道, 我得问 CS team."
+   > 你: "Great. 这就是 step 1 — 我们 lock 这个 metric 作为 success criteria, 现 baseline 我们 next week 一起确认."
+
+2. **What's the current baseline** without our system?
+
+   > 关键: 客户经常不知道 baseline. 这是 discovery 第一个 actionable next step.
+
+3. **Who's the loser** if we succeed?
+
+   > Sample dialog:
+   > 客户: "我们要 AI 自动化客服."
+   > 你: "如果 chatbot 自动化 80% inbound query, 谁的 job description 会变?"
+   > 客户: "CS team 的人会处理 less ticket, 但也可能 reorg 到更难的 case..."
+   > 你: "OK, 这是 organizational impact. 我们 design 的时候要把 CS team 拉进来, 不然他们会 silently sabotage 项目."
+
+4. **What's an outcome** that would make us look stupid (instead of successful)?
+
+   > Sample dialog:
+   > 你: "想象 6 个月后, 项目上线了, 但 outcome 是 disastrous. 最可能的 disaster scenario 是什么?"
+   > 客户: "Chatbot 给错信息, customer 投诉到 social media."
+   > 你: "Got it. 这告诉我 'accuracy + reversibility' 比 'speed' 重要. 我们 design 一个 tier 系统, tier 3 让 human 兜底."
+
+5. **What does week-1 look like?**
+
+   > Sample dialog:
+   > 你: "如果项目 launch week 1, 你看 dashboard 上想看到什么?"
+   > 客户: "Volume served by chatbot? Customer satisfaction?"
+   > 你: "OK. 这两个 metric 我们 week 1 一定 instrument. 那 week 1 的 'pass' threshold 是多少?"
+   > 客户: "至少 50% volume served, satisfaction > baseline."
+   > 你: "Locked. 这是我们 launch criteria."
+
+### 1.3 Goal ambiguity 的 STAR (Indonesia tier 3 refund)
+
+**S**: Indonesia ops "我们想 automate refund, 下季度 done"
+
+**T**: 把 abstract "automate refund" 拆成可 commit 的 specific scope
+
+**A**:
+1. Discovery — "What's the ONE metric?" → wrong-call rate
+2. Discovery — "Baseline?" → 当前 manual 0.3% wrong-call
+3. Discovery — "Loser?" → CS team 怕被替代; ops 要保留 oversight
+4. Discovery — "Disaster?" → wrong refund 导致 customer 投诉到 OJK (监管机构)
+5. Discovery — "Week 1 success?" → tier 1+2 throughput, 不 touch tier 3
+6. Decompose → tier 1/2/3, 不同 reversibility
+7. Pilot 2 weeks → tier 1+2 = 70% volume, 0% wrong, vs tier 3 projected 8% wrong
+8. Reframe → "give you right answer faster, not wrong on time"
+
+**R**: 6 weeks tier 1+2 上线, 70% throughput at 0% risk. Tier 3 6 个月后, 90 day 0 wrong refund.
+
+**Key takeaway**: Goal ambiguity 不是 "客户 lazy 不告诉我", 是 **客户自己没拆开 think**. FDE 工作是帮他们 articulate.
+
+### 1.4 Push-back dialog
+
+如果客户拒绝 discovery, 想直接 ship:
+
+> 客户: "Don't ask so many questions, just build it."
+> 你: "Fair. 我可以 sketch 一个 strawman design in 10 minutes, 但我想 flag **3 assumptions** I'm making. 如果任一 assumption 错, design 就 invalid.
+>
+> Assumption 1: success metric 是 ticket resolution time
+> Assumption 2: 接受 < 1% wrong-answer rate
+> Assumption 3: 必须 integrate with ServiceNow (而不是 self-hosted)
+>
+> 你想我先 sketch, 还是先 confirm 这 3 个?"
+
+90% 情况客户会 say "先 confirm 这 3 个".
 
 ---
 
-## 5 个 "what to NOT say"
+## ⚙️ Problem 2: Technical Ambiguity — 多个 viable 架构
 
-❌ "I just ship and iterate" → no thoughtfulness, scares hiring manager
-❌ "I align with my manager and ask them to decide" → no judgment
-❌ "I do a lot of research first" → if literal, can mean analysis paralysis
-❌ "It depends" without follow-through → wishy-washy
-❌ Generic story without metrics → not memorable
+### 2.1 这种 ambiguity 长什么样
+
+- "VectorDB 选 Pinecone 还是 Qdrant 还是 pgvector?"
+- "Streaming 用 Kafka 还是 Pulsar?"
+- "Voice agent ASR 选 Azure 还是 Google?"
+- "Agent orchestration 用 LangGraph 还是自研?"
+
+特征:
+- N 个 viable options
+- 每个 option 都能 work
+- Trade-off 真实但不致命
+- 决策 reversibility 不一致
+
+### 2.2 Trade-off matrix framework
+
+**Step 1**: 列出 options (2-5 个, 多了无意义)
+**Step 2**: 列出 axes (5-7 个 dimension)
+**Step 3**: 给每个 axis weight (重要性)
+**Step 4**: 评分每个 (option, axis) cell
+**Step 5**: 计算 weighted score
+**Step 6**: 检查最高分是否 robust (敏感度分析)
+
+### 2.3 例子: Voice agent ASR provider (Pakistan launch)
+
+| Axis | Weight | Azure | Google | AWS | Whisper local |
+|---|---|---|---|---|---|
+| Urdu accuracy | 30% | 92 | 95 | 88 | 91 |
+| Latency (ms) | 25% | 250 | 400 | 280 | 600 |
+| Cost ($/min) | 15% | 0.016 | 0.024 | 0.018 | 0.005 |
+| Reliability (uptime) | 15% | 99.9 | 99.95 | 99.9 | 99.5 |
+| Lock-in risk | 10% | medium | medium | medium | low |
+| Integration time | 5% | 1d | 1d | 2d | 1w |
+| **Weighted score** | | **3.7** | **3.9** | **3.5** | **3.2** |
+
+Google 微胜. 但敏感度分析: 如果 latency weight 从 25% 提到 35% (业务 strict 要求 < 500ms), Azure 反超.
+
+**Decision**: 不 single-pick, **cascade**: Azure primary, Google fallback, Whisper local last-resort. 把 trade-off 从 single choice 变 architectural design.
+
+### 2.4 Reversibility check
+
+```
+Decision: ASR provider 选哪个
+- One-way 吗? No — provider 可换 (有 abstraction layer)
+- Blast radius? High — production 用户调用
+- Time to detect? Day 1 (latency / accuracy 立刻看)
+- Recovery cost? 1 week eng to swap provider
+
+→ Two-way door + high blast → 1-2 weeks pilot, then commit
+→ 加 cascade design 把 single provider risk 进一步降低
+```
+
+### 2.5 Technical ambiguity 的 STAR (BNPL agent orchestration)
+
+**S**: BNPL chatbot 要做 agentic orchestration. 选项: LangChain / LangGraph / Semantic Kernel / 自研.
+
+**T**: 在 4 周内 ship MVP, 选一个 framework.
+
+**A**:
+1. **Decompose**: 已知 (4 周 deadline, 10 个 tool, 支持 multi-turn). 未知 (framework 稳定性, 中文 documentation). 假设 (我们的 use case 不需要 framework 自带的复杂 graph orchestration).
+2. **Trade-off matrix**:
+   - LangChain: 生态广, 但当时 stability 差, 频繁 breaking change
+   - LangGraph: 表达力强, 但 learning curve
+   - Semantic Kernel: 微软栈, 与 Azure 集成好
+   - 自研: 灵活, 但 4 周不够
+3. **Reversibility check**: 框架可换 (我们写 thin wrapper), 但 4 周 deadline 严
+4. **Decide**: 自研 minimal orchestration (workflow / tool / memory 三层), 后续可替换为成熟框架
+
+**R**: 4 周 MVP 上线, 92% routing accuracy. 6 个月后这个 minimal orchestration 成为内部 Agent Platform 雏形.
+
+**Reflection**: Technical ambiguity 没有 "best choice", 只有 "given constraints, best choice". 选了之后立刻设计 abstraction 让 reversibility 提高.
+
+### 2.6 Push-back dialog (技术决策被质疑)
+
+> Tech lead: "为什么自研而不是 LangChain?"
+> 你: "三个原因.
+>
+> One: LangChain 当时 (2024) 频繁 breaking change. 我们 4 周 deadline 不能花 1 周追新版本.
+>
+> Two: 我们的 use case 简单 (10 tool, 单 turn, 没 graph) — LangChain 90% 功能我们用不到, 带来 overhead.
+>
+> Three: 我们写 thin wrapper, 后续如果生态稳定可以替换. Reversibility 保留.
+>
+> 但你的 concern 我接受 — 如果 use case 复杂化, 比如要 graph orchestration, 我们 6 个月内会 reevaluate. 我们设 quarterly check-in 看是否换."
 
 ---
 
-## 5 个 "do say" formulas
+## ⚙️ Problem 3: Data Ambiguity — 稀疏 / 矛盾 / 噪声
 
-✅ **"I diagnose what kind of ambiguity it is"** → process signal
-✅ **"I decompose into known / unknown / assumption"** → clarity
-✅ **"For reversible decisions, I ship fast and measure"** → bias to action
-✅ **"For irreversible decisions, I invest in investigation"** → judgment
-✅ **"I validate with the stakeholder before final commit"** → collaboration
+### 3.1 这种 ambiguity 长什么样
+
+- "Routing accuracy 70%, 不知道为什么"
+- "Conversion rate 三个 dashboard 数字不一样"
+- "用户投诉激增, 但 metric 没变化"
+- "Pilot 数据看上去 promising, 但 sample 太小"
+
+特征:
+- 数据有但模糊 / 矛盾 / 不够
+- 用 intuition 选 hypothesis 风险大
+- 需要 systematic exploration
+
+### 3.2 Hypothesis-driven exploration framework
+
+**Step 1**: List all hypotheses (5-10 个), include "boring" ones
+**Step 2**: For each hypothesis, list cost-to-verify
+**Step 3**: Sort by cost ascending, run cheapest first
+**Step 4**: 每个 experiment 设 success/fail criteria 前置
+**Step 5**: Stop when explanation found, document
+
+**关键 trap**: 不要从最贵 hypothesis 开始. MLE 第一反应是 "训模型", 经常是最贵 hypothesis. 应该 cheap 的先排除.
+
+### 3.3 例子: BNPL routing 70% accuracy 诊断
+
+**Hypotheses + cost**:
+
+| H | Hypothesis | Cost to verify |
+|---|---|---|
+| H1 | 模型 capacity 不够 | High (fine-tune 1 周) |
+| H2 | Prompt 模糊 | Low (1 天 read + manual rewrite) |
+| H3 | Tool description 模糊 | Low (1 天 read confusion matrix) |
+| H4 | 用户表达不清 | Low (1 天 sample real query) |
+| H5 | 数据分布偏 | Med (3 天 distribution analysis) |
+| H6 | Embedding model 不够好 | Med (2 天 swap embedding) |
+| H7 | Routing 阈值 wrong | Low (半天 tune threshold) |
+
+**Run order**: H7 → H3 → H2 → H4 → H6 → H5 → H1
+
+**Reality**: H3 在 day 2 confirmed (60% mis-route 是 tool description 模糊). H1 (fine-tune) never needed.
+
+**Saved**: 3-4 weeks of unnecessary fine-tuning.
+
+### 3.4 Data ambiguity 的 STAR (Voice agent ASR 准确率诊断)
+
+**S**: Voice agent 在巴西上线第二周, ASR 准确率从 95% (test data) 掉到 87% (production).
+
+**T**: 找 root cause, fix within 1 week.
+
+**A**:
+1. **Hypotheses** + **cost**:
+   - H1: Vendor 服务降级 (low cost, 1h - 检查 vendor status)
+   - H2: 客户口音分布与 test set 不同 (med cost, 1 day - 分析 audio sample)
+   - H3: 网络延迟导致 audio frame drop (low cost, 2h - 检查 streaming)
+   - H4: 客户使用环境噪音大 (med cost, 1 day - manual listen)
+   - H5: ASR model 在某 dialect 表现差 (high cost, 1 week - per-dialect eval)
+2. **Run**:
+   - H1 1h → ruled out, vendor normal
+   - H3 2h → ruled out, no frame drop
+   - H4 1 day → partially confirmed, 60% calls have moderate background noise
+   - H2 1 day → confirmed, 巴西北部口音占比 30% (vs test set 5%)
+3. **Fix**: 加 audio preprocessing (noise reduction) + 针对北部口音 fine-tune 一个 lightweight adapter
+
+**R**: 87% → 93% in 1 week. Test set 重新 sample 包含北部口音.
+
+**Reflection**: Data ambiguity 的核心是 **不要 jump to conclusion**. 列出所有 hypothesis, 按 cost 排序, 系统排除. ConvFinQA 项目教会我这个 — 用 ablation 替代直觉.
+
+### 3.5 Push-back dialog (急于结论)
+
+> Manager: "Just retrain the model, accuracy 一定能上去."
+> 你: "Retrain 1 周成本. 我能不能先用 1 天看 confusion matrix? 如果 root cause 在 data side (e.g., tool description 模糊), retrain 也救不了. 如果 1 天后 confirm 是 model capacity, 我立刻 retrain."
+
+90% 情况, 1 天 cheap exploration 能避免 1 周贵的 retrain.
 
 ---
 
-## 简历专属 reframe
+## ⚙️ Problem 4: Organizational Ambiguity — 多 stakeholder 冲突
 
-Indonesia refund tier story 是 **黄金叙事** for this question. 但你可以扩展：
+### 4.1 这种 ambiguity 长什么样
 
-| Question variant | Best story |
-|---|---|
-| "Handle ambiguity" | Indonesia refund tier (decompose + reversibility) |
-| "Make decision without info" | Voice agent multi-region rollout (phased + measured) |
-| "Push back on stakeholder" | Same — refund tier |
-| "Bias to action vs caution" | ConvFinQA — bias to ship, measured, found negative result, **published it honestly** |
+- "Ops 想自动化, Legal 要 audit trail, Product 要速度"
+- "Sponsor 是 Product VP, 但 IT 才能批 deployment"
+- "几个 team 各自 sponsor 一部分, 没人 own end-to-end"
+- "Customer 说一件事, 实际 user 说另一件"
+
+特征:
+- 多人各自 valid 诉求
+- 没有 single decision maker
+- 优先级冲突
+- 不是技术问题, 是 organizational
+
+### 4.2 Stakeholder map framework
+
+**5 column**:
+| Stakeholder | 真实诉求 | 红线 (不能踩) | 妥协空间 | Veto power? |
+|---|---|---|---|---|
+| ... | ... | ... | ... | ... |
+
+**关键问题**:
+1. Who's the decision maker?
+2. Who funds it?
+3. Who blocks deployment?
+4. Who uses it?
+5. Who's the loser if it succeeds?
+
+经常: decision maker ≠ funder ≠ blocker ≠ user ≠ loser. 5 个 hat 5 个人.
+
+### 4.3 例子: BNPL chatbot 的 4 stakeholder
+
+| Stakeholder | 真实诉求 | 红线 | 妥协空间 | Veto? |
+|---|---|---|---|---|
+| Product VP | UX 好, 上线快 | 不能 break user flow | 可接受 phase rollout | 部分 |
+| Compliance | 不踩监管 | 任何具体 promise (额度/利率) | tier 1 FAQ 可放 | **是** |
+| CS Manager | CS team 不被替代 | 复杂 case 必给 CS | 简单 FAQ 可 chatbot | 部分 |
+| Risk | 不泄漏 PII | 不能 surface 用户信用数据 | 不含 PII 可 | **是** |
+
+**Conflict**:
+- Product 要快, Compliance 要 careful
+- CS 要保留, Product 要自动化最大化
+- Risk 要严, Product 要 surface 多
+
+**Resolution**:
+- **Tier-based design** — 把 ambiguity 显性化, 让每个 stakeholder 在自己 tier 红线内决定
+- Tier 1 (通用 FAQ, no PII, no promise) — Compliance + Risk 都批
+- Tier 2 (账户信息 limited) — Risk + Compliance 一起 review schema
+- Tier 3 (复杂 case) — 转 CS, CS 保留 + 拿到更难 case
+
+### 4.4 Escalation framework
+
+当 stakeholder 冲突无法在你 layer resolve, **不要硬撑**. Escalate to 共同 owner.
+
+**Escalation script**:
+> "Hey [manager], I've talked to Product (wants speed) + Compliance (wants careful review) + CS (wants to keep human role). 三方 valid 诉求, 我 layer 无法 fully reconcile. 我提议 tier-based 方案, 但需要 [you / exec] 来确认 priority. 我下周三 10am 跟 3 方一起 review, 你能否参与做最终 call?"
+
+**关键**: escalate 时带 proposal + invite 决策, 不是 dump 问题.
+
+### 4.5 Organizational ambiguity 的 STAR (Voice agent 多市场 stakeholder)
+
+**S**: Voice agent 扩展到 6 个市场, 每个市场 ops / product / compliance 各 1 个 stakeholder = 18 stakeholders.
+
+**T**: 设计架构 + scope 让 18 个 stakeholder 都 align.
+
+**A**:
+1. Per-market stakeholder map (18 行)
+2. 找共性 — LLM backbone, ASR pipeline, RAG framework 是 shared
+3. 找差异 — persona, TTS voice, escalation rules, compliance prompt 是 per-market
+4. **Workshop**: 每市场 1 day kickoff, 3 个 stakeholder 同时 in room, 当场决定 per-market layer
+5. **Decision log**: 每个市场的决定 written down, sign-off
+
+**R**: 6 个月内 6 个市场上线, 0 个市场上线后大改架构. **关键**: 上线前 align 比上线后 fix 快 10×.
+
+**Reflection**: Organizational ambiguity 的最大错误是 **silo build, late align**. 反过来 — **early align, then build** — 慢一点 start, 但 finish 快很多.
+
+### 4.6 Push-back dialog (stakeholder 让步)
+
+> 你 to Product VP: "I hear you want to launch in 8 weeks. Compliance 需要 12 weeks for review. 选项:
+> A) 12 weeks 完整 launch
+> B) 8 weeks 只 launch tier 1 (Compliance can pre-approve tier 1 in 4 weeks)
+> C) 8 weeks pilot 100 user, full launch 14 weeks
+>
+> 我建议 B — 8 weeks tier 1 是 60% volume, 你的 KPI 第一阶段满足. Tier 2/3 在 12-14 周 follow up."
+
+**给 option, 不 dump 问题**. Stakeholder 通常感谢 trade-off framing.
 
 ---
 
-## 5 follow-ups (recruiter / HM 会追问)
+## ⚙️ Problem 5: Outcome / Metric Ambiguity — 成功标准没定义
 
-**Q1**: "What if your decomposition is wrong — turn out tier 3 actually fine to automate quickly?"
-**A**: "Then I learn and reshape. The 2-week pilot was specifically designed to **stress-test my assumption**. If pilot showed 0% wrong-call on tier 3 difficult cases, I'd accelerate. **Decomposition is a hypothesis, not a commandment** — the eval is the truth."
+### 5.1 这种 ambiguity 长什么样
 
-**Q2**: "What if the ops team got angry at the pushback?"
-**A**: "They were initially frustrated — 'we asked for 8 weeks, why 12 weeks for tier 3'. The reframe that worked: **'I want to give you the right answer faster, not the wrong answer on time'**. Showed them the cost-of-wrong-call analysis (estimated 8% wrong rate × $X per refund = $Y monthly liability). Numbers diffused the emotional ask."
+- "Increase efficiency"
+- "Improve customer experience"
+- "Reduce cost"
+- "Make it better"
+- "Be like ChatGPT but for our business"
+
+特征:
+- 没 specific metric
+- 没 baseline
+- 没 threshold
+- 没 measurement plan
+
+### 5.2 KPI Lock framework
+
+**4 step**:
+
+1. **Convert vague to specific**: "Efficiency" → "Tickets per hour" or "Cost per ticket" or "First-call resolution rate"?
+2. **Establish baseline**: 当前 number 是多少?
+3. **Set threshold**: 多少算 success? "10% improvement", "20% improvement", "match human"?
+4. **Define measurement**: 怎么 measure? 谁 collect? 多频?
+
+### 5.3 Reference-point framing
+
+如果客户答 "I don't know", 给 reference:
+
+> "Let me give you 3 reference points so you can decide:
+>
+> (a) **Consumer search engine** — wrong result annoying, retry free. Acceptable error 5-10%.
+> (b) **Credit decision** — wrong call has financial + regulatory impact. Acceptable error < 1%.
+> (c) **Medical diagnosis** — wrong call life-threatening. Acceptable error < 0.01%.
+>
+> 你的 use case 落在 spectrum 哪里?"
+
+客户通常能 anchor 到某点, 然后 lock metric.
+
+### 5.4 例子: BNPL chatbot KPI lock
+
+**初始**: "Improve customer support."
+
+**Discovery**:
+- Specific? → "Reduce ticket resolution time" or "Increase deflection rate"? 客户选 deflection rate.
+- Baseline? → 当前 0% (无 chatbot). 客户原目标 50%.
+- Threshold? → 客户答 "as high as possible". 反问 "如果 50% 就 done, 60% 是 stretch, 70% 是 stretch goal?" 客户接受.
+- Measurement? → Daily dashboard, 周三 weekly review.
+
+**Lock**: 50% deflection in 3 months as success, 60% as stretch, 70% as stretch goal. Measured daily, reviewed weekly.
+
+**Result**: 上线 3 个月达到 65% (between target and stretch). 双方 happy.
+
+### 5.5 Outcome ambiguity 的 STAR (Internal Agent Platform metric lock)
+
+**S**: 做 Internal Agent Platform, leadership 问 "platform 算 success 的标准是什么?"
+
+**T**: 把 vague "make agents easier" 锁成 measurable.
+
+**A**:
+1. **Reference points**:
+   - Internal infra usually measured by # of teams adopting
+   - Or by build cost reduction
+   - Or by quality of agents built
+2. **Stakeholder workshop** (leadership + 5 种子 team lead)
+3. **Lock**: 6 个月内 5 → 10 teams onboard, build time per agent 50% reduce, 0 P0 incident
+4. **Measurement plan**: monthly adoption review, per-team survey on build time, on-call rotation tracking incident
+
+**R**: 6 个月 5 → 14 teams (140% of target), avg build time -65%, 0 P0. Stretch goals 都过.
+
+**Reflection**: Outcome ambiguity 是 FDE 工作最常见. 把 vague 锁成 measurable 是 FDE core skill. 没 lock 的 outcome = 6 个月后双方对 "成功" 定义不一致 = 失败.
+
+### 5.6 Push-back dialog (客户拒绝 lock metric)
+
+> 客户: "I don't want to commit to a specific number. Just do your best."
+> 你: "I hear you. But 'best' 不可 measurable, 6 个月后我们无法 evaluate 是否成功. 我提议这样:
+>
+> 我提一个 number based on industry benchmark, 你 push back. 比如 50% deflection rate in 3 months. 你觉得 ambitious / conservative / 完全不对?
+>
+> 如果 ambitious → 我调整 architecture more aggressive
+> 如果 conservative → 我们 lock 60%
+> 如果不对 → 你 propose 一个 alternative metric
+>
+> Lock metric 不是 contract, 是 alignment tool. 我们 quarterly review 可以 update."
+
+90% 情况, 客户能 react 到一个 strawman number 比 "from scratch propose" 容易很多.
+
+---
+
+# Part 3 · 串起来看
+
+这 5 种 ambiguity 是 FDE 工作的 5 个不同维度:
+
+1. **Goal ambiguity** — "客户不知道要啥" — 用 discovery 帮客户拆
+2. **Technical ambiguity** — "多个架构都行" — 用 trade-off matrix + reversibility
+3. **Data ambiguity** — "数据不清" — 用 hypothesis-driven 系统排除
+4. **Organizational ambiguity** — "stakeholder 冲突" — 用 stakeholder map + escalate
+5. **Outcome ambiguity** — "成功没定义" — 用 KPI lock + reference points
+
+**核心 mental model**: 每次面对 ambiguity 先 **classify type**, 再选 framework. 不要把所有 ambiguity 当一类处理.
+
+---
+
+## 必问 clarifying questions
+
+如果 HM 给一个具体场景问 "你会怎么 handle", 你可以反问 clarifying:
+
+**1. 哪种 ambiguity?**
+
+> "你描述的场景里, ambiguity 是关于 [goal / technical / data / org / outcome], 还是几种混合?"
+
+**2. Reversibility**
+
+> "这是 one-way 还是 two-way door? 我的 framework 不一样."
+
+**3. Stakeholder count**
+
+> "牵涉几个 stakeholder? 有没有 single decision maker?"
+
+**4. Timeline pressure**
+
+> "Timeline 是 days / weeks / months? 短 timeline 我 prioritize ship-and-measure, 长 timeline 我 invest 更多 discovery."
+
+**5. Blast radius**
+
+> "Wrong call 的 blast radius? 单一客户 vs 多客户 vs 公司层面? 影响 scoping 投入."
+
+---
+
+## 5 步框架 (回答这道题的 60 秒结构 + STAR)
+
+| 段 | 时长 | 内容 |
+|---|---|---|
+| Setup | 15s | "FDE 工作 90% 在 ambiguity 里, 我有 D·D·D·V framework" |
+| Framework | 20s | Diagnose type / Decompose / Decide by reversibility / Validate |
+| Story setup | 30s | "举一个 example — Indonesia tier 3 refund" |
+| Story action | 60s | 详细讲 4 个 D + 数据 |
+| Story result | 20s | 70% throughput, 0% risk, 6 weeks |
+| Takeaway | 15s | "Decomposition is hypothesis, not commandment" |
+
+Total: ~2.5 min. HM 通常会 follow up.
+
+---
+
+## 简历专属 reframe — MANY STAR stories
+
+### STAR 1: Indonesia Refund Tier (★ PRIMARY)
+
+**Use for**: Goal ambiguity + Outcome ambiguity (most behavioral questions)
+
+**S**: Ops "auto refund 下季度"
+**T**: 不完整信息下 commit conditionally
+**A**: 3-tier decomp by reversibility, 2-week pilot, data-driven reframe
+**R**: 70% throughput, 0% risk, 6 weeks; tier 3 0 wrong refund
+
+**FDE framing**: "Decomposition is hypothesis. Pilot validates. Data reframes ask."
+
+### STAR 2: Pakistan ASR Provider (Technical Ambiguity)
+
+**S**: 4 weeks deadline, ASR vendor 选择 (Azure / Google / AWS / Whisper)
+**T**: Choose without single source of truth
+**A**: Trade-off matrix, 3-day quick eval, cascade design instead of single-pick
+**R**: Pakistan launch on time, 0 ASR incident month 1
+
+**FDE framing**: "Don't pick the best. Design architecture so wrong choice is reversible."
+
+### STAR 3: BNPL Routing 70 → 92% (Data Ambiguity)
+
+**S**: Launch month 1, routing 70%, 不知道 why
+**T**: Diagnose root cause without disabling
+**A**: Hypothesis list ordered by cost, confusion matrix Day 2 → H3 confirmed (tool desc 模糊), rewrite + RAG discovery
+**R**: 70 → 92% in 6 weeks. Saved 3-4 weeks of unnecessary fine-tuning.
+
+**FDE framing**: "Cheap hypotheses first. MLE wants to train, FDE looks at data first."
+
+### STAR 4: BNPL 4-Stakeholder Conflict (Organizational Ambiguity)
+
+**S**: Product / Compliance / CS / Risk 4 个 stakeholder, 优先级冲突
+**T**: Design 满足 4 方红线
+**A**: Stakeholder map (5 col), tier-based design (tier 1/2/3 各 stakeholder 红线内决定)
+**R**: 0 compliance incident, CS satisfaction 提升 (拿到 high-value case), Product VP renew project
+
+**FDE framing**: "Make ambiguity explicit, help stakeholders reach consensus, don't unilateral decide."
+
+### STAR 5: ConvFinQA Ablation (Data Ambiguity + Honesty)
+
+**S**: 6-stage pipeline ablation, 2 stages negative lift
+**T**: Diagnose which stage really matters, decide on publication
+**A**: Per-stage ablation, publish all results including negative
+**R**: Paper accepted with reviewer praise for honesty; principle transferred to production retros
+
+**FDE framing**: "Ablation is the systematic way to handle data ambiguity. Honest reporting builds trust."
+
+### STAR 6: Voice Agent 7-Market Stakeholder Workshop (Organizational)
+
+**S**: Voice agent 扩展 6 个市场, 18 个 stakeholder
+**T**: Align 18 个 stakeholder 不 silo build then late align
+**A**: Per-market 1-day kickoff workshop, 3 stakeholder in room, shared/per-market layer 设计
+**R**: 6 markets 6 months, 0 markets 上线后大改
+
+**FDE framing**: "Early align then build, not silo build then align. 10× faster."
+
+### STAR 7: Internal Agent Platform KPI Lock (Outcome Ambiguity)
+
+**S**: Leadership "platform success criteria?"
+**T**: Vague → measurable
+**A**: Reference points + workshop, lock teams adoption count + build time + incident count
+**R**: 5 → 14 teams (140% target), -65% build time, 0 P0
+
+**FDE framing**: "Lock metric 不是 contract, 是 alignment tool. Without it, 6 月后双方定义不一致."
+
+### STAR 8: Wrong Call I Made (Show Vulnerability)
+
+**S**: Voice agent multi-region 我初始 scope 成 "translate prompts per language, ship"
+**T**: Multi-market localization
+**A** (wrong): 没 scope cultural review
+**R** (wrong): 上线后发现债务沟通文化差异 (Thailand 礼貌, Korea 直接), 4 周 redo persona + escalation logic
+**Lesson**: "Localization for AI > translation. 我现在 scope multi-market 必包含 cultural review."
+
+**FDE framing**: HM 想听一个真实 wrong call. 这是关键 trust signal. Don't fake humble — show genuine learning.
+
+---
+
+## 5 follow-ups (HM 会追问)
+
+**Q1**: "What if your decomposition turns out wrong — tier 3 actually fine to automate quickly?"
+
+**A**:
+> "Then I learn and reshape. 2-week pilot 是专门 stress-test 我的 assumption. 如果 pilot 显示 tier 3 difficult case 0% wrong, 我会 accelerate.
+>
+> **Decomposition is hypothesis, not commandment**. Eval 是 truth. 我 explicitly 留 pilot 检测我自己 wrong 的可能."
+
+**Q2**: "What if ops got angry at the pushback?"
+
+**A**:
+> "They were initially 不爽 — 'we asked 8 weeks, 你 12 weeks for tier 3'.
+>
+> Reframe 帮助: 'I want to give you the **right answer faster, not the wrong answer on time**'. 加上 cost-of-wrong-call 估算 (projected 8% wrong rate × $X per refund × monthly volume = $Y monthly liability). 数字 diffuse emotion.
+>
+> Ops 最终 thank me. 后来跟 my manager 反馈 'Gao 是少数 push back 但能让我感谢的 vendor.'"
 
 **Q3**: "How do you know when 'decompose more' becomes procrastination?"
-**A**: "Pragmatic rule: **decomposition that takes longer than 10% of the implementation timeline is over-decomposition**. For a 12-week project, > 1 week of scoping is procrastination. **At some point, ship a small piece and learn from data**. I'd rather over-decompose by 1 day than under-ship for 4 weeks."
+
+**A**:
+> "Pragmatic rule: **decomposition > 10% of total project timeline = over-decomposition**.
+>
+> 12-week project, > 1 week scoping 是 procrastination. **At some point, ship small piece and learn from data**.
+>
+> 我 prefer over-decompose by 1 day 不是 under-ship by 4 weeks. Two-way door 决定可以 quick ship + measure; one-way door 才需要长 scoping."
 
 **Q4**: "Have you ever made a wrong call under ambiguity?"
-**A**: Have a real one ready:
-> "Yes. On the voice agent, I initially scoped the multi-region rollout as 'translate prompts per language, ship'. Turns out **debt-collection cultural norms differ wildly** — what's polite in Thailand is rude in Korea. We had to redo the persona + escalation logic per market. **Cost: 4 extra weeks**. **Lesson: 'localization' for AI means more than translation; I now scope cultural review as part of multi-market projects**."
 
-**Q5**: "How do you balance speed and quality under ambiguity?"
-**A**: "By **reversibility classification**: two-way doors → speed. One-way doors → quality. I explicitly tag every decision when scoping. **Most decisions are two-way and can be reversed cheaply** — over-optimizing for quality on those is waste."
+**A** (use STAR 8 above):
+> "Yes. Voice agent multi-region rollout 我 initial scope 是 'translate prompts per language, ship'.
+>
+> Turns out 债务沟通文化差异巨大 — Thailand 礼貌 framing 是 polite, 直接说 'pay your debt' 是 rude. Korea 反过来, 礼貌过头反而 less credible.
+>
+> 我 redo persona + escalation logic per market, cost 4 extra weeks.
+>
+> Lesson: **'Localization' for AI > translation**. Cultural review 现在是 multi-market project 的 scope item, not optional."
 
----
+**Q5**: "How do you balance speed vs quality under ambiguity?"
 
-## ❌ 易错点
-
-1. **No structured framework** — just narrative
-2. **Pure speed/pure caution** — no nuance
-3. **Story without metrics** (70% / 0% / 6 weeks)
-4. **Blame stakeholder** for ambiguity
-5. **Solo decision** without stakeholder validation
-6. **Generic story** — sounds rehearsed
-7. **Doesn't tie to what FDE does** (deployment ambiguity)
-
----
-
-## ✅ 加分项
-
-1. **D·D·D·V framework** explicit
-2. **Reversibility classification** (one-way vs two-way doors)
-3. **"Decomposition is hypothesis" awareness**
-4. **Specific metrics in story** (70% / 0% / 8 weeks)
-5. **Acknowledge wrong call you made** in follow-up
-6. **Tie to FDE day-to-day** (customer deployment ambiguity is universal)
-7. **Quote business-language framing** ("right answer faster vs wrong answer on time")
+**A**:
+> "By **reversibility classification**:
+>
+> - Two-way doors → speed (ship + measure)
+> - One-way doors → quality (invest in scoping)
+>
+> 我 explicitly tag every decision at scoping time. **Most decisions are two-way and can be reversed cheaply** — over-optimizing quality on those is waste.
+>
+> 但 one-way doors (e.g., tier 3 refund, production model swap, pricing) — 我 explicitly slow down 投资 scoping. 错了 12 个月才发现的 decision 不应该 1 周决定."
 
 ---
 
-## Cheat Sheet
+## ❌ 易错点 (top 10)
+
+1. **No structured framework** — 纯 narrative, 没 framework signal
+2. **Pure speed or pure caution** — 没 nuance
+3. **Story 没 metrics** — 70% / 0% / 6 weeks 数字必须有
+4. **Blame stakeholder** for ambiguity — 显得 immature
+5. **Solo decide** 不 validate — 显示 silo 倾向
+6. **Generic story** — 听起来 rehearsed
+7. **Doesn't tie to FDE** — 没 connect 到 deployment ambiguity
+8. **Push back without data** — 显得 "你不愿意做"
+9. **不承认 wrong call** — 显示不 self-aware
+10. **没 reversibility 区分** — One-way / Two-way 不 distinguish
+
+---
+
+## ✅ 加分项 (top 10)
+
+1. **D·D·D·V framework** explicit, named, reusable
+2. **5 types of ambiguity** classification (goal / technical / data / org / outcome)
+3. **Reversibility classification** (one-way vs two-way doors)
+4. **"Decomposition is hypothesis"** awareness
+5. **Specific metrics** (70% / 0% / 8 weeks)
+6. **Acknowledge wrong call** with genuine learning
+7. **Tie to FDE day-to-day** (deployment ambiguity is universal)
+8. **Business-language reframe** ("right answer faster vs wrong on time")
+9. **Stakeholder validation** explicit
+10. **Cheap hypothesis first** in data ambiguity
+
+---
+
+## 一句话总结
+
+> **Handle ambiguity 不是 "我能 ship 没 spec 的项目", 是 "我能 classify ambiguity 5 类, decompose 成已知/未知/假设, 按 reversibility 决策, 用 stakeholder + data validate"**.
+>
+> D·D·D·V framework + reversibility classification + cheap hypothesis first + early stakeholder align = senior FDE.
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
 D·D·D·V framework:
-  Diagnose ambiguity type
-  Decompose into known / unknown / assumption
-  Decide by reversibility (one-way slow, two-way fast)
-  Validate with stakeholder
+  Diagnose      — 哪种 ambiguity (goal/tech/data/org/outcome)
+  Decompose     — 已知/未知/假设
+  Decide        — by reversibility (one-way slow, two-way fast)
+  Validate      — stakeholder + pilot data
 
-Reversibility classifier:
-  Two-way doors → ship + measure (most decisions)
-  One-way doors → investigate first
-  ID at scoping time, not after
+5 ambiguity types + 应对:
+  Goal       — 客户不知道想要啥     → Discovery 帮拆
+  Technical  — 多架构 viable        → Trade-off matrix + reversibility
+  Data       — 稀疏/矛盾/噪声       → Hypothesis-driven, cheap first
+  Org        — Stakeholder 冲突     → Stakeholder map + escalate
+  Outcome    — 成功没定义           → KPI lock + reference points
 
-Indonesia refund tier story:
-  S: ops wants auto refund "next quarter"
-  T: scope + timeline conflict
-  A: 3-tier decomposition by reversibility,
-     pilot 2 weeks, data-driven reframe
-  R: 70% throughput, 0% risk, 6 weeks
+Reversibility matrix:
+  One-way + high blast → 8-12 wk scoping (tier 3 refund)
+  One-way + low blast  → 2-4 wk scoping (single-customer change)
+  Two-way + high blast → 1-2 wk pilot then scale (multi-market)
+  Two-way + low blast  → ship + measure same day (prompt tune)
 
-Phrases:
-  "I diagnose what kind of ambiguity"
-  "Reversibility classification"
-  "Two-way doors → ship + measure"
-  "Decomposition is hypothesis"
+5-question discovery (Goal ambiguity):
+  1. The ONE metric in 6 months?
+  2. Current baseline?
+  3. Who's the loser if we succeed?
+  4. What outcome makes us look stupid?
+  5. What does week-1 success look like?
+
+Hypothesis order (Data ambiguity):
+  - List 5-10 hypotheses including "boring" ones
+  - Order by cost-to-verify (ascending)
+  - Run cheapest first
+  - Stop when explanation found
+  ❌ Don't start with "let's retrain" (most expensive usually)
+
+Stakeholder map (Org ambiguity, 5 col):
+  Stakeholder | 真实诉求 | 红线 | 妥协空间 | Veto power
+
+Reference points (Outcome ambiguity):
+  Consumer search (5-10% error OK)
+  Credit decision (< 1% error)
+  Medical (< 0.01% error)
+
+8 ready STAR stories:
+  1. Indonesia refund tier (★ goal + outcome)
+  2. Pakistan ASR cascade (technical)
+  3. BNPL routing 70→92% (data)
+  4. BNPL 4-stakeholder (org)
+  5. ConvFinQA ablation (data + honesty)
+  6. Voice agent 7-market workshop (org)
+  7. Internal Platform KPI lock (outcome)
+  8. Multi-region wrong call (vulnerability)
+
+Phrases to use:
+  "Decomposition is hypothesis, not commandment"
   "Right answer faster, not wrong on time"
+  "Two-way door → ship + measure"
+  "Cheap hypothesis first"
+  "Make ambiguity explicit, help stakeholders consensus"
 
-Anti-patterns:
+Phrases to NEVER use:
   "I just ship"
-  "I ask manager"
-  "I research first"
-  "It depends" without follow-up
-  No metrics
+  "I ask my manager"
+  "I research first" (alone, no concrete)
+  "It depends" (no follow through)
+
+Push-back dialog templates:
+  Customer impatient → "Sketch + flag 3 assumptions, or confirm first?"
+  Vague KPI → "Reference 3 industry anchors"
+  Solo lock metric refused → "I propose strawman, you push back"
+  Stakeholder conflict → "Give option A/B/C with trade-offs"
+
+5 follow-ups ready:
+  Q1: Decomp wrong? → Pilot stress-tests, learn + reshape
+  Q2: Stakeholder angry? → Reframe + cost data
+  Q3: Decompose vs procrastinate? → 10% rule
+  Q4: Wrong call story? → Multi-region localization (cultural)
+  Q5: Speed vs quality? → Reversibility classification
+
+Red lines:
+  - No framework signal
+  - No metrics in story
+  - No wrong call acknowledged
+  - No reversibility distinction
+  - Solo silo decision
 ```
 </script>
 <script>

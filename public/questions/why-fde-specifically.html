@@ -40,91 +40,448 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>题目（verbatim）</h3>
-<blockquote><p><strong>[Recruiter Screen 30-45 min]</strong></p>
-<p>"<strong>Why do you want FDE specifically</strong> versus other engineering roles at OpenAI / Google / etc?"</p></blockquote>
-<p><strong>出处</strong>：OpenAI recruiter 经典开场, Google FDE recruiter / Tomoro / Palantir 也都问.</p>
-<p><strong>Round</strong>：Recruiter Screen (30-45 min)</p>
+<blockquote><p><strong>[Recruiter Screen / Hiring Manager opener — 30-45 min]</strong></p>
+<p>"<strong>Why do you want FDE specifically</strong> versus other engineering roles? Why FDE at OpenAI / Google / Anthropic / Palantir, not Research / SWE / MLE / Sales Engineering?"</p></blockquote>
+<p><strong>出处</strong>: OpenAI recruiter 经典开场, Google FDE recruiter / Anthropic AS / Tomoro / Palantir Forward Deployed 都问. 几乎是每一家 FDE 面试<strong>第一题</strong>.</p>
+<p><strong>Round</strong>: Recruiter Screen / Hiring Manager opening (30-45 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
-<p><strong>Recruiter screen 不是技术深度</strong>, 是 <strong>fit + clarity</strong>：</p>
-<ol><li><strong>能不能 5 句话说清</strong> —— 啰嗦 = 没想清</li><li><strong>你懂 FDE vs others 区别</strong> —— 否则候选 mistake apply</li><li><strong>Motivation 真不真</strong></li><li><strong>未来 trajectory</strong> —— FDE 是 stepping stone 还是 home</li></ol>
+<p>表面是 "动机题", 实际是 <strong>fit + clarity + 角色理解</strong> 的复合考察:</p>
+<ol><li><strong>能不能 60-90 秒 内说清楚</strong> —— 啰嗦 = 没想清楚, 太短 = 没思考</li><li><strong>你懂不懂 FDE vs SWE / MLE / Research / Sales Engineering 的区别</strong> —— 不懂就是 mistake apply, 候选会浪费招聘官时间</li><li><strong>你的 motivation 真不真</strong> —— 是 "OpenAI 是最热的公司我要进来" 还是 "我已经在做 FDE 的事, 现在找匹配的 title"</li><li><strong>你的 career trajectory 合不合理</strong> —— FDE 是 stepping stone to PM/CTO, 还是 home / long-term identity</li><li><strong>你对这家公司具体了解多深</strong> —— 不同公司的 FDE flavor 完全不同, 你能不能差异化讲</li></ol>
+<p><strong>Recruiter 真正在筛的信号</strong> (按重要性排序):</p>
+<table class="md-table"><thead><tr><th>信号</th><th>权重</th><th>怎么体现</th></tr></thead><tbody><tr><td><strong>"已经在做 FDE 工作"</strong></td><td>★★★★★</td><td>你 quote 出当前工作里 FDE 形状的事 (客户对接 / scoping / 多 stakeholder / 端到端 ownership)</td></tr><tr><td><strong>角色边界清晰</strong></td><td>★★★★</td><td>你能讲出 FDE vs SWE vs MLE 的区别, 而不是 "我也想做 research 也想做 product"</td></tr><tr><td><strong>公司差异化</strong></td><td>★★★★</td><td>你知道 OpenAI FDE ≠ Anthropic AS ≠ Palantir FDE, 不是模板 pitch</td></tr><tr><td><strong>个人热情真实</strong></td><td>★★★</td><td>具体故事, 不是抽象口号</td></tr><tr><td><strong>trade-off 自觉</strong></td><td>★★★</td><td>你 acknowledge 你 give up 了什么 (e.g. 不能做 frontier research)</td></tr></tbody></table>
+<p><strong>没说出口的 anti-signal</strong>:</p>
+<ul><li>"我对 FDE 不熟, 但听起来不错" → 你在 fishing for any offer</li><li>"我想做 customer-facing 的 AI" → 模糊, 任何角色都能这么讲</li><li>"FDE 是 stepping stone 到 PM" → recruiter 听到立刻降权重</li><li>"看了 JD 我觉得能 cover 90%" → 把它当成 SWE 简历投递</li></ul>
 <hr />
-<h3>FDE vs others 区分（recruiter 关心的）</h3>
-<table class="md-table"><thead><tr><th>Role</th><th>What</th><th>适合 person</th></tr></thead><tbody><tr><td><strong>Pure ML / Research</strong></td><td>Frontier model 训练</td><td>Loves papers, novel architectures</td></tr><tr><td><strong>Platform Engineer</strong></td><td>内部 infra (vLLM tuning)</td><td>Loves systems</td></tr><tr><td><strong>Software Engineer (SWE)</strong></td><td>Product features</td><td>Loves shipping</td></tr><tr><td><strong>FDE</strong></td><td>At customer site, deploy + customize + own outcome</td><td>Loves <strong>customer-facing impact</strong> + technical depth</td></tr><tr><td><strong>Sales Engineer</strong></td><td>Pre-sales technical</td><td>Customer-facing but less hands-on coding</td></tr><tr><td><strong>Customer Success</strong></td><td>Post-sales relationship</td><td>Less technical</td></tr></tbody></table>
-<p>FDE 区别：<strong>both deep coding AND on-site with customer</strong>，不是 either-or。</p>
+<h1>Part 1 · 教学讲解</h1>
+<h3>1. 几个术语先讲清</h3>
+<p><strong>FDE (Forward Deployed Engineer)</strong>: 字面意思 "向前部署的工程师". 起源于 Palantir, 现在 OpenAI / Anthropic / Google Cloud / Databricks 都有类似角色. 核心定义:</p>
+<blockquote><p>一个 <strong>technically deep</strong> 的工程师, <strong>物理上或制度上贴近客户</strong>, 端到端负责 <strong>把通用产品 / 模型 / 平台 落地到客户具体业务上</strong>, 同时把 <strong>学到的东西反哺回产品 / 模型团队</strong>.</p></blockquote>
+<p>注意三个关键词:</p>
+<ul><li><strong>technically deep</strong> — 写代码、调模型、debug 系统, 不是 PPT 工程师</li><li><strong>贴近客户</strong> — 物理 on-site 或制度上深度对接 customer team</li><li><strong>端到端</strong> — 从 scoping → POC → production → renewal 全程 ownership</li></ul>
+<p><strong>SWE (Software Engineer)</strong>: 产品 / 内部 infra 工程师. 不直接对客户. 接需求做 feature.</p>
+<p><strong>MLE (Machine Learning Engineer)</strong>: 模型工程师. 主要做 training / fine-tuning / inference pipeline / eval.</p>
+<p><strong>Research / Research Engineer</strong>: Frontier model 研究. 主要 output 是 paper、新架构、新算法.</p>
+<p><strong>Sales Engineer (SE) / Solutions Architect (SA)</strong>: Pre-sales technical. 帮 sales 做 POC、demo、技术问答. <strong>不 own 长期 deployment</strong>.</p>
+<p><strong>Customer Success / Implementation Engineer</strong>: Post-sales 关系维护. 技术成分较低. 主要 driver 是 customer retention, 不是 code shipping.</p>
+<h4>FDE 在这张图里的位置</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                    Customer-facing
+                          ↑
+                          │
+          Sales Engineer  │  FDE  ←─ 你想去的位置
+              ↑           │     ↑
+              │           │     │
+              │           │     │
+   ───────────┴───────────┼─────┴──────────→ Technically deep
+              │           │     │
+              │           │     │
+              │           │  MLE / SWE / Research
+              ↓           │     ↓
+       Customer Success   │
+                          │
+                          ↓
+                   Internal-facing</code></pre>
+<p>FDE 是 <strong>同时高 customer-facing + 高 technical depth</strong> 的稀有象限. 这个象限不大, 但是是当今 GenAI 商业化的关键缺口.</p>
 <hr />
-<h3>60-90 秒 answer 框架</h3>
-<table class="md-table"><thead><tr><th>段</th><th>What</th></tr></thead><tbody><tr><td>1 (10s)</td><td>Identity anchor</td></tr><tr><td>2 (20s)</td><td>What specifically draws you to FDE</td></tr><tr><td>3 (20s)</td><td>Why you (proof)</td></tr><tr><td>4 (15s)</td><td>Why this company specifically</td></tr><tr><td>5 (10s)</td><td>Forward-looking (career arc)</td></tr></tbody></table>
+<h3>2. 这道题在考你什么 (深入)</h3>
+<p>Recruiter / HM 实际在评估 <strong>5 个潜在风险</strong>:</p>
+<h4>风险 1: "你是不是 'apply everywhere' 候选人?"</h4>
+<p>判断方式: 你对 FDE 的描述是否 specific. 模糊回答 = 你只是在投票.</p>
+<h4>风险 2: "你会不会三个月后想去做 research?"</h4>
+<p>FDE 离 research 比 SWE 近, 很多 research-aspiring 的候选会把 FDE 当 backdoor. Recruiter 怕招你两年你跳到 research team.</p>
+<p>破解: 主动 acknowledge "我考虑过 research, 但我的 energy 在 business outcome, 不在 paper. 这是 trade-off, 我清楚."</p>
+<h4>风险 3: "你能 handle customer 吗?"</h4>
+<p>很多 deep tech 候选 (尤其 PhD / pure research 背景) 看到 customer 就 panic. FDE 50% 时间在和客户 ops / IT / legal 撕扯, 不是和模型撕扯.</p>
+<p>破解: quote 你做过的 customer-facing 故事 (Indonesia ops team, 多市场 product manager).</p>
+<h4>风险 4: "你 long-term 待得住吗?"</h4>
+<p>FDE 的 churn rate 比 SWE 高. 一是 burnout (客户压力大), 二是 stepping stone 心态 (跳 PM / 创业).</p>
+<p>破解: trajectory 讲长期 ("我想在 FDE 这个 role 长期 compound, 因为这是 GenAI 行业未来十年的 key role").</p>
+<h4>风险 5: "你能写真正的代码吗?"</h4>
+<p>有些候选 FDE 听起来 fit, 但 coding round 拉垮. Recruiter 会在这一轮就埋下伏笔.</p>
+<p>破解: 在 motivation 里 quote technical depth ("vLLM / SGLang / SFT / DPO / RL alignment"), 让 recruiter 知道后面 technical round 不会塌.</p>
 <hr />
-<h3>你专属 sample answer（基于 resume）</h3>
-<blockquote><p>"Three reasons FDE specifically, not other engineering roles.</p>
-<p><strong>One</strong>: I love the <strong>gap between research and production</strong>. I've been at TikTok Payment for 3 years building production GenAI systems — voice agents, RAG chatbots, agent platforms. The most fulfilling work is when frontier model capability <strong>meets a specific business constraint at a customer site</strong> and I have to bridge the gap with engineering craft, not just model selection. That's the FDE job description.</p>
-<p><strong>Two</strong>: I've effectively been doing FDE work without the title. At TikTok I'm 'Expert Algorithm Engineer + Technical POC'. The POC part means I sit between research, engineering, product, and regional business teams across 7 markets. I translate business asks to model deliverables, debug at customer-equivalent sites (regional ops teams), and own outcome metrics like repayment conversion. <strong>The role I'm doing today is FDE shaped — I want the title and team that matches</strong>.</p>
-<p><strong>Three</strong>: At Tomoro / OpenAI Deployment Company specifically, FDEs work with frontier-model researchers down the hall, not 6 layers of corporate away. For someone who's been doing <strong>post-training (SFT, DPO, RL alignment) and inference optimization (vLLM, SGLang)</strong> on internal models, working at the source is irresistible.</p>
-<p>Not pure research because I'm motivated by <strong>business outcome, not papers</strong>. Not pure SWE because I want <strong>customer interaction</strong>, not isolated feature work. Not sales engineering because I want to <strong>own the code, not the slides</strong>.</p>
-<p>FDE is exactly the middle of those three."</p></blockquote>
-<p>⏱️ 75 seconds.</p>
+<h3>3. 回答框架: AURA (60-90 秒 monologue)</h3>
+<table class="md-table"><thead><tr><th>段</th><th>时长</th><th>What</th><th>你的 anchor</th></tr></thead><tbody><tr><td><strong>A</strong> — Anchor (identity)</td><td>10s</td><td>你是谁, 你做什么</td><td>"Algo engineer at TikTok Global Payment, building production GenAI for 3 years"</td></tr><tr><td><strong>U</strong> — Underlying motivation</td><td>20s</td><td>是什么 specifically 吸引你到 FDE</td><td>"Bridge frontier capability to specific business constraint at customer site"</td></tr><tr><td><strong>R</strong> — Right fit proof</td><td>25s</td><td>为什么是你</td><td>"Already doing FDE-shaped work — 7 markets, customer ops, end-to-end"</td></tr><tr><td><strong>A</strong> — Aligned target</td><td>15s</td><td>为什么这家公司, 为什么现在</td><td>"OpenAI FDE = frontier researcher down the hall, that's irresistible for someone doing post-training"</td></tr><tr><td><strong>Trade-off ack</strong></td><td>10s</td><td>你 give up 了什么</td><td>"Not pure research because outcome &gt; papers; not pure SWE because customer interaction matters"</td></tr></tbody></table>
+<p>Total: ~80 秒. 短不过 60, 长不过 100.</p>
+<h4>为什么是这个顺序</h4>
+<p><strong>Anchor first</strong> — recruiter 需要先知道你是谁, 才能听懂后面的故事. <strong>Motivation 比 proof 先</strong> — 因为 motivation 是抽象, proof 是落地. 先讲 why, 再讲 evidence. <strong>Company-specific 放后面</strong> — 因为前面已经把你这个人讲清楚, company piece 是 "为什么是这里", 自然接住. <strong>Trade-off ack 收尾</strong> — 显示成熟, 你不是 "什么都想要" 的人.</p>
 <hr />
-<h3>5 个 "what to NOT say"</h3>
-<p>❌ <strong>"I want to work at OpenAI, FDE is the most open role"</strong> → 不是 fit, 是 opportunism ❌ <strong>"Better comp than other roles"</strong> → 真实但 surface ❌ <strong>"I don't want to do research anymore"</strong> → defining negatively ❌ <strong>"My friend works there"</strong> → social, not personal ❌ <strong>"It's a hot new field"</strong> → trend-chasing</p>
+<h3>4. 不同公司的 FDE 差异化 framing</h3>
+<p><strong>OpenAI FDE / Solutions Architect</strong>:</p>
+<ul><li>公司位置: SF / NYC / London / Singapore (Tomoro acquisition 后 footprint 扩大)</li><li>客户类型: Fortune 500 enterprise + 高 ARR SaaS</li><li>工作内容: GPT 系列 + Operator + Codex + 自研 agent 框架的 enterprise 落地</li><li>Frontier proximity: <strong>极高</strong> — 和 research 同一栋楼 (现在加上 ChatGPT product team)</li><li>你的 framing: "我做 post-training 和 inference 优化 (vLLM/SGLang/SFT/DPO), 在 OpenAI 这边能直接和 model team 对话, 不需要 6 层 corporate"</li></ul>
+<p><strong>Anthropic Applied Solutions / Forward Deployed</strong>:</p>
+<ul><li>公司位置: SF / NYC / London (Singapore 也有)</li><li>客户类型: 偏 enterprise 安全敏感行业 (金融 / 法律 / 政府)</li><li>工作内容: Claude API + Claude Code + tool use 落地, 偏 safety 和 constitutional AI 应用</li><li>Frontier proximity: <strong>高</strong> — 但风格更 research-led</li><li>你的 framing: "Anthropic 对 safety 和 trust 的 framing 跟我做 financial / debt collection 的 high-stakes deployment 极其匹配 — tier-based confirm 模式本质上是 constitutional AI 思路"</li></ul>
+<p><strong>Google Cloud Vertex AI FDE / Customer Engineer</strong>:</p>
+<ul><li>公司位置: 全球大公司, 分散</li><li>客户类型: 跨 vertical, 包括 retail / health / finance / public sector</li><li>工作内容: Vertex + Gemini + agent builder + AlloyDB 整体打包落地</li><li>Frontier proximity: <strong>中</strong> — Google research 远, Cloud 团队相对独立</li><li>你的 framing: "字节 internal 7 个市场 deployment 经验对应到 Vertex 多 customer + 多 region 的 scale 挑战"</li></ul>
+<p><strong>Palantir Forward Deployed Engineer</strong>:</p>
+<ul><li>公司位置: SF / NYC / DC / London</li><li>客户类型: 政府 / 金融 / 制造业 / 健康, 高度定制化</li><li>工作内容: Foundry 平台 + 客户数据 ontology + ops 工作流, 模型层占比小</li><li>Frontier proximity: <strong>低</strong> — Palantir 不做 frontier model</li><li>你的 framing: <strong>不要把 Palantir FDE 当成 LLM FDE</strong> — 这里 LLM 是工具, ops + data 是主线. 你要 lean on TikTok PayLater 支付业务的 ops &amp; compliance 经验</li></ul>
+<p><strong>Databricks / Snowflake FDE</strong>:</p>
+<ul><li>公司位置: SF / Boston / 全球</li><li>客户类型: data-heavy enterprise (传统行业数据团队)</li><li>工作内容: 数据平台 + 模型 + serving 一体化</li><li>Frontier proximity: 低-中</li><li>你的 framing: lean on ConvFinQA + data ablation 这类 data engineering 经验</li></ul>
+<p><strong>字节 / 阿里 / 腾讯 FDE-类</strong>:</p>
+<ul><li>没有正式 FDE title, 但 "技术 POC" / "解决方案架构师" 是同形态</li><li>你的 framing: "我在 TikTok 做的就是这个 — Expert Algorithm Engineer + Technical POC + 7 个市场端到端"</li></ul>
+<h4>一个对照表 (cheat sheet)</h4>
+<table class="md-table"><thead><tr><th>公司</th><th>FDE 真正在做的事</th><th>你的钩子 (resume hook)</th></tr></thead><tbody><tr><td>OpenAI</td><td>Frontier model + enterprise deployment</td><td>vLLM / SGLang / SFT / DPO / agent platform</td></tr><tr><td>Anthropic</td><td>Safety-first AI + high-stakes industries</td><td>Indonesia tier 3 confirm pattern + debt collection 合规</td></tr><tr><td>Google Cloud</td><td>Multi-cloud scale + 多 vertical</td><td>7 markets × 6 languages + multi-tenant</td></tr><tr><td>Palantir</td><td>Data + ops + ontology</td><td>TikTok PayLater 支付合规 + 财务系统 integration</td></tr><tr><td>Databricks</td><td>Data + ML lifecycle</td><td>ConvFinQA + ablation methodology</td></tr></tbody></table>
 <hr />
-<h3>5 个 "do say" formulas</h3>
-<p>✅ <strong>"I've been doing FDE work without the title"</strong> + concrete evidence ✅ <strong>"What energizes me: [specific scenario]"</strong> ✅ <strong>"At [target company], FDE specifically means [X], which is [why fit]"</strong> ✅ <strong>"My experience at [current role] maps onto [FDE responsibility]"</strong> ✅ <strong>"FDE is the middle of [three other roles I considered]"</strong></p>
+<h3>5. 4 个真实场景演示</h3>
+<h4>场景 A: TikTok 内部的 "FDE-shaped" 工作 (你的当前)</h4>
+<p><strong>Situation</strong>: 你的 title 是 Expert Algorithm Engineer + Technical POC, 但实际工作覆盖 7 个市场 (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦), 每个市场有独立的:</p>
+<ul><li>产品 / 运营 team (不同时区, 不同语言)</li><li>法规 / 合规要求 (印尼的 OJK, 巴西的 BACEN)</li><li>用户行为模式 (债务沟通文化差异)</li><li>历史系统 (legacy repayment platform)</li></ul>
+<p><strong>Task</strong>: 把 voice agent 从印尼 (首发) 扩展到剩余 6 个市场.</p>
+<p><strong>Action</strong>:</p>
+<ol><li>每个市场 kickoff 一周做 scoping (3 个 stakeholder: ops / product / compliance)</li><li>决定哪些 component 共享 (LLM backbone + ASR pipeline + RAG framework)</li><li>哪些 component 必须 per-market (persona / TTS voice / escalation rules / compliance prompt)</li><li>上线后我自己 on-call 第一周, 跟当地 ops sit in 听通话</li></ol>
+<p><strong>Result</strong>: 6 个月内覆盖 7 个市场, 平均每市场 GMV 提升 X%, 但更重要的是建立了 "GenAI deployment per-market" 的 playbook.</p>
+<p><strong>这就是 FDE 的工作形态</strong>. 我的 title 是 algo engineer, 但 60% 时间在做 FDE.</p>
+<h4>场景 B: BNPL 客服 chatbot 的 stakeholder 拉扯</h4>
+<p><strong>Situation</strong>: 字节内部 BNPL (Buy Now Pay Later) product team 找我做客服 chatbot, 但他们的 stakeholder 比我想象的多:</p>
+<ul><li>Product team — 要 user experience 好</li><li>Compliance — 要不能 promise specific 额度 / 利率 (合规红线)</li><li>CS team — 怕 chatbot 抢他们的 job</li><li>Risk team — 要不能泄漏用户的信用数据</li></ul>
+<p><strong>Task</strong>: 设计一个 system 满足所有 4 方 + 用户 experience.</p>
+<p><strong>Action</strong>:</p>
+<ol><li>1v1 跟 4 个 stakeholder 谈, 出 stakeholder map</li><li>设计 tier-based response: tier 1 通用 FAQ (chatbot 直接答) / tier 2 账户特定信息 (chatbot 答, 但限制 surface area) / tier 3 复杂诉求 (transfer 给 CS)</li><li>CS team 从 "被替代" 变成 "拿到更难的 case", 反而提升 satisfaction</li><li>Routing accuracy 从最初的 70% 提到 92% (通过 RAG-based tool discovery)</li></ol>
+<p><strong>Result</strong>: 一年内承接了 80% 的 inbound traffic, CS team headcount 没减但生产力翻倍, compliance 0 incident.</p>
+<h4>场景 C: Internal Agent Platform 跨团队 abstraction</h4>
+<p><strong>Situation</strong>: 字节内部多个团队 (PayLater / Risk / Recommendation / 内部 IT) 都想做 agent application, 但每个团队从头造轮子. 我 (和小团队) 被指定做一个 internal agent platform.</p>
+<p><strong>Task</strong>: 设计共享 abstraction 让 N 个团队复用, 但又不限死他们的灵活度.</p>
+<p><strong>Action</strong>:</p>
+<ol><li>跟 5 个种子团队各做 1 小时访谈, 抽 commonality</li><li>抽出 3 层 abstraction:</li></ol>
+<ul><li>Workflow (orchestration of agents + tools)</li><li>Tool (callable function with schema)</li><li>Memory (short / long / shared)</li></ul>
+<ol><li>每个 abstraction 留 escape hatch (custom override)</li><li>给每个团队 onboarding doc + office hour</li></ol>
+<p><strong>Result</strong>: 6 个月内 5 个团队 → 14 个团队 adopt. 这种 "服务多个内部客户" 的形态本质上就是 FDE.</p>
+<h4>场景 D: ConvFinQA 项目里的 ablation methodology</h4>
+<p><strong>Situation</strong>: 学术合作项目, multi-hop financial QA. 团队最初的想法是 "把所有 component 都上, hope for the best".</p>
+<p><strong>Task</strong>: 弄清楚哪个 component 真正提供 lift.</p>
+<p><strong>Action</strong>:</p>
+<ol><li>设计 ablation study — 逐个 disable component</li><li>Pipeline 拆 6 个 stage (retrieval / decompose / sub-question / numeric reasoning / aggregation / verification)</li><li>每个 stage 单独 ablation, 看 metric drop</li><li>发现 2 个 stage 提供 80% 的 lift, 另 4 个 marginal</li><li>Publish 结果 — <strong>including the negative finding</strong> (诚实)</li></ol>
+<p><strong>Result</strong>: 论文发表, 但更重要的是建立了 "evidence-based pipeline design" 的习惯. 这种 "用 data 而不是直觉做架构决策" 是 FDE 的关键素质 — 因为客户问 "为什么要这个 component" 时, 你必须有 data 答.</p>
 <hr />
-<h3>简历专属 reframe</h3>
-<p>你完全可以用上面 sample 直接 say. 关键 anchors:</p>
-<ul><li><strong>"7 markets, 6 languages"</strong> (voice agent) — multi-stakeholder deployment proof</li><li><strong>"Translate business asks to model deliverables"</strong> — FDE 灵魂</li><li><strong>"Post-training + inference (vLLM/SGLang)"</strong> — technical depth match</li><li><strong>"Indonesia refund tier scoping"</strong> — concrete customer-facing story</li><li><strong>"Expert Algorithm Engineer + Technical POC"</strong> — title evidence</li></ul>
+<h3>6. 回答 playbook (numbered steps)</h3>
+<p><strong>Step 1</strong>: 先 Anchor (10 秒) — 用一句话讲你是谁</p>
+<blockquote><p>"I'm an expert algo engineer at TikTok Global Payment, building production GenAI for 3 years."</p></blockquote>
+<p><strong>Step 2</strong>: 进 Underlying Motivation (20 秒) — 用一句具体的话讲什么吸引你</p>
+<blockquote><p>"I love the gap between research and production — when frontier model capability meets a specific business constraint at a customer site, and I have to bridge the gap with engineering craft."</p></blockquote>
+<p><strong>Step 3</strong>: 立刻 follow-up Right Fit Proof (25 秒) — quote 具体经验</p>
+<blockquote><p>"I've effectively been doing FDE work without the title. My role covers 7 markets, 6 languages, debt collection voice agent. I sit between research, engineering, product, and 7 regional ops teams. I translate business asks to model deliverables. I own outcome metrics like repayment conversion. The role I'm doing today is FDE-shaped."</p></blockquote>
+<p><strong>Step 4</strong>: 切换到 Aligned Target (15 秒) — 公司差异化</p>
+<blockquote><p>"At [OpenAI / Anthropic / Tomoro / Palantir], FDE specifically means [X — pick from cheat sheet above]. For someone who's been doing [Y — your hook for that company], working at [Z — what the company does specifically] is irresistible."</p></blockquote>
+<p><strong>Step 5</strong>: Trade-off Ack (10 秒) — 收尾</p>
+<blockquote><p>"Not pure research because I'm motivated by business outcome, not papers. Not pure SWE because I want customer interaction, not isolated feature work. Not sales engineering because I want to own the code, not the slides. FDE is the middle of those three."</p></blockquote>
+<p><strong>Step 6</strong>: 停 — 不要继续讲. 等 recruiter follow up.</p>
+<p>⏱️ Total: ~80 秒.</p>
 <hr />
-<h3>5 个 recruiter follow-ups</h3>
-<p><strong>Q1</strong>: "Why now? You've been at TikTok 3 years." <strong>A</strong>: "Two things converging. <strong>One</strong>, my current work is FDE-shaped but TikTok doesn't have an FDE org — so the role doesn't compound. <strong>Two</strong>, GenAI deployment is at an inflection point — frontier model capability changing what's feasible monthly, and being at OpenAI's deployment arm puts me at the <strong>center</strong> of that change. The optimal time to make this move is now, before the field stabilizes."</p>
-<p><strong>Q2</strong>: "Why not just internal transfer to a research-y team?" <strong>A</strong>: "I've considered it. The trade-off: TikTok's strength is consumer-scale infra, which is amazing but <strong>not where frontier models are built</strong>. To compound on frontier-model knowledge, the right place is at a frontier lab. Plus I want <strong>deployment at customer sites</strong> (vs deployment within one company), and Tomoro is that exact role."</p>
-<p><strong>Q3</strong>: "You'd be working with smaller teams. Comfortable with that?" <strong>A</strong>: "Yes — my team is 3 engineers now, and many TikTok teams I work with are &lt; 10. I prefer it. Smaller teams mean <strong>direct ownership</strong> and faster iteration. Less politics, more shipping."</p>
-<p><strong>Q4</strong>: "Comp at OpenAI is competitive — what's your target?" <strong>A</strong>: "I'd want to understand the structure first — base, equity (especially PPU now that OpenAI Deployment Company is established), and remote / Singapore / London considerations. Based on what I've seen for senior FDE at OpenAI, total comp in the <strong>$300-500k USD</strong> range with the right mix of base + PPU equity would let me make this move. Can you share what you've budgeted for this level?"</p>
-<p><strong>Q5</strong>: "What if we offer SWE-Production role instead of FDE?" <strong>A</strong>: Honest:</p>
-<ul><li>"Depends on the role specifics. If SWE-Production is <strong>internal team, no customer interaction</strong>, it's a less good fit for me — I'd be giving up the customer-facing piece I want."</li><li>"If it's a hybrid with some customer aspect, I'd want to understand the day-to-day. I'm flexible on title if the <strong>shape of the work</strong> matches what I described."</li></ul>
+<h3>7. 几个容易踩的坑</h3>
+<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>List of generic reasons</strong> ("love AI, want to learn")</td><td>bland, 任何角色都能这么讲. 必须 specific to FDE</td></tr><tr><td>2</td><td><strong>Defining by negation</strong> ("不想做 research")</td><td>显得 narrow, 没有 positive vision</td></tr><tr><td>3</td><td><strong>Naming wrong differentiator</strong> ("FDE 远程办公好")</td><td>recruiter 立刻判断 "你不了解角色"</td></tr><tr><td>4</td><td><strong>太短</strong> (&lt; 30s)</td><td>feels 浅, 像背模板</td></tr><tr><td>5</td><td><strong>太长</strong> (&gt; 2min)</td><td>recruiter 注意力流失, "啰嗦" 标签</td></tr><tr><td>6</td><td><strong>No specific company connection</strong></td><td>generic FDE pitch, 显得是模板</td></tr><tr><td>7</td><td><strong>Trajectory 太模糊</strong> ("想成长")</td><td>没说服力</td></tr><tr><td>8</td><td><strong>Stepping stone 暗示</strong> ("以后想做 PM / CTO")</td><td>recruiter 立刻降权重</td></tr><tr><td>9</td><td><strong>没 quote technical depth</strong></td><td>recruiter 怕你 coding round 塌</td></tr><tr><td>10</td><td><strong>过度谦虚</strong> ("可能不够 qualified 但...")</td><td>self-sabotage</td></tr></tbody></table>
 <hr />
-<h3>❌ 易错点</h3>
-<ol><li><strong>List of generic reasons</strong> — "love AI, want to learn" — bland</li><li><strong>Defining by negation</strong> — "don't want research" only</li><li><strong>Naming wrong differentiator</strong> — "FDE = remote work" misses the role</li><li><strong>Too short</strong> — &lt; 30s feels rehearsed-shallow</li><li><strong>Too long</strong> — &gt; 2min loses recruiter attention</li><li><strong>No specific company connection</strong> — generic FDE pitch</li><li><strong>Forward-looking too vague</strong> — "I want to grow"</li></ol>
+<h3>一句话总结 (Part 1)</h3>
+<blockquote><p><strong>"Why FDE specifically" 这道题真正的 winning answer 不是 "我喜欢 customer-facing 的工作", 而是 "我已经在做 FDE-shaped 的工作了, 我要的是和工作形态匹配的 title + team + 公司, 加上你们公司在 [X] 上的独特优势"</strong>.</p>
+<p>Show, don't tell. 用当前工作 prove 你已经具备 FDE 形态, 用公司 specific 钩子 prove 你做过功课.</p></blockquote>
 <hr />
-<h3>✅ 加分项</h3>
-<ol><li><strong>"I've been doing FDE without the title"</strong> — show, don't tell</li><li><strong>3 specific reasons</strong> with proof each</li><li><strong>FDE vs adjacent roles distinction</strong></li><li><strong>Company-specific draw</strong> (Tomoro acquisition / Vertex AI scale)</li><li><strong>Career arc</strong> clearly articulated</li><li><strong>Acknowledge tradeoffs</strong> (not pure research)</li><li><strong>Quote prior FDE-shaped story</strong> (Indonesia refund tier)</li></ol>
+<h1>Part 2 · 5 个深度子问题</h1>
+<h3>⚙️ Problem 1: FDE vs SWE vs MLE vs Research — 边界讲清楚</h3>
+<p>这是 recruiter 验证 "你懂角色吗" 的关键. 答不清边界 = mistake apply.</p>
+<h4>1.1 4 个 axis 拆分</h4>
+<table class="md-table"><thead><tr><th>Axis</th><th>SWE</th><th>MLE</th><th>Research</th><th>FDE</th></tr></thead><tbody><tr><td><strong>Customer-facing time</strong></td><td>0-10%</td><td>5-15%</td><td>0%</td><td><strong>40-70%</strong></td></tr><tr><td><strong>Code shipping cadence</strong></td><td>weekly</td><td>weekly</td><td>monthly (paper)</td><td>weekly (POC), monthly (deployment)</td></tr><tr><td><strong>Ambiguity level</strong></td><td>low-med (PRD given)</td><td>med (eval ambiguous)</td><td>high (open problem)</td><td><strong>very high</strong> (customer doesn't know what they want)</td></tr><tr><td><strong>End-to-end ownership</strong></td><td>feature</td><td>model</td><td>research direction</td><td><strong>deployment outcome</strong></td></tr><tr><td><strong>Failure mode</strong></td><td>bug in code</td><td>model regression</td><td>paper rejected</td><td><strong>customer churn / no renewal</strong></td></tr><tr><td><strong>Speed pressure</strong></td><td>sprint cycle</td><td>quarter</td><td>conference deadline</td><td><strong>customer expectation = days/weeks</strong></td></tr><tr><td><strong>Stakeholder count</strong></td><td>2-3 (PM, designer, eng)</td><td>3-5 (PM, infra, ops)</td><td>1-2 (advisor, co-author)</td><td><strong>5-15</strong> (customer ops, IT, legal, exec, end-user)</td></tr><tr><td><strong>Travel / on-site</strong></td><td>0%</td><td>0-10%</td><td>5% (conferences)</td><td><strong>20-40%</strong></td></tr></tbody></table>
+<h4>1.2 边界 dialog script (recruiter 追问时)</h4>
+<p><strong>Recruiter</strong>: "How is FDE different from MLE?"</p>
+<p><strong>你</strong>:</p>
+<blockquote><p>"MLE 主要 lives in <strong>model lifecycle</strong> — data preparation, training, eval, inference optimization. The success metric is usually model quality (accuracy, latency). I do MLE work — vLLM tuning, SFT, DPO — but only when it serves the bigger picture.</p>
+<p>FDE 主要 lives in <strong>customer outcome</strong>. The success metric is <strong>customer renewal</strong>. I might do MLE work, but I also do integration work (auth, webhook, data pipeline), business work (KPI definition, stakeholder mapping), and product work (UX of the agent).</p>
+<p>一个具体例子: 在我的 voice agent 项目里, 当 ASR 准确率从 92% 提到 94% 时, MLE 的工作目标达成了. 但当地 ops 团队仍然 unhappy — 因为 ASR 错的那 6% 都集中在了高净值客户的姓名上, 影响重大. 我得做的是: 添加客户姓名的 dictionary boost, 加 fallback 'please spell your name', 加 human-in-loop tier. 这些都不是 MLE 工作, 是 FDE 工作."</p></blockquote>
+<p><strong>Recruiter</strong>: "Sounds like SWE then?"</p>
+<p><strong>你</strong>:</p>
+<blockquote><p>"SWE 通常 receives PRD and ships. FDE 经常<strong>自己 produce PRD</strong> — 因为客户连他们想要什么都不知道. 在 SWE 模式下, '需求不清' 是 PM 的问题. 在 FDE 模式下, '需求不清' 是你的工作核心."</p></blockquote>
+<h4>1.3 这个边界用在你的故事里</h4>
+<table class="md-table"><thead><tr><th>你的故事</th><th>SWE 角度</th><th>FDE 角度</th></tr></thead><tbody><tr><td>Voice agent 7 markets</td><td>"实现多语言切换"</td><td>"和 7 个市场 ops 团队 negotiate scope, 设计 per-market playbook"</td></tr><tr><td>BNPL chatbot</td><td>"实现 RAG-based tool routing"</td><td>"balance 4 个 stakeholder (product / compliance / CS / risk)"</td></tr><tr><td>Internal Agent Platform</td><td>"实现 workflow / tool / memory abstraction"</td><td>"对 14 个内部团队做 customer interview, 抽取 commonality"</td></tr><tr><td>Indonesia refund tier</td><td>"实现 tier 1 / 2 / 3 路由"</td><td>"和 ops team 谈 scope, 用 data 反驳过激诉求, 设计 phased rollout"</td></tr></tbody></table>
+<p>每个故事都有 FDE 角度. 答这道题的时候<strong>优先讲 FDE 角度</strong>.</p>
 <hr />
-<h3>Cheat Sheet</h3>
-<pre class="language-plaintext"><code class="language-plaintext">60-90 sec structure:
-  (10s) Identity anchor
-  (20s) What draws you to FDE
-  (20s) Why you (proof)
-  (15s) Why this company
-  (10s) Career arc forward
+<h3>⚙️ Problem 2: 为什么这道题答 "我已经在做 FDE 工作" 是最强 framing</h3>
+<h4>2.1 为什么 "show, don't tell" 在这道题如此重要</h4>
+<p><strong>Tell 的版本</strong>:</p>
+<blockquote><p>"I'm motivated by customer-facing AI work and end-to-end ownership."</p></blockquote>
+<p><strong>Show 的版本</strong>:</p>
+<blockquote><p>"Last month I flew to Jakarta for 3 days to sit with Indonesia ops team while they handled tier 3 refund edge cases. I watched 47 calls, identified 2 pattern bugs in our tier classifier, fixed them on the plane back. The next week's tier 1 auto-approval rate went from 71% to 79%."</p></blockquote>
+<p>第二种<strong>信息密度高 10 倍</strong>. 不只是 "我有热情", 而是 "我做这个事到了肉的程度".</p>
+<h4>2.2 你 resume 里能 "show" 出的 5 个具体 FDE moment</h4>
+<p><strong>Moment 1 — Indonesia tier 3 refund 现场 (假设)</strong>:</p>
+<blockquote><p>"我在 Indonesia 项目里, ops 想 8 周内 full automate refund. 我没 push back 也没 yes-man, 而是 2 周跑了 tier 1+2 pilot 拿到 70% 覆盖 + 0% wrong-call 的 data, 然后跟 ops 一起重新 scope. 最终 tier 3 6 个月后才上线, 但 0 wrong refund. 这就是 FDE 的 scoping muscle."</p></blockquote>
+<p><strong>Moment 2 — 巴基斯坦 ASR 故障</strong>:</p>
+<blockquote><p>"我们 Pakistan 上线第二周, ASR provider 突然挂了 40 分钟. 我提前做的 cascade fallback (provider A → B → C) 启动. 0 通话丢失, ops 团队都不知道. 但更重要的是 — 我事先和当地 ops 谈过 'worst case 你要什么', 他们说 '宁愿 silent fail 也不要 garbage response'. 我的设计直接基于他们的偏好, 不是技术选型直觉."</p></blockquote>
+<p><strong>Moment 3 — BNPL 路由准确度提升</strong>:</p>
+<blockquote><p>"BNPL chatbot 最初 routing accuracy 70%. 我没 jump to fine-tuning, 而是先看 confusion matrix — 发现 60% 的 mis-route 是 tool description 写得模糊, 不是模型能力问题. 重写了 12 个 tool 的 description (用 RAG-based discovery + dynamic prompt), accuracy 跳到 92%. <strong>MLE 会想训模型, FDE 会先看 data</strong>."</p></blockquote>
+<p><strong>Moment 4 — Internal Agent Platform 跨团队 abstraction</strong>:</p>
+<blockquote><p>"做 internal agent platform 的时候, 5 个种子团队我都做了 1 小时访谈. 期间 Risk 团队说 '我不需要 workflow abstraction, 我只用 tool layer'. 我没硬推, 让他们就用 tool layer. 6 个月后 Risk team 自己反过来要 workflow — 因为他们的 use case grew. <strong>FDE 的 abstraction 要给客户留 escape hatch, 不是强 sell</strong>."</p></blockquote>
+<p><strong>Moment 5 — ConvFinQA 学术诚实</strong>:</p>
+<blockquote><p>"ConvFinQA 项目 ablation 结果中有 2 个 component 是 negative lift. 团队最初想藏起来, 我坚持 publish 原始 finding. 后来这反而成了 paper 的 differentiator — reviewer 评论 'this is the kind of honest ablation rare in the field'. FDE 给客户讲 result 时也是这个原则 — 失败的实验也要讲清楚, 信任 &gt; short-term win."</p></blockquote>
+<h4>2.3 怎么把这些 moment 编入 60-90 秒 answer</h4>
+<p>不要全讲 (太长). <strong>挑 1 个最 fit 公司的 moment 简化成 1 句话</strong>:</p>
+<ul><li>For OpenAI: Moment 4 (platform abstraction → 类似 OpenAI 给 enterprise 做 API + agent 框架)</li><li>For Anthropic: Moment 1 (tier-based confirm → 类似 constitutional AI 思路)</li><li>For Palantir: Moment 2 (ASR cascade → 类似 ops-driven design)</li><li>For Google Cloud: Moment 4 (multi-team adoption → 类似 Vertex 多 customer)</li><li>For Databricks: Moment 5 (ablation methodology → 类似 data-driven decision)</li></ul>
+<hr />
+<h3>⚙️ Problem 3: 怎么针对具体公司 (OpenAI / Anthropic / Google / Palantir) framing</h3>
+<h4>3.1 公司差异化的 3 层</h4>
+<p>每家公司不一样在 3 层:</p>
+<ul><li><strong>Layer 1: 产品 / 模型</strong> — OpenAI GPT vs Anthropic Claude vs Gemini vs Palantir Foundry</li><li><strong>Layer 2: 客户类型</strong> — Fortune 500 vs 高安全行业 vs 多 vertical vs 政府/金融</li><li><strong>Layer 3: 文化 / 风格</strong> — Move fast vs Safety-first vs Cloud-scale vs Mission-driven</li></ul>
+<p>你的 framing 要 hit 所有 3 层.</p>
+<h4>3.2 OpenAI 专属 framing (60 秒 monologue)</h4>
+<blockquote><p>"OpenAI FDE 我看重的是 <strong>3 件事</strong>:</p>
+<p><strong>One</strong>: Frontier model proximity. 我做 post-training (SFT, DPO, RL alignment) 和 inference 优化 (vLLM, SGLang) 已经 3 年. 在 OpenAI, frontier researcher 是 down the hall, 不是 6 层 corporate. 当 customer 的 use case 触到 model capability 边界, 我能直接 escalate, 不是排队 quarterly planning.</p>
+<p><strong>Two</strong>: ChatGPT-scale 的 deployment 经验. 字节内部我做的是 7 个市场, 但 OpenAI 是真的全球 scale. 我想看 enterprise + consumer 双 funnel 的 deployment 怎么做.</p>
+<p><strong>Three</strong>: GPT-5 / Operator / Codex agent 系列是 FDE 战场的核心. 字节内部我做了 agent platform, 但 OpenAI 的 first-party agent stack 是行业 reference. 我想从 reference 的角度 build.</p>
+<p>Trade-off ack: OpenAI 不是 mission-pure research lab — 它是 product-driven. 我 explicitly 喜欢 product-driven, 不是 research-only. 这是 fit."</p></blockquote>
+<h4>3.3 Anthropic 专属 framing</h4>
+<blockquote><p>"Anthropic AS (Applied Solutions) / FDE 三个吸引点:</p>
+<p><strong>One</strong>: Constitutional AI + safety-first 的 framing 跟我做 high-stakes deployment (债务催收 / 金融 / 合规) 极度匹配. 我在 Indonesia 做 tier 3 refund 的时候, 本质上就是在做 constitutional confirm — agent 可以 propose 但不能 unilaterally execute. Anthropic 这种 framing 是 industry-leading.</p>
+<p><strong>Two</strong>: Claude Code + tool use stack. 我做 BNPL chatbot 用了 agentic tool routing, 但 Anthropic 在 tool use 的设计上 (specifically how to prompt for tool selection) 是我学习对象. 我想从 inside 看怎么 design.</p>
+<p><strong>Three</strong>: Anthropic 的客户类型 (金融 / 法律 / 政府) 跟我的 PayLater 经验直接对应. 我懂合规怎么影响 design — 不是 "我读过 GDPR", 而是 "我跟 OJK / BACEN 谈过怎么 deploy".</p>
+<p>Trade-off ack: Anthropic 比 OpenAI 节奏慢一些 (safety review), 我 explicitly 接受 — 因为 high-stakes 行业是 trust &gt; speed."</p></blockquote>
+<h4>3.4 Palantir 专属 framing</h4>
+<blockquote><p>"Palantir FDE 我 framing 不一样, 因为 Palantir 不做 frontier model. 我的 angle:</p>
+<p><strong>One</strong>: 我在 TikTok PayLater 做 payment infra + fraud + 合规, 跟 Palantir 在金融 / 政府的 deployment 高度对应. 不是 'LLM expert' angle, 是 'ops + data + integration' angle.</p>
+<p><strong>Two</strong>: Foundry ontology 跟我做 Indonesia 多 stakeholder scoping 直接对应. 客户的数据 model 是 deployment 的真正难点, 不是 LLM. 我懂这个.</p>
+<p><strong>Three</strong>: Palantir FDE 的 long-tenure 文化是我想要的. 我不想 12 个月跳一次, 我想 5-10 年 compound 一个 vertical 的 domain expertise.</p>
+<p>Trade-off ack: Palantir 不是 GenAI-first 公司 — 我接受. 我的目标不是 'always touch frontier model', 是 'build durable AI deployment expertise'."</p></blockquote>
+<h4>3.5 Google Cloud Vertex AI 专属 framing</h4>
+<blockquote><p>"Google Cloud Vertex AI FDE / Customer Engineer:</p>
+<p><strong>One</strong>: Multi-cloud + multi-vertical scale. 字节 7 markets 是我的 scale, Google 是 1000+ enterprise customers — 我想 10× 这个 scale.</p>
+<p><strong>Two</strong>: Gemini multimodality. 我做的 voice agent 是 ASR + TTS + LLM, 本质上是 multimodal pipeline. Gemini native multimodal 让我的工作 simplify. 我想 build 在 Gemini stack 上.</p>
+<p><strong>Three</strong>: Google Cloud + Workspace + Search 的 integration story. 客户已经 deeply 用 Google, FDE 工作不是 from scratch, 是 leverage existing customer footprint.</p>
+<p>Trade-off ack: Google Cloud team 跟 DeepMind research 不在一栋楼 (research independence). 我接受 — 我不是想做 research, 我想做 enterprise scale deployment."</p></blockquote>
+<h4>3.6 通用模板 (any 公司)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">[Company] FDE 我看重 3 件事:
 
-3 reasons formula:
-  1. Bridge research-to-production (motivation)
-  2. Already doing FDE work without title (proof)
-  3. Company-specific (frontier model proximity)
+One: [Company-specific product / model 优势] + [你的 technical hook]
+Two: [Company-specific customer type / scale] + [你的 deployment 经验]
+Three: [Company-specific 文化 / 战略] + [你的 alignment]
 
-Anchors to use:
-  - "7 markets, 6 languages" (multi-stakeholder)
-  - "Expert + Technical POC" (FDE-shaped already)
-  - "Indonesia refund tier scoping" (customer-facing story)
-  - "Post-training + vLLM/SGLang" (deep technical)
-  - "Translate business asks" (FDE soul)
+Trade-off ack: [Company 不擅长的事] — 我接受, 因为 [你的优先级]</code></pre>
+<p>3 个空填好就是一段 60 秒.</p>
+<hr />
+<h3>⚙️ Problem 4: "为什么不直接做 SWE / MLE / Research" — 不能 sound like 在 settle</h3>
+<h4>4.1 这道追问背后的 risk</h4>
+<p>Recruiter 怕你是 "FDE 是 backdoor" — 真正想做 research 但 research role 没 offer, 退而求其次. 一旦 recruiter 觉得你在 settle, 你的 offer 概率断崖.</p>
+<h4>4.2 防御 dialog scripts</h4>
+<p><strong>Recruiter</strong>: "Why not just pure research? You have ML chops."</p>
+<p><strong>❌ Bad answer</strong>:</p>
+<blockquote><p>"I want to do something more applied."</p></blockquote>
+<p><strong>Why bad</strong>: defines by negation, sounds like settling.</p>
+<p><strong>✅ Good answer</strong>:</p>
+<blockquote><p>"我 explicitly 考虑过 research route. Trade-off 是这样的: research role 的 unit of progress 是 paper / SOTA / 新架构, time horizon 是几个月到一年. FDE 的 unit of progress 是 customer outcome — 一个客户的债务催收回款率提升 5%, 一个客户的客服 ticket 缩短 30%. Time horizon 是周到月.</p>
+<p>我<strong>更 energizes</strong> by 后者, 不是不能做前者. 我做过 ConvFinQA 那种 academic project — 我享受 ablation 的过程, 但 paper acceptance 那一刻不是我最 satisfying 的瞬间. 反而是上线后第一周, 看到 ops team 把节省下来的时间用来处理 tier 3 复杂 case — 那是我 satisfying 的瞬间.</p>
+<p>所以这不是 'research role 抢不到所以来 FDE', 是 'research 和 FDE 我都能做, 我选 FDE 因为 satisfaction 更高'."</p></blockquote>
+<p><strong>Recruiter</strong>: "Why not just SWE? FDE comp is similar but SWE workload more predictable."</p>
+<p><strong>✅ Good answer</strong>:</p>
+<blockquote><p>"SWE 的预期 workflow 是: PM → PRD → eng → ship. FDE 的预期 workflow 是: customer → scoping → eng → 跟客户 iterate → ship. 两个 workflow 我都做过. SWE workflow 我觉得 missing one critical layer — <strong>直接和需求源头对话</strong>.</p>
+<p>在 SWE 模式下, 我 ship 完一个 feature, 通过 PM 听到 'customer 不喜欢'. 然后我 guess what they really wanted, ship 第二版.</p>
+<p>在 FDE 模式下, 我 ship 完, 我直接听到 customer 说 '这个 tier 3 case 你没考虑, 我们这里有 5% volume 是这种'. 然后我<strong>直接</strong> ship 第二版.</p>
+<p>信息流 latency 短 10 倍. 这是 SWE 给不了我的."</p></blockquote>
+<p><strong>Recruiter</strong>: "Why not MLE? 你 fine-tuning 经验丰富."</p>
+<p><strong>✅ Good answer</strong>:</p>
+<blockquote><p>"MLE 的 mental loop 是: data → train → eval → ship → repeat. 我做过完整 MLE loop (SFT, DPO, vLLM 部署). 但 MLE 的 happiness function 是 model quality metrics — accuracy, latency, throughput.</p>
+<p>我观察到自己的 happiness function 不是 model metric, 是 customer metric. 比如我做 voice agent ASR 从 92 到 94% 准确率, 我是开心的. 但我<strong>更</strong>开心当 ops team 跟我说 '客户姓名错了我们怎么修' — 我添加 dictionary boost + spelling fallback, ops team 满意度上来了.</p>
+<p>同一个项目, 同一个 ASR, 但 happiness 来源不一样. 我 explicitly 选 customer-driven 而不是 model-driven."</p></blockquote>
+<p><strong>Recruiter</strong>: "Why not Sales Engineer? Customer-facing 也满足了."</p>
+<p><strong>✅ Good answer</strong>:</p>
+<blockquote><p>"Sales Engineer 工作核心是 pre-sales — POC, demo, RFP 应答, 帮 sales close deal. 一旦 deal close, SE 工作基本结束, customer 交给 implementation team 或 customer success.</p>
+<p>我<strong>不喜欢</strong> 这个 cutoff. POC 是最有趣的 50%, deployment 后是另外 50% — 真实的 edge case 都在那里. 我想 own 整个 lifecycle 不是只 own 前一半.</p>
+<p>而且 SE 的 deliverable 是 slide + demo, FDE 的 deliverable 是 production code. 我想 own code."</p></blockquote>
+<h4>4.3 一个 universal "ladder" 答法</h4>
+<p>如果 recruiter 一次性问 "为啥不 SWE / MLE / Research?", 你可以用 ladder:</p>
+<blockquote><p>"我对这 3 个 role 的 mental model 是这样:</p>
+<ul><li><strong>Research</strong> 距离客户最远, 距离 frontier 最近. Unit = paper. 我 try 过, 不是我最 energize 的.</li><li><strong>MLE</strong> 在中间, 距离 model 近, 但仍然 abstracted from customer. Unit = model quality.</li><li><strong>SWE</strong> 在产品侧, 但 missing 直接和 customer 对话的环节.</li><li><strong>FDE</strong> 是 4 个里 distance to customer 最近, 同时仍然 own code. Unit = customer outcome.</li></ul>
+<p>这 4 个 role 我都能做 — 但 FDE 是 unit-of-progress 最 align 我的 happiness function 的那个."</p></blockquote>
+<hr />
+<h3>⚙️ Problem 5: 怎么 demonstrate fit through specific stories not abstract claims</h3>
+<h4>5.1 STAR 的 FDE 改造版</h4>
+<p>经典 STAR 是 Situation / Task / Action / Result. FDE 题里改造成:</p>
+<table class="md-table"><thead><tr><th>Element</th><th>Standard</th><th>FDE-optimized</th></tr></thead><tbody><tr><td><strong>S</strong> Situation</td><td>项目背景</td><td><strong>客户 (谁) + 困境 (什么)</strong></td></tr><tr><td><strong>T</strong> Task</td><td>你要做什么</td><td><strong>scoping + ownership 边界 (你 own 什么不 own 什么)</strong></td></tr><tr><td><strong>A</strong> Action</td><td>你做了什么</td><td><strong>scope negotiate + technical decision + stakeholder management</strong> (三个 sub-action 都要有)</td></tr><tr><td><strong>R</strong> Result</td><td>结果 metric</td><td><strong>business outcome (KPI) + technical metric + customer satisfaction</strong> (3 维)</td></tr></tbody></table>
+<h4>5.2 你的 5 个 FDE STAR story (现成可用)</h4>
+<h5>Story 1 — Indonesia tier 3 refund</h5>
+<p><strong>S</strong>: "印尼是 voice agent 首发市场. Ops team 周五 Slack 我: '想下季度 full automate refund'."</p>
+<p><strong>T</strong>: "Scope 不清 (什么 refund? 多大 amount?), timeline 不清 ('下季度' 是 8 周还是 12 周?), accountability 不清 (wrong call 谁负责?). 我得在不完整信息下 commit conditionally."</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Diagnose</strong>: 不是 'unknown unknown', 是 'decision-required without enough info'. Right move 是 structured discovery.</li><li><strong>Decompose</strong> 'automate refund' 成 3 tier: tier 1 info lookup / tier 2 structured calc / tier 3 final decision</li><li><strong>Reversibility analysis</strong>: tier 1 是 two-way door (错 info 易撤), tier 3 是 one-way door (错 refund 直接损失 + 监管风险)</li><li><strong>Pilot</strong>: 2 周跑 tier 1+2, 拿到 70% volume coverage + 0% wrong-call. Tier 3 projected 8% wrong-call rate.</li><li><strong>Reframe with data</strong>: 拿 pilot data 跟 ops 重新谈. Ops 接受 "right answer 慢 4 周比 wrong answer 准时" 的 framing.</li></ol>
+<p><strong>R</strong>:</p>
+<ul><li>Business: 6 周内 ops 拿到 70% throughput at 0% risk</li><li>Tier 3: 6 个月后上线 (after policy + monitoring + human-in-loop infra), 90 天 0 wrong refund</li><li>Customer: Ops lead 后来跟我 manager 反馈 "Gao 是少数 push back 还能让我感谢的 vendor"</li></ul>
+<p><strong>这个故事 quote 进 "Why FDE" 的 30 秒版</strong>:</p>
+<blockquote><p>"我做的 Indonesia refund tier scoping 就是 FDE 的灵魂工作 — ops 想 8 周 full automate, 我 push back 用 data + reversibility 重新 scope, 最终 ops 拿到他们想要的 60% benefit, 0% risk. 不是我 say 'no', 是我 reframe 成 'right answer faster'."</p></blockquote>
+<h5>Story 2 — 巴基斯坦 ASR cascade fallback</h5>
+<p><strong>S</strong>: "Voice agent 在 Pakistan 上线第二周, ASR provider Azure 突然挂 40 分钟."</p>
+<p><strong>T</strong>: "保证用户对话不被打断 (ops team 之前明确说 'silent fail 都比 garbage response 强'), 0 通话丢失."</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Pre-design</strong>: 我之前和 ops 谈过 worst case preference (silent fail vs degraded response), 他们选 silent fail</li><li><strong>Cascade</strong>: 设计了 ASR provider chain (Azure → Google → 本地 self-host Whisper), per-call timeout 3s, failover 自动</li><li><strong>Observability</strong>: 每次 fallback 记录 (provider, latency, accuracy proxy)</li><li><strong>Real incident</strong>: Azure 挂的 40 分钟内, system 自动 switch 到 Google, 但 Google 在 Urdu 上 accuracy 也下降 — system 进一步 switch 到 local Whisper</li></ol>
+<p><strong>R</strong>:</p>
+<ul><li>0 通话丢失</li><li>Ops 不知道有事故 (他们事后看 metrics 才发现)</li><li>但 Whisper 在 Urdu 上 accuracy drop 让我意识到 fallback chain 也要 per-language tune</li></ul>
+<p><strong>这个故事 quote 进 "Why FDE"</strong>:</p>
+<blockquote><p>"Pakistan ASR cascade 故事告诉我 FDE 跟 SWE 不一样的地方 — SWE 设计 fallback 是技术选型, FDE 设计 fallback 是 <em>基于 ops 的偏好</em>. 我之前花时间问 ops 'silent fail vs garbage response 你选哪个' — 这 30 分钟 conversation 决定了我整个 fallback 架构."</p></blockquote>
+<h5>Story 3 — BNPL chatbot 路由 70 → 92%</h5>
+<p><strong>S</strong>: "BNPL chatbot launch 第一个月, routing accuracy 70%, 远低于预期 90%."</p>
+<p><strong>T</strong>: "诊断为什么 routing 错. 同时不能 disable chatbot 因为 CS team 已经 reorg around 它."</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>不 jump to model</strong>: 没去 fine-tune, 先看 confusion matrix</li><li><strong>Data analysis</strong>: 发现 60% mis-route 是 "tool description 模糊" — 模型分不清 "check balance" vs "check past due"</li><li><strong>RAG-based tool discovery</strong>: 重写 12 个 tool description, 用 semantic embedding 做 dynamic prompt</li><li><strong>Iterate</strong>: weekly review with CS team — 他们 flag 的 case 直接进 dataset</li></ol>
+<p><strong>R</strong>:</p>
+<ul><li>Routing accuracy 70 → 92% in 6 weeks</li><li>CS team 反馈: tier 3 复杂 case 终于 only 给 CS 处理, 不会被 chatbot 错走</li><li>后来 internal Agent Platform 抄了这个 "RAG-based tool discovery" pattern</li></ul>
+<p><strong>这个故事 quote 进 "Why FDE"</strong>:</p>
+<blockquote><p>"BNPL routing 故事 — 一个 MLE 第一反应是训模型, 我先看 data. Confusion matrix 告诉我 60% 错在 tool description 模糊不是模型能力. 这个判断帮 saved 3-4 周的 fine-tuning 时间. FDE 的本能是 'data 先于 model'."</p></blockquote>
+<h5>Story 4 — Internal Agent Platform 14 团队 adoption</h5>
+<p><strong>S</strong>: "字节内部 5 个团队各自造 agent platform 轮子, leadership 让我做共享 abstraction."</p>
+<p><strong>T</strong>: "Design abstraction 满足 5 个种子团队 + scale 到 N 个未来团队, 但又不限死灵活度."</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Customer interview</strong>: 5 个种子团队各 1 小时 1v1, 抽 commonality</li><li><strong>3-layer abstraction</strong>: Workflow / Tool / Memory, 每层留 escape hatch</li><li><strong>Onboarding</strong>: doc + office hour + Slack channel</li><li><strong>Iterative</strong>: 6 个月后跟 14 个团队复盘, 抽出新 layer (shared eval framework)</li></ol>
+<p><strong>R</strong>:</p>
+<ul><li>5 团队 → 14 团队 in 6 months</li><li>Risk team 一开始只用 tool layer, 6 个月后主动要 workflow (use case grew)</li><li>Platform 成为字节内部 agent infra de facto standard</li></ul>
+<p><strong>这个故事 quote 进 "Why FDE"</strong>:</p>
+<blockquote><p>"Internal Agent Platform 故事让我意识到 FDE 工作的核心是 'serving multiple internal customers each with different requirements'. 跟 OpenAI / Anthropic FDE 服务 external enterprise 客户的形态本质上一样 — 你不是给一个客户 build 一个东西, 你在 build 一个 abstraction 给多个客户用."</p></blockquote>
+<h5>Story 5 — ConvFinQA ablation 诚实</h5>
+<p><strong>S</strong>: "ConvFinQA 学术项目, pipeline 6 个 stage. Ablation 结果 2 个 stage 是 negative lift."</p>
+<p><strong>T</strong>: "Negative result 要不要 publish?"</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Team initially 想藏</strong>: '只 publish 正面结果, 论文好看'</li><li><strong>我坚持 publish</strong>: 学术诚实 + 帮 community 避免踩坑</li><li><strong>Reframe</strong>: '这是 paper 的 differentiator, 不是 weakness'</li></ol>
+<p><strong>R</strong>:</p>
+<ul><li>Paper 接收, reviewer 评论 "this is the kind of honest ablation rare in the field"</li><li>这个原则我 transfer 到生产 — Indonesia tier 3 上线后我 publish 内部 retrospective 包含 wrong-call 案例</li></ul>
+<p><strong>这个故事 quote 进 "Why FDE"</strong>:</p>
+<blockquote><p>"ConvFinQA ablation 诚实的故事告诉我 FDE 跟 SE 不一样的地方 — SE 给 customer 讲 slide 是 highlight 成果, FDE 给 customer 讲 retrospective 是 highlight 包括失败的全貌. Customer 信任建立在 honest reporting 上, 不是 polished slide 上."</p></blockquote>
+<h4>5.3 故事的 picker rule</h4>
+<p>不要把 5 个故事全讲. <strong>挑 1 个最 fit 公司, 1 个 backup</strong>:</p>
+<table class="md-table"><thead><tr><th>公司</th><th>Primary story</th><th>Backup story</th></tr></thead><tbody><tr><td>OpenAI</td><td>Internal Agent Platform (跨 customer abstraction)</td><td>Indonesia tier 3 (high-stakes scoping)</td></tr><tr><td>Anthropic</td><td>Indonesia tier 3 (constitutional confirm pattern)</td><td>BNPL chatbot (safety + accuracy)</td></tr><tr><td>Palantir</td><td>Pakistan ASR cascade (ops-driven design)</td><td>Indonesia tier 3 (compliance scoping)</td></tr><tr><td>Google Cloud</td><td>Internal Agent Platform (multi-customer scale)</td><td>BNPL chatbot (data-driven decision)</td></tr><tr><td>Databricks</td><td>ConvFinQA ablation (data-driven methodology)</td><td>BNPL chatbot (RAG + data)</td></tr></tbody></table>
+<hr />
+<h1>Part 3 · 串起来看</h1>
+<h3>必问 clarifying questions</h3>
+<p>如果 recruiter follow up 模糊问题, 你可以反问 clarifying:</p>
+<p><strong>1. Define FDE for this company</strong></p>
+<blockquote><p>"I've researched [Company] FDE — could you confirm the day-to-day? Is it mostly enterprise B2B deployment (e.g., F500 customers), or more product-shaping work, or both? Different proportions changes my framing."</p></blockquote>
+<p><strong>2. Customer interaction model</strong></p>
+<blockquote><p>"Is FDE here primarily on-site at customer, remote-but-deep with customer team, or hybrid? Travel expectation?"</p></blockquote>
+<p><strong>3. Team structure</strong></p>
+<blockquote><p>"Solo FDE per account, pod of FDEs per account, or central FDE org with rotation? Affects how I describe my fit."</p></blockquote>
+<p><strong>4. Technical depth expectation</strong></p>
+<blockquote><p>"Is FDE expected to write production code daily, or more architecture + reviewing junior eng's code, or mostly hands-off-keyboard? My background is hands-on, want to confirm fit."</p></blockquote>
+<p><strong>5. Career path within FDE</strong></p>
+<blockquote><p>"Where do FDEs typically go in 3-5 years? Stay FDE? Promote to staff/principal FDE? Cross to PM/Eng Manager? I'm asking because my preference is to stay FDE long-term."</p></blockquote>
+<hr />
+<h3>5 步框架 (回答这道题的 60-90 秒结构)</h3>
+<table class="md-table"><thead><tr><th>段</th><th>时长</th><th>内容</th><th>Anchor 例</th></tr></thead><tbody><tr><td>Anchor</td><td>10s</td><td>"I'm a [role] at [company], doing [tech] for [years]"</td><td>"Expert algo engineer at TikTok Global Payment, 3 years production GenAI"</td></tr><tr><td>Motivation</td><td>20s</td><td>"What energizes me is [specific FDE characteristic]"</td><td>"Bridge frontier capability to specific business constraint at customer site"</td></tr><tr><td>Proof</td><td>25s</td><td>"I've been doing FDE work without the title — [specific evidence]"</td><td>"7 markets, 6 languages, 4 stakeholder types, end-to-end ownership"</td></tr><tr><td>Company target</td><td>15s</td><td>"At [Company], FDE means [X] — fits because [Y]"</td><td>(pick from cheat sheet)</td></tr><tr><td>Trade-off</td><td>10s</td><td>"Not pure [role A] because [reason]. Not [role B] because [reason]"</td><td>"Not research because outcome&gt;papers. Not SWE because customer interaction matters"</td></tr></tbody></table>
+<hr />
+<h3>简历专属 reframe — MANY STAR stories</h3>
+<h4>STAR Story 1: Indonesia Refund Tier (★ HIGHEST PRIORITY)</h4>
+<p><strong>Use for</strong>: "Why FDE / handle ambiguity / push back on stakeholder / customer scoping"</p>
+<p><strong>S</strong>: Ops team wants full automation in 8 weeks, no scope clarity <strong>T</strong>: Negotiate scope without information, commit conditionally <strong>A</strong>: 3-tier decomposition by reversibility, 2-week pilot, data-driven reframe <strong>R</strong>: 70% throughput, 0% risk, 6 weeks; tier 3 6 months later, 90-day 0 wrong refund <strong>FDE framing</strong>: "Scope ambiguity is rarely about timeline — it's about asker hasn't decomposed yet"</p>
+<h4>STAR Story 2: Pakistan ASR Cascade</h4>
+<p><strong>Use for</strong>: "Why FDE / failure mode design / ops collaboration"</p>
+<p><strong>S</strong>: ASR provider Azure outage 40 min during Pakistan launch week 2 <strong>T</strong>: 0 conversation lost, ops told us "silent fail &gt; garbage" <strong>A</strong>: Pre-design cascade (Azure → Google → local Whisper), per-call 3s timeout, per-language tune <strong>R</strong>: 0 calls lost, ops didn't notice until metric review; Whisper Urdu accuracy taught me per-language fallback <strong>FDE framing</strong>: "I designed fallback based on ops preference, not technical convenience"</p>
+<h4>STAR Story 3: BNPL Chatbot Routing 70 → 92%</h4>
+<p><strong>Use for</strong>: "Why FDE / data-driven decision / not jumping to fine-tune"</p>
+<p><strong>S</strong>: Routing accuracy 70%, CS team已经 reorg around chatbot <strong>T</strong>: Diagnose without disabling chatbot <strong>A</strong>: Confusion matrix → 60% errors are tool description ambiguity → rewrite 12 descriptions with RAG-based discovery <strong>R</strong>: 70 → 92% in 6 weeks; pattern reused in Internal Agent Platform <strong>FDE framing</strong>: "FDE instinct: data before model. MLE wants to train, FDE wants to look at confusion matrix first"</p>
+<h4>STAR Story 4: Internal Agent Platform 14 Teams</h4>
+<p><strong>Use for</strong>: "Why FDE / multi-customer abstraction / serving internal customers"</p>
+<p><strong>S</strong>: 5 teams reinventing agent infrastructure <strong>T</strong>: Design abstraction serving 5 seed teams + scale to N <strong>A</strong>: 1-hour interview each, 3-layer abstraction (Workflow/Tool/Memory), escape hatches, onboarding doc + office hour <strong>R</strong>: 5 → 14 teams in 6 months; Risk team started with just Tool layer, later adopted Workflow as use case grew <strong>FDE framing</strong>: "FDE work is serving multiple customers each with different requirements. External enterprise FDE is the same shape."</p>
+<h4>STAR Story 5: ConvFinQA Ablation Honesty</h4>
+<p><strong>Use for</strong>: "Why FDE / customer trust / honest reporting"</p>
+<p><strong>S</strong>: 6-stage pipeline ablation, 2 stages negative lift <strong>T</strong>: Publish or hide? <strong>A</strong>: Insisted on publishing negative results <strong>R</strong>: Reviewer praised "honest ablation rare in the field"; principle transfered to production retrospectives <strong>FDE framing</strong>: "Customer trust built on honest reporting, not polished slides. Same with academic peer review."</p>
+<h4>STAR Story 6: Voice Agent 7-Market Rollout</h4>
+<p><strong>Use for</strong>: "Why FDE / multi-stakeholder / cultural adaptation"</p>
+<p><strong>S</strong>: Expand voice agent from Indonesia to 6 more markets (Vietnam, Thailand, Philippines, Brazil, Mexico, Pakistan) <strong>T</strong>: Maintain core capabilities + adapt per-market (language, culture, compliance) <strong>A</strong>: Per-market scoping kickoff (3 stakeholders: ops/product/compliance), shared backbone (LLM/ASR/RAG) + per-market layer (persona/TTS voice/escalation/prompt), on-call first week with local ops <strong>R</strong>: 7 markets in 6 months; per-market GMV uplift; established multi-market deployment playbook <strong>FDE framing</strong>: "60% of my time was FDE work — translation between business and tech, scoping per-market, on-site debugging"</p>
+<h4>STAR Story 7: Voice Agent SFT/DPO Iteration</h4>
+<p><strong>Use for</strong>: "Why FDE / technical depth / not just abstraction"</p>
+<p><strong>S</strong>: Voice agent base LLM (Llama) hallucinated on debt amounts <strong>T</strong>: Reduce hallucination on financial figures from 4% to &lt;0.5% <strong>A</strong>: SFT on 50k human-labeled financial dialogs, DPO on 20k preference pairs (hallucination vs no-hallucination), vLLM-served, online eval <strong>R</strong>: 4% → 0.3% hallucination on financial figures; method documented for cross-market reuse <strong>FDE framing</strong>: "FDE doesn't mean not technical. I still wrote training loops, designed eval, served vLLM. But I did it because customer (ops team) needed 0.5% reliability."</p>
+<hr />
+<h3>5 follow-ups (recruiter / HM 会追问)</h3>
+<p><strong>Q1</strong>: "Why now? You've been at TikTok 3 years."</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"两件事 converging.</p>
+<p><strong>One</strong>, 我现在的工作是 FDE-shaped 但 TikTok 没有正式 FDE org — role 不 compound. 我已经做 N 个 internal customer 的 onboarding, learning 都在我自己身上, 但 title / promotion / mentor 都不 align 这个 role.</p>
+<p><strong>Two</strong>, GenAI deployment 处于 inflection point. Frontier model capability 每个月在变, FDE 在 frontier lab 旁边的位置是 industry 未来 10 年的 key seat. 错过 2026 这窗口, FDE 形态固化后入场难度高很多.</p>
+<p>所以是 'optimal time' 不是 'just want change'."</p></blockquote>
+<p><strong>Q2</strong>: "Why not internal transfer to TikTok 的 research-y team?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"考虑过. Trade-off:</p>
+<p>TikTok 的 strength 是 consumer scale infra (推荐 / 直播 / 广告), 这非常厉害, 但<strong>不是 frontier model 被 built 的地方</strong>. 我已经 compound 了 3 年的 GenAI deployment + post-training + multi-market 经验, 要继续 compound 在 frontier model 上, 正确的地方是 frontier lab.</p>
+<p>加上 — 我想做 <strong>deployment at customer sites (cross-company)</strong>, 不是 deployment within one company (TikTok 内部多 business unit). 这是 FDE 跟 internal infra 的本质区别."</p></blockquote>
+<p><strong>Q3</strong>: "You'd work with smaller teams at OpenAI FDE org. Comfortable with that?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"是的, 我 prefer.</p>
+<p>我现在的 team 是 3 个 engineer (+ rotating interns). TikTok 内部我对接的 team 也大多 &lt; 10 人. 我习惯 small team — direct ownership, faster iteration, less politics, more shipping.</p>
+<p>加上 FDE org 通常是 pod structure (3-5 人服务 1-2 customer), 这是我 sweet spot."</p></blockquote>
+<p><strong>Q4</strong>: "Comp at [Company] — what's your target?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"我 prefer 先理解 structure 再讨论 number.</p>
+<p>Base / equity (PPU 或 RSU) / location adjustment 都影响 total. 基于我看到的 senior FDE level (L5-L6 at OpenAI / S4-S5 at Anthropic), 我对 <strong>total comp $400-600k USD</strong> with right base + equity mix 比较 comfortable. 但 number 不是 dealbreaker — role fit 和 trajectory 更重要.</p>
+<p>想反问 — 你们这个 level 的 budget range 是什么? 我可以根据你的 range 调整 expectation."</p></blockquote>
+<p><strong>Q5</strong>: "What if we offer SWE-Production role instead of FDE?"</p>
+<p><strong>A</strong>:</p>
+<blockquote><p>"Depends on the role specifics.</p>
+<p>如果 SWE-Production 是 <strong>纯 internal team, 0 customer interaction</strong>, 不是 fit — 我 explicitly 想要 customer-facing piece.</p>
+<p>如果 SWE-Production 是 <strong>hybrid — 60% internal product 40% deployed at strategic customer</strong>, 我想了解 day-to-day. 我对 title 不 attach, 我对 <strong>work shape</strong> attach.</p>
+<p>但 honesty: 如果 SWE 给的 level 比 FDE 高一个档 (e.g., L5 SWE vs L4 FDE) 且 hybrid 比例 ok, 我会接受. 如果是同 level, 我选 FDE because 'shape of work' 优先."</p></blockquote>
+<hr />
+<h3>❌ 易错点 (top 12)</h3>
+<ol><li><strong>泛泛回答</strong> — "I love AI, want to learn" (任何 role 都能这么讲)</li><li><strong>Defining by negation</strong> — 只说不想做啥, 没说想做啥</li><li><strong>Wrong differentiator</strong> — "FDE = remote / less stress / better comp"</li><li><strong>太短</strong> (&lt; 30s) — 像背模板</li><li><strong>太长</strong> (&gt; 2min) — recruiter 注意力流失</li><li><strong>Generic company pitch</strong> — 没做差异化研究</li><li><strong>Stepping stone 暗示</strong> — "未来想做 PM / 自己创业"</li><li><strong>Trade-off 不 acknowledge</strong> — 显得 "什么都想要"</li><li><strong>No specific story</strong> — 抽象口号</li><li><strong>没 quote technical depth</strong> — recruiter 怕你 coding round 塌</li><li><strong>过度谦虚</strong> — "可能不够 qualified 但..."</li><li><strong>Salary 主动开第一个 number</strong> — 让 recruiter 先 anchor</li></ol>
+<hr />
+<h3>✅ 加分项 (top 10)</h3>
+<ol><li><strong>"I've been doing FDE work without the title"</strong> — show, don't tell</li><li><strong>3 reasons structure</strong> (Anchor / Motivation / Proof / Company / Trade-off)</li><li><strong>公司差异化</strong> framing — 不同公司不同 hook</li><li><strong>Technical depth quote</strong> — vLLM / SGLang / SFT / DPO / RL</li><li><strong>具体 customer-facing story</strong> — Indonesia / Pakistan / 多市场</li><li><strong>Trade-off acknowledgment</strong> — "not research because outcome &gt; papers"</li><li><strong>Long-term commitment</strong> — "FDE is home, not stepping stone"</li><li><strong>Salary reverse-anchor</strong> — "what's your budget?"</li><li><strong>Flexible on title, attached to work shape</strong></li><li><strong>30-second story summary</strong> ready (Indonesia tier / Pakistan ASR / Internal Platform)</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>"Why FDE specifically" 不是问你为啥喜欢 customer-facing, 是问你能不能在 60-90 秒内证明 "我已经在做 FDE 形态的工作, 我了解 FDE 跟其他 role 的边界, 我做过功课了解这家公司的 FDE flavor, 我准备好 long-term commit"</strong>.</p>
+<p>Show, don't tell. Anchor + Motivation + Proof + Company + Trade-off. 五段 60-90 秒.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (印 1 页)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">60-90 sec structure (AURA-T):
+  Anchor (10s)       — "Algo engineer at TikTok, 3y prod GenAI"
+  Underlying (20s)   — "Bridge frontier to customer constraint"
+  Right fit (25s)    — "7 markets, 4 stakeholders, FDE-shaped"
+  Aligned (15s)      — Company-specific hook
+  Trade-off (10s)    — "Not research / SWE / SE because [X]"
 
-FDE vs others positioning:
-  Not pure research — care about business outcome
-  Not pure SWE — want customer interaction
-  Not sales engineer — own the code, not slides
-  FDE = middle of the three
+Company-specific hooks:
+  OpenAI       — Frontier model + post-training + agent platform
+  Anthropic    — Safety + tier-confirm = constitutional AI
+  Google Cloud — Multi-cloud scale + 7 markets analog
+  Palantir     — Payment + ops + compliance (not LLM-first)
+  Databricks   — ConvFinQA ablation = data-driven decision
 
-Don't say:
-  - "I love AI"
-  - "Better comp"
-  - "I'm bored at TikTok"
-  - "My friend works here"
-  - "Hot new field"
+5 ready STAR stories:
+  1. Indonesia refund tier (★ scoping, push back, reversibility)
+  2. Pakistan ASR cascade (ops-driven design)
+  3. BNPL chatbot 70 → 92% (data before model)
+  4. Internal Agent Platform 14 teams (multi-customer abstraction)
+  5. ConvFinQA ablation (honest reporting)
+
+Phrases to use:
+  "I've been doing FDE work without the title"
+  "Translate business asks to model deliverables"
+  "Bridge frontier capability to business constraint"
+  "Right answer faster, not wrong answer on time"
+  "Customer trust built on honest reporting, not polished slides"
+
+Phrases to NEVER use:
+  "I love AI" / "Hot new field"
+  "Better comp" / "More remote"
+  "I don't want to do research"
+  "FDE is stepping stone to PM"
+  "My friend works there"
+  "Can probably cover 90%"
+
+FDE vs others (1-line each):
+  Research: distance to customer = max, unit = paper
+  MLE:      distance to customer = med, unit = model quality
+  SWE:      missing direct customer dialog
+  SE:       cutoff at deal close, doesn't own deployment
+  FDE:      distance to customer = min, unit = customer outcome ⭐
 
 Salary anchor (if asked):
-  $300-500k total, right base + equity mix
-  Reverse question: "what's your budget?"</code></pre>
+  "$400-600k total, right base + equity mix"
+  "What's your range?" (reverse)
+  Number is not dealbreaker, role fit + trajectory &gt; comp
+
+5 follow-ups ready:
+  Q1: Why now? → inflection point + role doesn't compound at TikTok
+  Q2: Why not internal transfer? → frontier model not built at TikTok
+  Q3: Comfortable with small team? → I prefer it
+  Q4: Comp target? → reverse anchor with range
+  Q5: SWE-Production instead? → depends on customer-facing %
+
+Red lines:
+  - Stepping stone implication
+  - Generic answer
+  - No specific story
+  - No company differentiation
+  - Open salary first</code></pre>
   </section>
 
   
@@ -138,187 +495,952 @@ Salary anchor (if asked):
 </main>
 <script id="md-source" type="text/markdown">## 题目（verbatim）
 
-> **[Recruiter Screen 30-45 min]**
+> **[Recruiter Screen / Hiring Manager opener — 30-45 min]**
 >
-> "**Why do you want FDE specifically** versus other engineering roles at OpenAI / Google / etc?"
+> "**Why do you want FDE specifically** versus other engineering roles? Why FDE at OpenAI / Google / Anthropic / Palantir, not Research / SWE / MLE / Sales Engineering?"
 
-**出处**：OpenAI recruiter 经典开场, Google FDE recruiter / Tomoro / Palantir 也都问.
+**出处**: OpenAI recruiter 经典开场, Google FDE recruiter / Anthropic AS / Tomoro / Palantir Forward Deployed 都问. 几乎是每一家 FDE 面试**第一题**.
 
-**Round**：Recruiter Screen (30-45 min)
+**Round**: Recruiter Screen / Hiring Manager opening (30-45 min)
 
 ---
 
 ## 这道题在考什么
 
-**Recruiter screen 不是技术深度**, 是 **fit + clarity**：
+表面是 "动机题", 实际是 **fit + clarity + 角色理解** 的复合考察:
 
-1. **能不能 5 句话说清** —— 啰嗦 = 没想清
-2. **你懂 FDE vs others 区别** —— 否则候选 mistake apply
-3. **Motivation 真不真**
-4. **未来 trajectory** —— FDE 是 stepping stone 还是 home
+1. **能不能 60-90 秒 内说清楚** —— 啰嗦 = 没想清楚, 太短 = 没思考
+2. **你懂不懂 FDE vs SWE / MLE / Research / Sales Engineering 的区别** —— 不懂就是 mistake apply, 候选会浪费招聘官时间
+3. **你的 motivation 真不真** —— 是 "OpenAI 是最热的公司我要进来" 还是 "我已经在做 FDE 的事, 现在找匹配的 title"
+4. **你的 career trajectory 合不合理** —— FDE 是 stepping stone to PM/CTO, 还是 home / long-term identity
+5. **你对这家公司具体了解多深** —— 不同公司的 FDE flavor 完全不同, 你能不能差异化讲
 
----
+**Recruiter 真正在筛的信号** (按重要性排序):
 
-## FDE vs others 区分（recruiter 关心的）
-
-| Role | What | 适合 person |
+| 信号 | 权重 | 怎么体现 |
 |---|---|---|
-| **Pure ML / Research** | Frontier model 训练 | Loves papers, novel architectures |
-| **Platform Engineer** | 内部 infra (vLLM tuning) | Loves systems |
-| **Software Engineer (SWE)** | Product features | Loves shipping |
-| **FDE** | At customer site, deploy + customize + own outcome | Loves **customer-facing impact** + technical depth |
-| **Sales Engineer** | Pre-sales technical | Customer-facing but less hands-on coding |
-| **Customer Success** | Post-sales relationship | Less technical |
+| **"已经在做 FDE 工作"** | ★★★★★ | 你 quote 出当前工作里 FDE 形状的事 (客户对接 / scoping / 多 stakeholder / 端到端 ownership) |
+| **角色边界清晰** | ★★★★ | 你能讲出 FDE vs SWE vs MLE 的区别, 而不是 "我也想做 research 也想做 product" |
+| **公司差异化** | ★★★★ | 你知道 OpenAI FDE ≠ Anthropic AS ≠ Palantir FDE, 不是模板 pitch |
+| **个人热情真实** | ★★★ | 具体故事, 不是抽象口号 |
+| **trade-off 自觉** | ★★★ | 你 acknowledge 你 give up 了什么 (e.g. 不能做 frontier research) |
 
-FDE 区别：**both deep coding AND on-site with customer**，不是 either-or。
+**没说出口的 anti-signal**:
 
----
-
-## 60-90 秒 answer 框架
-
-| 段 | What |
-|---|---|
-| 1 (10s) | Identity anchor |
-| 2 (20s) | What specifically draws you to FDE |
-| 3 (20s) | Why you (proof) |
-| 4 (15s) | Why this company specifically |
-| 5 (10s) | Forward-looking (career arc) |
+- "我对 FDE 不熟, 但听起来不错" → 你在 fishing for any offer
+- "我想做 customer-facing 的 AI" → 模糊, 任何角色都能这么讲
+- "FDE 是 stepping stone 到 PM" → recruiter 听到立刻降权重
+- "看了 JD 我觉得能 cover 90%" → 把它当成 SWE 简历投递
 
 ---
 
-## 你专属 sample answer（基于 resume）
+# Part 1 · 教学讲解
 
-> "Three reasons FDE specifically, not other engineering roles.
->
-> **One**: I love the **gap between research and production**. I've been at TikTok Payment for 3 years building production GenAI systems — voice agents, RAG chatbots, agent platforms. The most fulfilling work is when frontier model capability **meets a specific business constraint at a customer site** and I have to bridge the gap with engineering craft, not just model selection. That's the FDE job description.
->
-> **Two**: I've effectively been doing FDE work without the title. At TikTok I'm 'Expert Algorithm Engineer + Technical POC'. The POC part means I sit between research, engineering, product, and regional business teams across 7 markets. I translate business asks to model deliverables, debug at customer-equivalent sites (regional ops teams), and own outcome metrics like repayment conversion. **The role I'm doing today is FDE shaped — I want the title and team that matches**.
->
-> **Three**: At Tomoro / OpenAI Deployment Company specifically, FDEs work with frontier-model researchers down the hall, not 6 layers of corporate away. For someone who's been doing **post-training (SFT, DPO, RL alignment) and inference optimization (vLLM, SGLang)** on internal models, working at the source is irresistible.
->
-> Not pure research because I'm motivated by **business outcome, not papers**. Not pure SWE because I want **customer interaction**, not isolated feature work. Not sales engineering because I want to **own the code, not the slides**.
->
-> FDE is exactly the middle of those three."
+## 1. 几个术语先讲清
 
-⏱️ 75 seconds.
+**FDE (Forward Deployed Engineer)**: 字面意思 "向前部署的工程师". 起源于 Palantir, 现在 OpenAI / Anthropic / Google Cloud / Databricks 都有类似角色. 核心定义:
 
----
+> 一个 **technically deep** 的工程师, **物理上或制度上贴近客户**, 端到端负责 **把通用产品 / 模型 / 平台 落地到客户具体业务上**, 同时把 **学到的东西反哺回产品 / 模型团队**.
 
-## 5 个 "what to NOT say"
+注意三个关键词:
+- **technically deep** — 写代码、调模型、debug 系统, 不是 PPT 工程师
+- **贴近客户** — 物理 on-site 或制度上深度对接 customer team
+- **端到端** — 从 scoping → POC → production → renewal 全程 ownership
 
-❌ **"I want to work at OpenAI, FDE is the most open role"** → 不是 fit, 是 opportunism
-❌ **"Better comp than other roles"** → 真实但 surface
-❌ **"I don't want to do research anymore"** → defining negatively
-❌ **"My friend works there"** → social, not personal
-❌ **"It's a hot new field"** → trend-chasing
+**SWE (Software Engineer)**: 产品 / 内部 infra 工程师. 不直接对客户. 接需求做 feature.
 
----
+**MLE (Machine Learning Engineer)**: 模型工程师. 主要做 training / fine-tuning / inference pipeline / eval.
 
-## 5 个 "do say" formulas
+**Research / Research Engineer**: Frontier model 研究. 主要 output 是 paper、新架构、新算法.
 
-✅ **"I've been doing FDE work without the title"** + concrete evidence
-✅ **"What energizes me: [specific scenario]"**
-✅ **"At [target company], FDE specifically means [X], which is [why fit]"**
-✅ **"My experience at [current role] maps onto [FDE responsibility]"**
-✅ **"FDE is the middle of [three other roles I considered]"**
+**Sales Engineer (SE) / Solutions Architect (SA)**: Pre-sales technical. 帮 sales 做 POC、demo、技术问答. **不 own 长期 deployment**.
 
----
+**Customer Success / Implementation Engineer**: Post-sales 关系维护. 技术成分较低. 主要 driver 是 customer retention, 不是 code shipping.
 
-## 简历专属 reframe
-
-你完全可以用上面 sample 直接 say. 关键 anchors:
-
-- **"7 markets, 6 languages"** (voice agent) — multi-stakeholder deployment proof
-- **"Translate business asks to model deliverables"** — FDE 灵魂
-- **"Post-training + inference (vLLM/SGLang)"** — technical depth match
-- **"Indonesia refund tier scoping"** — concrete customer-facing story
-- **"Expert Algorithm Engineer + Technical POC"** — title evidence
-
----
-
-## 5 个 recruiter follow-ups
-
-**Q1**: "Why now? You've been at TikTok 3 years."
-**A**: "Two things converging. **One**, my current work is FDE-shaped but TikTok doesn't have an FDE org — so the role doesn't compound. **Two**, GenAI deployment is at an inflection point — frontier model capability changing what's feasible monthly, and being at OpenAI's deployment arm puts me at the **center** of that change. The optimal time to make this move is now, before the field stabilizes."
-
-**Q2**: "Why not just internal transfer to a research-y team?"
-**A**: "I've considered it. The trade-off: TikTok's strength is consumer-scale infra, which is amazing but **not where frontier models are built**. To compound on frontier-model knowledge, the right place is at a frontier lab. Plus I want **deployment at customer sites** (vs deployment within one company), and Tomoro is that exact role."
-
-**Q3**: "You'd be working with smaller teams. Comfortable with that?"
-**A**: "Yes — my team is 3 engineers now, and many TikTok teams I work with are < 10. I prefer it. Smaller teams mean **direct ownership** and faster iteration. Less politics, more shipping."
-
-**Q4**: "Comp at OpenAI is competitive — what's your target?"
-**A**: "I'd want to understand the structure first — base, equity (especially PPU now that OpenAI Deployment Company is established), and remote / Singapore / London considerations. Based on what I've seen for senior FDE at OpenAI, total comp in the **$300-500k USD** range with the right mix of base + PPU equity would let me make this move. Can you share what you've budgeted for this level?"
-
-**Q5**: "What if we offer SWE-Production role instead of FDE?"
-**A**: Honest:
-- "Depends on the role specifics. If SWE-Production is **internal team, no customer interaction**, it's a less good fit for me — I'd be giving up the customer-facing piece I want."
-- "If it's a hybrid with some customer aspect, I'd want to understand the day-to-day. I'm flexible on title if the **shape of the work** matches what I described."
-
----
-
-## ❌ 易错点
-
-1. **List of generic reasons** — "love AI, want to learn" — bland
-2. **Defining by negation** — "don't want research" only
-3. **Naming wrong differentiator** — "FDE = remote work" misses the role
-4. **Too short** — < 30s feels rehearsed-shallow
-5. **Too long** — > 2min loses recruiter attention
-6. **No specific company connection** — generic FDE pitch
-7. **Forward-looking too vague** — "I want to grow"
-
----
-
-## ✅ 加分项
-
-1. **"I've been doing FDE without the title"** — show, don't tell
-2. **3 specific reasons** with proof each
-3. **FDE vs adjacent roles distinction**
-4. **Company-specific draw** (Tomoro acquisition / Vertex AI scale)
-5. **Career arc** clearly articulated
-6. **Acknowledge tradeoffs** (not pure research)
-7. **Quote prior FDE-shaped story** (Indonesia refund tier)
-
----
-
-## Cheat Sheet
+### FDE 在这张图里的位置
 
 ```
-60-90 sec structure:
-  (10s) Identity anchor
-  (20s) What draws you to FDE
-  (20s) Why you (proof)
-  (15s) Why this company
-  (10s) Career arc forward
+                    Customer-facing
+                          ↑
+                          │
+          Sales Engineer  │  FDE  ←─ 你想去的位置
+              ↑           │     ↑
+              │           │     │
+              │           │     │
+   ───────────┴───────────┼─────┴──────────→ Technically deep
+              │           │     │
+              │           │     │
+              │           │  MLE / SWE / Research
+              ↓           │     ↓
+       Customer Success   │
+                          │
+                          ↓
+                   Internal-facing
+```
 
-3 reasons formula:
-  1. Bridge research-to-production (motivation)
-  2. Already doing FDE work without title (proof)
-  3. Company-specific (frontier model proximity)
+FDE 是 **同时高 customer-facing + 高 technical depth** 的稀有象限. 这个象限不大, 但是是当今 GenAI 商业化的关键缺口.
 
-Anchors to use:
-  - "7 markets, 6 languages" (multi-stakeholder)
-  - "Expert + Technical POC" (FDE-shaped already)
-  - "Indonesia refund tier scoping" (customer-facing story)
-  - "Post-training + vLLM/SGLang" (deep technical)
-  - "Translate business asks" (FDE soul)
+---
 
-FDE vs others positioning:
-  Not pure research — care about business outcome
-  Not pure SWE — want customer interaction
-  Not sales engineer — own the code, not slides
-  FDE = middle of the three
+## 2. 这道题在考你什么 (深入)
 
-Don't say:
-  - "I love AI"
-  - "Better comp"
-  - "I'm bored at TikTok"
-  - "My friend works here"
-  - "Hot new field"
+Recruiter / HM 实际在评估 **5 个潜在风险**:
+
+### 风险 1: "你是不是 'apply everywhere' 候选人?"
+
+判断方式: 你对 FDE 的描述是否 specific. 模糊回答 = 你只是在投票.
+
+### 风险 2: "你会不会三个月后想去做 research?"
+
+FDE 离 research 比 SWE 近, 很多 research-aspiring 的候选会把 FDE 当 backdoor. Recruiter 怕招你两年你跳到 research team.
+
+破解: 主动 acknowledge "我考虑过 research, 但我的 energy 在 business outcome, 不在 paper. 这是 trade-off, 我清楚."
+
+### 风险 3: "你能 handle customer 吗?"
+
+很多 deep tech 候选 (尤其 PhD / pure research 背景) 看到 customer 就 panic. FDE 50% 时间在和客户 ops / IT / legal 撕扯, 不是和模型撕扯.
+
+破解: quote 你做过的 customer-facing 故事 (Indonesia ops team, 多市场 product manager).
+
+### 风险 4: "你 long-term 待得住吗?"
+
+FDE 的 churn rate 比 SWE 高. 一是 burnout (客户压力大), 二是 stepping stone 心态 (跳 PM / 创业).
+
+破解: trajectory 讲长期 ("我想在 FDE 这个 role 长期 compound, 因为这是 GenAI 行业未来十年的 key role").
+
+### 风险 5: "你能写真正的代码吗?"
+
+有些候选 FDE 听起来 fit, 但 coding round 拉垮. Recruiter 会在这一轮就埋下伏笔.
+
+破解: 在 motivation 里 quote technical depth ("vLLM / SGLang / SFT / DPO / RL alignment"), 让 recruiter 知道后面 technical round 不会塌.
+
+---
+
+## 3. 回答框架: AURA (60-90 秒 monologue)
+
+| 段 | 时长 | What | 你的 anchor |
+|---|---|---|---|
+| **A** — Anchor (identity) | 10s | 你是谁, 你做什么 | "Algo engineer at TikTok Global Payment, building production GenAI for 3 years" |
+| **U** — Underlying motivation | 20s | 是什么 specifically 吸引你到 FDE | "Bridge frontier capability to specific business constraint at customer site" |
+| **R** — Right fit proof | 25s | 为什么是你 | "Already doing FDE-shaped work — 7 markets, customer ops, end-to-end" |
+| **A** — Aligned target | 15s | 为什么这家公司, 为什么现在 | "OpenAI FDE = frontier researcher down the hall, that's irresistible for someone doing post-training" |
+| **Trade-off ack** | 10s | 你 give up 了什么 | "Not pure research because outcome > papers; not pure SWE because customer interaction matters" |
+
+Total: ~80 秒. 短不过 60, 长不过 100.
+
+### 为什么是这个顺序
+
+**Anchor first** — recruiter 需要先知道你是谁, 才能听懂后面的故事.
+**Motivation 比 proof 先** — 因为 motivation 是抽象, proof 是落地. 先讲 why, 再讲 evidence.
+**Company-specific 放后面** — 因为前面已经把你这个人讲清楚, company piece 是 "为什么是这里", 自然接住.
+**Trade-off ack 收尾** — 显示成熟, 你不是 "什么都想要" 的人.
+
+---
+
+## 4. 不同公司的 FDE 差异化 framing
+
+**OpenAI FDE / Solutions Architect**:
+- 公司位置: SF / NYC / London / Singapore (Tomoro acquisition 后 footprint 扩大)
+- 客户类型: Fortune 500 enterprise + 高 ARR SaaS
+- 工作内容: GPT 系列 + Operator + Codex + 自研 agent 框架的 enterprise 落地
+- Frontier proximity: **极高** — 和 research 同一栋楼 (现在加上 ChatGPT product team)
+- 你的 framing: "我做 post-training 和 inference 优化 (vLLM/SGLang/SFT/DPO), 在 OpenAI 这边能直接和 model team 对话, 不需要 6 层 corporate"
+
+**Anthropic Applied Solutions / Forward Deployed**:
+- 公司位置: SF / NYC / London (Singapore 也有)
+- 客户类型: 偏 enterprise 安全敏感行业 (金融 / 法律 / 政府)
+- 工作内容: Claude API + Claude Code + tool use 落地, 偏 safety 和 constitutional AI 应用
+- Frontier proximity: **高** — 但风格更 research-led
+- 你的 framing: "Anthropic 对 safety 和 trust 的 framing 跟我做 financial / debt collection 的 high-stakes deployment 极其匹配 — tier-based confirm 模式本质上是 constitutional AI 思路"
+
+**Google Cloud Vertex AI FDE / Customer Engineer**:
+- 公司位置: 全球大公司, 分散
+- 客户类型: 跨 vertical, 包括 retail / health / finance / public sector
+- 工作内容: Vertex + Gemini + agent builder + AlloyDB 整体打包落地
+- Frontier proximity: **中** — Google research 远, Cloud 团队相对独立
+- 你的 framing: "字节 internal 7 个市场 deployment 经验对应到 Vertex 多 customer + 多 region 的 scale 挑战"
+
+**Palantir Forward Deployed Engineer**:
+- 公司位置: SF / NYC / DC / London
+- 客户类型: 政府 / 金融 / 制造业 / 健康, 高度定制化
+- 工作内容: Foundry 平台 + 客户数据 ontology + ops 工作流, 模型层占比小
+- Frontier proximity: **低** — Palantir 不做 frontier model
+- 你的 framing: **不要把 Palantir FDE 当成 LLM FDE** — 这里 LLM 是工具, ops + data 是主线. 你要 lean on TikTok PayLater 支付业务的 ops & compliance 经验
+
+**Databricks / Snowflake FDE**:
+- 公司位置: SF / Boston / 全球
+- 客户类型: data-heavy enterprise (传统行业数据团队)
+- 工作内容: 数据平台 + 模型 + serving 一体化
+- Frontier proximity: 低-中
+- 你的 framing: lean on ConvFinQA + data ablation 这类 data engineering 经验
+
+**字节 / 阿里 / 腾讯 FDE-类**:
+- 没有正式 FDE title, 但 "技术 POC" / "解决方案架构师" 是同形态
+- 你的 framing: "我在 TikTok 做的就是这个 — Expert Algorithm Engineer + Technical POC + 7 个市场端到端"
+
+### 一个对照表 (cheat sheet)
+
+| 公司 | FDE 真正在做的事 | 你的钩子 (resume hook) |
+|---|---|---|
+| OpenAI | Frontier model + enterprise deployment | vLLM / SGLang / SFT / DPO / agent platform |
+| Anthropic | Safety-first AI + high-stakes industries | Indonesia tier 3 confirm pattern + debt collection 合规 |
+| Google Cloud | Multi-cloud scale + 多 vertical | 7 markets × 6 languages + multi-tenant |
+| Palantir | Data + ops + ontology | TikTok PayLater 支付合规 + 财务系统 integration |
+| Databricks | Data + ML lifecycle | ConvFinQA + ablation methodology |
+
+---
+
+## 5. 4 个真实场景演示
+
+### 场景 A: TikTok 内部的 "FDE-shaped" 工作 (你的当前)
+
+**Situation**: 你的 title 是 Expert Algorithm Engineer + Technical POC, 但实际工作覆盖 7 个市场 (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦), 每个市场有独立的:
+- 产品 / 运营 team (不同时区, 不同语言)
+- 法规 / 合规要求 (印尼的 OJK, 巴西的 BACEN)
+- 用户行为模式 (债务沟通文化差异)
+- 历史系统 (legacy repayment platform)
+
+**Task**: 把 voice agent 从印尼 (首发) 扩展到剩余 6 个市场.
+
+**Action**:
+1. 每个市场 kickoff 一周做 scoping (3 个 stakeholder: ops / product / compliance)
+2. 决定哪些 component 共享 (LLM backbone + ASR pipeline + RAG framework)
+3. 哪些 component 必须 per-market (persona / TTS voice / escalation rules / compliance prompt)
+4. 上线后我自己 on-call 第一周, 跟当地 ops sit in 听通话
+
+**Result**: 6 个月内覆盖 7 个市场, 平均每市场 GMV 提升 X%, 但更重要的是建立了 "GenAI deployment per-market" 的 playbook.
+
+**这就是 FDE 的工作形态**. 我的 title 是 algo engineer, 但 60% 时间在做 FDE.
+
+### 场景 B: BNPL 客服 chatbot 的 stakeholder 拉扯
+
+**Situation**: 字节内部 BNPL (Buy Now Pay Later) product team 找我做客服 chatbot, 但他们的 stakeholder 比我想象的多:
+- Product team — 要 user experience 好
+- Compliance — 要不能 promise specific 额度 / 利率 (合规红线)
+- CS team — 怕 chatbot 抢他们的 job
+- Risk team — 要不能泄漏用户的信用数据
+
+**Task**: 设计一个 system 满足所有 4 方 + 用户 experience.
+
+**Action**:
+1. 1v1 跟 4 个 stakeholder 谈, 出 stakeholder map
+2. 设计 tier-based response: tier 1 通用 FAQ (chatbot 直接答) / tier 2 账户特定信息 (chatbot 答, 但限制 surface area) / tier 3 复杂诉求 (transfer 给 CS)
+3. CS team 从 "被替代" 变成 "拿到更难的 case", 反而提升 satisfaction
+4. Routing accuracy 从最初的 70% 提到 92% (通过 RAG-based tool discovery)
+
+**Result**: 一年内承接了 80% 的 inbound traffic, CS team headcount 没减但生产力翻倍, compliance 0 incident.
+
+### 场景 C: Internal Agent Platform 跨团队 abstraction
+
+**Situation**: 字节内部多个团队 (PayLater / Risk / Recommendation / 内部 IT) 都想做 agent application, 但每个团队从头造轮子. 我 (和小团队) 被指定做一个 internal agent platform.
+
+**Task**: 设计共享 abstraction 让 N 个团队复用, 但又不限死他们的灵活度.
+
+**Action**:
+1. 跟 5 个种子团队各做 1 小时访谈, 抽 commonality
+2. 抽出 3 层 abstraction:
+   - Workflow (orchestration of agents + tools)
+   - Tool (callable function with schema)
+   - Memory (short / long / shared)
+3. 每个 abstraction 留 escape hatch (custom override)
+4. 给每个团队 onboarding doc + office hour
+
+**Result**: 6 个月内 5 个团队 → 14 个团队 adopt. 这种 "服务多个内部客户" 的形态本质上就是 FDE.
+
+### 场景 D: ConvFinQA 项目里的 ablation methodology
+
+**Situation**: 学术合作项目, multi-hop financial QA. 团队最初的想法是 "把所有 component 都上, hope for the best".
+
+**Task**: 弄清楚哪个 component 真正提供 lift.
+
+**Action**:
+1. 设计 ablation study — 逐个 disable component
+2. Pipeline 拆 6 个 stage (retrieval / decompose / sub-question / numeric reasoning / aggregation / verification)
+3. 每个 stage 单独 ablation, 看 metric drop
+4. 发现 2 个 stage 提供 80% 的 lift, 另 4 个 marginal
+5. Publish 结果 — **including the negative finding** (诚实)
+
+**Result**: 论文发表, 但更重要的是建立了 "evidence-based pipeline design" 的习惯. 这种 "用 data 而不是直觉做架构决策" 是 FDE 的关键素质 — 因为客户问 "为什么要这个 component" 时, 你必须有 data 答.
+
+---
+
+## 6. 回答 playbook (numbered steps)
+
+**Step 1**: 先 Anchor (10 秒) — 用一句话讲你是谁
+> "I'm an expert algo engineer at TikTok Global Payment, building production GenAI for 3 years."
+
+**Step 2**: 进 Underlying Motivation (20 秒) — 用一句具体的话讲什么吸引你
+> "I love the gap between research and production — when frontier model capability meets a specific business constraint at a customer site, and I have to bridge the gap with engineering craft."
+
+**Step 3**: 立刻 follow-up Right Fit Proof (25 秒) — quote 具体经验
+> "I've effectively been doing FDE work without the title. My role covers 7 markets, 6 languages, debt collection voice agent. I sit between research, engineering, product, and 7 regional ops teams. I translate business asks to model deliverables. I own outcome metrics like repayment conversion. The role I'm doing today is FDE-shaped."
+
+**Step 4**: 切换到 Aligned Target (15 秒) — 公司差异化
+> "At [OpenAI / Anthropic / Tomoro / Palantir], FDE specifically means [X — pick from cheat sheet above]. For someone who's been doing [Y — your hook for that company], working at [Z — what the company does specifically] is irresistible."
+
+**Step 5**: Trade-off Ack (10 秒) — 收尾
+> "Not pure research because I'm motivated by business outcome, not papers. Not pure SWE because I want customer interaction, not isolated feature work. Not sales engineering because I want to own the code, not the slides. FDE is the middle of those three."
+
+**Step 6**: 停 — 不要继续讲. 等 recruiter follow up.
+
+⏱️ Total: ~80 秒.
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **List of generic reasons** ("love AI, want to learn") | bland, 任何角色都能这么讲. 必须 specific to FDE |
+| 2 | **Defining by negation** ("不想做 research") | 显得 narrow, 没有 positive vision |
+| 3 | **Naming wrong differentiator** ("FDE 远程办公好") | recruiter 立刻判断 "你不了解角色" |
+| 4 | **太短** (< 30s) | feels 浅, 像背模板 |
+| 5 | **太长** (> 2min) | recruiter 注意力流失, "啰嗦" 标签 |
+| 6 | **No specific company connection** | generic FDE pitch, 显得是模板 |
+| 7 | **Trajectory 太模糊** ("想成长") | 没说服力 |
+| 8 | **Stepping stone 暗示** ("以后想做 PM / CTO") | recruiter 立刻降权重 |
+| 9 | **没 quote technical depth** | recruiter 怕你 coding round 塌 |
+| 10 | **过度谦虚** ("可能不够 qualified 但...") | self-sabotage |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **"Why FDE specifically" 这道题真正的 winning answer 不是 "我喜欢 customer-facing 的工作", 而是 "我已经在做 FDE-shaped 的工作了, 我要的是和工作形态匹配的 title + team + 公司, 加上你们公司在 [X] 上的独特优势"**.
+>
+> Show, don't tell. 用当前工作 prove 你已经具备 FDE 形态, 用公司 specific 钩子 prove 你做过功课.
+
+---
+
+# Part 2 · 5 个深度子问题
+
+## ⚙️ Problem 1: FDE vs SWE vs MLE vs Research — 边界讲清楚
+
+这是 recruiter 验证 "你懂角色吗" 的关键. 答不清边界 = mistake apply.
+
+### 1.1 4 个 axis 拆分
+
+| Axis | SWE | MLE | Research | FDE |
+|---|---|---|---|---|
+| **Customer-facing time** | 0-10% | 5-15% | 0% | **40-70%** |
+| **Code shipping cadence** | weekly | weekly | monthly (paper) | weekly (POC), monthly (deployment) |
+| **Ambiguity level** | low-med (PRD given) | med (eval ambiguous) | high (open problem) | **very high** (customer doesn't know what they want) |
+| **End-to-end ownership** | feature | model | research direction | **deployment outcome** |
+| **Failure mode** | bug in code | model regression | paper rejected | **customer churn / no renewal** |
+| **Speed pressure** | sprint cycle | quarter | conference deadline | **customer expectation = days/weeks** |
+| **Stakeholder count** | 2-3 (PM, designer, eng) | 3-5 (PM, infra, ops) | 1-2 (advisor, co-author) | **5-15** (customer ops, IT, legal, exec, end-user) |
+| **Travel / on-site** | 0% | 0-10% | 5% (conferences) | **20-40%** |
+
+### 1.2 边界 dialog script (recruiter 追问时)
+
+**Recruiter**: "How is FDE different from MLE?"
+
+**你**:
+> "MLE 主要 lives in **model lifecycle** — data preparation, training, eval, inference optimization. The success metric is usually model quality (accuracy, latency). I do MLE work — vLLM tuning, SFT, DPO — but only when it serves the bigger picture.
+>
+> FDE 主要 lives in **customer outcome**. The success metric is **customer renewal**. I might do MLE work, but I also do integration work (auth, webhook, data pipeline), business work (KPI definition, stakeholder mapping), and product work (UX of the agent).
+>
+> 一个具体例子: 在我的 voice agent 项目里, 当 ASR 准确率从 92% 提到 94% 时, MLE 的工作目标达成了. 但当地 ops 团队仍然 unhappy — 因为 ASR 错的那 6% 都集中在了高净值客户的姓名上, 影响重大. 我得做的是: 添加客户姓名的 dictionary boost, 加 fallback 'please spell your name', 加 human-in-loop tier. 这些都不是 MLE 工作, 是 FDE 工作."
+
+**Recruiter**: "Sounds like SWE then?"
+
+**你**:
+> "SWE 通常 receives PRD and ships. FDE 经常**自己 produce PRD** — 因为客户连他们想要什么都不知道. 在 SWE 模式下, '需求不清' 是 PM 的问题. 在 FDE 模式下, '需求不清' 是你的工作核心."
+
+### 1.3 这个边界用在你的故事里
+
+| 你的故事 | SWE 角度 | FDE 角度 |
+|---|---|---|
+| Voice agent 7 markets | "实现多语言切换" | "和 7 个市场 ops 团队 negotiate scope, 设计 per-market playbook" |
+| BNPL chatbot | "实现 RAG-based tool routing" | "balance 4 个 stakeholder (product / compliance / CS / risk)" |
+| Internal Agent Platform | "实现 workflow / tool / memory abstraction" | "对 14 个内部团队做 customer interview, 抽取 commonality" |
+| Indonesia refund tier | "实现 tier 1 / 2 / 3 路由" | "和 ops team 谈 scope, 用 data 反驳过激诉求, 设计 phased rollout" |
+
+每个故事都有 FDE 角度. 答这道题的时候**优先讲 FDE 角度**.
+
+---
+
+## ⚙️ Problem 2: 为什么这道题答 "我已经在做 FDE 工作" 是最强 framing
+
+### 2.1 为什么 "show, don't tell" 在这道题如此重要
+
+**Tell 的版本**:
+> "I'm motivated by customer-facing AI work and end-to-end ownership."
+
+**Show 的版本**:
+> "Last month I flew to Jakarta for 3 days to sit with Indonesia ops team while they handled tier 3 refund edge cases. I watched 47 calls, identified 2 pattern bugs in our tier classifier, fixed them on the plane back. The next week's tier 1 auto-approval rate went from 71% to 79%."
+
+第二种**信息密度高 10 倍**. 不只是 "我有热情", 而是 "我做这个事到了肉的程度".
+
+### 2.2 你 resume 里能 "show" 出的 5 个具体 FDE moment
+
+**Moment 1 — Indonesia tier 3 refund 现场 (假设)**:
+> "我在 Indonesia 项目里, ops 想 8 周内 full automate refund. 我没 push back 也没 yes-man, 而是 2 周跑了 tier 1+2 pilot 拿到 70% 覆盖 + 0% wrong-call 的 data, 然后跟 ops 一起重新 scope. 最终 tier 3 6 个月后才上线, 但 0 wrong refund. 这就是 FDE 的 scoping muscle."
+
+**Moment 2 — 巴基斯坦 ASR 故障**:
+> "我们 Pakistan 上线第二周, ASR provider 突然挂了 40 分钟. 我提前做的 cascade fallback (provider A → B → C) 启动. 0 通话丢失, ops 团队都不知道. 但更重要的是 — 我事先和当地 ops 谈过 'worst case 你要什么', 他们说 '宁愿 silent fail 也不要 garbage response'. 我的设计直接基于他们的偏好, 不是技术选型直觉."
+
+**Moment 3 — BNPL 路由准确度提升**:
+> "BNPL chatbot 最初 routing accuracy 70%. 我没 jump to fine-tuning, 而是先看 confusion matrix — 发现 60% 的 mis-route 是 tool description 写得模糊, 不是模型能力问题. 重写了 12 个 tool 的 description (用 RAG-based discovery + dynamic prompt), accuracy 跳到 92%. **MLE 会想训模型, FDE 会先看 data**."
+
+**Moment 4 — Internal Agent Platform 跨团队 abstraction**:
+> "做 internal agent platform 的时候, 5 个种子团队我都做了 1 小时访谈. 期间 Risk 团队说 '我不需要 workflow abstraction, 我只用 tool layer'. 我没硬推, 让他们就用 tool layer. 6 个月后 Risk team 自己反过来要 workflow — 因为他们的 use case grew. **FDE 的 abstraction 要给客户留 escape hatch, 不是强 sell**."
+
+**Moment 5 — ConvFinQA 学术诚实**:
+> "ConvFinQA 项目 ablation 结果中有 2 个 component 是 negative lift. 团队最初想藏起来, 我坚持 publish 原始 finding. 后来这反而成了 paper 的 differentiator — reviewer 评论 'this is the kind of honest ablation rare in the field'. FDE 给客户讲 result 时也是这个原则 — 失败的实验也要讲清楚, 信任 > short-term win."
+
+### 2.3 怎么把这些 moment 编入 60-90 秒 answer
+
+不要全讲 (太长). **挑 1 个最 fit 公司的 moment 简化成 1 句话**:
+
+- For OpenAI: Moment 4 (platform abstraction → 类似 OpenAI 给 enterprise 做 API + agent 框架)
+- For Anthropic: Moment 1 (tier-based confirm → 类似 constitutional AI 思路)
+- For Palantir: Moment 2 (ASR cascade → 类似 ops-driven design)
+- For Google Cloud: Moment 4 (multi-team adoption → 类似 Vertex 多 customer)
+- For Databricks: Moment 5 (ablation methodology → 类似 data-driven decision)
+
+---
+
+## ⚙️ Problem 3: 怎么针对具体公司 (OpenAI / Anthropic / Google / Palantir) framing
+
+### 3.1 公司差异化的 3 层
+
+每家公司不一样在 3 层:
+- **Layer 1: 产品 / 模型** — OpenAI GPT vs Anthropic Claude vs Gemini vs Palantir Foundry
+- **Layer 2: 客户类型** — Fortune 500 vs 高安全行业 vs 多 vertical vs 政府/金融
+- **Layer 3: 文化 / 风格** — Move fast vs Safety-first vs Cloud-scale vs Mission-driven
+
+你的 framing 要 hit 所有 3 层.
+
+### 3.2 OpenAI 专属 framing (60 秒 monologue)
+
+> "OpenAI FDE 我看重的是 **3 件事**:
+>
+> **One**: Frontier model proximity. 我做 post-training (SFT, DPO, RL alignment) 和 inference 优化 (vLLM, SGLang) 已经 3 年. 在 OpenAI, frontier researcher 是 down the hall, 不是 6 层 corporate. 当 customer 的 use case 触到 model capability 边界, 我能直接 escalate, 不是排队 quarterly planning.
+>
+> **Two**: ChatGPT-scale 的 deployment 经验. 字节内部我做的是 7 个市场, 但 OpenAI 是真的全球 scale. 我想看 enterprise + consumer 双 funnel 的 deployment 怎么做.
+>
+> **Three**: GPT-5 / Operator / Codex agent 系列是 FDE 战场的核心. 字节内部我做了 agent platform, 但 OpenAI 的 first-party agent stack 是行业 reference. 我想从 reference 的角度 build.
+>
+> Trade-off ack: OpenAI 不是 mission-pure research lab — 它是 product-driven. 我 explicitly 喜欢 product-driven, 不是 research-only. 这是 fit."
+
+### 3.3 Anthropic 专属 framing
+
+> "Anthropic AS (Applied Solutions) / FDE 三个吸引点:
+>
+> **One**: Constitutional AI + safety-first 的 framing 跟我做 high-stakes deployment (债务催收 / 金融 / 合规) 极度匹配. 我在 Indonesia 做 tier 3 refund 的时候, 本质上就是在做 constitutional confirm — agent 可以 propose 但不能 unilaterally execute. Anthropic 这种 framing 是 industry-leading.
+>
+> **Two**: Claude Code + tool use stack. 我做 BNPL chatbot 用了 agentic tool routing, 但 Anthropic 在 tool use 的设计上 (specifically how to prompt for tool selection) 是我学习对象. 我想从 inside 看怎么 design.
+>
+> **Three**: Anthropic 的客户类型 (金融 / 法律 / 政府) 跟我的 PayLater 经验直接对应. 我懂合规怎么影响 design — 不是 "我读过 GDPR", 而是 "我跟 OJK / BACEN 谈过怎么 deploy".
+>
+> Trade-off ack: Anthropic 比 OpenAI 节奏慢一些 (safety review), 我 explicitly 接受 — 因为 high-stakes 行业是 trust > speed."
+
+### 3.4 Palantir 专属 framing
+
+> "Palantir FDE 我 framing 不一样, 因为 Palantir 不做 frontier model. 我的 angle:
+>
+> **One**: 我在 TikTok PayLater 做 payment infra + fraud + 合规, 跟 Palantir 在金融 / 政府的 deployment 高度对应. 不是 'LLM expert' angle, 是 'ops + data + integration' angle.
+>
+> **Two**: Foundry ontology 跟我做 Indonesia 多 stakeholder scoping 直接对应. 客户的数据 model 是 deployment 的真正难点, 不是 LLM. 我懂这个.
+>
+> **Three**: Palantir FDE 的 long-tenure 文化是我想要的. 我不想 12 个月跳一次, 我想 5-10 年 compound 一个 vertical 的 domain expertise.
+>
+> Trade-off ack: Palantir 不是 GenAI-first 公司 — 我接受. 我的目标不是 'always touch frontier model', 是 'build durable AI deployment expertise'."
+
+### 3.5 Google Cloud Vertex AI 专属 framing
+
+> "Google Cloud Vertex AI FDE / Customer Engineer:
+>
+> **One**: Multi-cloud + multi-vertical scale. 字节 7 markets 是我的 scale, Google 是 1000+ enterprise customers — 我想 10× 这个 scale.
+>
+> **Two**: Gemini multimodality. 我做的 voice agent 是 ASR + TTS + LLM, 本质上是 multimodal pipeline. Gemini native multimodal 让我的工作 simplify. 我想 build 在 Gemini stack 上.
+>
+> **Three**: Google Cloud + Workspace + Search 的 integration story. 客户已经 deeply 用 Google, FDE 工作不是 from scratch, 是 leverage existing customer footprint.
+>
+> Trade-off ack: Google Cloud team 跟 DeepMind research 不在一栋楼 (research independence). 我接受 — 我不是想做 research, 我想做 enterprise scale deployment."
+
+### 3.6 通用模板 (any 公司)
+
+```
+[Company] FDE 我看重 3 件事:
+
+One: [Company-specific product / model 优势] + [你的 technical hook]
+Two: [Company-specific customer type / scale] + [你的 deployment 经验]
+Three: [Company-specific 文化 / 战略] + [你的 alignment]
+
+Trade-off ack: [Company 不擅长的事] — 我接受, 因为 [你的优先级]
+```
+
+3 个空填好就是一段 60 秒.
+
+---
+
+## ⚙️ Problem 4: "为什么不直接做 SWE / MLE / Research" — 不能 sound like 在 settle
+
+### 4.1 这道追问背后的 risk
+
+Recruiter 怕你是 "FDE 是 backdoor" — 真正想做 research 但 research role 没 offer, 退而求其次. 一旦 recruiter 觉得你在 settle, 你的 offer 概率断崖.
+
+### 4.2 防御 dialog scripts
+
+**Recruiter**: "Why not just pure research? You have ML chops."
+
+**❌ Bad answer**:
+> "I want to do something more applied."
+
+**Why bad**: defines by negation, sounds like settling.
+
+**✅ Good answer**:
+> "我 explicitly 考虑过 research route. Trade-off 是这样的: research role 的 unit of progress 是 paper / SOTA / 新架构, time horizon 是几个月到一年. FDE 的 unit of progress 是 customer outcome — 一个客户的债务催收回款率提升 5%, 一个客户的客服 ticket 缩短 30%. Time horizon 是周到月.
+>
+> 我**更 energizes** by 后者, 不是不能做前者. 我做过 ConvFinQA 那种 academic project — 我享受 ablation 的过程, 但 paper acceptance 那一刻不是我最 satisfying 的瞬间. 反而是上线后第一周, 看到 ops team 把节省下来的时间用来处理 tier 3 复杂 case — 那是我 satisfying 的瞬间.
+>
+> 所以这不是 'research role 抢不到所以来 FDE', 是 'research 和 FDE 我都能做, 我选 FDE 因为 satisfaction 更高'."
+
+**Recruiter**: "Why not just SWE? FDE comp is similar but SWE workload more predictable."
+
+**✅ Good answer**:
+> "SWE 的预期 workflow 是: PM → PRD → eng → ship. FDE 的预期 workflow 是: customer → scoping → eng → 跟客户 iterate → ship. 两个 workflow 我都做过. SWE workflow 我觉得 missing one critical layer — **直接和需求源头对话**.
+>
+> 在 SWE 模式下, 我 ship 完一个 feature, 通过 PM 听到 'customer 不喜欢'. 然后我 guess what they really wanted, ship 第二版.
+>
+> 在 FDE 模式下, 我 ship 完, 我直接听到 customer 说 '这个 tier 3 case 你没考虑, 我们这里有 5% volume 是这种'. 然后我**直接** ship 第二版.
+>
+> 信息流 latency 短 10 倍. 这是 SWE 给不了我的."
+
+**Recruiter**: "Why not MLE? 你 fine-tuning 经验丰富."
+
+**✅ Good answer**:
+> "MLE 的 mental loop 是: data → train → eval → ship → repeat. 我做过完整 MLE loop (SFT, DPO, vLLM 部署). 但 MLE 的 happiness function 是 model quality metrics — accuracy, latency, throughput.
+>
+> 我观察到自己的 happiness function 不是 model metric, 是 customer metric. 比如我做 voice agent ASR 从 92 到 94% 准确率, 我是开心的. 但我**更**开心当 ops team 跟我说 '客户姓名错了我们怎么修' — 我添加 dictionary boost + spelling fallback, ops team 满意度上来了.
+>
+> 同一个项目, 同一个 ASR, 但 happiness 来源不一样. 我 explicitly 选 customer-driven 而不是 model-driven."
+
+**Recruiter**: "Why not Sales Engineer? Customer-facing 也满足了."
+
+**✅ Good answer**:
+> "Sales Engineer 工作核心是 pre-sales — POC, demo, RFP 应答, 帮 sales close deal. 一旦 deal close, SE 工作基本结束, customer 交给 implementation team 或 customer success.
+>
+> 我**不喜欢** 这个 cutoff. POC 是最有趣的 50%, deployment 后是另外 50% — 真实的 edge case 都在那里. 我想 own 整个 lifecycle 不是只 own 前一半.
+>
+> 而且 SE 的 deliverable 是 slide + demo, FDE 的 deliverable 是 production code. 我想 own code."
+
+### 4.3 一个 universal "ladder" 答法
+
+如果 recruiter 一次性问 "为啥不 SWE / MLE / Research?", 你可以用 ladder:
+
+> "我对这 3 个 role 的 mental model 是这样:
+>
+> - **Research** 距离客户最远, 距离 frontier 最近. Unit = paper. 我 try 过, 不是我最 energize 的.
+> - **MLE** 在中间, 距离 model 近, 但仍然 abstracted from customer. Unit = model quality.
+> - **SWE** 在产品侧, 但 missing 直接和 customer 对话的环节.
+> - **FDE** 是 4 个里 distance to customer 最近, 同时仍然 own code. Unit = customer outcome.
+>
+> 这 4 个 role 我都能做 — 但 FDE 是 unit-of-progress 最 align 我的 happiness function 的那个."
+
+---
+
+## ⚙️ Problem 5: 怎么 demonstrate fit through specific stories not abstract claims
+
+### 5.1 STAR 的 FDE 改造版
+
+经典 STAR 是 Situation / Task / Action / Result. FDE 题里改造成:
+
+| Element | Standard | FDE-optimized |
+|---|---|---|
+| **S** Situation | 项目背景 | **客户 (谁) + 困境 (什么)** |
+| **T** Task | 你要做什么 | **scoping + ownership 边界 (你 own 什么不 own 什么)** |
+| **A** Action | 你做了什么 | **scope negotiate + technical decision + stakeholder management** (三个 sub-action 都要有) |
+| **R** Result | 结果 metric | **business outcome (KPI) + technical metric + customer satisfaction** (3 维) |
+
+### 5.2 你的 5 个 FDE STAR story (现成可用)
+
+#### Story 1 — Indonesia tier 3 refund
+
+**S**: "印尼是 voice agent 首发市场. Ops team 周五 Slack 我: '想下季度 full automate refund'."
+
+**T**: "Scope 不清 (什么 refund? 多大 amount?), timeline 不清 ('下季度' 是 8 周还是 12 周?), accountability 不清 (wrong call 谁负责?). 我得在不完整信息下 commit conditionally."
+
+**A**:
+1. **Diagnose**: 不是 'unknown unknown', 是 'decision-required without enough info'. Right move 是 structured discovery.
+2. **Decompose** 'automate refund' 成 3 tier: tier 1 info lookup / tier 2 structured calc / tier 3 final decision
+3. **Reversibility analysis**: tier 1 是 two-way door (错 info 易撤), tier 3 是 one-way door (错 refund 直接损失 + 监管风险)
+4. **Pilot**: 2 周跑 tier 1+2, 拿到 70% volume coverage + 0% wrong-call. Tier 3 projected 8% wrong-call rate.
+5. **Reframe with data**: 拿 pilot data 跟 ops 重新谈. Ops 接受 "right answer 慢 4 周比 wrong answer 准时" 的 framing.
+
+**R**: 
+- Business: 6 周内 ops 拿到 70% throughput at 0% risk
+- Tier 3: 6 个月后上线 (after policy + monitoring + human-in-loop infra), 90 天 0 wrong refund
+- Customer: Ops lead 后来跟我 manager 反馈 "Gao 是少数 push back 还能让我感谢的 vendor"
+
+**这个故事 quote 进 "Why FDE" 的 30 秒版**:
+> "我做的 Indonesia refund tier scoping 就是 FDE 的灵魂工作 — ops 想 8 周 full automate, 我 push back 用 data + reversibility 重新 scope, 最终 ops 拿到他们想要的 60% benefit, 0% risk. 不是我 say 'no', 是我 reframe 成 'right answer faster'."
+
+#### Story 2 — 巴基斯坦 ASR cascade fallback
+
+**S**: "Voice agent 在 Pakistan 上线第二周, ASR provider Azure 突然挂 40 分钟."
+
+**T**: "保证用户对话不被打断 (ops team 之前明确说 'silent fail 都比 garbage response 强'), 0 通话丢失."
+
+**A**:
+1. **Pre-design**: 我之前和 ops 谈过 worst case preference (silent fail vs degraded response), 他们选 silent fail
+2. **Cascade**: 设计了 ASR provider chain (Azure → Google → 本地 self-host Whisper), per-call timeout 3s, failover 自动
+3. **Observability**: 每次 fallback 记录 (provider, latency, accuracy proxy)
+4. **Real incident**: Azure 挂的 40 分钟内, system 自动 switch 到 Google, 但 Google 在 Urdu 上 accuracy 也下降 — system 进一步 switch 到 local Whisper
+
+**R**:
+- 0 通话丢失
+- Ops 不知道有事故 (他们事后看 metrics 才发现)
+- 但 Whisper 在 Urdu 上 accuracy drop 让我意识到 fallback chain 也要 per-language tune
+
+**这个故事 quote 进 "Why FDE"**:
+> "Pakistan ASR cascade 故事告诉我 FDE 跟 SWE 不一样的地方 — SWE 设计 fallback 是技术选型, FDE 设计 fallback 是 *基于 ops 的偏好*. 我之前花时间问 ops 'silent fail vs garbage response 你选哪个' — 这 30 分钟 conversation 决定了我整个 fallback 架构."
+
+#### Story 3 — BNPL chatbot 路由 70 → 92%
+
+**S**: "BNPL chatbot launch 第一个月, routing accuracy 70%, 远低于预期 90%."
+
+**T**: "诊断为什么 routing 错. 同时不能 disable chatbot 因为 CS team 已经 reorg around 它."
+
+**A**:
+1. **不 jump to model**: 没去 fine-tune, 先看 confusion matrix
+2. **Data analysis**: 发现 60% mis-route 是 "tool description 模糊" — 模型分不清 "check balance" vs "check past due"
+3. **RAG-based tool discovery**: 重写 12 个 tool description, 用 semantic embedding 做 dynamic prompt
+4. **Iterate**: weekly review with CS team — 他们 flag 的 case 直接进 dataset
+
+**R**:
+- Routing accuracy 70 → 92% in 6 weeks
+- CS team 反馈: tier 3 复杂 case 终于 only 给 CS 处理, 不会被 chatbot 错走
+- 后来 internal Agent Platform 抄了这个 "RAG-based tool discovery" pattern
+
+**这个故事 quote 进 "Why FDE"**:
+> "BNPL routing 故事 — 一个 MLE 第一反应是训模型, 我先看 data. Confusion matrix 告诉我 60% 错在 tool description 模糊不是模型能力. 这个判断帮 saved 3-4 周的 fine-tuning 时间. FDE 的本能是 'data 先于 model'."
+
+#### Story 4 — Internal Agent Platform 14 团队 adoption
+
+**S**: "字节内部 5 个团队各自造 agent platform 轮子, leadership 让我做共享 abstraction."
+
+**T**: "Design abstraction 满足 5 个种子团队 + scale 到 N 个未来团队, 但又不限死灵活度."
+
+**A**:
+1. **Customer interview**: 5 个种子团队各 1 小时 1v1, 抽 commonality
+2. **3-layer abstraction**: Workflow / Tool / Memory, 每层留 escape hatch
+3. **Onboarding**: doc + office hour + Slack channel
+4. **Iterative**: 6 个月后跟 14 个团队复盘, 抽出新 layer (shared eval framework)
+
+**R**:
+- 5 团队 → 14 团队 in 6 months
+- Risk team 一开始只用 tool layer, 6 个月后主动要 workflow (use case grew)
+- Platform 成为字节内部 agent infra de facto standard
+
+**这个故事 quote 进 "Why FDE"**:
+> "Internal Agent Platform 故事让我意识到 FDE 工作的核心是 'serving multiple internal customers each with different requirements'. 跟 OpenAI / Anthropic FDE 服务 external enterprise 客户的形态本质上一样 — 你不是给一个客户 build 一个东西, 你在 build 一个 abstraction 给多个客户用."
+
+#### Story 5 — ConvFinQA ablation 诚实
+
+**S**: "ConvFinQA 学术项目, pipeline 6 个 stage. Ablation 结果 2 个 stage 是 negative lift."
+
+**T**: "Negative result 要不要 publish?"
+
+**A**:
+1. **Team initially 想藏**: '只 publish 正面结果, 论文好看'
+2. **我坚持 publish**: 学术诚实 + 帮 community 避免踩坑
+3. **Reframe**: '这是 paper 的 differentiator, 不是 weakness'
+
+**R**:
+- Paper 接收, reviewer 评论 "this is the kind of honest ablation rare in the field"
+- 这个原则我 transfer 到生产 — Indonesia tier 3 上线后我 publish 内部 retrospective 包含 wrong-call 案例
+
+**这个故事 quote 进 "Why FDE"**:
+> "ConvFinQA ablation 诚实的故事告诉我 FDE 跟 SE 不一样的地方 — SE 给 customer 讲 slide 是 highlight 成果, FDE 给 customer 讲 retrospective 是 highlight 包括失败的全貌. Customer 信任建立在 honest reporting 上, 不是 polished slide 上."
+
+### 5.3 故事的 picker rule
+
+不要把 5 个故事全讲. **挑 1 个最 fit 公司, 1 个 backup**:
+
+| 公司 | Primary story | Backup story |
+|---|---|---|
+| OpenAI | Internal Agent Platform (跨 customer abstraction) | Indonesia tier 3 (high-stakes scoping) |
+| Anthropic | Indonesia tier 3 (constitutional confirm pattern) | BNPL chatbot (safety + accuracy) |
+| Palantir | Pakistan ASR cascade (ops-driven design) | Indonesia tier 3 (compliance scoping) |
+| Google Cloud | Internal Agent Platform (multi-customer scale) | BNPL chatbot (data-driven decision) |
+| Databricks | ConvFinQA ablation (data-driven methodology) | BNPL chatbot (RAG + data) |
+
+---
+
+# Part 3 · 串起来看
+
+## 必问 clarifying questions
+
+如果 recruiter follow up 模糊问题, 你可以反问 clarifying:
+
+**1. Define FDE for this company**
+
+> "I've researched [Company] FDE — could you confirm the day-to-day? Is it mostly enterprise B2B deployment (e.g., F500 customers), or more product-shaping work, or both? Different proportions changes my framing."
+
+**2. Customer interaction model**
+
+> "Is FDE here primarily on-site at customer, remote-but-deep with customer team, or hybrid? Travel expectation?"
+
+**3. Team structure**
+
+> "Solo FDE per account, pod of FDEs per account, or central FDE org with rotation? Affects how I describe my fit."
+
+**4. Technical depth expectation**
+
+> "Is FDE expected to write production code daily, or more architecture + reviewing junior eng's code, or mostly hands-off-keyboard? My background is hands-on, want to confirm fit."
+
+**5. Career path within FDE**
+
+> "Where do FDEs typically go in 3-5 years? Stay FDE? Promote to staff/principal FDE? Cross to PM/Eng Manager? I'm asking because my preference is to stay FDE long-term."
+
+---
+
+## 5 步框架 (回答这道题的 60-90 秒结构)
+
+| 段 | 时长 | 内容 | Anchor 例 |
+|---|---|---|---|
+| Anchor | 10s | "I'm a [role] at [company], doing [tech] for [years]" | "Expert algo engineer at TikTok Global Payment, 3 years production GenAI" |
+| Motivation | 20s | "What energizes me is [specific FDE characteristic]" | "Bridge frontier capability to specific business constraint at customer site" |
+| Proof | 25s | "I've been doing FDE work without the title — [specific evidence]" | "7 markets, 6 languages, 4 stakeholder types, end-to-end ownership" |
+| Company target | 15s | "At [Company], FDE means [X] — fits because [Y]" | (pick from cheat sheet) |
+| Trade-off | 10s | "Not pure [role A] because [reason]. Not [role B] because [reason]" | "Not research because outcome>papers. Not SWE because customer interaction matters" |
+
+---
+
+## 简历专属 reframe — MANY STAR stories
+
+### STAR Story 1: Indonesia Refund Tier (★ HIGHEST PRIORITY)
+
+**Use for**: "Why FDE / handle ambiguity / push back on stakeholder / customer scoping"
+
+**S**: Ops team wants full automation in 8 weeks, no scope clarity
+**T**: Negotiate scope without information, commit conditionally
+**A**: 3-tier decomposition by reversibility, 2-week pilot, data-driven reframe
+**R**: 70% throughput, 0% risk, 6 weeks; tier 3 6 months later, 90-day 0 wrong refund
+**FDE framing**: "Scope ambiguity is rarely about timeline — it's about asker hasn't decomposed yet"
+
+### STAR Story 2: Pakistan ASR Cascade
+
+**Use for**: "Why FDE / failure mode design / ops collaboration"
+
+**S**: ASR provider Azure outage 40 min during Pakistan launch week 2
+**T**: 0 conversation lost, ops told us "silent fail > garbage"
+**A**: Pre-design cascade (Azure → Google → local Whisper), per-call 3s timeout, per-language tune
+**R**: 0 calls lost, ops didn't notice until metric review; Whisper Urdu accuracy taught me per-language fallback
+**FDE framing**: "I designed fallback based on ops preference, not technical convenience"
+
+### STAR Story 3: BNPL Chatbot Routing 70 → 92%
+
+**Use for**: "Why FDE / data-driven decision / not jumping to fine-tune"
+
+**S**: Routing accuracy 70%, CS team已经 reorg around chatbot
+**T**: Diagnose without disabling chatbot
+**A**: Confusion matrix → 60% errors are tool description ambiguity → rewrite 12 descriptions with RAG-based discovery
+**R**: 70 → 92% in 6 weeks; pattern reused in Internal Agent Platform
+**FDE framing**: "FDE instinct: data before model. MLE wants to train, FDE wants to look at confusion matrix first"
+
+### STAR Story 4: Internal Agent Platform 14 Teams
+
+**Use for**: "Why FDE / multi-customer abstraction / serving internal customers"
+
+**S**: 5 teams reinventing agent infrastructure
+**T**: Design abstraction serving 5 seed teams + scale to N
+**A**: 1-hour interview each, 3-layer abstraction (Workflow/Tool/Memory), escape hatches, onboarding doc + office hour
+**R**: 5 → 14 teams in 6 months; Risk team started with just Tool layer, later adopted Workflow as use case grew
+**FDE framing**: "FDE work is serving multiple customers each with different requirements. External enterprise FDE is the same shape."
+
+### STAR Story 5: ConvFinQA Ablation Honesty
+
+**Use for**: "Why FDE / customer trust / honest reporting"
+
+**S**: 6-stage pipeline ablation, 2 stages negative lift
+**T**: Publish or hide?
+**A**: Insisted on publishing negative results
+**R**: Reviewer praised "honest ablation rare in the field"; principle transfered to production retrospectives
+**FDE framing**: "Customer trust built on honest reporting, not polished slides. Same with academic peer review."
+
+### STAR Story 6: Voice Agent 7-Market Rollout
+
+**Use for**: "Why FDE / multi-stakeholder / cultural adaptation"
+
+**S**: Expand voice agent from Indonesia to 6 more markets (Vietnam, Thailand, Philippines, Brazil, Mexico, Pakistan)
+**T**: Maintain core capabilities + adapt per-market (language, culture, compliance)
+**A**: Per-market scoping kickoff (3 stakeholders: ops/product/compliance), shared backbone (LLM/ASR/RAG) + per-market layer (persona/TTS voice/escalation/prompt), on-call first week with local ops
+**R**: 7 markets in 6 months; per-market GMV uplift; established multi-market deployment playbook
+**FDE framing**: "60% of my time was FDE work — translation between business and tech, scoping per-market, on-site debugging"
+
+### STAR Story 7: Voice Agent SFT/DPO Iteration
+
+**Use for**: "Why FDE / technical depth / not just abstraction"
+
+**S**: Voice agent base LLM (Llama) hallucinated on debt amounts
+**T**: Reduce hallucination on financial figures from 4% to <0.5%
+**A**: SFT on 50k human-labeled financial dialogs, DPO on 20k preference pairs (hallucination vs no-hallucination), vLLM-served, online eval
+**R**: 4% → 0.3% hallucination on financial figures; method documented for cross-market reuse
+**FDE framing**: "FDE doesn't mean not technical. I still wrote training loops, designed eval, served vLLM. But I did it because customer (ops team) needed 0.5% reliability."
+
+---
+
+## 5 follow-ups (recruiter / HM 会追问)
+
+**Q1**: "Why now? You've been at TikTok 3 years."
+
+**A**:
+> "两件事 converging.
+>
+> **One**, 我现在的工作是 FDE-shaped 但 TikTok 没有正式 FDE org — role 不 compound. 我已经做 N 个 internal customer 的 onboarding, learning 都在我自己身上, 但 title / promotion / mentor 都不 align 这个 role.
+>
+> **Two**, GenAI deployment 处于 inflection point. Frontier model capability 每个月在变, FDE 在 frontier lab 旁边的位置是 industry 未来 10 年的 key seat. 错过 2026 这窗口, FDE 形态固化后入场难度高很多.
+>
+> 所以是 'optimal time' 不是 'just want change'."
+
+**Q2**: "Why not internal transfer to TikTok 的 research-y team?"
+
+**A**:
+> "考虑过. Trade-off:
+>
+> TikTok 的 strength 是 consumer scale infra (推荐 / 直播 / 广告), 这非常厉害, 但**不是 frontier model 被 built 的地方**. 我已经 compound 了 3 年的 GenAI deployment + post-training + multi-market 经验, 要继续 compound 在 frontier model 上, 正确的地方是 frontier lab.
+>
+> 加上 — 我想做 **deployment at customer sites (cross-company)**, 不是 deployment within one company (TikTok 内部多 business unit). 这是 FDE 跟 internal infra 的本质区别."
+
+**Q3**: "You'd work with smaller teams at OpenAI FDE org. Comfortable with that?"
+
+**A**:
+> "是的, 我 prefer.
+>
+> 我现在的 team 是 3 个 engineer (+ rotating interns). TikTok 内部我对接的 team 也大多 < 10 人. 我习惯 small team — direct ownership, faster iteration, less politics, more shipping.
+>
+> 加上 FDE org 通常是 pod structure (3-5 人服务 1-2 customer), 这是我 sweet spot."
+
+**Q4**: "Comp at [Company] — what's your target?"
+
+**A**:
+> "我 prefer 先理解 structure 再讨论 number.
+>
+> Base / equity (PPU 或 RSU) / location adjustment 都影响 total. 基于我看到的 senior FDE level (L5-L6 at OpenAI / S4-S5 at Anthropic), 我对 **total comp $400-600k USD** with right base + equity mix 比较 comfortable. 但 number 不是 dealbreaker — role fit 和 trajectory 更重要.
+>
+> 想反问 — 你们这个 level 的 budget range 是什么? 我可以根据你的 range 调整 expectation."
+
+**Q5**: "What if we offer SWE-Production role instead of FDE?"
+
+**A**:
+> "Depends on the role specifics.
+>
+> 如果 SWE-Production 是 **纯 internal team, 0 customer interaction**, 不是 fit — 我 explicitly 想要 customer-facing piece.
+>
+> 如果 SWE-Production 是 **hybrid — 60% internal product 40% deployed at strategic customer**, 我想了解 day-to-day. 我对 title 不 attach, 我对 **work shape** attach.
+>
+> 但 honesty: 如果 SWE 给的 level 比 FDE 高一个档 (e.g., L5 SWE vs L4 FDE) 且 hybrid 比例 ok, 我会接受. 如果是同 level, 我选 FDE because 'shape of work' 优先."
+
+---
+
+## ❌ 易错点 (top 12)
+
+1. **泛泛回答** — "I love AI, want to learn" (任何 role 都能这么讲)
+2. **Defining by negation** — 只说不想做啥, 没说想做啥
+3. **Wrong differentiator** — "FDE = remote / less stress / better comp"
+4. **太短** (< 30s) — 像背模板
+5. **太长** (> 2min) — recruiter 注意力流失
+6. **Generic company pitch** — 没做差异化研究
+7. **Stepping stone 暗示** — "未来想做 PM / 自己创业"
+8. **Trade-off 不 acknowledge** — 显得 "什么都想要"
+9. **No specific story** — 抽象口号
+10. **没 quote technical depth** — recruiter 怕你 coding round 塌
+11. **过度谦虚** — "可能不够 qualified 但..."
+12. **Salary 主动开第一个 number** — 让 recruiter 先 anchor
+
+---
+
+## ✅ 加分项 (top 10)
+
+1. **"I've been doing FDE work without the title"** — show, don't tell
+2. **3 reasons structure** (Anchor / Motivation / Proof / Company / Trade-off)
+3. **公司差异化** framing — 不同公司不同 hook
+4. **Technical depth quote** — vLLM / SGLang / SFT / DPO / RL
+5. **具体 customer-facing story** — Indonesia / Pakistan / 多市场
+6. **Trade-off acknowledgment** — "not research because outcome > papers"
+7. **Long-term commitment** — "FDE is home, not stepping stone"
+8. **Salary reverse-anchor** — "what's your budget?"
+9. **Flexible on title, attached to work shape**
+10. **30-second story summary** ready (Indonesia tier / Pakistan ASR / Internal Platform)
+
+---
+
+## 一句话总结
+
+> **"Why FDE specifically" 不是问你为啥喜欢 customer-facing, 是问你能不能在 60-90 秒内证明 "我已经在做 FDE 形态的工作, 我了解 FDE 跟其他 role 的边界, 我做过功课了解这家公司的 FDE flavor, 我准备好 long-term commit"**.
+>
+> Show, don't tell. Anchor + Motivation + Proof + Company + Trade-off. 五段 60-90 秒.
+
+---
+
+## Cheat Sheet (印 1 页)
+
+```
+60-90 sec structure (AURA-T):
+  Anchor (10s)       — "Algo engineer at TikTok, 3y prod GenAI"
+  Underlying (20s)   — "Bridge frontier to customer constraint"
+  Right fit (25s)    — "7 markets, 4 stakeholders, FDE-shaped"
+  Aligned (15s)      — Company-specific hook
+  Trade-off (10s)    — "Not research / SWE / SE because [X]"
+
+Company-specific hooks:
+  OpenAI       — Frontier model + post-training + agent platform
+  Anthropic    — Safety + tier-confirm = constitutional AI
+  Google Cloud — Multi-cloud scale + 7 markets analog
+  Palantir     — Payment + ops + compliance (not LLM-first)
+  Databricks   — ConvFinQA ablation = data-driven decision
+
+5 ready STAR stories:
+  1. Indonesia refund tier (★ scoping, push back, reversibility)
+  2. Pakistan ASR cascade (ops-driven design)
+  3. BNPL chatbot 70 → 92% (data before model)
+  4. Internal Agent Platform 14 teams (multi-customer abstraction)
+  5. ConvFinQA ablation (honest reporting)
+
+Phrases to use:
+  "I've been doing FDE work without the title"
+  "Translate business asks to model deliverables"
+  "Bridge frontier capability to business constraint"
+  "Right answer faster, not wrong answer on time"
+  "Customer trust built on honest reporting, not polished slides"
+
+Phrases to NEVER use:
+  "I love AI" / "Hot new field"
+  "Better comp" / "More remote"
+  "I don't want to do research"
+  "FDE is stepping stone to PM"
+  "My friend works there"
+  "Can probably cover 90%"
+
+FDE vs others (1-line each):
+  Research: distance to customer = max, unit = paper
+  MLE:      distance to customer = med, unit = model quality
+  SWE:      missing direct customer dialog
+  SE:       cutoff at deal close, doesn't own deployment
+  FDE:      distance to customer = min, unit = customer outcome ⭐
 
 Salary anchor (if asked):
-  $300-500k total, right base + equity mix
-  Reverse question: "what's your budget?"
+  "$400-600k total, right base + equity mix"
+  "What's your range?" (reverse)
+  Number is not dealbreaker, role fit + trajectory > comp
+
+5 follow-ups ready:
+  Q1: Why now? → inflection point + role doesn't compound at TikTok
+  Q2: Why not internal transfer? → frontier model not built at TikTok
+  Q3: Comfortable with small team? → I prefer it
+  Q4: Comp target? → reverse anchor with range
+  Q5: SWE-Production instead? → depends on customer-facing %
+
+Red lines:
+  - Stepping stone implication
+  - Generic answer
+  - No specific story
+  - No company differentiation
+  - Open salary first
 ```
 </script>
 <script>

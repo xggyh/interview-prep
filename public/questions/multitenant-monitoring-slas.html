@@ -41,129 +41,804 @@
     <h2>我的思路与解法</h2>
     <h3>题目（verbatim）</h3>
 <blockquote><p>"Design <strong>multi-tenant SaaS monitoring</strong> with <strong>varying client SLA requirements</strong>. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."</p></blockquote>
-<p><strong>出处</strong>：fde.academy 技术 round. Databricks / Snowflake / Datadog 都问过.</p>
-<p><strong>Round</strong>：Technical Integration (45-60 min)</p>
+<p><strong>出处</strong>: fde.academy 技术 round. Databricks / Snowflake / Datadog / Cloudflare 都问过.</p>
+<p><strong>Round</strong>: Technical Integration (45-60 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
+<p>考你做过 <strong>multi-tenant SaaS infrastructure</strong> 的真实痛点:</p>
+<ol><li><strong>SLA / SLO / SLI 区分得清吗</strong> — Error budget 怎么算</li><li><strong>Per-tenant metrics 怎么不爆 cardinality</strong> — 这是 monitoring 真正的难题</li><li><strong>Tier-based 怎么 enforce</strong> — Gold vs Bronze 怎么物理 / 逻辑区分</li><li><strong>Alert routing per-tenant</strong> — 不能所有 tenant 一个 channel</li><li><strong>Customer-facing dashboard + credit</strong> — SLA breach 要 compensate</li><li><strong>熟不熟工具</strong> — Prometheus / Mimir / Datadog / Grafana / Cortex / Thanos</li></ol>
+<p>考的不是 "你知道 P99", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor 和 cardinality 爆炸".</p>
+<hr />
+<h1>这道题在考什么</h1>
 <p>考你做过 <strong>multi-tenant SaaS infrastructure</strong>:</p>
-<ol><li><strong>不同 SLA tier 怎么 enforce</strong> —— Bronze vs Gold 怎么物理 / 逻辑区分</li><li><strong>Noisy neighbor isolation</strong> —— 大客户不能影响小客户</li><li><strong>Billable signal</strong> —— 哪些 metric 算 billable (latency 5xx 等)</li><li><strong>Aggregation at scale</strong> —— 1B+ events/day 怎么 store + query 每 tenant 不会爆</li></ol>
+<ol><li><strong>不同 SLA tier 怎么 enforce</strong> — Bronze vs Gold 怎么物理 / 逻辑区分</li><li><strong>Noisy neighbor isolation</strong> — 大客户不能影响小客户</li><li><strong>Cardinality 爆炸</strong> — 10k tenant × 100 metric × 10 label = 10M time series</li><li><strong>Billable signal aggregation</strong> — 哪些 metric 算 billable, 怎么 audit</li><li><strong>Customer-facing SLA dashboard</strong> — 客户能自助看, 出问题能 credit</li></ol>
+<hr />
+<h1>Part 1 · 教学讲解 — 先把概念讲透</h1>
+<h3>1. 四个术语先解释</h3>
+<p><strong>Multi-tenant SaaS</strong>: 一套<strong>软件 + 基础设施</strong>, 同时服务多个<strong>租户</strong> (tenant). 每个租户 (一家企业客户) 看到的像是独享, 实际上多个租户共享物理资源 (pooled) 或部分专用 (siloed) 或混合 (hybrid). 你做的 voice agent 7 markets 就是天然的 multi-tenant — 每个 market 一个 tenant.</p>
+<p><strong>SLA / SLO / SLI</strong>: 三个术语 SRE 圈天天用, 经常混:</p>
+<ul><li><strong>SLI</strong> (Service Level <strong>Indicator</strong>): <strong>一个可测量的数字</strong>. 例如: 过去 5 分钟的 successful_requests / total_requests. 是事实.</li><li><strong>SLO</strong> (Service Level <strong>Objective</strong>): <strong>内部目标</strong>. 例如: 99.9% requests succeed. 是 aspirational target, 团队的承诺.</li><li><strong>SLA</strong> (Service Level <strong>Agreement</strong>): <strong>合同条款</strong>. 例如: 我们保证 99.5% uptime, 不满足赔 10% 月费. 是法律约束, 跟客户签的.</li></ul>
+<p>公式: <code>SLA &lt; SLO</code>. 内部目标永远比对客户的承诺更严格, 留 buffer.</p>
+<p><strong>Error budget</strong> (错误预算): <code>1 - SLO</code>. 比如 SLO 99.9% 意味着每月可以有 0.1% × 30d = 43 分钟 unavailable. 这 43 分钟是你的「预算」, 用完了, 就 freeze release, 优先稳定性.</p>
+<p><strong>Cardinality</strong> (基数): 一个 metric 的 label 组合总数. 例如 <code>http_requests_total{tenant_id, endpoint, status_code, region}</code>, 1000 tenant × 50 endpoint × 5 status × 5 region = 1.25M unique time series. <strong>这是 multi-tenant monitoring 的头号杀手</strong>.</p>
+<p><strong>Noisy neighbor</strong>: 一个 tenant 异常行为 (流量飙升 / 大查询 / 死循环) 把共享资源吃光, 影响其他 tenant. SaaS 经典问题.</p>
+<hr />
+<h3>2. 这个问题的核心是什么</h3>
+<p>设想一个<strong>没 isolation / 没 per-tenant quota / 没 cardinality control</strong> 的 SaaS 灾难:</p>
+<pre class="language-plaintext"><code class="language-plaintext">2026-05-21 03:00  Bronze tier 客户 acme-corp 部署了一个 buggy script
+                  对你的 API 每秒发 50k 请求 (正常 100 QPS)
+                  
+03:01  你的 API gateway 没 per-tenant rate limit, 全部通过
+03:02  Database connection pool 被 acme 吃满 (500 conn)
+03:03  Gold tier 客户 bigcorp 的关键报表 query 等不到 conn, 超时
+03:05  Bigcorp CEO 在 Twitter 发: "your SaaS is down, terrible service"
+03:10  你的 PagerDuty 一片红, 但你看 monitoring "CPU 60%, 一切正常"
+       (因为 monitoring metric 没 per-tenant breakdown, aggregate 看不到 acme spike)
+03:30  你手忙脚乱猜原因, 期间所有 tenant 都受影响
+04:00  你终于发现是 acme, 手动 ban 它 IP
+04:30  恢复. Bigcorp 取消合同. SLA 赔付一个月免单</code></pre>
+<p><strong>问题</strong>:</p>
+<ul><li>没 per-tenant rate limit → 1 个 noisy tenant 拖垮全场</li><li>没 per-tenant metric → 看不到谁是元凶</li><li>没 tiered isolation → Gold 客户和 Bronze 共享同一资源池</li><li>没 SLA dashboard → 客户在 Twitter 发飙才知道</li><li>没 auto-credit → 客户人工要 compensation, 关系崩</li></ul>
+<p><strong>Production-grade 解法</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. API Gateway: per-tenant token bucket (按 tier QPS)
+2. App layer: per-tenant DB pool, memory quota, WFQ scheduler
+3. Physical: Gold tenant 走 dedicated replica
+4. Monitoring: per-tenant SLI, 但用 streaming aggregation 避免 cardinality 爆
+5. Alert: per-tenant routing, by severity tier
+6. Customer dashboard: 自助看 SLO compliance + error budget
+7. Auto-credit: SLA breach 自动 trigger compensation</code></pre>
+<hr />
+<h3>3. 典型架构图</h3>
+<pre class="language-plaintext"><code class="language-plaintext">                      ┌───────────────────────────┐
+                      │   Tenant Onboarding       │
+                      │  (tier, quota config)     │
+                      └─────────┬─────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│  API Gateway (Envoy / Kong)                                  │
+│    L1: Per-tenant token bucket rate limit (by tier)          │
+│    Authentication, tenant_id 注入 trace                       │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Application Layer                                           │
+│    L2: Per-tenant DB pool, memory quota, WFQ scheduler       │
+│    Tier-aware request routing:                               │
+│      Gold tenants  → dedicated replica set                   │
+│      Silver/Bronze → pooled replica set                      │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+        Telemetry emit per request:
+          tenant_id, tier, endpoint, status, latency_ms, ...
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Telemetry Pipeline                                          │
+│    Kafka (partition by tenant_id)                            │
+│    Flink: 1-min rollups per tenant per metric                │
+│    Sampling (head + tail biased for slow)                    │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+        ┌─────────────────────────────┐
+        │ TSDB / Mimir / Datadog      │
+        │  Hot:  1-min rollups, 30d   │
+        │  Warm: 1-hour rollups, 1y   │
+        │  Cold: 1-day rollups, 3y+   │
+        └─────────┬───────────────────┘
+                  ▼
+        ┌────────────────────────────────────────────────┐
+        │  Per-tenant Dashboard + SLA Computer            │
+        │  Auto-credit Logic                              │
+        │  Alert Routing (PagerDuty / Slack)              │
+        │  Billing System (separate DB!)                  │
+        └─────────────────────────────────────────────────┘</code></pre>
+<hr />
+<h3>4. SLI / SLO / SLA / Error Budget 关系表</h3>
+<table class="md-table"><thead><tr><th>概念</th><th>是什么</th><th>例子 (voice agent)</th><th>谁负责</th></tr></thead><tbody><tr><td><strong>SLI</strong></td><td>一个测量值</td><td>"过去 5 min 通话成功率"</td><td>系统 自动算</td></tr><tr><td><strong>SLO</strong></td><td>内部目标</td><td>"99.9% calls succeed"</td><td>SRE / Eng owner</td></tr><tr><td><strong>SLA</strong></td><td>对客户的承诺</td><td>"99.5% uptime, 不达赔 10%"</td><td>销售 / Legal</td></tr><tr><td><strong>Error budget</strong></td><td>允许失败的额度</td><td>99.9% SLO → 43 min/月可用</td><td>共同</td></tr><tr><td><strong>Burn rate</strong></td><td>当前消耗 EB 的速率</td><td>1h 内消耗 10% EB = 10x burn</td><td>Alert</td></tr></tbody></table>
+<p><strong>经验</strong>:</p>
+<ul><li>SLO 永远比 SLA 严 (留 20-50% buffer)</li><li>Error budget 跑完 → freeze release, 直到下个 window</li><li>Burn rate alert 比 SLO breach alert 更 actionable (前者预防, 后者已经晚了)</li></ul>
+<hr />
+<h3>5. 具体业务场景</h3>
+<h4>场景 A: 你的 TikTok Voice Agent 7 markets (你工作背景)</h4>
+<p><strong>7 markets = 7 tenants</strong>, 不同 SLA:</p>
+<table class="md-table"><thead><tr><th>Market</th><th>Tier</th><th>SLA (uptime)</th><th>Latency p99 SLO</th><th>Daily call volume</th></tr></thead><tbody><tr><td>Indonesia</td><td>Gold (high revenue)</td><td>99.95%</td><td>200ms</td><td>500k</td></tr><tr><td>Vietnam</td><td>Gold</td><td>99.95%</td><td>200ms</td><td>300k</td></tr><tr><td>Thailand</td><td>Silver</td><td>99.9%</td><td>250ms</td><td>100k</td></tr><tr><td>Philippines</td><td>Silver</td><td>99.9%</td><td>250ms</td><td>80k</td></tr><tr><td>Singapore</td><td>Bronze (small market)</td><td>99.5%</td><td>500ms</td><td>10k</td></tr><tr><td>Malaysia</td><td>Bronze</td><td>99.5%</td><td>500ms</td><td>8k</td></tr><tr><td>Korea</td><td>Pilot</td><td>best-effort</td><td>best-effort</td><td>1k</td></tr></tbody></table>
+<p><strong>Noisy neighbor 真实事故</strong>:</p>
+<ul><li>印尼发薪日 (15 号), 流量 burst 5x</li><li>印尼用 dedicated inference replica → 不影响其他 market</li><li>如果共享, 越南 Gold 客户也会受影响</li></ul>
+<h4>场景 B: BNPL Chatbot — 商户租户</h4>
+<ul><li>每个接入的电商商户 = 1 tenant</li><li>Top 10% 商户占 80% 流量 (长尾)</li><li>Gold 商户 (年 GMV &gt; 10M USD): 独享 LLM endpoint, 99.99% SLA</li><li>Silver / Bronze 共享 LLM endpoint, 99.9% / 99% SLA</li><li>Cardinality: 1000 tenant × 20 endpoint × 5 region = 100k time series</li></ul>
+<h4>场景 C: Internal Agent Platform — Team 当 tenant</h4>
+<ul><li>ByteDance 内部多个 team 用你的 Agent Platform</li><li>每个 team = 1 tenant</li><li>内部 SLA 不那么严, 但 cost attribution 必须准 (chargeback)</li><li>Billing 维度: tokens consumed, GPU-hours, storage GB-hours</li></ul>
+<h4>场景 D: ConvFinQA 内部用户</h4>
+<ul><li>每个 researcher = 1 tenant</li><li>"Fair share" 而不是 tiered: 没人付费, 大家公平</li><li>WFQ (Weighted Fair Queueing) 保证小用户不被大 batch 用户饿死</li></ul>
+<h4>场景 E: Cloudflare / Datadog 这种纯 SaaS</h4>
+<ul><li>10万+ tenant, 长尾极端</li><li>头部 1% tenant 占 50% 资源</li><li>Bronze 占 80% tenant 但只 5% 流量</li><li>Cardinality 是头号挑战 — 不能为所有 tenant 维护所有 metric</li></ul>
+<hr />
+<h3>6. 工程上要做什么 — 实现 checklist</h3>
+<p><strong>Stage 0: Tier Definition (Week 1)</strong></p>
+<ol><li>定义 3 个 tier: Bronze / Silver / Gold (or 4 with Platinum)</li><li>每个 tier 写清:</li></ol>
+<ul><li>Promised uptime SLA</li><li>Promised latency p99</li><li>Rate limit (QPS)</li><li>Throughput cap (req/day)</li><li>Isolation level (pooled / dedicated)</li><li>Support response time</li></ul>
+<ol><li>价格分级, tier 升级 path 清晰</li></ol>
+<p><strong>Stage 1: Isolation (Week 2-4)</strong></p>
+<ol><li><strong>L1 API Gateway</strong>: token bucket per tenant, configurable by tier</li><li><strong>L2 App layer</strong>: per-tenant DB connection pool, query timeout, memory quota</li><li><strong>L3 Physical</strong>: Gold tenants 独立 replica set (Kubernetes node taint + tolerations)</li><li>WFQ scheduler 对 background job (避免 1 tenant 占满 worker pool)</li></ol>
+<p><strong>Stage 2: Telemetry (Week 4-6)</strong></p>
+<ol><li>每个 request emit metric: tenant_id, tier, endpoint, status, latency_ms</li><li>Cardinality control: per-tenant only top-N important metrics, rest aggregated</li><li>Streaming aggregation (Flink / Spark Streaming): 1-min rollup per tenant</li><li>Storage tier: hot 30d, warm 1y, cold 3y+ (different retention by tier)</li></ol>
+<p><strong>Stage 3: SLO Computation + Alert (Week 6-8)</strong></p>
+<ol><li>SLI calc per 5-min sliding window per tenant</li><li>Error budget tracker: monthly rolling, 30-day window</li><li>Burn rate alert: 多 fast / multi-window (e.g., 1h burn at 10x = page, 6h at 5x = page)</li><li>Per-tenant alert routing (PagerDuty per-tenant integration / Slack channel)</li></ol>
+<p><strong>Stage 4: Customer-facing + Billing (Week 8-10)</strong></p>
+<ol><li>Customer self-serve dashboard: SLO compliance, error budget remaining, recent incidents</li><li>SLA credit auto-calculation: breach → automatic credit on next invoice</li><li>Billing system (separate DB!): metered usage, audit trail 13 months</li><li>Dispute window (60 days), self-serve usage report (CSV export)</li></ol>
+<hr />
+<h3>7. 几个容易踩的坑</h3>
+<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Cardinality 爆炸</strong></td><td>10k tenant × 100 metric × 10 label = 10M ts → Prometheus 内存爆</td></tr><tr><td>2</td><td><strong>Single shared infra for all tiers</strong></td><td>1 tenant 影响所有</td></tr><tr><td>3</td><td><strong>没 rate limit at gateway</strong></td><td>App 层被打爆</td></tr><tr><td>4</td><td><strong>Billing 跟 telemetry 同 DB</strong></td><td>Billing 受 telemetry retention 影响, 不能 audit</td></tr><tr><td>5</td><td><strong>Aggregate at query time</strong></td><td>慢 + 贵</td></tr><tr><td>6</td><td><strong>没 dispute window</strong></td><td>Billing 不可挑战, customer 怒</td></tr><tr><td>7</td><td><strong>Sampling for billing</strong></td><td>计费数据<strong>绝不能</strong> sample</td></tr><tr><td>8</td><td><strong>没 per-tenant DB pool</strong></td><td>1 tenant 拿光 conn, 全员 stall</td></tr><tr><td>9</td><td><strong>SLA = SLO</strong></td><td>没 buffer, breach 概率高</td></tr><tr><td>10</td><td><strong>Burn rate alert 单 window</strong></td><td>要 multi-window (fast + slow)</td></tr><tr><td>11</td><td><strong>Tier 不可升级</strong></td><td>客户成长后没自助 path</td></tr><tr><td>12</td><td><strong>Bronze tenant 受 DDoS</strong></td><td>没 anomaly detection / 自动 throttle</td></tr></tbody></table>
+<hr />
+<h3>一句话总结 (Part 1)</h3>
+<blockquote><p><strong>Multi-tenant SaaS monitoring + SLA = "3 层 isolation (gateway / app / physical) + per-tenant SLI 但控 cardinality + tier-based threshold + 自助 dashboard + 自动 credit + 严格 billing audit"</strong>.</p>
+<p>这道题考的不是 "你会用 Prometheus", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor + cardinality 爆炸".</p></blockquote>
+<hr />
+<h1>Part 2 · 5 个深度工程问题</h1>
+<h3>⚙️ Problem 1: SLA / SLO / SLI Taxonomy + Error Budget</h3>
+<h4>1.1 区分三者</h4>
+<pre class="language-python"><code class="language-python"># SLI (Service Level Indicator) — 一个数字
+def compute_availability_sli(window_sec=300):
+    """5 分钟滑动窗口的可用性."""
+    total = metric_store.sum('requests_total', last_seconds=window_sec)
+    failed = metric_store.sum('requests_failed', last_seconds=window_sec)
+    return (total - failed) / total if total &gt; 0 else 1.0
+
+# SLO (Service Level Objective) — 目标
+class SLO:
+    name = "api_availability"
+    target = 0.999  # 99.9%
+    window = "30d_rolling"
+
+    def check(self):
+        sli = compute_availability_sli()
+        return sli &gt;= self.target
+
+# SLA (Service Level Agreement) — 法律
+class SLA:
+    name = "Gold tier api_availability"
+    target = 0.995  # 99.5% (lower than SLO! 留 buffer)
+    breach_credit_pct = 10  # 不达成 → 10% 月费 credit</code></pre>
+<h4>1.2 Error Budget 计算</h4>
+<pre class="language-python"><code class="language-python">class ErrorBudget:
+    """
+    Error budget = (1 - SLO target) × total_requests_in_window.
+    """
+    def __init__(self, slo_target=0.999, window_days=30):
+        self.target = slo_target
+        self.window_days = window_days
+
+    def total_budget(self, tenant_id):
+        total = metric_store.sum(
+            'requests_total',
+            tenant_id=tenant_id,
+            last_days=self.window_days,
+        )
+        return total * (1 - self.target)
+
+    def consumed(self, tenant_id):
+        return metric_store.sum(
+            'requests_failed',
+            tenant_id=tenant_id,
+            last_days=self.window_days,
+        )
+
+    def remaining(self, tenant_id):
+        return self.total_budget(tenant_id) - self.consumed(tenant_id)
+
+    def remaining_pct(self, tenant_id):
+        total = self.total_budget(tenant_id)
+        if total == 0:
+            return 1.0
+        return self.remaining(tenant_id) / total</code></pre>
+<h4>1.3 Burn Rate Alerts (Multi-window Multi-burn-rate)</h4>
+<p><strong>Google SRE book</strong> 推荐的多窗口多 burn rate alert:</p>
+<pre class="language-python"><code class="language-python"># 防止 fast burn (灾难) + slow burn (温水煮青蛙) 都能 catch
+BURN_RATE_ALERTS = [
+    # (window, burn_rate_threshold, severity)
+    ('1h',  14,  'critical'),  # 1h 烧光全月 budget 的 1/14 → critical
+    ('6h',  7,   'critical'),  # 6h 烧光全月 budget 的 1/7  → critical
+    ('1d',  3,   'warning'),   # 24h 烧光全月 budget 的 1/3 → warning
+    ('3d',  1,   'warning'),   # 3d 烧光所有 budget → warning
+]
+
+def check_burn_rate(tenant_id, slo):
+    alerts = []
+    for window, threshold, sev in BURN_RATE_ALERTS:
+        sli_in_window = compute_availability_sli_for_window(tenant_id, window)
+        error_rate = 1 - sli_in_window
+        budget_burn_rate = error_rate / (1 - slo.target)
+        if budget_burn_rate &gt; threshold:
+            alerts.append({
+                'window': window,
+                'burn_rate': budget_burn_rate,
+                'severity': sev,
+            })
+    return alerts</code></pre>
+<p><strong>关键直觉</strong>:</p>
+<ul><li>1h 内消耗 10x 预期 burn → 这速度 4 天烧光全月 → critical</li><li>1d 内消耗 3x → 10 天烧光 → warning</li><li>多窗口配合: 短窗口 catch sudden, 长窗口 catch gradual</li></ul>
+<h4>1.4 Per-Tier SLO</h4>
+<pre class="language-python"><code class="language-python">TIER_SLOS = {
+    'gold': {
+        'availability': 0.9999,  # 99.99%
+        'latency_p99_ms': 200,
+        'sla_promise': 0.999,    # 比 SLO 低 0.09%
+    },
+    'silver': {
+        'availability': 0.999,
+        'latency_p99_ms': 500,
+        'sla_promise': 0.995,
+    },
+    'bronze': {
+        'availability': 0.99,
+        'latency_p99_ms': 1000,
+        'sla_promise': 0.97,
+    },
+}</code></pre>
+<hr />
+<h3>⚙️ Problem 2: Per-Tenant Metrics — Cardinality Explosion</h3>
+<p><strong>这是 multi-tenant monitoring 的核心难题</strong>. 不解决直接死.</p>
+<h4>2.1 Cardinality 数学</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Naive 设计:
+  Metric: http_requests_total
+  Labels: tenant_id, endpoint, status_code, region, method, version
+  
+  10,000 tenants × 50 endpoints × 5 status × 5 region × 6 method × 3 version
+  = 22,500,000 unique time series
+
+Prometheus 内存: 每个 ts ~3 KB
+  → 22.5M × 3 KB = 67.5 GB 内存
+  → 一个 Prometheus 进程承受不住 (典型 10M ts 极限)</code></pre>
+<h4>2.2 Cardinality Control 策略</h4>
+<h5>(a) Label Limit (硬性)</h5>
+<pre class="language-python"><code class="language-python"># Prometheus / Mimir / Datadog 都有这种限制
+# 配置: max_label_names_per_series = 10
+#       max_label_value_length = 256</code></pre>
+<h5>(b) 重要 Metric Only Per-tenant</h5>
+<pre class="language-python"><code class="language-python"># 不是所有 metric 都 per-tenant
+PER_TENANT_METRICS = [
+    'http_requests_total',  # 计费用
+    'http_request_duration_seconds',  # SLA 用
+    'http_requests_failed_total',  # SLO 用
+]
+
+# 其他 metric (内部 debug 类) — 不带 tenant_id
+INTERNAL_METRICS = [
+    'gc_duration_seconds',
+    'goroutines_count',
+    'db_connection_pool_size',
+]</code></pre>
+<h5>(c) 头部 vs 长尾 — 不同 strategy</h5>
+<pre class="language-python"><code class="language-python"># 头部 100 tenant: 全量 per-tenant metric
+# 长尾 9900 tenant: 聚合成 "small_tenant" bucket
+def tag_tenant_for_metric(tenant_id):
+    if tenant_id in TOP_100_TENANTS:
+        return tenant_id
+    return 'aggregated_small'</code></pre>
+<h5>(d) Endpoint Bucket</h5>
+<pre class="language-python"><code class="language-python"># 50 endpoint 直接用很 high cardinality, 用 bucket
+def bucket_endpoint(endpoint):
+    if endpoint.startswith('/api/v1/agent'):
+        return 'agent'
+    if endpoint.startswith('/api/v1/billing'):
+        return 'billing'
+    if endpoint.startswith('/api/v1/admin'):
+        return 'admin'
+    return 'other'</code></pre>
+<h5>(e) Streaming Aggregation (Flink / Spark)</h5>
+<pre class="language-python"><code class="language-python"># 不直接 push raw event 到 Prometheus
+# 用 Flink 流式聚合, 输出 pre-aggregated metric
+
+# Pseudocode for Flink job
+stream
+    .keyBy(event -&gt; event.tenant_id + ":" + event.endpoint_bucket)
+    .window(TumblingProcessingTimeWindows.of(Time.minutes(1)))
+    .aggregate(new RequestAggregator())
+    .map(agg -&gt; Metric.builder()
+        .name("http_requests_per_minute")
+        .label("tenant_id", agg.tenant)
+        .label("endpoint_bucket", agg.bucket)
+        .value(agg.count)
+        .build())
+    .addSink(prometheusSink)</code></pre>
+<p><strong>结果</strong>: 10M raw event/min → 50k aggregated metric/min, cardinality 可控.</p>
+<h4>2.3 Sampling for Non-billable</h4>
+<pre class="language-python"><code class="language-python"># 计费 metric (api_calls_total) — **100% 不能 sample**
+# Debug metric (db_query_duration) — 1/100 sampling OK
+
+class SamplingStrategy:
+    BILLABLE_METRICS = {'api_calls_total', 'compute_seconds_total', 'storage_gb_hours'}
+
+    def should_record(self, metric_name):
+        if metric_name in self.BILLABLE_METRICS:
+            return True  # 永远 record
+        return random.random() &lt; 0.01  # 1% sample</code></pre>
+<h4>2.4 Mimir / Cortex / Thanos (Prometheus 横向扩展)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Single Prometheus:    上限 ~10M ts, ~500K samples/sec
+                      ↓
+Mimir / Cortex:       horizontally scalable, 跨多 instance
+                      支持 multi-tenant 隔离 (per-tenant retention, RBAC)
+                      cost: 比 Datadog 便宜很多 (self-host)
+
+Datadog (SaaS):       cardinality $-cost, $0.05/host/hr + per-metric pricing
+                      cardinality 失控 = bill 失控</code></pre>
+<p><strong>选型</strong>:</p>
+<ul><li>&lt; 1000 tenant, &lt; 1M ts → single Prometheus + recording rules</li><li>&gt; 1000 tenant → Mimir / Cortex</li><li>大型 SaaS, 钱多 → Datadog (省运维)</li></ul>
+<hr />
+<h3>⚙️ Problem 3: Tier-Based Monitoring (Gold / Silver / Bronze)</h3>
+<h4>3.1 Tier 定义 — 不只是价格, 是<strong>资源 + 监控 + alert</strong></h4>
+<pre class="language-yaml"><code class="language-yaml">tiers:
+  gold:
+    isolation: dedicated_replica
+    rate_limit: 10000 qps
+    burst: 20000 qps for 60s
+    db_pool: 500 connections
+    sla_uptime: 0.9995
+    sla_latency_p99_ms: 200
+    monitor_sample_rate: 1.0   # 100% telemetry
+    alert_routing: pagerduty_oncall_24x7
+    support_response: 15min
+    storage_retention: 1y_hot
+
+  silver:
+    isolation: pooled (priority class A)
+    rate_limit: 1000 qps
+    burst: 2000 qps for 60s
+    db_pool: 50 connections
+    sla_uptime: 0.999
+    sla_latency_p99_ms: 500
+    monitor_sample_rate: 0.5   # 50% telemetry
+    alert_routing: slack_business_hours
+    support_response: 1h
+    storage_retention: 90d_warm
+
+  bronze:
+    isolation: pooled (priority class B)
+    rate_limit: 100 qps
+    burst: 200 qps for 60s
+    db_pool: 5 connections
+    sla_uptime: 0.99
+    sla_latency_p99_ms: 1000
+    monitor_sample_rate: 0.1   # 10% telemetry
+    alert_routing: email_daily_digest
+    support_response: 24h
+    storage_retention: 30d_cold</code></pre>
+<h4>3.2 Physical Isolation for Gold</h4>
+<pre class="language-python"><code class="language-python"># Kubernetes: Gold pods 走专用 node pool
+# 用 taints + tolerations 强制隔离
+
+# Node pool config (Terraform / GKE)
+resource "google_container_node_pool" "gold" {
+  name       = "gold-tier-pool"
+  node_count = 5
+
+  node_config {
+    taint {
+      key    = "tier"
+      value  = "gold"
+      effect = "NO_SCHEDULE"
+    }
+    labels = {
+      tier = "gold"
+    }
+  }
+}
+
+# Pod spec
+spec:
+  tolerations:
+  - key: "tier"
+    operator: "Equal"
+    value: "gold"
+    effect: "NoSchedule"
+  nodeSelector:
+    tier: "gold"</code></pre>
+<p><strong>好处</strong>:</p>
+<ul><li>Gold 流量永远不和 Bronze 共享 node</li><li>Gold 可以用更好的硬件 (GPU / 高 IO)</li><li>Auto-scale Gold pool 独立, 不被 Bronze 流量 burst 影响</li></ul>
+<h4>3.3 Pooled with Priority Class</h4>
+<p>Silver / Bronze 共享 pool, 但有优先级:</p>
+<pre class="language-python"><code class="language-python">class PriorityScheduler:
+    """Silver 优先于 Bronze 在 pooled infra."""
+
+    def __init__(self):
+        self.queues = {
+            'silver': PriorityQueue(),
+            'bronze': PriorityQueue(),
+        }
+
+    def enqueue(self, request):
+        tier = get_tenant_tier(request.tenant_id)
+        self.queues[tier].put(request)
+
+    def dequeue(self):
+        # WFQ: Silver 80% slot, Bronze 20%
+        if random.random() &lt; 0.8 and not self.queues['silver'].empty():
+            return self.queues['silver'].get()
+        if not self.queues['bronze'].empty():
+            return self.queues['bronze'].get()
+        return self.queues['silver'].get()  # fallback</code></pre>
+<h4>3.4 Per-Tier Threshold</h4>
+<pre class="language-python"><code class="language-python"># 同一 metric 不同 tier 不同 threshold
+LATENCY_P99_THRESHOLD = {
+    'gold': 200,    # ms
+    'silver': 500,
+    'bronze': 1000,
+}
+
+def check_latency_slo(tenant_id):
+    tier = get_tenant_tier(tenant_id)
+    p99 = metric_store.percentile(99, 'latency_ms', tenant_id=tenant_id)
+    threshold = LATENCY_P99_THRESHOLD[tier]
+    if p99 &gt; threshold:
+        alert(f"Tenant {tenant_id} ({tier}) p99 {p99}ms &gt; threshold {threshold}ms")</code></pre>
+<hr />
+<h3>⚙️ Problem 4: Alerting — Per-Tenant vs Aggregate, Routing, Severity</h3>
+<h4>4.1 Three Alert Strategies</h4>
+<pre class="language-plaintext"><code class="language-plaintext">1. Aggregate alerts (整体异常):
+   "P99 latency on all api endpoints &gt; 1s"
+   → SRE on-call
+
+2. Per-tier alerts (某 tier 整体异常):
+   "Gold tier error rate &gt; 0.1%"
+   → SRE + Gold customer success team
+
+3. Per-tenant alerts (具体 tenant):
+   "Tenant acme-corp error rate &gt; 5%"
+   → tenant's account manager + tech lead</code></pre>
+<h4>4.2 Severity Tier</h4>
+<pre class="language-python"><code class="language-python">class AlertSeverity:
+    P0 = 'critical'      # page 24x7
+    P1 = 'high'          # page business hours
+    P2 = 'medium'        # slack
+    P3 = 'low'           # email daily digest
+
+def determine_severity(alert):
+    tier = alert.tenant_tier
+    metric = alert.metric
+
+    # Gold tenant: 任何 SLA breach 都 P0
+    if tier == 'gold' and metric in SLA_METRICS:
+        return AlertSeverity.P0
+
+    # Silver: SLA breach P1, internal P2
+    if tier == 'silver':
+        return AlertSeverity.P1 if metric in SLA_METRICS else AlertSeverity.P2
+
+    # Bronze: 基本不 page
+    if tier == 'bronze':
+        return AlertSeverity.P2 if metric in SLA_METRICS else AlertSeverity.P3
+
+    return AlertSeverity.P2</code></pre>
+<h4>4.3 Routing Rules</h4>
+<pre class="language-yaml"><code class="language-yaml">routing_rules:
+  - match: {severity: P0, tier: gold}
+    route: pagerduty/oncall_engineer + pagerduty/gold_csm
+    escalate_after: 15min
+
+  - match: {severity: P1, tier: silver}
+    route: pagerduty/oncall_engineer (business hours only)
+    escalate_after: 1h
+    fallback_route: slack/#silver-incidents
+
+  - match: {severity: P2}
+    route: slack/#tenant-alerts
+    
+  - match: {severity: P3}
+    route: email/daily-digest@example.com</code></pre>
+<h4>4.4 Dedup + Suppression</h4>
+<pre class="language-python"><code class="language-python">class TenantAlertManager:
+    """
+    Per-tenant 范围内 dedup.
+    同一 tenant + 同一 metric + 1h 窗口只 fire 一次.
+    """
+    def __init__(self):
+        self.recent = {}  # (tenant_id, metric) → last_fire_ts
+
+    def fire_or_suppress(self, alert):
+        key = (alert.tenant_id, alert.metric_name)
+        last = self.recent.get(key, 0)
+        if time.time() - last &lt; 3600:
+            # 1h dedup window, 累计 count
+            self._increment_count(key)
+            return False
+        self.recent[key] = time.time()
+        return True</code></pre>
+<h4>4.5 Alert Quality — Quarterly Tune</h4>
+<pre class="language-python"><code class="language-python"># 看每个 alert 类型的 actionability
+def alert_quality_report(quarter):
+    report = {}
+    for alert_type in alert_types:
+        ats = db.get_alerts(quarter, type=alert_type)
+        resolved_real = sum(1 for a in ats if a.outcome == 'real_issue_fixed')
+        false_positive = sum(1 for a in ats if a.outcome == 'auto_resolved')
+        precision = resolved_real / len(ats) if ats else 0
+        report[alert_type] = {
+            'fired_count': len(ats),
+            'precision': precision,
+            'avg_mttr_min': sum(a.mttr_min for a in ats) / len(ats),
+        }
+    return report</code></pre>
+<hr />
+<h3>⚙️ Problem 5: Customer-Facing SLA Dashboard + Credit Logic</h3>
+<h4>5.1 Customer Self-serve Dashboard</h4>
+<pre class="language-python"><code class="language-python">class CustomerDashboard:
+    """每个客户能看自己的 SLA / 用量."""
+
+    def render(self, tenant_id):
+        return {
+            'current_month': {
+                'uptime': self.compute_uptime(tenant_id, 'this_month'),
+                'sla_target': self.get_sla(tenant_id).uptime,
+                'sla_met': self.compute_uptime(tenant_id, 'this_month') &gt;= self.get_sla(tenant_id).uptime,
+                'error_budget_remaining_pct': self.error_budget(tenant_id).remaining_pct(),
+                'incidents': self.list_incidents(tenant_id, 'this_month'),
+            },
+            'usage': {
+                'api_calls': self.usage_count(tenant_id, 'api_calls'),
+                'compute_seconds': self.usage_count(tenant_id, 'compute_seconds'),
+                'storage_gb_hours': self.usage_count(tenant_id, 'storage_gb_hours'),
+                'rate_limit_hits': self.count_429s(tenant_id),
+            },
+            'recommendations': self.recommendations(tenant_id),  # tier upgrade等
+            'next_invoice_estimate': self.estimate_bill(tenant_id),
+        }</code></pre>
+<h4>5.2 Auto-credit on SLA Breach</h4>
+<pre class="language-python"><code class="language-python">class SLACreditEngine:
+    """SLA breach → 自动算 credit."""
+
+    def __init__(self, db):
+        self.db = db
+
+    def compute_credit(self, tenant_id, month):
+        sla = self.db.get_sla(tenant_id)
+        actual_uptime = self.compute_uptime(tenant_id, month)
+
+        if actual_uptime &gt;= sla.uptime:
+            return 0  # 没 breach, 没 credit
+
+        # 标准 credit ladder (典型 SaaS)
+        gap = sla.uptime - actual_uptime
+        if gap &lt; 0.0001:    # 99.9% → 99.89%
+            credit_pct = 0.10  # 10% off
+        elif gap &lt; 0.001:   # 99.9% → 99.8%
+            credit_pct = 0.25
+        elif gap &lt; 0.01:    # 99.9% → 98.9%
+            credit_pct = 0.50
+        else:
+            credit_pct = 1.0   # 100% credit (基本免费)
+
+        monthly_bill = self.estimate_bill(tenant_id, month)
+        return monthly_bill * credit_pct
+
+    def issue_credit(self, tenant_id, month):
+        credit = self.compute_credit(tenant_id, month)
+        if credit &gt; 0:
+            self.db.create_credit_note(
+                tenant_id=tenant_id,
+                amount=credit,
+                reason=f"SLA breach in {month}",
+                applies_to_invoice='next',
+            )
+            self.notify_customer(tenant_id, credit)</code></pre>
+<h4>5.3 Billing Audit Trail</h4>
+<p><strong>Billing 必须独立 DB, 高 retention, 不可改</strong>:</p>
+<pre class="language-python"><code class="language-python">class BillingDB:
+    """
+    Billing 存储要求:
+      1. 独立于 telemetry DB (telemetry 7d 保留, billing 13 months)
+      2. 不能 sample (every event recorded)
+      3. 写入后不可修改 (append-only / WORM)
+      4. 加密 + 签名 (防篡改)
+      5. 跟 telemetry double-entry bookkeeping (可对账)
+    """
+
+    def record_billable_event(self, event):
+        # 写入前 sign
+        event.signature = hmac_sign(event, secret=BILLING_KEY)
+        # WORM table
+        self.db.insert_immutable('billable_events', event)
+        # 审计 log
+        audit.log({
+            'action': 'billable_event_recorded',
+            'event_id': event.id,
+            'tenant_id': event.tenant_id,
+            'amount': event.amount,
+            'ts': now(),
+        })</code></pre>
+<h4>5.4 Dispute Window + Self-serve Report</h4>
+<pre class="language-python"><code class="language-python">def export_usage_report(tenant_id, start_date, end_date, format='csv'):
+    """客户自助导出 usage report 用于对账."""
+    events = billing_db.query(
+        tenant_id=tenant_id,
+        start=start_date,
+        end=end_date,
+    )
+    if format == 'csv':
+        return to_csv(events, columns=['ts', 'event_id', 'metric', 'value', 'request_id'])
+    if format == 'json':
+        return to_json(events)
+
+def file_dispute(tenant_id, invoice_id, reason, evidence):
+    """客户提 dispute (60d window)."""
+    invoice = db.get_invoice(invoice_id)
+    if (now() - invoice.issued_at).days &gt; 60:
+        return {'error': 'Outside 60-day dispute window'}
+
+    db.create_dispute(
+        tenant_id=tenant_id,
+        invoice_id=invoice_id,
+        reason=reason,
+        evidence=evidence,
+        status='pending_review',
+    )
+    notify_billing_team(invoice_id)
+    return {'ok': True, 'dispute_id': ...}</code></pre>
+<h4>5.5 Public Status Page</h4>
+<pre class="language-python"><code class="language-python"># 跟客户透明 — 比客户先发现自己的 incident
+# 用 statuspage.io / 自建
+
+@app.route('/status')
+def public_status():
+    return {
+        'overall': overall_health(),
+        'services': {
+            'api': service_health('api'),
+            'inference': service_health('inference'),
+            'webhooks': service_health('webhooks'),
+        },
+        'incidents': list_active_incidents(),
+        'recent_incidents': list_incidents(last_days=30),
+        'sla_history': sla_compliance_history(months=12),
+    }</code></pre>
+<hr />
+<h1>Part 3 · 把 5 个问题串起来看</h1>
+<p>这 5 个问题是<strong>同一件事的不同 layer</strong>:</p>
+<ol><li><strong>SLI / SLO / SLA / Error Budget</strong> = 「<strong>度量框架</strong>」 — 你怎么定义"好坏"</li><li><strong>Per-tenant metrics + cardinality control</strong> = 「<strong>测量工具</strong>」 — 你怎么测出 1 万 tenant 的"好坏"</li><li><strong>Tier-based isolation</strong> = 「<strong>资源分配</strong>」 — 你怎么让不同 tier 的"好坏"目标可达</li><li><strong>Alert routing + severity</strong> = 「<strong>信号过滤</strong>」 — 测出 "坏" 时怎么找对人</li><li><strong>Customer-facing + credit</strong> = 「<strong>对客户兑现</strong>」 — 真的 "坏" 时怎么 honor 承诺</li></ol>
+<p>面试场或架构评审上, 能从这 5 层系统讲清楚, 就是<strong>做过大型 SaaS infra 的水准</strong>. 如果只会答 "我用 Prometheus + Grafana", 那是初级.</p>
 <hr />
 <h3>必问 clarifying questions</h3>
 <p><strong>1. SLA tiers</strong></p>
-<blockquote><p>"How many tiers — Bronze/Silver/Gold? What does each promise (availability %, latency p99, throughput)?"</p></blockquote>
+<blockquote><p>"How many tiers — Bronze/Silver/Gold? What does each promise (availability %, latency p99, throughput, support response)?"</p></blockquote>
 <p><strong>2. Tenant count + size distribution</strong></p>
-<blockquote><p>"100 tenants or 100k? Long-tail (5 huge, many tiny) or evenly distributed?"</p></blockquote>
+<blockquote><p>"100 tenants or 100k? Long-tail (5 huge, many tiny) or evenly distributed? Top 10% = X% traffic?"</p></blockquote>
 <p><strong>3. Multi-tenancy model</strong></p>
-<blockquote><p>"Pooled (shared infra) or siloed (dedicated)? Hybrid common — small tenants share, large dedicated?"</p></blockquote>
+<blockquote><p>"Pooled (shared infra) or siloed (dedicated)? Hybrid common — small tenants share, large dedicated? Acceptable cross-tier bleed?"</p></blockquote>
 <p><strong>4. Billing granularity</strong></p>
-<blockquote><p>"Per-API-call billing? Per-resource-hour? Tiered subscription with overage?"</p></blockquote>
+<blockquote><p>"Per-API-call billing? Per-resource-hour? Tiered subscription with overage? Determines whether sampling is OK."</p></blockquote>
 <p><strong>5. Existing observability</strong></p>
-<blockquote><p>"Are we building on Datadog / Prometheus + Grafana? Or greenfield?"</p></blockquote>
+<blockquote><p>"Are we building on Datadog / Prometheus + Grafana / Mimir? Or greenfield? Cost ceiling for telemetry?"</p></blockquote>
+<p><strong>6. Customer expectations</strong></p>
+<blockquote><p>"Do customers expect self-serve dashboard + credit auto-issue? Or manual ticket-based? Determines product surface."</p></blockquote>
 <hr />
 <h3>5 步框架</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify tier model + size dist + multi-tenancy model</td></tr><tr><td>5-20 min</td><td><strong>Storage + ingestion</strong> architecture (Kafka/TSDB sharded by tenant)</td></tr><tr><td>20-30 min</td><td><strong>Noisy neighbor isolation</strong> (quota + WFQ + tiered placement)</td></tr><tr><td>30-40 min</td><td><strong>SLA computation</strong> + per-tenant alert</td></tr><tr><td>40-50 min</td><td>Billable signal aggregation + audit</td></tr><tr><td>50-60 min</td><td>Failure modes + onboarding</td></tr></tbody></table>
-<hr />
-<h3>我会这样答（sample monologue）</h3>
-<blockquote><p>"Clarify — <em>[假设：3 tiers (Bronze 99.5%, Silver 99.9%, Gold 99.99%), 10k tenants long-tail (top 100 = 80% traffic), pooled with dedicated for Gold, per-API-call billing + overage]</em>.</p>
-<p><strong>High-level architecture</strong>:</p>
-<pre class="language-plaintext"><code class="language-plaintext">Tenant requests → API Gateway (auth + rate limit per tenant)
-                        ↓
-                 App Layer (multi-tenant DB queries, etc.)
-                        ↓
-                 Telemetry emit (every request: tenant_id, latency, status)
-                        ↓
-                 Kafka (partition by tenant_id)
-                        ↓
-                 Stream Processor (Flink): per-tenant 1-min rollups
-                        ↓
-                 TSDB (sharded by tenant_id)
-                        ↓
-                 Per-tenant dashboard + SLA computer + alerts + billing</code></pre>
-<p><strong>Storage</strong>: ClickHouse with <code>(tenant_id, timestamp)</code> primary key. Per-tenant query naturally hits 1 shard.</p>
-<p><strong>Noisy-neighbor isolation</strong>: 3 layers</p>
-<p><strong>L1: Rate limit at API Gateway</strong></p>
-<ul><li>Token bucket per tenant: Bronze 100 QPS, Silver 1000, Gold 10000 (configurable)</li><li>Burst allowance: 2x for 60s</li><li>Beyond → 429 with <code>Retry-After</code></li></ul>
-<p><strong>L2: Resource quota at app layer</strong></p>
-<ul><li>Per-tenant DB connection pool max (Bronze 5, Silver 50, Gold 500)</li><li>Per-tenant memory budget for query result sets</li><li>Background worker pool fair-share (WFQ — Weighted Fair Queueing)</li></ul>
-<p><strong>L3: Physical isolation for Gold</strong></p>
-<ul><li>Gold tenants run on dedicated replica set</li><li>Bronze/Silver share pooled infra</li><li><strong>Tier upgrade</strong>: deploy fresh dedicated infra in N minutes, drain pooled traffic</li></ul>
-<p><strong>SLA computation</strong>:</p>
-<p>Per-tenant SLOs:</p>
-<ul><li>Availability = (successful_requests / total_requests) over 5min sliding window</li><li>Latency p99 over 5min window</li><li><strong>Error budget</strong>: monthly, draws down on each 5xx / breach</li></ul>
-<p>Daily SLO digest auto-sent to customer + their account manager. Real-time alerts when error budget burn rate &gt; N% per hour.</p>
-<p><strong>Billable signal aggregation</strong>:</p>
-<p>Bill components:</p>
-<ul><li>API calls (counter)</li><li>Storage GB-hours (gauge)</li><li>Compute milliseconds (counter)</li></ul>
-<p>Stream processor outputs:</p>
-<pre class="language-plaintext"><code class="language-plaintext">{
-  tenant_id, hour, total_calls, total_4xx, total_5xx,
-  storage_gb_hours, compute_ms, sla_minutes_breached
-}</code></pre>
-<p>Persist hourly aggregates in <strong>billing DB</strong> (separate from telemetry DB). Monthly rollup → invoice.</p>
-<p><strong>Audit</strong>: every billable event has provenance (request ID + tenant + timestamp). Tenant can self-serve <strong>usage report</strong> + <strong>dispute window</strong> (60 days).</p>
-<p><strong>Failure modes</strong>:</p>
-<ul><li><strong>Quota exhaustion under burst</strong>: gold burst can starve silver if shared pool. Mitigate: separate gold pool.</li><li><strong>Telemetry pipeline lag</strong> at peak: degrade to <strong>sampled telemetry</strong> (1/10) to keep up</li><li><strong>Misattribution</strong>: shared services (rate limiter itself) — attribute by tenant_id in trace</li><li><strong>DDoS via legit tier</strong>: high-tier customer compromise → flood. Per-tenant max QPS hard ceiling even within tier.</li></ul>
-<p><strong>Onboarding new tenant</strong>: provisioning script creates per-tenant quota config + dashboard + alerting rules. &lt;10 min.</p>
-<p><strong>Cost optimization for telemetry</strong>:</p>
-<ul><li>1-minute rollups for hot store (30 days)</li><li>1-hour rollups for warm (1 year)</li><li>Daily rollups for cold (3+ years)</li><li>Saves 90%+ storage cost on long tail"</li></ul></blockquote>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify tier model + size dist + existing tools</td></tr><tr><td>5-15 min</td><td>SLI/SLO/SLA + error budget + burn rate alerting</td></tr><tr><td>15-25 min</td><td>Per-tenant metrics + cardinality control + storage tiers</td></tr><tr><td>25-35 min</td><td>Tier-based isolation (gateway + app + physical)</td></tr><tr><td>35-45 min</td><td>Alert routing + per-tier severity + dedup</td></tr><tr><td>45-55 min</td><td>Customer dashboard + credit logic + billing audit</td></tr><tr><td>55-60 min</td><td>Failure modes + onboarding + cost optimization</td></tr></tbody></table>
 <hr />
 <h3>简历专属 reframe</h3>
-<p>你的 <strong>voice agent 7 markets</strong> 是天然 multi-tenant：</p>
-<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Per-tenant SLA tiers</td><td>7 markets 不同 latency / accuracy SLA</td></tr><tr><td>Noisy neighbor isolation</td><td>Indonesia 流量 burst 不影响 Thailand</td></tr><tr><td>Token bucket rate limit</td><td>API gateway 自然有</td></tr><tr><td>Per-tenant dashboard</td><td>你 weekly 跟 regional ops review</td></tr><tr><td>Billing signal</td><td>ByteDance 内部 chargeback 通常按 region</td></tr></tbody></table>
-<p><strong>主动说</strong>：</p>
-<blockquote><p>"We treated 7 markets as 7 tenants in our voice agent. Each had a different SLA — Indonesia high-volume tolerance for 200ms, Thailand stricter at 150ms. We isolated via <strong>per-market Kafka partitions + dedicated inference replicas for the top-3 markets</strong>. Indonesia burst once during a payday spike — 5x normal traffic. <strong>Because the top-3 were dedicated, Thailand and Korea were unaffected</strong>. That isolation was worth its hardware cost."</p></blockquote>
+<p>你的 <strong>voice agent 7 markets</strong> + <strong>BNPL chatbot multi-tenant</strong> 都是天然 SaaS:</p>
+<table class="md-table"><thead><tr><th>题</th><th>你的经验</th></tr></thead><tbody><tr><td>Per-tenant SLA tiers</td><td>7 markets 不同 latency / accuracy SLA</td></tr><tr><td>Noisy neighbor isolation</td><td>Indonesia payday burst 不影响 Thailand</td></tr><tr><td>Token bucket rate limit</td><td>API gateway 自然有</td></tr><tr><td>Per-tenant dashboard</td><td>你 weekly 跟 regional ops review</td></tr><tr><td>Billing signal</td><td>ByteDance 内部 chargeback 按 region</td></tr><tr><td>Cardinality control</td><td>Voice agent metric per market — top markets full, long-tail aggregate</td></tr><tr><td>Burn rate alert</td><td>Voice agent on-call multi-window</td></tr><tr><td>Auto-credit</td><td>Indonesia SLA breach → adjust commission</td></tr><tr><td>Tier upgrade path</td><td>Bronze → Silver 怎么提升</td></tr></tbody></table>
+<p><strong>主动 quote</strong>:</p>
+<blockquote><p>"We treated 7 markets as 7 tenants in our voice agent. Each had a different SLA — Indonesia high-volume tolerance for 200ms p99, Thailand stricter at 150ms because of stricter compliance regime. We isolated via <strong>per-market Kafka partitions + dedicated inference replicas for top-3 markets</strong>. Indonesia had a payday burst event — 5x normal traffic. <strong>Because top-3 were dedicated, Thailand and Korea were unaffected</strong>. That isolation cost extra hardware but saved us a major SLA breach across 6 other markets. The lesson I'd transfer: <strong>tier-based physical isolation is worth its hardware cost</strong> when you have any sufficiently high-value tenant — it's insurance, not luxury. We also instituted <strong>per-market burn rate alerts (1h, 6h, 1d, 3d windows)</strong> — caught a slow degradation in Vietnam that gradient-shifted over 48h and would have missed a simple aggregate alert."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
-<p><strong>Q1</strong>: "Gold tenant suddenly spikes 20x, burns through capacity. What now?" <strong>A</strong>: Tier-protected:</p>
-<ul><li>Hard ceiling per tenant even in tier (e.g., 100k QPS max regardless of Gold)</li><li>Auto-scale dedicated infra (+20% capacity for 1h)</li><li>Customer-facing alert: "you're approaching capacity, do you need a tier upgrade?"</li><li>Bill overage 1.5x normal rate (motivation to upgrade)</li></ul>
-<p><strong>Q2</strong>: "Bronze tenant DDoS attempt — how protect Silver/Gold?" <strong>A</strong>:</p>
-<ul><li>Pooled Bronze infra completely separate physical from Silver/Gold</li><li>Cross-tier blast radius zero by design</li><li>Automated anomaly detection on Bronze: 100x normal → temporary throttle + alert customer</li></ul>
-<p><strong>Q3</strong>: "1B events/day storage cost — how reduce?" <strong>A</strong>:</p>
-<ul><li>90% to cold tier after 30 days (1/30 the cost)</li><li><strong>Aggregate-first storage</strong>: raw events for 7d, 1-min rollups for 90d, 1-hour for year+</li><li><strong>Sampling</strong> for non-critical metrics (debug traces)</li><li><strong>Per-tenant retention</strong> (Bronze 30d, Gold 1y)</li></ul>
-<p><strong>Q4</strong>: "Customer disputes a billing line. How do we prove?" <strong>A</strong>:</p>
-<ul><li><strong>Per-request audit log</strong> retained 13 months (1 year + buffer)</li><li>Tenant can self-serve usage report (CSV download)</li><li>Dispute window 60 days</li><li><strong>Cryptographic signature</strong> on monthly invoice (tamper-proof)</li><li>Internal "billing replay" tool: ops can reconstruct billing from raw logs</li></ul>
-<p><strong>Q5</strong>: "Multi-region deployment. SLA computed in which region?" <strong>A</strong>:</p>
-<ul><li>SLO <strong>per region</strong> (each region has its own availability score)</li><li>Customer sees <strong>per-region</strong> dashboard</li><li>Overall SLA = min(regions used) OR weighted by traffic distribution (negotiated)</li><li>Cross-region failover may pause SLO computation briefly (5-10 min)</li></ul>
+<p><strong>Q1</strong>: "Gold tenant suddenly spikes 20x, burns through capacity. What now?"</p>
+<p><strong>A</strong>: Tier-protected response:</p>
+<ul><li><strong>Hard ceiling</strong> per tenant even within tier (e.g., 100k QPS max regardless of Gold)</li><li><strong>Auto-scale dedicated infra</strong> (+20% capacity for 1h)</li><li><strong>Customer-facing alert</strong>: "you're approaching capacity, do you need a tier upgrade?"</li><li><strong>Bill overage 1.5x normal rate</strong> (motivation to upgrade properly)</li><li>If sustained for &gt; 4h: emergency capacity review, possibly negotiate dedicated cluster</li></ul>
+<p><strong>Q2</strong>: "Bronze tenant DDoS attempt — how protect Silver/Gold?"</p>
+<p><strong>A</strong>:</p>
+<ul><li>Pooled Bronze infra <strong>completely separate physical</strong> from Silver/Gold</li><li>Cross-tier blast radius <strong>zero by design</strong></li><li>Automated anomaly detection on Bronze: 100x normal → temporary throttle + alert customer</li><li>WAF rules on Bronze tier IP ranges (if applicable)</li><li>If proven malicious: terminate tenant per ToS</li></ul>
+<p><strong>Q3</strong>: "1B events/day storage cost — how reduce?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Tiered storage</strong>: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in S3</li><li><strong>Aggregate-first</strong>: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y</li><li><strong>Sampling</strong> for non-critical metrics (debug traces 1/100), but <strong>never for billing</strong></li><li><strong>Per-tenant retention</strong>: Bronze 30d, Silver 90d, Gold 1y</li><li><strong>Compression</strong>: Prometheus block compression / Mimir blocks → 10x storage saving</li></ul>
+<p><strong>Q4</strong>: "Customer disputes a billing line. How do we prove?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Per-request audit log</strong> retained 13 months (1 year + buffer for legal)</li><li>Tenant can <strong>self-serve usage report</strong> (CSV download)</li><li>Dispute window <strong>60 days</strong></li><li><strong>Cryptographic signature</strong> on monthly invoice (tamper-proof, HMAC)</li><li>Internal "<strong>billing replay</strong>" tool: ops can reconstruct billing from raw logs to verify</li><li>Match against telemetry DB (double-entry bookkeeping consistency)</li></ul>
+<p><strong>Q5</strong>: "Multi-region deployment. SLA computed in which region?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>SLO per region</strong> (each region has own availability score)</li><li>Customer sees <strong>per-region dashboard</strong></li><li>Overall SLA = <code>min(regions used)</code> OR <code>weighted by traffic distribution</code> (negotiated)</li><li>Cross-region <strong>failover</strong> may pause SLO computation briefly (5-10 min)</li><li>Multi-region active-active 是 "max" available, active-passive 是 region 1 own</li></ul>
+<p><strong>Q6</strong>: "How do you handle latency SLA across global users when our service is in Singapore only?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Be honest in SLA</strong>: "p99 &lt; 200ms from APAC region, &lt; 500ms from EU/US"</li><li>Or <strong>regional deployment</strong>: spin up EU/US replica (cost ↑)</li><li>Or <strong>CDN-front for cacheable</strong>: latency-sensitive read-only endpoints on CDN</li><li><strong>Per-region SLI</strong>: 不是单个 SLA 数字, 而是 per-customer-region 算</li><li>给客户透明的 latency map dashboard</li></ul>
 <hr />
 <h3>❌ 易错点</h3>
-<ol><li><strong>Single shared infra</strong> for all tiers — no isolation</li><li><strong>没 rate limit at gateway</strong> — app layer overloaded</li><li><strong>没 quota per-tenant DB connections</strong> — single tenant 杀全 DB</li><li><strong>Billing 跟 telemetry 同 DB</strong> — billing 精度受 telemetry retention 影响</li><li><strong>Aggregate at query time</strong> — query 慢 + 贵</li><li><strong>没 dispute window / audit</strong> — billing 不可挑战, customer 怒</li><li><strong>Sampling for everything</strong> — billing 数据不能 sample</li></ol>
+<ol><li><strong>Cardinality 失控</strong> — 10k tenant × 100 metric × 10 label</li><li><strong>Single shared infra for all tiers</strong> — no isolation</li><li><strong>没 rate limit at gateway</strong> — app 层被打爆</li><li><strong>没 quota per-tenant DB connections</strong> — 1 tenant 杀全 DB</li><li><strong>Billing 跟 telemetry 同 DB</strong> — billing 受 telemetry retention 影响</li><li><strong>Aggregate at query time</strong> — query 慢 + 贵</li><li><strong>没 dispute window / audit</strong> — billing 不可挑战, customer 怒</li><li><strong>Sampling for billing</strong> — billing 数据<strong>绝不能</strong> sample</li><li><strong>SLA = SLO</strong> (没 buffer) — breach 概率高</li><li><strong>Burn rate alert 单 window</strong> — 要 multi-window</li><li><strong>Tier 不可升级</strong> — 客户成长后没 path</li><li><strong>Bronze 受 DDoS 没 protect</strong> — anomaly detection 缺失</li></ol>
 <hr />
 <h3>✅ 加分项</h3>
-<ol><li><strong>3-layer isolation</strong> (gateway / app / physical)</li><li><strong>Tier-based dedicated infra</strong> for Gold</li><li><strong>Error budget burn rate</strong> alerts (modern SRE)</li><li><strong>Aggregate-first storage</strong> (rollups &gt; raw)</li><li><strong>Billing 独立 DB</strong> + cryptographic invoice</li><li><strong>Per-region SLO</strong> computation</li><li><strong>Hard ceiling even in tier</strong> anti-DDoS</li><li><strong>Tenant self-serve usage report</strong></li></ol>
+<ol><li><strong>3-layer isolation</strong> (gateway / app / physical)</li><li><strong>Tier-based dedicated infra</strong> for Gold</li><li><strong>Multi-window burn rate alerts</strong> (modern SRE)</li><li><strong>Aggregate-first storage</strong> (rollups &gt; raw)</li><li><strong>Billing 独立 DB</strong> + cryptographic invoice</li><li><strong>Per-region SLO</strong> computation</li><li><strong>Hard ceiling even within tier</strong> (anti-DDoS)</li><li><strong>Tenant self-serve usage report</strong> (60d dispute)</li><li><strong>Cardinality control</strong> (top-N + bucket + sampling)</li><li><strong>Auto-credit on SLA breach</strong> (no manual asking)</li><li><strong>Streaming aggregation</strong> (Flink for pre-rollup)</li><li><strong>Public status page</strong> (transparency)</li><li><strong>Per-tenant alert routing</strong> (not just one channel)</li></ol>
 <hr />
-<h3>Cheat Sheet</h3>
-<pre class="language-plaintext"><code class="language-plaintext">3 isolation layers:
-  L1 API Gateway: token bucket per tenant by tier
+<h3>一句话总结</h3>
+<blockquote><p><strong>Multi-tenant SaaS monitoring + SLA = "3 层 isolation (gateway / app / physical) + per-tenant SLI 但严控 cardinality + tier-based threshold + multi-window burn rate alert + 自助 dashboard + 自动 credit + 严格 billing audit"</strong>.</p>
+<p>这道题考的不是 "你会用 Prometheus", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor + cardinality 爆炸 + customer-facing SLA disputes".</p></blockquote>
+<hr />
+<h3>Cheat Sheet (印 1 页)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">SLI / SLO / SLA / Error Budget:
+  SLI  - measurement (e.g., success rate)
+  SLO  - internal target (99.9%)
+  SLA  - contractual promise (99.5%, with credit)
+  EB   - 1 - SLO, monthly window
+  Burn rate: how fast EB is consumed
+  SLO &gt; SLA (留 buffer)
+
+Burn rate alerts (Google SRE 推荐):
+  1h  @ 14x burn → critical (page)
+  6h  @ 7x burn  → critical
+  1d  @ 3x burn  → warning
+  3d  @ 1x burn  → warning
+
+3 isolation layers:
+  L1 API Gateway: per-tenant token bucket (by tier)
   L2 App: DB pool, memory quota, WFQ
   L3 Physical: dedicated replicas for Gold
 
-SLA computation:
-  Availability % over sliding window
-  Latency p99 over window
-  Error budget monthly, alert on burn rate
+Tier 标准 (示例):
+  Gold:   99.99% / 10k QPS / dedicated / 24x7
+  Silver: 99.9%  / 1k QPS  / pooled    / business h
+  Bronze: 99%    / 100 QPS / pooled    / email
 
-Tier 标准:
-  Bronze 99.5% / 100 QPS / pooled
-  Silver 99.9% / 1k QPS / pooled
-  Gold 99.99% / 10k QPS / dedicated
+Cardinality 控制 (multi-tenant 关键):
+  Per-tenant only top-N metrics
+  Top-100 tenant full, long-tail aggregated
+  Endpoint bucketing (not raw URL)
+  Streaming aggregation (Flink pre-rollup)
+  Sampling for non-billable (1% OK)
+  Billing NEVER sampled
+  Mimir/Cortex for &gt; 10M ts
+  Datadog for $$ + low-ops
 
-Storage (cost optim):
-  Raw 7d in hot
-  1-min rollups 30-90d in warm
-  1-hour 1-year+ in cold
-  Daily 3+ years compliance
+Storage tiers:
+  Hot:  raw 7d, 1-min rollups 30d
+  Warm: 1-min 30-90d in SSD
+  Cold: 1-hour 1y, daily 3y+
+  Per-tier retention (Bronze 30d, Gold 1y)
+
+Alert routing:
+  P0 (Gold SLA) → PagerDuty 24x7
+  P1 (Silver / non-SLA Gold) → business hours
+  P2 (Bronze) → Slack
+  P3 (info) → daily digest
+  Dedup 1h per (tenant × metric)
+  Per-tier severity
+
+Customer-facing:
+  Self-serve SLO dashboard
+  Error budget remaining %
+  Usage CSV export
+  Public status page
+  60d dispute window
+  Auto-credit on SLA breach
 
 Billing:
   Separate DB from telemetry
-  Per-request audit 13 months
-  Tenant self-serve report
+  100% recorded (no sampling)
+  WORM (immutable)
+  HMAC-signed events
+  13-month retention
+  Self-serve report
   Crypto-signed invoice
-  60-day dispute window
+  Double-entry consistency check
 
-Noisy neighbor:
+Noisy neighbor protection:
   Hard ceiling even in tier
   Auto-scale on Gold burst
-  Bronze完全 isolated from Silver/Gold</code></pre>
+  Bronze完全 isolated from Silver/Gold
+  Per-tenant DB pool
+  Per-tenant memory budget
+  WFQ scheduler
+
+工具栈:
+  API Gateway:  Envoy / Kong / Cloudflare
+  Metric:       Prometheus / Mimir / Cortex / Datadog
+  Visualization: Grafana / DD dashboard
+  Alert:        Alertmanager / PagerDuty / Opsgenie
+  Streaming:    Flink / Spark Streaming / Materialize
+  Storage:      ClickHouse / TimescaleDB / Druid
+
+红线:
+  - Cardinality 失控
+  - Single shared infra
+  - 没 per-tenant rate limit
+  - Sampling for billing
+  - SLA = SLO (no buffer)
+  - 单 window burn rate alert
+  - Telemetry + billing 同 DB</code></pre>
   </section>
 
   
@@ -179,20 +854,953 @@ Noisy neighbor:
 
 > "Design **multi-tenant SaaS monitoring** with **varying client SLA requirements**. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."
 
-**出处**：fde.academy 技术 round. Databricks / Snowflake / Datadog 都问过.
+**出处**: fde.academy 技术 round. Databricks / Snowflake / Datadog / Cloudflare 都问过.
 
-**Round**：Technical Integration (45-60 min)
+**Round**: Technical Integration (45-60 min)
 
 ---
 
 ## 这道题在考什么
 
+考你做过 **multi-tenant SaaS infrastructure** 的真实痛点:
+
+1. **SLA / SLO / SLI 区分得清吗** — Error budget 怎么算
+2. **Per-tenant metrics 怎么不爆 cardinality** — 这是 monitoring 真正的难题
+3. **Tier-based 怎么 enforce** — Gold vs Bronze 怎么物理 / 逻辑区分
+4. **Alert routing per-tenant** — 不能所有 tenant 一个 channel
+5. **Customer-facing dashboard + credit** — SLA breach 要 compensate
+6. **熟不熟工具** — Prometheus / Mimir / Datadog / Grafana / Cortex / Thanos
+
+考的不是 "你知道 P99", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor 和 cardinality 爆炸".
+
+---
+
+# 这道题在考什么
+
 考你做过 **multi-tenant SaaS infrastructure**:
 
-1. **不同 SLA tier 怎么 enforce** —— Bronze vs Gold 怎么物理 / 逻辑区分
-2. **Noisy neighbor isolation** —— 大客户不能影响小客户
-3. **Billable signal** —— 哪些 metric 算 billable (latency 5xx 等)
-4. **Aggregation at scale** —— 1B+ events/day 怎么 store + query 每 tenant 不会爆
+1. **不同 SLA tier 怎么 enforce** — Bronze vs Gold 怎么物理 / 逻辑区分
+2. **Noisy neighbor isolation** — 大客户不能影响小客户
+3. **Cardinality 爆炸** — 10k tenant × 100 metric × 10 label = 10M time series
+4. **Billable signal aggregation** — 哪些 metric 算 billable, 怎么 audit
+5. **Customer-facing SLA dashboard** — 客户能自助看, 出问题能 credit
+
+---
+
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 四个术语先解释
+
+**Multi-tenant SaaS**: 一套**软件 + 基础设施**, 同时服务多个**租户** (tenant). 每个租户 (一家企业客户) 看到的像是独享, 实际上多个租户共享物理资源 (pooled) 或部分专用 (siloed) 或混合 (hybrid). 你做的 voice agent 7 markets 就是天然的 multi-tenant — 每个 market 一个 tenant.
+
+**SLA / SLO / SLI**: 三个术语 SRE 圈天天用, 经常混:
+
+- **SLI** (Service Level **Indicator**): **一个可测量的数字**. 例如: 过去 5 分钟的 successful_requests / total_requests. 是事实.
+- **SLO** (Service Level **Objective**): **内部目标**. 例如: 99.9% requests succeed. 是 aspirational target, 团队的承诺.
+- **SLA** (Service Level **Agreement**): **合同条款**. 例如: 我们保证 99.5% uptime, 不满足赔 10% 月费. 是法律约束, 跟客户签的.
+
+公式: `SLA < SLO`. 内部目标永远比对客户的承诺更严格, 留 buffer.
+
+**Error budget** (错误预算): `1 - SLO`. 比如 SLO 99.9% 意味着每月可以有 0.1% × 30d = 43 分钟 unavailable. 这 43 分钟是你的「预算」, 用完了, 就 freeze release, 优先稳定性.
+
+**Cardinality** (基数): 一个 metric 的 label 组合总数. 例如 `http_requests_total{tenant_id, endpoint, status_code, region}`, 1000 tenant × 50 endpoint × 5 status × 5 region = 1.25M unique time series. **这是 multi-tenant monitoring 的头号杀手**.
+
+**Noisy neighbor**: 一个 tenant 异常行为 (流量飙升 / 大查询 / 死循环) 把共享资源吃光, 影响其他 tenant. SaaS 经典问题.
+
+---
+
+## 2. 这个问题的核心是什么
+
+设想一个**没 isolation / 没 per-tenant quota / 没 cardinality control** 的 SaaS 灾难:
+
+```
+2026-05-21 03:00  Bronze tier 客户 acme-corp 部署了一个 buggy script
+                  对你的 API 每秒发 50k 请求 (正常 100 QPS)
+                  
+03:01  你的 API gateway 没 per-tenant rate limit, 全部通过
+03:02  Database connection pool 被 acme 吃满 (500 conn)
+03:03  Gold tier 客户 bigcorp 的关键报表 query 等不到 conn, 超时
+03:05  Bigcorp CEO 在 Twitter 发: "your SaaS is down, terrible service"
+03:10  你的 PagerDuty 一片红, 但你看 monitoring "CPU 60%, 一切正常"
+       (因为 monitoring metric 没 per-tenant breakdown, aggregate 看不到 acme spike)
+03:30  你手忙脚乱猜原因, 期间所有 tenant 都受影响
+04:00  你终于发现是 acme, 手动 ban 它 IP
+04:30  恢复. Bigcorp 取消合同. SLA 赔付一个月免单
+```
+
+**问题**:
+
+- 没 per-tenant rate limit → 1 个 noisy tenant 拖垮全场
+- 没 per-tenant metric → 看不到谁是元凶
+- 没 tiered isolation → Gold 客户和 Bronze 共享同一资源池
+- 没 SLA dashboard → 客户在 Twitter 发飙才知道
+- 没 auto-credit → 客户人工要 compensation, 关系崩
+
+**Production-grade 解法**:
+
+```
+1. API Gateway: per-tenant token bucket (按 tier QPS)
+2. App layer: per-tenant DB pool, memory quota, WFQ scheduler
+3. Physical: Gold tenant 走 dedicated replica
+4. Monitoring: per-tenant SLI, 但用 streaming aggregation 避免 cardinality 爆
+5. Alert: per-tenant routing, by severity tier
+6. Customer dashboard: 自助看 SLO compliance + error budget
+7. Auto-credit: SLA breach 自动 trigger compensation
+```
+
+---
+
+## 3. 典型架构图
+
+```
+                      ┌───────────────────────────┐
+                      │   Tenant Onboarding       │
+                      │  (tier, quota config)     │
+                      └─────────┬─────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│  API Gateway (Envoy / Kong)                                  │
+│    L1: Per-tenant token bucket rate limit (by tier)          │
+│    Authentication, tenant_id 注入 trace                       │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Application Layer                                           │
+│    L2: Per-tenant DB pool, memory quota, WFQ scheduler       │
+│    Tier-aware request routing:                               │
+│      Gold tenants  → dedicated replica set                   │
+│      Silver/Bronze → pooled replica set                      │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+        Telemetry emit per request:
+          tenant_id, tier, endpoint, status, latency_ms, ...
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Telemetry Pipeline                                          │
+│    Kafka (partition by tenant_id)                            │
+│    Flink: 1-min rollups per tenant per metric                │
+│    Sampling (head + tail biased for slow)                    │
+└─────────────────┬───────────────────────────────────────────┘
+                  ▼
+        ┌─────────────────────────────┐
+        │ TSDB / Mimir / Datadog      │
+        │  Hot:  1-min rollups, 30d   │
+        │  Warm: 1-hour rollups, 1y   │
+        │  Cold: 1-day rollups, 3y+   │
+        └─────────┬───────────────────┘
+                  ▼
+        ┌────────────────────────────────────────────────┐
+        │  Per-tenant Dashboard + SLA Computer            │
+        │  Auto-credit Logic                              │
+        │  Alert Routing (PagerDuty / Slack)              │
+        │  Billing System (separate DB!)                  │
+        └─────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. SLI / SLO / SLA / Error Budget 关系表
+
+| 概念 | 是什么 | 例子 (voice agent) | 谁负责 |
+|---|---|---|---|
+| **SLI** | 一个测量值 | "过去 5 min 通话成功率" | 系统 自动算 |
+| **SLO** | 内部目标 | "99.9% calls succeed" | SRE / Eng owner |
+| **SLA** | 对客户的承诺 | "99.5% uptime, 不达赔 10%" | 销售 / Legal |
+| **Error budget** | 允许失败的额度 | 99.9% SLO → 43 min/月可用 | 共同 |
+| **Burn rate** | 当前消耗 EB 的速率 | 1h 内消耗 10% EB = 10x burn | Alert |
+
+**经验**:
+
+- SLO 永远比 SLA 严 (留 20-50% buffer)
+- Error budget 跑完 → freeze release, 直到下个 window
+- Burn rate alert 比 SLO breach alert 更 actionable (前者预防, 后者已经晚了)
+
+---
+
+## 5. 具体业务场景
+
+### 场景 A: 你的 TikTok Voice Agent 7 markets (你工作背景)
+
+**7 markets = 7 tenants**, 不同 SLA:
+
+| Market | Tier | SLA (uptime) | Latency p99 SLO | Daily call volume |
+|---|---|---|---|---|
+| Indonesia | Gold (high revenue) | 99.95% | 200ms | 500k |
+| Vietnam | Gold | 99.95% | 200ms | 300k |
+| Thailand | Silver | 99.9% | 250ms | 100k |
+| Philippines | Silver | 99.9% | 250ms | 80k |
+| Singapore | Bronze (small market) | 99.5% | 500ms | 10k |
+| Malaysia | Bronze | 99.5% | 500ms | 8k |
+| Korea | Pilot | best-effort | best-effort | 1k |
+
+**Noisy neighbor 真实事故**:
+
+- 印尼发薪日 (15 号), 流量 burst 5x
+- 印尼用 dedicated inference replica → 不影响其他 market
+- 如果共享, 越南 Gold 客户也会受影响
+
+### 场景 B: BNPL Chatbot — 商户租户
+
+- 每个接入的电商商户 = 1 tenant
+- Top 10% 商户占 80% 流量 (长尾)
+- Gold 商户 (年 GMV > 10M USD): 独享 LLM endpoint, 99.99% SLA
+- Silver / Bronze 共享 LLM endpoint, 99.9% / 99% SLA
+- Cardinality: 1000 tenant × 20 endpoint × 5 region = 100k time series
+
+### 场景 C: Internal Agent Platform — Team 当 tenant
+
+- ByteDance 内部多个 team 用你的 Agent Platform
+- 每个 team = 1 tenant
+- 内部 SLA 不那么严, 但 cost attribution 必须准 (chargeback)
+- Billing 维度: tokens consumed, GPU-hours, storage GB-hours
+
+### 场景 D: ConvFinQA 内部用户
+
+- 每个 researcher = 1 tenant
+- "Fair share" 而不是 tiered: 没人付费, 大家公平
+- WFQ (Weighted Fair Queueing) 保证小用户不被大 batch 用户饿死
+
+### 场景 E: Cloudflare / Datadog 这种纯 SaaS
+
+- 10万+ tenant, 长尾极端
+- 头部 1% tenant 占 50% 资源
+- Bronze 占 80% tenant 但只 5% 流量
+- Cardinality 是头号挑战 — 不能为所有 tenant 维护所有 metric
+
+---
+
+## 6. 工程上要做什么 — 实现 checklist
+
+**Stage 0: Tier Definition (Week 1)**
+
+1. 定义 3 个 tier: Bronze / Silver / Gold (or 4 with Platinum)
+2. 每个 tier 写清:
+   - Promised uptime SLA
+   - Promised latency p99
+   - Rate limit (QPS)
+   - Throughput cap (req/day)
+   - Isolation level (pooled / dedicated)
+   - Support response time
+3. 价格分级, tier 升级 path 清晰
+
+**Stage 1: Isolation (Week 2-4)**
+
+4. **L1 API Gateway**: token bucket per tenant, configurable by tier
+5. **L2 App layer**: per-tenant DB connection pool, query timeout, memory quota
+6. **L3 Physical**: Gold tenants 独立 replica set (Kubernetes node taint + tolerations)
+7. WFQ scheduler 对 background job (避免 1 tenant 占满 worker pool)
+
+**Stage 2: Telemetry (Week 4-6)**
+
+8. 每个 request emit metric: tenant_id, tier, endpoint, status, latency_ms
+9. Cardinality control: per-tenant only top-N important metrics, rest aggregated
+10. Streaming aggregation (Flink / Spark Streaming): 1-min rollup per tenant
+11. Storage tier: hot 30d, warm 1y, cold 3y+ (different retention by tier)
+
+**Stage 3: SLO Computation + Alert (Week 6-8)**
+
+12. SLI calc per 5-min sliding window per tenant
+13. Error budget tracker: monthly rolling, 30-day window
+14. Burn rate alert: 多 fast / multi-window (e.g., 1h burn at 10x = page, 6h at 5x = page)
+15. Per-tenant alert routing (PagerDuty per-tenant integration / Slack channel)
+
+**Stage 4: Customer-facing + Billing (Week 8-10)**
+
+16. Customer self-serve dashboard: SLO compliance, error budget remaining, recent incidents
+17. SLA credit auto-calculation: breach → automatic credit on next invoice
+18. Billing system (separate DB!): metered usage, audit trail 13 months
+19. Dispute window (60 days), self-serve usage report (CSV export)
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **Cardinality 爆炸** | 10k tenant × 100 metric × 10 label = 10M ts → Prometheus 内存爆 |
+| 2 | **Single shared infra for all tiers** | 1 tenant 影响所有 |
+| 3 | **没 rate limit at gateway** | App 层被打爆 |
+| 4 | **Billing 跟 telemetry 同 DB** | Billing 受 telemetry retention 影响, 不能 audit |
+| 5 | **Aggregate at query time** | 慢 + 贵 |
+| 6 | **没 dispute window** | Billing 不可挑战, customer 怒 |
+| 7 | **Sampling for billing** | 计费数据**绝不能** sample |
+| 8 | **没 per-tenant DB pool** | 1 tenant 拿光 conn, 全员 stall |
+| 9 | **SLA = SLO** | 没 buffer, breach 概率高 |
+| 10 | **Burn rate alert 单 window** | 要 multi-window (fast + slow) |
+| 11 | **Tier 不可升级** | 客户成长后没自助 path |
+| 12 | **Bronze tenant 受 DDoS** | 没 anomaly detection / 自动 throttle |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **Multi-tenant SaaS monitoring + SLA = "3 层 isolation (gateway / app / physical) + per-tenant SLI 但控 cardinality + tier-based threshold + 自助 dashboard + 自动 credit + 严格 billing audit"**.
+>
+> 这道题考的不是 "你会用 Prometheus", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor + cardinality 爆炸".
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: SLA / SLO / SLI Taxonomy + Error Budget
+
+### 1.1 区分三者
+
+```python
+# SLI (Service Level Indicator) — 一个数字
+def compute_availability_sli(window_sec=300):
+    """5 分钟滑动窗口的可用性."""
+    total = metric_store.sum('requests_total', last_seconds=window_sec)
+    failed = metric_store.sum('requests_failed', last_seconds=window_sec)
+    return (total - failed) / total if total > 0 else 1.0
+
+# SLO (Service Level Objective) — 目标
+class SLO:
+    name = "api_availability"
+    target = 0.999  # 99.9%
+    window = "30d_rolling"
+
+    def check(self):
+        sli = compute_availability_sli()
+        return sli >= self.target
+
+# SLA (Service Level Agreement) — 法律
+class SLA:
+    name = "Gold tier api_availability"
+    target = 0.995  # 99.5% (lower than SLO! 留 buffer)
+    breach_credit_pct = 10  # 不达成 → 10% 月费 credit
+```
+
+### 1.2 Error Budget 计算
+
+```python
+class ErrorBudget:
+    """
+    Error budget = (1 - SLO target) × total_requests_in_window.
+    """
+    def __init__(self, slo_target=0.999, window_days=30):
+        self.target = slo_target
+        self.window_days = window_days
+
+    def total_budget(self, tenant_id):
+        total = metric_store.sum(
+            'requests_total',
+            tenant_id=tenant_id,
+            last_days=self.window_days,
+        )
+        return total * (1 - self.target)
+
+    def consumed(self, tenant_id):
+        return metric_store.sum(
+            'requests_failed',
+            tenant_id=tenant_id,
+            last_days=self.window_days,
+        )
+
+    def remaining(self, tenant_id):
+        return self.total_budget(tenant_id) - self.consumed(tenant_id)
+
+    def remaining_pct(self, tenant_id):
+        total = self.total_budget(tenant_id)
+        if total == 0:
+            return 1.0
+        return self.remaining(tenant_id) / total
+```
+
+### 1.3 Burn Rate Alerts (Multi-window Multi-burn-rate)
+
+**Google SRE book** 推荐的多窗口多 burn rate alert:
+
+```python
+# 防止 fast burn (灾难) + slow burn (温水煮青蛙) 都能 catch
+BURN_RATE_ALERTS = [
+    # (window, burn_rate_threshold, severity)
+    ('1h',  14,  'critical'),  # 1h 烧光全月 budget 的 1/14 → critical
+    ('6h',  7,   'critical'),  # 6h 烧光全月 budget 的 1/7  → critical
+    ('1d',  3,   'warning'),   # 24h 烧光全月 budget 的 1/3 → warning
+    ('3d',  1,   'warning'),   # 3d 烧光所有 budget → warning
+]
+
+def check_burn_rate(tenant_id, slo):
+    alerts = []
+    for window, threshold, sev in BURN_RATE_ALERTS:
+        sli_in_window = compute_availability_sli_for_window(tenant_id, window)
+        error_rate = 1 - sli_in_window
+        budget_burn_rate = error_rate / (1 - slo.target)
+        if budget_burn_rate > threshold:
+            alerts.append({
+                'window': window,
+                'burn_rate': budget_burn_rate,
+                'severity': sev,
+            })
+    return alerts
+```
+
+**关键直觉**:
+
+- 1h 内消耗 10x 预期 burn → 这速度 4 天烧光全月 → critical
+- 1d 内消耗 3x → 10 天烧光 → warning
+- 多窗口配合: 短窗口 catch sudden, 长窗口 catch gradual
+
+### 1.4 Per-Tier SLO
+
+```python
+TIER_SLOS = {
+    'gold': {
+        'availability': 0.9999,  # 99.99%
+        'latency_p99_ms': 200,
+        'sla_promise': 0.999,    # 比 SLO 低 0.09%
+    },
+    'silver': {
+        'availability': 0.999,
+        'latency_p99_ms': 500,
+        'sla_promise': 0.995,
+    },
+    'bronze': {
+        'availability': 0.99,
+        'latency_p99_ms': 1000,
+        'sla_promise': 0.97,
+    },
+}
+```
+
+---
+
+## ⚙️ Problem 2: Per-Tenant Metrics — Cardinality Explosion
+
+**这是 multi-tenant monitoring 的核心难题**. 不解决直接死.
+
+### 2.1 Cardinality 数学
+
+```
+Naive 设计:
+  Metric: http_requests_total
+  Labels: tenant_id, endpoint, status_code, region, method, version
+  
+  10,000 tenants × 50 endpoints × 5 status × 5 region × 6 method × 3 version
+  = 22,500,000 unique time series
+
+Prometheus 内存: 每个 ts ~3 KB
+  → 22.5M × 3 KB = 67.5 GB 内存
+  → 一个 Prometheus 进程承受不住 (典型 10M ts 极限)
+```
+
+### 2.2 Cardinality Control 策略
+
+#### (a) Label Limit (硬性)
+
+```python
+# Prometheus / Mimir / Datadog 都有这种限制
+# 配置: max_label_names_per_series = 10
+#       max_label_value_length = 256
+```
+
+#### (b) 重要 Metric Only Per-tenant
+
+```python
+# 不是所有 metric 都 per-tenant
+PER_TENANT_METRICS = [
+    'http_requests_total',  # 计费用
+    'http_request_duration_seconds',  # SLA 用
+    'http_requests_failed_total',  # SLO 用
+]
+
+# 其他 metric (内部 debug 类) — 不带 tenant_id
+INTERNAL_METRICS = [
+    'gc_duration_seconds',
+    'goroutines_count',
+    'db_connection_pool_size',
+]
+```
+
+#### (c) 头部 vs 长尾 — 不同 strategy
+
+```python
+# 头部 100 tenant: 全量 per-tenant metric
+# 长尾 9900 tenant: 聚合成 "small_tenant" bucket
+def tag_tenant_for_metric(tenant_id):
+    if tenant_id in TOP_100_TENANTS:
+        return tenant_id
+    return 'aggregated_small'
+```
+
+#### (d) Endpoint Bucket
+
+```python
+# 50 endpoint 直接用很 high cardinality, 用 bucket
+def bucket_endpoint(endpoint):
+    if endpoint.startswith('/api/v1/agent'):
+        return 'agent'
+    if endpoint.startswith('/api/v1/billing'):
+        return 'billing'
+    if endpoint.startswith('/api/v1/admin'):
+        return 'admin'
+    return 'other'
+```
+
+#### (e) Streaming Aggregation (Flink / Spark)
+
+```python
+# 不直接 push raw event 到 Prometheus
+# 用 Flink 流式聚合, 输出 pre-aggregated metric
+
+# Pseudocode for Flink job
+stream
+    .keyBy(event -> event.tenant_id + ":" + event.endpoint_bucket)
+    .window(TumblingProcessingTimeWindows.of(Time.minutes(1)))
+    .aggregate(new RequestAggregator())
+    .map(agg -> Metric.builder()
+        .name("http_requests_per_minute")
+        .label("tenant_id", agg.tenant)
+        .label("endpoint_bucket", agg.bucket)
+        .value(agg.count)
+        .build())
+    .addSink(prometheusSink)
+```
+
+**结果**: 10M raw event/min → 50k aggregated metric/min, cardinality 可控.
+
+### 2.3 Sampling for Non-billable
+
+```python
+# 计费 metric (api_calls_total) — **100% 不能 sample**
+# Debug metric (db_query_duration) — 1/100 sampling OK
+
+class SamplingStrategy:
+    BILLABLE_METRICS = {'api_calls_total', 'compute_seconds_total', 'storage_gb_hours'}
+
+    def should_record(self, metric_name):
+        if metric_name in self.BILLABLE_METRICS:
+            return True  # 永远 record
+        return random.random() < 0.01  # 1% sample
+```
+
+### 2.4 Mimir / Cortex / Thanos (Prometheus 横向扩展)
+
+```
+Single Prometheus:    上限 ~10M ts, ~500K samples/sec
+                      ↓
+Mimir / Cortex:       horizontally scalable, 跨多 instance
+                      支持 multi-tenant 隔离 (per-tenant retention, RBAC)
+                      cost: 比 Datadog 便宜很多 (self-host)
+
+Datadog (SaaS):       cardinality $-cost, $0.05/host/hr + per-metric pricing
+                      cardinality 失控 = bill 失控
+```
+
+**选型**:
+
+- < 1000 tenant, < 1M ts → single Prometheus + recording rules
+- > 1000 tenant → Mimir / Cortex
+- 大型 SaaS, 钱多 → Datadog (省运维)
+
+---
+
+## ⚙️ Problem 3: Tier-Based Monitoring (Gold / Silver / Bronze)
+
+### 3.1 Tier 定义 — 不只是价格, 是**资源 + 监控 + alert**
+
+```yaml
+tiers:
+  gold:
+    isolation: dedicated_replica
+    rate_limit: 10000 qps
+    burst: 20000 qps for 60s
+    db_pool: 500 connections
+    sla_uptime: 0.9995
+    sla_latency_p99_ms: 200
+    monitor_sample_rate: 1.0   # 100% telemetry
+    alert_routing: pagerduty_oncall_24x7
+    support_response: 15min
+    storage_retention: 1y_hot
+
+  silver:
+    isolation: pooled (priority class A)
+    rate_limit: 1000 qps
+    burst: 2000 qps for 60s
+    db_pool: 50 connections
+    sla_uptime: 0.999
+    sla_latency_p99_ms: 500
+    monitor_sample_rate: 0.5   # 50% telemetry
+    alert_routing: slack_business_hours
+    support_response: 1h
+    storage_retention: 90d_warm
+
+  bronze:
+    isolation: pooled (priority class B)
+    rate_limit: 100 qps
+    burst: 200 qps for 60s
+    db_pool: 5 connections
+    sla_uptime: 0.99
+    sla_latency_p99_ms: 1000
+    monitor_sample_rate: 0.1   # 10% telemetry
+    alert_routing: email_daily_digest
+    support_response: 24h
+    storage_retention: 30d_cold
+```
+
+### 3.2 Physical Isolation for Gold
+
+```python
+# Kubernetes: Gold pods 走专用 node pool
+# 用 taints + tolerations 强制隔离
+
+# Node pool config (Terraform / GKE)
+resource "google_container_node_pool" "gold" {
+  name       = "gold-tier-pool"
+  node_count = 5
+
+  node_config {
+    taint {
+      key    = "tier"
+      value  = "gold"
+      effect = "NO_SCHEDULE"
+    }
+    labels = {
+      tier = "gold"
+    }
+  }
+}
+
+# Pod spec
+spec:
+  tolerations:
+  - key: "tier"
+    operator: "Equal"
+    value: "gold"
+    effect: "NoSchedule"
+  nodeSelector:
+    tier: "gold"
+```
+
+**好处**:
+
+- Gold 流量永远不和 Bronze 共享 node
+- Gold 可以用更好的硬件 (GPU / 高 IO)
+- Auto-scale Gold pool 独立, 不被 Bronze 流量 burst 影响
+
+### 3.3 Pooled with Priority Class
+
+Silver / Bronze 共享 pool, 但有优先级:
+
+```python
+class PriorityScheduler:
+    """Silver 优先于 Bronze 在 pooled infra."""
+
+    def __init__(self):
+        self.queues = {
+            'silver': PriorityQueue(),
+            'bronze': PriorityQueue(),
+        }
+
+    def enqueue(self, request):
+        tier = get_tenant_tier(request.tenant_id)
+        self.queues[tier].put(request)
+
+    def dequeue(self):
+        # WFQ: Silver 80% slot, Bronze 20%
+        if random.random() < 0.8 and not self.queues['silver'].empty():
+            return self.queues['silver'].get()
+        if not self.queues['bronze'].empty():
+            return self.queues['bronze'].get()
+        return self.queues['silver'].get()  # fallback
+```
+
+### 3.4 Per-Tier Threshold
+
+```python
+# 同一 metric 不同 tier 不同 threshold
+LATENCY_P99_THRESHOLD = {
+    'gold': 200,    # ms
+    'silver': 500,
+    'bronze': 1000,
+}
+
+def check_latency_slo(tenant_id):
+    tier = get_tenant_tier(tenant_id)
+    p99 = metric_store.percentile(99, 'latency_ms', tenant_id=tenant_id)
+    threshold = LATENCY_P99_THRESHOLD[tier]
+    if p99 > threshold:
+        alert(f"Tenant {tenant_id} ({tier}) p99 {p99}ms > threshold {threshold}ms")
+```
+
+---
+
+## ⚙️ Problem 4: Alerting — Per-Tenant vs Aggregate, Routing, Severity
+
+### 4.1 Three Alert Strategies
+
+```
+1. Aggregate alerts (整体异常):
+   "P99 latency on all api endpoints > 1s"
+   → SRE on-call
+
+2. Per-tier alerts (某 tier 整体异常):
+   "Gold tier error rate > 0.1%"
+   → SRE + Gold customer success team
+
+3. Per-tenant alerts (具体 tenant):
+   "Tenant acme-corp error rate > 5%"
+   → tenant's account manager + tech lead
+```
+
+### 4.2 Severity Tier
+
+```python
+class AlertSeverity:
+    P0 = 'critical'      # page 24x7
+    P1 = 'high'          # page business hours
+    P2 = 'medium'        # slack
+    P3 = 'low'           # email daily digest
+
+def determine_severity(alert):
+    tier = alert.tenant_tier
+    metric = alert.metric
+
+    # Gold tenant: 任何 SLA breach 都 P0
+    if tier == 'gold' and metric in SLA_METRICS:
+        return AlertSeverity.P0
+
+    # Silver: SLA breach P1, internal P2
+    if tier == 'silver':
+        return AlertSeverity.P1 if metric in SLA_METRICS else AlertSeverity.P2
+
+    # Bronze: 基本不 page
+    if tier == 'bronze':
+        return AlertSeverity.P2 if metric in SLA_METRICS else AlertSeverity.P3
+
+    return AlertSeverity.P2
+```
+
+### 4.3 Routing Rules
+
+```yaml
+routing_rules:
+  - match: {severity: P0, tier: gold}
+    route: pagerduty/oncall_engineer + pagerduty/gold_csm
+    escalate_after: 15min
+
+  - match: {severity: P1, tier: silver}
+    route: pagerduty/oncall_engineer (business hours only)
+    escalate_after: 1h
+    fallback_route: slack/#silver-incidents
+
+  - match: {severity: P2}
+    route: slack/#tenant-alerts
+    
+  - match: {severity: P3}
+    route: email/daily-digest@example.com
+```
+
+### 4.4 Dedup + Suppression
+
+```python
+class TenantAlertManager:
+    """
+    Per-tenant 范围内 dedup.
+    同一 tenant + 同一 metric + 1h 窗口只 fire 一次.
+    """
+    def __init__(self):
+        self.recent = {}  # (tenant_id, metric) → last_fire_ts
+
+    def fire_or_suppress(self, alert):
+        key = (alert.tenant_id, alert.metric_name)
+        last = self.recent.get(key, 0)
+        if time.time() - last < 3600:
+            # 1h dedup window, 累计 count
+            self._increment_count(key)
+            return False
+        self.recent[key] = time.time()
+        return True
+```
+
+### 4.5 Alert Quality — Quarterly Tune
+
+```python
+# 看每个 alert 类型的 actionability
+def alert_quality_report(quarter):
+    report = {}
+    for alert_type in alert_types:
+        ats = db.get_alerts(quarter, type=alert_type)
+        resolved_real = sum(1 for a in ats if a.outcome == 'real_issue_fixed')
+        false_positive = sum(1 for a in ats if a.outcome == 'auto_resolved')
+        precision = resolved_real / len(ats) if ats else 0
+        report[alert_type] = {
+            'fired_count': len(ats),
+            'precision': precision,
+            'avg_mttr_min': sum(a.mttr_min for a in ats) / len(ats),
+        }
+    return report
+```
+
+---
+
+## ⚙️ Problem 5: Customer-Facing SLA Dashboard + Credit Logic
+
+### 5.1 Customer Self-serve Dashboard
+
+```python
+class CustomerDashboard:
+    """每个客户能看自己的 SLA / 用量."""
+
+    def render(self, tenant_id):
+        return {
+            'current_month': {
+                'uptime': self.compute_uptime(tenant_id, 'this_month'),
+                'sla_target': self.get_sla(tenant_id).uptime,
+                'sla_met': self.compute_uptime(tenant_id, 'this_month') >= self.get_sla(tenant_id).uptime,
+                'error_budget_remaining_pct': self.error_budget(tenant_id).remaining_pct(),
+                'incidents': self.list_incidents(tenant_id, 'this_month'),
+            },
+            'usage': {
+                'api_calls': self.usage_count(tenant_id, 'api_calls'),
+                'compute_seconds': self.usage_count(tenant_id, 'compute_seconds'),
+                'storage_gb_hours': self.usage_count(tenant_id, 'storage_gb_hours'),
+                'rate_limit_hits': self.count_429s(tenant_id),
+            },
+            'recommendations': self.recommendations(tenant_id),  # tier upgrade等
+            'next_invoice_estimate': self.estimate_bill(tenant_id),
+        }
+```
+
+### 5.2 Auto-credit on SLA Breach
+
+```python
+class SLACreditEngine:
+    """SLA breach → 自动算 credit."""
+
+    def __init__(self, db):
+        self.db = db
+
+    def compute_credit(self, tenant_id, month):
+        sla = self.db.get_sla(tenant_id)
+        actual_uptime = self.compute_uptime(tenant_id, month)
+
+        if actual_uptime >= sla.uptime:
+            return 0  # 没 breach, 没 credit
+
+        # 标准 credit ladder (典型 SaaS)
+        gap = sla.uptime - actual_uptime
+        if gap < 0.0001:    # 99.9% → 99.89%
+            credit_pct = 0.10  # 10% off
+        elif gap < 0.001:   # 99.9% → 99.8%
+            credit_pct = 0.25
+        elif gap < 0.01:    # 99.9% → 98.9%
+            credit_pct = 0.50
+        else:
+            credit_pct = 1.0   # 100% credit (基本免费)
+
+        monthly_bill = self.estimate_bill(tenant_id, month)
+        return monthly_bill * credit_pct
+
+    def issue_credit(self, tenant_id, month):
+        credit = self.compute_credit(tenant_id, month)
+        if credit > 0:
+            self.db.create_credit_note(
+                tenant_id=tenant_id,
+                amount=credit,
+                reason=f"SLA breach in {month}",
+                applies_to_invoice='next',
+            )
+            self.notify_customer(tenant_id, credit)
+```
+
+### 5.3 Billing Audit Trail
+
+**Billing 必须独立 DB, 高 retention, 不可改**:
+
+```python
+class BillingDB:
+    """
+    Billing 存储要求:
+      1. 独立于 telemetry DB (telemetry 7d 保留, billing 13 months)
+      2. 不能 sample (every event recorded)
+      3. 写入后不可修改 (append-only / WORM)
+      4. 加密 + 签名 (防篡改)
+      5. 跟 telemetry double-entry bookkeeping (可对账)
+    """
+
+    def record_billable_event(self, event):
+        # 写入前 sign
+        event.signature = hmac_sign(event, secret=BILLING_KEY)
+        # WORM table
+        self.db.insert_immutable('billable_events', event)
+        # 审计 log
+        audit.log({
+            'action': 'billable_event_recorded',
+            'event_id': event.id,
+            'tenant_id': event.tenant_id,
+            'amount': event.amount,
+            'ts': now(),
+        })
+```
+
+### 5.4 Dispute Window + Self-serve Report
+
+```python
+def export_usage_report(tenant_id, start_date, end_date, format='csv'):
+    """客户自助导出 usage report 用于对账."""
+    events = billing_db.query(
+        tenant_id=tenant_id,
+        start=start_date,
+        end=end_date,
+    )
+    if format == 'csv':
+        return to_csv(events, columns=['ts', 'event_id', 'metric', 'value', 'request_id'])
+    if format == 'json':
+        return to_json(events)
+
+def file_dispute(tenant_id, invoice_id, reason, evidence):
+    """客户提 dispute (60d window)."""
+    invoice = db.get_invoice(invoice_id)
+    if (now() - invoice.issued_at).days > 60:
+        return {'error': 'Outside 60-day dispute window'}
+
+    db.create_dispute(
+        tenant_id=tenant_id,
+        invoice_id=invoice_id,
+        reason=reason,
+        evidence=evidence,
+        status='pending_review',
+    )
+    notify_billing_team(invoice_id)
+    return {'ok': True, 'dispute_id': ...}
+```
+
+### 5.5 Public Status Page
+
+```python
+# 跟客户透明 — 比客户先发现自己的 incident
+# 用 statuspage.io / 自建
+
+@app.route('/status')
+def public_status():
+    return {
+        'overall': overall_health(),
+        'services': {
+            'api': service_health('api'),
+            'inference': service_health('inference'),
+            'webhooks': service_health('webhooks'),
+        },
+        'incidents': list_active_incidents(),
+        'recent_incidents': list_incidents(last_days=30),
+        'sla_history': sla_compliance_history(months=12),
+    }
+```
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+这 5 个问题是**同一件事的不同 layer**:
+
+1. **SLI / SLO / SLA / Error Budget** = 「**度量框架**」 — 你怎么定义"好坏"
+2. **Per-tenant metrics + cardinality control** = 「**测量工具**」 — 你怎么测出 1 万 tenant 的"好坏"
+3. **Tier-based isolation** = 「**资源分配**」 — 你怎么让不同 tier 的"好坏"目标可达
+4. **Alert routing + severity** = 「**信号过滤**」 — 测出 "坏" 时怎么找对人
+5. **Customer-facing + credit** = 「**对客户兑现**」 — 真的 "坏" 时怎么 honor 承诺
+
+面试场或架构评审上, 能从这 5 层系统讲清楚, 就是**做过大型 SaaS infra 的水准**. 如果只会答 "我用 Prometheus + Grafana", 那是初级.
 
 ---
 
@@ -200,23 +1808,27 @@ Noisy neighbor:
 
 **1. SLA tiers**
 
-> "How many tiers — Bronze/Silver/Gold? What does each promise (availability %, latency p99, throughput)?"
+> "How many tiers — Bronze/Silver/Gold? What does each promise (availability %, latency p99, throughput, support response)?"
 
 **2. Tenant count + size distribution**
 
-> "100 tenants or 100k? Long-tail (5 huge, many tiny) or evenly distributed?"
+> "100 tenants or 100k? Long-tail (5 huge, many tiny) or evenly distributed? Top 10% = X% traffic?"
 
 **3. Multi-tenancy model**
 
-> "Pooled (shared infra) or siloed (dedicated)? Hybrid common — small tenants share, large dedicated?"
+> "Pooled (shared infra) or siloed (dedicated)? Hybrid common — small tenants share, large dedicated? Acceptable cross-tier bleed?"
 
 **4. Billing granularity**
 
-> "Per-API-call billing? Per-resource-hour? Tiered subscription with overage?"
+> "Per-API-call billing? Per-resource-hour? Tiered subscription with overage? Determines whether sampling is OK."
 
 **5. Existing observability**
 
-> "Are we building on Datadog / Prometheus + Grafana? Or greenfield?"
+> "Are we building on Datadog / Prometheus + Grafana / Mimir? Or greenfield? Cost ceiling for telemetry?"
+
+**6. Customer expectations**
+
+> "Do customers expect self-serve dashboard + credit auto-issue? Or manual ticket-based? Determines product surface."
 
 ---
 
@@ -224,168 +1836,111 @@ Noisy neighbor:
 
 | 时长 | 阶段 |
 |---|---|
-| 0-5 min | Clarify tier model + size dist + multi-tenancy model |
-| 5-20 min | **Storage + ingestion** architecture (Kafka/TSDB sharded by tenant) |
-| 20-30 min | **Noisy neighbor isolation** (quota + WFQ + tiered placement) |
-| 30-40 min | **SLA computation** + per-tenant alert |
-| 40-50 min | Billable signal aggregation + audit |
-| 50-60 min | Failure modes + onboarding |
-
----
-
-## 我会这样答（sample monologue）
-
-> "Clarify — *[假设：3 tiers (Bronze 99.5%, Silver 99.9%, Gold 99.99%), 10k tenants long-tail (top 100 = 80% traffic), pooled with dedicated for Gold, per-API-call billing + overage]*.
->
-> **High-level architecture**:
->
-> ```
-> Tenant requests → API Gateway (auth + rate limit per tenant)
->                         ↓
->                  App Layer (multi-tenant DB queries, etc.)
->                         ↓
->                  Telemetry emit (every request: tenant_id, latency, status)
->                         ↓
->                  Kafka (partition by tenant_id)
->                         ↓
->                  Stream Processor (Flink): per-tenant 1-min rollups
->                         ↓
->                  TSDB (sharded by tenant_id)
->                         ↓
->                  Per-tenant dashboard + SLA computer + alerts + billing
-> ```
->
-> **Storage**: ClickHouse with `(tenant_id, timestamp)` primary key. Per-tenant query naturally hits 1 shard.
->
-> **Noisy-neighbor isolation**: 3 layers
->
-> **L1: Rate limit at API Gateway**
-> - Token bucket per tenant: Bronze 100 QPS, Silver 1000, Gold 10000 (configurable)
-> - Burst allowance: 2x for 60s
-> - Beyond → 429 with `Retry-After`
->
-> **L2: Resource quota at app layer**
-> - Per-tenant DB connection pool max (Bronze 5, Silver 50, Gold 500)
-> - Per-tenant memory budget for query result sets
-> - Background worker pool fair-share (WFQ — Weighted Fair Queueing)
->
-> **L3: Physical isolation for Gold**
-> - Gold tenants run on dedicated replica set
-> - Bronze/Silver share pooled infra
-> - **Tier upgrade**: deploy fresh dedicated infra in N minutes, drain pooled traffic
->
-> **SLA computation**:
->
-> Per-tenant SLOs:
-> - Availability = (successful_requests / total_requests) over 5min sliding window
-> - Latency p99 over 5min window
-> - **Error budget**: monthly, draws down on each 5xx / breach
->
-> Daily SLO digest auto-sent to customer + their account manager.
-> Real-time alerts when error budget burn rate > N% per hour.
->
-> **Billable signal aggregation**:
->
-> Bill components:
-> - API calls (counter)
-> - Storage GB-hours (gauge)
-> - Compute milliseconds (counter)
->
-> Stream processor outputs:
-> ```
-> {
->   tenant_id, hour, total_calls, total_4xx, total_5xx,
->   storage_gb_hours, compute_ms, sla_minutes_breached
-> }
-> ```
-> Persist hourly aggregates in **billing DB** (separate from telemetry DB).
-> Monthly rollup → invoice.
->
-> **Audit**: every billable event has provenance (request ID + tenant + timestamp).
-> Tenant can self-serve **usage report** + **dispute window** (60 days).
->
-> **Failure modes**:
-> - **Quota exhaustion under burst**: gold burst can starve silver if shared pool. Mitigate: separate gold pool.
-> - **Telemetry pipeline lag** at peak: degrade to **sampled telemetry** (1/10) to keep up
-> - **Misattribution**: shared services (rate limiter itself) — attribute by tenant_id in trace
-> - **DDoS via legit tier**: high-tier customer compromise → flood. Per-tenant max QPS hard ceiling even within tier.
->
-> **Onboarding new tenant**: provisioning script creates per-tenant quota config + dashboard + alerting rules. <10 min.
->
-> **Cost optimization for telemetry**:
-> - 1-minute rollups for hot store (30 days)
-> - 1-hour rollups for warm (1 year)
-> - Daily rollups for cold (3+ years)
-> - Saves 90%+ storage cost on long tail"
+| 0-5 min | Clarify tier model + size dist + existing tools |
+| 5-15 min | SLI/SLO/SLA + error budget + burn rate alerting |
+| 15-25 min | Per-tenant metrics + cardinality control + storage tiers |
+| 25-35 min | Tier-based isolation (gateway + app + physical) |
+| 35-45 min | Alert routing + per-tier severity + dedup |
+| 45-55 min | Customer dashboard + credit logic + billing audit |
+| 55-60 min | Failure modes + onboarding + cost optimization |
 
 ---
 
 ## 简历专属 reframe
 
-你的 **voice agent 7 markets** 是天然 multi-tenant：
+你的 **voice agent 7 markets** + **BNPL chatbot multi-tenant** 都是天然 SaaS:
 
 | 题 | 你的经验 |
 |---|---|
 | Per-tenant SLA tiers | 7 markets 不同 latency / accuracy SLA |
-| Noisy neighbor isolation | Indonesia 流量 burst 不影响 Thailand |
+| Noisy neighbor isolation | Indonesia payday burst 不影响 Thailand |
 | Token bucket rate limit | API gateway 自然有 |
 | Per-tenant dashboard | 你 weekly 跟 regional ops review |
-| Billing signal | ByteDance 内部 chargeback 通常按 region |
+| Billing signal | ByteDance 内部 chargeback 按 region |
+| Cardinality control | Voice agent metric per market — top markets full, long-tail aggregate |
+| Burn rate alert | Voice agent on-call multi-window |
+| Auto-credit | Indonesia SLA breach → adjust commission |
+| Tier upgrade path | Bronze → Silver 怎么提升 |
 
-**主动说**：
+**主动 quote**:
 
-> "We treated 7 markets as 7 tenants in our voice agent. Each had a different SLA — Indonesia high-volume tolerance for 200ms, Thailand stricter at 150ms. We isolated via **per-market Kafka partitions + dedicated inference replicas for the top-3 markets**. Indonesia burst once during a payday spike — 5x normal traffic. **Because the top-3 were dedicated, Thailand and Korea were unaffected**. That isolation was worth its hardware cost."
+> "We treated 7 markets as 7 tenants in our voice agent. Each had a different SLA — Indonesia high-volume tolerance for 200ms p99, Thailand stricter at 150ms because of stricter compliance regime. We isolated via **per-market Kafka partitions + dedicated inference replicas for top-3 markets**. Indonesia had a payday burst event — 5x normal traffic. **Because top-3 were dedicated, Thailand and Korea were unaffected**. That isolation cost extra hardware but saved us a major SLA breach across 6 other markets. The lesson I'd transfer: **tier-based physical isolation is worth its hardware cost** when you have any sufficiently high-value tenant — it's insurance, not luxury. We also instituted **per-market burn rate alerts (1h, 6h, 1d, 3d windows)** — caught a slow degradation in Vietnam that gradient-shifted over 48h and would have missed a simple aggregate alert."
 
 ---
 
 ## 5 follow-ups
 
 **Q1**: "Gold tenant suddenly spikes 20x, burns through capacity. What now?"
-**A**: Tier-protected:
-- Hard ceiling per tenant even in tier (e.g., 100k QPS max regardless of Gold)
-- Auto-scale dedicated infra (+20% capacity for 1h)
-- Customer-facing alert: "you're approaching capacity, do you need a tier upgrade?"
-- Bill overage 1.5x normal rate (motivation to upgrade)
+
+**A**: Tier-protected response:
+- **Hard ceiling** per tenant even within tier (e.g., 100k QPS max regardless of Gold)
+- **Auto-scale dedicated infra** (+20% capacity for 1h)
+- **Customer-facing alert**: "you're approaching capacity, do you need a tier upgrade?"
+- **Bill overage 1.5x normal rate** (motivation to upgrade properly)
+- If sustained for > 4h: emergency capacity review, possibly negotiate dedicated cluster
 
 **Q2**: "Bronze tenant DDoS attempt — how protect Silver/Gold?"
+
 **A**:
-- Pooled Bronze infra completely separate physical from Silver/Gold
-- Cross-tier blast radius zero by design
+- Pooled Bronze infra **completely separate physical** from Silver/Gold
+- Cross-tier blast radius **zero by design**
 - Automated anomaly detection on Bronze: 100x normal → temporary throttle + alert customer
+- WAF rules on Bronze tier IP ranges (if applicable)
+- If proven malicious: terminate tenant per ToS
 
 **Q3**: "1B events/day storage cost — how reduce?"
+
 **A**:
-- 90% to cold tier after 30 days (1/30 the cost)
-- **Aggregate-first storage**: raw events for 7d, 1-min rollups for 90d, 1-hour for year+
-- **Sampling** for non-critical metrics (debug traces)
-- **Per-tenant retention** (Bronze 30d, Gold 1y)
+- **Tiered storage**: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in S3
+- **Aggregate-first**: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y
+- **Sampling** for non-critical metrics (debug traces 1/100), but **never for billing**
+- **Per-tenant retention**: Bronze 30d, Silver 90d, Gold 1y
+- **Compression**: Prometheus block compression / Mimir blocks → 10x storage saving
 
 **Q4**: "Customer disputes a billing line. How do we prove?"
+
 **A**:
-- **Per-request audit log** retained 13 months (1 year + buffer)
-- Tenant can self-serve usage report (CSV download)
-- Dispute window 60 days
-- **Cryptographic signature** on monthly invoice (tamper-proof)
-- Internal "billing replay" tool: ops can reconstruct billing from raw logs
+- **Per-request audit log** retained 13 months (1 year + buffer for legal)
+- Tenant can **self-serve usage report** (CSV download)
+- Dispute window **60 days**
+- **Cryptographic signature** on monthly invoice (tamper-proof, HMAC)
+- Internal "**billing replay**" tool: ops can reconstruct billing from raw logs to verify
+- Match against telemetry DB (double-entry bookkeeping consistency)
 
 **Q5**: "Multi-region deployment. SLA computed in which region?"
+
 **A**:
-- SLO **per region** (each region has its own availability score)
-- Customer sees **per-region** dashboard
-- Overall SLA = min(regions used) OR weighted by traffic distribution (negotiated)
-- Cross-region failover may pause SLO computation briefly (5-10 min)
+- **SLO per region** (each region has own availability score)
+- Customer sees **per-region dashboard**
+- Overall SLA = `min(regions used)` OR `weighted by traffic distribution` (negotiated)
+- Cross-region **failover** may pause SLO computation briefly (5-10 min)
+- Multi-region active-active 是 "max" available, active-passive 是 region 1 own
+
+**Q6**: "How do you handle latency SLA across global users when our service is in Singapore only?"
+
+**A**:
+- **Be honest in SLA**: "p99 < 200ms from APAC region, < 500ms from EU/US"
+- Or **regional deployment**: spin up EU/US replica (cost ↑)
+- Or **CDN-front for cacheable**: latency-sensitive read-only endpoints on CDN
+- **Per-region SLI**: 不是单个 SLA 数字, 而是 per-customer-region 算
+- 给客户透明的 latency map dashboard
 
 ---
 
 ## ❌ 易错点
 
-1. **Single shared infra** for all tiers — no isolation
-2. **没 rate limit at gateway** — app layer overloaded
-3. **没 quota per-tenant DB connections** — single tenant 杀全 DB
-4. **Billing 跟 telemetry 同 DB** — billing 精度受 telemetry retention 影响
-5. **Aggregate at query time** — query 慢 + 贵
-6. **没 dispute window / audit** — billing 不可挑战, customer 怒
-7. **Sampling for everything** — billing 数据不能 sample
+1. **Cardinality 失控** — 10k tenant × 100 metric × 10 label
+2. **Single shared infra for all tiers** — no isolation
+3. **没 rate limit at gateway** — app 层被打爆
+4. **没 quota per-tenant DB connections** — 1 tenant 杀全 DB
+5. **Billing 跟 telemetry 同 DB** — billing 受 telemetry retention 影响
+6. **Aggregate at query time** — query 慢 + 贵
+7. **没 dispute window / audit** — billing 不可挑战, customer 怒
+8. **Sampling for billing** — billing 数据**绝不能** sample
+9. **SLA = SLO** (没 buffer) — breach 概率高
+10. **Burn rate alert 单 window** — 要 multi-window
+11. **Tier 不可升级** — 客户成长后没 path
+12. **Bronze 受 DDoS 没 protect** — anomaly detection 缺失
 
 ---
 
@@ -393,50 +1948,121 @@ Noisy neighbor:
 
 1. **3-layer isolation** (gateway / app / physical)
 2. **Tier-based dedicated infra** for Gold
-3. **Error budget burn rate** alerts (modern SRE)
+3. **Multi-window burn rate alerts** (modern SRE)
 4. **Aggregate-first storage** (rollups > raw)
 5. **Billing 独立 DB** + cryptographic invoice
 6. **Per-region SLO** computation
-7. **Hard ceiling even in tier** anti-DDoS
-8. **Tenant self-serve usage report**
+7. **Hard ceiling even within tier** (anti-DDoS)
+8. **Tenant self-serve usage report** (60d dispute)
+9. **Cardinality control** (top-N + bucket + sampling)
+10. **Auto-credit on SLA breach** (no manual asking)
+11. **Streaming aggregation** (Flink for pre-rollup)
+12. **Public status page** (transparency)
+13. **Per-tenant alert routing** (not just one channel)
 
 ---
 
-## Cheat Sheet
+## 一句话总结
+
+> **Multi-tenant SaaS monitoring + SLA = "3 层 isolation (gateway / app / physical) + per-tenant SLI 但严控 cardinality + tier-based threshold + multi-window burn rate alert + 自助 dashboard + 自动 credit + 严格 billing audit"**.
+>
+> 这道题考的不是 "你会用 Prometheus", 是 "你跑过 10k+ tenant 的 SaaS, 处理过 noisy neighbor + cardinality 爆炸 + customer-facing SLA disputes".
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
+SLI / SLO / SLA / Error Budget:
+  SLI  - measurement (e.g., success rate)
+  SLO  - internal target (99.9%)
+  SLA  - contractual promise (99.5%, with credit)
+  EB   - 1 - SLO, monthly window
+  Burn rate: how fast EB is consumed
+  SLO > SLA (留 buffer)
+
+Burn rate alerts (Google SRE 推荐):
+  1h  @ 14x burn → critical (page)
+  6h  @ 7x burn  → critical
+  1d  @ 3x burn  → warning
+  3d  @ 1x burn  → warning
+
 3 isolation layers:
-  L1 API Gateway: token bucket per tenant by tier
+  L1 API Gateway: per-tenant token bucket (by tier)
   L2 App: DB pool, memory quota, WFQ
   L3 Physical: dedicated replicas for Gold
 
-SLA computation:
-  Availability % over sliding window
-  Latency p99 over window
-  Error budget monthly, alert on burn rate
+Tier 标准 (示例):
+  Gold:   99.99% / 10k QPS / dedicated / 24x7
+  Silver: 99.9%  / 1k QPS  / pooled    / business h
+  Bronze: 99%    / 100 QPS / pooled    / email
 
-Tier 标准:
-  Bronze 99.5% / 100 QPS / pooled
-  Silver 99.9% / 1k QPS / pooled
-  Gold 99.99% / 10k QPS / dedicated
+Cardinality 控制 (multi-tenant 关键):
+  Per-tenant only top-N metrics
+  Top-100 tenant full, long-tail aggregated
+  Endpoint bucketing (not raw URL)
+  Streaming aggregation (Flink pre-rollup)
+  Sampling for non-billable (1% OK)
+  Billing NEVER sampled
+  Mimir/Cortex for > 10M ts
+  Datadog for $$ + low-ops
 
-Storage (cost optim):
-  Raw 7d in hot
-  1-min rollups 30-90d in warm
-  1-hour 1-year+ in cold
-  Daily 3+ years compliance
+Storage tiers:
+  Hot:  raw 7d, 1-min rollups 30d
+  Warm: 1-min 30-90d in SSD
+  Cold: 1-hour 1y, daily 3y+
+  Per-tier retention (Bronze 30d, Gold 1y)
+
+Alert routing:
+  P0 (Gold SLA) → PagerDuty 24x7
+  P1 (Silver / non-SLA Gold) → business hours
+  P2 (Bronze) → Slack
+  P3 (info) → daily digest
+  Dedup 1h per (tenant × metric)
+  Per-tier severity
+
+Customer-facing:
+  Self-serve SLO dashboard
+  Error budget remaining %
+  Usage CSV export
+  Public status page
+  60d dispute window
+  Auto-credit on SLA breach
 
 Billing:
   Separate DB from telemetry
-  Per-request audit 13 months
-  Tenant self-serve report
+  100% recorded (no sampling)
+  WORM (immutable)
+  HMAC-signed events
+  13-month retention
+  Self-serve report
   Crypto-signed invoice
-  60-day dispute window
+  Double-entry consistency check
 
-Noisy neighbor:
+Noisy neighbor protection:
   Hard ceiling even in tier
   Auto-scale on Gold burst
   Bronze完全 isolated from Silver/Gold
+  Per-tenant DB pool
+  Per-tenant memory budget
+  WFQ scheduler
+
+工具栈:
+  API Gateway:  Envoy / Kong / Cloudflare
+  Metric:       Prometheus / Mimir / Cortex / Datadog
+  Visualization: Grafana / DD dashboard
+  Alert:        Alertmanager / PagerDuty / Opsgenie
+  Streaming:    Flink / Spark Streaming / Materialize
+  Storage:      ClickHouse / TimescaleDB / Druid
+
+红线:
+  - Cardinality 失控
+  - Single shared infra
+  - 没 per-tenant rate limit
+  - Sampling for billing
+  - SLA = SLO (no buffer)
+  - 单 window burn rate alert
+  - Telemetry + billing 同 DB
 ```
 </script>
 <script>
