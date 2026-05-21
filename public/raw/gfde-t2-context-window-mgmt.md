@@ -44,7 +44,7 @@
 
 **5. Cost budget**
 
-> "Per-call cost matters? 128K × $0.003 = $0.40 per call adds up."
+> "Per-call cost matters? 128K context × $2/1M (Gemini 3 Pro) = $0.26 per call adds up — 100 turn 累积 $26."
 
 ---
 
@@ -312,13 +312,13 @@
 **Q1**: "Summary quality is critical. How tune?"
 **A**:
 - **Structured summary** template: 'Decisions / Files modified / Open TODOs / User preferences'
-- **Cheaper LLM for summary** (gpt-4o-mini): summary doesn't need top quality
+- **Cheaper LLM for summary** (Gemini 3 Flash $0.50/$3 per 1M): summary doesn't need flagship quality
 - **Test recall**: occasional probe 'what did we decide about X' → if model misses, summary improved
 - **Versioned summaries**: keep both old + new during transition, prefer new if no info lost
 
 **Q2**: "1M context models exist now (Gemini 1.5, Claude 3.7). Just use them?"
 **A**:
-- **Cost still matters**: 1M tokens × $0.003 = $3 per call
+- **Cost still matters**: 1M tokens × $4/1M (Gemini 3 Pro >200K tier) = $4 per call
 - **Latency**: 1M context attention has higher per-call latency
 - **Lost-in-middle still real**: even with 1M, middle gets worse attention
 - **Use 1M for**: cold-start (load 1 huge doc), not for accumulating 50-turn agent state
@@ -326,8 +326,9 @@
 
 **Q3**: "Cost per session — what's economic?"
 **A**: Depends. Rule of thumb:
-- $0.05-0.20 per chat turn: acceptable for consumer
-- $1-5 per agent task: acceptable for B2B / dev tool
+- $0.01-0.05 per chat turn (Gemini 3 Flash): consumer-acceptable
+- $0.10-0.30 per turn (Gemini 3 Pro): B2B / pro
+- $1-5 per agent task (mixed flagship): dev tool / enterprise
 - Higher → must optimize via compaction + cheaper models on summarize
 
 **Q4**: "User says 'pick up where we left off' from yesterday's session. Practical?"
@@ -410,10 +411,11 @@ Lost-in-middle mitigation:
   Periodic 'key decisions' bullet
   Avoid burying in middle
 
-Cost economics:
-  $0.05-0.20/turn: consumer chat
-  $1-5/task: B2B agent
-  Use cheaper LLM for summarization
+Cost economics (2026 pricing):
+  $0.003-0.01/turn: consumer chat (Gemini 3 Flash)
+  $0.05-0.20/turn: B2B chat (Gemini 3 Pro)
+  $0.50-3/task: agent task (mixed Pro + Opus flagship)
+  Use Gemini 3 Flash / Claude Haiku 4.5 for summarization
 
 Observability:
   Per-turn token count

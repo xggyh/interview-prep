@@ -236,8 +236,8 @@
 **关键差异**: 限流时间 > 用户 latency budget。
 
 **解法**:
-- **Multi-vendor failover**: GPT-4 限流 → 立即试 Claude / Gemini
-- **降级到更小 model**: gpt-4 → gpt-4o-mini (10x rate limit)
+- **Multi-vendor failover**: Gemini 3 Pro 限流 → 立即试 Claude Sonnet 4.6 / GPT-5.4
+- **降级到更小 model**: Gemini 3 Pro → Gemini 3 Flash (4x rate limit, 4x 便宜)
 - **告诉用户排队**: "high traffic, position 12 of 50" — 非 chat 场景可接受
 - **预测性 throttle**: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical
 - **Cache hit**: 限流期间 cache hit rate 拉满，semantic cache 降阈值

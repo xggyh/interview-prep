@@ -77,7 +77,7 @@
 <ul><li>Bi-encoder: index once, query embedding once → ANN search ~ms</li><li>Cross-encoder: per query, must run forward pass for <strong>each candidate</strong>. 50 candidates × 100ms = 5s. Too slow for k=1M.</li></ul>
 <p>Hence pipeline: bi-encoder narrow to top-50 → cross-encoder rerank to top-10.</p>
 <p><strong>Reranker options — decision matrix</strong>:</p>
-<table class="md-table"><thead><tr><th>Option</th><th>Latency (50 docs)</th><th>Cost</th><th>Quality</th><th>When</th></tr></thead><tbody><tr><td><strong>bge-reranker-base</strong></td><td>~200ms (CPU)</td><td>Free (self-host)</td><td>Good</td><td>Default, latency-sensitive</td></tr><tr><td><strong>bge-reranker-large</strong></td><td>~500ms (GPU)</td><td>GPU $</td><td>Better</td><td>Quality &gt; latency</td></tr><tr><td><strong>Cohere rerank API</strong></td><td>~200ms</td><td>$1/1K calls</td><td>Excellent</td><td>Easy, no infra</td></tr><tr><td><strong>mxbai-rerank-large</strong></td><td>~400ms (GPU)</td><td>GPU $</td><td>Excellent</td><td>Self-hosted Cohere-class</td></tr><tr><td><strong>LLM-as-judge</strong> (GPT-4)</td><td>5-10s</td><td>$$$</td><td>Best</td><td>Top-3 final pass, expensive</td></tr><tr><td><strong>Domain-finetuned</strong></td><td>varies</td><td>training cost</td><td>Best for that domain</td><td>Have labeled data</td></tr></tbody></table>
+<table class="md-table"><thead><tr><th>Option</th><th>Latency (50 docs)</th><th>Cost</th><th>Quality</th><th>When</th></tr></thead><tbody><tr><td><strong>bge-reranker-base</strong></td><td>~200ms (CPU)</td><td>Free (self-host)</td><td>Good</td><td>Default, latency-sensitive</td></tr><tr><td><strong>bge-reranker-large</strong></td><td>~500ms (GPU)</td><td>GPU $</td><td>Better</td><td>Quality &gt; latency</td></tr><tr><td><strong>Cohere rerank API</strong></td><td>~200ms</td><td>$1/1K calls</td><td>Excellent</td><td>Easy, no infra</td></tr><tr><td><strong>mxbai-rerank-large</strong></td><td>~400ms (GPU)</td><td>GPU $</td><td>Excellent</td><td>Self-hosted Cohere-class</td></tr><tr><td><strong>LLM-as-judge</strong> (Gemini 3 Pro / Claude Opus 4.7)</td><td>5-10s</td><td>$$$</td><td>Best</td><td>Top-3 final pass, expensive</td></tr><tr><td><strong>Domain-finetuned</strong></td><td>varies</td><td>training cost</td><td>Best for that domain</td><td>Have labeled data</td></tr></tbody></table>
 <p><strong>My recommendation for this case</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Stage 1: BM25 + dense → top-50 (50ms)
 Stage 2: bge-reranker-large → top-10 (500ms)
@@ -135,7 +135,7 @@ Which doc better answers the query? Respond with just A or B.
 <h4>变体 4: Multi-modal rerank — image + text query</h4>
 <blockquote><p>"User search 'similar to this dress, but in black'. Image + text query."</p></blockquote>
 <p><strong>解法</strong>:</p>
-<ul><li><strong>CLIP-class embedding</strong>: image + text 进同空间, 直接 cosine</li><li><strong>Reranker</strong>: 大 multimodal model (Cohere multimodal / GPT-4V) 看 query image + candidate image 评分</li><li><strong>Attribute extraction</strong>: query image → 'red, A-line, knee-length' attribute; combine with 'black' modifier</li><li><strong>Visual diff penalty</strong>: 太相似的 (perceptual hash) 去重</li><li><strong>Style transfer aware</strong>: 'similar style, different color' → 颜色 feature 单独 swap</li><li><strong>Cost</strong>: vision API 贵, 不要 rerank 50 张, narrow to 10 先</li></ul>
+<ul><li><strong>CLIP-class embedding</strong>: image + text 进同空间, 直接 cosine</li><li><strong>Reranker</strong>: 大 multimodal model (Gemini 3 Pro multimodal / Claude Opus 4.7 vision) 看 query image + candidate image 评分</li><li><strong>Attribute extraction</strong>: query image → 'red, A-line, knee-length' attribute; combine with 'black' modifier</li><li><strong>Visual diff penalty</strong>: 太相似的 (perceptual hash) 去重</li><li><strong>Style transfer aware</strong>: 'similar style, different color' → 颜色 feature 单独 swap</li><li><strong>Cost</strong>: vision API 贵, 不要 rerank 50 张, narrow to 10 先</li></ul>
 <h4>变体 5: Personalized rerank — user history factored in</h4>
 <blockquote><p>"Top-50 候选, user 看过 / buy 过 / dismiss 过的 history 怎么用？"</p></blockquote>
 <p><strong>解法</strong>:</p>
@@ -150,7 +150,7 @@ Which doc better answers the query? Respond with just A or B.
 <p><strong>Q1</strong>: "Reranker latency too high (1s). Need &lt; 200ms total. Options?" <strong>A</strong>:</p>
 <ul><li><strong>Cheaper reranker</strong>: bge-reranker-base or distilled small</li><li><strong>Fewer candidates</strong>: top-20 instead of top-50</li><li><strong>No reranker, better first stage</strong>: invest in HyDE / multi-query / better embeddings</li><li><strong>Caching</strong>: cache (query, top-k) for common queries</li></ul>
 <p><strong>Q2</strong>: "LLM-as-judge sounds best — why not always?" <strong>A</strong>:</p>
-<ul><li><strong>Cost</strong>: GPT-4 pair-rank 50 candidates ≈ $0.50/query</li><li><strong>Latency</strong>: 5-10s</li><li><strong>Consistency</strong>: LLM judgment varies, calibration drift</li><li><strong>Use case</strong>: top-3 final pass only, high-stakes ✓</li><li><strong>Mass deployment</strong>: too expensive</li></ul>
+<ul><li><strong>Cost</strong>: Gemini 3 Pro pair-rank 50 candidates ≈ $0.10-0.20/query (50 pairs × ~2K tokens each × $2/1M); Claude Opus 4.7 ~$0.50/query</li><li><strong>Latency</strong>: 5-10s</li><li><strong>Consistency</strong>: LLM judgment varies, calibration drift</li><li><strong>Use case</strong>: top-3 final pass only, high-stakes ✓</li><li><strong>Mass deployment</strong>: too expensive</li></ul>
 <p><strong>Q3</strong>: "Reranker has its own biases (favors longer docs). How detect?" <strong>A</strong>:</p>
 <ul><li><strong>Slice eval by doc length</strong>: NDCG by length quartile</li><li><strong>Calibration test</strong>: synthesize known-relevant short docs, check still surfaces</li><li><strong>Diversity in eval set</strong>: span all doc length distributions</li><li><strong>Compare multiple rerankers</strong>: best per-slice may differ</li></ul>
 <p><strong>Q4</strong>: "Domain-specific (medical, legal). Generic reranker not enough?" <strong>A</strong>:</p>
@@ -319,7 +319,7 @@ Domain finetune:
 > | **bge-reranker-large** | ~500ms (GPU) | GPU $ | Better | Quality > latency |
 > | **Cohere rerank API** | ~200ms | $1/1K calls | Excellent | Easy, no infra |
 > | **mxbai-rerank-large** | ~400ms (GPU) | GPU $ | Excellent | Self-hosted Cohere-class |
-> | **LLM-as-judge** (GPT-4) | 5-10s | $$$ | Best | Top-3 final pass, expensive |
+> | **LLM-as-judge** (Gemini 3 Pro / Claude Opus 4.7) | 5-10s | $$$ | Best | Top-3 final pass, expensive |
 > | **Domain-finetuned** | varies | training cost | Best for that domain | Have labeled data |
 >
 > **My recommendation for this case**:
@@ -440,7 +440,7 @@ Domain finetune:
 
 **解法**:
 - **CLIP-class embedding**: image + text 进同空间, 直接 cosine
-- **Reranker**: 大 multimodal model (Cohere multimodal / GPT-4V) 看 query image + candidate image 评分
+- **Reranker**: 大 multimodal model (Gemini 3 Pro multimodal / Claude Opus 4.7 vision) 看 query image + candidate image 评分
 - **Attribute extraction**: query image → 'red, A-line, knee-length' attribute; combine with 'black' modifier
 - **Visual diff penalty**: 太相似的 (perceptual hash) 去重
 - **Style transfer aware**: 'similar style, different color' → 颜色 feature 单独 swap
@@ -487,7 +487,7 @@ Domain finetune:
 
 **Q2**: "LLM-as-judge sounds best — why not always?"
 **A**:
-- **Cost**: GPT-4 pair-rank 50 candidates ≈ $0.50/query
+- **Cost**: Gemini 3 Pro pair-rank 50 candidates ≈ $0.10-0.20/query (50 pairs × ~2K tokens each × $2/1M); Claude Opus 4.7 ~$0.50/query
 - **Latency**: 5-10s
 - **Consistency**: LLM judgment varies, calibration drift
 - **Use case**: top-3 final pass only, high-stakes ✓

@@ -40,7 +40,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>题目</h3>
-<blockquote><p>"Your LLM service serves customer's chatbot. Underlying LLM API has <strong>rate limit (10K TPM, 100 RPM)</strong> and is <strong>expensive ($0.01/1K tokens)</strong>. Customer traffic is bursty (100x peaks). Design the system."</p></blockquote>
+<blockquote><p>"Your LLM service serves customer's chatbot. Underlying LLM API has <strong>rate limit (10K TPM, 100 RPM)</strong> and is <strong>expensive ($5/$25 per 1M, Claude Opus 4.7)</strong>. Customer traffic is bursty (100x peaks). Design the system."</p></blockquote>
 <p>或追问形态:</p>
 <blockquote><p>"Cost is blowing up — 50% of LLM spend is repeated similar questions. Reduce cost without hurting UX."</p></blockquote>
 <p><strong>Round</strong>: System Design — Cost / Scale (45 min)</p>
@@ -145,13 +145,13 @@ Bronze: priority 3, max queue depth 2000, p99 &lt; 30s</code></pre>
     complexity = complexity_score(query)  # cheap classifier or heuristic
     
     if complexity &lt; 0.3:
-        return 'gpt-4o-mini'  # $0.0001/1K tokens
+        return 'gemini-3-flash'    # $0.50 / $3 per 1M — 90% of traffic
     elif complexity &lt; 0.7:
-        return 'gpt-4o'  # $0.0025/1K tokens
+        return 'gemini-3-pro'      # $2 / $12 per 1M — 8% of traffic
     else:
-        return 'gpt-4-turbo'  # $0.01/1K tokens</code></pre>
+        return 'claude-opus-4.7'   # $5 / $25 per 1M — 2% hard cases</code></pre>
 <p><strong>Classification</strong>:</p>
-<ul><li>Length + question type + keyword</li><li>Pre-classifier (small model) for hard cases</li><li>Per-tenant default model (gold gets gpt-4-turbo, bronze gets mini)</li></ul>
+<ul><li>Length + question type + keyword</li><li>Pre-classifier (small model) for hard cases</li><li>Per-tenant default model (gold tier gets Gemini 3 Pro / Claude Opus 4.7, bronze gets Gemini 3 Flash / Haiku 4.5)</li></ul>
 <p>Saves 30-70% cost with negligible quality loss in benchmark.</p>
 <p><strong>Budget enforcement</strong> (per tenant monthly):</p>
 <pre class="language-python"><code class="language-python">async def query(request, tenant):
@@ -171,7 +171,7 @@ Bronze: priority 3, max queue depth 2000, p99 &lt; 30s</code></pre>
 <p>Under load / over budget:</p>
 <table class="md-table"><thead><tr><th>Strategy</th><th>Trigger</th><th>UX impact</th></tr></thead><tbody><tr><td>Smaller model</td><td>Queue depth &gt; 80%</td><td>Slightly lower quality</td></tr><tr><td>More aggressive cache</td><td>Cost trending high</td><td>Slightly stale answers</td></tr><tr><td>Cached canned response</td><td>Severe overload</td><td>'Service busy, try later'</td></tr><tr><td>Reduce parallel tool calls</td><td>Latency budget exceeded</td><td>Slower response</td></tr><tr><td>Drop multi-turn context</td><td>Context &gt; 30K tokens</td><td>Less personalized</td></tr></tbody></table>
 <p><strong>Observability priorities</strong>:</p>
-<ul><li>Cache hit rate (exact + semantic + result + LLM prefix)</li><li>Queue depth per tier</li><li>Cost per tenant (real-time + forecast)</li><li>Model distribution (% mini / 4o / turbo)</li><li>Degradation events</li></ul>
+<ul><li>Cache hit rate (exact + semantic + result + LLM prefix)</li><li>Queue depth per tier</li><li>Cost per tenant (real-time + forecast)</li><li>Model distribution (% Flash / Pro / Opus)</li><li>Degradation events</li></ul>
 <p><strong>Putting it together — request lifecycle</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Request arrives
   ↓
@@ -215,16 +215,16 @@ Return response</code></pre>
 <h4>变体 4: Per-user budget 用完</h4>
 <blockquote><p>"免费用户 $5/month budget, 用完了。Agent 怎么办？"</p></blockquote>
 <p><strong>解法</strong>:</p>
-<ul><li><strong>Hard stop at limit</strong>: 不能继续无脑 serve (亏钱)</li><li><strong>Graceful UX</strong>: 'monthly limit reached, upgrade or wait until next month'</li><li><strong>Cached only mode</strong>: 限额后, 仅命中 cache 时 serve, 不走 LLM</li><li><strong>Cheap model fallback</strong>: 限额客户走 gpt-4o-mini (5x cheaper)</li><li><strong>Show usage</strong>: progress bar '4 of 5 USD used'</li><li><strong>Upsell trigger</strong>: 80% 时推 upgrade</li></ul>
+<ul><li><strong>Hard stop at limit</strong>: 不能继续无脑 serve (亏钱)</li><li><strong>Graceful UX</strong>: 'monthly limit reached, upgrade or wait until next month'</li><li><strong>Cached only mode</strong>: 限额后, 仅命中 cache 时 serve, 不走 LLM</li><li><strong>Cheap model fallback</strong>: 限额客户走 Gemini 3 Flash ($0.50/$3 per 1M, ~4x cheaper than Pro)</li><li><strong>Show usage</strong>: progress bar '4 of 5 USD used'</li><li><strong>Upsell trigger</strong>: 80% 时推 upgrade</li></ul>
 <h4>变体 5: LLM vendor 突然 cut quota</h4>
 <blockquote><p>"OpenAI 把我们配额从 100K TPM 砍到 50K, 还能扛吗？"</p></blockquote>
 <p><strong>解法</strong>:</p>
-<ul><li><strong>多 vendor 早就接上</strong>: Claude + Gemini + Llama 都接, 立即 spillover</li><li><strong>Aggressive cache</strong>: 临时把 cache threshold 调松到 0.85, 命中翻倍</li><li><strong>Cheaper model 主力</strong>: gpt-4 → gpt-4o-mini 临时降级</li><li><strong>Queue + delay</strong>: &lt; SLA 影响下推后部分非紧急</li><li><strong>Notify customer</strong>: SLA breach 风险预警</li><li><strong>Long-term</strong>: 加 self-host (vLLM 自托管) 减依赖</li></ul>
+<ul><li><strong>多 vendor 早就接上</strong>: Claude + Gemini + Llama 都接, 立即 spillover</li><li><strong>Aggressive cache</strong>: 临时把 cache threshold 调松到 0.85, 命中翻倍</li><li><strong>Cheaper model 主力</strong>: Gemini 3 Pro → Gemini 3 Flash 临时降级 (4x 便宜)</li><li><strong>Queue + delay</strong>: &lt; SLA 影响下推后部分非紧急</li><li><strong>Notify customer</strong>: SLA breach 风险预警</li><li><strong>Long-term</strong>: 加 self-host (vLLM 自托管) 减依赖</li></ul>
 <hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Cache strategy</td><td>Voice agent — semantic cache for repeated user phrases</td></tr><tr><td>Rate limit + queue</td><td>TikTok payment — natural at scale</td></tr><tr><td>Cost routing</td><td>BNPL chatbot — small model for routing, big for complex</td></tr><tr><td>Multi-tenant</td><td>Voice agent 7 markets</td></tr><tr><td>Budget enforcement</td><td>TikTok payment — quota / chargeback flow</td></tr><tr><td>Degradation</td><td>Voice agent fallback to text-input under ASR overload</td></tr></tbody></table>
 <p><strong>Quote</strong>:</p>
-<blockquote><p>"BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. <strong>Hit rate 38%</strong>, <strong>cost reduction 42%</strong> (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, <strong>cost-routing</strong> automatically pushed non-critical queries to gpt-4o-mini (10x cheaper than gpt-4-turbo), no measurable quality drop."</p></blockquote>
+<blockquote><p>"BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. <strong>Hit rate 38%</strong>, <strong>cost reduction 42%</strong> (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, <strong>cost-routing</strong> automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Semantic cache wrong-hit — returns answer for slightly different question. Mitigate?" <strong>A</strong>:</p>
@@ -327,7 +327,7 @@ Observability:
 </main>
 <script id="md-source" type="text/markdown">## 题目
 
-> "Your LLM service serves customer's chatbot. Underlying LLM API has **rate limit (10K TPM, 100 RPM)** and is **expensive ($0.01/1K tokens)**. Customer traffic is bursty (100x peaks). Design the system."
+> "Your LLM service serves customer's chatbot. Underlying LLM API has **rate limit (10K TPM, 100 RPM)** and is **expensive ($5/$25 per 1M, Claude Opus 4.7)**. Customer traffic is bursty (100x peaks). Design the system."
 
 或追问形态:
 
@@ -513,17 +513,17 @@ Observability:
 >     complexity = complexity_score(query)  # cheap classifier or heuristic
 >     
 >     if complexity < 0.3:
->         return 'gpt-4o-mini'  # $0.0001/1K tokens
+>         return 'gemini-3-flash'    # $0.50 / $3 per 1M — 90% of traffic
 >     elif complexity < 0.7:
->         return 'gpt-4o'  # $0.0025/1K tokens
+>         return 'gemini-3-pro'      # $2 / $12 per 1M — 8% of traffic
 >     else:
->         return 'gpt-4-turbo'  # $0.01/1K tokens
+>         return 'claude-opus-4.7'   # $5 / $25 per 1M — 2% hard cases
 > ```
 >
 > **Classification**:
 > - Length + question type + keyword
 > - Pre-classifier (small model) for hard cases
-> - Per-tenant default model (gold gets gpt-4-turbo, bronze gets mini)
+> - Per-tenant default model (gold tier gets Gemini 3 Pro / Claude Opus 4.7, bronze gets Gemini 3 Flash / Haiku 4.5)
 >
 > Saves 30-70% cost with negligible quality loss in benchmark.
 >
@@ -562,7 +562,7 @@ Observability:
 > - Cache hit rate (exact + semantic + result + LLM prefix)
 > - Queue depth per tier
 > - Cost per tenant (real-time + forecast)
-> - Model distribution (% mini / 4o / turbo)
+> - Model distribution (% Flash / Pro / Opus)
 > - Degradation events
 >
 > **Putting it together — request lifecycle**:
@@ -647,7 +647,7 @@ Observability:
 - **Hard stop at limit**: 不能继续无脑 serve (亏钱)
 - **Graceful UX**: 'monthly limit reached, upgrade or wait until next month'
 - **Cached only mode**: 限额后, 仅命中 cache 时 serve, 不走 LLM
-- **Cheap model fallback**: 限额客户走 gpt-4o-mini (5x cheaper)
+- **Cheap model fallback**: 限额客户走 Gemini 3 Flash ($0.50/$3 per 1M, ~4x cheaper than Pro)
 - **Show usage**: progress bar '4 of 5 USD used'
 - **Upsell trigger**: 80% 时推 upgrade
 
@@ -658,7 +658,7 @@ Observability:
 **解法**:
 - **多 vendor 早就接上**: Claude + Gemini + Llama 都接, 立即 spillover
 - **Aggressive cache**: 临时把 cache threshold 调松到 0.85, 命中翻倍
-- **Cheaper model 主力**: gpt-4 → gpt-4o-mini 临时降级
+- **Cheaper model 主力**: Gemini 3 Pro → Gemini 3 Flash 临时降级 (4x 便宜)
 - **Queue + delay**: < SLA 影响下推后部分非紧急
 - **Notify customer**: SLA breach 风险预警
 - **Long-term**: 加 self-host (vLLM 自托管) 减依赖
@@ -678,7 +678,7 @@ Observability:
 
 **Quote**:
 
-> "BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. **Hit rate 38%**, **cost reduction 42%** (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, **cost-routing** automatically pushed non-critical queries to gpt-4o-mini (10x cheaper than gpt-4-turbo), no measurable quality drop."
+> "BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. **Hit rate 38%**, **cost reduction 42%** (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, **cost-routing** automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop."
 
 ---
 

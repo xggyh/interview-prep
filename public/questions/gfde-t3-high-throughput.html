@@ -58,7 +58,7 @@
 <p><strong>3. SLA</strong></p>
 <blockquote><p>"p99 &lt; 1s — for TTFT (time to first token) or full response?"</p></blockquote>
 <p><strong>4. Cost target</strong></p>
-<blockquote><p>"$ per 1K tokens you can charge / spend?"</p></blockquote>
+<blockquote><p>"$ per 1M tokens budget? (Gemini 3 Flash $0.50/$3 baseline cheap, Opus 4.7 $5/$25 flagship)"</p></blockquote>
 <p><strong>5. Hardware available</strong></p>
 <blockquote><p>"H100s / A100s / TPUs / mixed? Cloud / on-prem?"</p></blockquote>
 <hr />
@@ -121,7 +121,7 @@ Shared prefix: [system prompt] [RAG: doc-X]</code></pre>
 <p><strong>Observability</strong>:</p>
 <table class="md-table"><thead><tr><th>Metric</th><th>Why</th></tr></thead><tbody><tr><td>TTFT (time-to-first-token)</td><td>User-perceived latency</td></tr><tr><td>TPOT (time-per-output-token)</td><td>Throughput per request</td></tr><tr><td>Batch size avg / max</td><td>Utilization</td></tr><tr><td>KV cache utilization</td><td>Memory pressure</td></tr><tr><td>Token cost per request</td><td>Economics</td></tr><tr><td>Queue depth</td><td>Backpressure signal</td></tr><tr><td>Eval pass rate (sampled)</td><td>Quality drift</td></tr></tbody></table>
 <p><strong>Cost math</strong>:</p>
-<p>H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.0002/1K tokens raw compute. Plus: prefix-cache hit gains, batching efficiency. Achievable: $0.001-0.002 / 1K tokens with optimization.</p>
+<p>H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.20/1M tokens raw compute. Plus: prefix-cache hit gains, batching efficiency. Achievable self-host: $0.30-0.50 / 1M tokens — competitive vs Gemini 3 Flash ($0.50/1M) and beats Gemini 3 Pro ($2/1M).</p>
 <p><strong>Failover</strong>:</p>
 <ul><li>Per-replica health check (heartbeat)</li><li>Inflight requests on failed replica → retry on healthy</li><li>KV cache lost on failover; LLM redoes prefill (acceptable, &lt; 1s usually)</li></ul>
 <p><strong>What NOT to do</strong>:</p>
@@ -131,7 +131,7 @@ Shared prefix: [system prompt] [RAG: doc-X]</code></pre>
 <h4>变体 1: 消费 chatbot — 高 QPS, low value per query</h4>
 <blockquote><p>"100K QPS chatbot, 每 query $0.001 都贵。怎么 serving？"</p></blockquote>
 <p><strong>解法</strong>:</p>
-<ul><li><strong>小 model 主力</strong>: 90% 用 Llama-8B / Mistral-7B (自托管 vLLM)</li><li><strong>Aggressive batching</strong>: continuous batch + PagedAttention 拉满</li><li><strong>Semantic cache</strong>: FAQ-heavy → cache hit 50%+</li><li><strong>Quantization</strong>: INT8 / INT4 极致</li><li><strong>Cost-aware routing</strong>: 复杂 query 才升级到 GPT-4 (5% 流量)</li><li><strong>Multi-tenant 1 model</strong>: 不为每客户独立部署, S-LoRA 服务多 LoRA</li></ul>
+<ul><li><strong>小 model 主力</strong>: 90% 用 Llama-8B / Mistral-7B (自托管 vLLM)</li><li><strong>Aggressive batching</strong>: continuous batch + PagedAttention 拉满</li><li><strong>Semantic cache</strong>: FAQ-heavy → cache hit 50%+</li><li><strong>Quantization</strong>: INT8 / INT4 极致</li><li><strong>Cost-aware routing</strong>: 复杂 query 才升级到 Gemini 3 Pro / Claude Opus 4.7 (5% 流量)</li><li><strong>Multi-tenant 1 model</strong>: 不为每客户独立部署, S-LoRA 服务多 LoRA</li></ul>
 <h4>变体 2: 代码助手 — 高 QPS 但 query 复杂</h4>
 <blockquote><p>"1M dev 用 Copilot-like 服务, 高 QPS + 大 context (open files)"</p></blockquote>
 <p><strong>解法</strong>:</p>
@@ -291,7 +291,7 @@ Observability:
 
 **4. Cost target**
 
-> "$ per 1K tokens you can charge / spend?"
+> "$ per 1M tokens budget? (Gemini 3 Flash $0.50/$3 baseline cheap, Opus 4.7 $5/$25 flagship)"
 
 **5. Hardware available**
 
@@ -438,9 +438,9 @@ Observability:
 >
 > **Cost math**:
 >
-> H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.0002/1K tokens raw compute.
+> H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.20/1M tokens raw compute.
 > Plus: prefix-cache hit gains, batching efficiency.
-> Achievable: $0.001-0.002 / 1K tokens with optimization.
+> Achievable self-host: $0.30-0.50 / 1M tokens — competitive vs Gemini 3 Flash ($0.50/1M) and beats Gemini 3 Pro ($2/1M).
 >
 > **Failover**:
 >
@@ -468,7 +468,7 @@ Observability:
 - **Aggressive batching**: continuous batch + PagedAttention 拉满
 - **Semantic cache**: FAQ-heavy → cache hit 50%+
 - **Quantization**: INT8 / INT4 极致
-- **Cost-aware routing**: 复杂 query 才升级到 GPT-4 (5% 流量)
+- **Cost-aware routing**: 复杂 query 才升级到 Gemini 3 Pro / Claude Opus 4.7 (5% 流量)
 - **Multi-tenant 1 model**: 不为每客户独立部署, S-LoRA 服务多 LoRA
 
 ### 变体 2: 代码助手 — 高 QPS 但 query 复杂

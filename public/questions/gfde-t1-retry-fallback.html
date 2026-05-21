@@ -156,7 +156,7 @@ for tool_call in tool_calls:
 <blockquote><p>"LLM vendor 突然限流, 让我们等 60s。但用户 chat 体验等 5s 都嫌长。怎么办？"</p></blockquote>
 <p><strong>关键差异</strong>: 限流时间 &gt; 用户 latency budget。</p>
 <p><strong>解法</strong>:</p>
-<ul><li><strong>Multi-vendor failover</strong>: GPT-4 限流 → 立即试 Claude / Gemini</li><li><strong>降级到更小 model</strong>: gpt-4 → gpt-4o-mini (10x rate limit)</li><li><strong>告诉用户排队</strong>: "high traffic, position 12 of 50" — 非 chat 场景可接受</li><li><strong>预测性 throttle</strong>: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical</li><li><strong>Cache hit</strong>: 限流期间 cache hit rate 拉满，semantic cache 降阈值</li><li><strong>跟 vendor 谈</strong>: 长期 quota 提升，但 short-term 还是要软兜底</li></ul>
+<ul><li><strong>Multi-vendor failover</strong>: Gemini 3 Pro 限流 → 立即试 Claude Sonnet 4.6 / GPT-5.4</li><li><strong>降级到更小 model</strong>: Gemini 3 Pro → Gemini 3 Flash (4x rate limit, 4x 便宜)</li><li><strong>告诉用户排队</strong>: "high traffic, position 12 of 50" — 非 chat 场景可接受</li><li><strong>预测性 throttle</strong>: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical</li><li><strong>Cache hit</strong>: 限流期间 cache hit rate 拉满，semantic cache 降阈值</li><li><strong>跟 vendor 谈</strong>: 长期 quota 提升，但 short-term 还是要软兜底</li></ul>
 <hr />
 <h3>简历专属 reframe</h3>
 <table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>3-layer retry</td><td>Voice agent ASR / TTS / LLM 都有</td></tr><tr><td>Circuit breaker</td><td>Multi-tenant SLA monitoring 你做过</td></tr><tr><td>Fallback ladder</td><td>Voice agent 7 markets — 某 market 挂了 fallback English voice</td></tr><tr><td>Latency budget</td><td>Streaming voice p99 &lt; 800ms</td></tr><tr><td>Observability</td><td>Voice agent weekly metrics</td></tr></tbody></table>
@@ -469,8 +469,8 @@ Observability:
 **关键差异**: 限流时间 > 用户 latency budget。
 
 **解法**:
-- **Multi-vendor failover**: GPT-4 限流 → 立即试 Claude / Gemini
-- **降级到更小 model**: gpt-4 → gpt-4o-mini (10x rate limit)
+- **Multi-vendor failover**: Gemini 3 Pro 限流 → 立即试 Claude Sonnet 4.6 / GPT-5.4
+- **降级到更小 model**: Gemini 3 Pro → Gemini 3 Flash (4x rate limit, 4x 便宜)
 - **告诉用户排队**: "high traffic, position 12 of 50" — 非 chat 场景可接受
 - **预测性 throttle**: 接近 rate limit 时 (e.g., 80%) 提前拒绝 non-critical
 - **Cache hit**: 限流期间 cache hit rate 拉满，semantic cache 降阈值

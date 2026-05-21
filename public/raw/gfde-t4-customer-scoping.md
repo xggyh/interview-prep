@@ -138,7 +138,7 @@
 > ```
 >
 > Tech stack (deliberately minimal):
-> - LLM: GPT-4o (skip self-hosted for MVP)
+> - LLM: Gemini 3 Pro for reasoning ($2/$12 per 1M), Gemini 3 Flash for cheap operations ($0.50/$3) — skip self-hosted for MVP
 > - Vector DB: Pinecone (cloud, fast)
 > - Frontend: simple web form (Streamlit / Next.js)
 > - Integration: read-only Salesforce API + Outlook

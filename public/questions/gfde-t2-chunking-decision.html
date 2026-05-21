@@ -168,7 +168,7 @@
 <hr />
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Smaller chunks = more vectors = more storage. Cost concern." <strong>A</strong>:</p>
-<ul><li><strong>Storage scale</strong>: 1M chunks × 1KB embedding = 1GB. Cheap.</li><li><strong>Index size</strong>: HNSW index has overhead but sub-linear with chunk count</li><li><strong>Query cost</strong>: ANN search log(n), small impact</li><li><strong>Real concern</strong>: embedding cost upfront (1M × $0.0001 = $100). Amortize over query.</li></ul>
+<ul><li><strong>Storage scale</strong>: 1M chunks × 1KB embedding = 1GB. Cheap.</li><li><strong>Index size</strong>: HNSW index has overhead but sub-linear with chunk count</li><li><strong>Query cost</strong>: ANN search log(n), small impact</li><li><strong>Real concern</strong>: embedding cost upfront — 1M chunks × $0.025/1M tokens (text-embedding-3-small / gemini-embedding) × ~500 tok per chunk = ~$12.50. Amortize over query.</li></ul>
 <p><strong>Q2</strong>: "Reindexing — when doc changes, recompute embeddings expensive." <strong>A</strong>:</p>
 <ul><li><strong>Delta indexing</strong>: chunk-level changes detected via hash, only re-embed changed chunks</li><li><strong>Versioning</strong>: old + new coexist briefly during transition</li><li><strong>Async</strong>: change → queue → background reindex (eventual consistency acceptable for most RAG)</li></ul>
 <p><strong>Q3</strong>: "Some chunks are 'TOC' or 'copyright' — junk for retrieval. Filter?" <strong>A</strong>:</p>
@@ -538,7 +538,7 @@ Late chunking (advanced):
 - **Storage scale**: 1M chunks × 1KB embedding = 1GB. Cheap.
 - **Index size**: HNSW index has overhead but sub-linear with chunk count
 - **Query cost**: ANN search log(n), small impact
-- **Real concern**: embedding cost upfront (1M × $0.0001 = $100). Amortize over query.
+- **Real concern**: embedding cost upfront — 1M chunks × $0.025/1M tokens (text-embedding-3-small / gemini-embedding) × ~500 tok per chunk = ~$12.50. Amortize over query.
 
 **Q2**: "Reindexing — when doc changes, recompute embeddings expensive."
 **A**:

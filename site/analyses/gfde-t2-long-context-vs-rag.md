@@ -38,7 +38,7 @@
 
 **4. Latency / cost tolerance**
 
-> "Each query $5 + 30s OK (research tool) or need $0.01 + 1s (consumer)?"
+> "Each query $5 + 30s OK (research tool with Claude Opus 4.7 long-context) or need $0.01 + 1s (consumer Gemini 3 Flash)?"
 
 **5. Precision需求**
 
@@ -72,7 +72,7 @@
 > - **Implicit context** across distant pages handled
 >
 > **Long-context weaknesses**:
-> - **Token cost**: 1M tokens × $0.003/1K = $3 per call (1M context Gemini cost)
+> - **Token cost**: 1M tokens × $4/1M = $4 per call (Gemini 3 Pro at >200K tier); output ~$0.01 (500 tok @ $18/1M)
 > - **Latency**: 1M context ~30-60s per call
 > - **Lost-in-middle**: even with 1M, attention is U-shaped, middle pages worse recall
 > - **Doesn't scale to 500M corpus** — fits 1M max
@@ -80,7 +80,7 @@
 >
 > **RAG strengths**:
 > - **Scales to billion-token corpus** (indexed once, query small)
-> - **Per-query cost cheap**: $0.01-0.10
+> - **Per-query cost cheap**: $0.001-0.05 (Gemini 3 Flash retrieval-narrowed)
 > - **Per-query latency low**: 100ms-2s
 > - **Granular update**: change 1 doc → re-embed that chunk
 > - **Citation natural**: retrieved chunks have provenance
@@ -134,7 +134,7 @@
 > Best of both:
 > - RAG narrows 500M → 500K
 > - Long-context handles within-500K with multi-hop, no chunking loss
-> - Cost per query: $1.50 (500K × $3) instead of $3 (1M)
+> - Cost per query: $1.00 (500K × $2/1M Gemini 3 Pro standard tier) instead of $4 (1M @ Pro >200K tier)
 > - Latency: 15s instead of 60s
 >
 > **Cost math** for our case:
@@ -142,9 +142,10 @@
 > | Approach | Cost/query | Latency | Feasibility |
 > |---|---|---|---|
 > | Pure long-context | N/A | N/A | Corpus 500M > 1M limit |
-> | Pure RAG | $0.05 | 2s | Misses multi-hop |
-> | **Hybrid (10 docs)** | **$1.50** | **15s** | **Fits + multi-hop OK** |
-> | Hybrid (3 docs, 150K) | $0.50 | 5s | Compromise |
+> | Pure RAG (Flash) | $0.005 | 2s | Misses multi-hop |
+> | **Hybrid (10 docs, 500K Gemini 3 Pro)** | **$1.00** | **15s** | **Fits + multi-hop OK** |
+> | Hybrid (3 docs, 150K Pro) | $0.30 | 5s | Compromise |
+> | Hybrid (10 docs, Opus 4.7 200K) | $1.25 | 25s | Highest quality, $$$ |
 >
 > **Volume scaling**:
 >
@@ -271,8 +272,8 @@
 
 **Q2**: "Hybrid is complex. Can I just use long-context everywhere if cheap enough?"
 **A**: Cost is the gate:
-- 100K tokens × $0.003 = $0.30/q → 1M queries/day = $300K/day. Prohibitive.
-- 10K tokens (RAG-narrowed) × $0.003 = $0.03/q → $30K/day. Sustainable.
+- 100K tokens × $2/1M = $0.20/q (Gemini 3 Pro) → 1M queries/day = $200K/day. Prohibitive.
+- 10K tokens (RAG-narrowed) × $0.50/1M (Flash) = $0.005/q → $5K/day. Sustainable.
 - Always cheaper to retrieve first
 
 **Q3**: "Long-context is lost-in-middle. Is RAG immune?"
@@ -290,7 +291,7 @@
 
 **Q5**: "Customer prefers long-context for simplicity. Defend hybrid."
 **A**:
-- Pure long-context is **vendor lock-in** (only Gemini/Claude at 1M, no OpenAI parity)
+- Pure long-context **cost scales fast**: at Gemini 3 Pro $4/1M (>200K tier), 1M queries × $4 = $4M / day — unscalable. Hybrid sublinear.
 - Cost scales linearly with context size, hybrid sublinear with retrieval
 - Multi-tenancy: each customer's data isolated → RAG natural
 - Real-time updates: RAG re-embed delta, long-context full reload
@@ -313,7 +314,7 @@
 
 1. **Hybrid 是默认答案** in production
 2. **Decision tree** by corpus size + cost + multi-hop
-3. **Cost math** explicit ($1.50/q vs $3 vs $0.05)
+3. **Cost math** explicit ($1.00/q hybrid Pro vs $4 pure long-context vs $0.005 pure RAG Flash)
 4. **Lost-in-middle** both approaches
 5. **Citation strategy** comparison
 6. **Update frequency** consideration
@@ -331,7 +332,7 @@ Long-context strengths:
   Implicit cross-doc context
 
 Long-context weaknesses:
-  Cost ($3/q at 1M tokens)
+  Cost ($4/q at 1M Gemini 3 Pro >200K tier)
   Latency (30-60s)
   Lost-in-middle still real
   Doesn't fit > 1M corpus
@@ -339,7 +340,7 @@ Long-context weaknesses:
 
 RAG strengths:
   Scales to billion tokens
-  Cheap per query ($0.01-0.10)
+  Cheap per query ($0.005-0.05 Gemini 3 Flash)
   Fast per query
   Granular update
   Citation natural
@@ -359,7 +360,7 @@ Decision tree:
 Hybrid pattern:
   RAG: 500M → top-10 docs (500K tokens)
   Long-context: handle multi-hop within
-  Cost: ~$1.50/q vs $3/q full
+  Cost: ~$1.00/q (Gemini 3 Pro hybrid) vs $4/q (1M full) vs $0.005/q (pure Flash RAG)
 
 Cost scaling:
   100 q/day pure long: $300/day, OK

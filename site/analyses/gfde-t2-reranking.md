@@ -92,7 +92,7 @@
 > | **bge-reranker-large** | ~500ms (GPU) | GPU $ | Better | Quality > latency |
 > | **Cohere rerank API** | ~200ms | $1/1K calls | Excellent | Easy, no infra |
 > | **mxbai-rerank-large** | ~400ms (GPU) | GPU $ | Excellent | Self-hosted Cohere-class |
-> | **LLM-as-judge** (GPT-4) | 5-10s | $$$ | Best | Top-3 final pass, expensive |
+> | **LLM-as-judge** (Gemini 3 Pro / Claude Opus 4.7) | 5-10s | $$$ | Best | Top-3 final pass, expensive |
 > | **Domain-finetuned** | varies | training cost | Best for that domain | Have labeled data |
 >
 > **My recommendation for this case**:
@@ -213,7 +213,7 @@
 
 **解法**:
 - **CLIP-class embedding**: image + text 进同空间, 直接 cosine
-- **Reranker**: 大 multimodal model (Cohere multimodal / GPT-4V) 看 query image + candidate image 评分
+- **Reranker**: 大 multimodal model (Gemini 3 Pro multimodal / Claude Opus 4.7 vision) 看 query image + candidate image 评分
 - **Attribute extraction**: query image → 'red, A-line, knee-length' attribute; combine with 'black' modifier
 - **Visual diff penalty**: 太相似的 (perceptual hash) 去重
 - **Style transfer aware**: 'similar style, different color' → 颜色 feature 单独 swap
@@ -260,7 +260,7 @@
 
 **Q2**: "LLM-as-judge sounds best — why not always?"
 **A**:
-- **Cost**: GPT-4 pair-rank 50 candidates ≈ $0.50/query
+- **Cost**: Gemini 3 Pro pair-rank 50 candidates ≈ $0.10-0.20/query (50 pairs × ~2K tokens each × $2/1M); Claude Opus 4.7 ~$0.50/query
 - **Latency**: 5-10s
 - **Consistency**: LLM judgment varies, calibration drift
 - **Use case**: top-3 final pass only, high-stakes ✓

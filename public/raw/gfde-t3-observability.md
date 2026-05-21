@@ -70,11 +70,11 @@
 > User request (trace_id=xxx)
 > ├── span: API gateway (10ms)
 > ├── span: Agent loop start (parent)
-> │   ├── span: LLM call #1 (300ms, 1.2K tokens, $0.003)
+> │   ├── span: LLM call #1 (Gemini 3 Pro, 300ms, 1.2K tokens in + 500 out, $0.009)
 > │   ├── span: Tool call #1 (search_inventory, 150ms)
 > │   │   ├── span: DB query (100ms)
 > │   │   └── span: Cache lookup (5ms, hit)
-> │   ├── span: LLM call #2 (250ms, 800 tokens, $0.002)
+> │   ├── span: LLM call #2 (Gemini 3 Pro, 250ms, 800 in + 300 out, $0.005)
 > │   └── span: Tool call #2 (send_email, 200ms)
 > └── span: Response stream (50ms TTFT, 800ms total)
 > ```
@@ -97,7 +97,7 @@
 >     'trace_id': trace.id,
 >     'span_id': span.id,
 >     'timestamp': now(),
->     'model': 'gpt-4o',
+>     'model': 'gemini-3-pro',
 >     'prompt_template_version': 'v3.2',
 >     'prompt_hash': hash(prompt),  # for grouping
 >     'input_tokens': 1234,
@@ -324,7 +324,7 @@
 
 **Q3**: "Eval-in-prod — who decides ground truth?"
 **A**:
-- **LLM-as-judge**: GPT-4 evaluates response vs expected qualities. Calibrated against human eval set.
+- **LLM-as-judge**: Claude Opus 4.7 / Gemini 3 Pro evaluates response vs expected qualities. Calibrated against human eval set.
 - **Self-eval**: LLM rates its own response (unreliable but cheap)
 - **User signals**: thumbs / engagement / follow-up corrections
 - **Heuristic checks**: response is on-topic, no refusal, no hallucination markers

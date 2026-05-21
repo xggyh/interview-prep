@@ -286,7 +286,7 @@
 - **Storage scale**: 1M chunks × 1KB embedding = 1GB. Cheap.
 - **Index size**: HNSW index has overhead but sub-linear with chunk count
 - **Query cost**: ANN search log(n), small impact
-- **Real concern**: embedding cost upfront (1M × $0.0001 = $100). Amortize over query.
+- **Real concern**: embedding cost upfront — 1M chunks × $0.025/1M tokens (text-embedding-3-small / gemini-embedding) × ~500 tok per chunk = ~$12.50. Amortize over query.
 
 **Q2**: "Reindexing — when doc changes, recompute embeddings expensive."
 **A**:

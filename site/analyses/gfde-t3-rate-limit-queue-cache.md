@@ -1,6 +1,6 @@
 ## 题目
 
-> "Your LLM service serves customer's chatbot. Underlying LLM API has **rate limit (10K TPM, 100 RPM)** and is **expensive ($0.01/1K tokens)**. Customer traffic is bursty (100x peaks). Design the system."
+> "Your LLM service serves customer's chatbot. Underlying LLM API has **rate limit (10K TPM, 100 RPM)** and is **expensive ($5/$25 per 1M, Claude Opus 4.7)**. Customer traffic is bursty (100x peaks). Design the system."
 
 或追问形态:
 
@@ -186,17 +186,17 @@
 >     complexity = complexity_score(query)  # cheap classifier or heuristic
 >     
 >     if complexity < 0.3:
->         return 'gpt-4o-mini'  # $0.0001/1K tokens
+>         return 'gemini-3-flash'    # $0.50 / $3 per 1M — 90% of traffic
 >     elif complexity < 0.7:
->         return 'gpt-4o'  # $0.0025/1K tokens
+>         return 'gemini-3-pro'      # $2 / $12 per 1M — 8% of traffic
 >     else:
->         return 'gpt-4-turbo'  # $0.01/1K tokens
+>         return 'claude-opus-4.7'   # $5 / $25 per 1M — 2% hard cases
 > ```
 >
 > **Classification**:
 > - Length + question type + keyword
 > - Pre-classifier (small model) for hard cases
-> - Per-tenant default model (gold gets gpt-4-turbo, bronze gets mini)
+> - Per-tenant default model (gold tier gets Gemini 3 Pro / Claude Opus 4.7, bronze gets Gemini 3 Flash / Haiku 4.5)
 >
 > Saves 30-70% cost with negligible quality loss in benchmark.
 >
@@ -235,7 +235,7 @@
 > - Cache hit rate (exact + semantic + result + LLM prefix)
 > - Queue depth per tier
 > - Cost per tenant (real-time + forecast)
-> - Model distribution (% mini / 4o / turbo)
+> - Model distribution (% Flash / Pro / Opus)
 > - Degradation events
 >
 > **Putting it together — request lifecycle**:
@@ -320,7 +320,7 @@
 - **Hard stop at limit**: 不能继续无脑 serve (亏钱)
 - **Graceful UX**: 'monthly limit reached, upgrade or wait until next month'
 - **Cached only mode**: 限额后, 仅命中 cache 时 serve, 不走 LLM
-- **Cheap model fallback**: 限额客户走 gpt-4o-mini (5x cheaper)
+- **Cheap model fallback**: 限额客户走 Gemini 3 Flash ($0.50/$3 per 1M, ~4x cheaper than Pro)
 - **Show usage**: progress bar '4 of 5 USD used'
 - **Upsell trigger**: 80% 时推 upgrade
 
@@ -331,7 +331,7 @@
 **解法**:
 - **多 vendor 早就接上**: Claude + Gemini + Llama 都接, 立即 spillover
 - **Aggressive cache**: 临时把 cache threshold 调松到 0.85, 命中翻倍
-- **Cheaper model 主力**: gpt-4 → gpt-4o-mini 临时降级
+- **Cheaper model 主力**: Gemini 3 Pro → Gemini 3 Flash 临时降级 (4x 便宜)
 - **Queue + delay**: < SLA 影响下推后部分非紧急
 - **Notify customer**: SLA breach 风险预警
 - **Long-term**: 加 self-host (vLLM 自托管) 减依赖
@@ -351,7 +351,7 @@
 
 **Quote**:
 
-> "BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. **Hit rate 38%**, **cost reduction 42%** (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, **cost-routing** automatically pushed non-critical queries to gpt-4o-mini (10x cheaper than gpt-4-turbo), no measurable quality drop."
+> "BNPL chatbot — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', etc.). We added semantic cache with 0.92 threshold + 1h TTL. **Hit rate 38%**, **cost reduction 42%** (caches are free). Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, **cost-routing** automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop."
 
 ---
 

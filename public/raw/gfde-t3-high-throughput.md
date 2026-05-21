@@ -41,7 +41,7 @@
 
 **4. Cost target**
 
-> "$ per 1K tokens you can charge / spend?"
+> "$ per 1M tokens budget? (Gemini 3 Flash $0.50/$3 baseline cheap, Opus 4.7 $5/$25 flagship)"
 
 **5. Hardware available**
 
@@ -188,9 +188,9 @@
 >
 > **Cost math**:
 >
-> H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.0002/1K tokens raw compute.
+> H100 ~ $3-4/hour, 5K tokens/sec per replica = 18M tokens/hour = $0.20/1M tokens raw compute.
 > Plus: prefix-cache hit gains, batching efficiency.
-> Achievable: $0.001-0.002 / 1K tokens with optimization.
+> Achievable self-host: $0.30-0.50 / 1M tokens — competitive vs Gemini 3 Flash ($0.50/1M) and beats Gemini 3 Pro ($2/1M).
 >
 > **Failover**:
 >
@@ -218,7 +218,7 @@
 - **Aggressive batching**: continuous batch + PagedAttention 拉满
 - **Semantic cache**: FAQ-heavy → cache hit 50%+
 - **Quantization**: INT8 / INT4 极致
-- **Cost-aware routing**: 复杂 query 才升级到 GPT-4 (5% 流量)
+- **Cost-aware routing**: 复杂 query 才升级到 Gemini 3 Pro / Claude Opus 4.7 (5% 流量)
 - **Multi-tenant 1 model**: 不为每客户独立部署, S-LoRA 服务多 LoRA
 
 ### 变体 2: 代码助手 — 高 QPS 但 query 复杂

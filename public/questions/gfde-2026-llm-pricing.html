@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>💵 [Pricing] 2026 LLM API 价格速查 (Gemini 3 / Claude 4.7 / GPT-5.5) · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=0721b730">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE / 💵 [Pricing] 2026 LLM API 价格速查 (Gemini 3 / Claude 4.7 / GPT-5.5)</div>
+  <h1>💵 [Pricing] 2026 LLM API 价格速查 (Gemini 3 / Claude 4.7 / GPT-5.5)</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde">Google FDE</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#1a73e8"><strong>Google FDE</strong> · Senior+ · 📋 10 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-2026-llm-pricing.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-2026-llm-pricing.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Google FDE cost math 必备 — Gemini 3 Pro/Flash、Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5、GPT-5.5/5.4 全价表。面试默认用 Gemini 3 Pro/Flash 量化 (Google 主场). 含 3-tier routing template + 心算公式 + caching/batch 优惠表。</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>💵 2026 年 LLM API 价格速查 (Google FDE 必背)</h3>
+<p><strong>为什么这页存在</strong>: Google FDE 面试 cost math 是必考。你脱口而出 "1M tokens 大概多少钱" + 知道选哪个模型 routing, 加分明显。<strong>面试场默认用 Gemini 3 Pro / Flash 量化</strong> (Google FDE, 主场优势)。</p>
+<p><strong>Last updated</strong>: 2026-05-21</p>
+<hr />
+<h3>📊 主流 LLM 价格表 (per 1M tokens, USD)</h3>
+<table class="md-table"><thead><tr><th>Model</th><th style="text-align:right">Input</th><th style="text-align:right">Output</th><th>备注</th></tr></thead><tbody><tr><td><strong>Gemini 3 Pro</strong> ⭐</td><td style="text-align:right">$2.00</td><td style="text-align:right">$12.00</td><td>≤200K context; 上 200K 翻倍 $4 / $18</td></tr><tr><td><strong>Gemini 3 Flash</strong> ⭐</td><td style="text-align:right">$0.50</td><td style="text-align:right">$3.00</td><td>Pro 1/4 input 价</td></tr><tr><td><strong>Gemini 3 Flash-Lite</strong></td><td style="text-align:right">$0.10</td><td style="text-align:right">$0.40</td><td>super cheap, batch</td></tr><tr><td><strong>Claude Opus 4.7</strong></td><td style="text-align:right">$5.00</td><td style="text-align:right">$25.00</td><td>Apr 2026; 新 tokenizer 多出 ~35% token</td></tr><tr><td><strong>Claude Sonnet 4.6</strong></td><td style="text-align:right">$3.00</td><td style="text-align:right">$15.00</td><td>mid-tier mainstream</td></tr><tr><td><strong>Claude Haiku 4.5</strong></td><td style="text-align:right">$1.00</td><td style="text-align:right">$5.00</td><td>cheap Claude</td></tr><tr><td><strong>GPT-5.5</strong></td><td style="text-align:right">$5.00</td><td style="text-align:right">$30.00</td><td>Apr 2026 涨价: 比 GPT-5 翻 2x</td></tr><tr><td><strong>GPT-5.5 mini</strong></td><td style="text-align:right">$1.25</td><td style="text-align:right">$7.50</td><td></td></tr><tr><td><strong>GPT-5.4</strong></td><td style="text-align:right">$2.50</td><td style="text-align:right">$15.00</td><td>仍 available 作 backup</td></tr><tr><td><strong>GPT-5.4 mini</strong></td><td style="text-align:right">$0.75</td><td style="text-align:right">$4.50</td><td></td></tr><tr><td><strong>GPT-5.4 nano</strong></td><td style="text-align:right">$0.10</td><td style="text-align:right">$0.40</td><td>super cheap</td></tr><tr><td><strong>o-series (reasoning)</strong></td><td style="text-align:right">$15+</td><td style="text-align:right">$60+</td><td>high-reasoning, 高价</td></tr></tbody></table>
+<p>⭐ = Google FDE 面试<strong>首选 quantization 基准</strong></p>
+<hr />
+<h3>🎯 5x output:input 是普遍规律</h3>
+<blockquote><p>Anthropic / Google 都保持 output 是 input 5x 价格。OpenAI GPT-5.5 是 6x。 心算公式: input price × 5 ≈ output price (Claude / Gemini)</p></blockquote>
+<hr />
+<h3>💰 常用 cost 心算 (Gemini 3 Pro 基准)</h3>
+<h4>单次 call 大概多少钱</h4>
+<table class="md-table"><thead><tr><th>Context size</th><th>Input cost (Gemini 3 Pro)</th><th>Output cost (假设 500 token output)</th></tr></thead><tbody><tr><td>1K tokens</td><td>$0.002</td><td>$0.006</td></tr><tr><td>10K tokens</td><td>$0.02</td><td>$0.006</td></tr><tr><td>100K tokens</td><td>$0.20</td><td>$0.006</td></tr><tr><td>128K tokens</td><td>$0.26</td><td>$0.006</td></tr><tr><td>200K tokens</td><td>$0.40</td><td>$0.006</td></tr><tr><td><strong>500K tokens</strong> (above 200K threshold!)</td><td>$2.00 (at $4/1M)</td><td>$0.009 (at $18/1M)</td></tr><tr><td><strong>1M tokens</strong> (full Gemini Pro context)</td><td>$4.00 (at $4/1M)</td><td>$0.009</td></tr></tbody></table>
+<h4>Per-用户成本估算</h4>
+<table class="md-table"><thead><tr><th>用户行为</th><th>估算 cost</th></tr></thead><tbody><tr><td>Chat 用户 1 turn (~2K context + 500 output)</td><td>~$0.01 (Gemini Pro) / ~$0.003 (Flash)</td></tr><tr><td>用户 1 个 session (~10 turn, 50K accumulated)</td><td>~$0.10 (Pro) / ~$0.03 (Flash)</td></tr><tr><td>用户 1 天 (~20 sessions)</td><td>~$2 (Pro) / ~$0.60 (Flash)</td></tr><tr><td>用户 1 月 (active)</td><td>~$60 (Pro) / ~$18 (Flash)</td></tr><tr><td>Agent task (50 LLM calls + 10 tool calls)</td><td>~$0.50-2</td></tr></tbody></table>
+<h4>Per-feature daily cost (10K QPS workload)</h4>
+<table class="md-table"><thead><tr><th>Setup</th><th>Daily cost</th></tr></thead><tbody><tr><td>100% Gemini 3 Flash, 2K context avg</td><td>~$8,000 / day</td></tr><tr><td>100% Gemini 3 Pro, 2K context avg</td><td>~$32,000 / day</td></tr><tr><td><strong>Hybrid: 80% Flash + 20% Pro</strong></td><td>~<strong>$12,500 / day</strong></td></tr><tr><td>100% Claude Opus 4.7</td><td>~$80,000 / day</td></tr><tr><td>Hybrid with cache (50% hit)</td><td>~$6,000 / day</td></tr></tbody></table>
+<hr />
+<h3>🎚 Cost-aware routing 3-tier 模板</h3>
+<p>面试场默认这个 template:</p>
+<pre class="language-python"><code class="language-python">async def route_model(query, complexity_score):
+    if complexity_score &lt; 0.3:
+        # 简单 query (FAQ / lookup / 短答) — 90% 流量
+        return 'gemini-3-flash'        # $0.50/$3 per 1M
+    elif complexity_score &lt; 0.7:
+        # 中等 query (reasoning / multi-step) — 8% 流量
+        return 'gemini-3-pro'          # $2/$12 per 1M
+    else:
+        # 复杂 query (long context / hard reasoning) — 2% 流量
+        return 'claude-opus-4.7'       # $5/$25 per 1M
+        # or 'gpt-5.5' for OpenAI-strong tasks</code></pre>
+<p><strong>Cost weighted average</strong> (80/15/5 split):</p>
+<ul><li>Flash: 0.8 × $0.50 = $0.40</li><li>Pro: 0.15 × $2 = $0.30</li><li>Opus: 0.05 × $5 = $0.25</li><li><strong>Blended input cost: ~$0.95 per 1M</strong> (vs $5 if 100% Opus)</li><li><strong>Savings: ~80% 的成本 reduction</strong>, quality on average 接近 Pro</li></ul>
+<hr />
+<h3>🧊 Caching / batch / prefix 降本</h3>
+<p>不同 provider 有不同 discount:</p>
+<table class="md-table"><thead><tr><th>Provider</th><th>Mechanism</th><th>Discount</th></tr></thead><tbody><tr><td><strong>Anthropic</strong></td><td>Prompt caching</td><td>Cached input <strong>90% off</strong> (e.g., Opus cached input $0.50/1M)</td></tr><tr><td><strong>Anthropic</strong></td><td>Batch API</td><td><strong>50% off</strong> standard rates</td></tr><tr><td><strong>Google</strong></td><td>Implicit cache (auto)</td><td>up to <strong>75% off</strong> input</td></tr><tr><td><strong>Google</strong></td><td>Batch</td><td><strong>50% off</strong></td></tr><tr><td><strong>OpenAI</strong></td><td>Cached input</td><td><strong>50% off</strong> typically</td></tr><tr><td><strong>OpenAI</strong></td><td>Batch</td><td><strong>50% off</strong></td></tr><tr><td><strong>OpenAI</strong></td><td>Flex (slower)</td><td><strong>50% off</strong> standard</td></tr><tr><td><strong>OpenAI</strong></td><td>Priority (faster)</td><td><strong>2.5x</strong> standard ($$$)</td></tr></tbody></table>
+<p><strong>面试用法</strong>:</p>
+<blockquote><p>"For repeated agent loop with shared system prompt, Anthropic prompt caching gives 90% off cached input — so a 50K-token system prompt costs $2.50 first call but $0.25 every subsequent call. Combined with batch discount, sustained workload runs ~10-20% of peak rates."</p></blockquote>
+<hr />
+<h3>🏷 vs 自托管 (vLLM / SGLang)</h3>
+<table class="md-table"><thead><tr><th>Approach</th><th>Effective $/1M tokens</th><th>Setup cost</th></tr></thead><tbody><tr><td>Gemini 3 Flash (API)</td><td>$0.50 / $3</td><td>$0</td></tr><tr><td>Self-host Llama 4 70B (vLLM, H100)</td><td>~$0.20-0.50</td><td>GPU + ops time</td></tr><tr><td>Self-host Mistral / Mixtral</td><td>~$0.10-0.30</td><td>GPU + ops time</td></tr></tbody></table>
+<p><strong>心算 break-even</strong>:</p>
+<ul><li>自托管 1 个 H100 ($3/hr) × 5K tokens/sec = ~$0.0002/1K = $0.20/1M raw compute</li><li>加 ops overhead (model 维护 / monitoring / quality eval): ~$0.30-0.50/1M</li><li><strong>Crossover</strong>: 月消耗 &gt; $30K LLM cost 才值得自托管</li></ul>
+<hr />
+<h3>📏 Context window 上限 (2026)</h3>
+<table class="md-table"><thead><tr><th>Model</th><th>Standard context</th><th>Max context</th></tr></thead><tbody><tr><td>Gemini 3 Pro</td><td>1M tokens</td><td>2M experimental</td></tr><tr><td>Gemini 3 Flash</td><td>1M tokens</td><td>1M</td></tr><tr><td>Claude Opus 4.7</td><td>200K</td><td>1M (beta)</td></tr><tr><td>Claude Sonnet 4.6</td><td>200K</td><td>1M (beta)</td></tr><tr><td>GPT-5.5</td><td>400K</td><td>1M (with cache)</td></tr><tr><td>GPT-5.4</td><td>200K</td><td>400K</td></tr></tbody></table>
+<p><strong>Trend</strong>: 1M context 成主流, 但 cost 线性增长, 不能滥用. <strong>Hybrid (RAG + long-context) 仍是 production 默认.</strong></p>
+<hr />
+<h3>🎤 面试常用 quotable 句子</h3>
+<p>把以下背下来, 面试现场直接说:</p>
+<blockquote><p><strong>On cost-aware routing</strong>: "我们 default to Gemini 3 Flash at $0.50/1M input — 90% query 走它. Complex query escalate to Gemini 3 Pro at $2/1M. 真正难的少量 query 升 Claude Opus 4.7 at $5/$25. Blended cost 大概在 $0.7-1 per 1M token, 比纯 flagship 省 80%."</p></blockquote>
+<blockquote><p><strong>On context size</strong>: "128K context call cost about $0.26 with Gemini 3 Pro — not nothing, but 100 turn 累积也才 $26. Long-context viable for high-value workload."</p></blockquote>
+<blockquote><p><strong>On caching</strong>: "With Anthropic prompt caching, agent loop sharing 50K system prompt — first call costs $2.50, every subsequent only $0.25 — 10x reduction on repeated prefix."</p></blockquote>
+<blockquote><p><strong>On break-even self-host</strong>: "Self-host break-even 月 LLM 消耗 $30K+. Below that, API cheaper than GPU ops overhead. Above that, vLLM / SGLang 自托管 ROI 明显, 加上 latency / privacy 收益."</p></blockquote>
+<hr />
+<h3>🚨 价格变动 watch list</h3>
+<table class="md-table"><thead><tr><th>模型</th><th>变化方向</th><th>警觉点</th></tr></thead><tbody><tr><td>GPT-5.5</td><td>比 GPT-5 涨 2x (Apr 2026)</td><td>OpenAI 走高端 / 高 margin 路线</td></tr><tr><td>Claude Opus 4.7</td><td>单价没变</td><td>但 tokenizer 改, 同样文本多 35% token, <strong>隐性涨价</strong></td></tr><tr><td>Gemini 3 Pro</td><td>没变</td><td>维持 $2/$12 价格优势</td></tr><tr><td>Gemini 3 Flash</td><td>没变</td><td>$0.50/$3 — 大部分 production 主力</td></tr></tbody></table>
+<p><strong>Trend</strong>: API 价不再单边降. 不同厂商 differentiate by <strong>price tier / context / caching / batch</strong>.</p>
+<hr />
+<h3>Cheat Sheet (1 张图)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">💵 2026 LLM 价 (Input / Output per 1M tokens)
+
+Cheap tier:
+  Gemini 3 Flash      $0.50 / $3
+  Claude Haiku 4.5    $1 / $5
+  GPT-5.4 mini        $0.75 / $4.50
+
+Mid tier:
+  Gemini 3 Pro        $2 / $12        ← Google FDE 默认基准
+  Claude Sonnet 4.6   $3 / $15
+  GPT-5.4             $2.50 / $15
+
+Flagship:
+  Claude Opus 4.7     $5 / $25
+  GPT-5.5             $5 / $30
+  Gemini 3 Pro (&gt;200K)$4 / $18
+
+Routing template (Google FDE):
+  90% → Gemini 3 Flash
+  9% → Gemini 3 Pro
+  1% → Claude Opus 4.7
+
+Cost levers:
+  Prompt cache: Anthropic 90% off
+  Batch: 50% off (all)
+  Self-host break-even: $30K+/month
+
+Cost math 心算:
+  128K context @ Gemini 3 Pro = $0.26 in
+  1M context @ Gemini 3 Pro (&gt;200K) = $4 in
+  Chat turn (2K) = ~$0.01
+  Session (10 turn) = ~$0.10</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t4-permissions-recovery.html">← T4.4 · 权限 / 安全边界 / 失败恢复</a>
+    <a href="gfde-english-terminology.html">📣 [English Terminology] Google FDE 面试英语术语 + 音标发音 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## 💵 2026 年 LLM API 价格速查 (Google FDE 必背)
+
+**为什么这页存在**: Google FDE 面试 cost math 是必考。你脱口而出 "1M tokens 大概多少钱" + 知道选哪个模型 routing, 加分明显。**面试场默认用 Gemini 3 Pro / Flash 量化** (Google FDE, 主场优势)。
+
+**Last updated**: 2026-05-21
+
+---
+
+## 📊 主流 LLM 价格表 (per 1M tokens, USD)
+
+| Model | Input | Output | 备注 |
+|---|---:|---:|---|
+| **Gemini 3 Pro** ⭐ | $2.00 | $12.00 | ≤200K context; 上 200K 翻倍 $4 / $18 |
+| **Gemini 3 Flash** ⭐ | $0.50 | $3.00 | Pro 1/4 input 价 |
+| **Gemini 3 Flash-Lite** | $0.10 | $0.40 | super cheap, batch |
+| **Claude Opus 4.7** | $5.00 | $25.00 | Apr 2026; 新 tokenizer 多出 ~35% token |
+| **Claude Sonnet 4.6** | $3.00 | $15.00 | mid-tier mainstream |
+| **Claude Haiku 4.5** | $1.00 | $5.00 | cheap Claude |
+| **GPT-5.5** | $5.00 | $30.00 | Apr 2026 涨价: 比 GPT-5 翻 2x |
+| **GPT-5.5 mini** | $1.25 | $7.50 | |
+| **GPT-5.4** | $2.50 | $15.00 | 仍 available 作 backup |
+| **GPT-5.4 mini** | $0.75 | $4.50 | |
+| **GPT-5.4 nano** | $0.10 | $0.40 | super cheap |
+| **o-series (reasoning)** | $15+ | $60+ | high-reasoning, 高价 |
+
+⭐ = Google FDE 面试**首选 quantization 基准**
+
+---
+
+## 🎯 5x output:input 是普遍规律
+
+> Anthropic / Google 都保持 output 是 input 5x 价格。OpenAI GPT-5.5 是 6x。
+> 心算公式: input price × 5 ≈ output price (Claude / Gemini)
+
+---
+
+## 💰 常用 cost 心算 (Gemini 3 Pro 基准)
+
+### 单次 call 大概多少钱
+
+| Context size | Input cost (Gemini 3 Pro) | Output cost (假设 500 token output) |
+|---|---|---|
+| 1K tokens | $0.002 | $0.006 |
+| 10K tokens | $0.02 | $0.006 |
+| 100K tokens | $0.20 | $0.006 |
+| 128K tokens | $0.26 | $0.006 |
+| 200K tokens | $0.40 | $0.006 |
+| **500K tokens** (above 200K threshold!) | $2.00 (at $4/1M) | $0.009 (at $18/1M) |
+| **1M tokens** (full Gemini Pro context) | $4.00 (at $4/1M) | $0.009 |
+
+### Per-用户成本估算
+
+| 用户行为 | 估算 cost |
+|---|---|
+| Chat 用户 1 turn (~2K context + 500 output) | ~$0.01 (Gemini Pro) / ~$0.003 (Flash) |
+| 用户 1 个 session (~10 turn, 50K accumulated) | ~$0.10 (Pro) / ~$0.03 (Flash) |
+| 用户 1 天 (~20 sessions) | ~$2 (Pro) / ~$0.60 (Flash) |
+| 用户 1 月 (active) | ~$60 (Pro) / ~$18 (Flash) |
+| Agent task (50 LLM calls + 10 tool calls) | ~$0.50-2 |
+
+### Per-feature daily cost (10K QPS workload)
+
+| Setup | Daily cost |
+|---|---|
+| 100% Gemini 3 Flash, 2K context avg | ~$8,000 / day |
+| 100% Gemini 3 Pro, 2K context avg | ~$32,000 / day |
+| **Hybrid: 80% Flash + 20% Pro** | ~**$12,500 / day** |
+| 100% Claude Opus 4.7 | ~$80,000 / day |
+| Hybrid with cache (50% hit) | ~$6,000 / day |
+
+---
+
+## 🎚 Cost-aware routing 3-tier 模板
+
+面试场默认这个 template:
+
+```python
+async def route_model(query, complexity_score):
+    if complexity_score < 0.3:
+        # 简单 query (FAQ / lookup / 短答) — 90% 流量
+        return 'gemini-3-flash'        # $0.50/$3 per 1M
+    elif complexity_score < 0.7:
+        # 中等 query (reasoning / multi-step) — 8% 流量
+        return 'gemini-3-pro'          # $2/$12 per 1M
+    else:
+        # 复杂 query (long context / hard reasoning) — 2% 流量
+        return 'claude-opus-4.7'       # $5/$25 per 1M
+        # or 'gpt-5.5' for OpenAI-strong tasks
+```
+
+**Cost weighted average** (80/15/5 split):
+- Flash: 0.8 × $0.50 = $0.40
+- Pro: 0.15 × $2 = $0.30
+- Opus: 0.05 × $5 = $0.25
+- **Blended input cost: ~$0.95 per 1M** (vs $5 if 100% Opus)
+- **Savings: ~80% 的成本 reduction**, quality on average 接近 Pro
+
+---
+
+## 🧊 Caching / batch / prefix 降本
+
+不同 provider 有不同 discount:
+
+| Provider | Mechanism | Discount |
+|---|---|---|
+| **Anthropic** | Prompt caching | Cached input **90% off** (e.g., Opus cached input $0.50/1M) |
+| **Anthropic** | Batch API | **50% off** standard rates |
+| **Google** | Implicit cache (auto) | up to **75% off** input |
+| **Google** | Batch | **50% off** |
+| **OpenAI** | Cached input | **50% off** typically |
+| **OpenAI** | Batch | **50% off** |
+| **OpenAI** | Flex (slower) | **50% off** standard |
+| **OpenAI** | Priority (faster) | **2.5x** standard ($$$) |
+
+**面试用法**:
+> "For repeated agent loop with shared system prompt, Anthropic prompt caching gives 90% off cached input — so a 50K-token system prompt costs $2.50 first call but $0.25 every subsequent call. Combined with batch discount, sustained workload runs ~10-20% of peak rates."
+
+---
+
+## 🏷 vs 自托管 (vLLM / SGLang)
+
+| Approach | Effective $/1M tokens | Setup cost |
+|---|---|---|
+| Gemini 3 Flash (API) | $0.50 / $3 | $0 |
+| Self-host Llama 4 70B (vLLM, H100) | ~$0.20-0.50 | GPU + ops time |
+| Self-host Mistral / Mixtral | ~$0.10-0.30 | GPU + ops time |
+
+**心算 break-even**:
+- 自托管 1 个 H100 ($3/hr) × 5K tokens/sec = ~$0.0002/1K = $0.20/1M raw compute
+- 加 ops overhead (model 维护 / monitoring / quality eval): ~$0.30-0.50/1M
+- **Crossover**: 月消耗 > $30K LLM cost 才值得自托管
+
+---
+
+## 📏 Context window 上限 (2026)
+
+| Model | Standard context | Max context |
+|---|---|---|
+| Gemini 3 Pro | 1M tokens | 2M experimental |
+| Gemini 3 Flash | 1M tokens | 1M |
+| Claude Opus 4.7 | 200K | 1M (beta) |
+| Claude Sonnet 4.6 | 200K | 1M (beta) |
+| GPT-5.5 | 400K | 1M (with cache) |
+| GPT-5.4 | 200K | 400K |
+
+**Trend**: 1M context 成主流, 但 cost 线性增长, 不能滥用. **Hybrid (RAG + long-context) 仍是 production 默认.**
+
+---
+
+## 🎤 面试常用 quotable 句子
+
+把以下背下来, 面试现场直接说:
+
+> **On cost-aware routing**: "我们 default to Gemini 3 Flash at $0.50/1M input — 90% query 走它. Complex query escalate to Gemini 3 Pro at $2/1M. 真正难的少量 query 升 Claude Opus 4.7 at $5/$25. Blended cost 大概在 $0.7-1 per 1M token, 比纯 flagship 省 80%."
+
+> **On context size**: "128K context call cost about $0.26 with Gemini 3 Pro — not nothing, but 100 turn 累积也才 $26. Long-context viable for high-value workload."
+
+> **On caching**: "With Anthropic prompt caching, agent loop sharing 50K system prompt — first call costs $2.50, every subsequent only $0.25 — 10x reduction on repeated prefix."
+
+> **On break-even self-host**: "Self-host break-even 月 LLM 消耗 $30K+. Below that, API cheaper than GPU ops overhead. Above that, vLLM / SGLang 自托管 ROI 明显, 加上 latency / privacy 收益."
+
+---
+
+## 🚨 价格变动 watch list
+
+| 模型 | 变化方向 | 警觉点 |
+|---|---|---|
+| GPT-5.5 | 比 GPT-5 涨 2x (Apr 2026) | OpenAI 走高端 / 高 margin 路线 |
+| Claude Opus 4.7 | 单价没变 | 但 tokenizer 改, 同样文本多 35% token, **隐性涨价** |
+| Gemini 3 Pro | 没变 | 维持 $2/$12 价格优势 |
+| Gemini 3 Flash | 没变 | $0.50/$3 — 大部分 production 主力 |
+
+**Trend**: API 价不再单边降. 不同厂商 differentiate by **price tier / context / caching / batch**.
+
+---
+
+## Cheat Sheet (1 张图)
+
+```
+💵 2026 LLM 价 (Input / Output per 1M tokens)
+
+Cheap tier:
+  Gemini 3 Flash      $0.50 / $3
+  Claude Haiku 4.5    $1 / $5
+  GPT-5.4 mini        $0.75 / $4.50
+
+Mid tier:
+  Gemini 3 Pro        $2 / $12        ← Google FDE 默认基准
+  Claude Sonnet 4.6   $3 / $15
+  GPT-5.4             $2.50 / $15
+
+Flagship:
+  Claude Opus 4.7     $5 / $25
+  GPT-5.5             $5 / $30
+  Gemini 3 Pro (>200K)$4 / $18
+
+Routing template (Google FDE):
+  90% → Gemini 3 Flash
+  9% → Gemini 3 Pro
+  1% → Claude Opus 4.7
+
+Cost levers:
+  Prompt cache: Anthropic 90% off
+  Batch: 50% off (all)
+  Self-host break-even: $30K+/month
+
+Cost math 心算:
+  128K context @ Gemini 3 Pro = $0.26 in
+  1M context @ Gemini 3 Pro (>200K) = $4 in
+  Chat turn (2K) = ~$0.01
+  Session (10 turn) = ~$0.10
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

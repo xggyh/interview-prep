@@ -44,7 +44,7 @@
 <hr />
 <h3>1. 心智模型 — LLM application 是 distributed system + AI failure modes</h3>
 <p>不是 traditional web service：</p>
-<ul><li>单 request 可能 30s + (vs 100ms)</li><li>Per-request cost $0.01 - $1 (vs ~free)</li><li>Output non-deterministic</li><li>Tool calls 让 1 request → 多 downstream call</li><li>Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota</li></ul>
+<ul><li>单 request 可能 30s + (vs 100ms)</li><li>Per-request cost $0.001 (Gemini 3 Flash) - $1 (Claude Opus 4.7 long context) (vs ~free for traditional)</li><li>Output non-deterministic</li><li>Tool calls 让 1 request → 多 downstream call</li><li>Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota</li></ul>
 <p><strong>Google FDE 在 T3 考的是</strong>: 你能不能 design a production-grade LLM app considering all these.</p>
 <hr />
 <h3>2. 6 个核心子主题（对应场景题）</h3>
@@ -93,12 +93,12 @@ Prompts     (reusable prompt templates)</code></pre>
 <h4>Layer 4: Cost-aware routing</h4>
 <pre class="language-python"><code class="language-python">def route(request, complexity_score):
     if complexity_score &lt; 0.3:
-        return "gpt-4o-mini"  # 90% cases
+        return "gemini-3-flash"     # $0.50 / $3 per 1M — 90% cases
     elif complexity_score &lt; 0.7:
-        return "gpt-4o"
+        return "gemini-3-pro"       # $2 / $12 per 1M
     else:
-        return "gpt-4-turbo"  # hard cases only</code></pre>
-<p>Cost optimization 10-50% without quality loss.</p>
+        return "claude-opus-4.7"    # $5 / $25 per 1M — hard cases only</code></pre>
+<p>Cost optimization 50-80% without quality loss. <strong>Blended cost</strong> in this split: ~$0.85/1M vs $5/1M if all-Opus.</p>
 <hr />
 <h3>8. Eventual Consistency — Agent multi-step state</h3>
 <p>Agent 跑 5 步：</p>
@@ -180,7 +180,7 @@ Your resume hooks:
 
 不是 traditional web service：
 - 单 request 可能 30s + (vs 100ms)
-- Per-request cost $0.01 - $1 (vs ~free)
+- Per-request cost $0.001 (Gemini 3 Flash) - $1 (Claude Opus 4.7 long context) (vs ~free for traditional)
 - Output non-deterministic
 - Tool calls 让 1 request → 多 downstream call
 - Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota
@@ -313,14 +313,14 @@ LLM Client (Claude Desktop / VSCode / 任何 app)
 ```python
 def route(request, complexity_score):
     if complexity_score < 0.3:
-        return "gpt-4o-mini"  # 90% cases
+        return "gemini-3-flash"     # $0.50 / $3 per 1M — 90% cases
     elif complexity_score < 0.7:
-        return "gpt-4o"
+        return "gemini-3-pro"       # $2 / $12 per 1M
     else:
-        return "gpt-4-turbo"  # hard cases only
+        return "claude-opus-4.7"    # $5 / $25 per 1M — hard cases only
 ```
 
-Cost optimization 10-50% without quality loss.
+Cost optimization 50-80% without quality loss. **Blended cost** in this split: ~$0.85/1M vs $5/1M if all-Opus.
 
 ---
 

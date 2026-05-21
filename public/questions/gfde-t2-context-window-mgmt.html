@@ -60,7 +60,7 @@
 <p><strong>4. Model context limit</strong></p>
 <blockquote><p>"Current model 128K — moving to 1M would solve? Or always more demand?"</p></blockquote>
 <p><strong>5. Cost budget</strong></p>
-<blockquote><p>"Per-call cost matters? 128K × $0.003 = $0.40 per call adds up."</p></blockquote>
+<blockquote><p>"Per-call cost matters? 128K context × $2/1M (Gemini 3 Pro) = $0.26 per call adds up — 100 turn 累积 $26."</p></blockquote>
 <hr />
 <h3>5 步框架</h3>
 <table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify agent shape + state importance</td></tr><tr><td>5-15 min</td><td>4 strategies overview</td></tr><tr><td>15-25 min</td><td>Summary-based compression (hierarchical)</td></tr><tr><td>25-35 min</td><td>External memory (vector DB / KV store)</td></tr><tr><td>35-45 min</td><td>Tool output handling + observability</td></tr></tbody></table>
@@ -200,11 +200,11 @@ def recall(query):
 <hr />
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Summary quality is critical. How tune?" <strong>A</strong>:</p>
-<ul><li><strong>Structured summary</strong> template: 'Decisions / Files modified / Open TODOs / User preferences'</li><li><strong>Cheaper LLM for summary</strong> (gpt-4o-mini): summary doesn't need top quality</li><li><strong>Test recall</strong>: occasional probe 'what did we decide about X' → if model misses, summary improved</li><li><strong>Versioned summaries</strong>: keep both old + new during transition, prefer new if no info lost</li></ul>
+<ul><li><strong>Structured summary</strong> template: 'Decisions / Files modified / Open TODOs / User preferences'</li><li><strong>Cheaper LLM for summary</strong> (Gemini 3 Flash $0.50/$3 per 1M): summary doesn't need flagship quality</li><li><strong>Test recall</strong>: occasional probe 'what did we decide about X' → if model misses, summary improved</li><li><strong>Versioned summaries</strong>: keep both old + new during transition, prefer new if no info lost</li></ul>
 <p><strong>Q2</strong>: "1M context models exist now (Gemini 1.5, Claude 3.7). Just use them?" <strong>A</strong>:</p>
-<ul><li><strong>Cost still matters</strong>: 1M tokens × $0.003 = $3 per call</li><li><strong>Latency</strong>: 1M context attention has higher per-call latency</li><li><strong>Lost-in-middle still real</strong>: even with 1M, middle gets worse attention</li><li><strong>Use 1M for</strong>: cold-start (load 1 huge doc), not for accumulating 50-turn agent state</li><li><strong>Hybrid</strong>: short-term active context fits 32K, archived in vector DB</li></ul>
+<ul><li><strong>Cost still matters</strong>: 1M tokens × $4/1M (Gemini 3 Pro &gt;200K tier) = $4 per call</li><li><strong>Latency</strong>: 1M context attention has higher per-call latency</li><li><strong>Lost-in-middle still real</strong>: even with 1M, middle gets worse attention</li><li><strong>Use 1M for</strong>: cold-start (load 1 huge doc), not for accumulating 50-turn agent state</li><li><strong>Hybrid</strong>: short-term active context fits 32K, archived in vector DB</li></ul>
 <p><strong>Q3</strong>: "Cost per session — what's economic?" <strong>A</strong>: Depends. Rule of thumb:</p>
-<ul><li>$0.05-0.20 per chat turn: acceptable for consumer</li><li>$1-5 per agent task: acceptable for B2B / dev tool</li><li>Higher → must optimize via compaction + cheaper models on summarize</li></ul>
+<ul><li>$0.01-0.05 per chat turn (Gemini 3 Flash): consumer-acceptable</li><li>$0.10-0.30 per turn (Gemini 3 Pro): B2B / pro</li><li>$1-5 per agent task (mixed flagship): dev tool / enterprise</li><li>Higher → must optimize via compaction + cheaper models on summarize</li></ul>
 <p><strong>Q4</strong>: "User says 'pick up where we left off' from yesterday's session. Practical?" <strong>A</strong>:</p>
 <ul><li>Persist conversation state to DB on session-end</li><li>On resume: load last summary + last 5 turns</li><li>Optionally: snapshot before close, semantic-index everything</li><li><strong>Practical</strong>: usually 80% restore is enough; pixel-perfect restore not worth the cost</li></ul>
 <p><strong>Q5</strong>: "Agent forgets recent decision because compaction summarized it. How avoid?" <strong>A</strong>:</p>
@@ -254,10 +254,11 @@ Lost-in-middle mitigation:
   Periodic 'key decisions' bullet
   Avoid burying in middle
 
-Cost economics:
-  $0.05-0.20/turn: consumer chat
-  $1-5/task: B2B agent
-  Use cheaper LLM for summarization
+Cost economics (2026 pricing):
+  $0.003-0.01/turn: consumer chat (Gemini 3 Flash)
+  $0.05-0.20/turn: B2B chat (Gemini 3 Pro)
+  $0.50-3/task: agent task (mixed Pro + Opus flagship)
+  Use Gemini 3 Flash / Claude Haiku 4.5 for summarization
 
 Observability:
   Per-turn token count
@@ -329,7 +330,7 @@ Observability:
 
 **5. Cost budget**
 
-> "Per-call cost matters? 128K × $0.003 = $0.40 per call adds up."
+> "Per-call cost matters? 128K context × $2/1M (Gemini 3 Pro) = $0.26 per call adds up — 100 turn 累积 $26."
 
 ---
 
@@ -597,13 +598,13 @@ Observability:
 **Q1**: "Summary quality is critical. How tune?"
 **A**:
 - **Structured summary** template: 'Decisions / Files modified / Open TODOs / User preferences'
-- **Cheaper LLM for summary** (gpt-4o-mini): summary doesn't need top quality
+- **Cheaper LLM for summary** (Gemini 3 Flash $0.50/$3 per 1M): summary doesn't need flagship quality
 - **Test recall**: occasional probe 'what did we decide about X' → if model misses, summary improved
 - **Versioned summaries**: keep both old + new during transition, prefer new if no info lost
 
 **Q2**: "1M context models exist now (Gemini 1.5, Claude 3.7). Just use them?"
 **A**:
-- **Cost still matters**: 1M tokens × $0.003 = $3 per call
+- **Cost still matters**: 1M tokens × $4/1M (Gemini 3 Pro >200K tier) = $4 per call
 - **Latency**: 1M context attention has higher per-call latency
 - **Lost-in-middle still real**: even with 1M, middle gets worse attention
 - **Use 1M for**: cold-start (load 1 huge doc), not for accumulating 50-turn agent state
@@ -611,8 +612,9 @@ Observability:
 
 **Q3**: "Cost per session — what's economic?"
 **A**: Depends. Rule of thumb:
-- $0.05-0.20 per chat turn: acceptable for consumer
-- $1-5 per agent task: acceptable for B2B / dev tool
+- $0.01-0.05 per chat turn (Gemini 3 Flash): consumer-acceptable
+- $0.10-0.30 per turn (Gemini 3 Pro): B2B / pro
+- $1-5 per agent task (mixed flagship): dev tool / enterprise
 - Higher → must optimize via compaction + cheaper models on summarize
 
 **Q4**: "User says 'pick up where we left off' from yesterday's session. Practical?"
@@ -695,10 +697,11 @@ Lost-in-middle mitigation:
   Periodic 'key decisions' bullet
   Avoid burying in middle
 
-Cost economics:
-  $0.05-0.20/turn: consumer chat
-  $1-5/task: B2B agent
-  Use cheaper LLM for summarization
+Cost economics (2026 pricing):
+  $0.003-0.01/turn: consumer chat (Gemini 3 Flash)
+  $0.05-0.20/turn: B2B chat (Gemini 3 Pro)
+  $0.50-3/task: agent task (mixed Pro + Opus flagship)
+  Use Gemini 3 Flash / Claude Haiku 4.5 for summarization
 
 Observability:
   Per-turn token count

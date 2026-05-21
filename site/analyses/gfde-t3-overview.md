@@ -8,7 +8,7 @@
 
 不是 traditional web service：
 - 单 request 可能 30s + (vs 100ms)
-- Per-request cost $0.01 - $1 (vs ~free)
+- Per-request cost $0.001 (Gemini 3 Flash) - $1 (Claude Opus 4.7 long context) (vs ~free for traditional)
 - Output non-deterministic
 - Tool calls 让 1 request → 多 downstream call
 - Failure mode 多: model error + tool error + LLM hallucination + 上游 API quota
@@ -141,14 +141,14 @@ LLM Client (Claude Desktop / VSCode / 任何 app)
 ```python
 def route(request, complexity_score):
     if complexity_score < 0.3:
-        return "gpt-4o-mini"  # 90% cases
+        return "gemini-3-flash"     # $0.50 / $3 per 1M — 90% cases
     elif complexity_score < 0.7:
-        return "gpt-4o"
+        return "gemini-3-pro"       # $2 / $12 per 1M
     else:
-        return "gpt-4-turbo"  # hard cases only
+        return "claude-opus-4.7"    # $5 / $25 per 1M — hard cases only
 ```
 
-Cost optimization 10-50% without quality loss.
+Cost optimization 50-80% without quality loss. **Blended cost** in this split: ~$0.85/1M vs $5/1M if all-Opus.
 
 ---
 
