@@ -2,21 +2,688 @@
 
 > "Design **reliable webhook integration** when client systems **frequently go offline**. Cover retry, idempotency, dead-letter handling, backpressure."
 
-**出处**：fde.academy 技术 round 经典. Stripe-style webhook problem 适用所有 enterprise.
+**出处**: fde.academy 技术 round 经典. Stripe / Shopify / Twilio 这类 webhook producer 都解过这个问题, 也是任何 enterprise SaaS 必备能力.
 
-**Round**：Technical Integration (45 min)
+**Round**: Technical Integration (45 min)
 
 ---
 
 ## 这道题在考什么
 
-考你做过 **producer-side webhook delivery** —— Stripe/Twilio/Shopify 都解过的标准问题：
+考你做过 **producer-side webhook delivery** — 真实的 production 痛点:
 
-1. **At-least-once vs exactly-once** —— 哪个 realistic
-2. **Idempotency model** —— 客户端 dedup 还是服务端
-3. **Retry strategy** —— exponential backoff + jitter + cap
-4. **DLQ (dead letter queue)** —— 永远失败的事件怎么 handle
-5. **Backpressure** —— 客户端 slow，我方 queue 不能爆
+1. **At-least-once vs exactly-once** — 哪个 realistic
+2. **Idempotency model** — 客户端 dedup 还是服务端
+3. **Retry strategy** — exponential backoff + jitter + cap
+4. **DLQ (dead letter queue)** — 永远失败的事件怎么 handle
+5. **Backpressure** — 客户端 slow, 我方 queue 不能爆
+
+---
+
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 三个术语先解释
+
+**Webhook**: 「反向 API」. 不是你去拉对方数据, 而是**对方 (producer) 主动 HTTP POST 推数据到你 (consumer)**. 用在事件驱动场景: 「客户付款了」「订单状态变了」「文件上传完了」.
+
+技术上就是 HTTP POST 到对方提供的 URL. 但 **"flaky clients"** 让这个简单事情变难: 客户的接收端可能挂了、慢了、超时了、断网了.
+
+**Flaky clients**: 客户端**间歇性不可用** — 不是永远挂 (那简单, 标记下线), 而是 30 秒上 / 30 秒下 / 一小时挂半小时. 真实 production 里这类客户能占 5-10%.
+
+**Reliable webhook**: 保证「**事件最终都被 consumer 处理**」, 即便客户端 flaky. 关键词: **at-least-once delivery + 客户端 idempotent**.
+
+**Dead-letter handling**: 重试 N 次仍失败的事件, 放到一个**死信队列 (DLQ)**, 由 ops / 客户手动处理. 不能让它在 retry 循环里永远跑.
+
+**Backpressure**: **慢消费者不能拖死生产者**. 比如客户端处理能力 10 req/s, 我方有 10K req/s 推过去, 必须有机制不让我方 queue 爆.
+
+---
+
+## 2. 这个问题的核心是什么
+
+**设想没有任何 retry / DLQ / backpressure 的灾难场景**:
+
+```
+我方:  事件 1 → POST → 客户端 500 (数据库正在 failover)
+我方:  事件丢了 ❌  (客户永远不知道, 数据不一致)
+
+我方:  事件 2 → POST → 客户端 timeout (网络抖动)
+我方:  不知道客户端到底收没收到 ❌
+
+客户端突然恢复:  请告诉我刚才漏了啥
+我方:           ¯\_(ツ)_/¯ 没记 ❌
+```
+
+**问题**:
+
+- 客户端短暂不可用 → 事件**永久丢失**
+- 网络超时 → 我方**不知道送达没送达**
+- 客户端慢 → 我方 queue 越压越深, **OOM 雪崩**
+- 攻击者伪造事件 POST 到客户端 → 客户端**没法分辨真假**
+
+**Reliable webhook 的解法**:
+
+```
+事件 → 持久队列 (Kafka)
+     → Worker 拉取 + POST 到客户端
+     → 失败 → 重试队列 (带 delay) → 再 POST
+     → 重试 N 次仍失败 → DLQ (持久, 7-30 天)
+     → 持续监控 + 慢客户端自动降速 + alert ops
+     → 签名所有 webhook (HMAC) 防伪造
+```
+
+---
+
+## 3. 典型流程图
+
+```
+                  ┌──────────────────────────────────────────┐
+                  │            Producer (我方)               │
+                  └──────────────────────────────────────────┘
+
+  Event source  →  Kafka topic              (持久, 14d 保留)
+  (DB CDC,           ↓
+   user action,    [按 client_id × entity_id 分区, 保证 per-entity 顺序]
+   ...)             ↓
+                  Webhook Worker Pool       (per-partition 1 consumer)
+                    ↓
+                  HTTP POST → 客户端 URL
+                    ↓                ↓
+                  200 OK           失败 (5xx / timeout / conn refused)
+                    ↓                ↓
+                  ACK Kafka      Retry Queue (Kafka with delayed_until_ts)
+                    │                ↓
+                    │              重新 Worker 取出 → POST
+                    │                ↓ (失败累计 8 次)
+                    │              DLQ (S3 cold storage)
+                    │                ↓
+                    │              Ops dashboard + 客户 alert
+                  done              ↓
+                                  Self-serve replay UI
+
+                  ┌────────────────────────────────────────────┐
+                  │ Side concerns:                             │
+                  │  - HMAC-SHA256 签名每个 POST               │
+                  │  - X-Event-Id header (client 用来 dedup)   │
+                  │  - X-Signature header (client 用来验真)    │
+                  │  - 每 client 独立并发 + queue depth alert  │
+                  └────────────────────────────────────────────┘
+```
+
+---
+
+## 4. 三个关键 ID / 概念分类表
+
+每个 webhook 上有这 3 个 header, 各自解决一类问题:
+
+| Header | 寿命 | 用途 | 谁负责 |
+|---|---|---|---|
+| `X-Event-Id` | 永久 | 客户端 dedup 防止双处理 | Producer 生成, Consumer 使用 |
+| `X-Signature` | 单次 | HMAC 验真, 防伪造 | Producer 签, Consumer 验 |
+| `X-Timestamp` | 5 min 容差 | 防 replay attack | Producer 当前时间, Consumer 拒太老的 |
+
+**3 类 HTTP 响应状态码的 retry 决策**:
+
+| Status | 含义 | 怎么处理 |
+|---|---|---|
+| 2xx | 成功 | ACK, 不再 retry |
+| 408, 429, 5xx | 临时故障 | Retry with backoff |
+| 4xx (除 408/429) | 客户端永久错误 | **NOT retry** (4xx 重试是浪费) |
+| connection refused / timeout | 网络层失败 | Retry |
+
+---
+
+## 5. 具体业务场景
+
+### 场景 A: TikTok PayLater → 商户的 CRM (你的工作背景)
+
+债务催收 voice agent 完事后, 把通话结果推到商户 CRM 的 webhook:
+
+```
+PayLater 系统 → POST 到商户 https://acme.com/webhooks/calls
+  Body: {
+    event_id: "evt_abc123",
+    event_type: "call.completed",
+    timestamp: "2026-05-21T14:30:00Z",
+    data: {
+      customer_id: "cust_42",
+      outcome: "promised_to_pay",
+      recording_url: "...",
+      transcript_url: "..."
+    }
+  }
+  Headers: X-Event-Id, X-Signature, X-Timestamp
+```
+
+商户 CRM 可能是 small business 的 self-host 系统, **半夜会 down 1-2 小时维护** — 你必须 retry 兜底.
+
+### 场景 B: Stripe → 你的 SaaS
+
+Stripe 是 producer, 你是 consumer:
+
+- Stripe webhook 推支付事件 (`payment_intent.succeeded` / `invoice.paid`)
+- 你的服务有时被 deploy 重启 → 200ms 的窗口 Stripe POST 失败
+- Stripe 会在 24h 内 retry 5 次, 但你接 webhook 的 endpoint 必须 **idempotent** (因为 Stripe at-least-once)
+
+### 场景 C: GitHub → 你的 CI / 通知系统
+
+`push` / `pull_request` 事件:
+
+- GitHub 是 producer
+- 你的 CI / CD 系统是 consumer
+- 重要: 顺序性, `created → updated → closed` 不能乱
+
+### 场景 D: 你的 IoT 平台 → 客户的告警系统
+
+- IoT 设备 1M 个, 每秒大量事件
+- 客户告警系统是企业级, peak 能扛, 但偶尔挂 5 min
+- **Volume** 大, 不能让短暂故障导致几十万事件丢失
+
+### 场景 E: Twilio SMS / 短信回执 → 你的客户营销系统
+
+- 用户回复短信 → Twilio webhook 推到你
+- 双向 customer interaction, **顺序** 很重要 (用户先回 "STOP" 后回 "OK" vs 反过来意义不同)
+
+---
+
+## 6. 工程上要做什么 (实现 checklist)
+
+**作为 Producer 方** (你推 webhook 给客户):
+
+1. **持久化事件**: 事件先入 Kafka / 持久 queue, 不要直接发 — 防 worker crash 丢事件
+2. **Worker pool**: per-partition / per-client 各 1 个 consumer, 控制并发
+3. **HTTP POST 客户端 URL**, timeout 30s
+4. **结果处理**:
+   - 2xx: ACK
+   - 5xx / 408 / 429 / network err: 入重试队列
+   - 其他 4xx: 直 DLQ (不可重试)
+5. **签名**: HMAC-SHA256 + `client_secret`, 写 `X-Signature` header
+6. **Event_id**: UUID, 写 `X-Event-Id`
+7. **Timestamp**: 当前时间, 写 `X-Timestamp` (用于 client 防 replay)
+8. **DLQ**: 7-8 次重试仍失败 → S3 cold storage, dashboard 可见
+9. **Self-serve replay**: 客户 UI 可选时间窗 replay
+10. **Documentation**: 给 customer 一份 spec 含: dedup-by-event-id, signature 验证代码, retry schedule
+
+**作为 Consumer 方** (你接 webhook):
+
+1. **HTTPS endpoint** + WAF
+2. **签名验证**: 不验签的 endpoint 是公开攻击面
+3. **Idempotency**: dedup by `event_id` (Redis 1h TTL + DB unique constraint)
+4. **快速 ACK**: 收到先返 200, 后台 async 处理 — 防 producer 重试压垮你
+5. **Async processing**: 入自己的 queue, 慢慢消费
+6. **错误隔离**: 单个事件处理失败不影响其他
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **承诺 exactly-once 投递** | 网络环境下不可能. 老老实实 at-least-once + 客户端 dedup |
+| 2 | **No DLQ** | 永远失败的事件在 retry 循环里浪费资源, 队列堵塞 |
+| 3 | **No jitter** | 全部 worker 30s 后同时 retry → 客户端再次被打挂 (thundering herd) |
+| 4 | **Retry on 4xx** | 4xx 是 client 永久错误, retry 是浪费. 例外: 408 timeout, 429 rate limit |
+| 5 | **No ordering 处理** | `order.created` 和 `order.updated` 乱序到达, 客户端看到 "updated" 前还没 "created" |
+| 6 | **No backpressure** | 慢客户端 → 我方 queue depth 涨 → 内存涨 → OOM |
+| 7 | **No HMAC signing** | 攻击者可以伪造 webhook 给客户端, 触发非授权操作 |
+| 8 | **同步处理 inline** | Consumer 把业务逻辑写在 webhook handler 里 → 慢 → producer 超时 → 重试风暴 |
+| 9 | **明文记录 webhook body** | 包含 PII, 日志泄漏风险 |
+| 10 | **客户端 URL 不可变** | 客户改了域名 / 路径就废了, 提供 self-service config UI |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **Reliable webhook = "at-least-once 投递 + 客户端 idempotent + 有限 retry + DLQ 兜底 + backpressure 保护两端"**.
+>
+> 现代 SaaS 离不开它, 但**承诺 exactly-once 是骗自己**. 把语义讲清楚, 客户配合 dedup, 才是真正 production-ready.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: At-least-once vs Exactly-once — 哪个 realistic
+
+**有 3 种投递语义**, 面试场要能讲清楚为啥选 at-least-once:
+
+| 语义 | 含义 | 现实可行吗 |
+|---|---|---|
+| **At-most-once** | 最多 1 次, 可能丢 | ✓ 可行但糟糕 — 谁愿意丢 payment 通知 |
+| **At-least-once** | 至少 1 次, 可能多次 | ✓ 标准做法 |
+| **Exactly-once** | 恰好 1 次 | **网络环境下不可能** (有数学证明) |
+
+### 为什么 exactly-once 是 fiction
+
+```
+Producer 发送 → Consumer 收到 → Consumer 处理 → Consumer 回 200
+                                                       ↓
+                                                  网络断了!
+                                                       ↓
+Producer:  我没收到 200, 我得 retry
+Consumer:  我处理了, 没记下来 (因为 ACK 没回)
+```
+
+无论 producer / consumer 在哪一步崩了, 都可能导致**「处理了但 producer 不知道」**或**「producer 以为没处理但其实处理了」**.
+
+**Two Generals Problem** 的现代版本: 你无法用消息传递达到 100% 共识.
+
+### Solution: at-least-once + 客户端 idempotent
+
+```
+Producer: 我保证至少送 1 次, 网络 OK 时可能送 2-3 次
+Consumer: 我保证用 event_id dedup, 重复的我 noop
+
+结果: 系统级别表现为 "事实上 exactly-once" — 但每一边各自简单
+```
+
+### Idempotency 实现细节 (consumer side)
+
+```python
+def webhook_handler(event):
+    event_id = event['event_id']
+
+    # Layer 1: Redis 快速 dedup (1h TTL)
+    if redis.set(f'evt:{event_id}', '1', nx=True, ex=3600):
+        # 第一次见
+        pass
+    else:
+        # 已经见过
+        return 200, "duplicate, ignored"
+
+    # Layer 2: DB unique constraint 防 race
+    try:
+        with db.transaction():
+            db.execute(
+                "INSERT INTO processed_events (event_id, ...) VALUES (?, ...)",
+                event_id, ...
+            )
+            handle_business_logic(event)
+    except UniqueViolation:
+        # Redis miss 但 DB hit (Redis 刚 evict 等罕见 case)
+        return 200, "duplicate caught at DB layer"
+
+    return 200, "processed"
+```
+
+**两层防御**: Redis 快, DB unique 兜底.
+
+### 一些 producer 也可以做的 dedup hint
+
+- 同 entity 同 state-transition 的事件不要发 2 次 (producer 自己也 dedup)
+- 但**不能依赖 producer 完美 dedup** — 网络重试不在 producer 控制内
+
+---
+
+## ⚙️ Problem 2: Retry 策略 — Exponential Backoff + Jitter + Cap + Budget
+
+**最常见的 retry 配置 (Stripe 风格)**:
+
+```
+Attempt 1: 立即
+Attempt 2: 30s 后
+Attempt 3: 2 min 后
+Attempt 4: 10 min 后
+Attempt 5: 1 hour 后
+Attempt 6: 6 hours 后
+Attempt 7: 24 hours 后
+Attempt 8: 进 DLQ
+
+Total retry window ≈ 36 hours
+```
+
+### 为什么要 exponential backoff
+
+- 临时故障一般几秒就过, 不需要慢
+- 持久故障 (客户端 maintenance window 1h) 需要等
+- **几何级数**覆盖几秒到几天的故障时长
+- 同时给客户端**喘息时间**, 不会被狂砸
+
+### 为什么要 jitter
+
+```
+没 jitter 的灾难:
+  事件 A → 30s 后 retry
+  事件 B → 30s 后 retry
+  事件 C → 30s 后 retry
+  ...
+  10K 事件 → 整整 30s 后全部同一秒打到客户端 → 再次 503 → 又 30s 后 → ...
+
+加了 jitter:
+  事件 A → 30s ± 6s (24-36s) 后 retry
+  事件 B → 30s ± 6s 后 retry
+  ...
+  打到客户端的事件均匀分布在 12s 窗口内, 不会瞬时打爆
+```
+
+**实现**: `delay = base_delay * 2^attempt * (1 + random(-0.2, 0.2))`
+
+### Retry 决策表
+
+| Response | Retry? | 原因 |
+|---|---|---|
+| 200, 201, 202, 204 | NO | 成功 |
+| 301, 302, 303 | follow redirect | 重定向 (不算 retry) |
+| 400 | NO | 客户端永久错误, 数据问题 |
+| 401 | NO* | 签名问题, retry 也不会变 (* 但 alert 上来) |
+| 403 | NO | 权限拒绝 |
+| 404 | NO | URL 不存在 |
+| 408 Timeout | YES | 网络层 timeout |
+| 422 Unprocessable | NO | 客户端数据格式问题 |
+| 429 Rate Limit | YES (with Retry-After) | 遵守对方限流提示 |
+| 500, 502, 503, 504 | YES | 服务端临时 |
+| Connection refused | YES | 服务暂时不可用 |
+| Connection timeout | YES | 网络问题 |
+| SSL/TLS error | NO* | 证书过期等 (alert 上来人解决) |
+
+### Retry budget (防止 retry 占用过多资源)
+
+```python
+class RetryBudget:
+    """限制 retry 占总流量的比例, 防止退化成 retry-only-storm"""
+
+    def __init__(self, max_retry_ratio=0.2, window_sec=60):
+        self.max_ratio = max_retry_ratio
+        self.window = window_sec
+
+    def can_retry(self, client_id):
+        first_attempts = count_recent(client_id, type='first', window=self.window)
+        retries = count_recent(client_id, type='retry', window=self.window)
+        if retries / (first_attempts + retries + 1) > self.max_ratio:
+            # 这个客户的 retry 已经超 20% 流量, 不再 retry, 直接 DLQ
+            return False
+        return True
+```
+
+**为什么需要 budget**: 客户端长期 down 时, retry 会无限增长, 最终 retry 占用 90% 流量, 影响其他客户端. Budget 让 retry 有上限.
+
+### Cancellation
+
+```python
+# 如果新事件覆盖了旧事件 (e.g., entity 已 deleted), 取消未完成的 retry
+def on_entity_deleted(entity_id):
+    # 找所有这个 entity 还在 retry 队列里的 event
+    pending = retry_queue.find(entity_id=entity_id, status='pending')
+    for evt in pending:
+        retry_queue.cancel(evt.id, reason='entity_deleted')
+```
+
+---
+
+## ⚙️ Problem 3: Ordering Guarantees — Per-entity vs Global vs None
+
+**三种 ordering**:
+
+| 模式 | 保证 | 实现 | 代价 |
+|---|---|---|---|
+| **No ordering** | 全乱序 | 任意并发投递 | 最简单, 但客户端必须容忍乱序 |
+| **Per-entity ordering** ⭐ | 同 entity 顺序保证 | Kafka partition by entity_id, 单 consumer | 复杂度可控, 多数场景够 |
+| **Global ordering** | 全局严格顺序 | 单 partition / 单 worker | **不可扩展**, 几乎从不选 |
+
+### Per-entity ordering 实现 (推荐)
+
+```
+Kafka topic: webhook_events
+Partition key: hash(client_id, entity_id)
+
+  Partition 0: order_42 events  → Worker_0 → 客户端 (顺序保证)
+  Partition 1: order_43 events  → Worker_1 → 客户端
+  Partition 2: order_44 events  → Worker_2 → 客户端
+  ...
+  Partition N: order_X events   → Worker_N
+```
+
+**关键**:
+
+- 同 entity 的所有事件**必定**进同一 partition (因为 hash 相同)
+- 单 partition 由**单 consumer** 处理 (Kafka 保证 per-partition FIFO)
+- 不同 entity 可并行, 极大化吞吐量
+
+### Head-of-line blocking 问题
+
+```
+Partition 0:  order_42.created → order_42.updated → order_42.deleted
+                ↓ FAILED (客户端临时 down)
+              Retry 30s, 2m, 10m...
+
+期间 order_42.updated 和 order_42.deleted 全部 blocked!
+```
+
+**Solution 1: Skip + DLQ after timeout**
+
+```python
+if event.first_attempt_ts < now() - timedelta(minutes=5):
+    dlq.push(event, reason='blocked_too_long')
+    advance_consumer()  # 跳过, 继续处理下一个
+    notify_customer(f'event {event.id} skipped, see DLQ')
+```
+
+**Solution 2: Sub-partition by event-type** (high-volume entity)
+
+- entity_id × event_type → finer partition
+- 但破坏全局 entity 顺序
+
+**Solution 3: Side-queue for retry, keep main queue moving**
+
+- 失败的 event 进独立 retry queue
+- 主 queue 继续前进
+- 但**破坏 ordering** — 这是 trade-off
+
+实战: 大多数场景接受 "如果 retry 持续超过 5 min, ordering 可以放宽 + DLQ tag"
+
+---
+
+## ⚙️ Problem 4: Backpressure + Per-client Adaptive
+
+**核心**: 慢消费者不能拖死 producer.
+
+### 4.1 Producer 侧 backpressure
+
+```python
+class WebhookProducer:
+    def __init__(self):
+        self.per_client_queue_depth = {}
+        self.MAX_DEPTH_PER_CLIENT = 10000
+
+    def push(self, client_id, event):
+        if self.per_client_queue_depth.get(client_id, 0) >= self.MAX_DEPTH_PER_CLIENT:
+            # 客户端积压太多, 拒绝新事件 入 DLQ
+            dlq.push(event, reason='client_queue_full')
+            self.alert_customer(client_id, 'webhook queue full, fix endpoint')
+            return False
+
+        kafka.push(event)
+        self.per_client_queue_depth[client_id] += 1
+        return True
+```
+
+### 4.2 Worker 侧 per-client 并发限制
+
+```python
+# 每客户最多 10 个并发 in-flight, 防止某个慢客户端独占 worker pool
+per_client_semaphore = defaultdict(lambda: Semaphore(10))
+
+def deliver(event):
+    with per_client_semaphore[event.client_id]:
+        return http.post(event.url, body=event.body, timeout=30)
+```
+
+### 4.3 Adaptive backoff (per-client)
+
+观察客户端的健康度, 动态调整频率:
+
+```python
+class AdaptiveDelivery:
+    def __init__(self):
+        # 每个客户的 EMA error rate
+        self.error_rate = {}  # client_id → recent error rate
+
+    def get_concurrency(self, client_id):
+        err = self.error_rate.get(client_id, 0)
+        if err < 0.05:
+            return 50  # healthy, 全速
+        elif err < 0.2:
+            return 20  # 有点慢
+        elif err < 0.5:
+            return 5   # 不健康
+        else:
+            return 1   # 几乎挂了, 慢慢试
+
+    def update(self, client_id, success):
+        # EMA update
+        cur = self.error_rate.get(client_id, 0)
+        delta = 0 if success else 1
+        self.error_rate[client_id] = 0.95 * cur + 0.05 * delta
+```
+
+效果: 慢客户端**自动降速**, 健康客户端不受影响.
+
+### 4.4 Circuit breaker per client
+
+```python
+class CircuitBreaker:
+    """单客户端连续失败 10 次, 开熔断 5 min, 期间所有事件直接 DLQ"""
+
+    def call(self, client_id, fn):
+        if self.state[client_id] == 'OPEN':
+            if now() > self.opened_at[client_id] + 5*60:
+                self.state[client_id] = 'HALF_OPEN'  # 试探
+            else:
+                raise CircuitOpenException
+
+        try:
+            result = fn()
+            if self.state[client_id] == 'HALF_OPEN':
+                self.state[client_id] = 'CLOSED'  # 恢复
+            self.failures[client_id] = 0
+            return result
+        except Exception as e:
+            self.failures[client_id] += 1
+            if self.failures[client_id] >= 10:
+                self.state[client_id] = 'OPEN'
+                self.opened_at[client_id] = now()
+                self.alert(f'client {client_id} circuit opened')
+            raise
+```
+
+---
+
+## ⚙️ Problem 5: DLQ + Observability + Self-Serve Replay
+
+### 5.1 DLQ (Dead Letter Queue) 设计
+
+**DLQ 必须**:
+
+- **持久** (不是 Redis, 至少 30 天)
+- **可查询** (按 client / event_type / time range)
+- **可 replay** (重新塞回主队列)
+- **有 metadata** (失败原因 / 最后 HTTP response / attempt count)
+
+```python
+class DLQEntry:
+    event_id: str
+    client_id: str
+    original_payload: dict
+    failure_reason: str          # 'max_retries_exceeded', '4xx_permanent', etc.
+    last_attempted_at: datetime
+    last_response_code: int
+    last_response_body: str
+    attempt_count: int
+    sent_to_dlq_at: datetime
+    can_replay: bool             # 是否允许 self-serve replay
+```
+
+**存储**: S3 (cold storage) + 索引 entries in Postgres for query
+
+### 5.2 Observability (4 维度)
+
+| 维度 | Metric | Alert 条件 |
+|---|---|---|
+| **Per-client delivery rate** | Success/min by client | < 50% for > 10 min → alert |
+| **DLQ growth rate** | DLQ entries/min | > 100/min sustained → page |
+| **Queue depth** | Per-client in-flight | > 80% of max → warn |
+| **Latency p99** | First-attempt to ACK | > 5s → investigate |
+
+**Dashboard 必备页面**:
+
+1. **Per-client health**: success rate + queue depth + DLQ size
+2. **Event-type breakdown**: 哪类事件最常失败
+3. **Time-series**: 7-day trend of delivery success
+4. **Failed event explorer**: 可搜索 DLQ, 按 client / time / reason
+
+### 5.3 Self-serve replay
+
+**客户 UI**:
+
+```
+[Webhook Replay Tool]
+
+  Client: acme-corp
+  Time range: [2026-05-19 14:00] – [2026-05-19 16:00]
+  Event types: [payment.succeeded ✓] [call.completed ✓] [...]
+  Status: [Failed ✓] [DLQ ✓]
+
+  Found 142 events matching.
+  Estimated time to replay: 5 minutes
+  Will respect rate limits.
+
+  [Replay Now]   [Export CSV]   [Cancel]
+```
+
+**实现**:
+
+```python
+def replay(client_id, time_range, event_types, dry_run=False):
+    candidates = dlq.query(client_id, time_range, event_types)
+
+    if dry_run:
+        return {'count': len(candidates), 'estimated_duration_sec': len(candidates) * 0.2}
+
+    for evt in candidates:
+        # 标记重发, 但保留原 event_id (客户端依然能 dedup)
+        new_attempt = evt.clone()
+        new_attempt.is_replay = True
+        new_attempt.original_attempt_id = evt.id
+        main_queue.push(new_attempt)
+
+    audit.log({
+        'action': 'replay',
+        'actor': current_user,
+        'client_id': client_id,
+        'count': len(candidates),
+        'ts': now(),
+    })
+```
+
+### 5.4 Audit log
+
+每次 webhook 投递的元数据 (不含 body 详情, 避免 PII):
+
+```json
+{
+  "event_id": "evt_abc",
+  "client_id": "tenant_42",
+  "attempts": [
+    {"ts": "2026-05-21T14:00:00Z", "result": "5xx", "duration_ms": 15234},
+    {"ts": "2026-05-21T14:00:30Z", "result": "5xx", "duration_ms": 12000},
+    {"ts": "2026-05-21T14:02:30Z", "result": "200", "duration_ms": 320}
+  ],
+  "final_status": "delivered",
+  "delivered_at": "2026-05-21T14:02:30Z"
+}
+```
+
+保留 90 天供合规审计 + customer dispute resolution.
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+1. **At-least-once + idempotent** 决定「事件不会丢」
+2. **Retry strategy** 决定「短暂故障下还能送达」
+3. **Ordering** 决定「下游业务逻辑能不能正确处理事件序列」
+4. **Backpressure + adaptive** 决定「慢客户端不会拖垮系统」
+5. **DLQ + observability + replay** 决定「真正挂的事件可被人工救」
+
+面试场把这 5 个 layer 都讲清楚, 加上「我自己 production 踩过 X 坑」, 就是 staff-level webhook 系统设计.
 
 ---
 
@@ -28,7 +695,7 @@
 
 **2. Volume**
 
-> "Events/sec sustained + peak? 100/s? 10k/s?"
+> "Events/sec sustained + peak? 100/s? 10k/s? 决定 architecture scale."
 
 **3. Order matter?**
 
@@ -44,115 +711,21 @@
 
 ---
 
-## 5 步框架
+## 5 步框架 (sample 45-min answer)
 
 | 时长 | 阶段 |
 |---|---|
-| 0-5 min | Clarify direction + volume + ordering |
-| 5-15 min | Core delivery model (queue → worker → HTTP POST) |
-| 15-25 min | Retry strategy (backoff + jitter + cap + DLQ) |
-| 25-35 min | Idempotency (event_id) + ordering |
-| 35-45 min | Backpressure + per-client rate limit + monitoring |
-
----
-
-## 我会这样答（sample monologue）
-
-> "Clarify — *[假设：we're producer, 1k events/sec sustained 10k peak, ordering matters per-entity not globally, real-time aim <5s p99, 5% of clients are flaky]*.
->
-> **Architecture**:
->
-> ```
-> Event source → Kafka topic (partition by client_id × entity_id for per-entity order)
->                    ↓
->              Webhook Worker Pool (consumers per client_id partition)
->                    ↓
->              HTTP POST to client URL
->                    ↓ (on failure)
->              Retry Queue (Kafka with delay) → Worker
->                    ↓ (after N retries)
->              DLQ (cold storage, S3 + dashboard)
-> ```
->
-> **Delivery model**: at-least-once with idempotent receiver. **Exactly-once is fiction across network**, force client to dedup by `event_id`.
->
-> **Retry strategy**:
-> ```
-> Attempt 1: immediate
-> Attempt 2: 30s
-> Attempt 3: 2min
-> Attempt 4: 10min
-> Attempt 5: 1h
-> Attempt 6: 6h
-> Attempt 7: 24h
-> Attempt 8: DLQ
-> ```
-> Each with **±20% jitter** to prevent retry stampede.
->
-> Total retry window ~36 hours. After DLQ, **manual + alert customer**.
->
-> **What status codes to retry**:
-> - **5xx**: retry (server-side temporary)
-> - **429**: retry with `Retry-After` header
-> - **408, 503**: retry
-> - **Connection errors, timeouts**: retry
-> - **4xx other than 408/429**: NO retry (permanent error like 401 = bad creds, 422 = bad data)
->
-> **Idempotency**:
-> - Every webhook includes `X-Event-Id` header (UUID)
-> - Client is expected to dedup by this ID
-> - Documented in our spec
-> - Provide a **dedup-cache library** for top languages
->
-> **Ordering per-entity**:
-> - Partition Kafka topic by `client_id × entity_id`
-> - Single consumer per partition guarantees ordered delivery
-> - If `order_123.updated` retries 30s, all subsequent `order_123` events wait. Deadline:
->   - After max wait (5 min), **skip** the stuck event into DLQ, send next
->   - Customer notified: "order_123 events out-of-order, oldest in DLQ"
->
-> **Backpressure**:
-> - Per-client max in-flight requests (e.g., 50 concurrent POSTs)
-> - If client returns 429 / consistently slow → **dynamic backoff per client** (their queue depth grows, we slow more)
-> - Kafka topic-level retention 14 days — even if client is down 13 days, replay works
-> - **If client's queue grows > 1M events**, **page customer** + auto-suspend webhook with alert
->
-> **Signing for security**:
-> - Every webhook signed with HMAC-SHA256 + client secret
-> - Header: `X-Signature: t=<timestamp>,v1=<hash>`
-> - Client verifies → guards against forged webhooks from attackers
-> - Secret rotation: support 2 active secrets (current + previous) for 30-day cutover
->
-> **Monitoring**:
-> - **Per-client delivery rate** (over 5 min): alert if drops to 0
-> - **Queue depth** per client
-> - **DLQ size** per event type
-> - **p99 delivery latency** end-to-end
->
-> **Failure modes**:
-> - **Stampede on retry**: jitter solves
-> - **Client URL changes**: provide self-serve config update
-> - **Client returns 200 but didn't process**: that's their bug, we're done at HTTP layer
-> - **DLQ explodes**: alert, then **bulk-retry option** for ops once client recovers
-> - **DDoS via webhook**: if attacker injects events → we'd flood client. **Rate limit at event source**
->
-> **Customer experience**:
-> - **Real-time dashboard**: per-event status (delivered / retrying / DLQ)
-> - **Self-serve retry**: customer can manually replay specific events
-> - **Audit log**: every attempt + response code logged 90 days
-> - **Webhook testing tool**: simulate POSTs to validate client's endpoint
->
-> **Phasing 30 days**:
-> - Wk 1: Core delivery + simple retry
-> - Wk 2: Idempotency + signing
-> - Wk 3: DLQ + monitoring dashboard
-> - Wk 4: Self-serve retry tool + ordering"
+| 0-5 min | Clarify direction + volume + ordering + tolerance |
+| 5-15 min | Core delivery model (Kafka + Worker + HTTP POST) + at-least-once 语义 |
+| 15-25 min | Retry strategy (backoff + jitter + cap + budget + 4xx vs 5xx) |
+| 25-35 min | Ordering (per-entity partition) + Backpressure (adaptive per-client) |
+| 35-45 min | DLQ + observability + self-serve replay + customer experience |
 
 ---
 
 ## 简历专属 reframe
 
-你的 **voice agent multi-region** + **BNPL chatbot retry logic** 都涉及类似：
+你的 **voice agent multi-region** + **BNPL chatbot retry logic** 都涉及类似:
 
 | 题 | 你做过 |
 |---|---|
@@ -161,22 +734,25 @@
 | DLQ pattern | Voice agent failed calls 上报系统 |
 | HMAC signing | Voice agent multi-tenant auth (类似) |
 | Per-client backpressure | 7 markets traffic asymmetry handling |
+| Adaptive per-client | Voice agent 5% bad-network 客户自动降频 |
 
-**主动说**：
+**主动 quote**:
 
-> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to S3. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern."
+> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to S3. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."
 
 ---
 
 ## 5 follow-ups
 
 **Q1**: "Customer says they need 99.99% delivery. Possible?"
+
 **A**: 跟 99.99% **eventual** delivery 是可行的 (we always retry until DLQ), 但 **99.99% within real-time** 是 unsupportable if client is down. Frame:
 - "99.99% eventual delivery via 36h retry window — yes"
 - "99.99% delivered within 5s — requires client to maintain 99.99% uptime, which is **on them**"
 - **Customer Tier upgrade**: dedicated worker pool for Gold (more aggressive retry, lower queue depth)
 
 **Q2**: "Client only accepts 1 webhook at a time (no concurrency). 10k events/sec arrives. Stuck?"
+
 **A**:
 - Per-client concurrency = 1 → queue grows
 - After queue depth > threshold → page customer with options:
@@ -185,6 +761,7 @@
   3. Customer accepts increased latency / DLQ growth
 
 **Q3**: "Client misses 3-day event burst, asks us to replay everything 'newest first'."
+
 **A**:
 - DLQ retention 30 days → can replay
 - **Replay UI**: customer picks time range, replay starts
@@ -192,13 +769,14 @@
 - Standard pattern for migration-back-online scenarios
 
 **Q4**: "Race: client sends 'updated' before we deliver 'created'. State mismatch."
-**A**: 不可能 from our side if same-entity events partitioned to same Kafka partition (FIFO).
-But race CAN happen if **client** does parallel processing internally → that's their architecture. We help by including:
+
+**A**: 不可能 from our side if same-entity events partitioned to same Kafka partition (FIFO). 但 race CAN happen if **client** does parallel processing internally → that's their architecture. We help by including:
 - `event_sequence_number` per entity (we own)
 - `created_at` server-side timestamp
 - Client should buffer + process in order if their handler is async
 
 **Q5**: "We need to deliver to webhook URL behind firewall (corporate). They can't expose endpoint."
+
 **A**: 3 options:
 1. **Polling reverse**: client polls us instead of us pushing. Less real-time but firewall-friendly
 2. **Long polling / SSE**: server-sent events client opens
@@ -206,7 +784,7 @@ But race CAN happen if **client** does parallel processing internally → that's
 
 ---
 
-## ❌ 易错点
+## ❌ 易错点 (top 10)
 
 1. **Promise exactly-once** — 不存在
 2. **No DLQ** — events 永远 stuck in retry
@@ -215,10 +793,13 @@ But race CAN happen if **client** does parallel processing internally → that's
 5. **没 ordering 处理** — multi-event entities race
 6. **没 backpressure** — slow client cause queue OOM
 7. **没 HMAC signing** — replay attacks / forged webhooks
+8. **同步业务逻辑 in handler** — consumer slow → producer 重试风暴
+9. **明文 webhook body in log** — PII leak
+10. **No retry budget** — retry 流量长期占主流量比例失控
 
 ---
 
-## ✅ 加分项
+## ✅ 加分项 (top 10)
 
 1. **at-least-once + client-side idempotency** standard pattern
 2. **Per-entity Kafka partition** for ordering
@@ -226,51 +807,86 @@ But race CAN happen if **client** does parallel processing internally → that's
 4. **HMAC-SHA256 signing** + 2-secret rotation
 5. **Self-serve retry UI** for customer
 6. **Per-client adaptive backoff** based on history
-7. **Webhook testing tool** for onboarding
-8. **Polling fallback** for firewall'd clients
+7. **Circuit breaker per client**
+8. **Retry budget** to prevent retry-takes-over-traffic
+9. **Webhook testing tool** for onboarding
+10. **Polling fallback** for firewall'd clients
 
 ---
 
-## Cheat Sheet
+## 一句话总结
+
+> **Reliable webhook = 投递语义诚实 (at-least-once) + 客户端配合 (idempotent) + 合理 retry (backoff + jitter + budget) + 严格隔离 (per-client backpressure) + 兜底机制 (DLQ + replay)**.
+>
+> 把这 5 个 layer 都做到, 就是真正 production-grade 的 webhook integration.
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
-Delivery model:
-  at-least-once + receiver dedup by event_id
+投递语义:
+  At-least-once + 客户端 dedup by event_id ⭐
+  Exactly-once 是 fiction, 别承诺
+
+Headers (每个 webhook 必带):
+  X-Event-Id      → 客户端 dedup (UUID, 永久)
+  X-Signature     → HMAC-SHA256 验真
+  X-Timestamp     → 防 replay attack (5min 容差)
 
 Retry schedule (with ±20% jitter):
   immediate / 30s / 2m / 10m / 1h / 6h / 24h / DLQ
   Total ~36h window
+  Per-client retry budget 20% 流量上限
 
-What to retry:
-  5xx, 408, 429 (with Retry-After), conn errors
-  NEVER 4xx (other than 408/429)
+Retry decision:
+  5xx, 408, 429 (Retry-After), conn err → YES
+  4xx (except 408/429) → NO (permanent)
+  SSL err → NO (alert)
 
 Ordering:
-  Kafka partition by client × entity
-  Single consumer per partition
-  Skip stuck events to DLQ after 5min
+  Per-entity (推荐): Kafka partition by hash(client_id, entity_id)
+  Head-of-line block 超 5 min → skip + DLQ + notify
 
-Backpressure:
-  Per-client max concurrency
-  Queue depth alert > threshold
-  Auto-suspend at extreme depth
-  Tenant tier dedicated workers for Gold
+Backpressure (4 layer):
+  Per-client queue cap (10K)
+  Per-client concurrency cap (10 in-flight)
+  Adaptive backoff (EMA error rate)
+  Circuit breaker (10 fails → 5min open)
+
+Idempotency consumer side:
+  Layer 1: Redis SET NX 1h TTL
+  Layer 2: DB unique constraint
+  快速 ACK 200, async 处理业务
+
+DLQ:
+  S3 cold + Postgres index
+  保留 30 天 (custom 可配)
+  Metadata: failure_reason, attempts, last_response
+
+Self-serve replay:
+  时间范围 + event-type filter
+  Dry-run 预估
+  保留原 event_id 让 client 仍能 dedup
+
+Observability (4 维度):
+  Per-client success rate (alert < 50%)
+  DLQ growth rate (page > 100/min)
+  Queue depth per client (warn > 80%)
+  P99 latency (investigate > 5s)
 
 Security:
-  HMAC-SHA256 signing
-  2 active secrets for rotation
-  Replay protection via timestamp
-  TLS 1.3 transit
-
-Customer tools:
-  Dashboard: per-event status
-  Self-serve retry by time range
-  Audit log 90 days
-  Test endpoint validator
+  HMAC-SHA256 sign
+  2-secret rotation
+  TLS 1.3
+  IP allowlist optional
 
 红线:
-  - Exactly-once promise (fiction)
+  - Promise exactly-once
   - No DLQ
   - No jitter
   - Retry on 4xx
+  - No HMAC
+  - Sync handler
+  - No backpressure
 ```
