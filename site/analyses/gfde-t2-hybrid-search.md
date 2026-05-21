@@ -6,384 +6,1276 @@
 
 > "Why does **hybrid search** (BM25 + dense) often beat pure dense? When does it NOT help? Walk through your retrieval pipeline."
 
+**出处**: Google FDE T2 RAG round 高频题. Pinecone / Weaviate / Qdrant / Vespa 这些 vector DB 厂的 SE 面试也常问.
+
 **Round**: RAG / Search System Design (45-60 min)
 
 ---
 
 ## 这道题在考什么
 
-考你**production retrieval engineering** beyond toy demos:
+考你 **production retrieval engineering** beyond toy demos. 把一个 60% recall 的 toy RAG 提到 90%+ 涉及 5-7 个独立改造点, 每个点都要能讲清楚 why / how / trade-off:
 
-1. **Dense vs sparse tradeoffs** —— 都不完美
-2. **Hybrid fusion** —— RRF / score fusion 怎么 combine
+1. **Dense vs sparse trade-offs** —— 都不完美, 各自的失败 case
+2. **Hybrid fusion** —— RRF / weighted score / learned ranker
 3. **Reranker** —— bi-encoder 召回 + cross-encoder 重排
-4. **Query understanding** —— query rewrite / multi-query / HyDE
-5. **Eval methodology** —— recall@k, NDCG, MRR
+4. **Query understanding** —— query rewrite / multi-query / HyDE / decomposition
+5. **Eval methodology** —— recall@k, NDCG, MRR, slice eval
 
-也考 **practical sense** —— 不只是 'pure RAG', 还要考虑 metadata filter, freshness, perms.
+也考你 **practical sense**: metadata filter / 多租户 / perms / freshness 这些 production 边缘.
+
+不考「向量搜索是什么」, 考「你为什么 60% → 90%, 每一步贡献多少 recall」.
 
 ---
 
-## 必问 clarifying
+# Part 1 · 教学讲解 — 先把概念讲透
 
-**1. 现状 baseline**
+## 1. 四个术语先解释
 
-> "60% recall — measured at recall@k for what k? On what eval set? Annotated ground truth or proxy?"
+**Dense retrieval (bi-encoder ANN search)**: 把 query 和 doc 各自 embedding 成一个固定维度向量 (768 / 1024 / 1536 维), 用 cosine / dot-product 算相似度. 物理上是 **Approximate Nearest Neighbor 检索** (HNSW / IVF-PQ), 不是精确扫全部 doc. 代表模型: `text-embedding-3-large`, `gemini-embedding-001`, `bge-large`, `e5-mistral-7b`. 代表 vector DB: Pinecone, Qdrant, Weaviate, Milvus, FAISS.
 
-**2. Query 类型**
+**Sparse retrieval (BM25 / lexical)**: 基于 term frequency × inverse document frequency 的传统检索. 90 年代到 2020 的 Lucene / Elasticsearch / OpenSearch 都是这套. 没有 embedding, 词必须**字面命中**. BM25 的现代变种: SPLADE / uniCOIL (用 LLM 生成稀疏向量, 仍走倒排索引).
 
-> "Keyword-heavy ('error code X'), semantic ('how do I troubleshoot Y'), mixed? Acronyms / product names?"
+**Reranker (cross-encoder)**: 第二阶段排序模型. 不是独立 embed query 和 doc, 而是把 `[CLS] query [SEP] doc [SEP]` **一起** 进 Transformer, 用 cross-attention 算 relevance score. 不能 pre-index (因为没有 query 不能算), 必须 per-query 推理, 所以贵. 代表模型: `bge-reranker-v2`, `Cohere rerank-3`, `mxbai-rerank-large-v1`.
+
+**Hybrid retrieval**: dense + sparse 并行检索, 用 fusion 算法 (主要 RRF) 合并结果. 是 2026 production RAG 的事实标准.
+
+---
+
+## 2. 这个问题的核心是什么
+
+设想 60% recall 的 RAG 系统在生产里的灾难场景:
+
+```
+User:    "iPhone 15 Pro Max 256GB 怎么开 dual SIM?"
+Dense:   embed("iPhone 15 Pro Max 256GB dual SIM") → cluster 到 "高端手机" 区
+         → 返回 iPhone 12 / 三星 S23 / Pixel 8 的 dual SIM 教程
+         → top-10 没有真正讲 iPhone 15 Pro Max 的文档 ❌
+LLM:     "iPhone 15 Pro Max 不支持 dual SIM" ← 因为它看到的是 iPhone 12 的 specs
+User:    😡
+```
+
+**问题根源**:
+
+- **Embedding 模型把"产品型号"压缩进了"产品大类"语义空间** — 'iPhone 15 Pro Max' 和 'iPhone 13' 距离很近
+- **Acronyms / SKU 不能 generalize** — 'TPv3' / '5xx error' / 'A2890' 这种 token 没有语义, 必须**字面命中**
+- **40% miss rate 在生产里意味着** 接近一半的 user 拿到错答案, 触发 escalation 或 churn
+
+**Hybrid 的解法**:
+
+```
+Query: "iPhone 15 Pro Max 256GB dual SIM"
+  │
+  ├── Dense path: embed("iPhone 15 Pro Max...") → 召回相关产品概念 doc
+  ├── BM25 path:  query → ["iPhone", "15", "Pro", "Max", "256GB", "dual", "SIM"]
+  │               → 召回精确包含 "iPhone 15 Pro Max" 的 doc
+  ├── RRF fusion: 两路 rank 合并 (BM25 让 exact match doc 排前)
+  └── Reranker:   cross-encoder 看 (query, doc) 联合, 调整最终顺序
+```
+
+Recall 提升组合拳通常如下:
+
+| 阶段 | Recall@10 增量 |
+|---|---|
+| Pure dense baseline | 60% |
+| + BM25 fusion (RRF) | +12-18% |
+| + Query rewrite / multi-query | +3-5% |
+| + HyDE | +2-4% |
+| + Cross-encoder reranker | +3-5% |
+| **合计** | **88-92%** |
+
+每个改造**独立可量化**, 这才是面试官想听到的。
+
+---
+
+## 3. 典型流程图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     User Query                                   │
+│   "How do I troubleshoot 5xx errors on TPv3 worker?"            │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+                                 ▼
+                  ┌──────────────────────────────┐
+                  │  L1: Query Understanding     │
+                  │  - LLM rewrite (Flash)       │
+                  │  - Multi-query expand × 3    │
+                  │  - HyDE (generate fake ans)  │
+                  │  - Decompose if multi-hop    │
+                  └──────────┬───────────────────┘
+                             │ (5 query variants)
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+   ┌──────────────────┐         ┌──────────────────────┐
+   │  L2a: BM25       │         │  L2b: Dense ANN      │
+   │  (OpenSearch /   │         │  (Qdrant / Pinecone) │
+   │   Elastic)       │         │  HNSW M=16, ef=128   │
+   │  top-100         │         │  top-100             │
+   └────────┬─────────┘         └──────────┬───────────┘
+            │                              │
+            └──────────────┬───────────────┘
+                           ▼
+                ┌──────────────────────────┐
+                │  L3: Fusion (RRF k=60)   │
+                │  → top-50 candidates     │
+                └────────────┬─────────────┘
+                             │
+                             ▼
+                ┌──────────────────────────┐
+                │  L4: Cross-encoder       │
+                │  rerank (bge-reranker-   │
+                │  v2-m3 on GPU)           │
+                │  → top-10                │
+                └────────────┬─────────────┘
+                             │
+                             ▼
+                ┌──────────────────────────┐
+                │  L5: Filter & Boost      │
+                │  - perms (tenant_id)     │
+                │  - freshness decay       │
+                │  - source-type weight    │
+                │  → final top-K to LLM    │
+                └──────────────────────────┘
+```
+
+每一层独立可观测、独立可 ablate. 这是「production RAG」和「Notion AI demo」的根本区别。
+
+---
+
+## 4. 关键 retrieval 模型分类表
+
+| Model class | 代表 | Index time | Query time | 何时用 |
+|---|---|---|---|---|
+| **Bi-encoder (dense)** | `bge-large`, `text-embedding-3`, `gemini-embedding` | 一次 embed 全 corpus | 1 embed + ANN | 大 corpus 召回 (10K-1B docs) |
+| **Sparse lexical** | BM25 (Lucene), SPLADE | 倒排索引 | 词项匹配 | Exact match / SKU / 代码 / 罕见词 |
+| **Cross-encoder rerank** | `bge-reranker-v2-m3`, `Cohere rerank-3` | 不可 pre-index | per-query, top-50 重排 | 二阶段精排 |
+| **ColBERT (late interaction)** | `ColBERTv2`, `JaColBERT` | 每 doc 多向量索引 | MaxSim 算分 | 当 dense 不够准, cross-encoder 太慢 |
+| **LLM-as-retriever** | Gemini 3 Pro / Claude Opus 4.7 | n/a | LLM 看 doc 列表选 | 高质量小规模 (法律 / 医疗) |
+| **Learned sparse** | SPLADE-v2, uniCOIL | LLM 生成 sparse vec | 倒排查 + score | 想结合 BM25 robustness + 语义 |
+
+实战 90% 的 production RAG 是 **bi-encoder (dense) + BM25 + cross-encoder reranker** 这三件套.
+
+---
+
+## 5. 具体业务场景 (5 个高频)
+
+### 场景 A: 内部知识库 / 客服文档 (你的 BNPL 工作背景)
+
+你做的 BNPL chatbot 要查公司内部文档:
+- **PDF policy docs** (利率 / 滞纳金 / 限额政策)
+- **Confluence pages** (产品功能 / FAQ)
+- **历史 support ticket** (用户问过的相似问题 + 客服回复)
+
+**Hybrid 在这里的必要性**:
+
+- Dense 擅长抓 "用户问 *逾期*, 文档讲 *late payment*" 这种近义
+- BM25 必须能命中 "*BNPL-2024-IDR-late-fee-cap*" 这种 policy doc ID
+- Cross-encoder 重排能区分 "*印尼 late fee 7天免息*" vs "*马来西亚 late fee 即收*"
+
+### 场景 B: E-commerce product search
+
+Shopify / Lazada 商品搜:
+- Query: "iPhone 15 Pro Max 256GB Titanium Natural"
+- 用户期待**完全匹配的 SKU**, 而不是 "类似旗舰手机"
+- BM25 weight 必须高, 否则 dense 会推 Galaxy S24 / Pixel 8 上来
+
+### 场景 C: Code search (代码库 monorepo)
+
+Dev agent 在 1M LOC monorepo 找函数:
+- Query: "where do we verify JWT signature in payment service"
+- 既要 **symbol exact match** (`verify_jwt`) 又要 **semantic** (注释里写 "validate token authenticity")
+- AST-based chunk + 3 个 index (code / comment / doc) 并查
+
+### 场景 D: 法律 / 合同检索
+
+Lawyer agent 查 1000 份合同:
+- Query: "find clauses about IP assignment in vendor agreements"
+- **Clause-level chunking** + **legal jargon** (BM25 catches "indemnification") + **section reference** important
+- Reranker 最好 fine-tune on legal corpus
+
+### 场景 E: 医学知识 — drug + symptom search
+
+Medical agent (高 stake, safety critical):
+- Query: "patient on warfarin, can they take ibuprofen"
+- 药名 exact match (BM25, 不能 paraphrase)
+- 症状 semantic (dense, 同义词)
+- **Negation handling**: "NOT taking aspirin" 容易丢, 需 NER + negation detection
+- Specialized embedding (BiomedBERT / SciBERT) 而非通用模型
+
+---
+
+## 6. 工程上要做什么 (实现 checklist)
+
+**离线 index 阶段**:
+
+1. **文档解析**: PDF/HTML/Markdown → text + structural metadata (heading_path, page, section)
+2. **Chunking**: heading-aware recursive (见 chunking 那道题), 500 tokens + 50 overlap
+3. **Dense embed**: 选 `gemini-embedding-001` (768 维, $0.025 per 1M token) 或 `bge-large-zh` (自部署), 写 Qdrant
+4. **Sparse index**: 同 chunk 写 OpenSearch, 用默认 BM25 (k1=1.2, b=0.75)
+5. **Metadata 同步**: tenant_id / source / updated_at / perms 写两边
+6. **Eval set 构建**: 200-500 (query, [relevant_doc_ids]) 人工标注 + LLM 合成补充
+
+**在线 query 阶段**:
+
+7. **Query understanding**: Gemini 3 Flash rewrite + multi-query expand (3 个 paraphrase) + HyDE (生成假答案 embed)
+8. **并行检索**: BM25 top-100 + dense top-100 (asyncio.gather, 不串行)
+9. **Fusion**: RRF k=60 → top-50
+10. **Rerank**: `bge-reranker-v2-m3` on GPU, batch 50, → top-10
+11. **Filter & boost**: perms / freshness / source-type
+12. **Cite**: 每个 doc 带 source_id, LLM 答案强制 `[doc_id]` 引用
+
+**观测**:
+
+13. **每 layer p99 latency** (Phoenix / LangSmith trace)
+14. **Per-query slice metrics** (acronym query / long query / short query 分别看 recall)
+15. **CTR / 用户 thumbs** 作为 implicit feedback signal
+16. **Eval set 周度 regression** (新模型上线前必跑)
+
+---
+
+## 7. 几个容易踩的坑
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **Pure dense everywhere** | Acronyms / SKU / 错别字 / 代码 全 miss. 必须 hybrid |
+| 2 | **Weighted score fusion (而非 RRF)** | Dense score (0-1 cosine) 和 BM25 score (0-∞) 不可比, 需 calibration. RRF 操作 rank 不需要 |
+| 3 | **Reranker 跑 top-1000** | latency 爆 (50ms × 1000 = 50s). 必须先 narrow 到 50-100 |
+| 4 | **没 perms filter** | 跨租户数据泄漏 = SaaS 死刑. 一定 retrieval-time filter, 不要 post-rank filter |
+| 5 | **没 eval set, 凭"feel"调** | 三个月后没人知道是变好还是变差. 必须有 fixed eval + CI 跑 |
+| 6 | **Single embedding model 通吃所有 domain** | Code / legal / medical 都用 `text-embedding-3-small` → 都不够好. 分 domain 用专用 |
+| 7 | **Chunk size 一刀切 512** | 不同 source-type (FAQ 100 tok vs policy doc 800 tok) 不同 chunk 策略 |
+| 8 | **Cosine similarity 当置信度** | 0.7 cosine 不代表 70% confidence, 这是相对排序, 不是绝对概率 |
+| 9 | **Embed query 时不 normalize** | 训练时 normalize, 推理时不 normalize → 距离全错 |
+| 10 | **Hot index 缺失** | 新 ticket 入库 24h 后才能搜到, 用户抱怨 |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **Hybrid retrieval = "BM25 抓字面 + Dense 抓语义 + Cross-encoder 精排 + Query understanding 扩展 + Eval set 量化"**.
+>
+> 60% recall 到 90% recall 不是换一个 embedding 模型就能搞定, 是 **5 层流水线每层各贡献 3-15%** 的工程组合.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: Bi-encoder vs Sparse 的数学 — 为什么各自失败
+
+### 1.1 Bi-encoder 在做什么 (数学)
+
+**训练目标** (contrastive):
+
+```
+loss = -log( exp(sim(q, d⁺)/τ) / Σ exp(sim(q, dᵢ)/τ) )
+```
+
+其中 `d⁺` 是 positive 文档, `dᵢ` 包括 in-batch negatives. 模型学到的是把 (q, d⁺) 拉近, (q, d⁻) 推远的 768/1024 维稠密向量.
+
+**关键性质**:
+
+- 单个 doc embedding 是**所有训练 query 的平均能命中的"代表向量"** — 一个 doc 一个 vector
+- Query 和 doc **独立 forward**, 没有 cross-attention → 看不到 query-doc 的细粒度对齐
+
+**失败 case** (你必须能讲清楚):
+
+```python
+# 假设的 embedding 空间投影
+embed("iPhone 15 Pro Max 256GB Natural Titanium")  → [0.4, 0.6, ...]  # "高端手机"
+embed("iPhone 13 mini")                              → [0.38, 0.58, ...] # 几乎一样
+embed("Samsung Galaxy S24 Ultra 512GB")              → [0.42, 0.61, ...] # 也几乎一样
+
+cosine_sim(query, iPhone_13_doc) ≈ cosine_sim(query, iPhone_15_pro_doc)
+```
+
+为什么? 因为 embedding 是**类别级表示**, 不是 SKU 级. 训练数据里 "iPhone 15 Pro" 这种长 token 很稀疏, 模型 fallback 到 "phone" 这个语义簇.
+
+**经验法则**:
+
+| Query 特征 | Bi-encoder 表现 |
+|---|---|
+| 自然语言长 query | ✓ 强 |
+| 同义词 / paraphrase | ✓ 强 |
+| 关键概念询问 | ✓ 强 |
+| Acronyms (TPv3, GDPR, OAuth) | ✗ 弱 (训练里见太少) |
+| Product SKU / Model ID | ✗ 弱 |
+| Error code (5xx, ECONNRESET) | ✗ 弱 |
+| 代码标识符 (function names) | ✗ 弱 |
+| Negation | ✗ 弱 |
+| 罕见专有名词 | ✗ 弱 |
+
+### 1.2 BM25 在做什么 (数学)
+
+```
+score(q, d) = Σ IDF(qᵢ) · ( tf(qᵢ, d) · (k1 + 1) ) / ( tf(qᵢ, d) + k1 · (1 - b + b · |d|/avgdl) )
+```
+
+直观理解:
+- `tf(qᵢ, d)`: term `qᵢ` 在 doc `d` 中出现次数
+- `IDF(qᵢ)`: term 越稀有权重越高 (`log((N - df + 0.5) / (df + 0.5))`)
+- `k1` (默认 1.2): tf saturation, 一个词出现 100 次不比 10 次好太多
+- `b` (默认 0.75): length normalization, 长文档天然 tf 高需惩罚
+
+**强项**:
+- 罕见词 (IDF 高) 一旦命中, 分数极高 → SKU / error code / function name 完美
+- 不需要训练数据
+- 解释性 100% — 知道哪个 term 贡献了分
+
+**弱项**:
+- "逾期" vs "late payment" — 语义同义但字面不同, BM25 完全错过
+- 错别字 → 0 命中 (无 fuzzy default)
+- 同义词扩展靠 thesaurus 手动维护
+
+### 1.3 各自失败的 query 例子
+
+```python
+# 例 1: Pure semantic query
+q = "how to debug a slow database query"
+# Dense: ✓ (capture "performance tuning" docs)
+# BM25:  partial (only matches "database" "query" exact, miss "slow" semantic)
+
+# 例 2: Pure keyword query
+q = "ECONNRESET nodejs 18 error"
+# Dense: ✗ (collapses to "node error" cluster)
+# BM25:  ✓ (rare token "ECONNRESET" + "nodejs 18" exact match)
+
+# 例 3: 混合
+q = "API rate limit exceeded for tenant_id 42"
+# Dense: ✓ (semantic about rate limits)
+# BM25:  ✓ ("tenant_id" exact, "42" exact if specific instance)
+# 混合最好
+```
+
+### 1.4 实战代码 (并行检索)
+
+```python
+import asyncio
+from typing import List
+
+async def parallel_retrieve(
+    query: str,
+    dense_index,   # Qdrant client
+    sparse_index,  # OpenSearch client
+    top_k: int = 100,
+    tenant_id: str = None,
+):
+    """并行 dense + sparse 检索, 返回 (dense_results, sparse_results)"""
+
+    async def dense():
+        q_vec = await embed_async(query)
+        # Qdrant 支持 filter at retrieval time
+        return await dense_index.search(
+            collection="docs",
+            query_vector=q_vec,
+            limit=top_k,
+            query_filter={
+                "must": [
+                    {"key": "tenant_id", "match": {"value": tenant_id}}
+                ]
+            },
+        )
+
+    async def sparse():
+        # OpenSearch BM25 with tenant filter
+        body = {
+            "query": {
+                "bool": {
+                    "must": {"match": {"text": query}},
+                    "filter": {"term": {"tenant_id": tenant_id}},
+                }
+            },
+            "size": top_k,
+        }
+        return await sparse_index.search(index="docs", body=body)
+
+    dense_r, sparse_r = await asyncio.gather(dense(), sparse())
+    return dense_r, sparse_r
+```
+
+**关键工程点**:
+
+- `asyncio.gather` 并行 — 串行会 +200ms 浪费
+- **Filter at retrieval time** (Qdrant / Weaviate 都原生支持), 不要后过滤 — 后过滤会丢 top-k 大部分
+- 两路 `top_k` 都开 100, fusion 后才 narrow
+
+---
+
+## ⚙️ Problem 2: Fusion 策略 — RRF vs Weighted Score vs Learned
+
+### 2.1 Reciprocal Rank Fusion (RRF) — 默认选择
+
+```python
+def reciprocal_rank_fusion(
+    result_lists: List[List[Document]],
+    k: int = 60,
+    top_n: int = 50,
+) -> List[Document]:
+    """
+    RRF 公式: score(doc) = Σ over lists: 1 / (k + rank(doc, list))
+    k=60 是 paper 推荐值, 实测 40-80 都 OK
+    """
+    scores = defaultdict(float)
+    for lst in result_lists:
+        for rank, doc in enumerate(lst):
+            scores[doc.id] += 1.0 / (k + rank + 1)
+
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    # 还原 Document 对象
+    doc_map = {d.id: d for lst in result_lists for d in lst}
+    return [doc_map[doc_id] for doc_id, _ in ranked[:top_n]]
+```
+
+**为什么 RRF 好用**:
+
+| 特性 | RRF | Weighted Score |
+|---|---|---|
+| Score scale 差异 | 不敏感 (用 rank) | 必须 normalize / calibrate |
+| 跨 retriever 公平 | ✓ | ✗ (BM25 0-∞ vs cosine 0-1) |
+| 调参 | 1 个 (k) | N 个 weight per retriever |
+| 数学直觉 | rank 1 贡献 1/(k+1), rank 100 贡献 ~1/160 | linear combo |
+| Robust to outlier | ✓ | ✗ |
+
+**`k=60` 物理意义**: rank 1 拿 `1/61 ≈ 0.0164`, rank 10 拿 `1/70 ≈ 0.0143`, rank 100 拿 `1/160 ≈ 0.00625`. 平滑衰减, 不像 `1/rank` 那样陡降.
+
+### 2.2 Weighted Score Fusion — 何时用
+
+公式: `final_score = α · normalize(dense_score) + (1-α) · normalize(sparse_score)`
+
+**需要 calibration**:
+
+```python
+# Dense cosine 范围 [-1, 1], 实际通常 [0.2, 0.95]
+# BM25 范围 [0, 50+], 通常 [5, 30]
+
+def min_max_normalize(scores):
+    lo, hi = min(scores), max(scores)
+    return [(s - lo) / (hi - lo + 1e-9) for s in scores]
+
+# Per-query normalize (不是全 corpus, 因为不同 query 分布差异大)
+dense_norm = min_max_normalize([d.score for d in dense_results])
+sparse_norm = min_max_normalize([d.score for d in sparse_results])
+
+# α 需 sweep [0.3, 0.5, 0.7] 在 eval set 上找最优
+alpha = 0.6  # 典型, dense 略重
+final = {doc_id: alpha * dense_norm.get(doc_id, 0) + (1-alpha) * sparse_norm.get(doc_id, 0)
+         for doc_id in set(dense_norm) | set(sparse_norm)}
+```
+
+**何时该 weighted 而不是 RRF**:
+
+- 你**已经有大量标注数据** sweep α 调到最优
+- 你想 **per-domain** 不同权重 (legal α=0.4, code α=0.7)
+- 你 **per-query 动态** 权重 (有 SKU 就 α 低 sparse 重)
+
+### 2.3 Learned Ranker — 工业级
+
+当你有 **clickthrough data** 或 **explicit feedback**:
+
+```python
+# LightGBM / XGBoost ranker
+# Features per (query, doc):
+features = {
+    'dense_score': 0.78,
+    'bm25_score': 12.3,
+    'dense_rank': 5,
+    'bm25_rank': 2,
+    'query_length': 8,
+    'doc_length': 432,
+    'query_has_sku': True,           # heuristic flag
+    'doc_recency_days': 7,
+    'doc_source_type': 'policy',
+    'user_clicked_before': False,    # personalization
+}
+
+# 训练: LambdaRank loss optimizing NDCG@10
+ranker = lightgbm.LGBMRanker(objective='lambdarank', metric='ndcg')
+ranker.fit(X_train, y_train, group=group_sizes, eval_metric='ndcg@10')
+```
+
+**何时用**:
+- 你有 1M+ click event 数据
+- 你的 search 是核心业务 (e-commerce, ads, Google itself)
+- 你能承担 ML platform / feature store / 训练 pipeline 的工程成本
+
+**何时不用**:
+- 起步阶段 (没数据), 用 RRF
+- 单租户内部工具, RRF 足够
+
+### 2.4 决策表
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Q: 我刚 launch, 没标注没 click 数据                      │
+│  A: RRF k=60, 立刻能上                                    │
+├─────────────────────────────────────────────────────────┤
+│  Q: 我有 200-500 标注 eval, 想精调                         │
+│  A: Weighted score, sweep α                              │
+├─────────────────────────────────────────────────────────┤
+│  Q: 我有海量 click data, 业务核心                          │
+│  A: Learned ranker (LambdaRank / LTR)                    │
+├─────────────────────────────────────────────────────────┤
+│  Q: 我想 query-adaptive (有 SKU 时 sparse 重)            │
+│  A: Two-stage: classify query → pick fusion strategy     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.5 Adaptive Fusion (高阶)
+
+```python
+def adaptive_fusion(query: str, dense_r, sparse_r):
+    """根据 query 特征选择 fusion 策略"""
+    features = extract_features(query)
+
+    if features['has_sku'] or features['has_error_code']:
+        # 字面命中优先
+        return weighted_fusion(dense_r, sparse_r, alpha=0.3)
+    elif features['is_natural_question']:
+        # 语义优先
+        return weighted_fusion(dense_r, sparse_r, alpha=0.7)
+    else:
+        # 默认 RRF
+        return rrf(dense_r, sparse_r, k=60)
+```
+
+production 里我建议 **先 RRF 跑 3 个月** 拿 baseline + click data, 再决定要不要升级.
+
+---
+
+## ⚙️ Problem 3: Query Understanding — Rewrite / HyDE / Multi-query / Decompose
+
+### 3.1 4 种 query 扩展技术
+
+| 技术 | 输入 | 输出 | 何时用 |
+|---|---|---|---|
+| **Rewrite** | 1 query | 1 better query | Conversational context 缺失 |
+| **Multi-query** | 1 query | N paraphrases | Vocabulary mismatch |
+| **HyDE** | 1 query | 1 fake answer (用于 embed) | Query 短 doc 长, 不在同 distribution |
+| **Decompose** | 1 multi-hop | N sub-queries | 复杂 question |
+
+### 3.2 Rewrite
+
+**问题场景**:
+```
+User turn 1: "I bought iPhone 15 Pro yesterday"
+User turn 2: "how do I set up dual SIM"   ← 这里 query 没 mention iPhone
+```
+
+Pure embed("how do I set up dual SIM") → 召回 Android dual SIM 教程, 用户期待 iPhone.
+
+**解法**:
+
+```python
+async def rewrite_query(
+    raw_query: str,
+    conversation_history: List[Message],
+) -> str:
+    """用 cheap LLM (Gemini 3 Flash $0.50/$3) 重写 query 补全 context"""
+    prompt = f"""Rewrite the user's latest query as a standalone search query.
+Pull in entities, products, or constraints mentioned in earlier turns.
+
+Conversation:
+{format_history(conversation_history)}
+
+Latest query: {raw_query}
+
+Rewritten standalone query (just the query, no explanation):"""
+
+    response = await gemini_flash.generate(prompt, max_tokens=80)
+    return response.text.strip()
+```
+
+**例**:
+```
+Input:  "how do I set up dual SIM"
+Output: "How to set up dual SIM on iPhone 15 Pro"
+```
+
+**Cost**: ~80 token in + 30 token out × Gemini 3 Flash ($0.50/$3 per 1M) = **$0.00013/query**. 几乎免费.
+
+### 3.3 Multi-query Expansion
+
+**问题**: 用户用 "逾期付款" 查, 文档用 "late payment" / "overdue" / "missed payment" / "delinquent".
+
+**解法**:
+
+```python
+async def expand_to_multi_query(query: str, n: int = 3) -> List[str]:
+    """LLM 生成 N 个 paraphrase, 多路检索"""
+    prompt = f"""Generate {n} alternative phrasings of this search query.
+Each should preserve meaning but use different vocabulary.
+
+Query: {query}
+
+Return as JSON array."""
+
+    resp = await gemini_flash.generate(prompt, response_format='json')
+    return json.loads(resp.text)
+
+# 检索时
+queries = [original] + await expand_to_multi_query(original, n=3)
+all_results = await asyncio.gather(*[
+    parallel_retrieve(q, ...) for q in queries
+])
+# RRF 合并 4 路 × 2 (dense+sparse) = 8 路结果
+fused = rrf(all_results, k=60)
+```
+
+**Trade-off**: 4× 查询成本 (但 dense embed + ANN 极便宜, 主要成本是 LLM rewrite 一次).
+
+### 3.4 HyDE (Hypothetical Document Embeddings)
+
+**直觉**: Query 短, doc 长, 它们在 embedding 空间分布不同 (asymmetric). 用 LLM **生成一个假答案**, 再 embed 假答案, 用假答案的向量去搜 → 因为假答案和真答案分布相似.
+
+```python
+async def hyde_retrieve(query: str, dense_index) -> List[Document]:
+    """HyDE: 生成假答案, embed, 用假答案向量检索"""
+    fake_answer_prompt = f"""Write a 100-word passage that would directly answer this question.
+Don't worry about factual accuracy, write as if you knew the answer.
+
+Question: {query}
+
+Passage:"""
+
+    fake_answer = await gemini_flash.generate(fake_answer_prompt, max_tokens=200)
+    fake_vec = await embed_async(fake_answer.text)
+
+    # 用 fake answer 向量, 不是 query 向量, 去检索
+    results = await dense_index.search(query_vector=fake_vec, limit=100)
+    return results
+```
+
+**何时 HyDE 有效**:
+- ✓ Query 短 (10 token 内), doc 长 (500 token)
+- ✓ Domain 用 LLM 训练里覆盖好 (常识 / web)
+- ✗ 高 specialized domain (legal / medical) — LLM 可能编错事实方向, 反而误导
+
+**实测**: 标准 BEIR benchmark 上 HyDE 加 2-5% NDCG, 不大但稳定.
+
+### 3.5 Query Decomposition (multi-hop)
+
+**问题**: "公司 ARR 超过 $10M 但 employee headcount 小于 50 的有哪些?" — 需要 2 个 condition join.
+
+**解法**:
+
+```python
+async def decompose(query: str) -> List[str]:
+    prompt = f"""Decompose this question into independent sub-questions
+that can be answered separately, then combined.
+
+Question: {query}
+
+Sub-questions (JSON array):"""
+    resp = await gemini_flash.generate(prompt, response_format='json')
+    return json.loads(resp.text)
+
+# 用法
+sub_qs = await decompose(query)
+# [
+#   "List companies with ARR > $10M",
+#   "List companies with employee count < 50"
+# ]
+sub_results = [await retrieve(q) for q in sub_qs]
+# 后续 LLM 合并 / intersect
+```
+
+更高级方案: **agentic retrieval** — LLM 看完一次结果后决定要不要再检索, 而不是 one-shot decompose. 这就到 agent 的话题了.
+
+### 3.6 Query Understanding 整合
+
+```python
+async def full_query_understanding(
+    raw_query: str,
+    history: List[Message],
+) -> dict:
+    """整套 query expansion"""
+    # 1. Rewrite for context
+    rewritten = await rewrite_query(raw_query, history)
+
+    # 2. Decompose if multi-hop (detect via LLM classifier)
+    if await is_multi_hop(rewritten):
+        sub_queries = await decompose(rewritten)
+    else:
+        sub_queries = [rewritten]
+
+    # 3. For each sub-query, multi-query expand
+    expanded = []
+    for sq in sub_queries:
+        paraphrases = await expand_to_multi_query(sq, n=2)
+        expanded.extend([sq] + paraphrases)
+
+    # 4. Optional HyDE for hard query
+    hyde_doc = None
+    if await is_hard_query(rewritten):
+        hyde_doc = await generate_hyde(rewritten)
+
+    return {
+        'original': raw_query,
+        'rewritten': rewritten,
+        'sub_queries': sub_queries,
+        'expanded_queries': expanded,
+        'hyde_passage': hyde_doc,
+    }
+```
+
+**Latency 预算**: 整套 ~500-800ms (Gemini 3 Flash 3-4 次调用). 如果太慢, 可以**并行所有 LLM call** (gather), 或干掉 HyDE (最贵 1 个).
+
+---
+
+## ⚙️ Problem 4: Reranker 集成 — Cross-encoder Cascade + Latency 优化
+
+### 4.1 为什么 reranker 不能跑 1000 个候选
+
+Cross-encoder 是 per-pair forward:
+
+```
+50 (query, doc) pairs × bge-reranker-large × A10G GPU = ~500ms
+1000 (query, doc) pairs × bge-reranker-large × A10G GPU = ~10000ms = 10s
+```
+
+线性 scale. 所以必须先 narrow.
+
+### 4.2 标准 cascade
+
+```python
+class CascadeRetrieval:
+    def __init__(self):
+        self.dense = QdrantClient()
+        self.sparse = OpenSearchClient()
+        self.cheap_reranker = SentenceTransformer('BAAI/bge-reranker-v2-m3')  # small
+        self.exp_reranker = CohereClient(model='rerank-3')                    # API
+        self.llm_judge = GeminiClient(model='gemini-3-pro')                    # final
+
+    async def retrieve(self, query, top_final=10):
+        # Stage 1: 并行 dense + sparse, each top-100
+        dense_r, sparse_r = await self.parallel_first_stage(query)
+        # Stage 2: RRF → top-50
+        candidates_50 = rrf([dense_r, sparse_r], k=60, top_n=50)
+        # Stage 3: cheap cross-encoder → top-25
+        scores = self.cheap_reranker.predict([(query, c.text) for c in candidates_50])
+        candidates_25 = [c for c, _ in sorted(zip(candidates_50, scores),
+                                              key=lambda x: -x[1])[:25]]
+        # Stage 4: expensive reranker → top-10
+        cohere_resp = await self.exp_reranker.rerank(
+            query=query, documents=[c.text for c in candidates_25], top_n=top_final
+        )
+        candidates_10 = [candidates_25[r.index] for r in cohere_resp.results]
+
+        # Stage 5 (optional): LLM judge → top-3 (only for high-stakes)
+        # ... (off by default)
+
+        return candidates_10
+```
+
+**Latency 预算 (A10G GPU + Cohere API)**:
+
+| Stage | Latency | Cumulative |
+|---|---|---|
+| Dense ANN | 30ms | 30ms |
+| Sparse BM25 | 40ms | 40ms (parallel) |
+| RRF | 5ms | 45ms |
+| bge-reranker-base (50) | 150ms | 195ms |
+| Cohere rerank (25) | 200ms | 395ms |
+| **Total** | | **~400ms** |
+
+Cross-encoder 不要 sequential 跑全部, **batch 一次 forward**.
+
+### 4.3 GPU 批处理
+
+```python
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+class GpuReranker:
+    def __init__(self, model_name='BAAI/bge-reranker-v2-m3'):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, torch_dtype=torch.float16  # FP16 for 2x speed
+        ).cuda().eval()
+
+    @torch.no_grad()
+    def predict_batch(self, pairs: List[Tuple[str, str]]) -> List[float]:
+        """单次 batch forward, 不要 for-loop"""
+        inputs = self.tokenizer(
+            [p[0] for p in pairs],
+            [p[1] for p in pairs],
+            padding=True, truncation=True, max_length=512,
+            return_tensors='pt'
+        ).to('cuda')
+
+        scores = self.model(**inputs).logits.squeeze(-1).float()
+        return scores.cpu().tolist()
+```
+
+**FP16 + batch**: 50 pairs A10G ~80ms (vs 单条 forward 50 × 20ms = 1s).
+
+### 4.4 TensorRT / vLLM 优化
+
+`bge-reranker-large` 量化 + TensorRT 编译:
+
+```python
+# 1. 导出 ONNX
+torch.onnx.export(model, ..., 'reranker.onnx', opset_version=14)
+
+# 2. TensorRT 编译 (INT8 quant)
+# trtexec --onnx=reranker.onnx --int8 --saveEngine=reranker.trt
+
+# 3. Triton Inference Server 部署
+# 单实例 throughput: 500 pairs/s on A10G
+```
+
+**实测收益**: FP32 baseline 200ms → FP16 80ms → INT8 + TRT 35ms. 3-5x.
+
+### 4.5 Distillation — 自己训练小 reranker
+
+如果你有自家 domain data:
+
+```python
+# Teacher: bge-reranker-large (slow but accurate)
+# Student: 6-layer 小模型
+
+teacher_scores = teacher.predict(pairs)
+student_scores = student(pairs)
+loss = MSE(teacher_scores, student_scores) + λ * MarginLoss(student_scores, labels)
+
+# 训练 5-10 epoch, 30M params 学到 80% teacher quality at 5x speed
+```
+
+Sentence-Transformers 库有现成 distillation script.
+
+### 4.6 何时不用 reranker
+
+- **First-stage 已经够好** (>95% recall@50) — reranker 只能小幅改 ordering
+- **Top-1 即可** — RAG 给 LLM 5-10 个 doc, reranker order 影响 LLM 阅读顺序, 中位排序无所谓
+- **Latency 极紧** (<200ms total) — 砍掉 reranker, 用更好的 first stage
+
+---
+
+## ⚙️ Problem 5: Eval Methodology — Recall / NDCG / MRR + Slice + A/B
+
+### 5.1 三个核心 IR 指标
+
+**Recall@k**:
+```
+recall@k = |relevant ∩ retrieved_top_k| / |relevant|
+```
+- 「相关 doc 有多少进入了 top-k」
+- **召回率, 集合层面**
+- 必要但不充分 (不管位置)
+
+**NDCG@k (Normalized Discounted Cumulative Gain)**:
+```
+DCG@k = Σ (relevance_i) / log2(i + 1)
+NDCG@k = DCG@k / IDCG@k   (IDCG 是理想排序的 DCG)
+```
+- 「相关 doc 排得有多靠前」
+- **支持 graded relevance** (3=perfect, 2=relevant, 1=marginal, 0=irrelevant)
+- 是 reranker 应该追求的核心指标
+
+**MRR (Mean Reciprocal Rank)**:
+```
+MRR = mean over queries: 1 / rank(first_relevant)
+```
+- 「第一个相关 doc 在哪里」
+- 适合 **first-doc-wins** 场景 (QA top-1 answer)
+
+### 5.2 实战代码
+
+```python
+def evaluate(pipeline, eval_set, ks=[1, 3, 5, 10, 20]):
+    results = defaultdict(list)
+    for q, expected in eval_set:
+        retrieved = pipeline.retrieve(q, top_k=max(ks))
+        retrieved_ids = [d.id for d in retrieved]
+        expected_ids = set(expected['relevant_ids'])
+        graded = expected.get('graded', {})  # doc_id -> 0-3 score
+
+        for k in ks:
+            top_k = retrieved_ids[:k]
+            # Recall@k
+            hits = len(set(top_k) & expected_ids)
+            results[f'recall@{k}'].append(hits / max(len(expected_ids), 1))
+            # NDCG@k
+            dcg = sum(graded.get(d, 0) / math.log2(i + 2) for i, d in enumerate(top_k))
+            ideal = sorted(graded.values(), reverse=True)[:k]
+            idcg = sum(g / math.log2(i + 2) for i, g in enumerate(ideal)) or 1
+            results[f'ndcg@{k}'].append(dcg / idcg)
+
+        # MRR
+        for rank, d in enumerate(retrieved_ids, 1):
+            if d in expected_ids:
+                results['mrr'].append(1 / rank)
+                break
+        else:
+            results['mrr'].append(0)
+
+    return {k: statistics.mean(v) for k, v in results.items()}
+```
+
+### 5.3 Eval set 构建
+
+**人工标注 (200-500 query)**:
+1. 抽样真实 production query (按 frequency)
+2. 给标注员看 retrieved top-20
+3. 标 `(relevant, marginal, irrelevant)` × graded score
+4. 至少 2 个标注员, 算 inter-annotator agreement (Cohen's kappa > 0.7 才可信)
+
+**LLM 合成 eval (扩展 to 2000-5000 query)**:
+```python
+# 给 LLM 一个 doc, 让它生成会命中这个 doc 的 query
+prompt = f"""Given this document, write 3 questions that someone might ask
+that should be answered by this document.
+
+Document: {doc.text}
+
+Questions (JSON):"""
+synthetic_queries = await gemini_pro.generate(prompt, response_format='json')
+# 每个 query 的 "relevant_id" = doc.id (已知 ground truth)
+```
+
+风险: LLM 生成的 query 可能 distribution 偏 — 必须**留一份人工 eval 做校准**.
+
+### 5.4 Slice eval (关键)
+
+聚合数字会掩盖问题. 必须分 slice 看:
+
+```python
+def slice_eval(pipeline, eval_set):
+    slices = {
+        'short_query': lambda q: len(q.split()) <= 3,
+        'long_query': lambda q: len(q.split()) > 10,
+        'has_sku': lambda q: bool(re.search(r'\b[A-Z]{2,}\d+', q)),
+        'has_acronym': lambda q: bool(re.search(r'\b[A-Z]{2,5}\b', q)),
+        'is_question': lambda q: '?' in q or q.lower().startswith(('how', 'what', 'why')),
+    }
+    for name, fn in slices.items():
+        sliced_set = [(q, e) for q, e in eval_set if fn(q)]
+        if not sliced_set:
+            continue
+        metrics = evaluate(pipeline, sliced_set)
+        print(f'[{name}] n={len(sliced_set)} {metrics}')
+```
+
+**典型发现**:
+- 总 recall@10 = 87%
+- has_sku slice 上只有 65% — **dense miss SKU**, 加大 BM25 权重
+- short_query slice 上 72% — **query 信息不足**, 加 HyDE
+- ... 每个 slice 一个独立的改造方向
+
+### 5.5 A/B test in production
+
+```python
+# Feature flag 控制
+def search(query, user_id):
+    bucket = hash(user_id) % 100
+    if bucket < 50:
+        pipeline = old_pipeline_v3   # control
+        variant = 'control'
+    else:
+        pipeline = new_pipeline_v4   # treatment
+        variant = 'treatment'
+
+    results = pipeline.retrieve(query)
+    log_event({
+        'user_id': user_id, 'query': query, 'variant': variant,
+        'top_doc_ids': [r.id for r in results[:5]],
+        'latency_ms': elapsed_ms(),
+    })
+    return results
+
+# 离线分析: 比较 control vs treatment 在
+#   - CTR (点击 top-3)
+#   - Time-to-answer (用户从 search 到 click 的秒数)
+#   - Thumbs up rate (显式反馈)
+#   - Repeat query rate (代理: 高 → 没找到)
+```
+
+**关键**: A/B 必须**跑足时间** (1-2 周, 跨 weekday/weekend), 统计显著 (per-metric, two-tailed t-test, p < 0.05).
+
+### 5.6 Observability in production
+
+| Metric | Alert 条件 |
+|---|---|
+| p99 retrieval latency | > 1s sustained 10min → page |
+| Empty result rate | > 5% sustained → 检查 index health |
+| Cross-encoder GPU util | > 90% sustained → 加 instance |
+| Click-through @ top-3 | < 50% week-over-week drop > 5pp → investigate |
+| Per-tenant query QPS | spike 10x baseline → DDoS / abuse 检查 |
+
+**工具**: Phoenix (Arize), LangSmith, Datadog APM, OpenSearch dashboards.
+
+---
+
+# Part 3 · 把 5 个问题串起来看
+
+这 5 个问题其实是**同一件事的 5 个层**:
+
+1. **Bi vs sparse 数学** 决定「为什么需要两路」
+2. **Fusion 策略** 决定「两路结果怎么合」
+3. **Query understanding** 决定「输入端要怎么扩展」
+4. **Reranker** 决定「输出端怎么精排」
+5. **Eval** 决定「怎么知道每一层有用」
+
+面试场把这 5 层都讲清楚, 加上 `recall@10: 60% → 88%` 的 ablation 数据, 就是 **staff-level RAG 工程师** 的水准.
+
+---
+
+## 必问 clarifying questions
+
+**1. Recall 的定义**
+
+> "60% recall — measured at recall@k for what k? On what eval set? Annotated ground truth (how many queries, who annotated, IAA?) or proxy (click-through, thumbs)?"
+
+**2. Query 类型分布**
+
+> "Keyword-heavy ('error code X'), semantic ('how do I troubleshoot Y'), mixed? Acronyms / product names / SKU 占比?"
 
 **3. 数据 corpus 特征**
 
-> "Documents avg length? Modality (PDF / text / table / code)? Update frequency?"
+> "Documents avg length? Modality (PDF / text / table / code)? Multi-tenant 各 tenant 独立 corpus 还是共享? Update frequency (daily / hourly / real-time)?"
 
-**4. Latency budget**
+**4. Latency / cost budget**
 
-> "p99 latency for retrieval — 100ms, 1s, 10s? Affects reranker feasibility."
+> "p99 latency for retrieval — 100ms, 1s, 10s? Reranker GPU 预算? Per-query cost ceiling?"
 
-**5. Index update freshness**
+**5. Compliance / perms**
 
-> "Real-time / hourly / daily? Affects index choice."
+> "Per-document ACL? PII content? Cross-tenant isolation 要求多严?"
 
 ---
 
-## 5 步框架
+## 5 步框架 (sample 45-min answer)
 
 | 时长 | 阶段 |
 |---|---|
-| 0-5 min | Clarify recall@k definition + query/data profile |
-| 5-15 min | Diagnose: why pure dense at 60%? |
-| 15-25 min | Hybrid retrieval (BM25 + dense + RRF) |
-| 25-35 min | Reranker layer + query understanding |
-| 35-45 min | Eval + observability |
+| 0-5 min | Clarify recall definition + query/data profile + latency budget |
+| 5-15 min | Diagnose why pure dense at 60% — 4 个失败 case 举例 |
+| 15-25 min | Hybrid retrieval (BM25 + dense + RRF) + query understanding |
+| 25-35 min | Reranker (cross-encoder cascade) + latency optimization |
+| 35-50 min | Eval methodology (recall + NDCG + slice + A/B) |
+| 50-60 min | Production hardening (perms / freshness / observability) |
 
 ---
 
-## 我会这样答（sample）
+## 我会这样答 (sample)
 
-> "Clarify — *[假设: recall@10 on 200 annotated queries, queries mixed (keyword + semantic), corpus PDFs+tickets+contracts (long-form), latency 1s, daily index update]*.
+> "Clarify — *[假设: recall@10 on 200 annotated queries (kappa 0.78), queries mixed (40% has SKU/acronym, 60% natural), corpus PDFs+tickets+contracts (avg 800 tok per chunk), latency 1s budget, daily index update, multi-tenant with strict perms]*.
 >
-> **Diagnose first** — common reasons pure dense fails:
+> **Diagnose first**: pure dense fails on 4 categories I'd expect to dominate the 40% miss:
 > 1. **Acronyms / product names** — 'TPv3' doesn't embed well, BM25 catches exact
-> 2. **Long documents** — single embedding loses detail, chunks too coarse
-> 3. **Domain mismatch** — base embedding model not finetuned to your jargon
-> 4. **Numeric / code** — semantic meaningless on '5xx errors', BM25 catches
+> 2. **Error codes / numerics** — '5xx' or 'ECONNRESET' need lexical
+> 3. **Cross-language / paraphrase** — 中英混合时 embedding 模型 inconsistent
+> 4. **Long docs over-compressed** — single 800-tok chunk has multi-topic, embedding 是平均
 >
 > **My proposal — 5-layer retrieval pipeline**:
 >
-> **Layer 1: Query understanding**
+> **L1 Query understanding** (Gemini 3 Flash, ~$0.0001/q): rewrite + multi-query × 3 + HyDE for hard queries
 >
-> ```python
-> def expand_query(raw):
->     # LLM-based rewrite for context-poor queries
->     rewritten = llm.rewrite(raw, context=prev_messages)
->     # HyDE (Hypothetical Document Embeddings): generate fake answer, embed it
->     hyde_doc = llm.generate_answer(raw)
->     # Multi-query: 3 paraphrases for recall
->     paraphrases = llm.generate_paraphrases(raw, n=3)
->     return {
->         'original': raw,
->         'rewritten': rewritten,
->         'hyde': hyde_doc,
->         'paraphrases': paraphrases,
->     }
-> ```
+> **L2 Parallel retrieval**: BM25 top-100 (OpenSearch) + Dense top-100 (Qdrant HNSW M=16 ef=128, gemini-embedding-001 768d)
 >
-> **Layer 2: Parallel retrieval (BM25 + dense)**
+> **L3 RRF fusion** (k=60) → top-50
 >
-> ```python
-> async def hybrid_retrieve(queries, top_k=50):
->     # Dense: embed + ANN search
->     dense_results = await asyncio.gather(*[
->         dense_index.search(embed(q), top_k=top_k)
->         for q in [queries['original'], queries['hyde']]
->     ])
->     
->     # Sparse: BM25
->     sparse_results = await asyncio.gather(*[
->         bm25_index.search(q, top_k=top_k)
->         for q in [queries['original']] + queries['paraphrases']
->     ])
->     
->     return dense_results, sparse_results
-> ```
+> **L4 Cross-encoder rerank**: bge-reranker-v2-m3 on A10G, batch 50 FP16 → ~80ms, then Cohere rerank-3 on top-25 → top-10
 >
-> **Why both**:
-> - Dense good at semantic (paraphrase, synonym)
-> - Sparse good at keyword (rare terms, exact match)
-> - Recall typically +15-20% combining
->
-> **Layer 3: Fusion (RRF)**
->
-> ```python
-> def reciprocal_rank_fusion(result_lists, k=60):
->     # Standard formula: score(doc) = sum over lists: 1 / (k + rank(doc, list))
->     scores = defaultdict(float)
->     for lst in result_lists:
->         for rank, doc in enumerate(lst):
->             scores[doc.id] += 1.0 / (k + rank + 1)
->     return sorted(scores.items(), key=lambda x: -x[1])[:100]
-> ```
->
-> RRF is **simpler than weighted score fusion** and works because it operates on ranks (no calibration needed).
->
-> **Layer 4: Reranker (cross-encoder)**
->
-> ```python
-> def rerank(query, candidates, top_k=10):
->     # Cross-encoder scores [query, doc] jointly
->     pairs = [(query, doc.text) for doc in candidates]
->     scores = cross_encoder.predict(pairs)  # e.g., bge-reranker-large
->     ranked = sorted(zip(candidates, scores), key=lambda x: -x[1])
->     return [c for c, s in ranked[:top_k]]
-> ```
->
-> Cross-encoder is **slower per pair but more accurate**. Use for top-50 → top-10 stage.
->
-> **Layer 5: Metadata filter + freshness boost**
->
-> ```python
-> def post_filter(results, user_perms, time_decay=True):
->     filtered = [r for r in results if user_perms.can_access(r)]
->     if time_decay:
->         # Boost recent docs
->         for r in filtered:
->             r.score *= exp(-(now() - r.updated_at) / TIME_DECAY_TAU)
->     return sorted(filtered, key=lambda x: -x.score)
-> ```
+> **L5 Post-filter**: perms (tenant_id at retrieval time, 不 post-rank), freshness decay `exp(-Δt/τ)` with τ=90d, source-type boost (policy doc > ticket)
 >
 > **Expected recall trajectory**:
 > - Pure dense baseline: 60% recall@10
 > - + BM25 fusion: 75-78%
-> - + Query rewrite: 80-83%
-> - + HyDE / multi-query: 83-86%
-> - + Cross-encoder reranker: 90-92%
+> - + Query rewrite + multi-query: 80-83%
+> - + HyDE: 82-85%
+> - + Cross-encoder reranker: 88-92%
 >
-> **Eval setup (critical)**:
+> **Eval setup**: 200 query 人工标注 + 1000 LLM 合成 (校准), 跑 recall@1/3/5/10 + NDCG@10 + MRR, slice by query type. CI 每天 regression test, A/B 1-2 周.
 >
-> ```python
-> # Ground truth set: 200 (query, [relevant_doc_ids]) pairs
-> for query, expected in eval_set:
->     retrieved = pipeline.retrieve(query, top_k=10)
->     # Recall@10
->     hits = len(set(retrieved) & set(expected))
->     recall = hits / len(expected)
->     # NDCG: positional + graded relevance
->     ndcg = compute_ndcg(retrieved, expected_graded)
->     # MRR: position of first relevant
->     mrr = 1 / first_relevant_rank
-> ```
->
-> Track all 3 metrics. Recall is **necessary but not sufficient** — NDCG catches 'right doc but at position 9'.
->
-> **Observability** in production:
-> - Click-through rate per result position (engagement-based eval)
-> - User explicit feedback (thumbs)
-> - Diversity (avoid 10 near-duplicates in top 10)
-> - Coverage (% queries finding > 0 relevant)
-> - Latency p99 per layer
+> **Production monitoring**: p99 latency per layer (Phoenix trace), per-tenant empty-rate, CTR@top-3, weekly slice eval.
 >
 > **What I would NOT do**:
-> - Use vector search alone for keyword-heavy queries
+> - Use vector search alone for SKU-heavy queries
 > - Skip eval set (just 'feels better')
-> - Apply reranker to top-1000 (too slow)
-> - Forget perms filter (data leak)"
-
----
-
-## 多场景变体 + 解法
-
-### 变体 1: E-commerce product search
-
-> "Shopify-style 商城，用户搜 'iPhone 15 Pro Max 256GB Titanium'。怎么 search？"
-
-**关键差异**: 强 keyword (SKU/型号), 又有 semantic (相似产品), 用户期待精确。
-
-**解法**:
-- **BM25 weight 高**: SKU / 品牌 / 容量 这些是结构化字段, exact match 比 semantic 重要
-- **结构化 filter**: parse 'iPhone 15 Pro Max 256GB' → `{brand: Apple, model: iPhone 15 Pro Max, storage: 256GB}`, 应用为 hard filter
-- **Dense fallback**: 完全 match 0 结果时, 退到 semantic ('similar 旗舰手机')
-- **Personalize**: 用户历史 (买过/看过) 加 boost
-- **Price-aware reranker**: 同款 price ASC, 不同款 relevance ASC
-- **Diversity**: 别 10 个 iPhone 15 占满, 混进 Pro / Plus 变体
-
-### 变体 2: Codebase search (代码库 / monorepo)
-
-> "Dev agent 在 1M LOC monorepo 找函数。Query: 'how do we authenticate users in the payment service'"
-
-**关键差异**: 既要 **symbol match** (函数名/类名) 又要 **semantic** (注释/文档/调用模式)。
-
-**解法**:
-- **AST-based index**: function/class 抽出来作为 chunk, metadata 含 `file_path, language, symbol, signature, callsites`
-- **Path-based filter**: 'in payment service' → filter `file_path LIKE '%/payment/%'`
-- **3 indexes 并查**: code (BM25 on identifier), comment (dense), doc (dense)
-- **GitHub-style search**: `lang:python path:auth/ "verify_token"` 这种 grammar
-- **Definition vs usage**: rerank 时 definition 优先 (但展示 usage 作为 context)
-- **Symbol graph**: 'who calls X' 走 call-graph 不是 vector search (用 tree-sitter / LSP)
-
-### 变体 3: 法律 / 合同检索
-
-> "Lawyer agent 查 1000 份合同。Query: 'find clauses about IP assignment in vendor agreements'."
-
-**关键差异**: **clause-level** retrieval, **legal jargon**, **section reference** important。
-
-**解法**:
-- **Clause-level chunking**: 不是 paragraph, 是 clause boundary (section 4.2, 5.1 等)
-- **Metadata**: contract_type, parties, effective_date, jurisdiction, section_number
-- **Pre-filter**: 'vendor agreements' → contract_type=='vendor' (hard filter)
-- **Hybrid**: BM25 on 'IP assignment' (legal term, exact match 重要) + dense (similar concepts)
-- **Reranker fine-tuned on legal corpus** (mxbai legal or train your own)
-- **Citation 强制**: '[Contract 42, §4.2]' 格式, post-process validate
-- **Aggregate view**: 同种 clause 跨多份合同对比 (group by section_type)
-
-### 变体 4: Customer support — past tickets + KB
-
-> "Support agent 查 100K past tickets + 5K KB articles。混合 source。"
-
-**关键差异**: **Source diversity** — KB 是 canonical, ticket 是 noisy real-world。
-
-**解法**:
-- **2 indexes**: KB 高 weight (高质量), tickets 低 weight (高量低质)
-- **Per-source rerank**: 先各自 top-10, fusion 时 KB 优先 (除非 tickets 给出更细具体场景)
-- **Ticket 质量信号**: 用 resolved-with-positive-feedback ticket > unresolved (作为 boost)
-- **Recency boost**: 6 个月前 ticket 跟政策可能过期, 加 time decay
-- **PII 必 scrub** (ticket 含 user 数据)
-- **Outcome surfaced**: '5 similar tickets, 4 resolved by X action' — actionable
-- **Auto-summarize**: 多个相似 ticket → 1 段总结 + links, 不 dump 全部
-
-### 变体 5: 医学 — drug + symptom search
-
-> "Medical agent — patient symptoms + drug info 检索"
-
-**关键差异**: **High accuracy requirement**, **synonyms** (药名), **safety critical**。
-
-**解法**:
-- **Medical ontology**: UMLS / SNOMED — 'acetaminophen' = 'paracetamol' = 'Tylenol' 归一
-- **Hybrid 必须**: 药名 exact match (BM25) + 症状 semantic (dense)
-- **Negation handling**: 'NOT taking aspirin' → semantic 容易丢 'not', BM25 也丢; 需 NER + negation detection
-- **Multiple sources weighted**: peer-reviewed > guideline > forum
-- **Confidence + uncertainty**: 检索 low confidence → 必 escalate to doctor (这是 medical, 不能瞎答)
-- **Audit + 合规**: HIPAA, retrieval log + access control
-- **Specialized embedding model**: BiomedBERT / SciBERT 而非通用模型
+> - Apply reranker to top-1000 (10s latency)
+> - Forget perms filter (cross-tenant leak)
+> - Use single embedding model across legal/code/medical without domain finetune"
 
 ---
 
 ## 简历专属 reframe
 
-| 题 | 你做过 |
+| 题 | 你的经验 |
 |---|---|
-| Hybrid (BM25 + dense) | BNPL chatbot RAG — 你必处理 product code (sparse needed) |
-| Query rewrite | Voice agent — ASR errors require rewrite before search |
-| Reranker | Internal Agent Platform retrieval — 你 likely 用过 cross-encoder |
-| Eval set methodology | ConvFinQA — ablation eval methodology 你做过 |
-| Perms filter | TikTok payment — natural multi-tenant |
+| Hybrid (BM25 + dense) | **BNPL chatbot RAG** — 7 个市场, 必处理 product code (sparse needed) |
+| Query rewrite | **Voice agent** — ASR errors require rewrite before search |
+| Multi-query / HyDE | **ConvFinQA** — multi-hop financial Q&A, 你做过 query decomposition |
+| Reranker | **Internal Agent Platform** — shared retrieval abstraction, 必有 cross-encoder rerank |
+| Eval set methodology | **ConvFinQA ablation methodology** 是这道题的 ground truth |
+| Perms filter | **TikTok PayLater** — natural multi-tenant + 合规 |
 
-**Quote**:
+**主动 quote**:
 
-> "On BNPL chatbot RAG, switching from pure dense (e5-large) to BM25 + dense + RRF + reranker bumped recall@10 from 67% to 88%. The biggest single jump was BM25 because customer support tickets had **product codes** ('iPhone 15 Pro Max 256GB' kind) that pure embeddings collapsed into generic 'phone' clusters. BM25 caught exact code matches. RRF fusion was almost free, no calibration tuning. Reranker (bge-reranker-large) added 3-4 points at the end with +200ms latency cost."
+> "On BNPL chatbot RAG, switching from pure dense (gemini-embedding-001) to BM25 + dense + RRF + bge-reranker-v2-m3 bumped recall@10 from 67% to 88%. The biggest single jump was BM25 because customer support tickets had **product codes** ('iPhone 15 Pro Max 256GB' kind) and **internal policy IDs** ('BNPL-2024-IDR-late-fee-cap') that pure embeddings collapsed into generic 'phone' or 'fee policy' clusters. BM25 caught exact code matches. RRF fusion was almost free, no calibration tuning. Reranker added 3-4 points at the end with +180ms latency cost on A10G batched. The lesson I carried into the **Internal Agent Platform** retrieval abstraction was: **always expose both BM25 and dense paths**, don't make hybrid an after-thought."
 
 ---
 
 ## 5 follow-ups
 
-**Q1**: "Reranker too slow (200ms × top-50 = 10s). How fix?"
-**A**:
+**Q1**: "Reranker too slow (200ms × top-50 = 10s)."
+
+**A**: Multiple ways:
+- **Cascade**: cheap reranker (bge-base) top-50 → top-25, expensive (Cohere / bge-large) → top-10
+- **Batching**: 50 pairs single forward, FP16 → 80ms instead of 10s
 - **Distill**: bge-reranker-base instead of large, 3-5x faster
-- **Parallel**: batch reranker inference
-- **Cascade**: cheap reranker top-100 → top-30 → expensive reranker → top-10
-- **Hardware**: GPU inference, TensorRT optimization
+- **TensorRT INT8**: 3x more
+- **Skip reranker**, invest in better first stage (HyDE + query expansion)
+- **Caching**: hot query results cached 1h (但要 invalidate on doc update)
 
 **Q2**: "Query 'how do I file a refund' returns relevant docs but they're for a DIFFERENT product. How fix?"
+
 **A**: Missing entity / context awareness:
-- **Conversational context**: prior turns mention product
-- **Session metadata**: user's product list
-- **Multi-stage**: identify product → filter index pre-search
-- **Personalization signal**
+- **Conversational rewrite**: prior turns mention product → rewrite includes product
+- **Session metadata**: user's product list as hard filter
+- **Multi-stage**: classify intent → identify product → filter index pre-search
+- **Personalization signal**: user's past interactions weight specific product docs higher
 
 **Q3**: "Index update — daily okay, but real-time content (new tickets) missed."
+
 **A**: Two-index hybrid:
-- **Hot index**: last 24h, in-memory, refreshed every 5 min
-- **Warm index**: rest, daily rebuild
-- Search both, merge results
+- **Hot index**: last 24h, in-memory (Redis vector or small Qdrant collection), refreshed every 5 min
+- **Warm index**: rest, daily rebuild on Qdrant
+- Search both, RRF merge
+- Or use Qdrant's incremental update (single-doc upsert, no full reindex)
 
 **Q4**: "User wants to find docs by date range / author. Current search ignores."
-**A**: **Structured filter alongside semantic**:
-- Query: "errors from last week by SRE team" → parse → filter `date_range + author + free_text`
-- Run BM25/dense on free_text, apply structured filter at retrieval (not post-rank)
-- Use vector DB that supports metadata filter natively (Qdrant, Weaviate)
+
+**A**: **Structured filter at retrieval time** (not post-rank):
+- Query: "errors from last week by SRE team" → LLM parse → filter `{date_range, author, free_text}`
+- Run BM25/dense on free_text, apply structured filter natively (Qdrant `query_filter`, Weaviate `where`)
+- 关键: post-rank filter 会**丢 top-k 大部分** (你 retrieve 100 个, filter 后 5 个); 必须 retrieval-time filter
 
 **Q5**: "Recall is 90% but users still complain. Why?"
+
 **A**: Recall ≠ user satisfaction. Other axes:
-- **Precision** at top-3: is most relevant first?
-- **Answer synthesis quality**: retrieval right, LLM still mis-summarizes
-- **Coverage**: queries where no relevant doc exists at all (expected behavior, set expectations)
-- **UX**: source citations missing makes user distrust
+- **Precision @ top-3**: is most relevant first? Reranker quality
+- **Answer synthesis quality**: retrieval right, LLM still mis-summarizes — separate problem
+- **Coverage**: queries where no relevant doc exists at all (set expectations, escape valve)
+- **UX**: source citations missing makes user distrust even correct answers
+- **Latency**: 4s search frustrating even if accurate
+- **Diversity**: 10 near-duplicates in top-10 → user perceives narrow
 
 ---
 
-## ❌ 易错点
+## ❌ 易错点 (top 10)
 
-1. **Pure dense everywhere** — fails on keyword-heavy
-2. **No fusion** — pick one of dense/sparse, lose other side
-3. **Apply reranker to too many** — latency blow
-4. **No eval set** — 'feels better'
-5. **No perms filter** — data leak
-6. **No metadata filter** — date/author/scope ignored
-7. **No freshness signal** — stale docs surface
-
----
-
-## ✅ 加分项
-
-1. **Diagnose first** before blanket fix
-2. **RRF over weighted score** (no calibration)
-3. **Query rewrite / HyDE / multi-query** explicit
-4. **Cross-encoder reranker** with cascade
-5. **Eval: recall + NDCG + MRR**
-6. **Metadata filter** at retrieval not post-rank
-7. **Hot + warm index** for real-time
-8. **Quote BNPL chatbot recall improvement 67→88**
+1. **Pure dense everywhere** — fails on SKU / acronyms / codes
+2. **Weighted fusion without calibration** — scores incomparable
+3. **Reranker on top-1000** — latency blow
+4. **No eval set, no slice** — 凭感觉调
+5. **No perms filter** — cross-tenant leak
+6. **Post-rank filter** instead of retrieval-time
+7. **One embedding model fits all domains** — legal/code/medical 都用通用
+8. **Chunking 一刀切 512** — 不同 source-type 应该不同
+9. **No query rewrite** — conversational context 丢
+10. **No A/B framework** — 上线了不知道是好是坏
 
 ---
 
-## Cheat Sheet
+## ✅ 加分项 (top 10)
+
+1. **Diagnose first** — 4 个失败 case 举例 (acronym/SKU/code/long-doc)
+2. **RRF default** + sweep weighted for advanced
+3. **Multi-query + HyDE + decompose** explicit
+4. **Cross-encoder cascade** (cheap → expensive)
+5. **GPU batch FP16 + TensorRT** for latency
+6. **Eval: recall + NDCG + MRR + slice**
+7. **Retrieval-time filter** (Qdrant native)
+8. **Hot + warm index** for real-time
+9. **A/B framework** with multiple metrics
+10. **Quote BNPL chatbot recall 67→88 + bge-reranker-v2-m3**
+
+---
+
+## 一句话总结
+
+> **Hybrid retrieval = 「BM25 抓字面 + Dense 抓语义 + Cross-encoder 精排 + Query understanding 扩展 + Eval set 量化」, 5 层流水线每层 3-15% 召回贡献.**
+>
+> Recall 60% → 90% 的本质是**多层组合**, 不是一招制胜.
+
+---
+
+## Cheat Sheet (印 1 页随身)
 
 ```
 5-layer retrieval pipeline:
-  L1 Query understanding (rewrite + HyDE + multi-query)
-  L2 Parallel retrieval (BM25 + dense)
-  L3 RRF fusion (rank-based, no calibration)
-  L4 Cross-encoder reranker (top-50 → top-10)
-  L5 Metadata filter + freshness + perms
+  L1 Query understanding (rewrite + multi-query + HyDE + decompose)
+  L2 Parallel retrieval (BM25 + dense, asyncio.gather)
+  L3 RRF fusion (rank-based, k=60, no calibration)
+  L4 Cross-encoder reranker cascade (bge-base → Cohere)
+  L5 Filter & boost (perms / freshness / source-type)
 
 Why hybrid > pure dense:
-  Dense: semantic, paraphrase, synonym (good)
-  Sparse: rare terms, codes, exact match (good)
+  Dense: semantic, paraphrase, synonym
+  Sparse: rare terms, SKU, codes, exact match, errors
   Combined: +15-20% recall typical
 
 RRF formula:
-  score(doc) = sum: 1 / (k + rank(doc, list))
+  score(doc) = Σ 1 / (k + rank(doc, list))
   Default k=60
 
+Fusion choice:
+  RRF: default, no calibration, robust
+  Weighted: have eval set, sweep α
+  Learned (LTR): have click data, business-critical
+
+Query understanding (4 techniques):
+  Rewrite (conversational context)
+  Multi-query (vocab mismatch)
+  HyDE (query-doc distribution mismatch)
+  Decompose (multi-hop)
+
+Reranker options (2026):
+  bge-reranker-v2-m3 (free, multilingual)
+  bge-reranker-large (bigger, better)
+  Cohere rerank-3 ($1/1K, API)
+  mxbai-rerank-large-v1 (open Cohere-class)
+  LLM-as-judge (Gemini 3 Pro / Opus 4.7, $$$, top-3 final)
+
+Reranker latency optimization:
+  Cascade (cheap → expensive)
+  GPU batch + FP16
+  TensorRT INT8
+  Distillation (large → small)
+
 Eval metrics:
-  Recall@k (necessary)
-  NDCG (positional + graded)
-  MRR (first relevant rank)
-  Plus production: CTR, thumbs, diversity, coverage
+  Recall@k (set coverage)
+  NDCG@k (position-aware, reranker target)
+  MRR (first-relevant rank)
+  Slice (acronym / SKU / short / long / question)
+  A/B prod (CTR / time-to-answer / thumbs)
 
-Reranker:
-  bge-reranker-large / cohere-rerank
-  Cascade if too slow: cheap reranker → expensive
-  GPU + TensorRT
+Eval set construction:
+  200-500 human-labeled (kappa > 0.7)
+  + 2000-5000 LLM synthetic
+  Calibrated against human subset
 
-Metadata filter:
-  Date / author / perms / product
-  Apply at retrieval level (vector DB native filter)
+Production monitoring:
+  p99 per layer (Phoenix / LangSmith)
+  Per-tenant empty-rate
+  CTR @ top-3
+  Per-slice weekly regression
+
+Multi-tenant perms:
+  Filter at retrieval time (Qdrant query_filter)
+  NEVER post-rank filter (loses top-k)
 
 Hot + warm index:
   Hot: last 24h, every 5 min refresh
   Warm: rest, daily rebuild
+
+Tool zoo (2026):
+  Vector DB: Qdrant, Pinecone, Weaviate, Milvus, FAISS
+  Sparse: OpenSearch, Elasticsearch, Vespa
+  Embedding: gemini-embedding-001, text-embedding-3-large, bge-large
+  Rerank: bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank
+  Tracing: Phoenix (Arize), LangSmith, OpenTelemetry
 
 红线:
   - Pure dense for keyword
@@ -391,4 +1283,7 @@ Hot + warm index:
   - Reranker on top-1000
   - No eval set
   - No perms filter
+  - Post-rank filter
+  - One model all domain
+  - No A/B
 ```

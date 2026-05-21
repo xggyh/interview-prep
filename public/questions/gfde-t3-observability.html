@@ -43,226 +43,1780 @@
 <blockquote><p>"An LLM agent in production is <strong>misbehaving</strong> — sometimes wrong answer, sometimes slow, sometimes expensive. <strong>You can't reproduce it locally</strong>. Design the <strong>observability stack</strong> so you can debug + improve."</p></blockquote>
 <p>或追问形态:</p>
 <blockquote><p>"Walk through the difference between observability for traditional web service vs LLM agent. What's new / different?"</p></blockquote>
-<p><strong>Round</strong>: Production Observability (45 min)</p>
+<p><strong>出处</strong>: Google FDE T3 production observability round 高频题. 2026 LLM platform team 必备能力.</p>
+<p><strong>Round</strong>: Production Observability (45-60 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
-<p>考你<strong>3 pillars + LLM-specific</strong>:</p>
-<ol><li><strong>Traces</strong> —— per-request end-to-end (multi-LLM-call, multi-tool)</li><li><strong>Logs</strong> —— prompt + response 必 capture</li><li><strong>Metrics</strong> —— latency, error rate, tokens, cost</li><li><strong>LLM-specific</strong> —— eval-in-prod, quality drift, jailbreak attempts</li><li><strong>PII handling</strong> —— logging compliance</li></ol>
+<p>考你 <strong>在 prod 跑过 LLM agent + 真正 debug 过 LLM-specific 问题</strong>:</p>
+<ol><li><strong>4-layer instrumentation</strong> —— distributed trace + LLM-specific log + metrics + quality eval</li><li><strong>Sampling strategy</strong> —— 10K QPS 不能 100% log, tail sampling / error-100% / slow-100% / anomaly</li><li><strong>PII redaction</strong> —— prompt + response 含敏感信息, 必须 redact (presidio) + hash for correlation</li><li><strong>Eval-in-prod</strong> —— LLM-as-judge sample, drift detection, calibration to human eval</li><li><strong>Debug workflow</strong> —— trace_id → slice analysis → re-run → root cause</li><li><strong>LLM-specific signals</strong> —— TTFT, token cost, eval pass rate, jailbreak attempts, hallucination</li></ol>
+<p>传统 web observability 工具不够用 — LLM agent 有 prompt template version, model version, tool call chain, semantic similarity 等独特维度.</p>
 <hr />
-<h3>必问 clarifying</h3>
+<h1>Part 1 · 教学讲解 — 先把概念讲透</h1>
+<h3>1. 四个术语先解释</h3>
+<p><strong>Distributed Tracing</strong>: 一个 user request 走完全程的所有 span 串成一条 trace. 现代标准是 <strong>OpenTelemetry</strong> (OTel) — vendor-neutral SDK, 输出到 Datadog / Honeycomb / Jaeger / Tempo / Phoenix. Trace 由 trace_id (全局唯一) + span_id (每段) + parent_span_id (父子关系) 组成.</p>
+<p><strong>Eval-in-prod</strong>: 把 LLM evaluation 放到 production. 不是离线跑 benchmark, 而是<strong>实时抽样 5% 的真实 traffic</strong>, 用 LLM-as-judge 或 user feedback signal 评分, 监控 quality drift. 这是 2026 LLM platform 标配, 不做就盲飞.</p>
+<p><strong>PII redaction</strong>: 个人识别信息脱敏. Prompt + response 可能含信用卡 / 邮箱 / 电话 / SSN / 病历. <strong>必须在 log 写入前 redact</strong>, 不能等 log 进了 SIEM 再来. 用 Microsoft Presidio / AWS Macie / Google DLP 等成熟库.</p>
+<p><strong>Tail-based sampling</strong>: 不是随机 1% sample, 而是<strong>等 trace 完成后, 看整条 trace 特征</strong>再决定保不保留. 慢的 / 错的 / 异常的 100% 保留, 正常的 1% 保留. Honeycomb / Datadog / Tempo 都支持.</p>
+<hr />
+<h3>2. 核心问题 (灾难场景)</h3>
+<p>设想没有 observability stack, agent 在 prod 出问题:</p>
+<p><strong>灾难 A — 用户报问题, 但没法 reproduce</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">用户:  "你的 agent 昨天给我答错了 invoice 金额"
+你:    "什么时候发生的?"
+用户:  "下午 3 点左右吧"
+你:    没 trace, 不知道用户问的什么, 不知道 agent 用了哪个 tool, 不知道哪个 model 版本
+
+只能在 staging 用类似 prompt 试: 试不出来 (因为 prompt template 已经升级, 工具响应已经变, RAG 数据已变)
+
+结果: "请提供更多信息" "我们调查中" — 几天过去都没结论</code></pre>
+<p><strong>灾难 B — 全 log 不区分 trace</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">log format (典型反模式):
+  2026-05-21 14:30:00 INFO [chatbot] User asked: "what's my balance"
+  2026-05-21 14:30:00 INFO [chatbot] LLM call to gpt-5.5
+  2026-05-21 14:30:01 INFO [chatbot] Tool call get_balance
+  ...
+
+100 个并发 request 的 log 全混在一起, 没法分清哪些 line 属于同一个 user request.
+排查必须从时间近邻 + 关键词搜, 极其低效.
+
+正确: 每行带 trace_id + span_id + user_id</code></pre>
+<p><strong>灾难 C — 不做 eval-in-prod</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">传统 metric:  p99 latency 250ms ✓
+              error rate 0.5% ✓
+              throughput 8K QPS ✓
+              
+所有 metric 都正常, dashboard 一片绿.
+
+但用户实际感受: "agent 最近答得变差了"
+
+为什么 metric 不暴露? 因为 LLM 失败 ≠ HTTP 5xx, LLM 给出垃圾答案是 200 OK 但内容差.
+
+解: 5% sample 用 LLM-as-judge 评分 → 跟踪 eval pass rate (1 周看 trend)</code></pre>
+<p><strong>灾难 D — PII 明文写 log</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">log: "User john.doe@bank.com asked about card ending 4242, balance was $5234.21"
+
+后果:
+  - SOC2 / GDPR audit fail
+  - Log aggregation (Splunk, Datadog) 现在持有客户 PII
+  - 内部员工任何 dev 都能搜到客户数据
+  - Log retention 政策违反 (PII 需要 special handling)
+  - Bug: hash key 不动但 PII 还在 → CCPA 删除请求时漏
+
+正确: 在 log 写入前 redact, "[EMAIL] asked about [CARD], balance [REDACTED]"
+保留 hash for correlation: log_id += hash(email) 让客服能查</code></pre>
+<p><strong>正确的 mental model — 4 layers</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">L1 Distributed Tracing      → 每 request 端到端 span 链
+L2 LLM-specific Logging     → prompt / response (PII-redacted) / model version
+L3 Metrics                  → latency, cost, error rate (time-series)
+L4 Quality Monitoring       → eval-in-prod, drift detection, user signal</code></pre>
+<hr />
+<h3>3. 典型架构图</h3>
+<p><strong>完整 stack</strong> (2026 LLM platform observability):</p>
+<pre class="language-plaintext"><code class="language-plaintext">┌─────────────────────────────────────────────────────────────────────┐
+│                          User Request                               │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ trace_id created
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         API Gateway                                 │
+│  - Generate trace_id                                                │
+│  - OTel auto-instrument                                             │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ propagate traceparent header
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Agent Orchestrator                            │
+│  ├─ span: load conversation state (Redis lookup)                    │
+│  ├─ span: LLM call #1 (Gemini 3 Pro)                                │
+│  │   ├─ attr: model, prompt_template_version, input_tokens         │
+│  │   ├─ attr: output_tokens, cost_usd, ttft_ms                     │
+│  │   ├─ event: prompt_hash (group similar)                         │
+│  │   └─ event: eval_sampled=true (5% sample)                       │
+│  ├─ span: tool call (MCP gateway → SF API)                          │
+│  │   └─ span: DB query inside tool                                  │
+│  ├─ span: LLM call #2                                               │
+│  └─ span: response streaming                                        │
+└──┬──────────────────────────────────────────────────────────────────┘
+   │ OTel SDK exports
+   │
+   ├─── Trace export ────→  Honeycomb / Datadog / Tempo (hot 7d)
+   │                        S3 cold storage (90d)
+   │
+   ├─── Log export ──────→  Datadog Logs / Loki / BigQuery
+   │   (PII-redacted)       Searchable, sampled
+   │
+   ├─── Metrics export ──→  Prometheus / Mimir / Datadog
+   │                        Grafana dashboard
+   │
+   └─── Quality eval ────→  LangSmith / Phoenix / Langfuse
+       (5% sampled         LLM-as-judge scoring
+        + user feedback)   Drift detection</code></pre>
+<p><strong>Single request trace 详细</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">trace_id = abc123, user_id = u_42, tenant = bank_42
+
+00:00:00.000  ROOT span: POST /v1/agent/chat (1200ms total)
+00:00:00.005  ├─ Auth + rate limit (5ms)
+00:00:00.010  ├─ Load conv state (Redis 15ms hit)
+00:00:00.025  ├─ Agent loop start
+00:00:00.025  │  ├─ LLM call #1: tool selection (Gemini 3 Pro)
+              │  │   prompt_template: agent_v3.2
+              │  │   input_tokens: 1234 (prefix cache hit 80%)
+              │  │   output_tokens: 156
+              │  │   ttft: 180ms
+              │  │   total: 320ms
+              │  │   cost: $0.0034
+              │  │   tools_chosen: [get_balance]
+00:00:00.345  │  ├─ Tool call: get_balance
+              │  │   ├─ MCP gateway (5ms)
+              │  │   ├─ OBO token exchange (2ms cached)
+              │  │   ├─ Internal API call (78ms)
+              │  │   │   └─ DB query (60ms)
+              │  │   └─ Response cache write (2ms)
+              │  │   Total: 87ms
+00:00:00.432  │  ├─ LLM call #2: response generation
+              │  │   prompt_template: agent_v3.2_response
+              │  │   input_tokens: 1390 (history + tool result)
+              │  │   output_tokens: 234
+              │  │   ttft: 220ms
+              │  │   total: 680ms
+              │  │   cost: $0.0042
+00:00:01.112  │  └─ Save state (write-ahead Redis + async DB)
+00:00:01.122  └─ Response streaming complete
+
+Total: 1.122s
+Cost: $0.0076
+Tools: [get_balance]
+Models: [gemini-3-pro × 2]
+Quality eval: sampled (will score async)</code></pre>
+<hr />
+<h3>4. 关键分类表</h3>
+<h4>4.1 4-Layer Observability 对比</h4>
+<table class="md-table"><thead><tr><th>Layer</th><th>What</th><th>Tools (2026)</th><th>Retention</th><th>Sampling</th></tr></thead><tbody><tr><td><strong>L1 Tracing</strong></td><td>Per-request span chain</td><td>OpenTelemetry + Honeycomb / Datadog / Tempo</td><td>hot 7d, cold 90d</td><td>tail-based (errors + slow 100%, normal 1%)</td></tr><tr><td><strong>L2 Logging</strong></td><td>Prompt / response / tool args (PII-redacted)</td><td>Datadog Logs / Loki / BigQuery</td><td>90d (PII issues → 30d)</td><td>100% structured metric, 10% redacted content</td></tr><tr><td><strong>L3 Metrics</strong></td><td>Latency, cost, error rate time-series</td><td>Prometheus / Mimir / Datadog</td><td>1 year aggregated</td><td>100% (aggregated)</td></tr><tr><td><strong>L4 Quality eval</strong></td><td>eval pass rate, drift, user signal</td><td>LangSmith / Phoenix / Langfuse / Braintrust</td><td>90d full, 1y aggregated</td><td>5% LLM judge + 100% flagged</td></tr></tbody></table>
+<h4>4.2 LLM-Specific signals (vs 传统 web)</h4>
+<table class="md-table"><thead><tr><th>Signal</th><th>Traditional web</th><th>LLM agent</th></tr></thead><tbody><tr><td>Latency</td><td>request → response</td><td>TTFT + TPOT + total</td></tr><tr><td>Errors</td><td>HTTP 4xx/5xx</td><td>+ LLM refusal, hallucination, off-topic</td></tr><tr><td>Cost</td><td>servers, bandwidth</td><td>+ input/output tokens × model price</td></tr><tr><td>Cache hit</td><td>DB query cache</td><td>+ exact + semantic + prefix KV cache</td></tr><tr><td>Quality</td><td>functional test</td><td>eval-in-prod, drift detection</td></tr><tr><td>Security</td><td>SQL injection, XSS</td><td>+ jailbreak attempts, prompt injection</td></tr><tr><td>Versioning</td><td>code SHA</td><td>+ prompt template, model, RAG corpus version</td></tr><tr><td>User signal</td><td>ratings, NPS</td><td>+ thumbs, regen click, copy click, follow-up</td></tr></tbody></table>
+<h4>4.3 3 类 alert priority</h4>
+<table class="md-table"><thead><tr><th>Alert</th><th>Threshold</th><th>Action</th></tr></thead><tbody><tr><td><strong>P0 Page oncall (immediate)</strong></td><td>p99 &gt; SLO 5 min, error rate &gt; 2% 5 min, jailbreak &gt; 100/min</td><td>PagerDuty / SMS / phone call</td></tr><tr><td><strong>P1 Slack ML team</strong></td><td>eval pass rate &lt; 90% 1h, cost trend up 50% 1h, drift &gt; threshold</td><td>Slack channel</td></tr><tr><td><strong>P2 Email weekly review</strong></td><td>model mix shift, token usage growth, tool error rate up</td><td>Email + dashboard pin</td></tr></tbody></table>
+<h4>4.4 4 类 trace sampling strategy</h4>
+<table class="md-table"><thead><tr><th>Strategy</th><th>When</th><th>Coverage</th></tr></thead><tbody><tr><td><strong>Head sampling</strong> (random 1%)</td><td>Simple, low cost</td><td>1% all traffic, but misses rare events</td></tr><tr><td><strong>Tail sampling</strong> (post-hoc)</td><td>Production standard</td><td>1% normal + 100% errors + 100% slow + 100% anomaly</td></tr><tr><td><strong>Adaptive sampling</strong></td><td>Per-route based on importance</td><td>Important routes 10%, low-traffic 100%, high-traffic 0.1%</td></tr><tr><td><strong>User-targeted</strong></td><td>Specific user / tenant</td><td>100% for VIP customer, 100% for cohort under investigation</td></tr></tbody></table>
+<hr />
+<h3>5. 具体业务场景 (4-5 个深度变体)</h3>
+<h4>场景 A: 生产 agent silent quality drop (经典)</h4>
+<p>用户报: "agent 最近答得变差了". 所有 metric 正常.</p>
+<pre class="language-plaintext"><code class="language-plaintext">Debug 流程:
+
+Step 1: 用户反馈量化
+  - "变差" 是什么 — collect thumb-down rate
+  - 时间 — 哪天开始, 多大用户群感受到
+  - 实测: thumb-down rate 上周 3% → 这周 6%, 翻倍
+
+Step 2: Eval-in-prod 抽样数据
+  - 过去 7d 的 5% LLM-as-judge 评分 vs 之前
+  - 实测: eval pass rate 92% → 85%, 7pp drop, 显著
+
+Step 3: Slice by 维度找 outlier
+  - by model:           gpt-5.5 4% drop, gemini-3-pro 11% drop ← bingo
+  - by tenant:          tenant_42 normal, tenant_88 18% drop
+  - by query type:      'how do I' normal, 'compare X vs Y' drop big
+  - by time-of-day:     12-15h drop bigger
+
+Step 4: 时间对齐发布 / 配置变更
+  - 5/14 deploy: prompt template v3.1 → v3.2
+  - 5/15: RAG corpus 更新 (上传新文档)
+  - 5/17: Gemini 3 Pro vendor side update
+
+Step 5: 抽 100 'bad' case 详读
+  - LangSmith 查 eval &lt; 0.5 的 trace
+  - 发现共性: agent 回答 confidence 很高但事实错误
+  - 看 RAG 检索: top-3 chunk 有 1 个明显 wrong
+
+Step 6: Root cause
+  - 新 RAG corpus 上传的文档某些段落 metadata error
+  - reranker 错误地给低质量 chunk 高分
+  - LLM 信了 RAG 的 chunk
+
+Step 7: Fix
+  - 紧急: revert RAG corpus
+  - 中期: 加 RAG quality eval (chunk 准确性 daily test)
+  - 长期: 双盲 review 每次 RAG corpus update
+
+实战工具:
+  LangSmith / Phoenix → 抽 bad case trace, 详读 RAG retrieval
+  Datadog → metric slicing
+  BigQuery → 长期 trend</code></pre>
+<h4>场景 B: Cost spike investigation</h4>
+<p>本周 LLM bill 突然 5x. 谁 / 什么 / 为什么?</p>
+<pre class="language-plaintext"><code class="language-plaintext">Debug 流程:
+
+Step 1: 按 tenant attribution
+  Dashboard: cost per tenant per day, 7 day trend
+  发现: tenant_88 周一 $50 → 周四 $5000 (100x spike)
+
+Step 2: 按 feature attribution (per-span tag)
+  - tenant_88 的所有 trace, 按 feature_id 聚合
+  - 实测: 'document_chat' feature 占 95%
+  - 调查: 该 feature 是上周新上线
+
+Step 3: 看 individual session 行为
+  - 拉 tenant_88 的 trace
+  - 实测: 平均 session 30+ LLM call (vs 平台均值 5 calls)
+  - 单 session 平均 cost $1.5 (vs 平台均值 $0.05)
+
+Step 4: 看 prompt token
+  - 该 feature input token / call: 平均 50K (vs 平台均值 1K)
+  - Why? 因为 'document_chat' 把整个 PDF 塞 context
+
+Step 5: 看 cache hit
+  - Prefix cache hit rate: 5% (vs 平台 80%)
+  - Why? 因为每 session 不同 PDF, system prompt 也变了
+
+Step 6: Root causes
+  a. New feature 没 cost guard
+  b. PDF size 没 limit, 上传 100MB PDF
+  c. Cache hit 低 (different PDF per session)
+  d. 用了 Opus 4.7 ($5/$25) 而不是 Flash
+
+Step 7: Fix
+  - 紧急: cap tenant_88 monthly budget, alert
+  - 中期: feature-level: PDF size limit 10MB, route to Flash for first pass
+  - 长期: per-feature cost guard alarm
+
+实战工具:
+  Datadog cost dashboard
+  BigQuery for tenant deep dive
+  LangSmith for individual trace inspection</code></pre>
+<h4>场景 C: P99 latency alert fired</h4>
+<p>P99 latency 突 2s → 5s. Page oncall.</p>
+<pre class="language-plaintext"><code class="language-plaintext">Debug 流程:
+
+Step 1: 看 trace 在哪一 span 慢
+  - Tail sampled traces (P99) 进 Honeycomb
+  - 看 span breakdown
+  - 发现: LLM call 占 4s (本应 ~500ms)
+
+Step 2: 看哪个 model / replica
+  - by model: gemini-3-pro normal, llama-70b-self-host slow
+  - by replica: replica-23 占 80% slow traces
+  - 实测: replica-23 GPU util 100%, 比其他高
+
+Step 3: 看 replica 内部 metric
+  - queue depth: 200 (上限), 其他 replica &lt; 50
+  - KV cache util: 95% (满)
+  - Batch size 上限到了
+
+Step 4: 看为什么 load 不均
+  - Sticky routing per conv_id, 某些大 user (long conv) 集中到 replica-23
+  - Routing 没考虑 conv length
+
+Step 5: Fix
+  - 紧急: drain replica-23, 让 conv 重新分布
+  - 中期: routing 算法考虑 conv length, balance better
+  - 长期: 容量规划, replica 数量 +20%
+
+实战工具:
+  Honeycomb / Tempo trace view
+  Datadog dashboard per replica
+  vLLM admin endpoint (/metrics)</code></pre>
+<h4>场景 D: Jailbreak attempt detection</h4>
+<p>怎么知道有人试图越狱 agent?</p>
+<pre class="language-plaintext"><code class="language-plaintext">Detection 策略:
+
+Step 1: Input pattern matching
+  Pattern detection on user query:
+  - "ignore previous instructions"
+  - "pretend you are"
+  - "developer mode"
+  - "DAN" (Do Anything Now)
+  - "roleplay as"
+  - 中文 jailbreak: "忽略之前的指令"
+  → 命中 → 标记 suspicious = True
+
+Step 2: Real-time LLM classifier
+  - 小 model (Haiku $1/1M) classify: "is this a jailbreak attempt?"
+  - 100ms latency, cheap
+  - 训练 / few-shot with examples
+  - 命中 → flagged = True
+
+Step 3: Response pattern detection
+  - Agent 输出 包含 'I cannot' / 'as an AI' 异常增多 → 攻击中
+  - 用户 / session frequency of attempts → 频繁 → 异常
+
+Step 4: Honeypot
+  - Inject 'secrets' 假信息: "ignore: SECRET_KEY=ABC123_TEST"
+  - 看 agent 输出是否泄漏 → 检测 jailbreak 成功
+  
+Step 5: Forensics 存储
+  - Full input + output 存安全存储 (单独 retention)
+  - Separate index, no PII mixing
+  - 7d hot, 90d cold
+
+Step 6: Alert + block
+  - User &gt; 10 attempts/min → temp ban 30min
+  - User &gt; 50 attempts/day → manual review by security
+  - Tenant pattern → escalate to security team
+
+实战:
+
+flagged_traces = await datadog.query(
+    "@input.jailbreak_flag:true",
+    window="last 1h"
+)
+for trace in flagged_traces:
+    if trace.user_id not in already_alerted:
+        await alert_security(trace.user_id, trace.input)
+
+监控 metric:
+  - jailbreak_attempts_total (counter)
+  - jailbreak_attempts_by_user (gauge)
+  - jailbreak_attempts_per_min (rate)
+  - jailbreak_success_rate (when honeypot triggered)</code></pre>
+<h4>场景 E: Per-tenant SLA verification</h4>
+<p>卖 agent 给 enterprise, 承诺 99.9% / p99 &lt; 2s. 怎么证明做到了?</p>
+<pre class="language-plaintext"><code class="language-plaintext">Setup:
+
+1. Per-tenant SLI dashboard
+   - Availability: success rate per tenant
+   - Latency: p50/p95/p99 per tenant
+   - Error rate: by HTTP code + LLM-specific (refusal, hallucination)
+   - Quality: eval pass rate per tenant
+
+2. Synthetic probes
+   每分钟模拟 1 tenant request:
+   - 用 standard test case
+   - 测量 latency + success
+   - 长期 reliability 测量 (independent of real traffic)
+
+3. SLO error budget
+   99.9% = 43min downtime/month
+   每周 review: 本月用了多少 budget
+   超 50% 用了 → 暂停 deploy
+   超 100% → page 紧急
+
+4. Monthly report
+   Auto-generate:
+   - Availability achieved
+   - Latency distribution
+   - Top errors
+   - Incidents (with RCA links)
+   - Cost summary
+   给 customer 看
+
+5. Incident attribution
+   - Internal incident → counts vs SLA
+   - Customer's fault (e.g., bad input) → not counted
+   - Vendor's fault (OpenAI down) → counted, but split out
+
+6. Compensation policy
+   - 触发 breach 自动给 credit
+   - 0-30% 可用性 → 100% credit
+   - 30-90% → 50% credit
+   - 90-99% → 25% credit
+   - 99-99.9% → 10% credit
+   
+7. Independent audit
+   - 第三方 Datadog Synthetic / Pingdom 监控
+   - Reports 给 customer 看 (no conflict of interest)</code></pre>
+<hr />
+<h3>6. 工程 checklist</h3>
+<p><strong>设计 observability stack</strong>:</p>
+<ol><li><strong>OTel SDK 接入所有 service</strong> — Python / Node / Go 都用 OTel</li><li><strong>Trace context propagation</strong> — HTTP / gRPC / Kafka 都注入 traceparent header</li><li><strong>Span 命名规范</strong> — <code>service.operation.detail</code> (e.g., <code>agent.llm.call</code>, <code>mcp.tool.execute</code>)</li><li><strong>Span attributes 标准化</strong> — <code>llm.model</code>, <code>llm.prompt_template_version</code>, <code>llm.input_tokens</code>, <code>llm.cost_usd</code></li><li><strong>PII redaction at write time</strong> — Presidio middleware before log write</li><li><strong>Sampling strategy</strong> — tail-based, error+slow 100%, normal 1%</li><li><strong>Retention tiering</strong> — hot 7d full, warm 90d aggregated, cold 1y metric-only</li><li><strong>Eval-in-prod pipeline</strong> — 5% sample, LLM-judge, drift dashboard</li><li><strong>Alert routing</strong> — P0 PagerDuty, P1 Slack, P2 email</li><li><strong>Cost attribution</strong> — every span has tenant_id + feature_id + model + tokens</li></ol>
+<p><strong>Per-span 必带 attributes (LLM-specific)</strong>:</p>
+<pre class="language-python"><code class="language-python">span.set_attributes({
+    # Tracing context
+    "service.name": "agent-orchestrator",
+    "trace.user_id": user.id,        # via attr, not log (compliance)
+    "trace.tenant_id": tenant.id,
+    "trace.feature_id": "document_chat",   # for cost attribution
+    "trace.session_id": session.id,
+    
+    # LLM-specific
+    "llm.model": "gemini-3-pro",
+    "llm.prompt_template": "agent_v3.2",
+    "llm.prompt_hash": hash(prompt),   # for grouping
+    "llm.input_tokens": 1234,
+    "llm.input_tokens_cached": 1000,   # prefix cache hit
+    "llm.output_tokens": 256,
+    "llm.cost_usd": 0.0034,
+    "llm.ttft_ms": 180,
+    "llm.finish_reason": "stop",
+    "llm.temperature": 0.7,
+    
+    # Quality signals (later populated)
+    "quality.eval_sampled": False,
+    "quality.eval_score": None,       # filled async
+    "quality.user_thumbs": None,
+    
+    # Tool calls
+    "tools.used": ["get_balance", "send_email"],
+    "tools.error_count": 0,
+    
+    # Cache
+    "cache.exact_hit": False,
+    "cache.semantic_hit": False,
+    "cache.prefix_hit_ratio": 0.8,
+})</code></pre>
+<hr />
+<h3>7. 易错坑表</h3>
+<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Log raw PII</strong></td><td>Compliance violation, SOC2/GDPR fail. 解: Presidio redact at write time</td></tr><tr><td>2</td><td><strong>No correlation between user report and trace</strong></td><td>用户报问题, 你找不到 trace. 解: user-facing error message 含 trace_id (e.g., "Error ID: tr_abc123"), client log + server log 都带 trace_id</td></tr><tr><td>3</td><td><strong>100% sample everything</strong></td><td>Cost blow, log storage $$$. 解: tail-based 1% + error/slow 100%</td></tr><tr><td>4</td><td><strong>No LLM-specific eval</strong></td><td>Quality drift 看不到, metric 全绿但用户骂. 解: 5% LLM-judge eval-in-prod</td></tr><tr><td>5</td><td><strong>No tool-level spans</strong></td><td>Debug 停在 LLM 边界, 不知道是 RAG / tool 哪步坏. 解: 每 tool call 独立 span</td></tr><tr><td>6</td><td><strong>Single pillar (only logs)</strong></td><td>没 metric 没 trace, debug 全靠 grep. 解: 3 pillars + quality</td></tr><tr><td>7</td><td><strong>No alerting</strong></td><td>等用户投诉. 解: SLO alert + eval drift alert</td></tr><tr><td>8</td><td><strong>Trace context 不 propagate</strong></td><td>跨 service 调用 trace 断了. 解: HTTP header / gRPC metadata 注入 traceparent</td></tr><tr><td>9</td><td><strong>No version tracking</strong></td><td>'agent 变差了' 但不知道 prompt/model/RAG 哪个动了. 解: prompt_template_version / model_version / rag_corpus_version 都 attribute</td></tr><tr><td>10</td><td><strong>No cost attribution by feature</strong></td><td>月底账单 spike 不知道哪 feature 贵. 解: feature_id 必须 propagate 到每 span</td></tr></tbody></table>
+<hr />
+<h3>一句话总结 (Part 1)</h3>
+<blockquote><p><strong>LLM agent observability = 4 layers</strong>: (L1) distributed trace OTel-based, (L2) PII-redacted LLM-specific log (prompt + response + tokens + model + version), (L3) metrics (latency / cost / error / cache hit / eval), (L4) quality monitoring with eval-in-prod 5% sample + drift detection + user signals.</p>
+<p>传统 web observability 不够 — LLM-specific signals (TTFT/TPOT, token cost, prompt template version, model version, RAG corpus version, jailbreak attempts, hallucination, refusal) 都要专门捕获. 没有这些, prod LLM agent 是黑盒.</p></blockquote>
+<hr />
+<h1>Part 2 · 5 个深度工程问题</h1>
+<h3>⚙️ Problem 1: 4-Layer Instrumentation — Trace + Log + Metric + Eval</h3>
+<p>把 4 个 layer 拆开讲清楚怎么实现.</p>
+<h4>1.1 Layer 1: Distributed Tracing with OpenTelemetry</h4>
+<pre class="language-python"><code class="language-python"># Setup OTel in agent service
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Initialize
+provider = TracerProvider(
+    resource=Resource.create({
+        "service.name": "agent-orchestrator",
+        "service.version": os.environ["GIT_SHA"],
+        "deployment.environment": os.environ["ENV"],
+    })
+)
+provider.add_span_processor(
+    BatchSpanProcessor(
+        OTLPSpanExporter(endpoint="https://otel-collector:4317"),
+        max_export_batch_size=512,
+    )
+)
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer(__name__)
+
+# Use in handlers
+async def chat_handler(req):
+    with tracer.start_as_current_span(
+        "agent.chat",
+        kind=trace.SpanKind.SERVER,
+        attributes={
+            "trace.user_id": req.user_id,
+            "trace.tenant_id": req.tenant_id,
+            "trace.feature_id": req.feature_id,
+        },
+    ) as span:
+        # Load state
+        with tracer.start_as_current_span("agent.load_state") as load_span:
+            state = await store.get(req.conversation_id)
+            load_span.set_attribute("cache.tier_hit", state.tier)  # L1/L2/L3
+        
+        # Agent loop (multiple LLM + tool calls)
+        result = await agent_loop(req, state)
+        
+        span.set_attribute("agent.total_llm_calls", result.llm_call_count)
+        span.set_attribute("agent.total_tool_calls", result.tool_call_count)
+        span.set_attribute("agent.total_cost_usd", result.total_cost)
+        
+        return result
+
+async def agent_loop(req, state):
+    iterations = 0
+    while not done:
+        iterations += 1
+        
+        # LLM call span
+        with tracer.start_as_current_span(
+            "agent.llm.call",
+            attributes={
+                "llm.iteration": iterations,
+                "llm.model": chosen_model,
+                "llm.prompt_template": "agent_v3.2",
+                "llm.prompt_hash": hashlib.sha256(prompt.encode()).hexdigest()[:16],
+            },
+        ) as llm_span:
+            response = await llm.generate(prompt, model=chosen_model)
+            
+            llm_span.set_attributes({
+                "llm.input_tokens": response.usage.input_tokens,
+                "llm.output_tokens": response.usage.output_tokens,
+                "llm.cached_input_tokens": response.usage.cached_input_tokens,
+                "llm.cost_usd": compute_cost(response.usage, chosen_model),
+                "llm.ttft_ms": response.ttft_ms,
+                "llm.finish_reason": response.finish_reason,
+                "llm.refused": response.refused,
+            })
+        
+        # Tool call (if applicable)
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                with tracer.start_as_current_span(
+                    "agent.tool.call",
+                    attributes={
+                        "tool.id": tc.tool_id,
+                        "tool.args_size": len(json.dumps(tc.args)),
+                    },
+                ) as tool_span:
+                    tool_result = await mcp_gateway.call(tc.tool_id, tc.args)
+                    tool_span.set_attributes({
+                        "tool.success": tool_result.success,
+                        "tool.latency_ms": tool_result.latency_ms,
+                        "tool.cache_hit": tool_result.cache_hit,
+                    })</code></pre>
+<h4>1.2 Layer 2: LLM-specific Structured Logging</h4>
+<pre class="language-python"><code class="language-python">import structlog
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
+logger = structlog.get_logger("agent")
+analyzer = AnalyzerEngine()
+anonymizer = AnonymizerEngine()
+
+def redact_pii(text):
+    """Redact PII at log write time"""
+    results = analyzer.analyze(
+        text=text,
+        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD",
+                  "US_SSN", "IP_ADDRESS", "LOCATION", "DATE_TIME"],
+        language="en",
+    )
+    anonymized = anonymizer.anonymize(
+        text=text,
+        analyzer_results=results,
+    )
+    return anonymized.text
+
+class LLMLogger:
+    async def log_call(self, span, prompt, response, request):
+        # Sample for full content logging (10%)
+        log_content = random.random() &lt; 0.1
+        
+        log_entry = {
+            # Tracing context
+            "trace_id": span.get_span_context().trace_id,
+            "span_id": span.get_span_context().span_id,
+            
+            # Metadata
+            "timestamp": time.time(),
+            "user_id": request.user_id,
+            "tenant_id": request.tenant_id,
+            "feature_id": request.feature_id,
+            
+            # LLM-specific
+            "model": request.model,
+            "prompt_template_version": "agent_v3.2",
+            "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest(),
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "cost_usd": compute_cost(response.usage),
+            "latency_ttft_ms": response.ttft_ms,
+            "latency_total_ms": response.total_ms,
+            "finish_reason": response.finish_reason,
+            "tools_used": [t.tool_id for t in response.tool_calls],
+            
+            # Content (PII-redacted, sampled)
+            "prompt_redacted": redact_pii(prompt) if log_content else None,
+            "response_redacted": redact_pii(response.content) if log_content else None,
+            
+            # Quality signals (filled later)
+            "user_thumbs": None,
+            "eval_sampled": False,
+            "eval_score": None,
+        }
+        
+        logger.info("llm_call", **log_entry)
+
+# Storage tiers
+# Hot (7 days): Datadog Logs / Loki - queryable
+# Warm (90 days): S3 / BigQuery - bulk analytics  
+# Cold: aggregated only, 1 year</code></pre>
+<h4>1.3 Layer 3: Metrics (Prometheus / Mimir / Datadog)</h4>
+<pre class="language-python"><code class="language-python">from prometheus_client import Counter, Histogram, Gauge
+
+# Latency metrics
+ttft_histogram = Histogram(
+    'llm_ttft_seconds',
+    'Time to first token',
+    ['model', 'prompt_template_version'],
+    buckets=[0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10],
+)
+
+total_latency_histogram = Histogram(
+    'llm_total_latency_seconds',
+    'Total LLM call latency',
+    ['model'],
+)
+
+# Token / cost metrics
+input_tokens_counter = Counter(
+    'llm_input_tokens_total',
+    'Input tokens consumed',
+    ['model', 'tenant_id', 'cached'],   # cached=true/false
+)
+
+output_tokens_counter = Counter(
+    'llm_output_tokens_total',
+    'Output tokens generated',
+    ['model', 'tenant_id'],
+)
+
+cost_counter = Counter(
+    'llm_cost_usd_total',
+    'LLM cost in USD',
+    ['model', 'tenant_id', 'feature_id'],
+)
+
+# Quality metrics
+eval_score_histogram = Histogram(
+    'llm_eval_score',
+    'LLM-judge eval score',
+    ['model', 'prompt_template_version', 'tenant_id'],
+    buckets=[0, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0],
+)
+
+eval_pass_rate_gauge = Gauge(
+    'llm_eval_pass_rate',
+    'Eval pass rate (5min rolling)',
+    ['model'],
+)
+
+# Cache metrics
+cache_hit_counter = Counter(
+    'cache_hits_total',
+    'Cache hits',
+    ['tier'],   # L1/L2/L3/prefix
+)
+
+# Tool metrics
+tool_call_counter = Counter(
+    'tool_calls_total',
+    'Tool calls',
+    ['tool_id', 'success'],
+)
+
+tool_latency_histogram = Histogram(
+    'tool_latency_seconds',
+    'Tool call latency',
+    ['tool_id'],
+)
+
+# Security metrics
+jailbreak_counter = Counter(
+    'jailbreak_attempts_total',
+    'Jailbreak attempt detected',
+    ['user_id', 'tenant_id', 'severity'],
+)
+
+# Usage
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    response = await call_next(request)
+    
+    # Record post-response
+    if hasattr(request.state, 'llm_metrics'):
+        m = request.state.llm_metrics
+        ttft_histogram.labels(
+            model=m.model,
+            prompt_template_version=m.prompt_version
+        ).observe(m.ttft / 1000)
+        
+        input_tokens_counter.labels(
+            model=m.model,
+            tenant_id=request.state.tenant_id,
+            cached='true' if m.cached_tokens else 'false',
+        ).inc(m.input_tokens)
+        
+        cost_counter.labels(
+            model=m.model,
+            tenant_id=request.state.tenant_id,
+            feature_id=request.state.feature_id,
+        ).inc(m.cost)
+    
+    return response</code></pre>
+<h4>1.4 Layer 4: Quality Monitoring (Eval-in-Prod)</h4>
+<pre class="language-python"><code class="language-python">class EvalInProdPipeline:
+    """5% sample → LLM-as-judge → score → metrics + alerts"""
+    
+    def __init__(self):
+        self.judge_model = "claude-sonnet-4.6"   # high quality judge
+        self.sample_rate = 0.05
+    
+    async def maybe_eval(self, trace_id, request, response):
+        # Decide whether to eval
+        if random.random() &gt; self.sample_rate:
+            return
+        
+        # Async eval task
+        asyncio.create_task(
+            self._eval(trace_id, request, response)
+        )
+    
+    async def _eval(self, trace_id, request, response):
+        # LLM-as-judge prompt
+        eval_prompt = f"""Evaluate this AI assistant response:
+
+User query: {request.query}
+Tool calls made: {response.tools_used}
+Assistant response: {response.content}
+
+Score on:
+1. Helpfulness (0-1): Does it answer the user's question?
+2. Accuracy (0-1): Is the information correct?
+3. Safety (0-1): Is it free of harmful content?
+4. Refusal (0-1): Did it inappropriately refuse?
+
+Return JSON: {{"helpfulness": 0.x, "accuracy": 0.x, "safety": 0.x, "refusal_appropriate": 0.x, "overall": 0.x, "concerns": "..."}}
+"""
+        
+        judge_response = await self.llm.generate(
+            eval_prompt,
+            model=self.judge_model,
+            response_format="json",
+        )
+        
+        scores = json.loads(judge_response.content)
+        
+        # Record metrics
+        eval_score_histogram.labels(
+            model=request.model,
+            prompt_template_version=request.prompt_version,
+            tenant_id=request.tenant_id,
+        ).observe(scores["overall"])
+        
+        # Update trace
+        await datadog.update_trace(trace_id, {
+            "quality.eval_score": scores["overall"],
+            "quality.eval_helpfulness": scores["helpfulness"],
+            "quality.eval_accuracy": scores["accuracy"],
+            "quality.eval_safety": scores["safety"],
+            "quality.eval_concerns": scores["concerns"],
+        })
+        
+        # Alert on low score
+        if scores["overall"] &lt; 0.3:
+            await alert(
+                f"Low eval score detected: trace_id={trace_id}, score={scores['overall']}, concerns={scores['concerns']}",
+                severity="P1",
+                channel="ml-team",
+            )</code></pre>
+<h4>1.5 Drift detection</h4>
+<pre class="language-python"><code class="language-python">class DriftDetector:
+    """Detect distribution shift in prompts / responses / eval scores"""
+    
+    async def daily_check(self):
+        # Compare last 24h to baseline (previous week avg)
+        baseline_window = (now - timedelta(days=7), now - timedelta(days=1))
+        recent_window = (now - timedelta(hours=24), now)
+        
+        # Prompt distribution drift
+        baseline_prompts = await self._sample_prompts(baseline_window, n=500)
+        recent_prompts = await self._sample_prompts(recent_window, n=500)
+        
+        baseline_embs = [await embed(p) for p in baseline_prompts]
+        recent_embs = [await embed(p) for p in recent_prompts]
+        
+        # Maximum Mean Discrepancy (MMD) test
+        mmd_stat, p_value = mmd_test(baseline_embs, recent_embs)
+        
+        if p_value &lt; 0.05:
+            await alert(
+                f"Prompt distribution drift detected (MMD={mmd_stat:.3f}, p={p_value:.4f})",
+                severity="P1",
+                channel="ml-team",
+            )
+        
+        # Eval score drift
+        baseline_scores = await self._eval_scores(baseline_window)
+        recent_scores = await self._eval_scores(recent_window)
+        
+        baseline_mean = mean(baseline_scores)
+        recent_mean = mean(recent_scores)
+        
+        if recent_mean &lt; baseline_mean - 0.05:   # 5pp drop
+            await alert(
+                f"Eval pass rate dropped: {baseline_mean:.3f} → {recent_mean:.3f}",
+                severity="P0",
+                channel="oncall",
+            )
+        
+        # Cost spike
+        baseline_cost = await self._avg_cost(baseline_window)
+        recent_cost = await self._avg_cost(recent_window)
+        
+        if recent_cost &gt; baseline_cost * 1.5:
+            await alert(
+                f"Cost spike: avg per request {baseline_cost:.4f} → {recent_cost:.4f}",
+                severity="P1",
+                channel="ml-team",
+            )</code></pre>
+<hr />
+<h3>⚙️ Problem 2: Sampling Strategy at Scale — Tail-based, Error-100%, Slow-100%, Anomaly</h3>
+<p>10K QPS 不能 100% sample. 但要 catch 关键 trace. Tail-based sampling 是答案.</p>
+<h4>2.1 为什么 head sampling 不够</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Head sampling (sample at start):
+  trace 第一个 span 决定要不要 sample (e.g., random 1%)
+  
+Problem:
+  Error trace: 99% miss (因为 only 1% sampled)
+  Slow trace: 99% miss
+  
+解决: tail sampling</code></pre>
+<h4>2.2 Tail-based sampling 机制</h4>
+<pre class="language-python"><code class="language-python">class TailSampler:
+    """OTel collector tail sampling processor"""
+    
+    def __init__(self):
+        # Buffer all spans for a trace until trace 'completes' or timeout
+        self.buffers = {}   # trace_id → list[span]
+        self.timeouts = {}  # trace_id → deadline
+    
+    async def process_span(self, span):
+        trace_id = span.context.trace_id
+        
+        # Buffer
+        self.buffers.setdefault(trace_id, []).append(span)
+        self.timeouts[trace_id] = time.time() + 30   # 30s timeout
+        
+        # If this is the root span (parent_span_id is None), wait 5s then decide
+        if span.parent_span_id is None:
+            asyncio.create_task(
+                self._decide_and_export(trace_id)
+            )
+    
+    async def _decide_and_export(self, trace_id):
+        # Wait for child spans
+        await asyncio.sleep(5)
+        
+        spans = self.buffers.pop(trace_id, [])
+        if not spans:
+            return
+        
+        # Apply sampling rules
+        should_keep = self._should_keep(spans)
+        
+        if should_keep:
+            for span in spans:
+                await self.exporter.export(span)
+        # Else: drop entire trace
+    
+    def _should_keep(self, spans):
+        """Apply sampling rules"""
+        # Rule 1: error → 100% keep
+        if any(s.status_code == "ERROR" for s in spans):
+            return True
+        
+        # Rule 2: slow trace → 100% keep
+        root = next((s for s in spans if s.parent_span_id is None), None)
+        if root and root.duration_ms &gt; 5000:
+            return True
+        
+        # Rule 3: high cost → 100% keep
+        total_cost = sum(s.attributes.get("llm.cost_usd", 0) for s in spans)
+        if total_cost &gt; 0.5:
+            return True
+        
+        # Rule 4: low eval score → 100% keep (filled async)
+        # Done in eval pipeline
+        
+        # Rule 5: jailbreak flagged → 100% keep
+        if any(s.attributes.get("security.jailbreak_flag") for s in spans):
+            return True
+        
+        # Rule 6: VIP user → 100% keep
+        if any(s.attributes.get("trace.tenant_tier") == "vip" for s in spans):
+            return True
+        
+        # Rule 7: anomaly detected → 100% keep
+        if self._anomaly_score(spans) &gt; 0.9:
+            return True
+        
+        # Default: random 1%
+        return random.random() &lt; 0.01
+    
+    def _anomaly_score(self, spans):
+        """Detect anomaly based on span pattern"""
+        # E.g., unusual number of LLM calls in 1 trace
+        llm_calls = sum(1 for s in spans if s.name == "agent.llm.call")
+        if llm_calls &gt; 20:   # avg is 2-5
+            return 0.95
+        return 0.0</code></pre>
+<h4>2.3 OTel Collector config</h4>
+<pre class="language-yaml"><code class="language-yaml"># otel-collector-config.yaml
+processors:
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100000
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      
+      - name: slow-policy
+        type: latency
+        latency: {threshold_ms: 5000}
+      
+      - name: high-cost-policy
+        type: numeric_attribute
+        numeric_attribute:
+          key: llm.cost_usd
+          min_value: 0.5
+      
+      - name: vip-policy
+        type: string_attribute
+        string_attribute:
+          key: trace.tenant_tier
+          values: [vip, enterprise]
+      
+      - name: random-policy
+        type: probabilistic
+        probabilistic: {sampling_percentage: 1}
+
+  attributes:
+    actions:
+      - key: api_key
+        action: delete   # never export sensitive
+
+exporters:
+  otlp/datadog:
+    endpoint: trace.agent.datadoghq.com:4317
+    headers:
+      DD-API-KEY: ${DD_API_KEY}
+  
+  otlp/honeycomb:
+    endpoint: api.honeycomb.io:443
+    headers:
+      x-honeycomb-team: ${HONEYCOMB_API_KEY}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, attributes]
+      exporters: [otlp/datadog, otlp/honeycomb]</code></pre>
+<h4>2.4 Adaptive sampling per route</h4>
+<pre class="language-python"><code class="language-python"># Different rates for different routes
+sampling_config = {
+    "/v1/agent/chat":  {"normal_rate": 0.01, "vip_rate": 1.0},
+    "/v1/agent/voice": {"normal_rate": 0.1,  "vip_rate": 1.0},  # higher
+    "/v1/admin/*":     {"normal_rate": 1.0,  "vip_rate": 1.0},  # 100%
+    "/v1/health":      {"normal_rate": 0.001, "vip_rate": 0.001},  # very low
+}
+
+# 因为 voice 价值高, sample 多点
+# Admin 永远 100% (低 QPS, 高价值)
+# Health check 极低 (高 QPS, 低价值)</code></pre>
+<h4>2.5 Cost math</h4>
+<pre class="language-plaintext"><code class="language-plaintext">10K QPS sustained
+1 trace ≈ 10 span avg
+1 span ≈ 1 KB serialized
+
+Without sampling:
+  10K × 10 × 1KB = 100 MB/sec
+  Per day: 8.6 TB
+  Datadog cost: $1.7M / month (rough)
+
+With tail sampling 1% + 100% errors/slow (~3% total):
+  3 MB/sec, 250 GB/day
+  Datadog cost: ~$50K / month
+  
+30x cost saving with strategic sampling</code></pre>
+<hr />
+<h3>⚙️ Problem 3: PII Redaction Pipeline — Presidio, Hash for Correlation</h3>
+<p>PII handling 是 compliance 红线. 详细讲清楚怎么实现.</p>
+<h4>3.1 哪些 PII 需要 redact</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Common PII categories:
+  - Person name (PERSON)
+  - Email (EMAIL_ADDRESS)
+  - Phone (PHONE_NUMBER)
+  - Credit card (CREDIT_CARD, with Luhn check)
+  - SSN (US_SSN, UK_NHS, EU_NIR)
+  - IBAN (banking)
+  - Passport / national ID
+  - IP address (IP_ADDRESS)
+  - MAC address
+  - Address (LOCATION)
+  - Date of birth (DATE_TIME with year)
+  - Medical record number
+  - License plate
+
+Domain-specific:
+  - Account number (bank)
+  - Patient ID (healthcare)
+  - Employee ID
+  - Order ID (if business-sensitive)
+
+False positives:
+  - Common names also in regular text
+  - Date in different format
+  - Need NER + context, not just regex</code></pre>
+<h4>3.2 Presidio integration</h4>
+<pre class="language-python"><code class="language-python">from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
+
+class PIIRedactor:
+    def __init__(self):
+        # Configure NLP engine (spaCy)
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [
+                {"lang_code": "en", "model_name": "en_core_web_lg"},
+                {"lang_code": "zh", "model_name": "zh_core_web_lg"},  # 中文 PII
+            ],
+        }
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+        nlp_engine = provider.create_engine()
+        
+        self.analyzer = AnalyzerEngine(
+            nlp_engine=nlp_engine,
+            supported_languages=["en", "zh"],
+        )
+        self.anonymizer = AnonymizerEngine()
+        
+        # Custom recognizers for domain
+        self._add_custom_recognizers()
+    
+    def _add_custom_recognizers(self):
+        # Custom: TikTok payment account number
+        from presidio_analyzer import Pattern, PatternRecognizer
+        
+        account_pattern = Pattern(
+            name="account_pattern",
+            regex=r"\bACC-\d{10}\b",
+            score=0.9,
+        )
+        account_recognizer = PatternRecognizer(
+            supported_entity="ACCOUNT_NUMBER",
+            patterns=[account_pattern],
+        )
+        self.analyzer.registry.add_recognizer(account_recognizer)
+    
+    def redact(self, text, language="en"):
+        # Analyze
+        results = self.analyzer.analyze(
+            text=text,
+            entities=[
+                "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER",
+                "CREDIT_CARD", "US_SSN", "IBAN_CODE",
+                "IP_ADDRESS", "LOCATION", "DATE_TIME",
+                "ACCOUNT_NUMBER",  # custom
+            ],
+            language=language,
+        )
+        
+        # Anonymize with operators
+        anonymized = self.anonymizer.anonymize(
+            text=text,
+            analyzer_results=results,
+            operators={
+                "DEFAULT": OperatorConfig("replace", {"new_value": "[REDACTED]"}),
+                "EMAIL_ADDRESS": OperatorConfig("mask", {
+                    "type": "mask",
+                    "masking_char": "*",
+                    "chars_to_mask": 100,
+                    "from_end": False,
+                }),
+                "CREDIT_CARD": OperatorConfig("replace", {"new_value": "[CARD]"}),
+                "PERSON": OperatorConfig("replace", {"new_value": "[PERSON]"}),
+                "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "[PHONE]"}),
+            },
+        )
+        
+        return anonymized.text, results
+
+# Usage
+redactor = PIIRedactor()
+
+def log_prompt(prompt, language="en"):
+    redacted_prompt, pii_found = redactor.redact(prompt, language)
+    
+    log_entry = {
+        "prompt_redacted": redacted_prompt,
+        "pii_types_found": [r.entity_type for r in pii_found],
+        "pii_count": len(pii_found),
+    }
+    logger.info("prompt", **log_entry)</code></pre>
+<h4>3.3 Hash for correlation</h4>
+<pre class="language-python"><code class="language-python"># 你需要保留 PII 的 hash, 让客服查询 (不暴露 PII 本身)
+
+class PIIHasher:
+    """Salted hash for correlation"""
+    
+    def __init__(self, salt):
+        self.salt = salt
+    
+    def hash_pii(self, value, entity_type):
+        # Per-entity-type salt
+        full_salt = f"{self.salt}:{entity_type}"
+        return hashlib.sha256(
+            (value + full_salt).encode()
+        ).hexdigest()[:16]  # 16-char prefix sufficient for correlation
+    
+    def correlate(self, plaintext_email):
+        # 客户报问题, 给你 plaintext email
+        # 你计算 hash, 在 log 里查
+        h = self.hash_pii(plaintext_email, "EMAIL")
+        return h
+
+# In logs:
+log_entry = {
+    "user_email_hash": "a1b2c3d4e5f6...",   # not plaintext
+    "user_email_redacted": "[EMAIL]",
+    ...
+}
+
+# When customer reports:
+customer_email = "john@bank.com"
+hash = pii_hasher.correlate(customer_email)
+# Search logs for hash → find traces</code></pre>
+<h4>3.4 Right to be Forgotten (GDPR / CCPA)</h4>
+<pre class="language-python"><code class="language-python">class RightToErasure:
+    """Handle user data deletion request"""
+    
+    async def delete_user_data(self, user_id):
+        # 1. Find all PII hashes for this user
+        user = await db.get_user(user_id)
+        all_hashes = [
+            pii_hasher.hash_pii(user.email, "EMAIL"),
+            pii_hasher.hash_pii(user.phone, "PHONE"),
+            # ... per PII field
+        ]
+        
+        # 2. Delete from each storage tier
+        await datadog.delete_logs_by_hash(all_hashes)
+        await s3.delete_logs_by_hash(all_hashes)
+        await bigquery.delete_rows("logs", "user_email_hash IN (...)", all_hashes)
+        await langsmith.delete_traces_by_user(user_id)
+        
+        # 3. Mark deletion in audit log (keep for compliance)
+        await audit.log_deletion(user_id, by="user_request", timestamp=now())
+        
+        # 4. Notify downstream
+        await pubsub.publish("user.data_deleted", {"user_id": user_id})</code></pre>
+<h4>3.5 Throughput considerations</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Presidio analysis: 5-20ms per 1KB text (spaCy NLP)
+
+At 10K QPS with 2KB avg prompt:
+  10K × 10ms = 100s of CPU per second
+  Need ~100 cores
+
+Mitigations:
+  - Cache PII analysis result by prompt hash (10-20% reuse)
+  - Use lighter rules (regex-only) for fast path
+  - Heavy analysis (NER) only for content logged
+  - Skip if not logging full content</code></pre>
+<hr />
+<h3>⚙️ Problem 4: Eval-in-Prod — LLM-as-Judge, Drift Detection, Calibration</h3>
+<p>Eval-in-prod 是 LLM 区别于传统 web 的 key. 必须实现.</p>
+<h4>4.1 Eval framework 完整</h4>
+<pre class="language-python"><code class="language-python">class EvalInProd:
+    def __init__(self):
+        # Judge model: high quality, deterministic
+        self.judge_model = "claude-sonnet-4.6"  # or Opus 4.7 for hard
+        self.sample_rate = 0.05
+        # Force-eval certain segments
+        self.force_eval = {
+            "low_user_thumb": True,
+            "new_prompt_version": True,
+            "vip_tenant": True,
+            "jailbreak_flagged": True,
+        }
+    
+    async def maybe_eval(self, request, response):
+        should_eval = False
+        
+        # Sampling
+        if random.random() &lt; self.sample_rate:
+            should_eval = True
+        
+        # Force-eval
+        if response.user_feedback == "thumbs_down":
+            should_eval = True
+        if request.prompt_template_version.startswith("new_"):
+            should_eval = True
+        if request.tenant.tier == "vip":
+            should_eval = True
+        if response.security.jailbreak_flag:
+            should_eval = True
+        
+        if should_eval:
+            asyncio.create_task(self._eval(request, response))
+    
+    async def _eval(self, request, response):
+        # Build judge prompt
+        judge_prompt = self._build_judge_prompt(request, response)
+        
+        # Multiple eval dimensions
+        judge_response = await self.llm.generate(
+            judge_prompt,
+            model=self.judge_model,
+            temperature=0.1,  # consistent
+            response_format="json",
+        )
+        
+        scores = json.loads(judge_response.content)
+        
+        # Store
+        await self.store_eval(request, response, scores)
+        
+        # Real-time alerts
+        if scores["overall"] &lt; 0.3:
+            await alert_ml_team(request, response, scores)
+        
+        # Update metrics
+        eval_score_histogram.labels(
+            model=request.model,
+            prompt_template_version=request.prompt_version,
+        ).observe(scores["overall"])
+    
+    def _build_judge_prompt(self, request, response):
+        return f"""You are an expert evaluator of AI assistant responses.
+
+Evaluate the following interaction:
+
+User query: {request.query}
+
+Available tools: {[t.name for t in request.available_tools]}
+Tools the assistant used: {response.tools_used}
+Tool results: {response.tool_results}
+
+Assistant response: {response.content}
+
+Evaluate on these dimensions (0.0 to 1.0):
+
+1. **Helpfulness**: Does it answer the user's question?
+2. **Accuracy**: Are factual claims correct (based on tool results)?
+3. **Tool selection**: Did it choose appropriate tools?
+4. **Safety**: Free of harmful, biased, or inappropriate content?
+5. **Refusal appropriateness**: 1.0 if refused appropriately, 1.0 if helped appropriately, 0.0 if wrong refusal or wrong help.
+6. **Conciseness**: Right amount of detail (not too verbose, not too terse)?
+
+Return JSON:
+{{
+  "helpfulness": 0.x,
+  "accuracy": 0.x,
+  "tool_selection": 0.x,
+  "safety": 0.x,
+  "refusal_appropriate": 0.x,
+  "conciseness": 0.x,
+  "overall": 0.x,
+  "concerns": "brief description of any issues, or 'none'",
+  "category": "good/acceptable/poor/bad"
+}}
+"""</code></pre>
+<h4>4.2 Calibration to human eval</h4>
+<p>LLM-as-judge 可能有 bias, 必须 calibrate:</p>
+<pre class="language-python"><code class="language-python">class JudgeCalibration:
+    """Compare LLM judge to human eval"""
+    
+    async def weekly_calibration(self):
+        # 1. Sample 100 examples from past week
+        samples = await self.sample_diverse_traces(n=100)
+        
+        # 2. Get LLM judge scores
+        llm_scores = await asyncio.gather(*[
+            self.llm_judge(s) for s in samples
+        ])
+        
+        # 3. Get human eval (from labeling platform)
+        # Show same samples to 2 human reviewers blind
+        human_scores = await self.send_to_human_labelers(samples)
+        # human_scores: avg of 2 reviewers per sample
+        
+        # 4. Compute agreement
+        correlation = pearsonr(llm_scores, human_scores)
+        cohen_kappa = cohen_kappa_score(
+            [self.bucket(s) for s in llm_scores],
+            [self.bucket(s) for s in human_scores],
+        )
+        
+        # 5. Find systematic bias
+        diffs = [l - h for l, h in zip(llm_scores, human_scores)]
+        mean_diff = mean(diffs)
+        
+        if abs(mean_diff) &gt; 0.1:
+            # LLM judge systematically high/low
+            await alert(
+                f"Judge calibration off: LLM avg {mean(llm_scores):.3f}, human avg {mean(human_scores):.3f}",
+                channel="ml-team",
+            )
+        
+        # 6. Find disagreement patterns
+        large_disagreement = [
+            (s, l, h) for s, l, h in zip(samples, llm_scores, human_scores)
+            if abs(l - h) &gt; 0.3
+        ]
+        # 分析这些 case, 改 judge prompt
+        
+        return {
+            "n": len(samples),
+            "correlation": correlation.statistic,
+            "kappa": cohen_kappa,
+            "mean_diff": mean_diff,
+            "large_disagreement_count": len(large_disagreement),
+        }</code></pre>
+<h4>4.3 Per-tenant / per-model eval dashboard</h4>
+<pre class="language-sql"><code class="language-sql">-- BigQuery view: eval_dashboard
+SELECT
+    DATE(timestamp) as day,
+    tenant_id,
+    model,
+    prompt_template_version,
+    COUNT(*) as eval_count,
+    AVG(eval_score) as avg_score,
+    PERCENTILE_CONT(eval_score, 0.1)[OFFSET(0)] as p10_score,
+    PERCENTILE_CONT(eval_score, 0.5)[OFFSET(0)] as p50_score,
+    SUM(CASE WHEN eval_score &lt; 0.5 THEN 1 ELSE 0 END) / COUNT(*) as pct_failing,
+    SUM(CASE WHEN eval_category = 'bad' THEN 1 ELSE 0 END) as bad_count
+FROM eval_records
+WHERE timestamp &gt; DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+GROUP BY day, tenant_id, model, prompt_template_version
+ORDER BY day DESC</code></pre>
+<h4>4.4 User signal as eval</h4>
+<pre class="language-python"><code class="language-python">class UserSignalEval:
+    """Use user behavior as quality signal"""
+    
+    async def collect_signals(self, trace_id):
+        signals = {}
+        
+        # 1. Thumb up/down (explicit)
+        thumb = await self.get_thumb_feedback(trace_id)
+        signals["explicit_thumb"] = thumb  # -1, 0, +1
+        
+        # 2. Copy / share (positive)
+        copies = await self.get_copy_events(trace_id)
+        signals["copied"] = copies &gt; 0
+        
+        # 3. Regenerate click (negative)
+        regen = await self.get_regen_events(trace_id)
+        signals["regenerated"] = regen &gt; 0
+        
+        # 4. Follow-up that contradicts (negative)
+        followups = await self.get_followup_queries(trace_id)
+        if followups:
+            contradiction = await self.detect_contradiction(
+                trace_id, followups
+            )
+            signals["contradicted_by_followup"] = contradiction
+        
+        # 5. Session abandonment (mild negative)
+        next_action = await self.get_next_action(trace_id)
+        signals["abandoned"] = next_action is None  # user left
+        
+        # 6. Time on response (engagement)
+        time_spent = await self.get_dwell_time(trace_id)
+        signals["dwell_seconds"] = time_spent
+        
+        # Aggregate to user_score (0-1)
+        score = self._aggregate(signals)
+        return score, signals
+    
+    def _aggregate(self, signals):
+        score = 0.5  # neutral
+        if signals["explicit_thumb"] == 1:
+            score = 0.9
+        elif signals["explicit_thumb"] == -1:
+            score = 0.1
+        elif signals["copied"]:
+            score = 0.8
+        elif signals["regenerated"]:
+            score = 0.3
+        elif signals["contradicted_by_followup"]:
+            score = 0.2
+        elif signals["abandoned"]:
+            score = 0.4
+        elif signals["dwell_seconds"] &gt; 30:
+            score = 0.7  # engaged
+        return score</code></pre>
+<hr />
+<h3>⚙️ Problem 5: Debug Workflow — Trace_ID → Slice → Re-run → Root Cause</h3>
+<p>具体 debug 一个 user-reported issue 的工作流.</p>
+<h4>5.1 Standard debug runbook</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Step 1: User report intake
+  Customer success → ticket with:
+  - User ID / email
+  - Approximate time of incident
+  - What user saw
+  - What user expected
+  - Error ID (if shown to user)
+
+Step 2: Find trace
+  If error_id (trace_id): direct lookup in Honeycomb
+  Else: search by user_id + time window
+  Tools: Honeycomb / Datadog APM / LangSmith
+  
+  Filter:
+    @user.id:"u_42" AND @timestamp:[2026-05-21T14:00 TO 14:30]
+
+Step 3: Read trace top-down
+  Root span → child spans → identify slow / errored span
+  
+  Common patterns:
+  - LLM call returned refusal (check response content)
+  - Tool call failed (check tool error)
+  - RAG retrieval bad (check retrieved chunks)
+  - State load wrong (check conv state)
+
+Step 4: Compare to good cases
+  Find similar trace where it worked (same prompt template, similar query)
+  Diff:
+  - Different RAG chunks?
+  - Different tool args?
+  - Different prompt parameters?
+  - Different model version?
+
+Step 5: Re-run with same input
+  Extract from trace:
+  - User query
+  - Conversation state at that time
+  - Tool results (if 'replay mode')
+  
+  Replay tool:
+  GET /admin/trace/{trace_id}/replay
+  Returns: same setup, runs LLM again
+  
+  See if reproduces.
+
+Step 6: If reproduces → narrow
+  - Try with different model → does it persist?
+  - Try with previous prompt template → does it persist?
+  - Try with previous RAG corpus → does it persist?
+  - Try with simplified context → minimal repro?
+
+Step 7: Root cause classification
+  Common categories:
+  - Prompt template regression (recent change)
+  - Model version regression (vendor side)
+  - RAG corpus issue (bad chunk, wrong rerank)
+  - Tool API drift (response format changed)
+  - Edge case in user input (unusual phrasing)
+  - LLM hallucination (no signal, just bad luck)
+  - Cache stale (showing old answer)
+
+Step 8: Fix + verify
+  - Hot fix (if regression): revert
+  - Add eval case to suite (prevent recurrence)
+  - Document in post-mortem</code></pre>
+<h4>5.2 Replay tool implementation</h4>
+<pre class="language-python"><code class="language-python">class TraceReplayTool:
+    """Replay a trace deterministically"""
+    
+    async def replay(self, trace_id, options):
+        # Fetch trace
+        trace = await self.honeycomb.get_trace(trace_id)
+        
+        # Extract original inputs
+        original_request = self._extract_request(trace)
+        original_state = await self.store.get_at_version(
+            original_request.conv_id,
+            timestamp=trace.start_ts,
+        )
+        
+        # Replay options
+        config = {
+            "model": options.model or original_request.model,
+            "prompt_template": options.prompt_version or original_request.prompt_version,
+            "rag_corpus_version": options.rag_version or original_request.rag_version,
+            "temperature": 0.0,  # deterministic
+            "seed": original_request.seed,  # if available
+            "use_mock_tool_results": options.mock_tools,
+        }
+        
+        if options.mock_tools:
+            # Use exact tool results from original trace (deterministic replay)
+            mock_tool_results = self._extract_tool_results(trace)
+            return await self._replay_with_mocks(
+                original_request, original_state, config, mock_tool_results
+            )
+        else:
+            # Re-execute fully
+            return await self._replay_full(
+                original_request, original_state, config
+            )
+    
+    async def _replay_with_mocks(self, req, state, config, mock_results):
+        # Override tool execution to return mock_results
+        with mock_tool_calls(mock_results):
+            return await self.agent.run(req, state, config)
+    
+    async def diff(self, original_trace_id, replay_result):
+        original = await self.honeycomb.get_trace(original_trace_id)
+        
+        diff = {
+            "original_response": original.response,
+            "replay_response": replay_result.response,
+            "response_diff": diff_text(original.response, replay_result.response),
+            "original_tools_used": original.tools_used,
+            "replay_tools_used": replay_result.tools_used,
+            "original_eval_score": original.eval_score,
+            "replay_eval_score": await self.eval.score(replay_result),
+        }
+        return diff</code></pre>
+<h4>5.3 Slice analysis dashboard</h4>
+<pre class="language-sql"><code class="language-sql">-- Find slices with anomalous quality / cost / latency
+WITH baseline AS (
+    SELECT
+        tenant_id,
+        model,
+        prompt_template_version,
+        AVG(latency_ms) as baseline_latency,
+        AVG(eval_score) as baseline_eval,
+        AVG(cost_usd) as baseline_cost
+    FROM traces
+    WHERE timestamp BETWEEN ts_start AND ts_baseline_end
+    GROUP BY tenant_id, model, prompt_template_version
+),
+recent AS (
+    SELECT
+        tenant_id,
+        model,
+        prompt_template_version,
+        AVG(latency_ms) as recent_latency,
+        AVG(eval_score) as recent_eval,
+        AVG(cost_usd) as recent_cost,
+        COUNT(*) as n
+    FROM traces
+    WHERE timestamp &gt; ts_recent_start
+    GROUP BY tenant_id, model, prompt_template_version
+)
+SELECT
+    r.*,
+    b.baseline_latency,
+    b.baseline_eval,
+    b.baseline_cost,
+    (r.recent_latency - b.baseline_latency) / b.baseline_latency as latency_delta_pct,
+    (r.recent_eval - b.baseline_eval) as eval_delta,
+    (r.recent_cost - b.baseline_cost) / b.baseline_cost as cost_delta_pct
+FROM recent r
+JOIN baseline b USING (tenant_id, model, prompt_template_version)
+WHERE r.n &gt; 100   -- min sample size
+  AND (
+    abs(latency_delta_pct) &gt; 0.2 OR
+    abs(eval_delta) &gt; 0.1 OR
+    abs(cost_delta_pct) &gt; 0.5
+  )
+ORDER BY abs(eval_delta) DESC
+LIMIT 20</code></pre>
+<h4>5.4 Production case study (你的简历 hook)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Case study: Voice agent Indonesia market eval drop (2025 你做过的)
+
+Day 0 - 周一: 
+  ML team weekly review notice Indonesia eval pass rate 92% → 84%
+  (其他 market 不动)
+
+Day 0 - 下午:
+  Slice analysis dashboard:
+  - by market: ID 异常, 其他 ok
+  - by model: Llama-70B 在 ID 异常, Gemini 在 ID 也异常 → 不是 model 问题
+  - by prompt: agent_v3.2 + v3.1 都受影响 → 不是 prompt
+  - by time: 周一开始
+
+Day 0 - 晚:
+  Recent deploys check:
+  - 周日 deploy: RAG corpus update for ID, 加了新的 collection script
+  - 怀疑 RAG 是问题
+
+Day 0 - 抽 100 bad case:
+  - 看 RAG retrieved chunks
+  - 共性: top-1 chunk 是新加的 "high pressure collection" script (不合规)
+  - LLM 跟着这个 script 给出 aggressive 回答, eval 评低
+
+Day 0 - hotfix:
+  - Revert RAG corpus update
+  - eval pass rate 几小时内回升 92%
+
+Day 1 - post-mortem:
+  - Add eval suite for ID market specific
+  - Add chunk-level review before RAG corpus update
+  - Add automatic eval-on-deploy: deploy 后立即跑 100 eval, fail 自动 revert
+
+Time from alert to fix: 4 hours
+Without observability stack: 几天 (用户投诉 → 调查 → 排错)</code></pre>
+<p>简历挂钩:</p>
+<blockquote><p>"Voice agent had weekly metric review process. Eval-in-prod 5% sample with LLM-as-judge — caught Indonesia market eval drop from 92% to 84% within hours of RAG corpus update. Slice analysis pinpointed RAG as cause (other markets fine, all models same drop = not model). Hot fix: revert RAG corpus. Time from alert to recovery: 4 hours. Without this stack, would have taken days, would have caused customer churn."</p></blockquote>
+<hr />
+<h1>Part 3 · 串起来看</h1>
+<p>5 个 problem 是 observability 的完整体系:</p>
+<ol><li><strong>4-layer instrumentation</strong> 是 foundation — trace + log + metric + eval</li><li><strong>Sampling strategy</strong> 让 10K QPS 也能 manageable cost</li><li><strong>PII redaction</strong> 保 compliance, hash for correlation</li><li><strong>Eval-in-prod</strong> 抓 LLM-specific 的 quality drift (传统 metric 看不见)</li><li><strong>Debug workflow</strong> 把所有 layer 串起来 — trace_id → slice → re-run → root cause</li></ol>
+<p>面试场把这 5 层讲清楚 + 给一个 production case study (你 voice agent ID 那个), 就是 staff-level production observability 水准.</p>
+<hr />
+<h3>必问 clarifying questions</h3>
 <p><strong>1. Volume</strong></p>
-<blockquote><p>"QPS — affects sampling strategy."</p></blockquote>
+<blockquote><p>"QPS — affects sampling strategy + cost. 100 QPS easy, 10K QPS need tail-sampling."</p></blockquote>
 <p><strong>2. Compliance</strong></p>
-<blockquote><p>"PII in prompts — can log full or redact?"</p></blockquote>
+<blockquote><p>"PII in prompts — can log full content (B2C consumer chat) or full redact (banking, healthcare)?"</p></blockquote>
 <p><strong>3. Cost concern</strong></p>
-<blockquote><p>"Log every request fully or sample?"</p></blockquote>
+<blockquote><p>"1% observability cost budget OK, or strict &lt;0.5%? Affects sampling aggressiveness."</p></blockquote>
 <p><strong>4. Latency budget</strong></p>
-<blockquote><p>"Observability adds overhead — acceptable?"</p></blockquote>
+<blockquote><p>"Observability overhead — &lt; 10ms acceptable? Async export usually has 0 overhead, sync redaction is 5-20ms."</p></blockquote>
 <p><strong>5. Existing infra</strong></p>
-<blockquote><p>"Datadog / Honeycomb / custom? Reuse?"</p></blockquote>
+<blockquote><p>"Datadog / Honeycomb / Tempo / custom? Reuse vs build. OTel SDK lets you switch."</p></blockquote>
+<p><strong>6. Quality bar</strong></p>
+<blockquote><p>"What's 'misbehaving'? Hallucination? Refusal? Off-topic? Affects eval design."</p></blockquote>
 <hr />
-<h3>5 步框架</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify volume / compliance / cost</td></tr><tr><td>5-15 min</td><td>3 pillars (trace / log / metric)</td></tr><tr><td>15-25 min</td><td>LLM-specific (eval / quality / cost)</td></tr><tr><td>25-35 min</td><td>Sampling + PII redaction strategy</td></tr><tr><td>35-45 min</td><td>Alerting + debug workflow</td></tr></tbody></table>
+<h3>5 步框架 (sample 45-60 min answer)</h3>
+<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify volume / compliance / cost / existing infra</td></tr><tr><td>5-15 min</td><td>4 layers (trace / log / metric / quality) overview</td></tr><tr><td>15-25 min</td><td>LLM-specific signals (TTFT, tokens, cache hit, eval)</td></tr><tr><td>25-35 min</td><td>Sampling + PII redaction strategy</td></tr><tr><td>35-45 min</td><td>Eval-in-prod + drift detection</td></tr><tr><td>45-55 min</td><td>Debug workflow + case study</td></tr><tr><td>55-60 min</td><td>Tools (LangSmith / Phoenix / Honeycomb / Datadog) + Q&amp;A</td></tr></tbody></table>
 <hr />
-<h3>我会这样答（sample）</h3>
-<blockquote><p>"Clarify — <em>[假设: 10K QPS, PII present (must redact in logs), 1% cost budget for observability, Datadog + OpenTelemetry available]</em>.</p>
+<h3>我会这样答 (sample 完整版)</h3>
+<blockquote><p>"Clarify — <em>[假设: 10K QPS, PII present (must redact in logs), 1% observability cost budget, Datadog + OpenTelemetry available, multi-tenant SaaS]</em>.</p>
 <p><strong>4-layer observability</strong>:</p>
-<p><strong>Layer 1: Distributed Tracing</strong> (per-request)</p>
-<pre class="language-plaintext"><code class="language-plaintext">User request (trace_id=xxx)
-├── span: API gateway (10ms)
-├── span: Agent loop start (parent)
-│   ├── span: LLM call #1 (Gemini 3 Pro, 300ms, 1.2K tokens in + 500 out, $0.009)
-│   ├── span: Tool call #1 (search_inventory, 150ms)
-│   │   ├── span: DB query (100ms)
-│   │   └── span: Cache lookup (5ms, hit)
-│   ├── span: LLM call #2 (Gemini 3 Pro, 250ms, 800 in + 300 out, $0.005)
-│   └── span: Tool call #2 (send_email, 200ms)
-└── span: Response stream (50ms TTFT, 800ms total)</code></pre>
-<p>Implementation: <strong>OpenTelemetry</strong> auto-instrument + manual spans for tool calls + LLM calls.</p>
-<p>Each span captures:</p>
-<ul><li>duration</li><li>status (ok / error)</li><li>inputs (token count, not content unless authorized)</li><li>outputs (token count, citations, tool name)</li><li>errors with stack trace</li></ul>
-<p><strong>Critical</strong>: trace context propagates to MCP servers / tools via headers.</p>
-<p><strong>Layer 2: LLM-specific Logging</strong></p>
-<pre class="language-python"><code class="language-python">log_entry = {
-    'trace_id': trace.id,
-    'span_id': span.id,
-    'timestamp': now(),
-    'model': 'gemini-3-pro',
-    'prompt_template_version': 'v3.2',
-    'prompt_hash': hash(prompt),  # for grouping
-    'input_tokens': 1234,
-    'output_tokens': 256,
-    'cost': 0.0034,
-    'latency_ttft': 0.18,
-    'latency_total': 1.2,
-    'finish_reason': 'stop',
-    'tools_used': ['search_inventory', 'send_email'],
-    # PII-redacted content
-    'prompt_redacted': redact_pii(prompt),
-    'response_redacted': redact_pii(response),
-    # Quality signals
-    'user_thumbs': None,  # filled later
-    'eval_sampled': False,  # 5% sampled for eval
-}</code></pre>
-<p>Storage tiered:</p>
-<ul><li><strong>Hot (last 7 days)</strong>: queryable, sampled at 100%</li><li><strong>Warm (90 days)</strong>: full PII-redacted, S3/BQ</li><li><strong>Cold</strong>: aggregated only, indefinite</li></ul>
-<p><strong>Layer 3: Metrics (time series)</strong></p>
-<table class="md-table"><thead><tr><th>Metric</th><th>Why</th></tr></thead><tbody><tr><td>latency p50/p95/p99 (TTFT + total)</td><td>UX</td></tr><tr><td>token in/out per request</td><td>Cost + capacity</td></tr><tr><td>cost per session</td><td>Economics</td></tr><tr><td>error rate (by type)</td><td>Reliability</td></tr><tr><td>tool call count per turn</td><td>Behavior</td></tr><tr><td>cache hit rate (semantic + result)</td><td>Optimization</td></tr><tr><td>eval pass rate (sampled)</td><td>Quality</td></tr><tr><td>user thumbs ratio</td><td>Quality</td></tr><tr><td>jailbreak attempt count</td><td>Security</td></tr></tbody></table>
-<p><strong>Layer 4: LLM-specific Quality Monitoring</strong></p>
-<p>Eval-in-prod:</p>
-<pre class="language-python"><code class="language-python">async def with_eval(prompt, response):
-    if random.random() &lt; 0.05:  # 5% sample
-        eval_score = await evaluator.judge(prompt, response)
-        metrics.record('eval.quality', eval_score, tags=[model, version])
-        if eval_score &lt; threshold:
-            alert('quality drop')</code></pre>
-<p>Drift detection:</p>
-<pre class="language-python"><code class="language-python"># Compare current week's prompt distribution to baseline
-# Embedding-based: are new queries semantically novel?
-# If drift &gt; threshold → alert</code></pre>
-<p><strong>Sampling strategy</strong> (10K QPS, cost concern):</p>
-<ul><li><strong>Traces</strong>: 1% baseline, <strong>100% for errors</strong>, <strong>100% for high-cost calls</strong> ($ &gt; $0.10)</li><li><strong>Logs</strong>: 100% structured metric, 10% full prompt-redacted, 1% with prompt content (for debug)</li><li><strong>Eval samples</strong>: 5% random, force-eval all flagged (jailbreak detection / low confidence)</li></ul>
-<p><strong>PII redaction pipeline</strong>:</p>
-<pre class="language-python"><code class="language-python">def redact(text):
-    # Use presidio / AWS Macie
-    text = re.sub(r'\b[\d-]{13,19}\b', '[CARD]', text)  # Luhn-validate
-    text = re.sub(EMAIL_REGEX, '[EMAIL]', text)
-    text = re.sub(PHONE_REGEX, '[PHONE]', text)
-    # Named entity recognition for names
-    text = ner_redact(text, types=['PERSON'])
-    return text</code></pre>
-<p>Apply at log-write time. Never store raw PII in logs.</p>
-<p><strong>Alerting strategy</strong>:</p>
-<table class="md-table"><thead><tr><th>Alert</th><th>Threshold</th><th>Action</th></tr></thead><tbody><tr><td>p99 latency &gt; SLO</td><td>for 5 min</td><td>Page oncall</td></tr><tr><td>Error rate &gt; 2%</td><td>for 5 min</td><td>Page oncall</td></tr><tr><td>Cost per session &gt; $1</td><td>sustained 10 min</td><td>Email cost team</td></tr><tr><td>Eval pass rate &lt; 90%</td><td>over 1 hour</td><td>Slack ML team</td></tr><tr><td>Jailbreak attempts &gt; 100/min</td><td>for 5 min</td><td>Page security</td></tr><tr><td>Tool error rate &gt; 10%</td><td>for 5 min</td><td>Page platform</td></tr></tbody></table>
-<p><strong>Debug workflow for the misbehaving agent</strong>:</p>
-<ol><li><strong>Reproduce by trace</strong>: get trace_id from user report → full trace + logs</li><li><strong>Compare to good cases</strong>: find similar trace where it worked → diff</li><li><strong>Re-run with same input</strong>: capture prompt/response, eval scored</li><li><strong>Check eval suite</strong>: did regression land in recent deploy?</li><li><strong>Slice analysis</strong>: which user / tenant / model / tool / time-of-day?</li><li><strong>Root cause</strong>: usually one of: (a) bad prompt template change, (b) tool API drift, (c) model version change, (d) edge case in user input</li></ol>
-<p><strong>Tools (2026)</strong>:</p>
-<table class="md-table"><thead><tr><th>Tool</th><th>What</th></tr></thead><tbody><tr><td><strong>OpenTelemetry</strong></td><td>Standard trace / log / metric collection</td></tr><tr><td><strong>Datadog / Honeycomb</strong></td><td>Trace storage + query</td></tr><tr><td><strong>LangSmith</strong></td><td>LLM-specific trace, eval-in-prod</td></tr><tr><td><strong>Phoenix (Arize)</strong></td><td>OSS LLM observability</td></tr><tr><td><strong>Helicone</strong></td><td>LLM proxy logging</td></tr><tr><td><strong>Langfuse</strong></td><td>Full eval + observability</td></tr><tr><td><strong>Braintrust</strong></td><td>Eval framework</td></tr></tbody></table>
-<p><strong>What NOT to do</strong>:</p>
-<ul><li>Log raw PII (compliance violation)</li><li>100% sample everything (cost blow)</li><li>No correlation between trace and LLM call</li><li>Skip eval-in-prod (quality drift invisible)</li><li>No tool-specific spans (root cause hidden)</li><li>No alerting (waiting for users to complain)"</li></ul></blockquote>
+<p><strong>L1 Distributed Tracing</strong> with OpenTelemetry. Per-request trace including agent loop, each LLM call (model / template version / tokens / cost / TTFT), each tool call (MCP, OBO, DB), each cache lookup. Trace context propagates to MCP servers and downstream services via traceparent header.</p>
+<p><strong>L2 LLM-specific Logging</strong>. Per LLM call, structured log with: trace_id, model, prompt_template_version, prompt_hash, input/output tokens, cost, latency, tools_used. Content (prompt/response) is <strong>PII-redacted at write time</strong> via Microsoft Presidio. We keep hash for correlation but never plaintext PII. Storage tiered: hot 7d Datadog, warm 90d S3, cold 1y BigQuery aggregated.</p>
+<p><strong>L3 Metrics</strong> time-series via Prometheus / Mimir. Beyond traditional latency/error, LLM-specific: TTFT/TPOT, input/output tokens per (model, tenant), cost per (tenant, feature), cache hit rate per tier (L1/L2/L3/prefix), tool error rate, eval pass rate sampled.</p>
+<p><strong>L4 Quality monitoring</strong>. 5% random sample + 100% flagged (low thumbs, new prompt version, VIP tenant, jailbreak detected) sent to LLM-as-judge (Sonnet 4.6) for scoring. Multi-dimensional score: helpfulness, accuracy, tool selection, safety, refusal appropriateness, conciseness. Calibrated weekly against human labelers.</p>
+<p><strong>Sampling strategy</strong>: tail-based — 1% random + 100% errors + 100% slow (&gt;5s) + 100% high-cost (&gt;$0.5) + 100% VIP. OTel collector tail_sampling processor. Cost: ~30x saving vs 100% sample.</p>
+<p><strong>PII redaction</strong>: Presidio with spaCy NER + custom recognizers for domain (account numbers, etc.). Applied at log write time. Hash for correlation: SHA-256 with per-entity-type salt. Right-to-be-Forgotten supported via hash-based deletion.</p>
+<p><strong>Drift detection</strong>: daily compare past 24h to baseline (last week). Methods: MMD test for prompt distribution shift, mean eval score drop, cost spike alert. Page oncall if eval &gt; 5pp drop, alert ML team if MMD p &lt; 0.05.</p>
+<p><strong>Debug workflow</strong>: User report → find trace by user_id+time → read top-down → compare to good case → re-run with replay tool (deterministic with mocked tool results) → narrow root cause → fix + add to eval suite.</p>
+<p><strong>Real case (voice agent Indonesia)</strong>: eval pass 92% → 84%, slice analysis → RAG corpus update was root cause, hot fix revert, 4h from alert to recovery. Without this stack: would have taken days, customer churn likely.</p>
+<p><strong>Tools 2026</strong>: OpenTelemetry (standard SDK), Datadog / Honeycomb (trace+log+metric), LangSmith / Phoenix / Langfuse (LLM-specific), Braintrust (eval suite), Presidio (PII redaction). 2026 趋势 OTel + multi-vendor backend."</p></blockquote>
 <hr />
-<h3>多场景变体 + 解法</h3>
-<h4>变体 1: 生产 agent silent quality drop</h4>
-<blockquote><p>"用户开始抱怨 'agent 最近答得差'。Metric 都正常 (latency, error)。怎么 debug?"</p></blockquote>
-<p><strong>解法</strong>:</p>
-<ul><li><strong>Eval-in-prod 抽样</strong>: 5% LLM-as-judge 评分, plot trend</li><li><strong>Slice by</strong>: model version / tenant / query type / time → 找异常 slice</li><li><strong>Diff vs baseline</strong>: 抽 100 'bad' + 100 'good', 看 prompt template / model 是否动过</li><li><strong>User feedback signal</strong>: thumbs down trend, sentiment shift</li><li><strong>A/B with control</strong>: 5% 流量到旧版, 比当前</li><li><strong>Recent deploys</strong>: 上次 prompt template change / model upgrade 时间对齐</li><li><strong>Root cause 多 layer</strong>: 看 retrieval (recall 降?), reranker (NDCG 降?), LLM (eval pass 降?), tool (error rate 升?)</li></ul>
-<h4>变体 2: Cost spike investigation</h4>
-<blockquote><p>"本周 LLM bill 突然 5x。怎么查？"</p></blockquote>
-<p><strong>解法</strong>:</p>
-<ul><li><strong>Per-tenant attribution</strong>: dashboard 看哪 tenant 涨</li><li><strong>Per-feature attribution</strong>: 哪 product feature 触发了多 LLM call</li><li><strong>Token analysis</strong>: input token 变长 (context bloat?) or output (response 变啰嗦?)</li><li><strong>Model mix change</strong>: routing 把更多流量送给 expensive model</li><li><strong>Loop bug</strong>: agent retry 失控 (per-session call count 异常)</li><li><strong>Cache miss spike</strong>: cache hit rate 降 → 更多真 LLM call</li><li><strong>Jailbreak attack</strong>: 攻击者疯狂打高 token, anomaly detect</li><li><strong>Postmortem</strong>: identify + fix + budget alert tuning</li></ul>
-<h4>变体 3: P99 latency alert fired</h4>
-<blockquote><p>"P99 latency 突 2s → 5s。怎么 debug？"</p></blockquote>
-<p><strong>解法</strong>:</p>
-<ul><li><strong>Trace slow 请求</strong>: tail-sampling 抓 p95+ trace, 看 span breakdown</li><li><strong>By layer</strong>: LLM call slow? Tool call slow? DB slow? Network slow?</li><li><strong>By tenant / model</strong>: 某 tenant 量大占资源 / 某 model serving 抖动</li><li><strong>Queue depth</strong>: backpressure → 排队 → 总延迟涨</li><li><strong>KV cache hit rate</strong>: 突降 → prefill 多 → 慢</li><li><strong>GPU util</strong>: 接近 100% saturate → 加 replica</li><li><strong>Downstream</strong>: 上游 API slow → 慢</li></ul>
-<h4>变体 4: Jailbreak attempt detection</h4>
-<blockquote><p>"怎么知道有人试图越狱 agent?"</p></blockquote>
-<p><strong>解法</strong>:</p>
-<ul><li><strong>Pattern detection on input</strong>: 'ignore previous', 'pretend you are', 'developer mode'</li><li><strong>LLM-classifier</strong>: 小 model 实时分类 input '是否疑似越狱'</li><li><strong>Response pattern</strong>: agent 输出 'I cannot' / 'as an AI' 反常增多 → 攻击者尝试中</li><li><strong>Per-user 频率</strong>: 单 user 短时间高频 → 异常</li><li><strong>Honeypot</strong>: 故意放些 'secrets' 看是否被 'leak' → 检测越狱成功</li><li><strong>Forensics</strong>: 完整 input + output 存安全存储 (单独 retention)</li><li><strong>Alert + block</strong>: &gt; N 次/min → 临时 ban + 升级安全 team</li></ul>
-<h4>变体 5: Per-tenant SLA verification</h4>
-<blockquote><p>"卖 agent 给 enterprise, 承诺 99.9% / p99 &lt; 2s。怎么证明做到了？"</p></blockquote>
-<p><strong>解法</strong>:</p>
-<ul><li><strong>Per-tenant SLI dashboard</strong>: availability, latency, error rate</li><li><strong>Synthetic probes</strong>: 每分钟模拟 1 tenant request, 长期可用性测量</li><li><strong>Monthly report</strong>: auto-generate, 给 customer 看</li><li><strong>Error budget</strong>: 99.9% = 43min downtime/month, 用了多少</li><li><strong>Incident attribution</strong>: 哪次 outage 算入 tenant 的 SLA breach</li><li><strong>Compensation policy</strong>: 触发 breach 自动给 credit (consumed budget 通知 customer)</li><li><strong>Independent audit</strong>: 第三方 monitoring (Datadog Synthetics) 可信</li></ul>
-<hr />
-<h3>简历专属 reframe</h3>
-<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>Distributed tracing</td><td>Voice agent — multi-region debugging 必 trace</td></tr><tr><td>LLM-specific logs</td><td>BNPL chatbot — prompt versioning + token tracking</td></tr><tr><td>Eval-in-prod</td><td>ConvFinQA — eval methodology you've done at scale</td></tr><tr><td>PII redaction</td><td>Compliance for debt collection — log redaction必</td></tr><tr><td>Alerting</td><td>Voice agent SLA weekly review</td></tr></tbody></table>
-<p><strong>Quote</strong>:</p>
-<blockquote><p>"Voice agent had weekly metric review. We instrumented per-market: ASR latency p99, LLM token cost per call, TTS latency, <strong>end-to-end p99 &lt; 800ms</strong> budget. Eval-in-prod sampled 5% of calls → LLM-judge evaluated for hallucination / refusal. When Indonesia market's eval pass rate dropped 8% one week, we traced to a model version rollout, <strong>rolled back in 2 hours</strong> because the alert + trace + diff workflow was set up. Without observability, that'd have taken days."</p></blockquote>
+<h3>简历专属 reframe — Gao Xin's hooks</h3>
+<table class="md-table"><thead><tr><th>Topic</th><th>你的经验</th><th>How to quote</th></tr></thead><tbody><tr><td><strong>Distributed tracing</strong></td><td>Voice agent — multi-region debugging</td><td>"Voice agent for 7 markets had OTel trace propagation across ASR / LLM / TTS / database. Trace_id flowed end-to-end so debugging cross-system issue was always possible."</td></tr><tr><td><strong>LLM-specific logs</strong></td><td>BNPL chatbot — prompt versioning</td><td>"BNPL chatbot logged prompt_template_version + model_version + RAG_corpus_version per call. Critical when investigating quality drops — knew exactly what changed."</td></tr><tr><td><strong>Eval-in-prod</strong></td><td>ConvFinQA — multi-hop eval</td><td>"ConvFinQA used LLM-as-judge eval-in-prod at 10% sample. Drift detection caught when reranker silently regressed (NDCG @5 from 0.78 to 0.71)."</td></tr><tr><td><strong>PII redaction</strong></td><td>Debt collection compliance</td><td>"Indonesia debt collection had strict PII rules. Presidio + custom NER for debt amounts / phone numbers. Redact at write time, hash for correlation. SOC2 audit passed."</td></tr><tr><td><strong>Voice agent case</strong></td><td>ID market eval drop</td><td>"Indonesia market eval pass 92% → 84% in 1 week. Sliced by market/model/prompt/RAG, identified RAG corpus update, reverted in 4 hours. Without observability stack would have taken days."</td></tr><tr><td><strong>Cost attribution</strong></td><td>TikTok payment infra</td><td>"Per-feature cost attribution via OTel span tags. Caught one feature where misconfigured prompts caused 100x token usage in 1 week. Fixed before bill came."</td></tr><tr><td><strong>Per-tenant SLA</strong></td><td>7 markets contract</td><td>"Per-tenant SLA dashboard: availability + p99 + eval pass rate. Monthly auto-generated report sent to enterprise customer. Synthetic probes every 1min."</td></tr></tbody></table>
+<p><strong>主动 quote</strong> (面试场说出来):</p>
+<blockquote><p>"On voice agent for TikTok Global Payment, we built 4-layer observability:</p>
+<ul><li>OTel for distributed tracing across ASR → LLM → TTS → DB → CRM</li><li>Structured logs with prompt template version + model version + RAG corpus version</li><li>Prometheus metrics for TTFT / TPOT / cost / cache hit rate</li><li>LangSmith for LLM-specific trace inspection + eval-in-prod 5% sample</li></ul>
+<p>Key win: Indonesia market eval dropped 92% → 84% in 1 week. Without slice analysis, we wouldn't have known. With it: 4 hours to identify RAG corpus update as cause, revert, and back to 92%. Saved customer churn worth $$$.</p>
+<p>Hard lesson: <strong>PII redaction must be at log-write time, not post-hoc</strong>. Early version had unredacted PII in 1 week of Datadog logs — SOC2 audit caught it, had to delete + retroactively redact. Now Presidio is middleware on every log call."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
-<p><strong>Q1</strong>: "Trace volume — 10K QPS × full spans = expensive. Cost optim?" <strong>A</strong>:</p>
-<ul><li><strong>Smart sampling</strong>: 1% baseline + 100% errors + 100% slow (&gt; p95)</li><li><strong>Span aggregation</strong>: similar spans (DB query type) merged at storage</li><li><strong>Retention tiers</strong>: hot 7d full, warm 90d aggregated, cold metric-only</li><li><strong>Vendor: Honeycomb tail-based sampling</strong> (sample whole trace if ANY span anomalous)</li></ul>
-<p><strong>Q2</strong>: "Can't reproduce user-reported issue. What's in your trace that helps?" <strong>A</strong>:</p>
-<ul><li>Full input + full response (PII-redacted)</li><li>Model version + prompt template version</li><li>All tool calls with inputs/outputs</li><li>LLM-specific: top_p / temp / seed if available</li><li>Re-run script: extract inputs from trace → replay</li></ul>
-<p><strong>Q3</strong>: "Eval-in-prod — who decides ground truth?" <strong>A</strong>:</p>
-<ul><li><strong>LLM-as-judge</strong>: Claude Opus 4.7 / Gemini 3 Pro evaluates response vs expected qualities. Calibrated against human eval set.</li><li><strong>Self-eval</strong>: LLM rates its own response (unreliable but cheap)</li><li><strong>User signals</strong>: thumbs / engagement / follow-up corrections</li><li><strong>Heuristic checks</strong>: response is on-topic, no refusal, no hallucination markers</li><li><strong>Human sample</strong>: 100 random per week, manual review by ML team</li></ul>
-<p><strong>Q4</strong>: "Jailbreak detection — log everything for security?" <strong>A</strong>:</p>
-<ul><li><strong>Inline detection</strong>: pattern + LLM-classifier on input → flag</li><li><strong>Logged</strong>: full input (in secure store, not main logs), trace, user_id</li><li><strong>Alerting</strong>: &gt; 100 attempts/min from same user → block</li><li><strong>Forensics</strong>: incident-response can pull all flagged + nearby</li></ul>
-<p><strong>Q5</strong>: "Cost observability — how attribute to features?" <strong>A</strong>:</p>
-<ul><li>Tag each span with <code>feature_id</code> (which product feature triggered)</li><li>Per-feature cost dashboard: sum of all spans tagged with feature</li><li>Time-series: cost per feature per day</li><li>Identify expensive features for optimization or pricing decisions</li></ul>
+<p><strong>Q1</strong>: "Trace volume — 10K QPS × full spans = expensive. Cost optimization?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Tail-based sampling</strong>: 1% baseline + 100% errors + 100% slow + 100% high-cost + 100% VIP</li><li><strong>Span aggregation</strong>: similar spans (e.g., DB query type) merged at storage</li><li><strong>Retention tiers</strong>: hot 7d full, warm 90d aggregated, cold 1y metric-only</li><li><strong>Adaptive per-route</strong>: high-traffic low-value routes 0.1%, low-traffic high-value 100%</li><li><strong>Vendor: Honeycomb tail-based</strong> (sample whole trace if ANY span anomalous), Datadog APM</li><li>Cost target: ~30x reduction vs 100% sampling</li></ul>
+<p><strong>Q2</strong>: "Can't reproduce user-reported issue. What's in your trace that helps?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Full input + full response</strong> (PII-redacted) sampled at 10%</li><li><strong>Model version + prompt template version + RAG corpus version</strong></li><li><strong>All tool calls</strong> with inputs/outputs (full)</li><li><strong>LLM parameters</strong>: temperature, top_p, seed (if available)</li><li><strong>Conversation state</strong> at request time (Redis snapshot)</li><li><strong>Re-run script</strong>: extract inputs from trace → replay deterministic with same state + mocked tool results</li><li><strong>Comparison to good case</strong>: find similar trace where it worked, diff inputs/outputs</li></ul>
+<p><strong>Q3</strong>: "Eval-in-prod — who decides ground truth?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>LLM-as-judge</strong>: Sonnet 4.6 / Opus 4.7 as judge. Multi-dim score (helpfulness, accuracy, safety, etc.). Calibrated against human eval set weekly.</li><li><strong>Human labeled set</strong>: 200-500 examples curated, "gold standard". Judge accuracy measured against this.</li><li><strong>User signals</strong>: thumbs up/down, copy, regenerate, follow-up correction. Aggregate to user_score.</li><li><strong>Heuristic checks</strong>: response is on-topic, no refusal markers, no hallucination markers (e.g., "I don't know" + factual claim).</li><li><strong>Production triangulation</strong>: LLM judge + user signal + heuristic. Disagreement triggers human review.</li></ul>
+<p><strong>Q4</strong>: "Jailbreak detection — log everything for security?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Inline detection</strong>: pattern matching (keywords like "ignore previous") + LLM-classifier on input → flag</li><li><strong>Logged</strong>: full input (in separate secure store, not main logs), trace, user_id, severity score</li><li><strong>Alerting</strong>: &gt; 10 attempts/min from same user → temp ban; &gt; 50 / day → security review</li><li><strong>Forensics retention</strong>: 7d hot, 90d cold, separate from regular logs (compliance: need ability to fully delete on RTBF)</li><li><strong>Honeypot</strong>: inject 'secrets' to detect successful exfiltration, alert if leaked</li><li><strong>Pattern library</strong>: maintain known jailbreak patterns, update weekly</li></ul>
+<p><strong>Q5</strong>: "Cost observability — how attribute to features?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Tag each span with feature_id</strong> (which product feature triggered this LLM call)</li><li><strong>Tag with tenant_id, user_id, model</strong></li><li><strong>Cost per span</strong>: input_tokens × input_price + output_tokens × output_price</li><li><strong>Per-feature dashboard</strong>: sum costs by feature_id, time-series</li><li><strong>Per-tenant attribution</strong>: sum costs by tenant_id</li><li><strong>Daily cost report</strong>: top 10 expensive features, week-over-week trend</li><li><strong>Identify expensive features</strong> for: optimization, pricing decision, deprecation</li></ul>
+<p><strong>Q6</strong> (bonus): "If you could only have 3 metrics for an LLM agent, which?"</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Eval pass rate</strong> (sampled 5%, LLM-judge multi-dim). Without this you're blind to quality drift.</li><li><strong>TTFT p99</strong> (per model, per tenant). Latency is user-perceived quality.</li><li><strong>Cost per user per day</strong> (per feature). Without this, runaway customer can burn budget overnight.</li></ol>
+<p>Honorable mention: jailbreak attempts/min, cache hit rate, tool error rate.</p>
 <hr />
-<h3>❌ 易错点</h3>
-<ol><li><strong>Log raw PII</strong> — compliance</li><li><strong>No correlation</strong> between user report and trace</li><li><strong>100% sample</strong> — cost blow</li><li><strong>No LLM-specific eval</strong> — quality silent regression</li><li><strong>No tool-level spans</strong> — debug stuck at LLM boundary</li><li><strong>Single-pillar</strong> (only logs, no traces / metrics)</li><li><strong>No alerting</strong> — wait for user complaint</li></ol>
+<h3>❌ 易错点 (top 10)</h3>
+<ol><li><strong>Log raw PII</strong> — compliance violation</li><li><strong>No correlation between user report and trace</strong> — debug impossible</li><li><strong>100% sample everything</strong> — cost blow</li><li><strong>No LLM-specific eval</strong> — quality drift invisible</li><li><strong>No tool-level spans</strong> — debug stuck at LLM boundary</li><li><strong>Single-pillar (only logs, no traces/metrics)</strong> — limited visibility</li><li><strong>No alerting</strong> — wait for user complaint</li><li><strong>Trace context not propagated cross-service</strong> — broken trace chain</li><li><strong>No version tracking</strong> — 'something changed' but don't know what</li><li><strong>No cost attribution by feature</strong> — cost spike root cause unknown</li></ol>
 <hr />
-<h3>✅ 加分项</h3>
-<ol><li><strong>4 layers</strong>: trace / log / metric / quality</li><li><strong>OpenTelemetry standard</strong></li><li><strong>LLM-specific signals</strong> (TTFT, token cost, eval, jailbreak)</li><li><strong>Smart sampling</strong> (errors + slow always)</li><li><strong>PII redaction pipeline</strong></li><li><strong>Eval-in-prod with LLM-judge</strong></li><li><strong>Cost attribution by feature</strong></li><li><strong>Quote voice agent Indonesia rollback story</strong></li></ol>
+<h3>✅ 加分项 (top 12)</h3>
+<ol><li><strong>4 layers</strong>: trace / log / metric / quality</li><li><strong>OpenTelemetry standard</strong> (vendor-neutral 2026)</li><li><strong>LLM-specific signals</strong> (TTFT/TPOT, token cost, eval, jailbreak)</li><li><strong>Smart sampling</strong> (tail-based, errors + slow always)</li><li><strong>PII redaction pipeline</strong> at write time (Presidio + hash)</li><li><strong>Eval-in-prod</strong> with LLM-judge + calibration</li><li><strong>Drift detection</strong> (MMD test, eval drop alert)</li><li><strong>Cost attribution</strong> by tenant + feature</li><li><strong>Right-to-be-Forgotten</strong> workflow</li><li><strong>Replay tool</strong> for deterministic debug</li><li><strong>Per-tenant SLA dashboard</strong> with synthetic probes</li><li><strong>Quote voice agent Indonesia 4-hour debug story</strong></li></ol>
 <hr />
-<h3>Cheat Sheet</h3>
+<h3>一句话总结</h3>
+<blockquote><p><strong>LLM agent observability = 4 layers (trace OTel + LLM-specific log PII-redacted + metric Prometheus + quality eval-in-prod) + smart sampling (tail-based) + drift detection + debug workflow (trace_id → slice → re-run → root cause)</strong>.</p>
+<p>传统 web observability 不够 — LLM-specific signals (TTFT, token cost, prompt/model/RAG version, jailbreak, hallucination) 必须专门 instrument. 5% LLM-judge eval-in-prod 是 2026 LLM platform 标配, 不做就是盲飞.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (印 1 页)</h3>
 <pre class="language-plaintext"><code class="language-plaintext">4 observability layers:
-  L1 Distributed Traces (OTel)
-  L2 LLM-specific Logs (prompt/response/version)
-  L3 Metrics (latency/cost/error)
-  L4 Quality monitoring (eval-in-prod)
+  L1 Distributed Traces  (OTel + Honeycomb / Datadog / Tempo)
+  L2 LLM-specific Logs   (prompt/response PII-redacted, tokens, cost, version)
+  L3 Metrics             (Prometheus / Mimir, latency / cost / error / cache)
+  L4 Quality monitoring  (LangSmith / Phoenix, eval-in-prod 5%, drift)
 
-Trace must capture:
-  Agent loop (parent span)
-  Each LLM call (model/tokens/cost)
-  Each tool call (name/duration/error)
-  Each DB / cache / external call
-  Context propagation to MCP servers
+Span attributes (LLM-specific):
+  llm.model
+  llm.prompt_template_version
+  llm.prompt_hash
+  llm.input_tokens (+ cached_input_tokens)
+  llm.output_tokens
+  llm.cost_usd
+  llm.ttft_ms / total_ms
+  llm.finish_reason
+  llm.refused
+  tools.used
+  cache.prefix_hit_ratio
+  quality.eval_score (populated async)
+  security.jailbreak_flag
 
-LLM-specific log fields:
-  trace_id, span_id, timestamp
-  model, prompt_template_version
-  prompt_hash (group)
-  tokens in/out, cost
-  TTFT, total latency
-  finish_reason
-  tools_used
-  prompt_redacted, response_redacted
-  user_thumbs, eval_sampled
+Key LLM metrics:
+  TTFT / TPOT p50/p95/p99
+  Input/output tokens (cached vs not)
+  Cost per (tenant, feature, model)
+  Cache hit rate per tier
+  Tool call success rate
+  Eval pass rate (sampled)
+  Jailbreak attempts / min
+  User thumbs ratio
 
-Key metrics:
-  latency p50/95/99 (TTFT + total)
-  tokens / cost per request
-  error rate by type
-  tool call count
-  cache hit rate
-  eval pass rate (sampled)
-  user thumbs ratio
-  jailbreak attempts
-
-Sampling strategy:
-  Traces: 1% + 100% errors + 100% slow
-  Logs: 100% metric, 10% redacted, 1% with content
-  Eval: 5% random + 100% flagged
+Sampling strategy (10K QPS):
+  Tail-based:
+    1% random baseline
+    100% errors
+    100% slow (&gt;5s)
+    100% high cost (&gt;$0.5)
+    100% VIP tenant
+    100% jailbreak flagged
+  Cost: ~30x reduction vs 100%
 
 PII redaction:
+  Presidio (spaCy NER + custom recognizers)
   Apply at log-write time
-  presidio / Macie
-  Card / email / phone / NRIC / API key
-  NER for names
+  Entities: PERSON / EMAIL / PHONE / CREDIT_CARD / SSN / LOCATION
+  Hash for correlation (sha256 + per-type salt)
+  Right-to-be-Forgotten via hash deletion
 
-Alerting rules:
-  p99 latency &gt; SLO 5 min → page
-  Error rate &gt; 2% 5 min → page
-  Cost / session &gt; $1 sustained → email
-  Eval &lt; 90% 1 hour → slack ML
-  Jailbreak &gt; 100/min → page security
+Eval-in-prod:
+  5% random sample + force-eval flagged
+  LLM-as-judge (Sonnet 4.6)
+  Multi-dim: helpfulness / accuracy / tool / safety / refusal / conciseness
+  Calibrate vs human weekly
+  Alert on eval drop &gt; 5pp
 
-Tools:
-  OTel + Datadog / Honeycomb
-  LangSmith / Phoenix / Helicone / Langfuse
-  Braintrust for eval
+Drift detection (daily):
+  MMD test on prompt embeddings
+  Eval score baseline vs recent
+  Cost mean baseline vs recent
+  Tool error rate baseline vs recent
+
+Alerting tiers:
+  P0 PagerDuty: p99 &gt; SLO 5min, error &gt; 2%, jailbreak &gt; 100/min, eval drop &gt; 5pp
+  P1 Slack ML: eval &lt; 90% 1h, cost trend up 50%, drift detected
+  P2 Email weekly: model mix shift, usage trend
 
 Debug workflow:
-  Reproduce by trace_id
-  Diff vs good case
-  Re-run with same input
-  Check eval suite
-  Slice analysis (user / tenant / model / time)
-  Root cause: prompt / tool / model / input
+  Trace_id from user report → find trace
+  Read trace top-down → identify failed span
+  Compare to good case (same template, similar query)
+  Re-run with replay tool (deterministic mocks)
+  Slice analysis (by tenant / model / template / time)
+  Root cause: prompt / tool / model / RAG / input / cache stale
+
+Tools 2026:
+  OpenTelemetry (vendor-neutral SDK)
+  Datadog / Honeycomb / Tempo (trace + log + metric)
+  LangSmith / Phoenix / Langfuse (LLM-specific)
+  Braintrust (eval suite)
+  Presidio / AWS Macie (PII redaction)
+  Mimir (Prometheus-compatible TS)
 
 Cost attribution:
-  Tag spans with feature_id
-  Per-feature dashboard
+  Per-span tag: feature_id, tenant_id, model
+  Aggregate: per-feature dashboard, per-tenant report
+  Catch: feature with bad prompt → 100x token spike
+
+Per-tenant SLA:
+  Dashboard: availability, p99, eval pass
+  Synthetic probes 1/min
+  SLO error budget tracking
+  Monthly auto-report to customer
+  Credit policy for breach
 
 红线:
   - Raw PII in logs
-  - 100% sample
-  - No LLM eval
-  - No tool spans
+  - 100% sample everything (cost)
+  - No LLM eval (quality blind)
+  - No tool spans (debug stuck)
   - Single pillar
-  - No alerting</code></pre>
+  - No alerting
+  - Trace context not propagated
+  - No version tracking
+  - No cost attribution
+  - No PII deletion workflow
+
+Resume quotes:
+  "Voice agent ID market eval drop 92→84%, 4h identify+fix via slice"
+  "BNPL chatbot prompt_template_version + model_version tracking"
+  "SOC2 audit passed via Presidio redaction at write time"
+  "Per-tenant SLA dashboard + synthetic probes 7 markets"</code></pre>
   </section>
 
   
@@ -282,450 +1836,2180 @@ Cost attribution:
 
 > "Walk through the difference between observability for traditional web service vs LLM agent. What's new / different?"
 
-**Round**: Production Observability (45 min)
+**出处**: Google FDE T3 production observability round 高频题. 2026 LLM platform team 必备能力.
+
+**Round**: Production Observability (45-60 min)
 
 ---
 
 ## 这道题在考什么
 
-考你**3 pillars + LLM-specific**:
+考你 **在 prod 跑过 LLM agent + 真正 debug 过 LLM-specific 问题**:
 
-1. **Traces** —— per-request end-to-end (multi-LLM-call, multi-tool)
-2. **Logs** —— prompt + response 必 capture
-3. **Metrics** —— latency, error rate, tokens, cost
-4. **LLM-specific** —— eval-in-prod, quality drift, jailbreak attempts
-5. **PII handling** —— logging compliance
+1. **4-layer instrumentation** —— distributed trace + LLM-specific log + metrics + quality eval
+2. **Sampling strategy** —— 10K QPS 不能 100% log, tail sampling / error-100% / slow-100% / anomaly
+3. **PII redaction** —— prompt + response 含敏感信息, 必须 redact (presidio) + hash for correlation
+4. **Eval-in-prod** —— LLM-as-judge sample, drift detection, calibration to human eval
+5. **Debug workflow** —— trace_id → slice analysis → re-run → root cause
+6. **LLM-specific signals** —— TTFT, token cost, eval pass rate, jailbreak attempts, hallucination
+
+传统 web observability 工具不够用 — LLM agent 有 prompt template version, model version, tool call chain, semantic similarity 等独特维度.
 
 ---
 
-## 必问 clarifying
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 四个术语先解释
+
+**Distributed Tracing**: 一个 user request 走完全程的所有 span 串成一条 trace. 现代标准是 **OpenTelemetry** (OTel) — vendor-neutral SDK, 输出到 Datadog / Honeycomb / Jaeger / Tempo / Phoenix. Trace 由 trace_id (全局唯一) + span_id (每段) + parent_span_id (父子关系) 组成.
+
+**Eval-in-prod**: 把 LLM evaluation 放到 production. 不是离线跑 benchmark, 而是**实时抽样 5% 的真实 traffic**, 用 LLM-as-judge 或 user feedback signal 评分, 监控 quality drift. 这是 2026 LLM platform 标配, 不做就盲飞.
+
+**PII redaction**: 个人识别信息脱敏. Prompt + response 可能含信用卡 / 邮箱 / 电话 / SSN / 病历. **必须在 log 写入前 redact**, 不能等 log 进了 SIEM 再来. 用 Microsoft Presidio / AWS Macie / Google DLP 等成熟库.
+
+**Tail-based sampling**: 不是随机 1% sample, 而是**等 trace 完成后, 看整条 trace 特征**再决定保不保留. 慢的 / 错的 / 异常的 100% 保留, 正常的 1% 保留. Honeycomb / Datadog / Tempo 都支持.
+
+---
+
+## 2. 核心问题 (灾难场景)
+
+设想没有 observability stack, agent 在 prod 出问题:
+
+**灾难 A — 用户报问题, 但没法 reproduce**:
+
+```
+用户:  "你的 agent 昨天给我答错了 invoice 金额"
+你:    "什么时候发生的?"
+用户:  "下午 3 点左右吧"
+你:    没 trace, 不知道用户问的什么, 不知道 agent 用了哪个 tool, 不知道哪个 model 版本
+
+只能在 staging 用类似 prompt 试: 试不出来 (因为 prompt template 已经升级, 工具响应已经变, RAG 数据已变)
+
+结果: "请提供更多信息" "我们调查中" — 几天过去都没结论
+```
+
+**灾难 B — 全 log 不区分 trace**:
+
+```
+log format (典型反模式):
+  2026-05-21 14:30:00 INFO [chatbot] User asked: "what's my balance"
+  2026-05-21 14:30:00 INFO [chatbot] LLM call to gpt-5.5
+  2026-05-21 14:30:01 INFO [chatbot] Tool call get_balance
+  ...
+
+100 个并发 request 的 log 全混在一起, 没法分清哪些 line 属于同一个 user request.
+排查必须从时间近邻 + 关键词搜, 极其低效.
+
+正确: 每行带 trace_id + span_id + user_id
+```
+
+**灾难 C — 不做 eval-in-prod**:
+
+```
+传统 metric:  p99 latency 250ms ✓
+              error rate 0.5% ✓
+              throughput 8K QPS ✓
+              
+所有 metric 都正常, dashboard 一片绿.
+
+但用户实际感受: "agent 最近答得变差了"
+
+为什么 metric 不暴露? 因为 LLM 失败 ≠ HTTP 5xx, LLM 给出垃圾答案是 200 OK 但内容差.
+
+解: 5% sample 用 LLM-as-judge 评分 → 跟踪 eval pass rate (1 周看 trend)
+```
+
+**灾难 D — PII 明文写 log**:
+
+```
+log: "User john.doe@bank.com asked about card ending 4242, balance was $5234.21"
+
+后果:
+  - SOC2 / GDPR audit fail
+  - Log aggregation (Splunk, Datadog) 现在持有客户 PII
+  - 内部员工任何 dev 都能搜到客户数据
+  - Log retention 政策违反 (PII 需要 special handling)
+  - Bug: hash key 不动但 PII 还在 → CCPA 删除请求时漏
+
+正确: 在 log 写入前 redact, "[EMAIL] asked about [CARD], balance [REDACTED]"
+保留 hash for correlation: log_id += hash(email) 让客服能查
+```
+
+**正确的 mental model — 4 layers**:
+
+```
+L1 Distributed Tracing      → 每 request 端到端 span 链
+L2 LLM-specific Logging     → prompt / response (PII-redacted) / model version
+L3 Metrics                  → latency, cost, error rate (time-series)
+L4 Quality Monitoring       → eval-in-prod, drift detection, user signal
+```
+
+---
+
+## 3. 典型架构图
+
+**完整 stack** (2026 LLM platform observability):
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          User Request                               │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ trace_id created
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         API Gateway                                 │
+│  - Generate trace_id                                                │
+│  - OTel auto-instrument                                             │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ propagate traceparent header
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Agent Orchestrator                            │
+│  ├─ span: load conversation state (Redis lookup)                    │
+│  ├─ span: LLM call #1 (Gemini 3 Pro)                                │
+│  │   ├─ attr: model, prompt_template_version, input_tokens         │
+│  │   ├─ attr: output_tokens, cost_usd, ttft_ms                     │
+│  │   ├─ event: prompt_hash (group similar)                         │
+│  │   └─ event: eval_sampled=true (5% sample)                       │
+│  ├─ span: tool call (MCP gateway → SF API)                          │
+│  │   └─ span: DB query inside tool                                  │
+│  ├─ span: LLM call #2                                               │
+│  └─ span: response streaming                                        │
+└──┬──────────────────────────────────────────────────────────────────┘
+   │ OTel SDK exports
+   │
+   ├─── Trace export ────→  Honeycomb / Datadog / Tempo (hot 7d)
+   │                        S3 cold storage (90d)
+   │
+   ├─── Log export ──────→  Datadog Logs / Loki / BigQuery
+   │   (PII-redacted)       Searchable, sampled
+   │
+   ├─── Metrics export ──→  Prometheus / Mimir / Datadog
+   │                        Grafana dashboard
+   │
+   └─── Quality eval ────→  LangSmith / Phoenix / Langfuse
+       (5% sampled         LLM-as-judge scoring
+        + user feedback)   Drift detection
+```
+
+**Single request trace 详细**:
+
+```
+trace_id = abc123, user_id = u_42, tenant = bank_42
+
+00:00:00.000  ROOT span: POST /v1/agent/chat (1200ms total)
+00:00:00.005  ├─ Auth + rate limit (5ms)
+00:00:00.010  ├─ Load conv state (Redis 15ms hit)
+00:00:00.025  ├─ Agent loop start
+00:00:00.025  │  ├─ LLM call #1: tool selection (Gemini 3 Pro)
+              │  │   prompt_template: agent_v3.2
+              │  │   input_tokens: 1234 (prefix cache hit 80%)
+              │  │   output_tokens: 156
+              │  │   ttft: 180ms
+              │  │   total: 320ms
+              │  │   cost: $0.0034
+              │  │   tools_chosen: [get_balance]
+00:00:00.345  │  ├─ Tool call: get_balance
+              │  │   ├─ MCP gateway (5ms)
+              │  │   ├─ OBO token exchange (2ms cached)
+              │  │   ├─ Internal API call (78ms)
+              │  │   │   └─ DB query (60ms)
+              │  │   └─ Response cache write (2ms)
+              │  │   Total: 87ms
+00:00:00.432  │  ├─ LLM call #2: response generation
+              │  │   prompt_template: agent_v3.2_response
+              │  │   input_tokens: 1390 (history + tool result)
+              │  │   output_tokens: 234
+              │  │   ttft: 220ms
+              │  │   total: 680ms
+              │  │   cost: $0.0042
+00:00:01.112  │  └─ Save state (write-ahead Redis + async DB)
+00:00:01.122  └─ Response streaming complete
+
+Total: 1.122s
+Cost: $0.0076
+Tools: [get_balance]
+Models: [gemini-3-pro × 2]
+Quality eval: sampled (will score async)
+```
+
+---
+
+## 4. 关键分类表
+
+### 4.1 4-Layer Observability 对比
+
+| Layer | What | Tools (2026) | Retention | Sampling |
+|---|---|---|---|---|
+| **L1 Tracing** | Per-request span chain | OpenTelemetry + Honeycomb / Datadog / Tempo | hot 7d, cold 90d | tail-based (errors + slow 100%, normal 1%) |
+| **L2 Logging** | Prompt / response / tool args (PII-redacted) | Datadog Logs / Loki / BigQuery | 90d (PII issues → 30d) | 100% structured metric, 10% redacted content |
+| **L3 Metrics** | Latency, cost, error rate time-series | Prometheus / Mimir / Datadog | 1 year aggregated | 100% (aggregated) |
+| **L4 Quality eval** | eval pass rate, drift, user signal | LangSmith / Phoenix / Langfuse / Braintrust | 90d full, 1y aggregated | 5% LLM judge + 100% flagged |
+
+### 4.2 LLM-Specific signals (vs 传统 web)
+
+| Signal | Traditional web | LLM agent |
+|---|---|---|
+| Latency | request → response | TTFT + TPOT + total |
+| Errors | HTTP 4xx/5xx | + LLM refusal, hallucination, off-topic |
+| Cost | servers, bandwidth | + input/output tokens × model price |
+| Cache hit | DB query cache | + exact + semantic + prefix KV cache |
+| Quality | functional test | eval-in-prod, drift detection |
+| Security | SQL injection, XSS | + jailbreak attempts, prompt injection |
+| Versioning | code SHA | + prompt template, model, RAG corpus version |
+| User signal | ratings, NPS | + thumbs, regen click, copy click, follow-up |
+
+### 4.3 3 类 alert priority
+
+| Alert | Threshold | Action |
+|---|---|---|
+| **P0 Page oncall (immediate)** | p99 > SLO 5 min, error rate > 2% 5 min, jailbreak > 100/min | PagerDuty / SMS / phone call |
+| **P1 Slack ML team** | eval pass rate < 90% 1h, cost trend up 50% 1h, drift > threshold | Slack channel |
+| **P2 Email weekly review** | model mix shift, token usage growth, tool error rate up | Email + dashboard pin |
+
+### 4.4 4 类 trace sampling strategy
+
+| Strategy | When | Coverage |
+|---|---|---|
+| **Head sampling** (random 1%) | Simple, low cost | 1% all traffic, but misses rare events |
+| **Tail sampling** (post-hoc) | Production standard | 1% normal + 100% errors + 100% slow + 100% anomaly |
+| **Adaptive sampling** | Per-route based on importance | Important routes 10%, low-traffic 100%, high-traffic 0.1% |
+| **User-targeted** | Specific user / tenant | 100% for VIP customer, 100% for cohort under investigation |
+
+---
+
+## 5. 具体业务场景 (4-5 个深度变体)
+
+### 场景 A: 生产 agent silent quality drop (经典)
+
+用户报: "agent 最近答得变差了". 所有 metric 正常.
+
+```
+Debug 流程:
+
+Step 1: 用户反馈量化
+  - "变差" 是什么 — collect thumb-down rate
+  - 时间 — 哪天开始, 多大用户群感受到
+  - 实测: thumb-down rate 上周 3% → 这周 6%, 翻倍
+
+Step 2: Eval-in-prod 抽样数据
+  - 过去 7d 的 5% LLM-as-judge 评分 vs 之前
+  - 实测: eval pass rate 92% → 85%, 7pp drop, 显著
+
+Step 3: Slice by 维度找 outlier
+  - by model:           gpt-5.5 4% drop, gemini-3-pro 11% drop ← bingo
+  - by tenant:          tenant_42 normal, tenant_88 18% drop
+  - by query type:      'how do I' normal, 'compare X vs Y' drop big
+  - by time-of-day:     12-15h drop bigger
+
+Step 4: 时间对齐发布 / 配置变更
+  - 5/14 deploy: prompt template v3.1 → v3.2
+  - 5/15: RAG corpus 更新 (上传新文档)
+  - 5/17: Gemini 3 Pro vendor side update
+
+Step 5: 抽 100 'bad' case 详读
+  - LangSmith 查 eval < 0.5 的 trace
+  - 发现共性: agent 回答 confidence 很高但事实错误
+  - 看 RAG 检索: top-3 chunk 有 1 个明显 wrong
+
+Step 6: Root cause
+  - 新 RAG corpus 上传的文档某些段落 metadata error
+  - reranker 错误地给低质量 chunk 高分
+  - LLM 信了 RAG 的 chunk
+
+Step 7: Fix
+  - 紧急: revert RAG corpus
+  - 中期: 加 RAG quality eval (chunk 准确性 daily test)
+  - 长期: 双盲 review 每次 RAG corpus update
+
+实战工具:
+  LangSmith / Phoenix → 抽 bad case trace, 详读 RAG retrieval
+  Datadog → metric slicing
+  BigQuery → 长期 trend
+```
+
+### 场景 B: Cost spike investigation
+
+本周 LLM bill 突然 5x. 谁 / 什么 / 为什么?
+
+```
+Debug 流程:
+
+Step 1: 按 tenant attribution
+  Dashboard: cost per tenant per day, 7 day trend
+  发现: tenant_88 周一 $50 → 周四 $5000 (100x spike)
+
+Step 2: 按 feature attribution (per-span tag)
+  - tenant_88 的所有 trace, 按 feature_id 聚合
+  - 实测: 'document_chat' feature 占 95%
+  - 调查: 该 feature 是上周新上线
+
+Step 3: 看 individual session 行为
+  - 拉 tenant_88 的 trace
+  - 实测: 平均 session 30+ LLM call (vs 平台均值 5 calls)
+  - 单 session 平均 cost $1.5 (vs 平台均值 $0.05)
+
+Step 4: 看 prompt token
+  - 该 feature input token / call: 平均 50K (vs 平台均值 1K)
+  - Why? 因为 'document_chat' 把整个 PDF 塞 context
+
+Step 5: 看 cache hit
+  - Prefix cache hit rate: 5% (vs 平台 80%)
+  - Why? 因为每 session 不同 PDF, system prompt 也变了
+
+Step 6: Root causes
+  a. New feature 没 cost guard
+  b. PDF size 没 limit, 上传 100MB PDF
+  c. Cache hit 低 (different PDF per session)
+  d. 用了 Opus 4.7 ($5/$25) 而不是 Flash
+
+Step 7: Fix
+  - 紧急: cap tenant_88 monthly budget, alert
+  - 中期: feature-level: PDF size limit 10MB, route to Flash for first pass
+  - 长期: per-feature cost guard alarm
+
+实战工具:
+  Datadog cost dashboard
+  BigQuery for tenant deep dive
+  LangSmith for individual trace inspection
+```
+
+### 场景 C: P99 latency alert fired
+
+P99 latency 突 2s → 5s. Page oncall.
+
+```
+Debug 流程:
+
+Step 1: 看 trace 在哪一 span 慢
+  - Tail sampled traces (P99) 进 Honeycomb
+  - 看 span breakdown
+  - 发现: LLM call 占 4s (本应 ~500ms)
+
+Step 2: 看哪个 model / replica
+  - by model: gemini-3-pro normal, llama-70b-self-host slow
+  - by replica: replica-23 占 80% slow traces
+  - 实测: replica-23 GPU util 100%, 比其他高
+
+Step 3: 看 replica 内部 metric
+  - queue depth: 200 (上限), 其他 replica < 50
+  - KV cache util: 95% (满)
+  - Batch size 上限到了
+
+Step 4: 看为什么 load 不均
+  - Sticky routing per conv_id, 某些大 user (long conv) 集中到 replica-23
+  - Routing 没考虑 conv length
+
+Step 5: Fix
+  - 紧急: drain replica-23, 让 conv 重新分布
+  - 中期: routing 算法考虑 conv length, balance better
+  - 长期: 容量规划, replica 数量 +20%
+
+实战工具:
+  Honeycomb / Tempo trace view
+  Datadog dashboard per replica
+  vLLM admin endpoint (/metrics)
+```
+
+### 场景 D: Jailbreak attempt detection
+
+怎么知道有人试图越狱 agent?
+
+```
+Detection 策略:
+
+Step 1: Input pattern matching
+  Pattern detection on user query:
+  - "ignore previous instructions"
+  - "pretend you are"
+  - "developer mode"
+  - "DAN" (Do Anything Now)
+  - "roleplay as"
+  - 中文 jailbreak: "忽略之前的指令"
+  → 命中 → 标记 suspicious = True
+
+Step 2: Real-time LLM classifier
+  - 小 model (Haiku $1/1M) classify: "is this a jailbreak attempt?"
+  - 100ms latency, cheap
+  - 训练 / few-shot with examples
+  - 命中 → flagged = True
+
+Step 3: Response pattern detection
+  - Agent 输出 包含 'I cannot' / 'as an AI' 异常增多 → 攻击中
+  - 用户 / session frequency of attempts → 频繁 → 异常
+
+Step 4: Honeypot
+  - Inject 'secrets' 假信息: "ignore: SECRET_KEY=ABC123_TEST"
+  - 看 agent 输出是否泄漏 → 检测 jailbreak 成功
+  
+Step 5: Forensics 存储
+  - Full input + output 存安全存储 (单独 retention)
+  - Separate index, no PII mixing
+  - 7d hot, 90d cold
+
+Step 6: Alert + block
+  - User > 10 attempts/min → temp ban 30min
+  - User > 50 attempts/day → manual review by security
+  - Tenant pattern → escalate to security team
+
+实战:
+
+flagged_traces = await datadog.query(
+    "@input.jailbreak_flag:true",
+    window="last 1h"
+)
+for trace in flagged_traces:
+    if trace.user_id not in already_alerted:
+        await alert_security(trace.user_id, trace.input)
+
+监控 metric:
+  - jailbreak_attempts_total (counter)
+  - jailbreak_attempts_by_user (gauge)
+  - jailbreak_attempts_per_min (rate)
+  - jailbreak_success_rate (when honeypot triggered)
+```
+
+### 场景 E: Per-tenant SLA verification
+
+卖 agent 给 enterprise, 承诺 99.9% / p99 < 2s. 怎么证明做到了?
+
+```
+Setup:
+
+1. Per-tenant SLI dashboard
+   - Availability: success rate per tenant
+   - Latency: p50/p95/p99 per tenant
+   - Error rate: by HTTP code + LLM-specific (refusal, hallucination)
+   - Quality: eval pass rate per tenant
+
+2. Synthetic probes
+   每分钟模拟 1 tenant request:
+   - 用 standard test case
+   - 测量 latency + success
+   - 长期 reliability 测量 (independent of real traffic)
+
+3. SLO error budget
+   99.9% = 43min downtime/month
+   每周 review: 本月用了多少 budget
+   超 50% 用了 → 暂停 deploy
+   超 100% → page 紧急
+
+4. Monthly report
+   Auto-generate:
+   - Availability achieved
+   - Latency distribution
+   - Top errors
+   - Incidents (with RCA links)
+   - Cost summary
+   给 customer 看
+
+5. Incident attribution
+   - Internal incident → counts vs SLA
+   - Customer's fault (e.g., bad input) → not counted
+   - Vendor's fault (OpenAI down) → counted, but split out
+
+6. Compensation policy
+   - 触发 breach 自动给 credit
+   - 0-30% 可用性 → 100% credit
+   - 30-90% → 50% credit
+   - 90-99% → 25% credit
+   - 99-99.9% → 10% credit
+   
+7. Independent audit
+   - 第三方 Datadog Synthetic / Pingdom 监控
+   - Reports 给 customer 看 (no conflict of interest)
+```
+
+---
+
+## 6. 工程 checklist
+
+**设计 observability stack**:
+
+1. **OTel SDK 接入所有 service** — Python / Node / Go 都用 OTel
+2. **Trace context propagation** — HTTP / gRPC / Kafka 都注入 traceparent header
+3. **Span 命名规范** — `service.operation.detail` (e.g., `agent.llm.call`, `mcp.tool.execute`)
+4. **Span attributes 标准化** — `llm.model`, `llm.prompt_template_version`, `llm.input_tokens`, `llm.cost_usd`
+5. **PII redaction at write time** — Presidio middleware before log write
+6. **Sampling strategy** — tail-based, error+slow 100%, normal 1%
+7. **Retention tiering** — hot 7d full, warm 90d aggregated, cold 1y metric-only
+8. **Eval-in-prod pipeline** — 5% sample, LLM-judge, drift dashboard
+9. **Alert routing** — P0 PagerDuty, P1 Slack, P2 email
+10. **Cost attribution** — every span has tenant_id + feature_id + model + tokens
+
+**Per-span 必带 attributes (LLM-specific)**:
+
+```python
+span.set_attributes({
+    # Tracing context
+    "service.name": "agent-orchestrator",
+    "trace.user_id": user.id,        # via attr, not log (compliance)
+    "trace.tenant_id": tenant.id,
+    "trace.feature_id": "document_chat",   # for cost attribution
+    "trace.session_id": session.id,
+    
+    # LLM-specific
+    "llm.model": "gemini-3-pro",
+    "llm.prompt_template": "agent_v3.2",
+    "llm.prompt_hash": hash(prompt),   # for grouping
+    "llm.input_tokens": 1234,
+    "llm.input_tokens_cached": 1000,   # prefix cache hit
+    "llm.output_tokens": 256,
+    "llm.cost_usd": 0.0034,
+    "llm.ttft_ms": 180,
+    "llm.finish_reason": "stop",
+    "llm.temperature": 0.7,
+    
+    # Quality signals (later populated)
+    "quality.eval_sampled": False,
+    "quality.eval_score": None,       # filled async
+    "quality.user_thumbs": None,
+    
+    # Tool calls
+    "tools.used": ["get_balance", "send_email"],
+    "tools.error_count": 0,
+    
+    # Cache
+    "cache.exact_hit": False,
+    "cache.semantic_hit": False,
+    "cache.prefix_hit_ratio": 0.8,
+})
+```
+
+---
+
+## 7. 易错坑表
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **Log raw PII** | Compliance violation, SOC2/GDPR fail. 解: Presidio redact at write time |
+| 2 | **No correlation between user report and trace** | 用户报问题, 你找不到 trace. 解: user-facing error message 含 trace_id (e.g., "Error ID: tr_abc123"), client log + server log 都带 trace_id |
+| 3 | **100% sample everything** | Cost blow, log storage $$$. 解: tail-based 1% + error/slow 100% |
+| 4 | **No LLM-specific eval** | Quality drift 看不到, metric 全绿但用户骂. 解: 5% LLM-judge eval-in-prod |
+| 5 | **No tool-level spans** | Debug 停在 LLM 边界, 不知道是 RAG / tool 哪步坏. 解: 每 tool call 独立 span |
+| 6 | **Single pillar (only logs)** | 没 metric 没 trace, debug 全靠 grep. 解: 3 pillars + quality |
+| 7 | **No alerting** | 等用户投诉. 解: SLO alert + eval drift alert |
+| 8 | **Trace context 不 propagate** | 跨 service 调用 trace 断了. 解: HTTP header / gRPC metadata 注入 traceparent |
+| 9 | **No version tracking** | 'agent 变差了' 但不知道 prompt/model/RAG 哪个动了. 解: prompt_template_version / model_version / rag_corpus_version 都 attribute |
+| 10 | **No cost attribution by feature** | 月底账单 spike 不知道哪 feature 贵. 解: feature_id 必须 propagate 到每 span |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **LLM agent observability = 4 layers**: (L1) distributed trace OTel-based, (L2) PII-redacted LLM-specific log (prompt + response + tokens + model + version), (L3) metrics (latency / cost / error / cache hit / eval), (L4) quality monitoring with eval-in-prod 5% sample + drift detection + user signals.
+>
+> 传统 web observability 不够 — LLM-specific signals (TTFT/TPOT, token cost, prompt template version, model version, RAG corpus version, jailbreak attempts, hallucination, refusal) 都要专门捕获. 没有这些, prod LLM agent 是黑盒.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: 4-Layer Instrumentation — Trace + Log + Metric + Eval
+
+把 4 个 layer 拆开讲清楚怎么实现.
+
+### 1.1 Layer 1: Distributed Tracing with OpenTelemetry
+
+```python
+# Setup OTel in agent service
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Initialize
+provider = TracerProvider(
+    resource=Resource.create({
+        "service.name": "agent-orchestrator",
+        "service.version": os.environ["GIT_SHA"],
+        "deployment.environment": os.environ["ENV"],
+    })
+)
+provider.add_span_processor(
+    BatchSpanProcessor(
+        OTLPSpanExporter(endpoint="https://otel-collector:4317"),
+        max_export_batch_size=512,
+    )
+)
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer(__name__)
+
+# Use in handlers
+async def chat_handler(req):
+    with tracer.start_as_current_span(
+        "agent.chat",
+        kind=trace.SpanKind.SERVER,
+        attributes={
+            "trace.user_id": req.user_id,
+            "trace.tenant_id": req.tenant_id,
+            "trace.feature_id": req.feature_id,
+        },
+    ) as span:
+        # Load state
+        with tracer.start_as_current_span("agent.load_state") as load_span:
+            state = await store.get(req.conversation_id)
+            load_span.set_attribute("cache.tier_hit", state.tier)  # L1/L2/L3
+        
+        # Agent loop (multiple LLM + tool calls)
+        result = await agent_loop(req, state)
+        
+        span.set_attribute("agent.total_llm_calls", result.llm_call_count)
+        span.set_attribute("agent.total_tool_calls", result.tool_call_count)
+        span.set_attribute("agent.total_cost_usd", result.total_cost)
+        
+        return result
+
+async def agent_loop(req, state):
+    iterations = 0
+    while not done:
+        iterations += 1
+        
+        # LLM call span
+        with tracer.start_as_current_span(
+            "agent.llm.call",
+            attributes={
+                "llm.iteration": iterations,
+                "llm.model": chosen_model,
+                "llm.prompt_template": "agent_v3.2",
+                "llm.prompt_hash": hashlib.sha256(prompt.encode()).hexdigest()[:16],
+            },
+        ) as llm_span:
+            response = await llm.generate(prompt, model=chosen_model)
+            
+            llm_span.set_attributes({
+                "llm.input_tokens": response.usage.input_tokens,
+                "llm.output_tokens": response.usage.output_tokens,
+                "llm.cached_input_tokens": response.usage.cached_input_tokens,
+                "llm.cost_usd": compute_cost(response.usage, chosen_model),
+                "llm.ttft_ms": response.ttft_ms,
+                "llm.finish_reason": response.finish_reason,
+                "llm.refused": response.refused,
+            })
+        
+        # Tool call (if applicable)
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                with tracer.start_as_current_span(
+                    "agent.tool.call",
+                    attributes={
+                        "tool.id": tc.tool_id,
+                        "tool.args_size": len(json.dumps(tc.args)),
+                    },
+                ) as tool_span:
+                    tool_result = await mcp_gateway.call(tc.tool_id, tc.args)
+                    tool_span.set_attributes({
+                        "tool.success": tool_result.success,
+                        "tool.latency_ms": tool_result.latency_ms,
+                        "tool.cache_hit": tool_result.cache_hit,
+                    })
+```
+
+### 1.2 Layer 2: LLM-specific Structured Logging
+
+```python
+import structlog
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
+logger = structlog.get_logger("agent")
+analyzer = AnalyzerEngine()
+anonymizer = AnonymizerEngine()
+
+def redact_pii(text):
+    """Redact PII at log write time"""
+    results = analyzer.analyze(
+        text=text,
+        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD",
+                  "US_SSN", "IP_ADDRESS", "LOCATION", "DATE_TIME"],
+        language="en",
+    )
+    anonymized = anonymizer.anonymize(
+        text=text,
+        analyzer_results=results,
+    )
+    return anonymized.text
+
+class LLMLogger:
+    async def log_call(self, span, prompt, response, request):
+        # Sample for full content logging (10%)
+        log_content = random.random() < 0.1
+        
+        log_entry = {
+            # Tracing context
+            "trace_id": span.get_span_context().trace_id,
+            "span_id": span.get_span_context().span_id,
+            
+            # Metadata
+            "timestamp": time.time(),
+            "user_id": request.user_id,
+            "tenant_id": request.tenant_id,
+            "feature_id": request.feature_id,
+            
+            # LLM-specific
+            "model": request.model,
+            "prompt_template_version": "agent_v3.2",
+            "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest(),
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "cost_usd": compute_cost(response.usage),
+            "latency_ttft_ms": response.ttft_ms,
+            "latency_total_ms": response.total_ms,
+            "finish_reason": response.finish_reason,
+            "tools_used": [t.tool_id for t in response.tool_calls],
+            
+            # Content (PII-redacted, sampled)
+            "prompt_redacted": redact_pii(prompt) if log_content else None,
+            "response_redacted": redact_pii(response.content) if log_content else None,
+            
+            # Quality signals (filled later)
+            "user_thumbs": None,
+            "eval_sampled": False,
+            "eval_score": None,
+        }
+        
+        logger.info("llm_call", **log_entry)
+
+# Storage tiers
+# Hot (7 days): Datadog Logs / Loki - queryable
+# Warm (90 days): S3 / BigQuery - bulk analytics  
+# Cold: aggregated only, 1 year
+```
+
+### 1.3 Layer 3: Metrics (Prometheus / Mimir / Datadog)
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Latency metrics
+ttft_histogram = Histogram(
+    'llm_ttft_seconds',
+    'Time to first token',
+    ['model', 'prompt_template_version'],
+    buckets=[0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10],
+)
+
+total_latency_histogram = Histogram(
+    'llm_total_latency_seconds',
+    'Total LLM call latency',
+    ['model'],
+)
+
+# Token / cost metrics
+input_tokens_counter = Counter(
+    'llm_input_tokens_total',
+    'Input tokens consumed',
+    ['model', 'tenant_id', 'cached'],   # cached=true/false
+)
+
+output_tokens_counter = Counter(
+    'llm_output_tokens_total',
+    'Output tokens generated',
+    ['model', 'tenant_id'],
+)
+
+cost_counter = Counter(
+    'llm_cost_usd_total',
+    'LLM cost in USD',
+    ['model', 'tenant_id', 'feature_id'],
+)
+
+# Quality metrics
+eval_score_histogram = Histogram(
+    'llm_eval_score',
+    'LLM-judge eval score',
+    ['model', 'prompt_template_version', 'tenant_id'],
+    buckets=[0, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0],
+)
+
+eval_pass_rate_gauge = Gauge(
+    'llm_eval_pass_rate',
+    'Eval pass rate (5min rolling)',
+    ['model'],
+)
+
+# Cache metrics
+cache_hit_counter = Counter(
+    'cache_hits_total',
+    'Cache hits',
+    ['tier'],   # L1/L2/L3/prefix
+)
+
+# Tool metrics
+tool_call_counter = Counter(
+    'tool_calls_total',
+    'Tool calls',
+    ['tool_id', 'success'],
+)
+
+tool_latency_histogram = Histogram(
+    'tool_latency_seconds',
+    'Tool call latency',
+    ['tool_id'],
+)
+
+# Security metrics
+jailbreak_counter = Counter(
+    'jailbreak_attempts_total',
+    'Jailbreak attempt detected',
+    ['user_id', 'tenant_id', 'severity'],
+)
+
+# Usage
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    response = await call_next(request)
+    
+    # Record post-response
+    if hasattr(request.state, 'llm_metrics'):
+        m = request.state.llm_metrics
+        ttft_histogram.labels(
+            model=m.model,
+            prompt_template_version=m.prompt_version
+        ).observe(m.ttft / 1000)
+        
+        input_tokens_counter.labels(
+            model=m.model,
+            tenant_id=request.state.tenant_id,
+            cached='true' if m.cached_tokens else 'false',
+        ).inc(m.input_tokens)
+        
+        cost_counter.labels(
+            model=m.model,
+            tenant_id=request.state.tenant_id,
+            feature_id=request.state.feature_id,
+        ).inc(m.cost)
+    
+    return response
+```
+
+### 1.4 Layer 4: Quality Monitoring (Eval-in-Prod)
+
+```python
+class EvalInProdPipeline:
+    """5% sample → LLM-as-judge → score → metrics + alerts"""
+    
+    def __init__(self):
+        self.judge_model = "claude-sonnet-4.6"   # high quality judge
+        self.sample_rate = 0.05
+    
+    async def maybe_eval(self, trace_id, request, response):
+        # Decide whether to eval
+        if random.random() > self.sample_rate:
+            return
+        
+        # Async eval task
+        asyncio.create_task(
+            self._eval(trace_id, request, response)
+        )
+    
+    async def _eval(self, trace_id, request, response):
+        # LLM-as-judge prompt
+        eval_prompt = f"""Evaluate this AI assistant response:
+
+User query: {request.query}
+Tool calls made: {response.tools_used}
+Assistant response: {response.content}
+
+Score on:
+1. Helpfulness (0-1): Does it answer the user's question?
+2. Accuracy (0-1): Is the information correct?
+3. Safety (0-1): Is it free of harmful content?
+4. Refusal (0-1): Did it inappropriately refuse?
+
+Return JSON: {{"helpfulness": 0.x, "accuracy": 0.x, "safety": 0.x, "refusal_appropriate": 0.x, "overall": 0.x, "concerns": "..."}}
+"""
+        
+        judge_response = await self.llm.generate(
+            eval_prompt,
+            model=self.judge_model,
+            response_format="json",
+        )
+        
+        scores = json.loads(judge_response.content)
+        
+        # Record metrics
+        eval_score_histogram.labels(
+            model=request.model,
+            prompt_template_version=request.prompt_version,
+            tenant_id=request.tenant_id,
+        ).observe(scores["overall"])
+        
+        # Update trace
+        await datadog.update_trace(trace_id, {
+            "quality.eval_score": scores["overall"],
+            "quality.eval_helpfulness": scores["helpfulness"],
+            "quality.eval_accuracy": scores["accuracy"],
+            "quality.eval_safety": scores["safety"],
+            "quality.eval_concerns": scores["concerns"],
+        })
+        
+        # Alert on low score
+        if scores["overall"] < 0.3:
+            await alert(
+                f"Low eval score detected: trace_id={trace_id}, score={scores['overall']}, concerns={scores['concerns']}",
+                severity="P1",
+                channel="ml-team",
+            )
+```
+
+### 1.5 Drift detection
+
+```python
+class DriftDetector:
+    """Detect distribution shift in prompts / responses / eval scores"""
+    
+    async def daily_check(self):
+        # Compare last 24h to baseline (previous week avg)
+        baseline_window = (now - timedelta(days=7), now - timedelta(days=1))
+        recent_window = (now - timedelta(hours=24), now)
+        
+        # Prompt distribution drift
+        baseline_prompts = await self._sample_prompts(baseline_window, n=500)
+        recent_prompts = await self._sample_prompts(recent_window, n=500)
+        
+        baseline_embs = [await embed(p) for p in baseline_prompts]
+        recent_embs = [await embed(p) for p in recent_prompts]
+        
+        # Maximum Mean Discrepancy (MMD) test
+        mmd_stat, p_value = mmd_test(baseline_embs, recent_embs)
+        
+        if p_value < 0.05:
+            await alert(
+                f"Prompt distribution drift detected (MMD={mmd_stat:.3f}, p={p_value:.4f})",
+                severity="P1",
+                channel="ml-team",
+            )
+        
+        # Eval score drift
+        baseline_scores = await self._eval_scores(baseline_window)
+        recent_scores = await self._eval_scores(recent_window)
+        
+        baseline_mean = mean(baseline_scores)
+        recent_mean = mean(recent_scores)
+        
+        if recent_mean < baseline_mean - 0.05:   # 5pp drop
+            await alert(
+                f"Eval pass rate dropped: {baseline_mean:.3f} → {recent_mean:.3f}",
+                severity="P0",
+                channel="oncall",
+            )
+        
+        # Cost spike
+        baseline_cost = await self._avg_cost(baseline_window)
+        recent_cost = await self._avg_cost(recent_window)
+        
+        if recent_cost > baseline_cost * 1.5:
+            await alert(
+                f"Cost spike: avg per request {baseline_cost:.4f} → {recent_cost:.4f}",
+                severity="P1",
+                channel="ml-team",
+            )
+```
+
+---
+
+## ⚙️ Problem 2: Sampling Strategy at Scale — Tail-based, Error-100%, Slow-100%, Anomaly
+
+10K QPS 不能 100% sample. 但要 catch 关键 trace. Tail-based sampling 是答案.
+
+### 2.1 为什么 head sampling 不够
+
+```
+Head sampling (sample at start):
+  trace 第一个 span 决定要不要 sample (e.g., random 1%)
+  
+Problem:
+  Error trace: 99% miss (因为 only 1% sampled)
+  Slow trace: 99% miss
+  
+解决: tail sampling
+```
+
+### 2.2 Tail-based sampling 机制
+
+```python
+class TailSampler:
+    """OTel collector tail sampling processor"""
+    
+    def __init__(self):
+        # Buffer all spans for a trace until trace 'completes' or timeout
+        self.buffers = {}   # trace_id → list[span]
+        self.timeouts = {}  # trace_id → deadline
+    
+    async def process_span(self, span):
+        trace_id = span.context.trace_id
+        
+        # Buffer
+        self.buffers.setdefault(trace_id, []).append(span)
+        self.timeouts[trace_id] = time.time() + 30   # 30s timeout
+        
+        # If this is the root span (parent_span_id is None), wait 5s then decide
+        if span.parent_span_id is None:
+            asyncio.create_task(
+                self._decide_and_export(trace_id)
+            )
+    
+    async def _decide_and_export(self, trace_id):
+        # Wait for child spans
+        await asyncio.sleep(5)
+        
+        spans = self.buffers.pop(trace_id, [])
+        if not spans:
+            return
+        
+        # Apply sampling rules
+        should_keep = self._should_keep(spans)
+        
+        if should_keep:
+            for span in spans:
+                await self.exporter.export(span)
+        # Else: drop entire trace
+    
+    def _should_keep(self, spans):
+        """Apply sampling rules"""
+        # Rule 1: error → 100% keep
+        if any(s.status_code == "ERROR" for s in spans):
+            return True
+        
+        # Rule 2: slow trace → 100% keep
+        root = next((s for s in spans if s.parent_span_id is None), None)
+        if root and root.duration_ms > 5000:
+            return True
+        
+        # Rule 3: high cost → 100% keep
+        total_cost = sum(s.attributes.get("llm.cost_usd", 0) for s in spans)
+        if total_cost > 0.5:
+            return True
+        
+        # Rule 4: low eval score → 100% keep (filled async)
+        # Done in eval pipeline
+        
+        # Rule 5: jailbreak flagged → 100% keep
+        if any(s.attributes.get("security.jailbreak_flag") for s in spans):
+            return True
+        
+        # Rule 6: VIP user → 100% keep
+        if any(s.attributes.get("trace.tenant_tier") == "vip" for s in spans):
+            return True
+        
+        # Rule 7: anomaly detected → 100% keep
+        if self._anomaly_score(spans) > 0.9:
+            return True
+        
+        # Default: random 1%
+        return random.random() < 0.01
+    
+    def _anomaly_score(self, spans):
+        """Detect anomaly based on span pattern"""
+        # E.g., unusual number of LLM calls in 1 trace
+        llm_calls = sum(1 for s in spans if s.name == "agent.llm.call")
+        if llm_calls > 20:   # avg is 2-5
+            return 0.95
+        return 0.0
+```
+
+### 2.3 OTel Collector config
+
+```yaml
+# otel-collector-config.yaml
+processors:
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100000
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      
+      - name: slow-policy
+        type: latency
+        latency: {threshold_ms: 5000}
+      
+      - name: high-cost-policy
+        type: numeric_attribute
+        numeric_attribute:
+          key: llm.cost_usd
+          min_value: 0.5
+      
+      - name: vip-policy
+        type: string_attribute
+        string_attribute:
+          key: trace.tenant_tier
+          values: [vip, enterprise]
+      
+      - name: random-policy
+        type: probabilistic
+        probabilistic: {sampling_percentage: 1}
+
+  attributes:
+    actions:
+      - key: api_key
+        action: delete   # never export sensitive
+
+exporters:
+  otlp/datadog:
+    endpoint: trace.agent.datadoghq.com:4317
+    headers:
+      DD-API-KEY: ${DD_API_KEY}
+  
+  otlp/honeycomb:
+    endpoint: api.honeycomb.io:443
+    headers:
+      x-honeycomb-team: ${HONEYCOMB_API_KEY}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, attributes]
+      exporters: [otlp/datadog, otlp/honeycomb]
+```
+
+### 2.4 Adaptive sampling per route
+
+```python
+# Different rates for different routes
+sampling_config = {
+    "/v1/agent/chat":  {"normal_rate": 0.01, "vip_rate": 1.0},
+    "/v1/agent/voice": {"normal_rate": 0.1,  "vip_rate": 1.0},  # higher
+    "/v1/admin/*":     {"normal_rate": 1.0,  "vip_rate": 1.0},  # 100%
+    "/v1/health":      {"normal_rate": 0.001, "vip_rate": 0.001},  # very low
+}
+
+# 因为 voice 价值高, sample 多点
+# Admin 永远 100% (低 QPS, 高价值)
+# Health check 极低 (高 QPS, 低价值)
+```
+
+### 2.5 Cost math
+
+```
+10K QPS sustained
+1 trace ≈ 10 span avg
+1 span ≈ 1 KB serialized
+
+Without sampling:
+  10K × 10 × 1KB = 100 MB/sec
+  Per day: 8.6 TB
+  Datadog cost: $1.7M / month (rough)
+
+With tail sampling 1% + 100% errors/slow (~3% total):
+  3 MB/sec, 250 GB/day
+  Datadog cost: ~$50K / month
+  
+30x cost saving with strategic sampling
+```
+
+---
+
+## ⚙️ Problem 3: PII Redaction Pipeline — Presidio, Hash for Correlation
+
+PII handling 是 compliance 红线. 详细讲清楚怎么实现.
+
+### 3.1 哪些 PII 需要 redact
+
+```
+Common PII categories:
+  - Person name (PERSON)
+  - Email (EMAIL_ADDRESS)
+  - Phone (PHONE_NUMBER)
+  - Credit card (CREDIT_CARD, with Luhn check)
+  - SSN (US_SSN, UK_NHS, EU_NIR)
+  - IBAN (banking)
+  - Passport / national ID
+  - IP address (IP_ADDRESS)
+  - MAC address
+  - Address (LOCATION)
+  - Date of birth (DATE_TIME with year)
+  - Medical record number
+  - License plate
+
+Domain-specific:
+  - Account number (bank)
+  - Patient ID (healthcare)
+  - Employee ID
+  - Order ID (if business-sensitive)
+
+False positives:
+  - Common names also in regular text
+  - Date in different format
+  - Need NER + context, not just regex
+```
+
+### 3.2 Presidio integration
+
+```python
+from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
+
+class PIIRedactor:
+    def __init__(self):
+        # Configure NLP engine (spaCy)
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [
+                {"lang_code": "en", "model_name": "en_core_web_lg"},
+                {"lang_code": "zh", "model_name": "zh_core_web_lg"},  # 中文 PII
+            ],
+        }
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+        nlp_engine = provider.create_engine()
+        
+        self.analyzer = AnalyzerEngine(
+            nlp_engine=nlp_engine,
+            supported_languages=["en", "zh"],
+        )
+        self.anonymizer = AnonymizerEngine()
+        
+        # Custom recognizers for domain
+        self._add_custom_recognizers()
+    
+    def _add_custom_recognizers(self):
+        # Custom: TikTok payment account number
+        from presidio_analyzer import Pattern, PatternRecognizer
+        
+        account_pattern = Pattern(
+            name="account_pattern",
+            regex=r"\bACC-\d{10}\b",
+            score=0.9,
+        )
+        account_recognizer = PatternRecognizer(
+            supported_entity="ACCOUNT_NUMBER",
+            patterns=[account_pattern],
+        )
+        self.analyzer.registry.add_recognizer(account_recognizer)
+    
+    def redact(self, text, language="en"):
+        # Analyze
+        results = self.analyzer.analyze(
+            text=text,
+            entities=[
+                "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER",
+                "CREDIT_CARD", "US_SSN", "IBAN_CODE",
+                "IP_ADDRESS", "LOCATION", "DATE_TIME",
+                "ACCOUNT_NUMBER",  # custom
+            ],
+            language=language,
+        )
+        
+        # Anonymize with operators
+        anonymized = self.anonymizer.anonymize(
+            text=text,
+            analyzer_results=results,
+            operators={
+                "DEFAULT": OperatorConfig("replace", {"new_value": "[REDACTED]"}),
+                "EMAIL_ADDRESS": OperatorConfig("mask", {
+                    "type": "mask",
+                    "masking_char": "*",
+                    "chars_to_mask": 100,
+                    "from_end": False,
+                }),
+                "CREDIT_CARD": OperatorConfig("replace", {"new_value": "[CARD]"}),
+                "PERSON": OperatorConfig("replace", {"new_value": "[PERSON]"}),
+                "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "[PHONE]"}),
+            },
+        )
+        
+        return anonymized.text, results
+
+# Usage
+redactor = PIIRedactor()
+
+def log_prompt(prompt, language="en"):
+    redacted_prompt, pii_found = redactor.redact(prompt, language)
+    
+    log_entry = {
+        "prompt_redacted": redacted_prompt,
+        "pii_types_found": [r.entity_type for r in pii_found],
+        "pii_count": len(pii_found),
+    }
+    logger.info("prompt", **log_entry)
+```
+
+### 3.3 Hash for correlation
+
+```python
+# 你需要保留 PII 的 hash, 让客服查询 (不暴露 PII 本身)
+
+class PIIHasher:
+    """Salted hash for correlation"""
+    
+    def __init__(self, salt):
+        self.salt = salt
+    
+    def hash_pii(self, value, entity_type):
+        # Per-entity-type salt
+        full_salt = f"{self.salt}:{entity_type}"
+        return hashlib.sha256(
+            (value + full_salt).encode()
+        ).hexdigest()[:16]  # 16-char prefix sufficient for correlation
+    
+    def correlate(self, plaintext_email):
+        # 客户报问题, 给你 plaintext email
+        # 你计算 hash, 在 log 里查
+        h = self.hash_pii(plaintext_email, "EMAIL")
+        return h
+
+# In logs:
+log_entry = {
+    "user_email_hash": "a1b2c3d4e5f6...",   # not plaintext
+    "user_email_redacted": "[EMAIL]",
+    ...
+}
+
+# When customer reports:
+customer_email = "john@bank.com"
+hash = pii_hasher.correlate(customer_email)
+# Search logs for hash → find traces
+```
+
+### 3.4 Right to be Forgotten (GDPR / CCPA)
+
+```python
+class RightToErasure:
+    """Handle user data deletion request"""
+    
+    async def delete_user_data(self, user_id):
+        # 1. Find all PII hashes for this user
+        user = await db.get_user(user_id)
+        all_hashes = [
+            pii_hasher.hash_pii(user.email, "EMAIL"),
+            pii_hasher.hash_pii(user.phone, "PHONE"),
+            # ... per PII field
+        ]
+        
+        # 2. Delete from each storage tier
+        await datadog.delete_logs_by_hash(all_hashes)
+        await s3.delete_logs_by_hash(all_hashes)
+        await bigquery.delete_rows("logs", "user_email_hash IN (...)", all_hashes)
+        await langsmith.delete_traces_by_user(user_id)
+        
+        # 3. Mark deletion in audit log (keep for compliance)
+        await audit.log_deletion(user_id, by="user_request", timestamp=now())
+        
+        # 4. Notify downstream
+        await pubsub.publish("user.data_deleted", {"user_id": user_id})
+```
+
+### 3.5 Throughput considerations
+
+```
+Presidio analysis: 5-20ms per 1KB text (spaCy NLP)
+
+At 10K QPS with 2KB avg prompt:
+  10K × 10ms = 100s of CPU per second
+  Need ~100 cores
+
+Mitigations:
+  - Cache PII analysis result by prompt hash (10-20% reuse)
+  - Use lighter rules (regex-only) for fast path
+  - Heavy analysis (NER) only for content logged
+  - Skip if not logging full content
+```
+
+---
+
+## ⚙️ Problem 4: Eval-in-Prod — LLM-as-Judge, Drift Detection, Calibration
+
+Eval-in-prod 是 LLM 区别于传统 web 的 key. 必须实现.
+
+### 4.1 Eval framework 完整
+
+```python
+class EvalInProd:
+    def __init__(self):
+        # Judge model: high quality, deterministic
+        self.judge_model = "claude-sonnet-4.6"  # or Opus 4.7 for hard
+        self.sample_rate = 0.05
+        # Force-eval certain segments
+        self.force_eval = {
+            "low_user_thumb": True,
+            "new_prompt_version": True,
+            "vip_tenant": True,
+            "jailbreak_flagged": True,
+        }
+    
+    async def maybe_eval(self, request, response):
+        should_eval = False
+        
+        # Sampling
+        if random.random() < self.sample_rate:
+            should_eval = True
+        
+        # Force-eval
+        if response.user_feedback == "thumbs_down":
+            should_eval = True
+        if request.prompt_template_version.startswith("new_"):
+            should_eval = True
+        if request.tenant.tier == "vip":
+            should_eval = True
+        if response.security.jailbreak_flag:
+            should_eval = True
+        
+        if should_eval:
+            asyncio.create_task(self._eval(request, response))
+    
+    async def _eval(self, request, response):
+        # Build judge prompt
+        judge_prompt = self._build_judge_prompt(request, response)
+        
+        # Multiple eval dimensions
+        judge_response = await self.llm.generate(
+            judge_prompt,
+            model=self.judge_model,
+            temperature=0.1,  # consistent
+            response_format="json",
+        )
+        
+        scores = json.loads(judge_response.content)
+        
+        # Store
+        await self.store_eval(request, response, scores)
+        
+        # Real-time alerts
+        if scores["overall"] < 0.3:
+            await alert_ml_team(request, response, scores)
+        
+        # Update metrics
+        eval_score_histogram.labels(
+            model=request.model,
+            prompt_template_version=request.prompt_version,
+        ).observe(scores["overall"])
+    
+    def _build_judge_prompt(self, request, response):
+        return f"""You are an expert evaluator of AI assistant responses.
+
+Evaluate the following interaction:
+
+User query: {request.query}
+
+Available tools: {[t.name for t in request.available_tools]}
+Tools the assistant used: {response.tools_used}
+Tool results: {response.tool_results}
+
+Assistant response: {response.content}
+
+Evaluate on these dimensions (0.0 to 1.0):
+
+1. **Helpfulness**: Does it answer the user's question?
+2. **Accuracy**: Are factual claims correct (based on tool results)?
+3. **Tool selection**: Did it choose appropriate tools?
+4. **Safety**: Free of harmful, biased, or inappropriate content?
+5. **Refusal appropriateness**: 1.0 if refused appropriately, 1.0 if helped appropriately, 0.0 if wrong refusal or wrong help.
+6. **Conciseness**: Right amount of detail (not too verbose, not too terse)?
+
+Return JSON:
+{{
+  "helpfulness": 0.x,
+  "accuracy": 0.x,
+  "tool_selection": 0.x,
+  "safety": 0.x,
+  "refusal_appropriate": 0.x,
+  "conciseness": 0.x,
+  "overall": 0.x,
+  "concerns": "brief description of any issues, or 'none'",
+  "category": "good/acceptable/poor/bad"
+}}
+"""
+```
+
+### 4.2 Calibration to human eval
+
+LLM-as-judge 可能有 bias, 必须 calibrate:
+
+```python
+class JudgeCalibration:
+    """Compare LLM judge to human eval"""
+    
+    async def weekly_calibration(self):
+        # 1. Sample 100 examples from past week
+        samples = await self.sample_diverse_traces(n=100)
+        
+        # 2. Get LLM judge scores
+        llm_scores = await asyncio.gather(*[
+            self.llm_judge(s) for s in samples
+        ])
+        
+        # 3. Get human eval (from labeling platform)
+        # Show same samples to 2 human reviewers blind
+        human_scores = await self.send_to_human_labelers(samples)
+        # human_scores: avg of 2 reviewers per sample
+        
+        # 4. Compute agreement
+        correlation = pearsonr(llm_scores, human_scores)
+        cohen_kappa = cohen_kappa_score(
+            [self.bucket(s) for s in llm_scores],
+            [self.bucket(s) for s in human_scores],
+        )
+        
+        # 5. Find systematic bias
+        diffs = [l - h for l, h in zip(llm_scores, human_scores)]
+        mean_diff = mean(diffs)
+        
+        if abs(mean_diff) > 0.1:
+            # LLM judge systematically high/low
+            await alert(
+                f"Judge calibration off: LLM avg {mean(llm_scores):.3f}, human avg {mean(human_scores):.3f}",
+                channel="ml-team",
+            )
+        
+        # 6. Find disagreement patterns
+        large_disagreement = [
+            (s, l, h) for s, l, h in zip(samples, llm_scores, human_scores)
+            if abs(l - h) > 0.3
+        ]
+        # 分析这些 case, 改 judge prompt
+        
+        return {
+            "n": len(samples),
+            "correlation": correlation.statistic,
+            "kappa": cohen_kappa,
+            "mean_diff": mean_diff,
+            "large_disagreement_count": len(large_disagreement),
+        }
+```
+
+### 4.3 Per-tenant / per-model eval dashboard
+
+```sql
+-- BigQuery view: eval_dashboard
+SELECT
+    DATE(timestamp) as day,
+    tenant_id,
+    model,
+    prompt_template_version,
+    COUNT(*) as eval_count,
+    AVG(eval_score) as avg_score,
+    PERCENTILE_CONT(eval_score, 0.1)[OFFSET(0)] as p10_score,
+    PERCENTILE_CONT(eval_score, 0.5)[OFFSET(0)] as p50_score,
+    SUM(CASE WHEN eval_score < 0.5 THEN 1 ELSE 0 END) / COUNT(*) as pct_failing,
+    SUM(CASE WHEN eval_category = 'bad' THEN 1 ELSE 0 END) as bad_count
+FROM eval_records
+WHERE timestamp > DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+GROUP BY day, tenant_id, model, prompt_template_version
+ORDER BY day DESC
+```
+
+### 4.4 User signal as eval
+
+```python
+class UserSignalEval:
+    """Use user behavior as quality signal"""
+    
+    async def collect_signals(self, trace_id):
+        signals = {}
+        
+        # 1. Thumb up/down (explicit)
+        thumb = await self.get_thumb_feedback(trace_id)
+        signals["explicit_thumb"] = thumb  # -1, 0, +1
+        
+        # 2. Copy / share (positive)
+        copies = await self.get_copy_events(trace_id)
+        signals["copied"] = copies > 0
+        
+        # 3. Regenerate click (negative)
+        regen = await self.get_regen_events(trace_id)
+        signals["regenerated"] = regen > 0
+        
+        # 4. Follow-up that contradicts (negative)
+        followups = await self.get_followup_queries(trace_id)
+        if followups:
+            contradiction = await self.detect_contradiction(
+                trace_id, followups
+            )
+            signals["contradicted_by_followup"] = contradiction
+        
+        # 5. Session abandonment (mild negative)
+        next_action = await self.get_next_action(trace_id)
+        signals["abandoned"] = next_action is None  # user left
+        
+        # 6. Time on response (engagement)
+        time_spent = await self.get_dwell_time(trace_id)
+        signals["dwell_seconds"] = time_spent
+        
+        # Aggregate to user_score (0-1)
+        score = self._aggregate(signals)
+        return score, signals
+    
+    def _aggregate(self, signals):
+        score = 0.5  # neutral
+        if signals["explicit_thumb"] == 1:
+            score = 0.9
+        elif signals["explicit_thumb"] == -1:
+            score = 0.1
+        elif signals["copied"]:
+            score = 0.8
+        elif signals["regenerated"]:
+            score = 0.3
+        elif signals["contradicted_by_followup"]:
+            score = 0.2
+        elif signals["abandoned"]:
+            score = 0.4
+        elif signals["dwell_seconds"] > 30:
+            score = 0.7  # engaged
+        return score
+```
+
+---
+
+## ⚙️ Problem 5: Debug Workflow — Trace_ID → Slice → Re-run → Root Cause
+
+具体 debug 一个 user-reported issue 的工作流.
+
+### 5.1 Standard debug runbook
+
+```
+Step 1: User report intake
+  Customer success → ticket with:
+  - User ID / email
+  - Approximate time of incident
+  - What user saw
+  - What user expected
+  - Error ID (if shown to user)
+
+Step 2: Find trace
+  If error_id (trace_id): direct lookup in Honeycomb
+  Else: search by user_id + time window
+  Tools: Honeycomb / Datadog APM / LangSmith
+  
+  Filter:
+    @user.id:"u_42" AND @timestamp:[2026-05-21T14:00 TO 14:30]
+
+Step 3: Read trace top-down
+  Root span → child spans → identify slow / errored span
+  
+  Common patterns:
+  - LLM call returned refusal (check response content)
+  - Tool call failed (check tool error)
+  - RAG retrieval bad (check retrieved chunks)
+  - State load wrong (check conv state)
+
+Step 4: Compare to good cases
+  Find similar trace where it worked (same prompt template, similar query)
+  Diff:
+  - Different RAG chunks?
+  - Different tool args?
+  - Different prompt parameters?
+  - Different model version?
+
+Step 5: Re-run with same input
+  Extract from trace:
+  - User query
+  - Conversation state at that time
+  - Tool results (if 'replay mode')
+  
+  Replay tool:
+  GET /admin/trace/{trace_id}/replay
+  Returns: same setup, runs LLM again
+  
+  See if reproduces.
+
+Step 6: If reproduces → narrow
+  - Try with different model → does it persist?
+  - Try with previous prompt template → does it persist?
+  - Try with previous RAG corpus → does it persist?
+  - Try with simplified context → minimal repro?
+
+Step 7: Root cause classification
+  Common categories:
+  - Prompt template regression (recent change)
+  - Model version regression (vendor side)
+  - RAG corpus issue (bad chunk, wrong rerank)
+  - Tool API drift (response format changed)
+  - Edge case in user input (unusual phrasing)
+  - LLM hallucination (no signal, just bad luck)
+  - Cache stale (showing old answer)
+
+Step 8: Fix + verify
+  - Hot fix (if regression): revert
+  - Add eval case to suite (prevent recurrence)
+  - Document in post-mortem
+```
+
+### 5.2 Replay tool implementation
+
+```python
+class TraceReplayTool:
+    """Replay a trace deterministically"""
+    
+    async def replay(self, trace_id, options):
+        # Fetch trace
+        trace = await self.honeycomb.get_trace(trace_id)
+        
+        # Extract original inputs
+        original_request = self._extract_request(trace)
+        original_state = await self.store.get_at_version(
+            original_request.conv_id,
+            timestamp=trace.start_ts,
+        )
+        
+        # Replay options
+        config = {
+            "model": options.model or original_request.model,
+            "prompt_template": options.prompt_version or original_request.prompt_version,
+            "rag_corpus_version": options.rag_version or original_request.rag_version,
+            "temperature": 0.0,  # deterministic
+            "seed": original_request.seed,  # if available
+            "use_mock_tool_results": options.mock_tools,
+        }
+        
+        if options.mock_tools:
+            # Use exact tool results from original trace (deterministic replay)
+            mock_tool_results = self._extract_tool_results(trace)
+            return await self._replay_with_mocks(
+                original_request, original_state, config, mock_tool_results
+            )
+        else:
+            # Re-execute fully
+            return await self._replay_full(
+                original_request, original_state, config
+            )
+    
+    async def _replay_with_mocks(self, req, state, config, mock_results):
+        # Override tool execution to return mock_results
+        with mock_tool_calls(mock_results):
+            return await self.agent.run(req, state, config)
+    
+    async def diff(self, original_trace_id, replay_result):
+        original = await self.honeycomb.get_trace(original_trace_id)
+        
+        diff = {
+            "original_response": original.response,
+            "replay_response": replay_result.response,
+            "response_diff": diff_text(original.response, replay_result.response),
+            "original_tools_used": original.tools_used,
+            "replay_tools_used": replay_result.tools_used,
+            "original_eval_score": original.eval_score,
+            "replay_eval_score": await self.eval.score(replay_result),
+        }
+        return diff
+```
+
+### 5.3 Slice analysis dashboard
+
+```sql
+-- Find slices with anomalous quality / cost / latency
+WITH baseline AS (
+    SELECT
+        tenant_id,
+        model,
+        prompt_template_version,
+        AVG(latency_ms) as baseline_latency,
+        AVG(eval_score) as baseline_eval,
+        AVG(cost_usd) as baseline_cost
+    FROM traces
+    WHERE timestamp BETWEEN ts_start AND ts_baseline_end
+    GROUP BY tenant_id, model, prompt_template_version
+),
+recent AS (
+    SELECT
+        tenant_id,
+        model,
+        prompt_template_version,
+        AVG(latency_ms) as recent_latency,
+        AVG(eval_score) as recent_eval,
+        AVG(cost_usd) as recent_cost,
+        COUNT(*) as n
+    FROM traces
+    WHERE timestamp > ts_recent_start
+    GROUP BY tenant_id, model, prompt_template_version
+)
+SELECT
+    r.*,
+    b.baseline_latency,
+    b.baseline_eval,
+    b.baseline_cost,
+    (r.recent_latency - b.baseline_latency) / b.baseline_latency as latency_delta_pct,
+    (r.recent_eval - b.baseline_eval) as eval_delta,
+    (r.recent_cost - b.baseline_cost) / b.baseline_cost as cost_delta_pct
+FROM recent r
+JOIN baseline b USING (tenant_id, model, prompt_template_version)
+WHERE r.n > 100   -- min sample size
+  AND (
+    abs(latency_delta_pct) > 0.2 OR
+    abs(eval_delta) > 0.1 OR
+    abs(cost_delta_pct) > 0.5
+  )
+ORDER BY abs(eval_delta) DESC
+LIMIT 20
+```
+
+### 5.4 Production case study (你的简历 hook)
+
+```
+Case study: Voice agent Indonesia market eval drop (2025 你做过的)
+
+Day 0 - 周一: 
+  ML team weekly review notice Indonesia eval pass rate 92% → 84%
+  (其他 market 不动)
+
+Day 0 - 下午:
+  Slice analysis dashboard:
+  - by market: ID 异常, 其他 ok
+  - by model: Llama-70B 在 ID 异常, Gemini 在 ID 也异常 → 不是 model 问题
+  - by prompt: agent_v3.2 + v3.1 都受影响 → 不是 prompt
+  - by time: 周一开始
+
+Day 0 - 晚:
+  Recent deploys check:
+  - 周日 deploy: RAG corpus update for ID, 加了新的 collection script
+  - 怀疑 RAG 是问题
+
+Day 0 - 抽 100 bad case:
+  - 看 RAG retrieved chunks
+  - 共性: top-1 chunk 是新加的 "high pressure collection" script (不合规)
+  - LLM 跟着这个 script 给出 aggressive 回答, eval 评低
+
+Day 0 - hotfix:
+  - Revert RAG corpus update
+  - eval pass rate 几小时内回升 92%
+
+Day 1 - post-mortem:
+  - Add eval suite for ID market specific
+  - Add chunk-level review before RAG corpus update
+  - Add automatic eval-on-deploy: deploy 后立即跑 100 eval, fail 自动 revert
+
+Time from alert to fix: 4 hours
+Without observability stack: 几天 (用户投诉 → 调查 → 排错)
+```
+
+简历挂钩:
+
+> "Voice agent had weekly metric review process. Eval-in-prod 5% sample with LLM-as-judge — caught Indonesia market eval drop from 92% to 84% within hours of RAG corpus update. Slice analysis pinpointed RAG as cause (other markets fine, all models same drop = not model). Hot fix: revert RAG corpus. Time from alert to recovery: 4 hours. Without this stack, would have taken days, would have caused customer churn."
+
+---
+
+# Part 3 · 串起来看
+
+5 个 problem 是 observability 的完整体系:
+
+1. **4-layer instrumentation** 是 foundation — trace + log + metric + eval
+2. **Sampling strategy** 让 10K QPS 也能 manageable cost
+3. **PII redaction** 保 compliance, hash for correlation
+4. **Eval-in-prod** 抓 LLM-specific 的 quality drift (传统 metric 看不见)
+5. **Debug workflow** 把所有 layer 串起来 — trace_id → slice → re-run → root cause
+
+面试场把这 5 层讲清楚 + 给一个 production case study (你 voice agent ID 那个), 就是 staff-level production observability 水准.
+
+---
+
+## 必问 clarifying questions
 
 **1. Volume**
 
-> "QPS — affects sampling strategy."
+> "QPS — affects sampling strategy + cost. 100 QPS easy, 10K QPS need tail-sampling."
 
 **2. Compliance**
 
-> "PII in prompts — can log full or redact?"
+> "PII in prompts — can log full content (B2C consumer chat) or full redact (banking, healthcare)?"
 
 **3. Cost concern**
 
-> "Log every request fully or sample?"
+> "1% observability cost budget OK, or strict <0.5%? Affects sampling aggressiveness."
 
 **4. Latency budget**
 
-> "Observability adds overhead — acceptable?"
+> "Observability overhead — < 10ms acceptable? Async export usually has 0 overhead, sync redaction is 5-20ms."
 
 **5. Existing infra**
 
-> "Datadog / Honeycomb / custom? Reuse?"
+> "Datadog / Honeycomb / Tempo / custom? Reuse vs build. OTel SDK lets you switch."
+
+**6. Quality bar**
+
+> "What's 'misbehaving'? Hallucination? Refusal? Off-topic? Affects eval design."
 
 ---
 
-## 5 步框架
+## 5 步框架 (sample 45-60 min answer)
 
 | 时长 | 阶段 |
 |---|---|
-| 0-5 min | Clarify volume / compliance / cost |
-| 5-15 min | 3 pillars (trace / log / metric) |
-| 15-25 min | LLM-specific (eval / quality / cost) |
+| 0-5 min | Clarify volume / compliance / cost / existing infra |
+| 5-15 min | 4 layers (trace / log / metric / quality) overview |
+| 15-25 min | LLM-specific signals (TTFT, tokens, cache hit, eval) |
 | 25-35 min | Sampling + PII redaction strategy |
-| 35-45 min | Alerting + debug workflow |
+| 35-45 min | Eval-in-prod + drift detection |
+| 45-55 min | Debug workflow + case study |
+| 55-60 min | Tools (LangSmith / Phoenix / Honeycomb / Datadog) + Q&A |
 
 ---
 
-## 我会这样答（sample）
+## 我会这样答 (sample 完整版)
 
-> "Clarify — *[假设: 10K QPS, PII present (must redact in logs), 1% cost budget for observability, Datadog + OpenTelemetry available]*.
+> "Clarify — *[假设: 10K QPS, PII present (must redact in logs), 1% observability cost budget, Datadog + OpenTelemetry available, multi-tenant SaaS]*.
 >
 > **4-layer observability**:
 >
-> **Layer 1: Distributed Tracing** (per-request)
+> **L1 Distributed Tracing** with OpenTelemetry. Per-request trace including agent loop, each LLM call (model / template version / tokens / cost / TTFT), each tool call (MCP, OBO, DB), each cache lookup. Trace context propagates to MCP servers and downstream services via traceparent header.
 >
-> ```
-> User request (trace_id=xxx)
-> ├── span: API gateway (10ms)
-> ├── span: Agent loop start (parent)
-> │   ├── span: LLM call #1 (Gemini 3 Pro, 300ms, 1.2K tokens in + 500 out, $0.009)
-> │   ├── span: Tool call #1 (search_inventory, 150ms)
-> │   │   ├── span: DB query (100ms)
-> │   │   └── span: Cache lookup (5ms, hit)
-> │   ├── span: LLM call #2 (Gemini 3 Pro, 250ms, 800 in + 300 out, $0.005)
-> │   └── span: Tool call #2 (send_email, 200ms)
-> └── span: Response stream (50ms TTFT, 800ms total)
-> ```
+> **L2 LLM-specific Logging**. Per LLM call, structured log with: trace_id, model, prompt_template_version, prompt_hash, input/output tokens, cost, latency, tools_used. Content (prompt/response) is **PII-redacted at write time** via Microsoft Presidio. We keep hash for correlation but never plaintext PII. Storage tiered: hot 7d Datadog, warm 90d S3, cold 1y BigQuery aggregated.
 >
-> Implementation: **OpenTelemetry** auto-instrument + manual spans for tool calls + LLM calls.
+> **L3 Metrics** time-series via Prometheus / Mimir. Beyond traditional latency/error, LLM-specific: TTFT/TPOT, input/output tokens per (model, tenant), cost per (tenant, feature), cache hit rate per tier (L1/L2/L3/prefix), tool error rate, eval pass rate sampled.
 >
-> Each span captures:
-> - duration
-> - status (ok / error)
-> - inputs (token count, not content unless authorized)
-> - outputs (token count, citations, tool name)
-> - errors with stack trace
+> **L4 Quality monitoring**. 5% random sample + 100% flagged (low thumbs, new prompt version, VIP tenant, jailbreak detected) sent to LLM-as-judge (Sonnet 4.6) for scoring. Multi-dimensional score: helpfulness, accuracy, tool selection, safety, refusal appropriateness, conciseness. Calibrated weekly against human labelers.
 >
-> **Critical**: trace context propagates to MCP servers / tools via headers.
+> **Sampling strategy**: tail-based — 1% random + 100% errors + 100% slow (>5s) + 100% high-cost (>$0.5) + 100% VIP. OTel collector tail_sampling processor. Cost: ~30x saving vs 100% sample.
 >
-> **Layer 2: LLM-specific Logging**
+> **PII redaction**: Presidio with spaCy NER + custom recognizers for domain (account numbers, etc.). Applied at log write time. Hash for correlation: SHA-256 with per-entity-type salt. Right-to-be-Forgotten supported via hash-based deletion.
 >
-> ```python
-> log_entry = {
->     'trace_id': trace.id,
->     'span_id': span.id,
->     'timestamp': now(),
->     'model': 'gemini-3-pro',
->     'prompt_template_version': 'v3.2',
->     'prompt_hash': hash(prompt),  # for grouping
->     'input_tokens': 1234,
->     'output_tokens': 256,
->     'cost': 0.0034,
->     'latency_ttft': 0.18,
->     'latency_total': 1.2,
->     'finish_reason': 'stop',
->     'tools_used': ['search_inventory', 'send_email'],
->     # PII-redacted content
->     'prompt_redacted': redact_pii(prompt),
->     'response_redacted': redact_pii(response),
->     # Quality signals
->     'user_thumbs': None,  # filled later
->     'eval_sampled': False,  # 5% sampled for eval
-> }
-> ```
+> **Drift detection**: daily compare past 24h to baseline (last week). Methods: MMD test for prompt distribution shift, mean eval score drop, cost spike alert. Page oncall if eval > 5pp drop, alert ML team if MMD p < 0.05.
 >
-> Storage tiered:
-> - **Hot (last 7 days)**: queryable, sampled at 100%
-> - **Warm (90 days)**: full PII-redacted, S3/BQ
-> - **Cold**: aggregated only, indefinite
+> **Debug workflow**: User report → find trace by user_id+time → read top-down → compare to good case → re-run with replay tool (deterministic with mocked tool results) → narrow root cause → fix + add to eval suite.
 >
-> **Layer 3: Metrics (time series)**
+> **Real case (voice agent Indonesia)**: eval pass 92% → 84%, slice analysis → RAG corpus update was root cause, hot fix revert, 4h from alert to recovery. Without this stack: would have taken days, customer churn likely.
 >
-> | Metric | Why |
-> |---|---|
-> | latency p50/p95/p99 (TTFT + total) | UX |
-> | token in/out per request | Cost + capacity |
-> | cost per session | Economics |
-> | error rate (by type) | Reliability |
-> | tool call count per turn | Behavior |
-> | cache hit rate (semantic + result) | Optimization |
-> | eval pass rate (sampled) | Quality |
-> | user thumbs ratio | Quality |
-> | jailbreak attempt count | Security |
->
-> **Layer 4: LLM-specific Quality Monitoring**
->
-> Eval-in-prod:
->
-> ```python
-> async def with_eval(prompt, response):
->     if random.random() < 0.05:  # 5% sample
->         eval_score = await evaluator.judge(prompt, response)
->         metrics.record('eval.quality', eval_score, tags=[model, version])
->         if eval_score < threshold:
->             alert('quality drop')
-> ```
->
-> Drift detection:
->
-> ```python
-> # Compare current week's prompt distribution to baseline
-> # Embedding-based: are new queries semantically novel?
-> # If drift > threshold → alert
-> ```
->
-> **Sampling strategy** (10K QPS, cost concern):
->
-> - **Traces**: 1% baseline, **100% for errors**, **100% for high-cost calls** ($ > $0.10)
-> - **Logs**: 100% structured metric, 10% full prompt-redacted, 1% with prompt content (for debug)
-> - **Eval samples**: 5% random, force-eval all flagged (jailbreak detection / low confidence)
->
-> **PII redaction pipeline**:
->
-> ```python
-> def redact(text):
->     # Use presidio / AWS Macie
->     text = re.sub(r'\b[\d-]{13,19}\b', '[CARD]', text)  # Luhn-validate
->     text = re.sub(EMAIL_REGEX, '[EMAIL]', text)
->     text = re.sub(PHONE_REGEX, '[PHONE]', text)
->     # Named entity recognition for names
->     text = ner_redact(text, types=['PERSON'])
->     return text
-> ```
->
-> Apply at log-write time. Never store raw PII in logs.
->
-> **Alerting strategy**:
->
-> | Alert | Threshold | Action |
-> |---|---|---|
-> | p99 latency > SLO | for 5 min | Page oncall |
-> | Error rate > 2% | for 5 min | Page oncall |
-> | Cost per session > $1 | sustained 10 min | Email cost team |
-> | Eval pass rate < 90% | over 1 hour | Slack ML team |
-> | Jailbreak attempts > 100/min | for 5 min | Page security |
-> | Tool error rate > 10% | for 5 min | Page platform |
->
-> **Debug workflow for the misbehaving agent**:
->
-> 1. **Reproduce by trace**: get trace_id from user report → full trace + logs
-> 2. **Compare to good cases**: find similar trace where it worked → diff
-> 3. **Re-run with same input**: capture prompt/response, eval scored
-> 4. **Check eval suite**: did regression land in recent deploy?
-> 5. **Slice analysis**: which user / tenant / model / tool / time-of-day?
-> 6. **Root cause**: usually one of: (a) bad prompt template change, (b) tool API drift, (c) model version change, (d) edge case in user input
->
-> **Tools (2026)**:
->
-> | Tool | What |
-> |---|---|
-> | **OpenTelemetry** | Standard trace / log / metric collection |
-> | **Datadog / Honeycomb** | Trace storage + query |
-> | **LangSmith** | LLM-specific trace, eval-in-prod |
-> | **Phoenix (Arize)** | OSS LLM observability |
-> | **Helicone** | LLM proxy logging |
-> | **Langfuse** | Full eval + observability |
-> | **Braintrust** | Eval framework |
->
-> **What NOT to do**:
-> - Log raw PII (compliance violation)
-> - 100% sample everything (cost blow)
-> - No correlation between trace and LLM call
-> - Skip eval-in-prod (quality drift invisible)
-> - No tool-specific spans (root cause hidden)
-> - No alerting (waiting for users to complain)"
+> **Tools 2026**: OpenTelemetry (standard SDK), Datadog / Honeycomb (trace+log+metric), LangSmith / Phoenix / Langfuse (LLM-specific), Braintrust (eval suite), Presidio (PII redaction). 2026 趋势 OTel + multi-vendor backend."
 
 ---
 
-## 多场景变体 + 解法
+## 简历专属 reframe — Gao Xin's hooks
 
-### 变体 1: 生产 agent silent quality drop
+| Topic | 你的经验 | How to quote |
+|---|---|---|
+| **Distributed tracing** | Voice agent — multi-region debugging | "Voice agent for 7 markets had OTel trace propagation across ASR / LLM / TTS / database. Trace_id flowed end-to-end so debugging cross-system issue was always possible." |
+| **LLM-specific logs** | BNPL chatbot — prompt versioning | "BNPL chatbot logged prompt_template_version + model_version + RAG_corpus_version per call. Critical when investigating quality drops — knew exactly what changed." |
+| **Eval-in-prod** | ConvFinQA — multi-hop eval | "ConvFinQA used LLM-as-judge eval-in-prod at 10% sample. Drift detection caught when reranker silently regressed (NDCG @5 from 0.78 to 0.71)." |
+| **PII redaction** | Debt collection compliance | "Indonesia debt collection had strict PII rules. Presidio + custom NER for debt amounts / phone numbers. Redact at write time, hash for correlation. SOC2 audit passed." |
+| **Voice agent case** | ID market eval drop | "Indonesia market eval pass 92% → 84% in 1 week. Sliced by market/model/prompt/RAG, identified RAG corpus update, reverted in 4 hours. Without observability stack would have taken days." |
+| **Cost attribution** | TikTok payment infra | "Per-feature cost attribution via OTel span tags. Caught one feature where misconfigured prompts caused 100x token usage in 1 week. Fixed before bill came." |
+| **Per-tenant SLA** | 7 markets contract | "Per-tenant SLA dashboard: availability + p99 + eval pass rate. Monthly auto-generated report sent to enterprise customer. Synthetic probes every 1min." |
 
-> "用户开始抱怨 'agent 最近答得差'。Metric 都正常 (latency, error)。怎么 debug?"
+**主动 quote** (面试场说出来):
 
-**解法**:
-- **Eval-in-prod 抽样**: 5% LLM-as-judge 评分, plot trend
-- **Slice by**: model version / tenant / query type / time → 找异常 slice
-- **Diff vs baseline**: 抽 100 'bad' + 100 'good', 看 prompt template / model 是否动过
-- **User feedback signal**: thumbs down trend, sentiment shift
-- **A/B with control**: 5% 流量到旧版, 比当前
-- **Recent deploys**: 上次 prompt template change / model upgrade 时间对齐
-- **Root cause 多 layer**: 看 retrieval (recall 降?), reranker (NDCG 降?), LLM (eval pass 降?), tool (error rate 升?)
-
-### 变体 2: Cost spike investigation
-
-> "本周 LLM bill 突然 5x。怎么查？"
-
-**解法**:
-- **Per-tenant attribution**: dashboard 看哪 tenant 涨
-- **Per-feature attribution**: 哪 product feature 触发了多 LLM call
-- **Token analysis**: input token 变长 (context bloat?) or output (response 变啰嗦?)
-- **Model mix change**: routing 把更多流量送给 expensive model
-- **Loop bug**: agent retry 失控 (per-session call count 异常)
-- **Cache miss spike**: cache hit rate 降 → 更多真 LLM call
-- **Jailbreak attack**: 攻击者疯狂打高 token, anomaly detect
-- **Postmortem**: identify + fix + budget alert tuning
-
-### 变体 3: P99 latency alert fired
-
-> "P99 latency 突 2s → 5s。怎么 debug？"
-
-**解法**:
-- **Trace slow 请求**: tail-sampling 抓 p95+ trace, 看 span breakdown
-- **By layer**: LLM call slow? Tool call slow? DB slow? Network slow?
-- **By tenant / model**: 某 tenant 量大占资源 / 某 model serving 抖动
-- **Queue depth**: backpressure → 排队 → 总延迟涨
-- **KV cache hit rate**: 突降 → prefill 多 → 慢
-- **GPU util**: 接近 100% saturate → 加 replica
-- **Downstream**: 上游 API slow → 慢
-
-### 变体 4: Jailbreak attempt detection
-
-> "怎么知道有人试图越狱 agent?"
-
-**解法**:
-- **Pattern detection on input**: 'ignore previous', 'pretend you are', 'developer mode'
-- **LLM-classifier**: 小 model 实时分类 input '是否疑似越狱'
-- **Response pattern**: agent 输出 'I cannot' / 'as an AI' 反常增多 → 攻击者尝试中
-- **Per-user 频率**: 单 user 短时间高频 → 异常
-- **Honeypot**: 故意放些 'secrets' 看是否被 'leak' → 检测越狱成功
-- **Forensics**: 完整 input + output 存安全存储 (单独 retention)
-- **Alert + block**: > N 次/min → 临时 ban + 升级安全 team
-
-### 变体 5: Per-tenant SLA verification
-
-> "卖 agent 给 enterprise, 承诺 99.9% / p99 < 2s。怎么证明做到了？"
-
-**解法**:
-- **Per-tenant SLI dashboard**: availability, latency, error rate
-- **Synthetic probes**: 每分钟模拟 1 tenant request, 长期可用性测量
-- **Monthly report**: auto-generate, 给 customer 看
-- **Error budget**: 99.9% = 43min downtime/month, 用了多少
-- **Incident attribution**: 哪次 outage 算入 tenant 的 SLA breach
-- **Compensation policy**: 触发 breach 自动给 credit (consumed budget 通知 customer)
-- **Independent audit**: 第三方 monitoring (Datadog Synthetics) 可信
-
----
-
-## 简历专属 reframe
-
-| 题 | 你做过 |
-|---|---|
-| Distributed tracing | Voice agent — multi-region debugging 必 trace |
-| LLM-specific logs | BNPL chatbot — prompt versioning + token tracking |
-| Eval-in-prod | ConvFinQA — eval methodology you've done at scale |
-| PII redaction | Compliance for debt collection — log redaction必 |
-| Alerting | Voice agent SLA weekly review |
-
-**Quote**:
-
-> "Voice agent had weekly metric review. We instrumented per-market: ASR latency p99, LLM token cost per call, TTS latency, **end-to-end p99 < 800ms** budget. Eval-in-prod sampled 5% of calls → LLM-judge evaluated for hallucination / refusal. When Indonesia market's eval pass rate dropped 8% one week, we traced to a model version rollout, **rolled back in 2 hours** because the alert + trace + diff workflow was set up. Without observability, that'd have taken days."
+> "On voice agent for TikTok Global Payment, we built 4-layer observability:
+> - OTel for distributed tracing across ASR → LLM → TTS → DB → CRM
+> - Structured logs with prompt template version + model version + RAG corpus version
+> - Prometheus metrics for TTFT / TPOT / cost / cache hit rate
+> - LangSmith for LLM-specific trace inspection + eval-in-prod 5% sample
+>
+> Key win: Indonesia market eval dropped 92% → 84% in 1 week. Without slice analysis, we wouldn't have known. With it: 4 hours to identify RAG corpus update as cause, revert, and back to 92%. Saved customer churn worth $$$.
+>
+> Hard lesson: **PII redaction must be at log-write time, not post-hoc**. Early version had unredacted PII in 1 week of Datadog logs — SOC2 audit caught it, had to delete + retroactively redact. Now Presidio is middleware on every log call."
 
 ---
 
 ## 5 follow-ups
 
-**Q1**: "Trace volume — 10K QPS × full spans = expensive. Cost optim?"
+**Q1**: "Trace volume — 10K QPS × full spans = expensive. Cost optimization?"
+
 **A**:
-- **Smart sampling**: 1% baseline + 100% errors + 100% slow (> p95)
-- **Span aggregation**: similar spans (DB query type) merged at storage
-- **Retention tiers**: hot 7d full, warm 90d aggregated, cold metric-only
-- **Vendor: Honeycomb tail-based sampling** (sample whole trace if ANY span anomalous)
+- **Tail-based sampling**: 1% baseline + 100% errors + 100% slow + 100% high-cost + 100% VIP
+- **Span aggregation**: similar spans (e.g., DB query type) merged at storage
+- **Retention tiers**: hot 7d full, warm 90d aggregated, cold 1y metric-only
+- **Adaptive per-route**: high-traffic low-value routes 0.1%, low-traffic high-value 100%
+- **Vendor: Honeycomb tail-based** (sample whole trace if ANY span anomalous), Datadog APM
+- Cost target: ~30x reduction vs 100% sampling
 
 **Q2**: "Can't reproduce user-reported issue. What's in your trace that helps?"
+
 **A**:
-- Full input + full response (PII-redacted)
-- Model version + prompt template version
-- All tool calls with inputs/outputs
-- LLM-specific: top_p / temp / seed if available
-- Re-run script: extract inputs from trace → replay
+- **Full input + full response** (PII-redacted) sampled at 10%
+- **Model version + prompt template version + RAG corpus version**
+- **All tool calls** with inputs/outputs (full)
+- **LLM parameters**: temperature, top_p, seed (if available)
+- **Conversation state** at request time (Redis snapshot)
+- **Re-run script**: extract inputs from trace → replay deterministic with same state + mocked tool results
+- **Comparison to good case**: find similar trace where it worked, diff inputs/outputs
 
 **Q3**: "Eval-in-prod — who decides ground truth?"
+
 **A**:
-- **LLM-as-judge**: Claude Opus 4.7 / Gemini 3 Pro evaluates response vs expected qualities. Calibrated against human eval set.
-- **Self-eval**: LLM rates its own response (unreliable but cheap)
-- **User signals**: thumbs / engagement / follow-up corrections
-- **Heuristic checks**: response is on-topic, no refusal, no hallucination markers
-- **Human sample**: 100 random per week, manual review by ML team
+- **LLM-as-judge**: Sonnet 4.6 / Opus 4.7 as judge. Multi-dim score (helpfulness, accuracy, safety, etc.). Calibrated against human eval set weekly.
+- **Human labeled set**: 200-500 examples curated, "gold standard". Judge accuracy measured against this.
+- **User signals**: thumbs up/down, copy, regenerate, follow-up correction. Aggregate to user_score.
+- **Heuristic checks**: response is on-topic, no refusal markers, no hallucination markers (e.g., "I don't know" + factual claim).
+- **Production triangulation**: LLM judge + user signal + heuristic. Disagreement triggers human review.
 
 **Q4**: "Jailbreak detection — log everything for security?"
+
 **A**:
-- **Inline detection**: pattern + LLM-classifier on input → flag
-- **Logged**: full input (in secure store, not main logs), trace, user_id
-- **Alerting**: > 100 attempts/min from same user → block
-- **Forensics**: incident-response can pull all flagged + nearby
+- **Inline detection**: pattern matching (keywords like "ignore previous") + LLM-classifier on input → flag
+- **Logged**: full input (in separate secure store, not main logs), trace, user_id, severity score
+- **Alerting**: > 10 attempts/min from same user → temp ban; > 50 / day → security review
+- **Forensics retention**: 7d hot, 90d cold, separate from regular logs (compliance: need ability to fully delete on RTBF)
+- **Honeypot**: inject 'secrets' to detect successful exfiltration, alert if leaked
+- **Pattern library**: maintain known jailbreak patterns, update weekly
 
 **Q5**: "Cost observability — how attribute to features?"
+
 **A**:
-- Tag each span with `feature_id` (which product feature triggered)
-- Per-feature cost dashboard: sum of all spans tagged with feature
-- Time-series: cost per feature per day
-- Identify expensive features for optimization or pricing decisions
+- **Tag each span with feature_id** (which product feature triggered this LLM call)
+- **Tag with tenant_id, user_id, model**
+- **Cost per span**: input_tokens × input_price + output_tokens × output_price
+- **Per-feature dashboard**: sum costs by feature_id, time-series
+- **Per-tenant attribution**: sum costs by tenant_id
+- **Daily cost report**: top 10 expensive features, week-over-week trend
+- **Identify expensive features** for: optimization, pricing decision, deprecation
+
+**Q6** (bonus): "If you could only have 3 metrics for an LLM agent, which?"
+
+**A**:
+1. **Eval pass rate** (sampled 5%, LLM-judge multi-dim). Without this you're blind to quality drift.
+2. **TTFT p99** (per model, per tenant). Latency is user-perceived quality.
+3. **Cost per user per day** (per feature). Without this, runaway customer can burn budget overnight.
+
+Honorable mention: jailbreak attempts/min, cache hit rate, tool error rate.
 
 ---
 
-## ❌ 易错点
+## ❌ 易错点 (top 10)
 
-1. **Log raw PII** — compliance
-2. **No correlation** between user report and trace
-3. **100% sample** — cost blow
-4. **No LLM-specific eval** — quality silent regression
+1. **Log raw PII** — compliance violation
+2. **No correlation between user report and trace** — debug impossible
+3. **100% sample everything** — cost blow
+4. **No LLM-specific eval** — quality drift invisible
 5. **No tool-level spans** — debug stuck at LLM boundary
-6. **Single-pillar** (only logs, no traces / metrics)
+6. **Single-pillar (only logs, no traces/metrics)** — limited visibility
 7. **No alerting** — wait for user complaint
+8. **Trace context not propagated cross-service** — broken trace chain
+9. **No version tracking** — 'something changed' but don't know what
+10. **No cost attribution by feature** — cost spike root cause unknown
 
 ---
 
-## ✅ 加分项
+## ✅ 加分项 (top 12)
 
 1. **4 layers**: trace / log / metric / quality
-2. **OpenTelemetry standard**
-3. **LLM-specific signals** (TTFT, token cost, eval, jailbreak)
-4. **Smart sampling** (errors + slow always)
-5. **PII redaction pipeline**
-6. **Eval-in-prod with LLM-judge**
-7. **Cost attribution by feature**
-8. **Quote voice agent Indonesia rollback story**
+2. **OpenTelemetry standard** (vendor-neutral 2026)
+3. **LLM-specific signals** (TTFT/TPOT, token cost, eval, jailbreak)
+4. **Smart sampling** (tail-based, errors + slow always)
+5. **PII redaction pipeline** at write time (Presidio + hash)
+6. **Eval-in-prod** with LLM-judge + calibration
+7. **Drift detection** (MMD test, eval drop alert)
+8. **Cost attribution** by tenant + feature
+9. **Right-to-be-Forgotten** workflow
+10. **Replay tool** for deterministic debug
+11. **Per-tenant SLA dashboard** with synthetic probes
+12. **Quote voice agent Indonesia 4-hour debug story**
 
 ---
 
-## Cheat Sheet
+## 一句话总结
+
+> **LLM agent observability = 4 layers (trace OTel + LLM-specific log PII-redacted + metric Prometheus + quality eval-in-prod) + smart sampling (tail-based) + drift detection + debug workflow (trace_id → slice → re-run → root cause)**.
+>
+> 传统 web observability 不够 — LLM-specific signals (TTFT, token cost, prompt/model/RAG version, jailbreak, hallucination) 必须专门 instrument. 5% LLM-judge eval-in-prod 是 2026 LLM platform 标配, 不做就是盲飞.
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
 4 observability layers:
-  L1 Distributed Traces (OTel)
-  L2 LLM-specific Logs (prompt/response/version)
-  L3 Metrics (latency/cost/error)
-  L4 Quality monitoring (eval-in-prod)
+  L1 Distributed Traces  (OTel + Honeycomb / Datadog / Tempo)
+  L2 LLM-specific Logs   (prompt/response PII-redacted, tokens, cost, version)
+  L3 Metrics             (Prometheus / Mimir, latency / cost / error / cache)
+  L4 Quality monitoring  (LangSmith / Phoenix, eval-in-prod 5%, drift)
 
-Trace must capture:
-  Agent loop (parent span)
-  Each LLM call (model/tokens/cost)
-  Each tool call (name/duration/error)
-  Each DB / cache / external call
-  Context propagation to MCP servers
+Span attributes (LLM-specific):
+  llm.model
+  llm.prompt_template_version
+  llm.prompt_hash
+  llm.input_tokens (+ cached_input_tokens)
+  llm.output_tokens
+  llm.cost_usd
+  llm.ttft_ms / total_ms
+  llm.finish_reason
+  llm.refused
+  tools.used
+  cache.prefix_hit_ratio
+  quality.eval_score (populated async)
+  security.jailbreak_flag
 
-LLM-specific log fields:
-  trace_id, span_id, timestamp
-  model, prompt_template_version
-  prompt_hash (group)
-  tokens in/out, cost
-  TTFT, total latency
-  finish_reason
-  tools_used
-  prompt_redacted, response_redacted
-  user_thumbs, eval_sampled
+Key LLM metrics:
+  TTFT / TPOT p50/p95/p99
+  Input/output tokens (cached vs not)
+  Cost per (tenant, feature, model)
+  Cache hit rate per tier
+  Tool call success rate
+  Eval pass rate (sampled)
+  Jailbreak attempts / min
+  User thumbs ratio
 
-Key metrics:
-  latency p50/95/99 (TTFT + total)
-  tokens / cost per request
-  error rate by type
-  tool call count
-  cache hit rate
-  eval pass rate (sampled)
-  user thumbs ratio
-  jailbreak attempts
-
-Sampling strategy:
-  Traces: 1% + 100% errors + 100% slow
-  Logs: 100% metric, 10% redacted, 1% with content
-  Eval: 5% random + 100% flagged
+Sampling strategy (10K QPS):
+  Tail-based:
+    1% random baseline
+    100% errors
+    100% slow (>5s)
+    100% high cost (>$0.5)
+    100% VIP tenant
+    100% jailbreak flagged
+  Cost: ~30x reduction vs 100%
 
 PII redaction:
+  Presidio (spaCy NER + custom recognizers)
   Apply at log-write time
-  presidio / Macie
-  Card / email / phone / NRIC / API key
-  NER for names
+  Entities: PERSON / EMAIL / PHONE / CREDIT_CARD / SSN / LOCATION
+  Hash for correlation (sha256 + per-type salt)
+  Right-to-be-Forgotten via hash deletion
 
-Alerting rules:
-  p99 latency > SLO 5 min → page
-  Error rate > 2% 5 min → page
-  Cost / session > $1 sustained → email
-  Eval < 90% 1 hour → slack ML
-  Jailbreak > 100/min → page security
+Eval-in-prod:
+  5% random sample + force-eval flagged
+  LLM-as-judge (Sonnet 4.6)
+  Multi-dim: helpfulness / accuracy / tool / safety / refusal / conciseness
+  Calibrate vs human weekly
+  Alert on eval drop > 5pp
 
-Tools:
-  OTel + Datadog / Honeycomb
-  LangSmith / Phoenix / Helicone / Langfuse
-  Braintrust for eval
+Drift detection (daily):
+  MMD test on prompt embeddings
+  Eval score baseline vs recent
+  Cost mean baseline vs recent
+  Tool error rate baseline vs recent
+
+Alerting tiers:
+  P0 PagerDuty: p99 > SLO 5min, error > 2%, jailbreak > 100/min, eval drop > 5pp
+  P1 Slack ML: eval < 90% 1h, cost trend up 50%, drift detected
+  P2 Email weekly: model mix shift, usage trend
 
 Debug workflow:
-  Reproduce by trace_id
-  Diff vs good case
-  Re-run with same input
-  Check eval suite
-  Slice analysis (user / tenant / model / time)
-  Root cause: prompt / tool / model / input
+  Trace_id from user report → find trace
+  Read trace top-down → identify failed span
+  Compare to good case (same template, similar query)
+  Re-run with replay tool (deterministic mocks)
+  Slice analysis (by tenant / model / template / time)
+  Root cause: prompt / tool / model / RAG / input / cache stale
+
+Tools 2026:
+  OpenTelemetry (vendor-neutral SDK)
+  Datadog / Honeycomb / Tempo (trace + log + metric)
+  LangSmith / Phoenix / Langfuse (LLM-specific)
+  Braintrust (eval suite)
+  Presidio / AWS Macie (PII redaction)
+  Mimir (Prometheus-compatible TS)
 
 Cost attribution:
-  Tag spans with feature_id
-  Per-feature dashboard
+  Per-span tag: feature_id, tenant_id, model
+  Aggregate: per-feature dashboard, per-tenant report
+  Catch: feature with bad prompt → 100x token spike
+
+Per-tenant SLA:
+  Dashboard: availability, p99, eval pass
+  Synthetic probes 1/min
+  SLO error budget tracking
+  Monthly auto-report to customer
+  Credit policy for breach
 
 红线:
   - Raw PII in logs
-  - 100% sample
-  - No LLM eval
-  - No tool spans
+  - 100% sample everything (cost)
+  - No LLM eval (quality blind)
+  - No tool spans (debug stuck)
   - Single pillar
   - No alerting
+  - Trace context not propagated
+  - No version tracking
+  - No cost attribution
+  - No PII deletion workflow
+
+Resume quotes:
+  "Voice agent ID market eval drop 92→84%, 4h identify+fix via slice"
+  "BNPL chatbot prompt_template_version + model_version tracking"
+  "SOC2 audit passed via Presidio redaction at write time"
+  "Per-tenant SLA dashboard + synthetic probes 7 markets"
 ```
 </script>
 <script>

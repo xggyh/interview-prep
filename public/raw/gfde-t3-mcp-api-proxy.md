@@ -1,436 +1,2216 @@
 ## 题目
 
-> "Customer has **50 internal microservices**, each with own REST API + auth. They want an agent that can call any of them. Design the **tool abstraction layer**. Why is **MCP** (Model Context Protocol) relevant in 2026?"
+> "Customer has **50 internal microservices**, each with its own REST API + auth. They want an agent that can call any of them. Design the **tool abstraction layer**. Why is **MCP (Model Context Protocol)** relevant in 2026?"
 
 或追问形态:
 
 > "What does MCP solve that you can't get from just OpenAI's function-calling API? When would you NOT use MCP?"
 
-**Round**: Tool / Integration Architecture (45 min)
+**出处**: Google FDE T3 整合 round 高频题. 2026 几乎所有 enterprise LLM platform RFP 都问 MCP 适配.
+
+**Round**: Tool / Integration Architecture (45-60 min)
 
 ---
 
 ## 这道题在考什么
 
-考你**2026 modern integration architecture**:
+考你 **2026 modern agent integration architecture**:
 
-1. **Tool abstraction** —— LLM-agnostic interface
-2. **MCP 是 standard** —— Anthropic propose, Google/OpenAI also adopting
-3. **API proxy layer** —— auth / rate-limit / observability 统一
-4. **Schema versioning** —— customer API changes don't break agent
-5. **Discoverability** —— LLM 怎么知道有哪些 tools
+1. **Tool abstraction layer** —— LLM-agnostic interface, 不能 hardcode 到 OpenAI / Anthropic 任一家
+2. **MCP 是 2026 industry standard** —— Anthropic propose, Google / OpenAI / Cohere 都 adopting
+3. **Gateway 责任** —— auth (含 OBO) / rate-limit / observability / caching / version
+4. **Tool discovery at scale** —— 500 tools 时 LLM context 装不下, RAG over tool descriptions
+5. **Schema versioning** —— customer API 季度升级 不能 break agent
+6. **Legacy integration** —— REST → MCP adapter / 屏幕爬 / 文件落地 fallback
+
+不考 "什么是 function calling", 考 "你在 production 接过 50+ 内部服务给 LLM agent, 处理过 OBO + version drift + RAG-over-tools".
 
 ---
 
-## 必问 clarifying
+# Part 1 · 教学讲解 — 先把概念讲透
+
+## 1. 四个术语先解释
+
+**MCP (Model Context Protocol)**: Anthropic 2024 年开源, 2026 已成业界标准. 是一个**协议规范** + **SDK**, 标准化 LLM agent 如何**发现** + **调用** 外部能力. JSON-RPC over stdio/HTTP/SSE.
+
+**Tool abstraction layer**: 在 LLM 和后端 service 之间的**中间层**, 把 50 个不同 API 包装成 LLM 能统一理解的形式. 没有这层, LLM prompt 里要手写 50 个 function schema, 维护爆炸.
+
+**API proxy gateway**: 这个中间层的具体实现形态 — 一个统一入口, 处理 auth / rate-limit / observability / versioning. 类似 Kong / Apigee 但专为 LLM tool calling 优化.
+
+**OBO (On-Behalf-Of)**: OAuth 2.0 扩展, 用户登录 agent → agent 拿用户 token 去换某 service 的 token (scope ≤ 用户权限). **Agent 永远不能拥有比用户更高的权限** 是 enterprise 红线.
+
+---
+
+## 2. 核心问题 (灾难场景)
+
+设想没有抽象层 / 没有 MCP, 直接让 agent 调 50 个内部服务:
+
+**灾难 A — 把 50 个 API hardcode 到 LLM prompt**:
+
+```
+System prompt:
+"You have access to these tools:
+1. POST /api/v1/orders { customer_id, items, ... }
+2. GET /api/v2/inventory/{sku} 
+3. POST /salesforce/leads ...
+... (50 个)
+"
+
+后果:
+- Prompt 25K token 起步, 每 call 浪费 $0.05 (Gemini 3 Pro input)
+- Token cost 失控, 月费 $10K → $100K
+- 50 个里只有 5 个被这次任务用到, 剩下 45 个净污染上下文
+- LLM 出现 'too many tools' 综合症: tool 误选率 30%+
+- 任一 API 改 schema → prompt 要改 → eval 全跑一遍
+```
+
+**灾难 B — Agent 直接调 API**:
+
+```
+def agent_step(query):
+    if "create order" in query:
+        token = get_salesforce_token()   # agent 自己管 token??
+        resp = requests.post("/api/v1/orders", ...)
+    elif "check inventory" in query:
+        token = get_inventory_token()
+        resp = requests.get(...)
+    ...
+
+后果:
+- Token 散落 agent 代码各处, 旋转困难
+- Agent 实际拥有 admin 权限 (因为 agent 自己 service principal)
+- 没 rate limit → 一个 buggy loop 把内部服务打挂
+- 没 trace propagation → debug agent 卡在哪个 service 不知道
+- 50 个 service 升级时 agent code 要改 50 处
+```
+
+**灾难 C — 用 OpenAI function calling 但绑死 OpenAI**:
+
+```
+tools = [
+    {"type": "function", "function": {"name": "create_order", ...}},
+    {"type": "function", "function": {"name": "check_inventory", ...}},
+    ...
+]
+
+后果:
+- Schema 是 OpenAI 格式, 想换 Anthropic / Gemini 要全改
+- 没有 server-side tool catalog, 客户端 (agent) 必须手维护
+- 没有 dynamic discovery — agent 不能问 "你有哪些 tool 关于 inventory"
+- 没有 resources / prompts 抽象 — 只能调 function, 拿不到数据 / 模板
+```
+
+**正确的 mental model — MCP-based gateway**:
+
+```
+Agent (any LLM)
+  ↓ MCP protocol (vendor-neutral)
+MCP Gateway (统一入口)
+  - Discovery (RAG over tool descriptions)
+  - Auth + OBO
+  - Rate limit / quota
+  - Observability (OTel trace propagation)
+  - Caching (idempotent reads)
+  - Versioning + adapter
+  ↓ Per-service MCP server (or REST adapter)
+50 internal microservices
+```
+
+---
+
+## 3. 典型架构图
+
+**完整 stack**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          LLM Agent                                  │
+│  (Claude Sonnet 4.6 / Gemini 3 Pro / GPT-5.5)                       │
+│  - Receives MCP tool list                                           │
+│  - Decides which tool to call                                       │
+│  - Sends tool call request                                          │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ MCP protocol (JSON-RPC)
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   MCP Gateway (proxy)                               │
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │ Tool         │  │ Auth         │  │ Observability            │  │
+│  │ Discovery    │  │ + OBO        │  │ (OTel trace prop)        │  │
+│  │ (RAG)        │  │              │  │                          │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │ Rate Limit   │  │ Caching      │  │ Versioning + Adapter     │  │
+│  │ / Quota      │  │ (idempotent) │  │ (schema evolution)       │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
+└─────────────┬─────────────┬─────────────┬───────────────────────────┘
+              │             │             │
+              ▼             ▼             ▼
+       ┌──────────┐  ┌──────────┐  ┌──────────┐  ...  ┌──────────┐
+       │ MCP      │  │ MCP      │  │ MCP      │       │ MCP      │
+       │ Server 1 │  │ Server 2 │  │ Server 3 │       │ Server 50│
+       │ (SF)     │  │ (Jira)   │  │ (Workday)│       │ (Legacy) │
+       └────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘
+            │             │              │                   │
+            ▼             ▼              ▼                   ▼
+       ┌──────────┐  ┌──────────┐  ┌──────────┐       ┌──────────┐
+       │ Real     │  │ Real     │  │ Real     │       │ Mainframe│
+       │ API #1   │  │ API #2   │  │ API #3   │       │ + COBOL  │
+       └──────────┘  └──────────┘  └──────────┘       └──────────┘
+```
+
+**Per-request flow**:
+
+```
+1. User → Agent: "Update Salesforce lead, mark hot"
+2. Agent → Gateway: list_tools(query="salesforce lead update")
+3. Gateway: RAG search tool descriptions → return top-20 relevant
+4. Agent (LLM): picks "salesforce_update_lead" tool, generates args
+5. Agent → Gateway: call_tool("salesforce_update_lead", args)
+6. Gateway:
+   a. Auth check (OBO: exchange user token → SF token, scope ≤ user)
+   b. Rate limit check (per-user × per-tool quota)
+   c. Cache lookup (is this idempotent read? maybe skip call)
+   d. Forward to MCP server (with trace context)
+7. MCP server → Real Salesforce API
+8. Response → Gateway → Agent → User
+9. Observability: trace span recorded, cost logged, quota decremented
+```
+
+---
+
+## 4. 关键分类表
+
+### 4.1 MCP 的 3 个原语
+
+| 原语 | 用途 | 例子 | 谁定义 |
+|---|---|---|---|
+| **Resources** | 只读数据 | `file://docs/policy.md`, `db://users/42` | MCP server expose |
+| **Tools** | 可执行函数 | `create_order`, `send_email` | MCP server expose |
+| **Prompts** | 可复用 prompt 模板 | "summarize_meeting_notes" template | MCP server expose |
+
+**对应 OpenAI function calling**: 只对应 Tools, 没有 Resources / Prompts.
+
+### 4.2 MCP transport (运输层)
+
+| Transport | 适用 | 实现 |
+|---|---|---|
+| **stdio** | 本地子进程 | Subprocess + stdin/stdout JSON-RPC. 用于 desktop tools (Claude Desktop) |
+| **HTTP** | 跨网络 | RESTful POST per call. 简单, 但每 call 新 connection |
+| **SSE (Server-Sent Events)** | 长连接 streaming | 服务端 push 事件给客户端. 适合 long-running tool / streaming |
+| **WebSocket** (2026 加入) | 双向 streaming | 全双工, replacing SSE in some impls |
+
+### 4.3 Gateway 6 个责任
+
+| 责任 | 实现 |
+|---|---|
+| **Tool discovery** | Vector DB over tool descriptions, RAG retrieval, per-user filter |
+| **Auth + OBO** | OAuth scope exchange, token broker, per-tenant key isolation |
+| **Rate limit** | Token bucket per (user, tool, tenant), 429 with Retry-After |
+| **Observability** | OpenTelemetry trace propagation, LLM-specific log enrichment |
+| **Caching** | Idempotent read cache, semantic cache, per-tool TTL |
+| **Versioning** | Schema diff, adapter chain, deprecation warning, eval suite |
+
+### 4.4 500 tools 时的 discovery 策略层级
+
+| Level | 方法 | 用于 |
+|---|---|---|
+| **L1: Filter by role/tenant** | RBAC + per-tenant catalog | 用户只能看到他权限内的 tool |
+| **L2: RAG by query** | Vector search over tool descriptions | 当前 query 相关 top-20 |
+| **L3: Hierarchical** | Domain → category → tool | LLM 先选 domain, 再选 tool |
+| **L4: Meta-tool** | `find_tool(query)` 作为一个 tool | LLM 主动调 find_tool 查 |
+
+---
+
+## 5. 具体业务场景 (4-5 个深度变体)
+
+### 场景 A: 字节内部 Agent Platform 接 50+ service (你简历背景)
+
+你做的 Internal Agent Platform 实际就是这道题:
+
+```
+50+ internal services:
+  - 财务: 报销系统, 预算系统, 审批 workflow
+  - HR: Lark (飞书) 人员目录, 假期管理, 绩效
+  - DevOps: GitLab, Jenkins, Grafana, K8s, log query
+  - 业务: TikTok PayLater 后台, BNPL collection, fraud system
+  - 数据: Bytehouse, Clickhouse, ML platform
+  - ...
+
+MCP Gateway 设计:
+
+@app.post("/mcp/tools/list")
+async def list_tools(req: ListToolsRequest):
+    user = await auth.verify(req.user_token)
+    
+    # L1: RBAC filter
+    accessible = await rbac.tools_for(user)
+    
+    # L2: RAG search if query provided
+    if req.query:
+        emb = await embed(req.query)
+        candidates = await vector_db.search(
+            emb,
+            top_k=50,
+            filter={"tool_id": {"$in": accessible}}
+        )
+    else:
+        candidates = accessible
+    
+    # L3: Re-rank by user history
+    ranked = rank_by_usage(candidates, user)
+    return ranked[:20]
+
+@app.post("/mcp/tools/call")
+async def call_tool(req: ToolCallRequest):
+    user = await auth.verify(req.user_token)
+    
+    # OBO: exchange user token for service token
+    service_token = await oauth.exchange(
+        user_token=req.user_token,
+        target_service=tool_meta[req.tool_id].service,
+        scopes=tool_meta[req.tool_id].required_scopes,
+    )
+    
+    # Rate limit
+    await rate_limiter.acquire(user, req.tool_id)
+    
+    # Forward to MCP server
+    with trace.start_span("mcp.call") as span:
+        span.set_attr("tool_id", req.tool_id)
+        span.set_attr("user_id", user.id)
+        result = await mcp_servers[req.tool_id].call(
+            req.args,
+            auth=service_token,
+            trace_context=span.context,
+        )
+    
+    # Observability
+    await metrics.observe(
+        tool=req.tool_id,
+        user=user.id,
+        latency_ms=span.duration_ms,
+        success=result.success,
+        cost_usd=estimate_cost(req.tool_id, span.duration_ms),
+    )
+    
+    return result
+
+实战数据:
+- 200+ tool catalog (50 service × 4 avg endpoint)
+- RAG discovery 把 LLM context 从 35K → 4K token (一次 call 节省 $0.06)
+- 添加 RAG-based discovery 前后: tool 误选率 30% → 8%
+- OBO 让 agent 实际权限 = 用户权限, 安全审计通过
+```
+
+**简历挂钩**: 这就是你 Internal Agent Platform 的核心.
+
+### 场景 B: 多 LLM vendor switching (你的 BNPL chatbot)
+
+公司今天用 Claude, 明天可能换 Gemini, 后天加 自托管 vLLM:
+
+```
+Without MCP:
+  agent_v1.py (Anthropic SDK)
+    tools = [{type: "tool_use", ...}]   # Anthropic format
+  
+  换 Gemini → 全 rewrite:
+  agent_v2.py (Google SDK)
+    tools = [{function_declarations: [...]}]   # Google format
+  
+  换 OpenAI → 又 rewrite
+
+With MCP:
+  agent.py
+    mcp_client.list_tools()  → MCP standard format
+    mcp_client.call_tool(name, args)  → MCP standard
+  
+  换 LLM:
+  - 只换 LLM SDK 调用层 (Claude SDK → Gemini SDK)
+  - MCP 调用层不变
+  - 同 MCP server 服务所有 LLM
+
+Adapter pattern (LLM-side):
+
+class MCPToLLMAdapter:
+    """把 MCP tool 转成各 LLM 厂家的 function format"""
+    
+    def to_anthropic(self, mcp_tool):
+        return {
+            "name": mcp_tool.name,
+            "description": mcp_tool.description,
+            "input_schema": mcp_tool.input_schema,
+        }
+    
+    def to_openai(self, mcp_tool):
+        return {
+            "type": "function",
+            "function": {
+                "name": mcp_tool.name,
+                "description": mcp_tool.description,
+                "parameters": mcp_tool.input_schema,
+            }
+        }
+    
+    def to_gemini(self, mcp_tool):
+        return {
+            "function_declarations": [{
+                "name": mcp_tool.name,
+                "description": mcp_tool.description,
+                "parameters": mcp_tool.input_schema,
+            }]
+        }
+```
+
+### 场景 C: 客户自托管 sensitive data (合规)
+
+客户是 银行 / 医院, 数据不能上你的云:
+
+```
+设计: Customer-hosted MCP server, agent 远程调
+
+┌──────────────┐         ┌──────────────────────────────┐
+│ Your cloud   │         │ Customer VPC                 │
+│              │         │                              │
+│ Agent  ──────┼─────────┼──→ MCP Gateway (customer)    │
+│              │   TLS   │    ↓                         │
+│ MCP client   │ + VPN   │    Customer's internal API   │
+│ (LLM call)   │  / OAuth│    (Salesforce, HR, ...)     │
+└──────────────┘         └──────────────────────────────┘
+
+要点:
+- MCP server 部署在客户 VPC, data never leaves
+- Network: VPN tunnel / VPC peering / Tailscale-style mesh
+- Auth: OBO with customer's IdP
+- Schema 客户可定制 (custom field on lead)
+- Schema discovery: agent first call list_tools() 适应客户配置
+- Your responsibility: 提供 MCP server 模板 + 部署文档
+- Audit: 客户控制全部 audit log, 你不存原始数据
+```
+
+### 场景 D: Cross-cloud (GCP + AWS + Azure)
+
+agent 要操作 3 个 cloud 资源:
+
+```
+每 cloud 1 个 MCP server:
+  - gcp-mcp-server: bucket / pubsub / bigquery / vertex
+  - aws-mcp-server: s3 / sqs / dynamodb / lambda
+  - azure-mcp-server: blob / queue / cosmos / functions
+
+统一 tool naming convention:
+  cloud:gcp:storage:upload
+  cloud:aws:storage:upload
+  cloud:azure:storage:upload
+  
+  → 相似 schema, 不同实现
+
+Cross-cloud workflow:
+  Agent: "Copy bigquery export to S3"
+  → 1. gcp:bigquery:export (output → gcs)
+  → 2. transfer:gcs_to_s3 (or gcp:storage:read + aws:storage:write)
+  → 3. confirm completion
+
+Auth: per-cloud service account / OBO
+Cost tag: 每 tool call 标 cloud, 成本归属
+Egress 警告: 跨云传数据贵, tool wrapper warn
+```
+
+### 场景 E: Legacy mainframe + COBOL 集成
+
+客户核心系统 80 年代 mainframe, 没 modern API:
+
+```
+MCP adapter 重活:
+
+Approach 1: Screen-scrape via 3270 emulation
+  - Use py3270 / x3270 to emulate terminal
+  - Parse screens with regex or LLM (Gemini 3 Flash 解析)
+  - Wrap as MCP tool: get_account_balance(account_id)
+
+Approach 2: CDC (Change Data Capture)
+  - Mainframe writes to DB2 (or Oracle)
+  - Debezium / GoldenGate stream changes
+  - MCP read-only tools query the streamed copy
+  - No direct write to mainframe (太危险)
+
+Approach 3: File drop (existing pattern)
+  - Mainframe daily exports CSV
+  - MCP tool reads CSV, returns latest
+  - For writes: agent generates CSV, mainframe consumes daily
+
+Approach 4: Wrapper service
+  - 单独写 1 个 Java/Python wrapper, 用 mainframe SDK
+  - MCP server thin layer over wrapper
+  - Wrapper handles 3270 / COBOL data conversion / timeout
+
+Reality check:
+  - Latency 高 (mainframe slow): 500ms-5s
+  - 不稳定 (维护窗口频繁)
+  - Schema 演化困难, 任何变更都要 mainframe team
+  - Agent 要 graceful handle timeout
+  - 通常先 read-only, write 慢慢谈
+```
+
+---
+
+## 6. 工程 checklist
+
+**设计 MCP Gateway** (作为 platform team):
+
+1. **Tool catalog 持久化** — DB table: tools (id, name, description, schema, owner, version, deprecated)
+2. **Vector index over descriptions** — 给 RAG discovery 用 (Pinecone / Qdrant / pgvector)
+3. **Per-tool metadata** — required_scopes, rate_limit, cache_policy, version, owner
+4. **OBO token broker** — OAuth scope exchange, per-tenant key isolation
+5. **Trace propagation** — OpenTelemetry headers passed to MCP servers
+6. **Cost attribution** — per-tool cost tracking → tenant bill
+7. **Health check per MCP server** — circuit breaker, alerts
+8. **Schema diff CI check** — adapter regression detection
+9. **Eval suite per tool** — daily test against real / staging
+10. **Self-serve onboarding** — customer 自己 register MCP server
+
+**作为 MCP server 实现者**:
+
+1. **MCP SDK** — `mcp` Python / TypeScript SDK 标准实现
+2. **Tool description 详细** — LLM 用这个判断选不选, 写好关键
+3. **Schema versioning** — `v1.0`, `v2.0`, 别 break v1 用户
+4. **Idempotency** — 同 args 多次 call 同结果 (where possible)
+5. **Error messages LLM-friendly** — 不要 stack trace, 写 "you need to ... " 让 LLM 能恢复
+6. **Cancellation support** — agent 中途撤销 tool 调用
+7. **Streaming output** — 长 tool (e.g., 大文件 search) 用 SSE 返回 partial
+8. **Logging + metrics** — per-call duration, success rate, error types
+
+**Discovery 系统**:
+
+1. **Embedding 模型** — text-embedding-3-large 或 BGE 等
+2. **Tool description quality** — 1-2 句 + 用例, 不要光列 args
+3. **Per-user filter** — RBAC 先过滤, 再 RAG
+4. **Hybrid retrieval** — BM25 + dense embedding (Reciprocal Rank Fusion)
+5. **Tool usage history** — recently-used / frequently-used 加权
+6. **Stale tool eviction** — 长期未用 / deprecated 降权重
+
+---
+
+## 7. 易错坑表
+
+| # | 坑 | 后果 / 应对 |
+|---|---|---|
+| 1 | **把所有 tool 塞进 LLM prompt** | 25K token 起步, $0.05/call 浪费, 误选率高. 解: RAG discovery 只塞 top-20 |
+| 2 | **Agent 直接 hardcode API call** | Token 散落, 旋转难, 没 OBO. 解: 统一 MCP Gateway 入口 |
+| 3 | **没有 OBO** | Agent 权限 > 用户权限, 安全红线. 解: OAuth scope exchange |
+| 4 | **没有 versioning** | API 升级 break agent. 解: schema version + adapter chain + deprecation 警告 |
+| 5 | **没有 trace propagation** | Agent 调 tool 失败, 不知道在哪 layer. 解: OTel context propagation 到 MCP server |
+| 6 | **Tool description 写得差** | LLM 选错 tool. 解: 1-2 句精炼 + 用例 + 不要光列 args |
+| 7 | **没 circuit breaker** | 一个 MCP server 挂 → agent loop retry 把它打更挂. 解: per-server CB, 5 min open |
+| 8 | **缓存所有 tool output** | 副作用 tool (write) 不能缓存. 解: 只 cache idempotent read, 标记 cache_policy |
+| 9 | **OpenAI function calling format hardcode** | 锁死 OpenAI. 解: MCP standard, LLM-side adapter 转格式 |
+| 10 | **MCP server 没 health check** | 失效不知道. 解: gateway 每 30s ping, 失败 circuit open + alert |
+
+---
+
+## 一句话总结 (Part 1)
+
+> **MCP 是 2026 LLM agent integration 的事实标准**: vendor-neutral, 3 个原语 (Resources/Tools/Prompts), JSON-RPC transport.
+>
+> 50 个内部 service 接入 LLM 的正确做法 = **MCP Gateway 作为统一入口** + **RAG-based tool discovery** + **OBO 授权** + **Schema versioning + adapter**.
+>
+> 不用 MCP 也可以 work, 但锁死单一 LLM 厂家 + 失去 dynamic discovery + 没标准化 auth/observability. 2026 选不用 MCP = 选给自己挖坑.
+
+---
+
+# Part 2 · 5 个深度工程问题
+
+## ⚙️ Problem 1: MCP Protocol Deep Dive — Resources / Tools / Prompts, JSON-RPC
+
+把 MCP 协议本身吃透. 这是 2026 面试官检验你 "是不是只听过 MCP 没用过 MCP" 的关键.
+
+### 1.1 协议层级
+
+```
+Application layer:    MCP semantics (Resources / Tools / Prompts)
+Protocol layer:       JSON-RPC 2.0 (request / response / notification)
+Transport layer:      stdio | HTTP | SSE | WebSocket
+```
+
+JSON-RPC 2.0 例子:
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "create_lead",
+    "arguments": {"company": "Acme Corp", "email": "..."}
+  }
+}
+
+// Response (success)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {"type": "text", "text": "Lead created: L-12345"}
+    ]
+  }
+}
+
+// Response (error)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: email format incorrect"
+  }
+}
+```
+
+### 1.2 三个原语详细
+
+**Resources (只读数据)**:
+
+```python
+# Server side
+@server.list_resources()
+async def list_resources():
+    return [
+        Resource(
+            uri="file:///docs/policy.md",
+            name="Company Policy",
+            description="HR + compliance policies",
+            mimeType="text/markdown",
+        ),
+        Resource(
+            uri="db://orders/recent",
+            name="Recent Orders",
+            description="Last 100 orders",
+            mimeType="application/json",
+        ),
+    ]
+
+@server.read_resource()
+async def read_resource(uri: str):
+    if uri == "file:///docs/policy.md":
+        return open("/docs/policy.md").read()
+    elif uri == "db://orders/recent":
+        rows = await db.fetch("SELECT * FROM orders ORDER BY ts DESC LIMIT 100")
+        return json.dumps(rows)
+
+# Client side (agent)
+resources = await client.list_resources()
+content = await client.read_resource("file:///docs/policy.md")
+```
+
+**Tools (可执行函数)**:
+
+```python
+@server.list_tools()
+async def list_tools():
+    return [
+        Tool(
+            name="create_lead",
+            description="Create a new sales lead in CRM. Required when user mentions a new prospect company.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string"},
+                    "email": {"type": "string", "format": "email"},
+                    "source": {"type": "string", "enum": ["web", "phone", "partner"]},
+                },
+                "required": ["company", "email"],
+            },
+        ),
+    ]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict):
+    if name == "create_lead":
+        # validate
+        validated = validate_args(arguments, schema)
+        # execute
+        result = await salesforce.create_lead(**validated)
+        # return
+        return [
+            TextContent(type="text", text=f"Lead created: {result.id}")
+        ]
+```
+
+**Prompts (可复用模板)**:
+
+```python
+@server.list_prompts()
+async def list_prompts():
+    return [
+        Prompt(
+            name="summarize_call",
+            description="Summarize a customer call transcript",
+            arguments=[
+                PromptArgument(name="transcript", required=True),
+                PromptArgument(name="style", required=False),  # brief/detailed
+            ],
+        ),
+    ]
+
+@server.get_prompt()
+async def get_prompt(name: str, arguments: dict):
+    if name == "summarize_call":
+        return [
+            Message(
+                role="system",
+                content="You are a senior CSM. Summarize the call in {style} style.".format(
+                    style=arguments.get("style", "brief")
+                ),
+            ),
+            Message(
+                role="user",
+                content=f"Transcript:\n{arguments['transcript']}",
+            ),
+        ]
+```
+
+### 1.3 Lifecycle: initialization
+
+```
+Client                              Server
+  │                                    │
+  │  ── initialize ───────────────►    │
+  │  {capabilities, clientInfo}        │
+  │                                    │
+  │  ◄── initialize response ──────    │
+  │     {capabilities, serverInfo}     │
+  │                                    │
+  │  ── initialized notification ──►   │
+  │                                    │
+  │     [normal operation]             │
+  │  ── tools/list ──────────────►     │
+  │  ◄── response ─────────────────    │
+  │  ── tools/call ──────────────►     │
+  │  ◄── response ─────────────────    │
+  │     ...                            │
+  │                                    │
+  │  ── close ───────────────────►     │
+```
+
+Capability negotiation: client/server 互相宣告支持的功能 (sampling, roots, prompts, etc.), 不要假设对方支持所有.
+
+### 1.4 Transport 详细
+
+**stdio**:
+
+```python
+# Client spawns server as subprocess
+import subprocess
+proc = subprocess.Popen(
+    ["python", "my_mcp_server.py"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+)
+
+# Send JSON-RPC over stdin/stdout
+proc.stdin.write(json.dumps(request).encode() + b'\n')
+response = json.loads(proc.stdout.readline())
+```
+
+适用: Desktop tools (Claude Desktop), local-only scenarios.
+
+**HTTP (with SSE for server push)**:
+
+```python
+# Client → Server: POST /messages
+# Server → Client: SSE on /events
+
+import httpx
+
+async with httpx.AsyncClient() as client:
+    # Tool call
+    response = await client.post(
+        "https://mcp-server.com/messages",
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", ...}
+    )
+    
+    # Listen for server push (e.g., streaming output)
+    async with client.stream("GET", "https://mcp-server.com/events") as stream:
+        async for line in stream.aiter_lines():
+            if line.startswith("data:"):
+                event = json.loads(line[5:])
+                process(event)
+```
+
+**WebSocket** (2026 新增):
+
+```python
+import websockets
+
+async with websockets.connect("wss://mcp-server.com") as ws:
+    # Bidirectional
+    await ws.send(json.dumps(request))
+    response = json.loads(await ws.recv())
+```
+
+### 1.5 Error handling
+
+JSON-RPC 标准 error codes + MCP-specific:
+
+```
+-32700  Parse error
+-32600  Invalid Request
+-32601  Method not found
+-32602  Invalid params
+-32603  Internal error
+-32000 to -32099  Server-specific errors
+
+MCP-specific (in error.data):
+{
+  "code": -32602,
+  "message": "Invalid params",
+  "data": {
+    "field": "email",
+    "reason": "Not a valid email format",
+    "suggestion": "Use format user@domain.com"
+  }
+}
+```
+
+**Agent-friendly errors**: LLM 用错误恢复, 所以 error message 要可读 + 给建议.
+
+### 1.6 Production 实战
+
+**完整 MCP server example (一个 Salesforce wrapper)**:
+
+```python
+from mcp.server import Server
+from mcp.types import Tool, TextContent
+
+server = Server("salesforce-mcp")
+
+@server.list_tools()
+async def list_tools():
+    return [
+        Tool(
+            name="sf_create_lead",
+            description="Create a Salesforce lead. Use when user mentions a new business prospect with contact info.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string", "description": "Company name"},
+                    "first_name": {"type": "string"},
+                    "last_name": {"type": "string"},
+                    "email": {"type": "string", "format": "email"},
+                    "source": {"type": "string", "enum": ["web", "phone", "partner", "event"]},
+                },
+                "required": ["company", "last_name", "email"],
+            },
+        ),
+        Tool(
+            name="sf_get_lead",
+            description="Retrieve a Salesforce lead by ID or email",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "lead_id": {"type": "string"},
+                    "email": {"type": "string", "format": "email"},
+                },
+                "anyOf": [
+                    {"required": ["lead_id"]},
+                    {"required": ["email"]},
+                ],
+            },
+        ),
+    ]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict):
+    if name == "sf_create_lead":
+        try:
+            lead = await sf_client.create_lead(**arguments)
+            return [TextContent(
+                type="text",
+                text=f"Lead created successfully. ID: {lead.id}, URL: {lead.url}"
+            )]
+        except DuplicateLead as e:
+            return [TextContent(
+                type="text",
+                text=f"A lead with email {arguments['email']} already exists (ID: {e.existing_id}). Use sf_update_lead instead, or sf_get_lead to see current details."
+            )]
+        except SFAPIError as e:
+            return [TextContent(
+                type="text",
+                text=f"Salesforce API error: {e.message}. Common fixes: check token expiration, verify scope includes 'lead.write'."
+            )]
+    
+    elif name == "sf_get_lead":
+        # ...
+        pass
+
+if __name__ == "__main__":
+    server.run(transport="stdio")  # or HTTP/SSE
+```
+
+---
+
+## ⚙️ Problem 2: Gateway Responsibilities — Auth, OBO, Rate Limit, Observability, Caching
+
+Gateway 是这个 system 的关键, 6 个责任拆开讲清楚.
+
+### 2.1 Auth + OBO 完整流程
+
+```python
+class MCPGatewayAuth:
+    """OBO token broker"""
+    
+    def __init__(self):
+        self.token_cache = {}  # (user_id, service) → (token, expires_at)
+    
+    async def get_service_token(
+        self,
+        user_token: str,
+        target_service: str,
+        required_scopes: list[str],
+    ) -> str:
+        # Verify user token
+        user = await self.idp.verify_token(user_token)
+        
+        # Check user has the required perms
+        if not all(s in user.scopes for s in required_scopes):
+            raise PermissionDenied(
+                f"User {user.id} lacks scopes {set(required_scopes) - set(user.scopes)}"
+            )
+        
+        # Check OBO token cache
+        cache_key = (user.id, target_service)
+        if cached := self.token_cache.get(cache_key):
+            token, expires_at = cached
+            if expires_at - time.time() > 60:  # 1 min buffer
+                return token
+        
+        # Exchange via OAuth 2.0 token exchange (RFC 8693)
+        service_token = await self.oauth_exchange(
+            subject_token=user_token,
+            subject_token_type="urn:ietf:params:oauth:token-type:access_token",
+            audience=target_service,
+            scope=" ".join(required_scopes),
+        )
+        
+        # Cache
+        self.token_cache[cache_key] = (
+            service_token.access_token,
+            service_token.expires_at,
+        )
+        
+        return service_token.access_token
+    
+    async def oauth_exchange(self, **params):
+        # Call OAuth server's token endpoint with grant_type=token-exchange
+        resp = await httpx.post(
+            self.oauth_server_url + "/token",
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+                **params,
+            },
+            headers={"Authorization": f"Basic {self.client_credentials}"},
+        )
+        return ServiceToken.from_response(resp.json())
+```
+
+**为什么 OBO 重要**:
+
+```
+不用 OBO (反模式):
+  Agent service principal: scope=admin (因为要调所有 service)
+  User logs in: agent represents user
+  Agent calls SF: 用 admin scope → 可以读所有 lead
+  风险: agent bug → 用户看到不该看的数据 → 合规事故
+
+用 OBO (正确):
+  User logs in: gets user_token (scope=lead.read 自己负责的 region)
+  Agent calls SF via gateway:
+    Gateway exchange user_token → SF token (scope ≤ user_token's scope)
+    SF call returns 只这 region 的 lead
+  Agent 实际权限 = user 权限 = 不会越权
+```
+
+### 2.2 Rate limit 多维度
+
+```python
+class MultiDimRateLimit:
+    """Per (user, tool, tenant) bucket"""
+    
+    def __init__(self, redis_client):
+        self.redis = redis_client
+        # Tiers: free / pro / enterprise
+        self.limits = {
+            "free":       {"per_user_per_min": 60,   "per_user_per_day": 1000},
+            "pro":        {"per_user_per_min": 600,  "per_user_per_day": 50000},
+            "enterprise": {"per_user_per_min": 6000, "per_user_per_day": 500000},
+        }
+        # Per-tool overrides
+        self.tool_limits = {
+            "send_email": {"per_user_per_min": 10},   # expensive / abuse-prone
+            "get_status": {"per_user_per_min": 1000}, # cheap
+        }
+    
+    async def acquire(self, user_id, tenant_id, tool_id, tier="free"):
+        # 3-dim check
+        checks = [
+            (f"rl:user:{user_id}:min", self.limits[tier]["per_user_per_min"], 60),
+            (f"rl:user:{user_id}:day", self.limits[tier]["per_user_per_day"], 86400),
+            (f"rl:tool:{tool_id}:user:{user_id}", 
+             self.tool_limits.get(tool_id, {}).get("per_user_per_min", 1000), 60),
+            (f"rl:tenant:{tenant_id}:min", self.tenant_limits(tenant_id), 60),
+        ]
+        
+        for key, limit, ttl in checks:
+            # Token bucket via Redis Lua script (atomic)
+            current = await self.redis.eval(
+                """
+                local count = redis.call('INCR', KEYS[1])
+                if count == 1 then
+                    redis.call('EXPIRE', KEYS[1], ARGV[1])
+                end
+                return count
+                """,
+                1, key, ttl
+            )
+            if current > limit:
+                ttl = await self.redis.ttl(key)
+                raise RateLimitExceeded(
+                    f"Rate limit hit: {key} = {current}/{limit}",
+                    retry_after=ttl,
+                )
+```
+
+### 2.3 Observability: OTel trace propagation
+
+```python
+from opentelemetry import trace, propagate
+from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+
+tracer = trace.get_tracer("mcp-gateway")
+
+@app.post("/mcp/call")
+async def call_tool(req, raw_request):
+    # Extract incoming trace context
+    propagator = TraceContextTextMapPropagator()
+    ctx = propagator.extract(raw_request.headers)
+    
+    with tracer.start_as_current_span(
+        "mcp.gateway.call",
+        context=ctx,
+        kind=trace.SpanKind.SERVER,
+    ) as span:
+        span.set_attributes({
+            "mcp.tool": req.tool_id,
+            "mcp.user_id": req.user_id,
+            "mcp.tenant_id": req.tenant_id,
+            "mcp.args_size": len(json.dumps(req.args)),
+        })
+        
+        try:
+            # OBO
+            with tracer.start_span("auth.obo") as auth_span:
+                token = await auth.get_service_token(...)
+                auth_span.set_attr("auth.scope", token.scope)
+            
+            # Rate limit
+            with tracer.start_span("ratelimit.check"):
+                await rate_limiter.acquire(...)
+            
+            # Forward to MCP server (propagate context)
+            with tracer.start_span("mcp.server.call") as srv_span:
+                headers = {}
+                propagator.inject(headers)  # inject trace context
+                result = await mcp_servers[req.tool_id].call(
+                    req.args,
+                    auth=token,
+                    headers=headers,
+                )
+                srv_span.set_attr("mcp.result_size", len(str(result)))
+            
+            return result
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(trace.Status(trace.StatusCode.ERROR))
+            raise
+```
+
+**结果**: 一个 user → agent → gateway → MCP server → real API 的完整 trace 在 Datadog/Honeycomb 上能看到, debug agent 卡哪步秒看出.
+
+### 2.4 Caching layer
+
+```python
+class ToolCache:
+    """Multi-tier cache for idempotent reads"""
+    
+    def __init__(self, redis, vector_db=None):
+        self.redis = redis
+        self.vector_db = vector_db
+        # In-process small cache for ultra-hot
+        self.lru = LRUCache(maxsize=1000)
+    
+    def cache_key(self, tool_id, args, user_id=None):
+        # User-isolated for personal data tools
+        if tool_meta[tool_id].user_isolated:
+            return f"tool:{tool_id}:user:{user_id}:{hash(args)}"
+        else:
+            return f"tool:{tool_id}:{hash(args)}"
+    
+    async def get(self, tool_id, args, user_id=None):
+        meta = tool_meta[tool_id]
+        if not meta.cacheable:
+            return None  # write or non-idempotent tool
+        
+        key = self.cache_key(tool_id, args, user_id)
+        
+        # L1
+        if val := self.lru.get(key):
+            return val
+        
+        # L2: exact match
+        if val := await self.redis.get(key):
+            self.lru[key] = val
+            return val
+        
+        # L3: semantic match (for query tools)
+        if meta.semantic_cacheable and self.vector_db:
+            emb = await embed(json.dumps(args))
+            hits = await self.vector_db.search(emb, top_k=1, filter={"tool_id": tool_id})
+            if hits and hits[0].score > 0.95:
+                return hits[0].cached_response
+        
+        return None
+    
+    async def set(self, tool_id, args, response, user_id=None):
+        meta = tool_meta[tool_id]
+        if not meta.cacheable:
+            return
+        
+        key = self.cache_key(tool_id, args, user_id)
+        ttl = meta.cache_ttl_seconds  # per-tool config: 60s to 1h
+        
+        self.lru[key] = response
+        await self.redis.set(key, response, ex=ttl)
+        
+        if meta.semantic_cacheable and self.vector_db:
+            emb = await embed(json.dumps(args))
+            await self.vector_db.upsert(
+                key, emb,
+                metadata={"tool_id": tool_id, "cached_response": response, "ts": time.time()},
+            )
+```
+
+### 2.5 Per-tool config (driving gateway behavior)
+
+```yaml
+# tools.yaml — gateway 配置
+tools:
+  - id: sf_create_lead
+    service: salesforce
+    cacheable: false  # write op
+    required_scopes: [lead.write]
+    rate_limit: {per_user_per_min: 30}
+    timeout_ms: 5000
+    retry: {max_attempts: 3, backoff: exponential}
+  
+  - id: sf_get_lead
+    service: salesforce
+    cacheable: true
+    cache_ttl_seconds: 300
+    semantic_cacheable: false  # exact lookup
+    required_scopes: [lead.read]
+    user_isolated: true   # cache per user
+    rate_limit: {per_user_per_min: 200}
+  
+  - id: db_query_orders
+    service: inventory_db
+    cacheable: true
+    cache_ttl_seconds: 60
+    semantic_cacheable: true   # 'recent orders for Acme' fuzzy match
+    required_scopes: [order.read]
+    rate_limit: {per_user_per_min: 100}
+```
+
+---
+
+## ⚙️ Problem 3: Tool Discovery at Scale — RAG, Hierarchical, Per-Tenant
+
+500+ tools 时 LLM context 装不下, 必须 dynamic discovery. 这是 platform 的 secret sauce.
+
+### 3.1 问题规模
+
+```
+50 service × 10 endpoint avg = 500 tools
+Each tool description: 100-200 token
+Total tool catalog: 50K-100K token
+
+LLM context window:
+  Gemini 3 Pro: 1M token (装得下, 但 $0.05/call 浪费)
+  Claude Opus 4.7: 200K token (装得下一半, 还要留空间给 conv history)
+  Llama 3 70B self-host: 128K token (装不下)
+
+Even if fits: LLM 在 500 tool 里选错率 ~30% (太多选项 attention dilute)
+  
+正确做法: 只塞 top-20 相关 tool, 其他动态 discovery
+```
+
+### 3.2 RAG-based discovery (主方法)
+
+```python
+class ToolDiscovery:
+    def __init__(self):
+        # Vector index over tool descriptions
+        self.vector_db = QdrantClient(...)
+        # Tool metadata DB
+        self.db = ...
+    
+    async def index_tools(self):
+        """Run once / per deploy. Index all tool descriptions."""
+        tools = await self.db.list_all_tools()
+        for tool in tools:
+            # Composite text: name + description + use cases + categories
+            doc = f"""
+            Tool: {tool.name}
+            Description: {tool.description}
+            Use when: {tool.use_cases}
+            Categories: {', '.join(tool.categories)}
+            Examples: {tool.examples}
+            """
+            emb = await embed(doc)  # text-embedding-3-large
+            await self.vector_db.upsert(
+                tool.id,
+                emb,
+                metadata={
+                    "tool_id": tool.id,
+                    "service": tool.service,
+                    "tags": tool.tags,
+                    "deprecated": tool.deprecated,
+                    "owner": tool.owner,
+                    "required_scopes": tool.required_scopes,
+                },
+            )
+    
+    async def discover(
+        self,
+        query: str,
+        user: User,
+        top_k: int = 20,
+    ) -> list[Tool]:
+        # Step 1: RBAC filter
+        accessible_tool_ids = await self.rbac.tools_for(user)
+        
+        # Step 2: hybrid retrieval (dense + sparse)
+        query_emb = await embed(query)
+        
+        dense_hits = await self.vector_db.search(
+            query_emb,
+            top_k=top_k * 3,  # over-retrieve, then re-rank
+            filter={
+                "tool_id": {"$in": accessible_tool_ids},
+                "deprecated": False,
+            },
+        )
+        
+        sparse_hits = await self.bm25_search(
+            query,
+            top_k=top_k * 3,
+            filter_tool_ids=accessible_tool_ids,
+        )
+        
+        # Step 3: Reciprocal Rank Fusion
+        fused = rrf_merge(dense_hits, sparse_hits, k=60)
+        
+        # Step 4: Re-rank by usage frequency / recency
+        ranked = []
+        for hit in fused[:top_k * 2]:
+            tool = await self.db.get_tool(hit.tool_id)
+            score = hit.score * self._recency_boost(tool, user)
+            ranked.append((score, tool))
+        
+        ranked.sort(reverse=True)
+        return [t for _, t in ranked[:top_k]]
+    
+    def _recency_boost(self, tool, user):
+        # 用户最近用过的 tool 加分
+        recent_usage = self.usage_history.get(user.id, tool.id)
+        if recent_usage and recent_usage.last_used_within_days(7):
+            return 1.5
+        return 1.0
+```
+
+### 3.3 Hierarchical discovery (replace flat)
+
+```
+Domain layer:
+  - "CRM" (Salesforce, HubSpot, Pipedrive)
+  - "Payments" (Stripe, PayPal, Adyen)
+  - "Communication" (Slack, Email, SMS)
+  - "Data" (BigQuery, Snowflake, Postgres)
+
+LLM first picks domain (10 options), then tool within domain (20-50 options).
+
+Implementation:
+
+@server.list_tools()
+async def list_tools(req):
+    if not req.domain:
+        # Return only domain-level meta-tools
+        return [
+            Tool(name="explore_crm", description="CRM tools (Salesforce, HubSpot)"),
+            Tool(name="explore_payments", ...),
+            ...
+        ]
+    else:
+        # Return tools within domain
+        return tools_in_domain(req.domain)
+
+# Agent flow:
+# 1. Agent sees 10 domain meta-tools
+# 2. Picks "explore_crm" → list_tools(domain="crm")
+# 3. Sees 30 CRM tools, picks "sf_create_lead"
+# 4. Calls sf_create_lead with args
+
+Pros: simpler than RAG, more predictable
+Cons: 2 LLM calls instead of 1, +1 round-trip latency
+```
+
+### 3.4 Per-tenant tool catalog
+
+```python
+class PerTenantCatalog:
+    """Each tenant has subset of tools enabled"""
+    
+    async def tools_for_tenant(self, tenant_id):
+        # Tenant config
+        tenant = await self.db.get_tenant(tenant_id)
+        
+        enabled_tools = []
+        # Base catalog (everyone gets)
+        enabled_tools.extend(self.base_tools)
+        
+        # Tenant's enabled add-ons
+        for addon in tenant.enabled_addons:
+            enabled_tools.extend(self.addon_tools[addon])
+        
+        # Tenant's custom tools (uploaded by tenant)
+        enabled_tools.extend(await self.db.get_custom_tools(tenant_id))
+        
+        # Apply tenant-specific tool descriptions (e.g., 业务术语差异)
+        for tool in enabled_tools:
+            if override := tenant.tool_overrides.get(tool.id):
+                tool.description = override.description
+                tool.examples = override.examples
+        
+        return enabled_tools
+```
+
+### 3.5 Tool usage observability
+
+```python
+class ToolUsageTracker:
+    async def record_selection(self, user, query, available_tools, selected_tool):
+        await self.db.insert("tool_selections", {
+            "user_id": user.id,
+            "query": redact_pii(query),
+            "query_emb": await embed(query),  # for later analysis
+            "candidates": [t.id for t in available_tools],
+            "selected": selected_tool.id,
+            "ts": time.time(),
+        })
+    
+    async def record_outcome(self, selection_id, outcome):
+        # outcome: success / wrong_tool_chosen / tool_failed / no_tool_found
+        await self.db.update("tool_selections",
+            where={"id": selection_id},
+            set={"outcome": outcome},
+        )
+    
+    async def find_problematic_tools(self):
+        """Daily report"""
+        # Tools that are frequently chosen but lead to bad outcomes
+        return await self.db.query("""
+            SELECT selected, COUNT(*) as total,
+                   SUM(CASE WHEN outcome='wrong_tool_chosen' THEN 1 ELSE 0 END) as wrong_chosen
+            FROM tool_selections
+            WHERE ts > NOW() - INTERVAL '7 days'
+            GROUP BY selected
+            HAVING wrong_chosen / total > 0.15
+        """)
+    
+    # 解决: 这些 tool description 写得不清楚, 或与其他 tool 重叠
+```
+
+### 3.6 Meta-tool pattern: find_tool
+
+Sometimes 让 LLM 主动查 tool 比塞 top-20 更好:
+
+```python
+# Add 'find_tool' as a tool itself
+Tool(
+    name="find_tool",
+    description="Search for tools matching a query. Use this when you need a capability but don't see a tool for it.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "What capability you need"},
+        },
+        "required": ["query"],
+    },
+)
+
+# Agent flow:
+# 1. Agent sees minimal core tools + 'find_tool'
+# 2. Need to do something? Call find_tool("create salesforce lead")
+# 3. Gets 5 matching tools with descriptions
+# 4. Calls the appropriate one
+# 
+# 优势: 上下文极简, scales to 1000s of tools
+# 劣势: 多 1 round-trip
+```
+
+### 3.7 实测数据 (ByteDance Internal Agent Platform)
+
+```
+Before RAG discovery:
+  Tool catalog: 200 tools
+  All in system prompt: 35K token
+  Tool selection accuracy: 70%
+  Per-call cost: $0.07 input (just system prompt)
+
+After RAG discovery:
+  Tool catalog: 200 tools indexed
+  Per-query: top-20 returned: 4K token
+  Tool selection accuracy: 92% (+22pp)
+  Per-call cost: $0.008 input (10x reduction)
+  RAG retrieval latency: 30ms (Qdrant + text-embedding-3)
+```
+
+简历挂钩: **"70% → 92% tool selection accuracy"** 这个数字是你 Internal Agent Platform 的拿手 quote.
+
+---
+
+## ⚙️ Problem 4: Versioning + Schema Evolution — Adapter Chain, Deprecation, Eval Drift
+
+Customer 内部 API 每季度升级, agent 不能跟着崩. Schema 演化是 long-term 痛点.
+
+### 4.1 Version 模型
+
+```python
+# Tool registration with version
+@dataclass
+class ToolVersion:
+    tool_id: str           # "sf_create_lead"
+    version: str           # "v2.1" (semver)
+    schema: dict           # JSON schema
+    description: str
+    deprecated: bool = False
+    deprecated_at: datetime = None
+    sunset_at: datetime = None    # forcibly remove
+    replaced_by: str = None       # "sf_create_lead@v3.0"
+```
+
+### 4.2 Adapter chain
+
+Customer 升级 v1 → v2:
+
+```python
+class SchemaAdapter:
+    """Map between tool schema versions"""
+    
+    @staticmethod
+    def sf_create_lead_v1_to_v2(args_v1):
+        # v1: {company, email, source}
+        # v2: {company, email, source, source_details: {channel, campaign_id}}
+        args_v2 = {**args_v1}
+        if "source" in args_v1:
+            args_v2["source_details"] = {
+                "channel": args_v1["source"],
+                "campaign_id": None,
+            }
+        return args_v2
+    
+    @staticmethod
+    def sf_create_lead_v2_to_v1(args_v2):
+        # Backward compat (rare)
+        args_v1 = {k: v for k, v in args_v2.items() if k != "source_details"}
+        if "source_details" in args_v2:
+            args_v1["source"] = args_v2["source_details"]["channel"]
+        return args_v1
+
+# In gateway
+async def call_tool(req):
+    tool = req.tool_id
+    requested_version = req.version or "latest"
+    
+    # Find compatible version
+    if requested_version == "latest":
+        version = await registry.latest_version(tool)
+    else:
+        version = requested_version
+    
+    # If agent uses v1 but server is on v2: adapt
+    if version != await registry.current_server_version(tool):
+        adapter = SchemaAdapter.get(tool, from_=version, to_=current)
+        args_adapted = adapter(req.args)
+    else:
+        args_adapted = req.args
+    
+    # Call
+    result = await mcp_server.call(tool, args_adapted)
+    
+    # Adapt response back if needed
+    if requested_version != current:
+        response_adapter = SchemaAdapter.get_response(tool, from_=current, to_=requested_version)
+        result = response_adapter(result)
+    
+    return result
+```
+
+### 4.3 Deprecation flow
+
+```
+Day 0: New version v2 released
+  - v1 marked deprecated
+  - deprecated_at = NOW()
+  - sunset_at = NOW() + 90 days
+  - replaced_by = "v2"
+
+Day 0 - 30: Soft deprecation
+  - v1 still works
+  - Adapter chain v1 → v2 active
+  - Deprecation warning in response:
+    {
+      "result": {...},
+      "warnings": [
+        "Tool 'sf_create_lead' v1 is deprecated. Migrate to v2 by 2026-08-21. See migration guide: ..."
+      ]
+    }
+  - Per-tenant email notification
+
+Day 30 - 90: Hard deprecation
+  - v1 still works but logged as 'stale usage'
+  - Per-tenant dashboard shows 'using deprecated tool' warning
+  - Customer-success outreach
+
+Day 90+: Sunset
+  - v1 returns error: "Tool deprecated, use v2"
+  - Final reminder 7 days before sunset
+
+Day 180: Tombstone
+  - v1 schema removed from registry
+  - But adapter retained for migration tooling
+```
+
+### 4.4 Schema diff CI check
+
+```python
+# CI runs on every PR that changes tool schema
+async def check_schema_diff(old_schema, new_schema):
+    """Determine if schema change is breaking"""
+    
+    breaking_changes = []
+    
+    # Breaking: removed required field
+    for field in old_schema.get("required", []):
+        if field not in new_schema.get("required", []):
+            breaking_changes.append(f"Removed required field: {field}")
+    
+    # Breaking: added new required field (without default)
+    new_required = set(new_schema.get("required", [])) - set(old_schema.get("required", []))
+    for field in new_required:
+        if field not in old_schema.get("properties", {}):
+            breaking_changes.append(f"Added new required field without default: {field}")
+    
+    # Breaking: changed type of existing field
+    for field, prop in new_schema.get("properties", {}).items():
+        if field in old_schema.get("properties", {}):
+            if prop.get("type") != old_schema["properties"][field].get("type"):
+                breaking_changes.append(f"Changed type of field {field}")
+            if "enum" in prop:
+                removed_enums = set(old_schema["properties"][field].get("enum", [])) - set(prop["enum"])
+                if removed_enums:
+                    breaking_changes.append(f"Removed enum values for {field}: {removed_enums}")
+    
+    # Non-breaking but worth noting
+    new_optional = set(new_schema.get("properties", {}).keys()) - set(old_schema.get("properties", {}).keys()) - new_required
+    
+    return {
+        "breaking": breaking_changes,
+        "new_optional_fields": list(new_optional),
+        "requires_version_bump": "major" if breaking_changes else "minor",
+    }
+
+# CI fails if breaking change without major version bump
+```
+
+### 4.5 Eval drift detection
+
+```python
+class EvalDriftDetector:
+    """Daily eval against golden dataset to catch schema drift"""
+    
+    async def daily_eval(self):
+        golden_set = await self.db.get_golden_eval_set()  # 100 representative queries
+        
+        for tool_id in await self.registry.all_tool_ids():
+            tool_eval_results = []
+            for query in golden_set:
+                if not query.relevant_to(tool_id):
+                    continue
+                
+                # Simulate full flow: query → tool discovery → tool call → response
+                result = await self.simulate(query, expected_tool=tool_id)
+                
+                # Compare to expected
+                tool_eval_results.append({
+                    "query": query.id,
+                    "expected": query.expected_result,
+                    "actual": result,
+                    "pass": query.evaluator(result),
+                })
+            
+            pass_rate = sum(r["pass"] for r in tool_eval_results) / len(tool_eval_results)
+            
+            # Track over time
+            await metrics.record(
+                "eval.pass_rate",
+                pass_rate,
+                tags={"tool_id": tool_id},
+            )
+            
+            # Alert on regression
+            historical_avg = await metrics.get_avg("eval.pass_rate", tool_id, last_n=7)
+            if pass_rate < historical_avg * 0.9:
+                await alert(
+                    f"Eval pass rate for {tool_id} dropped: {pass_rate} (was {historical_avg})",
+                    severity="high",
+                    on_call="tool-owner-team",
+                )
+```
+
+### 4.6 Customer notification automation
+
+```python
+class DeprecationNotifier:
+    """Customer outreach on deprecation"""
+    
+    async def daily_check(self):
+        # Find tenants using deprecated tools
+        usage = await self.db.query("""
+            SELECT tenant_id, tool_id, COUNT(*) as call_count, version
+            FROM tool_calls
+            WHERE ts > NOW() - INTERVAL '7 days'
+              AND version IN (SELECT version FROM tool_versions WHERE deprecated = true)
+            GROUP BY tenant_id, tool_id, version
+        """)
+        
+        for row in usage:
+            tool = await self.registry.get(row["tool_id"], row["version"])
+            
+            if tool.sunset_at < datetime.now() + timedelta(days=30):
+                # Urgent: < 30 days to sunset
+                await self.notify_customer(
+                    tenant_id=row["tenant_id"],
+                    severity="urgent",
+                    subject=f"Action required: {tool.name} sunsets on {tool.sunset_at}",
+                    body=f"""
+                    Your tenant has called {tool.name} (v{row['version']}) {row['call_count']} times in the last 7 days.
+                    This tool version will be removed on {tool.sunset_at}.
+                    
+                    Migrate to {tool.replaced_by}.
+                    Migration guide: ...
+                    Schema diff: ...
+                    """,
+                )
+            elif tool.deprecated_at < datetime.now() - timedelta(days=30):
+                # Standard: in deprecation window
+                await self.notify_customer(...)
+```
+
+---
+
+## ⚙️ Problem 5: Legacy Integration — REST → MCP Adapter, Screen Scrape, File Drop Fallback
+
+不是所有 service 都 MCP-native, legacy integration 是必考.
+
+### 5.1 REST → MCP adapter (最常见)
+
+```python
+class SalesforceMCPAdapter:
+    """Wrap legacy REST API as MCP server"""
+    
+    def __init__(self):
+        self.sf_client = SalesforceClient(...)
+    
+    @server.list_tools()
+    async def list_tools(self):
+        # Hand-curated tool definitions, not auto-generated
+        # (auto-generation from OpenAPI is bad for LLM — descriptions are too technical)
+        return [
+            Tool(
+                name="sf_create_lead",
+                description="Create a new sales lead in Salesforce CRM. Use when user wants to register a new business prospect or contact.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "company": {"type": "string"},
+                        "first_name": {"type": "string"},
+                        "last_name": {"type": "string"},
+                        "email": {"type": "string", "format": "email"},
+                        "phone": {"type": "string"},
+                        "source": {
+                            "type": "string",
+                            "enum": ["web", "phone", "partner", "event"],
+                            "description": "How this lead was acquired",
+                        },
+                    },
+                    "required": ["company", "last_name", "email"],
+                },
+            ),
+            # ... 20 more tools
+        ]
+    
+    @server.call_tool()
+    async def call_tool(self, name, arguments):
+        if name == "sf_create_lead":
+            try:
+                # Translate MCP args → SF REST API args
+                sf_payload = self._translate_lead_create(arguments)
+                
+                # Execute REST call
+                resp = await self.sf_client.post("/services/data/v59.0/sobjects/Lead", json=sf_payload)
+                
+                # Translate SF response → MCP response
+                return self._translate_lead_response(resp)
+            
+            except SFAPIError as e:
+                # Translate SF errors → LLM-friendly
+                return self._translate_error(e)
+    
+    def _translate_lead_create(self, mcp_args):
+        # Map MCP field names → SF field names
+        return {
+            "Company": mcp_args["company"],
+            "FirstName": mcp_args.get("first_name"),
+            "LastName": mcp_args["last_name"],
+            "Email": mcp_args["email"],
+            "Phone": mcp_args.get("phone"),
+            "LeadSource": mcp_args["source"].capitalize(),
+        }
+    
+    def _translate_error(self, sf_error):
+        # SF errors are cryptic; translate to LLM-friendly
+        error_map = {
+            "DUPLICATES_DETECTED": "A lead with this email already exists. Use sf_get_lead to find it or sf_update_lead to modify.",
+            "FIELD_CUSTOM_VALIDATION_EXCEPTION": f"Salesforce validation rule failed: {sf_error.message}. The team may have custom rules; ask your admin.",
+            "INSUFFICIENT_ACCESS": "Your account doesn't have permission for this. Request 'lead.write' scope from admin.",
+        }
+        
+        msg = error_map.get(sf_error.code, sf_error.message)
+        return [TextContent(type="text", text=f"Error: {msg}")]
+```
+
+### 5.2 Screen scrape (mainframe)
+
+```python
+class MainframeMCPAdapter:
+    """3270 screen scrape via py3270"""
+    
+    def __init__(self):
+        from py3270 import Emulator
+        self.emulator = Emulator(...)
+        self.emulator.connect("mainframe.bank.com")
+    
+    @server.list_tools()
+    async def list_tools(self):
+        return [
+            Tool(
+                name="get_account_balance",
+                description="Get checking account balance from legacy banking system.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "account_number": {"type": "string", "pattern": "^[0-9]{10}$"},
+                    },
+                    "required": ["account_number"],
+                },
+            ),
+        ]
+    
+    @server.call_tool()
+    async def call_tool(self, name, args):
+        if name == "get_account_balance":
+            # Sequence of screen interactions
+            self.emulator.send_string("BALINQ\n")              # Balance Inquiry screen
+            await asyncio.sleep(0.5)
+            
+            self.emulator.send_string(args["account_number"] + "\n")
+            await asyncio.sleep(1.0)
+            
+            # Scrape screen
+            screen_text = self.emulator.string_get(5, 30, 50)  # row 5, col 30, length 50
+            
+            # Parse with regex (or LLM Gemini 3 Flash if structure varies)
+            match = re.search(r"BALANCE:\s+\$([0-9,.]+)", screen_text)
+            if match:
+                balance = float(match.group(1).replace(",", ""))
+                return [TextContent(
+                    type="text",
+                    text=f"Account {args['account_number']} balance: ${balance:.2f}"
+                )]
+            else:
+                return [TextContent(
+                    type="text",
+                    text="Could not retrieve balance. Account may not exist or system unavailable."
+                )]
+```
+
+Reality:
+- Flaky (mainframe maintenance windows)
+- Slow (3-10s per screen)
+- Schema 演化 = 重写 scraper
+- 错误处理弱
+- 只能用于 not-business-critical 场景
+
+### 5.3 File drop pattern
+
+```python
+class FileDropAdapter:
+    """Async daily file exchange"""
+    
+    @server.list_tools()
+    async def list_tools(self):
+        return [
+            Tool(
+                name="query_overnight_orders",
+                description="Query orders processed overnight. Data refreshed daily at 6am.",
+                inputSchema={...},
+            ),
+            Tool(
+                name="submit_batch_update",
+                description="Submit a batch update to legacy system. Processed nightly. Returns job_id for status check.",
+                inputSchema={...},
+            ),
+        ]
+    
+    async def query_overnight_orders(self, args):
+        # Read latest file
+        latest_file = await self.s3.get_latest("legacy-export/orders/")
+        df = pd.read_csv(latest_file)
+        # Filter
+        filtered = df[df["date"] == args["date"]]
+        return self._format_response(filtered)
+    
+    async def submit_batch_update(self, args):
+        # Write to inbox folder
+        job_id = str(uuid.uuid4())
+        await self.s3.upload(
+            f"legacy-inbox/{job_id}.csv",
+            self._format_csv(args["updates"])
+        )
+        # Record job
+        await self.db.insert("batch_jobs", {
+            "job_id": job_id,
+            "submitted_at": time.time(),
+            "status": "pending",  # legacy will pick up at midnight
+        })
+        return [TextContent(
+            type="text",
+            text=f"Batch submitted. Job ID: {job_id}. Will be processed by 6am next day. Use check_batch_status({job_id}) to poll."
+        )]
+```
+
+### 5.4 Graceful degradation when legacy is down
+
+```python
+class ResilientLegacyMCP:
+    """Multiple paths to data"""
+    
+    async def call_tool(self, name, args):
+        if name == "get_customer_info":
+            # Tier 1: try real-time API
+            try:
+                return await asyncio.wait_for(
+                    self.legacy_api.get(args),
+                    timeout=3
+                )
+            except (Timeout, ConnectionError):
+                pass
+            
+            # Tier 2: try cached data (last 24h)
+            cached = await self.cache.get(args["customer_id"])
+            if cached and time.time() - cached["fetched_at"] < 86400:
+                return self._mark_stale(cached["data"], cached["fetched_at"])
+            
+            # Tier 3: try analytics DB replica (replicated nightly)
+            replica = await self.analytics_db.get(args["customer_id"])
+            if replica:
+                return self._mark_stale(replica, "last replication")
+            
+            # Tier 4: return partial / fail gracefully
+            return [TextContent(
+                type="text",
+                text=f"Customer info temporarily unavailable. Last successful fetch was over 24h ago. The legacy system may be in maintenance. Try again in 30 minutes or use partial customer name lookup."
+            )]
+```
+
+### 5.5 Auto-generated MCP server from OpenAPI (caveat)
+
+```python
+# 听起来很美: 自动从 OpenAPI 生成 MCP server
+# 现实: 这种 auto-gen 很烂, LLM 用不好
+
+# Why:
+# 1. OpenAPI summaries 写给开发者, 太技术
+#    "Returns 200 with object" — LLM 不知道何时该用
+# 2. OpenAPI 不包含 "use cases" / "when to use"
+# 3. Error code 映射缺失
+# 4. 50 个 endpoint 生成 50 个 tool → discovery 灾难
+
+# 实际可行的 hybrid:
+# - 用 OpenAPI 启动: 自动生成 stub
+# - 人手 review + 改进 description
+# - 加 use cases / examples
+# - 标记 which to expose, which to hide
+# - 定期 audit: 哪些 tool 选错率高 → 改 description
+
+class OpenAPIToMCPGenerator:
+    def generate(self, openapi_spec):
+        tools = []
+        for path, methods in openapi_spec["paths"].items():
+            for method, op in methods.items():
+                if method.upper() not in ("GET", "POST", "PUT", "DELETE"):
+                    continue
+                # Skip internal / deprecated
+                if "x-internal" in op or op.get("deprecated"):
+                    continue
+                # Skip if no good summary
+                if not op.get("summary") or len(op["summary"]) < 20:
+                    continue   # too vague
+                
+                tool = Tool(
+                    name=op.get("operationId", f"{method}_{path}"),
+                    description=op["summary"] + "\n\n" + op.get("description", ""),
+                    inputSchema=self._build_schema(op),
+                )
+                tools.append(tool)
+        return tools
+        # 然后人 review!
+```
+
+---
+
+# Part 3 · 串起来看
+
+5 个 problem 是同一个故事的不同切面:
+
+1. **MCP protocol** 决定 "用什么标准协议"
+2. **Gateway responsibilities** 决定 "中间层做什么"
+3. **Tool discovery** 决定 "agent 怎么找到对的 tool"
+4. **Versioning** 决定 "schema 演化时怎么不 break"
+5. **Legacy integration** 决定 "不能改的 service 怎么接"
+
+面试场把这 5 个 layer 讲清楚 + 加上「我自己在 Internal Agent Platform 踩过 X 坑」, 就是 senior platform engineer 的水准.
+
+---
+
+## 必问 clarifying questions
 
 **1. LLM vendor**
 
-> "Single vendor (Claude only) or multi-vendor? Affects design — MCP is vendor-neutral."
+> "Single vendor (Claude only) or multi-vendor? Multi → MCP makes more sense. Single + greenfield → OpenAI function calling is simpler."
 
 **2. Internal API contract stability**
 
-> "Internal APIs change quarterly or monthly? Affects need for versioned tool spec."
+> "Quarterly changes or monthly? Affects need for versioning + adapter chain. If schemas churn, eval drift detection is critical."
 
 **3. Auth model**
 
-> "Per-API key, OAuth, custom token? Agent acts as itself or on-behalf-of user?"
+> "Per-API key, OAuth, custom token? Agent acts as itself or on-behalf-of user? OBO is enterprise standard 2026."
 
 **4. Tool catalog size**
 
-> "50 services × 10 endpoints each = 500 tools. LLM can't see all. Need scoping/routing."
+> "50 services × 10 endpoints = 500 tools. LLM can't see all. Need RAG discovery + per-user filtering."
 
-**5. Latency target**
+**5. Latency budget**
 
-> "Internal API latency + proxy overhead — budget OK?"
+> "Internal API latency + proxy overhead — 2s budget OK? Sub-100ms hard cases need different design."
+
+**6. Tenant isolation**
+
+> "Multi-tenant SaaS — each tenant sees own custom tools + tenant-specific descriptions?"
 
 ---
 
-## 5 步框架
+## 5 步框架 (sample 45-60 min answer)
 
 | 时长 | 阶段 |
 |---|---|
-| 0-5 min | Clarify vendor / catalog size / auth |
-| 5-15 min | MCP overview + why fit |
-| 15-25 min | Proxy layer (auth / rate-limit / observability) |
-| 25-35 min | Tool discovery + scoping (500 tools problem) |
-| 35-45 min | Versioning + observability |
+| 0-5 min | Clarify vendor / catalog size / auth / stability |
+| 5-15 min | MCP overview + 3 primitives + why fit |
+| 15-25 min | Gateway architecture (6 responsibilities) |
+| 25-35 min | Tool discovery (RAG + RBAC + hierarchical + meta-tool) |
+| 35-45 min | Versioning + adapter chain + deprecation flow |
+| 45-55 min | Legacy integration (REST adapter / scrape / file drop) |
+| 55-60 min | Observability + cost attribution + Q&A buffer |
 
 ---
 
-## 我会这样答（sample）
+## 我会这样答 (sample 完整版)
 
-> "Clarify — *[假设: multi-vendor (Claude + Gemini + GPT), APIs change quarterly, OAuth + on-behalf-of, 500 tools, latency 2s budget]*.
+> "Clarify — *[假设: multi-vendor (Claude + Gemini + GPT-5.5), 50 microservices × 10 endpoints = 500 tools, OAuth + on-behalf-of, quarterly schema changes, 2s latency budget]*.
 >
-> **MCP overview**:
+> **Choose MCP** because: vendor-neutral, future-proof, dynamic discovery support, standardized auth flow. OpenAI function calling alone locks you to OpenAI's tool schema format.
 >
-> Anthropic's Model Context Protocol (open-source, adopted by major LLM vendors). Standardizes:
+> **Architecture in 4 layers**:
 >
-> ```
-> Resources   — read-only data (files, DB rows, search results)
-> Tools       — callable functions
-> Prompts     — reusable prompt templates
-> ```
+> **(1) MCP Gateway** as single ingress. 6 responsibilities: discovery (RAG), auth (OBO), rate limit (per-user × per-tool × per-tenant), observability (OTel propagation), caching (idempotent reads, per-tool TTL), versioning (adapter chain).
 >
-> Servers expose these over JSON-RPC (stdio / HTTP / SSE). Clients (LLM apps) discover and consume uniformly.
+> **(2) Per-service MCP server** wrapping each microservice. REST adapter pattern: hand-curated tool descriptions (auto-gen from OpenAPI is bad — descriptions too technical for LLM). 1 day work per service for clean MCP.
 >
-> **Why MCP for this customer**:
+> **(3) Tool discovery** via Qdrant vector index + RBAC pre-filter + hybrid retrieval (dense + BM25 with RRF) + usage frequency boost. Return top-20 to LLM, not all 500. Our internal data: tool selection accuracy 70% → 92% after RAG + per-user history weighting.
 >
-> - **Vendor-neutral**: same MCP server consumed by Claude / Gemini / GPT
-> - **Future-proof**: spec evolves, customer not vendor-locked
-> - **Tool discovery**: clients query `list_tools` dynamically, no hardcode
-> - **Standard auth**: OAuth flow standardized
+> **(4) Versioning + eval**: schema-diff CI check, breaking change forces major version bump, adapter chain v1 ↔ v2, 90-day deprecation window with customer notification, daily eval against golden set to detect drift.
 >
-> **Architecture for 50 services**:
+> **OBO 是 enterprise 红线**: agent service principal never has admin scope. Each tool call exchanges user_token for service_token, scope ≤ user's. Bug in agent code → can't leak data outside user's permission.
 >
-> ```
->             ┌─────────────────────────┐
->             │   Agent (any LLM)       │
->             └────────────┬────────────┘
->                          │ MCP protocol
->             ┌────────────┴────────────┐
->             │  MCP Gateway (proxy)    │
->             │  - Discovery / routing  │
->             │  - Auth / OBO           │
->             │  - Rate limit           │
->             │  - Observability        │
->             │  - Tool selection (RAG) │
->             └─────┬──────┬──────┬─────┘
->             ┌─────┴┐ ┌───┴───┐ ┌┴────┐
->             │MCP-1 │ │MCP-2  │ │... 50│
->             │(Salesforce)    │ │      │
->             └──┬───┘ └───┬───┘ └──┬───┘
->             ┌──┴────┐┌───┴────┐┌──┴────┐
->             │Cust API│Cust API ││Cust API│
->             │  #1   ││  #2    ││  #N   │
->             └───────┘└────────┘└───────┘
-> ```
+> **Legacy integration**: REST adapter for modern services (~1 day each), 3270 scrape for mainframe (only read-only), file drop for batch-only systems. Always plan for graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 'unavailable, try later'.
 >
-> **MCP Gateway (proxy) responsibilities**:
+> **Cost**: per-call attribution via OTel span tagging. Each tool call cost (LLM + tool API + observability overhead) attributed to tenant. Monthly bill auto-generated.
 >
-> **1. Tool discovery + scoping**
->
-> With 500 tools, LLM context can't hold all definitions. Solution:
->
-> ```python
-> # Tool catalog embedded
-> tool_index = vector_index([tool.description for tool in all_tools])
->
-> async def list_relevant_tools(user_query, user_role, top_k=20):
->     # 1. RAG: retrieve top tools by query
->     candidates = tool_index.search(user_query, top_k=50)
->     # 2. Filter by user permissions
->     allowed = [t for t in candidates if user_role.can_use(t)]
->     # 3. Return top-k
->     return allowed[:top_k]
-> ```
->
-> LLM sees top-20 most relevant tools, not all 500.
->
-> **2. Auth + OBO (on-behalf-of)**
->
-> ```python
-> async def proxy_call(tool_name, args, user_token):
->     # Get OAuth token for target service, scoped to user
->     service_token = await oauth.exchange(
->         user_token=user_token,
->         scope=tool_registry[tool_name].required_scopes,
->     )
->     
->     # Call underlying MCP server with delegated auth
->     return await mcp_servers[tool.service].call(
->         tool_name, args,
->         auth=service_token,
->     )
-> ```
->
-> Agent **never has more perms than user**.
->
-> **3. Rate limit + quota**
->
-> ```python
-> async def proxy_call(...):
->     if not rate_limit.allow(user, tool):
->         raise RateLimitExceeded
->     if user.session_quota_remaining(tool) <= 0:
->         raise QuotaExceeded
->     ...
-> ```
->
-> **4. Observability**
->
-> - Per-call: tool, user, latency, status, cost
-> - Aggregated: per-tool success rate, per-user usage
-> - Traces propagate to underlying services (OpenTelemetry)
->
-> **5. Caching**
->
-> ```python
-> # For idempotent reads
-> async def proxy_call(tool, args):
->     if tool.is_idempotent_read:
->         cache_key = hash(tool, args)
->         cached = await cache.get(cache_key)
->         if cached: return cached
->     
->     result = await underlying_call(...)
->     
->     if tool.is_idempotent_read:
->         await cache.set(cache_key, result, ttl=tool.cache_ttl)
->     return result
-> ```
->
-> **6. Versioning**
->
-> ```python
-> # MCP descriptor includes version
-> {
->   "name": "create_order",
->   "version": "2.0",
->   "schema": {...},
->   "deprecated_versions": ["1.0"],
-> }
->
-> # Agent specs which version (default latest)
-> # Old agents pinned to v1 work until version EOL
-> # Gradual migration on customer schedule
-> ```
->
-> **Custom API → MCP server adapter** (when underlying API isn't MCP-native):
->
-> ```python
-> # Each microservice gets a thin adapter
-> class SalesforceMCPServer:
->     async def list_tools(self):
->         return [
->             Tool(name='create_lead', schema=..., handler=self.create_lead),
->             Tool(name='get_account', schema=..., handler=self.get_account),
->         ]
->     
->     async def create_lead(self, args):
->         resp = await sf_rest.post('/leads', json=args, auth=...)
->         return self.translate_response(resp)
-> ```
->
-> Adapter handles: REST → MCP mapping, error code translation, type coercion.
->
-> **When NOT to use MCP**:
->
-> - Single LLM vendor + small tool count + greenfield → OpenAI function calling is simpler
-> - High-frequency tools (microseconds) where MCP proxy overhead matters
-> - Tools that don't fit MCP semantics (stateful long-running like SSH session)
->
-> **Implementation steps**:
->
-> 1. Identify customer's existing API surface (50 services)
-> 2. Categorize: which need adapter, which natively MCP, which custom (e.g., GraphQL)
-> 3. Build MCP gateway as the single point of contact for LLM
-> 4. Per service: write adapter (~1 day each, 50 days for full coverage)
-> 5. Tool discovery via vector index + role-based filter
-> 6. OAuth + observability baked into gateway"
+> **Implementation timeline**: 50 services × 1 day adapter = 50 day-engineers. Gateway core 30 days. RAG discovery 15 days. Observability 10 days. Eval suite 20 days. Total ~125 day-engineers, 6 month with 2 engineers."
 
 ---
 
-## 多场景变体 + 解法
+## 简历专属 reframe — Gao Xin's hooks
 
-### 变体 1: SaaS 集成客户内部 stack
+| Topic | 你的经验 | How to quote |
+|---|---|---|
+| Tool abstraction | Internal Agent Platform — workflow/tool/memory abstractions you owned | "On Internal Agent Platform we built exactly this — though pre-MCP we rolled our own protocol. Tool registry with JSON-schema-defined inputs/outputs, gateway with auth + rate-limit + observability + retry." |
+| RAG-based discovery | BNPL chatbot — intent → tool routing | "BNPL chatbot intent router used embedding-based tool selection. After adding RAG retrieval over tool descriptions, tool-selection accuracy went 70% → 92%." |
+| OAuth / OBO | Voice agent multi-tenant — permission scoping | "Voice agent for 7 markets had per-market OAuth — each tenant's CRM had own scope rules. Token broker centralized OBO exchange, agent never had cross-tenant access." |
+| Rate limit / quota | TikTok payment — per-user QPS limits | "TikTok payment infra has natural per-user QPS limits. We applied same pattern to agent tool calls: token bucket per (user, tool, tenant). Prevented one buggy agent loop from DDoSing internal service." |
+| OBO + OAuth scope exchange | Indonesia refund tier — tier-based confirm | "Indonesia refund had tier-based scope: tier-1 user could only refund < $100, tier-2 < $1000. OBO ensured agent calling refund tool only had user's tier's scope." |
+| Multi-LLM vendor | ConvFinQA — ablation across models | "Ran ablation across Claude / Gemini / GPT for ConvFinQA. MCP-style protocol would've let us swap LLM without rewriting tool layer — lesson learned." |
 
-> "我们 SaaS 给企业用, 客户有自己的 Salesforce / Workday / Jira。怎么集成？"
+**主动 quote**:
 
-**解法**:
-- **MCP 适配器 per 客户系统**: 写一次 Salesforce-MCP adapter, 所有客户复用
-- **Per-tenant config**: 客户的 endpoint / token 存 secret manager, MCP server 启动注入
-- **Customer-hosted MCP server option**: data sensitive 客户自己 host MCP server, 我们的 agent 远程调
-- **Network boundary**: VPC peering / VPN tunnel / OAuth bridge
-- **Schema discovery**: agent first call `list_tools()` 适应客户 SF 自定义 field
-
-### 变体 2: Multi-tenant agent platform
-
-> "1 平台服务 100 客户, 每客户工具 catalog 不同。"
-
-**解法**:
-- **Per-tenant tool registry**: 路由时按 tenant 加载工具子集
-- **Shared MCP infrastructure**: 1 套 MCP gateway, multiplex
-- **Quota per tenant**: tool call rate, cost budget
-- **Isolation**: tenant A 不能看到 tenant B 的 tool/data
-- **Per-tenant fine-tune**: 工具描述可能 per-tenant 微调 (业务术语不同)
-- **Centralized observability** 但 per-tenant 视图
-
-### 变体 3: Cross-cloud (GCP + AWS + Azure)
-
-> "Agent 要操作 3 个 cloud 资源。"
-
-**解法**:
-- **每 cloud 1 个 MCP server**: gcp-mcp / aws-mcp / azure-mcp
-- **统一 tool naming**: `cloud:gcp:gcs:upload` / `cloud:aws:s3:upload` 但 schema 相似
-- **Cross-cloud workflow**: agent 决定 'copy from gcs to s3' 编排两个 tool
-- **Auth**: 各自 cloud IAM, agent 用 OBO 或 service account
-- **Cost-tag**: 每 tool call 标 cloud, 成本归属
-- **Egress 警告**: 跨云转数据贵, tool wrapper warn
-
-### 变体 4: LLM 厂家可移植性
-
-> "今天用 Claude, 明天可能换 Gemini。Tool spec 不要绑死。"
-
-**解法**:
-- **MCP 是 vendor-neutral**: 同 MCP server 对接 Claude / GPT / Gemini
-- **Adapter layer**: MCP tool → OpenAI function calling 格式 / Anthropic tool_use / Google function spec
-- **Prompt template 抽象**: 'tool calling instruction' per vendor 不同, 用模板
-- **测试矩阵**: 同套 eval 在 N 个 LLM 跑, 防 vendor-lock-in regression
-- **Routing logic**: 不同 query 走不同 LLM (cost / quality 优化)
-
-### 变体 5: Legacy system 集成 (mainframe / COBOL)
-
-> "客户核心系统是 mainframe, 没 modern API。怎么 agent 化？"
-
-**解法**:
-- **Adapter heavy lifting**: REST wrapper around CICS / COBOL screen-scrape
-- **CDC (change data capture)**: 不直接调 legacy, read 改动 stream
-- **Read-only first**: legacy 改造慢, 先把 query 能力 expose
-- **Per-screen mock**: legacy unavailable → mock for dev
-- **Latency expect**: legacy 慢 (500ms-5s), agent 超 timeout 要 graceful handle
-- **Vendor relationship**: 跟 legacy team 谈, 加 idempotency / audit hook
-
----
-
-## 简历专属 reframe
-
-| 题 | 你做过 |
-|---|---|
-| Tool abstraction | Internal Agent Platform — workflow/tool/memory abstraction 你 owned |
-| API proxy | TikTok payment — gateway layer 自然有 |
-| OAuth / OBO | Voice agent multi-tenant — permission scoping |
-| Tool discovery | BNPL chatbot — intent → tool routing |
-| Rate limit / quota | TikTok payment — per-user QPS limits 必做 |
-
-**Quote**:
-
-> "On Internal Agent Platform we built exactly this — though pre-MCP we rolled our own protocol. **Tool registry** with JSON-schema-defined inputs/outputs, **gateway** that did auth + rate-limit + observability + retry, and **RAG-based tool discovery** for agents with 200+ tool catalog. The big production lesson: **without discovery**, agents tried to call non-existent tools or use wrong tool for task. After adding RAG retrieval over tool descriptions, agent tool-selection accuracy went from 70% to 92%."
+> "On Internal Agent Platform at ByteDance, we built the exact MCP equivalent before MCP standard existed — rolled our own JSON-RPC protocol with tool registry, gateway, RAG discovery. The big production lesson came at 200+ tool scale: **without RAG-based discovery, agents tried to call non-existent tools or used wrong tool for task**. Tool selection accuracy was 70%. After adding embedding retrieval over tool descriptions + usage frequency weighting, accuracy jumped to 92%. The other big lesson: **OBO is non-negotiable enterprise** — early version had agent service principal with admin scope, security review caught it, we built token broker for scope exchange. Took 3 weeks but eliminated a class of incidents."
 
 ---
 
 ## 5 follow-ups
 
 **Q1**: "MCP overhead — extra hop. Latency cost?"
+
 **A**:
-- Single proxy hop ~5-20ms
-- Auth check / rate limit ~1-2ms (Redis)
-- Observability instrumentation ~< 1ms
-- Total ~10-25ms — acceptable for 2s budget
-- For sub-100ms hard cases: pre-fetch + cache aggressive
+- Single proxy hop ~5-20ms (HTTP + JSON serialization)
+- Auth check + OBO exchange: 1-2ms cached, 50ms cold (token endpoint call)
+- Rate limit check: 1-2ms (Redis Lua)
+- Observability instrumentation: < 1ms
+- Total typical overhead: ~10-25ms — acceptable for 2s budget
+- For sub-100ms hard cases: pre-fetch tokens, aggressive caching, OBO cache 10min TTL, consider sidecar pattern (Envoy ext_authz)
 
 **Q2**: "Customer API changes break agent. How handle?"
+
 **A**:
-- **Schema versioning** in MCP spec
-- **Adapter layer** handles old / new mapping
-- **Deprecation warning** for old version, cap usage
-- **Eval suite** runs daily against tools, alert on schema drift
-- **Customer notification** before breaking change
+- **Schema versioning** in MCP tool spec (semver)
+- **Adapter layer** v1 → v2 mapping (declarative or code)
+- **Deprecation warning** in response (90 day window)
+- **Eval suite** runs daily against tools, alerts on schema drift via pass rate drop
+- **Customer notification automation** — email + dashboard before breaking change
+- **Schema diff CI check** — breaking change without major version bump = PR fails
 
 **Q3**: "500 tools — LLM context can't fit. Beyond RAG retrieval?"
+
 **A**:
-- **Hierarchical**: domain → category → tool (LLM picks domain, then tool)
-- **Per-agent specialization**: customer-support agent sees only support tools
-- **Dynamic loading**: agent calls `list_tools(query)` then uses subset
-- **Tool meta-tools**: a 'find_tool' tool that LLM uses to discover
+- **Hierarchical**: domain → category → tool (LLM picks domain in 1st call, tool in 2nd)
+- **Per-agent specialization**: customer-support agent sees only support tools, ops agent sees only ops tools
+- **Per-user filter (RBAC)**: filter before RAG
+- **Meta-tool `find_tool`**: minimal core + LLM proactively queries for more
+- **Usage history boost**: recent + frequent tools rank higher
+- **Hybrid retrieval**: BM25 + dense embedding via Reciprocal Rank Fusion
 
 **Q4**: "MCP server crashes — gateway behavior?"
+
 **A**:
-- Circuit breaker per-MCP-server
-- Health check every 30s
-- If down: return ToolUnavailable to agent
-- Agent decides: alternative tool / fallback / fail user-visible
-- Reconnect attempt after 1 min
+- **Circuit breaker per MCP server** — 10 fails in 1min → CB opens, 5min cooldown
+- **Health check every 30s** — gateway pings, marks unhealthy
+- **If CB open**: gateway returns `ToolUnavailable` error to agent
+- **Agent decides**: alternative tool / fallback / fail user-visible
+- **Reconnect attempt** after 1min if backend healthy
+- **Graceful degradation**: tier-1 real-time → tier-2 cached → tier-3 replica → tier-4 unavailable
 
 **Q5**: "Compare MCP vs OpenAI function calling — when each?"
+
 **A**:
-- **OpenAI function calling**: single-vendor, in-process, fast, simple
-- **MCP**: vendor-neutral, distributed, has versioning, has discovery
-- **In practice**: OpenAI function calling is the LLM-side protocol; MCP is the tool-side protocol. They're complementary — MCP tool defs map to OpenAI function defs
-- **Choose MCP** when: multi-vendor, customer-owned tools, long-term
+- **OpenAI function calling**: in-process, single-vendor, fast, simple. LLM-side protocol — tells LLM how to express tool calls.
+- **MCP**: cross-process, vendor-neutral, has versioning, dynamic discovery, Resources + Prompts in addition to Tools. Tool-side protocol — standardizes how tools expose themselves.
+- **They're complementary**: MCP tool defs map to OpenAI function defs via adapter. You can have a MCP server, and a thin layer that translates to OpenAI function calling format when LLM is OpenAI.
+- **Choose MCP** when: multi-vendor LLM, customer-owned tools, long-term platform, need dynamic discovery.
+- **Choose function calling only** when: single LLM (OpenAI committed), small tool count (<20), greenfield, no third-party tool ecosystem.
+
+**Q6** (bonus): "How does prompt injection / tool abuse risk change with MCP?"
+
+**A**:
+- MCP doesn't make it worse, but the abstraction layer is **the right place to enforce policy**:
+- **Tool description sanitization**: LLM reads tool description as part of prompt → injection risk if description has malicious instructions
+- **Argument validation**: schema validation before call, reject obvious injections
+- **OBO scope enforcement**: even if LLM is tricked into calling powerful tool, OBO limits scope to user's perms
+- **Per-tool sensitive flagging**: `send_email`, `transfer_money` require explicit user confirmation in UI
+- **Audit log**: every tool call logged with user, prompt, args, result → forensics
+- **Rate limit + quota**: hostile prompt can't burn through budget
+- The gateway is the chokepoint — implement security there
 
 ---
 
-## ❌ 易错点
+## ❌ 易错点 (top 10)
 
-1. **No abstraction** — agent talks directly to each API
-2. **Hardcode 500 tools** in LLM context (won't fit)
-3. **No OBO** — agent has more perms than user
-4. **No versioning** — API change breaks agent
-5. **No discovery** — agent doesn't know which tool to use
-6. **MCP as the LLM protocol** (confusing with function calling)
-7. **No circuit breaker per tool**
-
----
-
-## ✅ 加分项
-
-1. **MCP standard** awareness + when/why
-2. **Gateway responsibilities** (auth / RL / obs / cache / version)
-3. **Tool discovery via RAG** for large catalog
-4. **OBO** authorization flow
-5. **Adapter pattern** for non-MCP-native APIs
-6. **Versioning** strategy with deprecation
-7. **OpenTelemetry trace propagation**
-8. **Quote Internal Agent Platform 70→92% tool accuracy**
+1. **Hardcode 500 tools in LLM context** — token cost + selection accuracy drops
+2. **Agent has direct API access** — no OBO, scope creep, security review fails
+3. **No tool discovery** — agent doesn't know which tool to use, errors
+4. **Auto-gen MCP from OpenAPI** — descriptions too technical, LLM picks wrong
+5. **No versioning** — customer schema change breaks agent
+6. **No circuit breaker per server** — one server down → agent stuck retry loop
+7. **MCP as the LLM protocol** (confused with function calling) — wrong layer
+8. **Cache all tool outputs** — writes shouldn't be cached
+9. **OAuth token broker missing** — agent reuses user_token for all services (security)
+10. **No trace propagation** — debug agent flow impossible
 
 ---
 
-## Cheat Sheet
+## ✅ 加分项 (top 12)
+
+1. **MCP 3 primitives** (Resources / Tools / Prompts) awareness
+2. **Gateway 6 responsibilities** clearly enumerated
+3. **OBO** as enterprise standard, OAuth 2.0 token exchange (RFC 8693)
+4. **RAG-based tool discovery** with embedding + RRF + recency boost
+5. **Hierarchical / meta-tool** alternatives for 500+ tools
+6. **Adapter pattern** for non-MCP-native APIs
+7. **Versioning strategy** with deprecation flow + 90-day window
+8. **Eval suite + schema diff CI** for drift detection
+9. **OpenTelemetry trace propagation** end-to-end
+10. **Legacy integration** patterns (REST adapter / scrape / file drop / graceful degrade)
+11. **2026 vendor-neutral** awareness (Anthropic + Google + OpenAI all support)
+12. **Quote Internal Agent Platform 70 → 92% tool accuracy**
+
+---
+
+## 一句话总结
+
+> **MCP-based Gateway 是 2026 LLM agent integration 的事实标准**: 一个统一入口 + 3 原语 (Resources/Tools/Prompts) + 6 责任 (discovery/auth/rl/obs/cache/version).
+>
+> 500 tool 用 RAG discovery + RBAC + 历史加权, 50 service 用 1 天 1 个 adapter, schema 演化用 version + adapter chain + 90 day deprecation. OBO 保证 agent 权限 ≤ 用户权限.
+>
+> 这是 staff-level platform 设计.
+
+---
+
+## Cheat Sheet (印 1 页)
 
 ```
 MCP (Model Context Protocol):
-  Anthropic open standard, adopted broadly 2026
-  Vendor-neutral
+  Anthropic open standard, 2026 业界标准
+  Vendor-neutral (Claude + Gemini + GPT)
   3 primitives: Resources / Tools / Prompts
-  JSON-RPC over stdio / HTTP / SSE
+  JSON-RPC over stdio / HTTP / SSE / WebSocket
 
-Gateway responsibilities:
-  Tool discovery (RAG over descriptions)
-  Auth + OBO (OAuth scope exchange)
-  Rate limit + quota
-  Observability (OTel)
-  Caching (idempotent reads)
-  Versioning
-  Circuit breaker per server
+Gateway 6 责任:
+  Tool discovery       (RAG over descriptions)
+  Auth + OBO           (OAuth scope exchange)
+  Rate limit + quota   (per user × tool × tenant)
+  Observability        (OTel trace propagation)
+  Caching              (idempotent reads, per-tool TTL)
+  Versioning + adapter (schema evolution)
 
-500 tools problem:
-  RAG-based discovery (top-20 relevant)
-  Hierarchical (domain → category → tool)
-  Per-agent specialization
-  Meta-tool 'find_tool'
+500 tools 问题:
+  L1 RBAC filter       (user 权限内)
+  L2 RAG by query      (vector embed top-20)
+  L3 Hierarchical      (domain → category → tool)
+  L4 Meta-tool find_tool
+  Usage history boost + RRF (dense+BM25)
 
-OBO (on-behalf-of):
+OBO (On-Behalf-Of):
   User token → exchange for service token
   Service token scope ≤ user's perms
+  RFC 8693 OAuth 2.0 token exchange
   Agent never has more perms than user
 
 Adapter pattern:
-  REST API → MCP server adapter
-  Handles: protocol map, type coerce, error translate
-  ~1 day per service
+  REST → MCP wrapper, ~1 day per service
+  Hand-curate descriptions (not auto-gen OpenAPI)
+  Translate args + error codes
 
 Versioning:
-  Schema version in MCP spec
-  Adapter handles old/new map
-  Deprecation warning + EOL date
-  Eval suite catches drift
+  semver in tool spec
+  Adapter chain v1 ↔ v2
+  Deprecation 90-day window
+  Schema diff CI breaking detection
+  Eval suite daily for drift
+
+Legacy integration:
+  REST API → adapter (modern)
+  Mainframe → 3270 scrape (read-only)
+  Batch only → file drop S3
+  Always: graceful degradation tier-1 → tier-4
+
+Cache policy:
+  Idempotent read: cache with TTL
+  Write op: never cache
+  Per-user isolation for personal data
+  Semantic cache for fuzzy queries
+
+Trace propagation:
+  OTel context: traceparent header
+  Inject before forward to MCP server
+  E2E trace: agent → gateway → mcp server → real api
+
+Circuit breaker:
+  Per-MCP-server CB
+  10 fails / 1min → open
+  5min cooldown
+  Health check every 30s
+
+Cost attribution:
+  Per-call: LLM + tool API + obs overhead
+  Tag span with tenant_id, tool_id
+  Monthly bill auto-generated
+
+2026 model pricing:
+  Gemini 3 Flash: $0.50/$3 (cache $0.10)
+  Gemini 3 Pro:   $2/$12 (cache $0.40)
+  Haiku 4.5:      $1/$5 (cache $0.10)
+  Sonnet 4.6:     $3/$15 (cache $0.30)
+  Opus 4.7:       $5/$25 (cache $0.50)
+  GPT-5.5:        $5/$30 (cache $1)
 
 When NOT MCP:
-  Single vendor, small tool count, greenfield
-  Sub-100ms latency hard
-  Stateful long-running (e.g., SSH)
+  Single LLM vendor + small tool count + greenfield
+  Sub-100ms hard latency (MCP overhead too much)
+  Stateful long-running tool (e.g., SSH session)
 
-Compared to function-calling:
-  OpenAI FC: LLM-side protocol, in-process
-  MCP: tool-side protocol, distributed
-  Complementary, FC tools defined as MCP tools
+When MCP:
+  Multi-vendor LLM
+  Customer-owned tool ecosystem
+  Long-term platform
+  Need dynamic discovery
 
 红线:
-  - No abstraction
-  - Hardcode all tools in context
-  - No OBO
+  - All tools in LLM prompt
+  - Agent direct API call (no OBO)
+  - No tool discovery
+  - Auto-gen from OpenAPI
   - No versioning
-  - No discovery
   - No circuit breaker
+  - Cache writes
+  - No trace propagation
+  - MCP = function calling 概念混淆
+
+Resume quotes:
+  "Internal Agent Platform — 70% → 92% tool selection accuracy after RAG discovery"
+  "Voice agent 7 markets — per-tenant OBO scope"
+  "BNPL chatbot — intent → tool routing"
 ```
