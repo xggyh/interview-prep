@@ -446,32 +446,34 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>面试题准备 · OpenAI / Google · Hello Interview 整理</title>
-<meta name="description" content="OpenAI / Google 面试题汇总 · 题面 + 中文思路解析 · Python 解法 · System Design 架构思路">
+<title>AI Agent Cookbook · Recipes for production agent systems</title>
+<meta name="description" content="Personal study notes on production AI agents — tool calling, RAG, context management, LLM serving, FDE delivery patterns.">
+<script>(function(){{try{{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}}catch(e){{}}}})();</script>
 <link rel="stylesheet" href="assets/style.css?v={CSS_HASH}">
 </head>
 <body>
 <header class="site-header">
   <div class="container">
-    <h1><a href="index.html">🧠 面试题准备</a></h1>
-    <div class="meta">来源：hellointerview.com · {len(questions)} 题 · OpenAI + Google</div>
+    <h1><a href="index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta">{len(questions)} recipes · Tool Calling · RAG · LLM Eng · Delivery</div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
   </div>
 </header>
 <main class="container">
   <div class="intro">
-    <h2>冲刺！</h2>
-    <p>题目来自 hellointerview.com 社区的真实候选人报告。每题包含原始题面、中文思路解析、System Design 思路 / Python 解法、易错点。按公司 / 类型筛选，按最近问询时间倒序。共 {len(questions)} 题。</p>
+    <h2>Recipes for production agent systems</h2>
+    <p>A personal study log on building real agent systems — gathered from production debugging notes, papers, and post-mortems. Each entry covers the problem, the framework I use, a sample walk-through, common pitfalls, and follow-up directions. Filter by topic / depth, sorted by recency. {len(questions)} entries total.</p>
     <div class="stats">{counts}</div>
   </div>
 
   <details class="self-intro">
-    <summary>📣 60-sec self intro (English, for HR screen)</summary>
+    <summary>📣 About the author</summary>
     <div class="self-intro-body">
       <p>Hi, I'm <strong>Gao Xin</strong> — I've been an algorithm engineer for about 5 years, currently <strong>Expert Algorithm Engineer and Technical POC</strong> at TikTok / ByteDance Global Payment in Singapore.</p>
-      <p>What I do is essentially <strong>what Tomoro does</strong> — taking frontier LLM and agent technology and deploying it in production for real business use cases.</p>
+      <p>I work at the intersection of frontier LLM/agent technology and production deployment — taking research-grade capabilities and shipping them as real systems for real business use cases.</p>
       <p>The project closest to my heart right now is a <strong>multilingual voice AI agent</strong> I lead — it handles debt collection conversations across <strong>7 markets in 6 languages</strong>, integrating ASR, TTS, and an LLM agent with tool-calling. I own it end-to-end: from data construction and post-training (SFT, DPO, RL-style alignment), through inference optimization on vLLM and SGLang, to the agent orchestration layer and the streaming voice stack.</p>
       <p>Before that I built a <strong>BNPL chatbot</strong> — an agentic + RAG system in production with intent routing and sub-agent orchestration — and I co-design our <strong>internal Agent Platform</strong> that other teams across ByteDance use to ship their own GenAI features.</p>
-      <p>The reason I'm excited about Tomoro is the role itself — being <strong>technical POC</strong> at TikTok already feels FDE-shaped: I sit between research, engineering, product, and regional business teams, translating model capabilities into solutions that move real metrics. Tomoro takes that to the next level — actually doing it at customer sites with frontier models. I'd love to do that work full-time.</p>
+      <p>This cookbook is where I write down what I learn about each pattern — so future me (and anyone else) can re-derive it without re-grinding.</p>
     </div>
   </details>
 
@@ -558,6 +560,25 @@ document.querySelectorAll('button[data-sort]').forEach(btn => {{
     applySort();
   }});
 }});
+
+// Theme toggle
+(function(){{
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){{
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }}
+  update();
+  btn.addEventListener('click', () => {{
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try {{ localStorage.setItem('theme', next); }} catch(e) {{}}
+    update();
+  }});
+}})();
 </script>
 </body>
 </html>"""
@@ -683,15 +704,17 @@ def render_detail(q, raw, analysis_md, prev_q, next_q):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{esc(title)} · 面试题准备</title>
+<title>{esc(title)} · AI Agent Cookbook</title>
+<script>(function(){{try{{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}}catch(e){{}}}})();</script>
 <link rel="stylesheet" href="../assets/style.css?v={CSS_HASH}">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
 <header class="site-header">
   <div class="container">
-    <h1><a href="../index.html">🧠 面试题准备</a></h1>
-    <div class="meta"><a href="../index.html">← 返回列表</a></div>
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
   </div>
 </header>
 <main class="container detail">
@@ -752,6 +775,25 @@ def render_detail(q, raw, analysis_md, prev_q, next_q):
       try {{ document.execCommand('copy'); btn.textContent = '✓ 已复制'; }}
       finally {{ ta.remove(); setTimeout(() => location.reload(), 1500); }}
     }}
+  }});
+}})();
+
+// Theme toggle
+(function(){{
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){{
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }}
+  update();
+  btn.addEventListener('click', () => {{
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try {{ localStorage.setItem('theme', next); }} catch(e) {{}}
+    update();
   }});
 }})();
 </script>
