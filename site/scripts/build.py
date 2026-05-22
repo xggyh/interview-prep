@@ -18,11 +18,12 @@ LEGACY_JSON = ROOT / "openai-interview-questions.json"
 QUESTIONS_JSON = UNIFIED_JSON if UNIFIED_JSON.exists() else LEGACY_JSON
 
 # Company display order on the index page
-COMPANY_ORDER = ["Google FDE", "FDE", "OpenAI", "Google"]
+COMPANY_ORDER = ["Google FDE", "Google L5", "FDE", "OpenAI", "Google"]
 
 # Per-company brand color (used for the company badge tint)
 COMPANY_COLOR = {
     "Google FDE": "#1a73e8",  # Google FDE — Google brand blue
+    "Google L5":  "#0f9d58",  # Google L5 — Google brand green (Senior coding focus)
     "FDE":    "#dc2626",   # FDE red (Palantir/OpenAI/Google composite)
     "OpenAI": "#10a37f",   # OpenAI green
     "Google": "#4285f4",   # Google blue
@@ -358,8 +359,25 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         href = f"questions/{slug_id}.html"
         qtype = q["type"]
         companies = q.get("companies", {})
+
+        # Detect "Google L5" — Senior-level Coding at Google (matches the
+        # hellointerview.com filter: company=Google + level=SENIOR + type=CODING).
+        is_google_l5 = False
+        if "Google" in companies and qtype == "Coding":
+            g_level = (companies["Google"].get("level") or "")
+            if "Senior" in g_level and "Junior-Senior" not in g_level:
+                is_google_l5 = True
+
         company_list = [c for c in COMPANY_ORDER if c in companies] + \
                        [c for c in companies if c not in COMPANY_ORDER]
+        # Inject pseudo-company "Google L5" so the existing company filter UI can target it
+        if is_google_l5 and "Google L5" not in company_list:
+            # Place right after Google for visual grouping
+            try:
+                idx = company_list.index("Google") + 1
+            except ValueError:
+                idx = len(company_list)
+            company_list.insert(idx, "Google L5")
         # Aggregate reports across companies for display
         total_reports = sum((companies[c].get("reportedUsers") or 0) for c in companies)
         # Most recent last-asked across companies
@@ -377,10 +395,18 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
 
         company_badges = []
         for c in company_list:
+            if c not in companies:
+                # Pseudo-company (e.g., "Google L5") — used only for filter, not displayed as badge
+                continue
             color = COMPANY_COLOR.get(c, "#57606a")
             n = companies[c].get("reportedUsers") or 0
             company_badges.append(
                 f'<span class="company-badge" style="--c:{color}" title="{esc(c)}: {n} 人报告">{esc(c)} {n}</span>'
+            )
+        # Render Google L5 as a distinct badge (since not in companies dict)
+        if is_google_l5:
+            company_badges.append(
+                f'<span class="company-badge" style="--c:{COMPANY_COLOR["Google L5"]}" title="Google L5 (Senior Coding)">Google L5</span>'
             )
 
         # Deep dive badge for teaching-style rewritten questions
@@ -828,6 +854,11 @@ def main():
         type_groups.setdefault(q["type"], []).append(q)
         for c in q.get("companies", {}):
             company_groups.setdefault(c, []).append(q)
+        # Pseudo-company "Google L5" — Senior-level Coding at Google
+        if q.get("type") == "Coding" and "Google" in q.get("companies", {}):
+            g_level = (q["companies"]["Google"].get("level") or "")
+            if "Senior" in g_level and "Junior-Senior" not in g_level:
+                company_groups.setdefault("Google L5", []).append(q)
 
     # Recency sort by MAX lastAsked across all companies
     def sk(q):
