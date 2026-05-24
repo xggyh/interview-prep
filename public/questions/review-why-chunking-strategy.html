@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Deep Dive #1 · Why That Chunking — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / AI Deep Dive #1 · Why That Chunking — 复习速查</div>
+  <h1>AI Deep Dive #1 · Why That Chunking — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-why-chunking-strategy.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-why-chunking-strategy.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [why-chunking-strategy] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>AI Deep Dive #1 · Why That Chunking — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/why-chunking-strategy.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/why-chunking-strategy.html"><code>why-chunking-strategy.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<blockquote><p><strong>Chunking 不是「切 doc」, 是「让 retrieval + generation 联合最优的设计决策」</strong>. 5 个决策维度: corpus 特征 / query pattern / retrieval method / embedding context limit / latency budget. Production 默认: structure-aware 300-500t + 30% overlap + hybrid (dense 0.7 + BM25 0.3 RRF) + bge-reranker-v2 top-50→10 + metadata (heading_path / doc_id / tenant / freshness / ACL). <strong>Eval-driven 不是 intuition-driven</strong>.</p></blockquote>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>Chunking</td><td>长文档切片段独立 embed</td><td>RAG 第一步</td></tr><tr><td>Fixed-size token</td><td>每 N tokens 一切 (e.g., 512)</td><td>baseline only</td></tr><tr><td>Recursive</td><td>\n\n → \n → . 递归 split</td><td>LangChain 默认 safe</td></tr><tr><td>Semantic chunking</td><td>embed 邻句, 相似度变化点切</td><td>主题混杂长文</td></tr><tr><td>Structure-aware</td><td>按 markdown header / HTML DOM 切</td><td>⭐ 结构化文档</td></tr><tr><td>Hierarchical (parent-child)</td><td>retrieve small, send large parent to LLM</td><td>长文回答需 large context</td></tr><tr><td>Late chunking</td><td>先 embed 整 doc, 再切 (Jina v3)</td><td>上下文依赖强</td></tr><tr><td>Dense</td><td>text-embedding 向量检索</td><td>语义近义</td></tr><tr><td>BM25 (Sparse)</td><td>关键词 / TF-IDF</td><td>精确术语 / ID</td></tr><tr><td>Hybrid</td><td>dense + BM25 加权</td><td>⭐ production 默认</td></tr><tr><td>Late interaction</td><td>ColBERT, token-level</td><td>5x storage 高 precision</td></tr><tr><td>Rerank</td><td>cross-encoder 二次精排</td><td>bge-reranker-v2-m3</td></tr><tr><td>RRF</td><td>Reciprocal Rank Fusion</td><td>hybrid 融合方法</td></tr><tr><td>HNSW</td><td>Hierarchical Navigable Small World</td><td>向量索引</td></tr><tr><td>ANN</td><td>Approximate Nearest Neighbor</td><td>向量检索</td></tr><tr><td>Metadata</td><td>heading_path / acl / freshness / lang</td><td>chunk 自带身份证</td></tr><tr><td>LLM-as-judge</td><td>用更强 LLM 评 retrieval</td><td>answer correctness eval</td></tr><tr><td>Cohen's kappa</td><td>judge 校准, &gt; 0.6 acceptable</td><td>LLM judge 不能裸用</td></tr></tbody></table>
+<h4>🎯 5 个核心 framework</h4>
+<p><strong>Framework 1</strong>: 6-Strategy Chunking Taxonomy</p>
+<ul><li>When: 任何 RAG 系统初始化</li><li>Algorithm: Fixed-size (baseline) / Recursive (safe default) / Semantic (主题混杂) / Structure-aware (markdown/PDF ⭐) / Hierarchical (parent-child) / Late chunking (Jina v3)</li><li>Trade-off: 速度 vs coherence vs implementation complexity</li><li>Tools: LangChain TextSplitter, llama_index node parsers, Jina-embed-v3 late, semantic-text-splitter</li></ul>
+<p><strong>Framework 2</strong>: 5-Method Retrieval Stack</p>
+<ul><li>When: 配合 chunking 联合设计</li><li>Algorithm:</li><li>Dense only (BGE-M3 / text-embedding-3-large) for 语义</li><li>BM25 only (Elasticsearch / Tantivy) for 精确术语 / ID</li><li>Hybrid (α=0.6-0.8 dense, RRF fusion) ⭐ production 默认</li><li>ColBERT (5x storage, 极致 precision)</li><li>+ Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget</li><li>Trade-off: precision vs latency vs storage</li><li>Tools: Pinecone / Weaviate / Qdrant / pgvector, Elasticsearch, Cohere rerank-v3</li></ul>
+<p><strong>Framework 3</strong>: 5 Decision Factors</p>
+<ul><li>When: 选 chunking 时</li><li>Algorithm:</li></ul>
+<ol><li>Corpus characteristics (length P50/P99, structure, tables, code, languages)</li><li>Query patterns (entity density, multi-hop, ID matching)</li><li>Retrieval method (joint design, dense vs hybrid 决定 chunking)</li><li>Embedding model context limit (bge-large 512, OpenAI 3-large 8191)</li><li>Latency budget (rerank 3-5x latency, budget &lt; 200ms 可能跳)</li></ol>
+<ul><li>Trade-off: 一个 factor 错 = full redesign</li><li>Tools: profile_corpus script (doc_count / length percentile / has_tables / has_code / languages / has_headings)</li></ul>
+<p><strong>Framework 4</strong>: Multi-Modal Chunking</p>
+<ul><li>When: 文档含 tables / code / 公式 / lists / images</li><li>Algorithm:</li><li>Tables → integral chunk + row chunks + NL description ("Q3 revenue was $1.2B (+8% YoY)")</li><li>Code → AST-aware (函数/类边界, 保持完整)</li><li>Formulas → LaTeX → NL + keep original</li><li>Lists → unit when small, header-replicated when split</li><li>Images → CLIP embed + caption + surrounding text</li><li>Trade-off: 多 chunker = 系统复杂度, 但单一 chunker 在混合 doc 表现差</li><li>Tools: unstructured.io, llama-parse, pdfplumber, tree-sitter (AST), CLIP / SigLIP</li></ul>
+<p><strong>Framework 5</strong>: 3-Layer Eval Methodology</p>
+<ul><li>When: 证明 "我选的是最优"</li><li>Algorithm:</li><li>Layer 1 Retrieval (golden set 200-500 queries): recall@10, NDCG@10, MRR</li><li>Layer 2 Generation: answer correctness via LLM-judge (Gemini 3 Pro / Claude Opus 4.7), Cohen's kappa &gt; 0.6 校准</li><li>Layer 3 Operational: latency P50/P99, cost per query, ingest throughput</li><li>Ablation: 9 variants, isolated changes</li><li>Slice: by query_type / difficulty / language</li><li>Cost-Quality Pareto front</li><li>Trade-off: 不只看 recall, 看 cost-quality 平衡</li><li>Tools: ragas, trulens, BEIR benchmark, custom golden set, LLM-judge calibration</li></ul>
+<h4>🌳 关键决策树</h4>
+<pre class="language-plaintext"><code class="language-plaintext">文档类型?
+├── 纯文本 / Markdown → Structure-aware (按 H2 切) ⭐
+├── PDF 含表格 / 公式 → 分类型 chunk (table integral / code AST / prose paragraph)
+├── 代码 → AST-aware (函数/类边界)
+├── Wiki / Confluence → Structure-aware + ACL metadata
+└── 多语言混杂 → BGE-M3 multilingual + per-language metadata
+
+Query 类型?
+├── 含 ID / 缩写 / 错拼 → Hybrid (BM25 抓精确)
+├── 纯语义 → Dense
+├── 多 hop reasoning → Hierarchical (small retrieve, large parent to LLM)
+└── 时间精确 ("Q3 2024") → BM25 + freshness metadata filter
+
+Latency budget?
+├── &lt; 200ms → skip rerank, 仅 hybrid
+├── 200-500ms → hybrid + rerank top-50→10 ⭐
+└── &gt; 500ms OK → ColBERT 全量 precision
+
+Corpus scale?
+├── &lt; 100K docs → 任意 setup
+├── 1M docs → HNSW + per-tenant sharding
+├── 100M docs → distilled embedding (768→256), tiered hot/cold
+└── 长 corpus + long-context model? → Hybrid (RAG narrows, Gemini 3 Pro / Claude Opus 4.7 digests)</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: 6-Strategy Taxonomy 实操</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # 1. Fixed-size: RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=50)
+  # 2. Recursive: 按 \n\n → \n → . 递归
+  # 3. Semantic: SemanticChunker, threshold breakpoint
+  # 4. Structure-aware: MarkdownHeaderTextSplitter or unstructured.io
+  # 5. Hierarchical: ParentDocumentRetriever, child 200t / parent 1500t
+  # 6. Late chunking: jina-embeddings-v3 with context-aware embed
+  
+  Production 默认: structure-aware 300-500t + 30% overlap + metadata enrich</code></pre>
+<ul><li>Top 3 gotchas: 默认 512 fixed → 句子截断 / 表格当 prose 切 → 信息丢失 / 切完换 embedding → 全部 re-embed</li><li>Tools: LangChain TextSplitters, llama_index node parser, semantic-text-splitter rust</li></ul>
+<p><strong>Problem 2: 5-Decision-Factor</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  profile = {
+      'doc_count': 50000,
+      'length_p50_p99': (1200, 8500),  # tokens
+      'has_tables': True,
+      'has_code': False,
+      'languages': {'en': 0.6, 'id': 0.2, 'vi': 0.1, 'th': 0.1},
+      'has_headings_pct': 0.85,
+      'query_pattern': 'entity_heavy + multi_hop',
+      'latency_budget_ms': 400,
+      'embed_ctx_limit': 8191,
+  }
+  → choose: structure-aware + hybrid + rerank</code></pre>
+<ul><li>Top 3 gotchas: 不 profile 直接 default / ignore latency budget / 忽略 query pattern</li><li>Tools: profile script, Pandas describe, Counter</li></ul>
+<p><strong>Problem 3: Multi-Modal Chunking</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Tables (financial 10-K):
+    Integral chunk (整张表 + 表标题 + 列名 metadata)
+    + Row chunks (每行单独 index)
+    + NL description ("Q3 revenue $1.2B, +8% YoY")
+  
+  Code:
+    AST-based (tree-sitter)
+    Function/Class boundary 保持完整
+    Imports + class signature 作为 metadata
+  
+  Formulas:
+    LaTeX original + NL translation
+    Both indexed
+  
+  Lists:
+    Small → unit chunk
+    Long → header-replicated when split
+  
+  Images:
+    CLIP / SigLIP embed
+    Caption text 一同 index
+    Surrounding paragraph context</code></pre>
+<ul><li>Top 3 gotchas: 表格当 prose / 代码乱切 / 公式只存 LaTeX</li><li>Tools: unstructured.io, llama-parse, pdfplumber, tree-sitter, CLIP</li></ul>
+<p><strong>Problem 4: Metadata Enrichment (chunk 身份证)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  metadata = {
+      'chunk_id': uuid,
+      'doc_id': '...',
+      'chunk_order': 3,
+      'heading_path': ['Chapter 2', 'Refund Policy', 'Timeline'],
+      'chunk_type': 'prose' | 'table' | 'code' | 'list',
+      'section_level': 2,
+      'source_url': '...',
+      'created_at': '2026-05-01',
+      'updated_at': '2026-05-15',
+      'author': '...',
+      'acl_list': ['ml_team', 'fde'],  # 硬过滤 pre-search
+      'tenant_id': 'acme',  # 硬过滤
+      'freshness_score': 0.92,
+      'confidence': 0.88,
+      'review_status': 'approved',
+      'language': 'id',
+      'topic_tags': ['refund', 'paylater'],
+      'embedding_model_version': 'bge-m3-v1.5',
+  }</code></pre>
+<ul><li>Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)</li><li>Tools: pgvector with JSONB, Pinecone metadata filter, pre-search WHERE clause</li></ul>
+<p><strong>Problem 5: Eval Methodology (3-Layer)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # Layer 1: Retrieval
+  recall_at_10 = num_relevant_in_top10 / num_relevant_total
+  ndcg_at_10 = sum(rel_i / log2(i+1)) / ideal_ndcg
+  mrr = mean(1/rank_first_relevant)
+  
+  # Layer 2: Generation
+  llm_judge_score = gemini_pro.complete(f"Rate answer correctness 0-10: {ans} vs {gold}")
+  kappa = cohen_kappa(human_score, judge_score)  # &gt; 0.6
+  
+  # Layer 3: Operational
+  p50, p99 latency; cost_per_query; ingest_throughput
+  
+  # Ablation: 9 variants, isolated changes
+  # Slice: by query_type / difficulty / language
+  # Pareto front: cost vs quality</code></pre>
+<ul><li>Top 3 gotchas: 只看 recall (忽略 generation correctness) / LLM-judge 不校准 / 没 ablation 不知道哪个 component lift</li><li>Tools: ragas, trulens, BEIR, MS MARCO, custom 200-500 golden, LLM-judge with kappa</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>默认 512 token 没 overlap → 句子截断 ("7-" / "-14" 分裂)</li><li>表格当 prose 切 → 信息丢失</li><li>没 metadata → LLM 不知道 chunk 出处</li><li>凭 intuition 选 → eval-driven 才 production-grade</li><li>切完换 embedding model → 必须 re-embed 全部</li><li>没 ACL 硬过滤 → 越权检索, 用户能 enumerate 文档存在性</li><li>没 freshness metadata → 旧政策被检 → 答错</li><li>Hybrid 没 RRF 直接 weighted sum → 分数不可比</li><li>Rerank 不分 latency budget → P99 爆</li><li>Hierarchical 没存 parent → retrieve 后无 large context</li><li>Semantic chunking 全量跑 → 2-3x slow ingest, 1M doc 跑不动</li><li>Late chunking 不支持的 embed model → 用了等于白用</li><li>没 stratify eval → 某 language 退步被掩盖</li><li>LLM-judge self-preference bias → 用不同 family</li><li>没 cost-quality Pareto → 选最高 recall 不一定最 optimal</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Structure-aware FAQ</td><td>BNPL 客服 RAG</td><td>FAQ Q-A 对切 + lang metadata</td></tr><tr><td>Multi-modal table</td><td>ConvFinQA</td><td>表格 integral + row + NL desc, 数字 BM25</td></tr><tr><td>Hierarchical</td><td>Voice agent 7 markets 法规</td><td>small retrieve large parent to LLM</td></tr><tr><td>ACL filter pre-search</td><td>Internal Agent Platform</td><td>per-team 权限隔离</td></tr><tr><td>Hybrid α tuning</td><td>BNPL multi-lang</td><td>0.6 dense + 0.4 BM25 ID match</td></tr><tr><td>Eval methodology</td><td>ConvFinQA 9-variant ablation</td><td>golden + ablation + slice</td></tr><tr><td>Cost-quality Pareto</td><td>Voice agent</td><td>rerank 不是默认开</td></tr><tr><td>LLM-as-judge calibration</td><td>ConvFinQA</td><td>kappa &gt; 0.6 校准</td></tr><tr><td>Multi-language BGE-M3</td><td>Voice agent</td><td>7 markets 6 languages</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"I chose structure-aware over fixed-size because the corpus had 85% headings — fixed would break the semantic boundary"</li><li>"Hybrid with α=0.7 dense + 0.3 BM25, RRF fusion, because queries had both semantic and entity components"</li><li>"I'd never pick chunking without first profiling the corpus — length P99, table density, language mix all matter"</li><li>"ConvFinQA — tables are integral chunks with row-level sub-chunks. Numbers go into BM25 separately, calculator agent verifies"</li><li>"Hierarchical for legal queries — child chunk retrieves the exact clause, parent gives LLM the section context"</li><li>"Eval is 3-layer: retrieval (recall@10), generation (LLM judge with kappa &gt; 0.6), operational (P99 latency + cost)"</li><li>"I'd switch to ColBERT only if precision is critical and storage 5x is OK — for most production, hybrid + rerank wins Pareto"</li><li>"At 100M scale I'd distill embedding 768 → 256, tiered hot/cold storage, and may skip rerank or distill the rerank model"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>默认 512 fixed 没 overlap</li><li>表格当 prose 切</li><li>没 metadata</li><li>凭 intuition 选不 eval</li><li>切完换 embedding model</li><li>没 ACL 硬过滤 pre-search</li><li>Hybrid 没 RRF 直接 weighted sum</li><li>Hierarchical 没存 parent</li><li>LLM-judge 不校准 kappa</li><li>没 stratify eval, aggregate 掩盖</li></ol>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-it-blocks-security.html">← Client Sim #5 · IT Blocks Security — 复习速查</a>
+    <a href="review-dataset-100x.html">AI Deep Dive #2 · Dataset 100x — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## AI Deep Dive #1 · Why That Chunking — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/why-chunking-strategy.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`why-chunking-strategy.html`](questions/why-chunking-strategy.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **Chunking 不是「切 doc」, 是「让 retrieval + generation 联合最优的设计决策」**. 5 个决策维度: corpus 特征 / query pattern / retrieval method / embedding context limit / latency budget. Production 默认: structure-aware 300-500t + 30% overlap + hybrid (dense 0.7 + BM25 0.3 RRF) + bge-reranker-v2 top-50→10 + metadata (heading_path / doc_id / tenant / freshness / ACL). **Eval-driven 不是 intuition-driven**.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| Chunking | 长文档切片段独立 embed | RAG 第一步 |
+| Fixed-size token | 每 N tokens 一切 (e.g., 512) | baseline only |
+| Recursive | \n\n → \n → . 递归 split | LangChain 默认 safe |
+| Semantic chunking | embed 邻句, 相似度变化点切 | 主题混杂长文 |
+| Structure-aware | 按 markdown header / HTML DOM 切 | ⭐ 结构化文档 |
+| Hierarchical (parent-child) | retrieve small, send large parent to LLM | 长文回答需 large context |
+| Late chunking | 先 embed 整 doc, 再切 (Jina v3) | 上下文依赖强 |
+| Dense | text-embedding 向量检索 | 语义近义 |
+| BM25 (Sparse) | 关键词 / TF-IDF | 精确术语 / ID |
+| Hybrid | dense + BM25 加权 | ⭐ production 默认 |
+| Late interaction | ColBERT, token-level | 5x storage 高 precision |
+| Rerank | cross-encoder 二次精排 | bge-reranker-v2-m3 |
+| RRF | Reciprocal Rank Fusion | hybrid 融合方法 |
+| HNSW | Hierarchical Navigable Small World | 向量索引 |
+| ANN | Approximate Nearest Neighbor | 向量检索 |
+| Metadata | heading_path / acl / freshness / lang | chunk 自带身份证 |
+| LLM-as-judge | 用更强 LLM 评 retrieval | answer correctness eval |
+| Cohen's kappa | judge 校准, > 0.6 acceptable | LLM judge 不能裸用 |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: 6-Strategy Chunking Taxonomy
+- When: 任何 RAG 系统初始化
+- Algorithm: Fixed-size (baseline) / Recursive (safe default) / Semantic (主题混杂) / Structure-aware (markdown/PDF ⭐) / Hierarchical (parent-child) / Late chunking (Jina v3)
+- Trade-off: 速度 vs coherence vs implementation complexity
+- Tools: LangChain TextSplitter, llama_index node parsers, Jina-embed-v3 late, semantic-text-splitter
+
+**Framework 2**: 5-Method Retrieval Stack
+- When: 配合 chunking 联合设计
+- Algorithm:
+  - Dense only (BGE-M3 / text-embedding-3-large) for 语义
+  - BM25 only (Elasticsearch / Tantivy) for 精确术语 / ID
+  - Hybrid (α=0.6-0.8 dense, RRF fusion) ⭐ production 默认
+  - ColBERT (5x storage, 极致 precision)
+  - + Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget
+- Trade-off: precision vs latency vs storage
+- Tools: Pinecone / Weaviate / Qdrant / pgvector, Elasticsearch, Cohere rerank-v3
+
+**Framework 3**: 5 Decision Factors
+- When: 选 chunking 时
+- Algorithm:
+  1. Corpus characteristics (length P50/P99, structure, tables, code, languages)
+  2. Query patterns (entity density, multi-hop, ID matching)
+  3. Retrieval method (joint design, dense vs hybrid 决定 chunking)
+  4. Embedding model context limit (bge-large 512, OpenAI 3-large 8191)
+  5. Latency budget (rerank 3-5x latency, budget < 200ms 可能跳)
+- Trade-off: 一个 factor 错 = full redesign
+- Tools: profile_corpus script (doc_count / length percentile / has_tables / has_code / languages / has_headings)
+
+**Framework 4**: Multi-Modal Chunking
+- When: 文档含 tables / code / 公式 / lists / images
+- Algorithm:
+  - Tables → integral chunk + row chunks + NL description ("Q3 revenue was $1.2B (+8% YoY)")
+  - Code → AST-aware (函数/类边界, 保持完整)
+  - Formulas → LaTeX → NL + keep original
+  - Lists → unit when small, header-replicated when split
+  - Images → CLIP embed + caption + surrounding text
+- Trade-off: 多 chunker = 系统复杂度, 但单一 chunker 在混合 doc 表现差
+- Tools: unstructured.io, llama-parse, pdfplumber, tree-sitter (AST), CLIP / SigLIP
+
+**Framework 5**: 3-Layer Eval Methodology
+- When: 证明 "我选的是最优"
+- Algorithm:
+  - Layer 1 Retrieval (golden set 200-500 queries): recall@10, NDCG@10, MRR
+  - Layer 2 Generation: answer correctness via LLM-judge (Gemini 3 Pro / Claude Opus 4.7), Cohen's kappa > 0.6 校准
+  - Layer 3 Operational: latency P50/P99, cost per query, ingest throughput
+  - Ablation: 9 variants, isolated changes
+  - Slice: by query_type / difficulty / language
+  - Cost-Quality Pareto front
+- Trade-off: 不只看 recall, 看 cost-quality 平衡
+- Tools: ragas, trulens, BEIR benchmark, custom golden set, LLM-judge calibration
+
+### 🌳 关键决策树
+
+```
+文档类型?
+├── 纯文本 / Markdown → Structure-aware (按 H2 切) ⭐
+├── PDF 含表格 / 公式 → 分类型 chunk (table integral / code AST / prose paragraph)
+├── 代码 → AST-aware (函数/类边界)
+├── Wiki / Confluence → Structure-aware + ACL metadata
+└── 多语言混杂 → BGE-M3 multilingual + per-language metadata
+
+Query 类型?
+├── 含 ID / 缩写 / 错拼 → Hybrid (BM25 抓精确)
+├── 纯语义 → Dense
+├── 多 hop reasoning → Hierarchical (small retrieve, large parent to LLM)
+└── 时间精确 ("Q3 2024") → BM25 + freshness metadata filter
+
+Latency budget?
+├── < 200ms → skip rerank, 仅 hybrid
+├── 200-500ms → hybrid + rerank top-50→10 ⭐
+└── > 500ms OK → ColBERT 全量 precision
+
+Corpus scale?
+├── < 100K docs → 任意 setup
+├── 1M docs → HNSW + per-tenant sharding
+├── 100M docs → distilled embedding (768→256), tiered hot/cold
+└── 长 corpus + long-context model? → Hybrid (RAG narrows, Gemini 3 Pro / Claude Opus 4.7 digests)
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: 6-Strategy Taxonomy 实操**
+- 核心解法:
+  ```python
+  # 1. Fixed-size: RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=50)
+  # 2. Recursive: 按 \n\n → \n → . 递归
+  # 3. Semantic: SemanticChunker, threshold breakpoint
+  # 4. Structure-aware: MarkdownHeaderTextSplitter or unstructured.io
+  # 5. Hierarchical: ParentDocumentRetriever, child 200t / parent 1500t
+  # 6. Late chunking: jina-embeddings-v3 with context-aware embed
+  
+  Production 默认: structure-aware 300-500t + 30% overlap + metadata enrich
+  ```
+- Top 3 gotchas: 默认 512 fixed → 句子截断 / 表格当 prose 切 → 信息丢失 / 切完换 embedding → 全部 re-embed
+- Tools: LangChain TextSplitters, llama_index node parser, semantic-text-splitter rust
+
+**Problem 2: 5-Decision-Factor**
+- 核心解法:
+  ```python
+  profile = {
+      'doc_count': 50000,
+      'length_p50_p99': (1200, 8500),  # tokens
+      'has_tables': True,
+      'has_code': False,
+      'languages': {'en': 0.6, 'id': 0.2, 'vi': 0.1, 'th': 0.1},
+      'has_headings_pct': 0.85,
+      'query_pattern': 'entity_heavy + multi_hop',
+      'latency_budget_ms': 400,
+      'embed_ctx_limit': 8191,
+  }
+  → choose: structure-aware + hybrid + rerank
+  ```
+- Top 3 gotchas: 不 profile 直接 default / ignore latency budget / 忽略 query pattern
+- Tools: profile script, Pandas describe, Counter
+
+**Problem 3: Multi-Modal Chunking**
+- 核心解法:
+  ```
+  Tables (financial 10-K):
+    Integral chunk (整张表 + 表标题 + 列名 metadata)
+    + Row chunks (每行单独 index)
+    + NL description ("Q3 revenue $1.2B, +8% YoY")
+  
+  Code:
+    AST-based (tree-sitter)
+    Function/Class boundary 保持完整
+    Imports + class signature 作为 metadata
+  
+  Formulas:
+    LaTeX original + NL translation
+    Both indexed
+  
+  Lists:
+    Small → unit chunk
+    Long → header-replicated when split
+  
+  Images:
+    CLIP / SigLIP embed
+    Caption text 一同 index
+    Surrounding paragraph context
+  ```
+- Top 3 gotchas: 表格当 prose / 代码乱切 / 公式只存 LaTeX
+- Tools: unstructured.io, llama-parse, pdfplumber, tree-sitter, CLIP
+
+**Problem 4: Metadata Enrichment (chunk 身份证)**
+- 核心解法:
+  ```python
+  metadata = {
+      'chunk_id': uuid,
+      'doc_id': '...',
+      'chunk_order': 3,
+      'heading_path': ['Chapter 2', 'Refund Policy', 'Timeline'],
+      'chunk_type': 'prose' | 'table' | 'code' | 'list',
+      'section_level': 2,
+      'source_url': '...',
+      'created_at': '2026-05-01',
+      'updated_at': '2026-05-15',
+      'author': '...',
+      'acl_list': ['ml_team', 'fde'],  # 硬过滤 pre-search
+      'tenant_id': 'acme',  # 硬过滤
+      'freshness_score': 0.92,
+      'confidence': 0.88,
+      'review_status': 'approved',
+      'language': 'id',
+      'topic_tags': ['refund', 'paylater'],
+      'embedding_model_version': 'bge-m3-v1.5',
+  }
+  ```
+- Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)
+- Tools: pgvector with JSONB, Pinecone metadata filter, pre-search WHERE clause
+
+**Problem 5: Eval Methodology (3-Layer)**
+- 核心解法:
+  ```python
+  # Layer 1: Retrieval
+  recall_at_10 = num_relevant_in_top10 / num_relevant_total
+  ndcg_at_10 = sum(rel_i / log2(i+1)) / ideal_ndcg
+  mrr = mean(1/rank_first_relevant)
+  
+  # Layer 2: Generation
+  llm_judge_score = gemini_pro.complete(f"Rate answer correctness 0-10: {ans} vs {gold}")
+  kappa = cohen_kappa(human_score, judge_score)  # > 0.6
+  
+  # Layer 3: Operational
+  p50, p99 latency; cost_per_query; ingest_throughput
+  
+  # Ablation: 9 variants, isolated changes
+  # Slice: by query_type / difficulty / language
+  # Pareto front: cost vs quality
+  ```
+- Top 3 gotchas: 只看 recall (忽略 generation correctness) / LLM-judge 不校准 / 没 ablation 不知道哪个 component lift
+- Tools: ragas, trulens, BEIR, MS MARCO, custom 200-500 golden, LLM-judge with kappa
+
+### 🔥 Production gotchas (top 15)
+
+1. 默认 512 token 没 overlap → 句子截断 ("7-" / "-14" 分裂)
+2. 表格当 prose 切 → 信息丢失
+3. 没 metadata → LLM 不知道 chunk 出处
+4. 凭 intuition 选 → eval-driven 才 production-grade
+5. 切完换 embedding model → 必须 re-embed 全部
+6. 没 ACL 硬过滤 → 越权检索, 用户能 enumerate 文档存在性
+7. 没 freshness metadata → 旧政策被检 → 答错
+8. Hybrid 没 RRF 直接 weighted sum → 分数不可比
+9. Rerank 不分 latency budget → P99 爆
+10. Hierarchical 没存 parent → retrieve 后无 large context
+11. Semantic chunking 全量跑 → 2-3x slow ingest, 1M doc 跑不动
+12. Late chunking 不支持的 embed model → 用了等于白用
+13. 没 stratify eval → 某 language 退步被掩盖
+14. LLM-judge self-preference bias → 用不同 family
+15. 没 cost-quality Pareto → 选最高 recall 不一定最 optimal
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Structure-aware FAQ | BNPL 客服 RAG | FAQ Q-A 对切 + lang metadata |
+| Multi-modal table | ConvFinQA | 表格 integral + row + NL desc, 数字 BM25 |
+| Hierarchical | Voice agent 7 markets 法规 | small retrieve large parent to LLM |
+| ACL filter pre-search | Internal Agent Platform | per-team 权限隔离 |
+| Hybrid α tuning | BNPL multi-lang | 0.6 dense + 0.4 BM25 ID match |
+| Eval methodology | ConvFinQA 9-variant ablation | golden + ablation + slice |
+| Cost-quality Pareto | Voice agent | rerank 不是默认开 |
+| LLM-as-judge calibration | ConvFinQA | kappa > 0.6 校准 |
+| Multi-language BGE-M3 | Voice agent | 7 markets 6 languages |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "I chose structure-aware over fixed-size because the corpus had 85% headings — fixed would break the semantic boundary"
+2. "Hybrid with α=0.7 dense + 0.3 BM25, RRF fusion, because queries had both semantic and entity components"
+3. "I'd never pick chunking without first profiling the corpus — length P99, table density, language mix all matter"
+4. "ConvFinQA — tables are integral chunks with row-level sub-chunks. Numbers go into BM25 separately, calculator agent verifies"
+5. "Hierarchical for legal queries — child chunk retrieves the exact clause, parent gives LLM the section context"
+6. "Eval is 3-layer: retrieval (recall@10), generation (LLM judge with kappa > 0.6), operational (P99 latency + cost)"
+7. "I'd switch to ColBERT only if precision is critical and storage 5x is OK — for most production, hybrid + rerank wins Pareto"
+8. "At 100M scale I'd distill embedding 768 → 256, tiered hot/cold storage, and may skip rerank or distill the rerank model"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. 默认 512 fixed 没 overlap
+2. 表格当 prose 切
+3. 没 metadata
+4. 凭 intuition 选不 eval
+5. 切完换 embedding model
+6. 没 ACL 硬过滤 pre-search
+7. Hybrid 没 RRF 直接 weighted sum
+8. Hierarchical 没存 parent
+9. LLM-judge 不校准 kappa
+10. 没 stratify eval, aggregate 掩盖
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

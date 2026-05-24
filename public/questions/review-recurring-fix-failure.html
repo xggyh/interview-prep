@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Client Sim #3 · Recurring Fix Failure — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / Client Sim #3 · Recurring Fix Failure — 复习速查</div>
+  <h1>Client Sim #3 · Recurring Fix Failure — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-recurring-fix-failure.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-recurring-fix-failure.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [recurring-fix-failure] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Client Sim #3 · Recurring Fix Failure — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/recurring-fix-failure.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/recurring-fix-failure.html"><code>recurring-fix-failure.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<blockquote><p><strong>3 次 fix 都失败不是「第 4 次更努力」, 是「诊断方法本身错了」</strong>. craft 不在修 bug, 在敢做反直觉决定: stop-the-line + 1 周 just RCA 不写代码 + fresh eyes + 立即 feature flag 缩小 blast radius. 客户失信不是 1 次 fix 修的, 是数月 consistent professionalism 修的. Trust 失 1 小时, 重建 3-6 月.</p></blockquote>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>RCA</td><td>Root Cause Analysis, 5-why 找症状之下原因</td><td>永远 &gt; fix-the-bug</td></tr><tr><td>5-Why</td><td>连续 5 个 why 到 process gap</td><td>真 root cause 是 process 不是 code</td></tr><tr><td>Stop-the-line</td><td>Toyota TPS 任何人发现质量问题 halt</td><td>3 次 fix 失败强制 trigger</td></tr><tr><td>Blameless postmortem</td><td>不归罪个人归罪 process/system</td><td>Google SRE 经典实践</td></tr><tr><td>Trust debt</td><td>类 technical debt 但社会维度</td><td>3 次失败 = trust account ≈ 0</td></tr><tr><td>Blast radius</td><td>单 incident 影响范围</td><td>第一优先缩小 (feature flag/kill switch)</td></tr><tr><td>Pattern recognition</td><td>失败次数 1/2/3/4 信号不同</td><td>知道何时承认 not push 第 4 次</td></tr><tr><td>Fresh eyes</td><td>bring in 没碰过此 bug 的 PE</td><td>break stuck thinking</td></tr><tr><td>Pair debug</td><td>客户 eng 同屏共同 reason</td><td>radical transparency</td></tr><tr><td>Hypothesis tracking</td><td>公开 board, ruled-in/ruled-out</td><td>RCA week 必备</td></tr><tr><td>30/60/90 milestone</td><td>stabilization / maturity / normalization</td><td>trust rebuild timeline</td></tr><tr><td>Service credit</td><td>3-month free + PE pro bono week</td><td>财务面 customer 出口</td></tr><tr><td>QBR</td><td>Quarterly Business Review</td><td>90 day 后 sustained stability</td></tr><tr><td>Architectural issue</td><td>不是 bug, 是 design 错</td><td>必 transparent, 给 3 path</td></tr><tr><td>Damages</td><td>客户 legal 措辞</td><td>多数是 negotiation leverage</td></tr><tr><td>Sponsor ammunition</td><td>私下给 Maria 内部 spin 材料</td><td>失去她 = 失去 internal 推进</td></tr></tbody></table>
+<h4>🎯 5 个核心 framework</h4>
+<p><strong>Framework 1</strong>: A·R·R·R Recovery (现场 + 24h 内)</p>
+<ul><li>When: 客户表达失去信任</li><li>Algorithm: 1. Admit process-level fault ("our diagnostic was wrong, not just code") 2. Reset approach (fresh PE, RCA week, pair-debug) 3. Reduce blast radius (feature flag/kill switch 一行命令) 4. Re-earn over time (30/60/90 day stability)</li><li>Trade-off: 反直觉 (慢下来), 但快是 trap</li><li>Tools: feature flag (LaunchDarkly), 30-day grace ask, structured daily 10-min sync</li></ul>
+<p><strong>Framework 2</strong>: Pattern Recognition (3 是 magic number)</p>
+<ul><li>When: fix 失败计数</li><li>Algorithm:</li><li>1 次: standard fix flow</li><li>2 次: deeper RCA before fix 3</li><li>3 次: <strong>诊断方法 / hypothesis class 错了</strong> → stop-the-line restart</li><li>4 次: crisis mode, leadership escalate</li><li>Trade-off: 数学上 root cause 找到 fix 90%+ 成功, 连续 3 次 fail = hypothesis distribution 整体偏移</li><li>Tools: 5-Why 重走 (3 次共同 blind spot), hypothesis log, 假设类目</li></ul>
+<p><strong>Framework 3</strong>: Stop-the-Line + RCA Week</p>
+<ul><li>When: 3 次 fix fail OR 客户明确 trust loss OR fix 引新 bug OR 监管事件</li><li>Algorithm:</li><li>Day 1: hypothesis explosion (20+, 别 self-censor)</li><li>Day 2: triage to top 5</li><li>Day 3: deep investigation</li><li>Day 4: convergence to top 1-2</li><li>Day 5: writeup + customer review</li><li>Trade-off: 1 周不写代码 vs 客户焦虑, 必 daily sync 平衡</li><li>Tools: hypothesis board, daily customer sync 10-min same time, ruled-out list 公开 growing</li></ul>
+<p><strong>Framework 4</strong>: Fresh Eyes + Pair Debug</p>
+<ul><li>When: 你 stuck in same hypothesis</li><li>Algorithm:</li><li>PE onboarding: 不先 share 你的 hypothesis, 让他独立 form view, day 3 compare</li><li>Converge → both possibly wrong (你已经错 3 次); Diverge → their view leads</li><li>Pair with customer eng: screen share 2h, out-loud reasoning, 让他 keyboard time, joint hypothesis</li><li>Trade-off: 自尊心 vs 让别人来, "我 dedicated" 反而是 ego trap</li><li>Tools: PE scoped 1-week engagement, customer eng 同屏 (Zoom screen control)</li></ul>
+<p><strong>Framework 5</strong>: Trust Rebuilding Playbook (30/60/90 + signals)</p>
+<ul><li>When: post-RCA, 长期修复</li><li>Algorithm:</li><li>Day 1-30 Stabilization: daily sync, dashboard, service credit applied</li><li>Day 31-60 Maturity: 3x/week sync, QBR prep</li><li>Day 61-90 Normalization: weekly sync, QBR, NPS check</li><li>Signals: customer proposes Tier 2 (rebuilding) / introduces other teams (strong) / references you (recovered) / NPS positive (quantitative) / daily sync reduced by customer (confidence)</li><li>Trade-off: 3-6 月慢, 但 promise faster = lie</li><li>Tools: stability tracker dashboard, weekly health report unsolicited, QBR template</li></ul>
+<h4>🌳 关键决策树</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Fix 失败计数?
+├── 1 次 → standard fix flow
+├── 2 次 → deeper RCA, deeper hypothesis
+├── 3 次 → STOP-THE-LINE
+│   ├── 1 week RCA no patches
+│   ├── Fresh PE bring in
+│   ├── Feature flag immediately (blast radius)
+│   ├── Pair debug with customer eng
+│   └── 30-day grace ask
+└── 4 次 → crisis, leadership escalate, service credit, retention
+
+客户表达失信
+├── 第一句永远: "You're right to be frustrated"
+├── 不 defend, 不 list mitigations
+├── Process-level admission "diagnostic was wrong, not code"
+└── 4 commitments: fresh eyes / 1 week RCA / blast radius / pair-debug
+
+发现 architectural issue (6-month rewrite needed)?
+├── 必 transparent 即使客户 walks away
+├── 3 paths offered:
+│   ├── Workaround (1-2 weeks, technical debt)
+│   ├── Rewrite (6 months, clean)
+│   └── De-scope (避免该 use case)
+└── 客户选, 你不 push
+
+CFO 提 damages?
+├── 多数 = negotiation leverage 不是 legal
+├── Escalate to your CEO + CFO
+├── Service credit (6 months) before legal
+└── Acknowledge cost without promising damages</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: Pattern Recognition (3 次失败信号)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  3 次 fix 共同 blind spot:
+    Fix 1: prompt rule
+    Fix 2: model tune
+    Fix 3: post-process classifier
+    Common assumption: 模型/prompt/算法不够好
+    Missing: 数据 distribution (Indonesian + Javanese 双语客户 underrepresented)
+  
+  5-Why 第 4 次重走:
+    Why 5% error? → misclassified
+    Why? → sarcasm + double negation
+    Why misclassed? → training data 不含该 pattern
+    Why not? → 数据收集 sample 不 cover bilingual
+    Why? → 数据 spec 没要求 representative
+  → 真 root cause: data spec process gap</code></pre>
+<ul><li>Top 3 gotchas: 同一 hypothesis class 反复 / "this time" 第 3 次说 / 不 question data distribution</li><li>Tools/tactics: hypothesis 类目分类 (model/data/infra/UX), 5-Why 强制 5 层</li></ul>
+<p><strong>Problem 2: Stop-the-Line + RCA Week</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Triggers: 3 fixes same class / explicit trust loss / fix 引新 bug / 监管
+  Day 1: 20+ hypothesis explosion (别 self-censor)
+  Day 2: triage to top 5
+  Day 3: deep investigate
+  Day 4: converge top 1-2
+  Day 5: writeup + customer review
+  
+  No code changes 这一周 (除 critical safety)
+  Daily customer update: "Today X, ruled out, next Y"
+  Hypothesis tracking board: 公开 ruled-in/ruled-out
+  Pair session with customer eng 2x/wk
+  RCA writeup 不 sanitized end-of-week</code></pre>
+<ul><li>Top 3 gotchas: 1 周不写代码客户焦虑 (用 daily sync 平衡) / hypothesis self-censor / RCA sanitize</li><li>Tools/tactics: shared hypothesis board (Miro/Notion), structured daily 10-min agenda</li></ul>
+<p><strong>Problem 3: Communication During Repeated Failure</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  4-Layer transparency:
+    L1: We deployed fix (standard)
+    L2: We think it's X (RCA daily)
+    L3: We tested X, ruled out, trying Y (pair-debug style)
+    L4: Our diagnostic was wrong (turning point admission, only 1x)
+  
+  Day-of script:
+    "You're right to be frustrated"
+    "Our diagnostic was wrong, not just our code"
+    "I'm bringing in fresh eyes"
+    "1 week of just RCA, no patches"
+    "30-day grace before contract decision"
+  
+  Sponsor private ammunition:
+    Maria 内部背锅, 给她 1-pager she can use internally
+    explanation that doesn't sound like vendor spin</code></pre>
+<ul><li>Top 3 gotchas: "This time we got it" (3 次后 = credibility burn) / spin progress / 内部 misalignment 当面</li><li>Tools/tactics: structured daily sync agenda, ruled-out list 公开 growing, sponsor 1:1 私下</li></ul>
+<p><strong>Problem 4: Fresh Eyes / Rotate Engineer</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  PE onboarding:
+    Don't share your hypothesis first
+    Let them form independent view
+    Compare on day 3:
+      Converge → both possibly wrong (你已经 wrong 3x)
+      Diverge → their view leads
+  
+  Pair debug with customer eng:
+    Screen share 2h
+    Out-loud reasoning ("here I'm thinking it's X because Y")
+    Customer eng keyboard time (joint experiment)
+    Joint hypothesis + next test
+  
+  Scoped engagement:
+    PE 1 week RCA + bounded follow-on
+    Don't drag PE into long-term ownership</code></pre>
+<ul><li>Top 3 gotchas: 自尊心 (我 dedicated 自己 own) / share hypothesis 先 bias PE / PE 被 dragged into 长期 ownership</li><li>Tools/tactics: Zoom screen control, PE engagement scope doc, customer eng joint invitation</li></ul>
+<p><strong>Problem 5: Trust Rebuilding Playbook</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Service credit defaults:
+    3-month free service
+    + 1 PE pro bono week
+    + RCA published
+    + 30-day grace before exit
+  
+  30/60/90 milestones:
+    Day 1-30: stabilization, daily sync, dashboard, credit applied
+    Day 31-60: maturity, 3x/wk sync, QBR prep
+    Day 61-90: normalization, weekly sync, QBR, NPS check
+  
+  Trust rebuild signals (you monitor):
+    Customer proposes Tier 2 → rebuilding
+    Customer introduces other teams → strong
+    Customer references you → recovered
+    NPS positive at 90 days → quantitative
+    Customer reduces daily sync cadence → confidence
+  
+  Don't promise faster trust rebuild — 6 months realistic</code></pre>
+<ul><li>Top 3 gotchas: 30-day trust = lie / 没 service credit (财务 customer 没出口) / 不 unsolicited weekly health report</li><li>Tools/tactics: dashboard 共享 read-only, weekly health PDF, NPS quarterly survey</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>"This time we got it" 第 3 次说 → 信用归零</li><li>Argue or defend → "You're right to be frustrated" 第一句</li><li>No process-level admission → 客户看出 still treating 1 bug</li><li>No blast radius reduction → 客户继续 bleed</li><li>Spin progress "we've made strides" → 长期灾难</li><li>Promise rapid trust rebuild → 失信</li><li>Hide architectural issue → 第 4 次 fix explode, 永久 lost</li><li>Same engineer keeps fixing → stuck in same hypothesis</li><li>No customer-facing visibility → anxiety amplifies</li><li>Internal misalignment in front of customer → confidence erosion real-time</li><li>Skip service credit → 财务 customer 没出口</li><li>Ship fix Friday afternoon → weekend 灾难复发</li><li>Architectural issue 没 3-path → 客户没选择权</li><li>CFO damages 直接 legal → 多数是 negotiation leverage, 先 credit</li><li>不 brief sponsor → 失去内部 champion</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Pattern recognition 3 次</td><td>Voice agent Indonesia</td><td>bilingual sarcasm 反复 fix 都没解</td></tr><tr><td>Data coverage 真 root</td><td>Voice agent ASR</td><td>Javanese underrepresented</td></tr><tr><td>Stop-the-line RCA week</td><td>ConvFinQA ablation</td><td>9 个 variant 都失败, 暂停 sprint 做 RCA</td></tr><tr><td>Fresh eyes</td><td>Refund tier 设计</td><td>bring in cross-team review</td></tr><tr><td>Service credit</td><td>Internal Agent Platform</td><td>scoped re-engagement</td></tr><tr><td>Pair debug</td><td>跨 ByteDance 内部多团队</td><td>同屏共同 reason</td></tr><tr><td>30/60/90 milestone</td><td>Voice agent 7-market rollout</td><td>渐进 stability check</td></tr><tr><td>Transparency 4-layer</td><td>ConvFinQA negative result</td><td>L4 admission 论文公开</td></tr><tr><td>QBR sustained</td><td>Voice agent</td><td>quarterly market health review</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"You're right to be frustrated"</li><li>"Our diagnostic approach was wrong, not just our code"</li><li>"I'm bringing in fresh eyes — a principal engineer who hasn't touched this"</li><li>"1 week of just RCA, no patches. I know that sounds counterintuitive, but 3 failed fixes mean we're patching the wrong thing"</li><li>"Would you give us 30 days under this plan before deciding cancel? Service credit attached"</li><li>"I won't promise rapid trust rebuild — that's a lie. 3-6 months of consistent professionalism is realistic"</li><li>"Indonesia voice agent 5% error — we fixed prompt, model, post-process, all same hypothesis class. Real cause was bilingual data underrepresented. 3 fixes failed because 3 fixes were the wrong class"</li><li>"Trust is lost in hours, rebuilt in months"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>"This time we got it" (credibility burning)</li><li>Defend / argue when customer frustrated</li><li>Spin progress ("we've made great strides")</li><li>Hide architectural issue if discovered</li><li>Same engineer keeps fixing</li><li>Friday afternoon fixes</li><li>Promise rapid trust rebuild (30-day = lie)</li><li>No blast radius reduction</li><li>No service credit discussion</li><li>Internal misalignment in front of customer</li></ol>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-six-weeks-in-three-days.html">← Client Sim #2 · 6-Week Feature in 3 Days — 复习速查</a>
+    <a href="review-cfo-model-variability.html">Client Sim #4 · CFO Model Variability — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Client Sim #3 · Recurring Fix Failure — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/recurring-fix-failure.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`recurring-fix-failure.html`](questions/recurring-fix-failure.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **3 次 fix 都失败不是「第 4 次更努力」, 是「诊断方法本身错了」**. craft 不在修 bug, 在敢做反直觉决定: stop-the-line + 1 周 just RCA 不写代码 + fresh eyes + 立即 feature flag 缩小 blast radius. 客户失信不是 1 次 fix 修的, 是数月 consistent professionalism 修的. Trust 失 1 小时, 重建 3-6 月.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| RCA | Root Cause Analysis, 5-why 找症状之下原因 | 永远 > fix-the-bug |
+| 5-Why | 连续 5 个 why 到 process gap | 真 root cause 是 process 不是 code |
+| Stop-the-line | Toyota TPS 任何人发现质量问题 halt | 3 次 fix 失败强制 trigger |
+| Blameless postmortem | 不归罪个人归罪 process/system | Google SRE 经典实践 |
+| Trust debt | 类 technical debt 但社会维度 | 3 次失败 = trust account ≈ 0 |
+| Blast radius | 单 incident 影响范围 | 第一优先缩小 (feature flag/kill switch) |
+| Pattern recognition | 失败次数 1/2/3/4 信号不同 | 知道何时承认 not push 第 4 次 |
+| Fresh eyes | bring in 没碰过此 bug 的 PE | break stuck thinking |
+| Pair debug | 客户 eng 同屏共同 reason | radical transparency |
+| Hypothesis tracking | 公开 board, ruled-in/ruled-out | RCA week 必备 |
+| 30/60/90 milestone | stabilization / maturity / normalization | trust rebuild timeline |
+| Service credit | 3-month free + PE pro bono week | 财务面 customer 出口 |
+| QBR | Quarterly Business Review | 90 day 后 sustained stability |
+| Architectural issue | 不是 bug, 是 design 错 | 必 transparent, 给 3 path |
+| Damages | 客户 legal 措辞 | 多数是 negotiation leverage |
+| Sponsor ammunition | 私下给 Maria 内部 spin 材料 | 失去她 = 失去 internal 推进 |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: A·R·R·R Recovery (现场 + 24h 内)
+- When: 客户表达失去信任
+- Algorithm: 1. Admit process-level fault ("our diagnostic was wrong, not just code") 2. Reset approach (fresh PE, RCA week, pair-debug) 3. Reduce blast radius (feature flag/kill switch 一行命令) 4. Re-earn over time (30/60/90 day stability)
+- Trade-off: 反直觉 (慢下来), 但快是 trap
+- Tools: feature flag (LaunchDarkly), 30-day grace ask, structured daily 10-min sync
+
+**Framework 2**: Pattern Recognition (3 是 magic number)
+- When: fix 失败计数
+- Algorithm:
+  - 1 次: standard fix flow
+  - 2 次: deeper RCA before fix 3
+  - 3 次: **诊断方法 / hypothesis class 错了** → stop-the-line restart
+  - 4 次: crisis mode, leadership escalate
+- Trade-off: 数学上 root cause 找到 fix 90%+ 成功, 连续 3 次 fail = hypothesis distribution 整体偏移
+- Tools: 5-Why 重走 (3 次共同 blind spot), hypothesis log, 假设类目
+
+**Framework 3**: Stop-the-Line + RCA Week
+- When: 3 次 fix fail OR 客户明确 trust loss OR fix 引新 bug OR 监管事件
+- Algorithm:
+  - Day 1: hypothesis explosion (20+, 别 self-censor)
+  - Day 2: triage to top 5
+  - Day 3: deep investigation
+  - Day 4: convergence to top 1-2
+  - Day 5: writeup + customer review
+- Trade-off: 1 周不写代码 vs 客户焦虑, 必 daily sync 平衡
+- Tools: hypothesis board, daily customer sync 10-min same time, ruled-out list 公开 growing
+
+**Framework 4**: Fresh Eyes + Pair Debug
+- When: 你 stuck in same hypothesis
+- Algorithm:
+  - PE onboarding: 不先 share 你的 hypothesis, 让他独立 form view, day 3 compare
+  - Converge → both possibly wrong (你已经错 3 次); Diverge → their view leads
+  - Pair with customer eng: screen share 2h, out-loud reasoning, 让他 keyboard time, joint hypothesis
+- Trade-off: 自尊心 vs 让别人来, "我 dedicated" 反而是 ego trap
+- Tools: PE scoped 1-week engagement, customer eng 同屏 (Zoom screen control)
+
+**Framework 5**: Trust Rebuilding Playbook (30/60/90 + signals)
+- When: post-RCA, 长期修复
+- Algorithm:
+  - Day 1-30 Stabilization: daily sync, dashboard, service credit applied
+  - Day 31-60 Maturity: 3x/week sync, QBR prep
+  - Day 61-90 Normalization: weekly sync, QBR, NPS check
+  - Signals: customer proposes Tier 2 (rebuilding) / introduces other teams (strong) / references you (recovered) / NPS positive (quantitative) / daily sync reduced by customer (confidence)
+- Trade-off: 3-6 月慢, 但 promise faster = lie
+- Tools: stability tracker dashboard, weekly health report unsolicited, QBR template
+
+### 🌳 关键决策树
+
+```
+Fix 失败计数?
+├── 1 次 → standard fix flow
+├── 2 次 → deeper RCA, deeper hypothesis
+├── 3 次 → STOP-THE-LINE
+│   ├── 1 week RCA no patches
+│   ├── Fresh PE bring in
+│   ├── Feature flag immediately (blast radius)
+│   ├── Pair debug with customer eng
+│   └── 30-day grace ask
+└── 4 次 → crisis, leadership escalate, service credit, retention
+
+客户表达失信
+├── 第一句永远: "You're right to be frustrated"
+├── 不 defend, 不 list mitigations
+├── Process-level admission "diagnostic was wrong, not code"
+└── 4 commitments: fresh eyes / 1 week RCA / blast radius / pair-debug
+
+发现 architectural issue (6-month rewrite needed)?
+├── 必 transparent 即使客户 walks away
+├── 3 paths offered:
+│   ├── Workaround (1-2 weeks, technical debt)
+│   ├── Rewrite (6 months, clean)
+│   └── De-scope (避免该 use case)
+└── 客户选, 你不 push
+
+CFO 提 damages?
+├── 多数 = negotiation leverage 不是 legal
+├── Escalate to your CEO + CFO
+├── Service credit (6 months) before legal
+└── Acknowledge cost without promising damages
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: Pattern Recognition (3 次失败信号)**
+- 核心解法:
+  ```
+  3 次 fix 共同 blind spot:
+    Fix 1: prompt rule
+    Fix 2: model tune
+    Fix 3: post-process classifier
+    Common assumption: 模型/prompt/算法不够好
+    Missing: 数据 distribution (Indonesian + Javanese 双语客户 underrepresented)
+  
+  5-Why 第 4 次重走:
+    Why 5% error? → misclassified
+    Why? → sarcasm + double negation
+    Why misclassed? → training data 不含该 pattern
+    Why not? → 数据收集 sample 不 cover bilingual
+    Why? → 数据 spec 没要求 representative
+  → 真 root cause: data spec process gap
+  ```
+- Top 3 gotchas: 同一 hypothesis class 反复 / "this time" 第 3 次说 / 不 question data distribution
+- Tools/tactics: hypothesis 类目分类 (model/data/infra/UX), 5-Why 强制 5 层
+
+**Problem 2: Stop-the-Line + RCA Week**
+- 核心解法:
+  ```
+  Triggers: 3 fixes same class / explicit trust loss / fix 引新 bug / 监管
+  Day 1: 20+ hypothesis explosion (别 self-censor)
+  Day 2: triage to top 5
+  Day 3: deep investigate
+  Day 4: converge top 1-2
+  Day 5: writeup + customer review
+  
+  No code changes 这一周 (除 critical safety)
+  Daily customer update: "Today X, ruled out, next Y"
+  Hypothesis tracking board: 公开 ruled-in/ruled-out
+  Pair session with customer eng 2x/wk
+  RCA writeup 不 sanitized end-of-week
+  ```
+- Top 3 gotchas: 1 周不写代码客户焦虑 (用 daily sync 平衡) / hypothesis self-censor / RCA sanitize
+- Tools/tactics: shared hypothesis board (Miro/Notion), structured daily 10-min agenda
+
+**Problem 3: Communication During Repeated Failure**
+- 核心解法:
+  ```
+  4-Layer transparency:
+    L1: We deployed fix (standard)
+    L2: We think it's X (RCA daily)
+    L3: We tested X, ruled out, trying Y (pair-debug style)
+    L4: Our diagnostic was wrong (turning point admission, only 1x)
+  
+  Day-of script:
+    "You're right to be frustrated"
+    "Our diagnostic was wrong, not just our code"
+    "I'm bringing in fresh eyes"
+    "1 week of just RCA, no patches"
+    "30-day grace before contract decision"
+  
+  Sponsor private ammunition:
+    Maria 内部背锅, 给她 1-pager she can use internally
+    explanation that doesn't sound like vendor spin
+  ```
+- Top 3 gotchas: "This time we got it" (3 次后 = credibility burn) / spin progress / 内部 misalignment 当面
+- Tools/tactics: structured daily sync agenda, ruled-out list 公开 growing, sponsor 1:1 私下
+
+**Problem 4: Fresh Eyes / Rotate Engineer**
+- 核心解法:
+  ```
+  PE onboarding:
+    Don't share your hypothesis first
+    Let them form independent view
+    Compare on day 3:
+      Converge → both possibly wrong (你已经 wrong 3x)
+      Diverge → their view leads
+  
+  Pair debug with customer eng:
+    Screen share 2h
+    Out-loud reasoning ("here I'm thinking it's X because Y")
+    Customer eng keyboard time (joint experiment)
+    Joint hypothesis + next test
+  
+  Scoped engagement:
+    PE 1 week RCA + bounded follow-on
+    Don't drag PE into long-term ownership
+  ```
+- Top 3 gotchas: 自尊心 (我 dedicated 自己 own) / share hypothesis 先 bias PE / PE 被 dragged into 长期 ownership
+- Tools/tactics: Zoom screen control, PE engagement scope doc, customer eng joint invitation
+
+**Problem 5: Trust Rebuilding Playbook**
+- 核心解法:
+  ```
+  Service credit defaults:
+    3-month free service
+    + 1 PE pro bono week
+    + RCA published
+    + 30-day grace before exit
+  
+  30/60/90 milestones:
+    Day 1-30: stabilization, daily sync, dashboard, credit applied
+    Day 31-60: maturity, 3x/wk sync, QBR prep
+    Day 61-90: normalization, weekly sync, QBR, NPS check
+  
+  Trust rebuild signals (you monitor):
+    Customer proposes Tier 2 → rebuilding
+    Customer introduces other teams → strong
+    Customer references you → recovered
+    NPS positive at 90 days → quantitative
+    Customer reduces daily sync cadence → confidence
+  
+  Don't promise faster trust rebuild — 6 months realistic
+  ```
+- Top 3 gotchas: 30-day trust = lie / 没 service credit (财务 customer 没出口) / 不 unsolicited weekly health report
+- Tools/tactics: dashboard 共享 read-only, weekly health PDF, NPS quarterly survey
+
+### 🔥 Production gotchas (top 15)
+
+1. "This time we got it" 第 3 次说 → 信用归零
+2. Argue or defend → "You're right to be frustrated" 第一句
+3. No process-level admission → 客户看出 still treating 1 bug
+4. No blast radius reduction → 客户继续 bleed
+5. Spin progress "we've made strides" → 长期灾难
+6. Promise rapid trust rebuild → 失信
+7. Hide architectural issue → 第 4 次 fix explode, 永久 lost
+8. Same engineer keeps fixing → stuck in same hypothesis
+9. No customer-facing visibility → anxiety amplifies
+10. Internal misalignment in front of customer → confidence erosion real-time
+11. Skip service credit → 财务 customer 没出口
+12. Ship fix Friday afternoon → weekend 灾难复发
+13. Architectural issue 没 3-path → 客户没选择权
+14. CFO damages 直接 legal → 多数是 negotiation leverage, 先 credit
+15. 不 brief sponsor → 失去内部 champion
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Pattern recognition 3 次 | Voice agent Indonesia | bilingual sarcasm 反复 fix 都没解 |
+| Data coverage 真 root | Voice agent ASR | Javanese underrepresented |
+| Stop-the-line RCA week | ConvFinQA ablation | 9 个 variant 都失败, 暂停 sprint 做 RCA |
+| Fresh eyes | Refund tier 设计 | bring in cross-team review |
+| Service credit | Internal Agent Platform | scoped re-engagement |
+| Pair debug | 跨 ByteDance 内部多团队 | 同屏共同 reason |
+| 30/60/90 milestone | Voice agent 7-market rollout | 渐进 stability check |
+| Transparency 4-layer | ConvFinQA negative result | L4 admission 论文公开 |
+| QBR sustained | Voice agent | quarterly market health review |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "You're right to be frustrated"
+2. "Our diagnostic approach was wrong, not just our code"
+3. "I'm bringing in fresh eyes — a principal engineer who hasn't touched this"
+4. "1 week of just RCA, no patches. I know that sounds counterintuitive, but 3 failed fixes mean we're patching the wrong thing"
+5. "Would you give us 30 days under this plan before deciding cancel? Service credit attached"
+6. "I won't promise rapid trust rebuild — that's a lie. 3-6 months of consistent professionalism is realistic"
+7. "Indonesia voice agent 5% error — we fixed prompt, model, post-process, all same hypothesis class. Real cause was bilingual data underrepresented. 3 fixes failed because 3 fixes were the wrong class"
+8. "Trust is lost in hours, rebuilt in months"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. "This time we got it" (credibility burning)
+2. Defend / argue when customer frustrated
+3. Spin progress ("we've made great strides")
+4. Hide architectural issue if discovered
+5. Same engineer keeps fixing
+6. Friday afternoon fixes
+7. Promise rapid trust rebuild (30-day = lie)
+8. No blast radius reduction
+9. No service credit discussion
+10. Internal misalignment in front of customer
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

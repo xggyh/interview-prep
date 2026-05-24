@@ -41,6 +41,8 @@ SOURCES = [
     ("FDE", ROOT / "site" / "data" / "fde-questions.json"),
     # Google FDE prep — HR-tipped topic areas (Tool calling / RAG / LLM eng / Delivery)
     ("Google FDE", ROOT / "site" / "data" / "google-fde-prep.json"),
+    # Review / rapid-recall pages — extracted Extended Cheat Sheets from the 49 full pages
+    ("Review", ROOT / "site" / "data" / "review-pages.json"),
 ]
 
 def main():

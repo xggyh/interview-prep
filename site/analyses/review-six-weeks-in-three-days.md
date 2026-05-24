@@ -1,0 +1,267 @@
+## Client Sim #2 · 6-Week Feature in 3 Days — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/six-weeks-in-three-days.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`six-weeks-in-three-days.html`](questions/six-weeks-in-three-days.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **"6 weeks → 3 days" 真问题不是「时间太短」, 是「客户没想清楚自己要啥」**. 80% case 在你深挖 scope 后真实需求只占 20%, 剩下 40% 真有需求时 tier-1 ship + roadmap 是唯一答案. 你的 craft 不是挤压 timeline, 而是结构化提问拆 monolithic ask 找 must-have, ship 它 + 把 90% 放进 official roadmap.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| Iron Triangle | Scope × Quality × Time, 只能选 2 | 客户教育核心语言 |
+| MVP carve-out | 最小但仍 viable, 解决核心不解全部 | 80/20 application |
+| D·D·O·C | Deeper why / Decompose / Offer phased / Commit specifically | 现场 4 步 framework |
+| Goal-post shifting | Tier 1 ship 后客户 ASAP Tier 2 | 用 written 文档预防 |
+| Real driver | board / 监管 / 竞品 / 合同 / PM 焦虑 / 不知道 | 6 archetype |
+| Tier 1/2/3 | P0 must / P1 nice / P2 future | scope 拆解输出 |
+| Hero culture | 周末加班 ship | 红线, 不可持续 |
+| Bug bomb | 3 天 full scope = 20-30 P1 bugs | Path B 灾难 |
+| Design doc | 24h written contract | 客户签字防 ghost |
+| Joint ownership | 客户也 own 数据/试点 | reciprocal commitment |
+| SMART deliverable | Specific / Measurable / ... | reframe 工具 |
+| Path A/B/C | full / rush / scoped | 3-option standard 模式 |
+| Sponsor ammunition | 数据 + roadmap | 给客户内部 champion |
+| Escalation L1-L3 | 客户内部 / 你+AE+EM / leadership | 何时升级 |
+| Math response | "Tier 1 3w stable vs Rush 5w stable" | 客户坚持 ALL 时用 |
+| Competitor counter | "Demo ≠ ship. Ask SLA" | 客户提竞品时 |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: D·D·O·C 现场 4 步
+- When: 客户 demand "6 周 3 天"
+- Algorithm: 1. Deeper why ("What happens day 4 if not ready?") 2. Decompose 9 component (schema/ETL/RBAC/chart/drill/date/export/email/alert/mobile/i18n) 3. Offer 3 phased option (A 6w full / B 3d full bug bomb / C 3d 20% scoped ⭐) 4. Commit specific date + 24h design doc
+- Trade-off: 慢但稳, 急功 yes/no 都死
+- Tools: 30-sec internal Slack check (not 30-min)
+
+**Framework 2**: Iron Triangle 教育 (Scope × Quality × Time)
+- When: 客户坚持 full scope rush time high quality
+- Algorithm: 教法则 "只能选 2" → 给 3 option (A scope+quality flex time / B scope+time flex quality / C quality+time flex scope) → recommend C → 让客户 explicitly choose
+- Trade-off: 客户教育需要时间但建立长期信任
+- Tools: triangle 画图, 数字 (20-30 P1 bugs, 15-20% outage 概率 demo 时, 2 engineers 4 weeks fix)
+
+**Framework 3**: MVP Carve-Out 80/20
+- When: tier 1 拆解时
+- Algorithm:
+  - Core (20% work, 80% value): 客户每天用
+  - Polish (40% work, 15% value): 感觉 done 但不在意
+  - Edge (40% work, 5% value): 1% user 用, 不做会骂
+  - Output: 1 URL + 1 view (no interaction) + 1 metric + 1 user (no multi-tenant) + 90 days (no full history) + English (no i18n) + Desktop (no mobile)
+- Trade-off: 精准识别 user 实际行为 (CFO board demo 不点 不 export 不 filter, 只 share screen)
+- Tools: 5 MVP 问题清单 ("which 1 component CFO opens?")
+
+**Framework 4**: 6 Driver Archetype 真实需求挖掘
+- When: 客户说 "需要 6 周功能"
+- Algorithm:
+  - A. Board/CEO 承诺 → 真需 1 chart
+  - B. 监管 deadline → MVP audit panel, defer advanced
+  - C. 竞品 demo → demo-only prototype 标 "preview"
+  - D. 合同 deliverable → 法务 amend
+  - E. PM 焦虑 → visibility (weekly demo), not feature ship
+  - F. 客户也不知道 → 引导 prioritize 帮想
+- Trade-off: 直接 push back 失关系, 引导 prioritize 帮客户想清楚
+- Tools: 5 question 清单 ("CFO opens what component?" "asks what question first?" "previous report extend?" "who else needs?")
+
+**Framework 5**: Saying No Without Losing Deal
+- When: 必须 push back 但不毁关系
+- Algorithm:
+  - Replace ❌ "Not realistic" / "We can't" / "Try our best" / "Let me check"
+  - With ✅ "Here are 3 honest options" / "What we can deliver is..." / "I commit Tier 1 by [date]" / "Let me propose 30 sec sync"
+  - Math response: "Tier 1 stable 3w. Full rush stable 5w. Tier 1 faster"
+  - Competitor counter: "Demo ≠ ship. Ask their post-launch SLA"
+  - Sales pressure: 公开不反驳, 用 written commit anchor, 私下 align, 必要 escalate
+- Trade-off: 拒绝艺术, AE 在场尤其难
+- Tools: 1-pager design doc, customer sign-off, daily 15-min sync visibility
+
+### 🌳 关键决策树
+
+```
+客户说 "6 weeks in 3 days"
+├── 第一句永远: "What's driving the 3-day window?"
+│   ├── Board/CEO commit? → 真需 1 chart (Driver A)
+│   ├── 监管? → MVP audit panel (Driver B)
+│   ├── 竞品 demo? → demo-only prototype (Driver C)
+│   ├── 合同? → 法务 amend (Driver D)
+│   ├── PM 焦虑? → weekly visibility (Driver E)
+│   └── 不知道? → 引导 prioritize (Driver F)
+├── Decompose 9 component
+├── Offer 3 option (A 6w / B 3d full bug bomb / C 3d 20% ⭐)
+└── 客户选 explicit
+   ├── 选 C → 24h design doc → daily sync → Tier 1 ship
+   ├── 选 B → math response (5w stable not 3d) → 仍选 → escalate
+   └── 选 A → Tier 1 ship 后 Tier 2 graduate
+
+Sales 在场, AE over-promise "24h fix guarantee"
+├── 公开: 不当面反驳
+├── 私下立刻: "If miss, lose them permanently"
+├── Written follow-up: 用更精确语言 anchor
+└── AE 坚持? → escalate manager. Reputation > 这一单
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: Diagnose Real Need (80% 真实只占 20%)**
+- 核心解法:
+  > "Before I respond on scope, help me understand what's driving the timeline. Is there a specific meeting, deadline, customer commitment, or board ask that anchors the 3-day window?"
+  > Reframe: "OK by Thursday, the artifact that matters is a chart showing top-10 customer revenue. Not the full dashboard, just that one chart. Match?"
+- Top 3 gotchas: 急着回答 yes/no / 不问 driver 错过 80% reduce / 客户 reject scope 缩减时不会 math response
+- Tools/tactics: 5 question 清单, SMART reframe template, 30-sec Slack internal check
+
+**Problem 2: Iron Triangle Negotiation**
+- 核心解法:
+  > "Every feature has 3 dimensions: scope / quality / time. In any project, you can prioritize 2 of these but not all 3.
+  > (A) Hold scope + quality, flex time: 6 weeks
+  > (B) Hold scope + time, flex quality: 3 days with 20-30 P1 bugs
+  > (C) Hold quality + time, flex scope: 3 days for 20% that solves CFO's need ⭐
+  > Which fits your priorities? I want this to be your call, not mine"
+- Top 3 gotchas: "Not realistic" / "We can't" / "Try our best" (3 红线短语)
+- Tools/tactics: 数字 (20-30 P1 bugs / 15-20% outage 概率 demo 时 / 4 weeks 2 engineers fix)
+
+**Problem 3: MVP Carve-Out (80/20)**
+- 核心解法:
+  ```
+  Full 6w: 11 components
+  3d MVP = #4 chart only:
+    - 复用 existing CRM API (skip schema + ETL)
+    - 单页 admin token (skip RBAC)
+    - 静态 chart 90d hardcode top-10
+    - 不做: drill / export / schedule / alert / mobile / i18n
+    - 不做: 任何 CFO 会点击的东西
+  Output: 1 URL, CFO open → see chart → share screen
+  ```
+- Top 3 gotchas: 全做 polish (40% work 15% value) / 加 edge case (40% work 5% value) / 没识别 CFO 实际行为
+- Tools/tactics: 5 MVP 问题 ("which 1 component CFO opens?")
+
+**Problem 4: Saying No Without Losing the Deal**
+- 核心解法:
+  ```
+  Replace 7 banned phrases:
+    ❌ "Not realistic" → ✅ "3 honest options"
+    ❌ "We can't" → ✅ "What we can deliver is..."
+    ❌ "Timeline unreasonable" → ✅ "Help me understand driver"
+    ❌ "Let me check" → ✅ "Let me propose 30 sec sync"
+    ❌ "We'll try" → ✅ "I commit Tier 1 by [date]"
+    ❌ "If we work weekends" → ✅ "Within work hours, Tier 1 fits"
+    ❌ "Engineering needs approve" → ✅ "Let me propose based on judgment"
+  Customer wants ALL math: "Tier 1 = stable 3w. Rush = stable 5w. Tier 1 faster"
+  Competitor: "Demo ≠ ship. Ask their SLA"
+  ```
+- Top 3 gotchas: 直接 no (关系 ender) / 直接 yes (团队 ender) / verbal-only commit (24h 漂移)
+- Tools/tactics: written 24h design doc, customer sign-off, daily 15-min sync
+
+**Problem 5: When to Escalate (AE / Leadership)**
+- 核心解法:
+  ```
+  L1 (你处理): 客户内部 1:1 with sponsor, 政治 spin
+  L2 (你 + AE + EM): 内部资源 align, 工程承诺确认
+  L3 (你的 director / VP / CRO + 客户 leadership): 战略层 deal at risk
+  AE over-promise 公开不反驳, 私下立刻校准
+  Sponsor 私下 brief, 给 ammunition (postmortem, data, roadmap)
+  Engineering Manager pushback? → 把 demand 转 official scope doc, escalate 不 absorb
+  Customer-facing primary 永远是你, internal cross-leadership 不要 cut you out
+  ```
+- Top 3 gotchas: AE 当面反驳 (公司面子) / 没 brief sponsor (失内 champion) / EM 当场否决 (没 internal alignment 就承诺)
+- Tools/tactics: 30-sec internal Slack, escalation template, sponsor ammunition pack
+
+### 🔥 Production gotchas (top 15)
+
+1. 直接 no → 关系 ender
+2. 直接 yes → 团队 ender
+3. "Let me check with engineering" → weak middleman
+4. "We'll try our best" → ambiguity 后续 blame game
+5. 不问 driver → 错过 80% 减 scope 机会
+6. Hero culture promise → 后续每次预期 heroics, burnout, attrition
+7. Verbal commitment only → 24h 后客户记成 "你说 ship 全部"
+8. 没 internal alignment 就承诺 → EM 当场否决
+9. Tier 1 ship 后 ghost → 客户感觉 abandoned
+10. Tier 1 ship 完美就停 → 客户 goal-post shift Tier 3 更快 = 灾难
+11. 3 day full scope ship → 20-30 P1 bugs + 4w fix = 总 5w
+12. 替客户决定 → "我推荐 C" 不让客户 explicitly choose
+13. AE 公开反驳 → 公司面子 -100
+14. 没 daily 15-min sync → 客户每天焦虑无 visibility
+15. CFO 用 polish (export/drill/mobile/i18n) → 她在 board 不点击
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Tier 1/2/3 scope | Indonesia refund tier | 真实做过的同款 framework |
+| Driver 挖真需 | Voice agent 7 markets 30天 | 越南 priority, 其他 6 分阶段 |
+| Math response | Multi-market rollout | 5w stable rush vs 3w Tier 1 stable |
+| Iron Triangle | BNPL chatbot | scope flex 客户教育 |
+| MVP carve-out | Internal Agent Platform | 30 行复用 |
+| 24h design doc | ConvFinQA reference impl | written ahead-of-time |
+| Daily sync visibility | Voice agent rollout | weekly cross-region |
+| Hero culture refuse | EM pushback | 内部 boundary |
+| Sponsor ammunition | Maria refund champion | postmortem + data |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "Before I respond on scope, help me understand what's driving the 3-day window"
+2. "Of the full feature, what's the must-have-on-day-3 vs nice-to-have?"
+3. "I want this to be your call, not mine — here are 3 honest options"
+4. "Path 1 gets you to stable full dashboard faster than Path 2. The math is 3 weeks vs 5 weeks"
+5. "Demo ≠ ship. Ask your competitor what's their post-launch SLA on this"
+6. "Within standard work hours, Tier 1 fits 3 days. I won't put my team on weekends because that's not how we deliver"
+7. "Indonesia refund tier 1/2/3 — same shape. Tier 1 in 3 days, Tier 2 in 2 weeks, Tier 3 in 6 weeks. Customer got chart Thursday + full dashboard 3 weeks later"
+8. "I'll commit Tier 1 by Thursday EOD with a written design doc — verbal commitments drift in 24h"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. Yes without internal alignment
+2. Verbal-only commitments
+3. Heroics culture promise
+4. No written design doc
+5. Ghost on Tier 2/3 after Tier 1 ship
+6. Put your name on impossible commitment
+7. "Let me check with engineering" (weak)
+8. "We'll try our best" (ambiguity)
+9. 替客户决定 (不让客户 explicitly choose)
+10. AE 公开反驳 (公司面子 -100)
+
+### 📊 数字 anchors (面试必记)
+
+| Metric | Value | Source |
+|---|---|---|
+| First-conversation response time | 5 minutes 内 acknowledge + ask driver | 不急 yes/no |
+| 5 question clarify budget | 5-7 questions max | BSCFS-aligned |
+| Path A (full scope, 6w) | high quality | baseline 选项 |
+| Path B (full scope, 3d) | 20-30 P1 bugs + 4w fix = 5w stable total | bug bomb |
+| Path C (20% scope, 3d, polished) | 3w to full dashboard | ⭐ recommend |
+| 6 driver archetypes | Board/CEO commit / 监管 / 竞品 / 合同 / PM 焦虑 / 客户不知 | identify 真因 |
+| 80/20 carve-out | 20% work delivers 80% value | core only |
+| Polish work | 40% work, 15% value | defer |
+| Edge case | 40% work, 5% value | defer |
+| Tier 1 MVP scope | 1 URL, 1 view (no interact), 1 metric, 1 user, 90 days data, EN only, Desktop only | radical |
+| 30-sec internal Slack check | EM ✓ before committing | 不 30-min |
+| 24h design doc | written commit, customer sign-off | 防 goal-post shift |
+| Daily 15-min sync during ship | visibility low anxiety | 客户 not focused on counting |
+| Pessimistic numbers (Path B) | 20-30 P1 bugs / 15-20% outage demo / 4w 2 engineers fix | concrete > vague |
+| Customer "wants ALL" math | "Tier 1 stable 3w vs Rush stable 5w" | math response |
+| Iron Triangle picks 2 of 3 | scope × quality × time | 教育 framework |
+| AE over-promise written follow-up | "RCA EOD tomorrow, re-demo Thursday" | anchor not "24h fix" |
+| Heroics refusal | within standard work hours | sustainability |
+| Indonesia refund tier 1/2/3 reference | tier 1 in 3d / tier 2 in 2w / tier 3 in 6w | proven shape |
+
+### 💡 24h Design Doc cheat (背诵 structure)
+
+| Section | Content |
+|---|---|
+| Context | 1 paragraph what / when / who |
+| Problem to solve | Specific user behavior (CFO opens chart in board review) |
+| Tier 1 scope | What we WILL build (5 bullets) |
+| Tier 1 NOT-scope | What we WON'T build (5 bullets, explicit) |
+| Tier 2 + 3 scope + dates | Roadmap with realistic dates |
+| Dependencies from customer | Their commitments (data / decision / sign-off) |
+| Daily check-in schedule | Same time, 15 min, owner per side |
+| Quality gates | Ship criteria (functional + non-functional) |
+| Sign-off signature lines | Customer side: __ Our side: __ Date: __ |

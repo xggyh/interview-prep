@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tech #1 · OAuth 2.0 CRM Integration — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / Tech #1 · OAuth 2.0 CRM Integration — 复习速查</div>
+  <h1>Tech #1 · OAuth 2.0 CRM Integration — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-oauth-crm-platform-integration.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-oauth-crm-platform-integration.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [oauth-crm-platform-integration] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Tech #1 · OAuth 2.0 CRM Integration — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/oauth-crm-platform-integration.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/oauth-crm-platform-integration.html"><code>oauth-crm-platform-integration.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>核心心智模型 (1 sentence)</h4>
+<p>OAuth 2.0 CRM ↔ Platform integration = "4 grant types (authorization_code with PKCE / client_credentials / refresh_token rotation / device_code) × 4 storage 层 (httpOnly cookie / Keychain / KMS+vault / Redis encrypted) × 3 middleware pattern (SDK / sidecar / dedicated Token Service) + per-tenant DEK + distributed lock on refresh + 30s clock skew buffer + cache 兜底 + composite + Bulk rate-limit mitigation", token lifetime: access 1-24h short / refresh 30d-perm rotate / auth_code 10min one-shot.</p>
+<h4>术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>OAuth 2.0</td><td>授权协议 (非认证), 让 A 应用代表 user 访问 B 数据</td><td>SaaS 互联标配</td></tr><tr><td>Grant type</td><td>怎么拿到 token (4 种生产场景)</td><td>流程选型</td></tr><tr><td>Access token</td><td>短期 (1-24h), 每次 API 调用 Header</td><td>工作 token</td></tr><tr><td>Refresh token</td><td>长期 (30d-perm), 换新 access token</td><td>续命</td></tr><tr><td>Auth code</td><td>一次性 10min, 换 access token</td><td>authorization_code 流程</td></tr><tr><td>PKCE</td><td>Proof Key for Code Exchange, 移动+SPA 防 code 截获</td><td>2026 best practice for ALL auth_code</td></tr><tr><td>Scope</td><td>权限范围声明, 用户授权时看到</td><td>最小权限</td></tr><tr><td>Token rotation</td><td>refresh 每用换新, 旧的失效</td><td>安全升级</td></tr><tr><td>Reuse detection</td><td>同 refresh_token 用 2 次 → revoke 全链</td><td>防偷</td></tr><tr><td>Distributed lock</td><td>Redis SETNX per-tenant 防 thundering herd refresh</td><td>高并发</td></tr><tr><td>Singleflight</td><td>多并发 refresh 收敛为 1 个</td><td>Go std lib / Caffeine</td></tr><tr><td>Clock skew buffer</td><td>NTP + 60s 容差</td><td>JWT exp check</td></tr><tr><td>OBO (On-Behalf-Of)</td><td>短期 narrow token, 不存 refresh</td><td>高合规 customer</td></tr><tr><td>Composite REST</td><td>25 ops/请求</td><td>Salesforce rate limit</td></tr><tr><td>Bulk API</td><td>10k records/请求</td><td>Salesforce 大量数据</td></tr><tr><td>CDC subscription</td><td>Change Data Capture push 替 polling</td><td>不踩限流</td></tr><tr><td>HSM</td><td>Hardware Security Module 加 client_secret</td><td>enterprise compliance</td></tr></tbody></table>
+<h4>5 个核心 framework / pattern</h4>
+<p><strong>Framework 1</strong>: 4 grant types selection</p>
+<ul><li>When: 流程开始</li><li>Algorithm: authorization_code (user delegation, 99% CRM) + PKCE / client_credentials (service-to-service, no user) / refresh_token (续命, rotate on use) / device_code (IoT/TV/CLI)</li><li>Trade-off: implicit / password 已废弃 — 绝不要用</li><li>Tools: authlib (Python), Spring Security OAuth (Java), golang.org/x/oauth2</li></ul>
+<p><strong>Framework 2</strong>: Token storage 4 场景</p>
+<ul><li>When: 持久化 token</li><li>Algorithm: Browser → httpOnly+Secure+SameSite Cookie / Mobile → iOS Keychain or Android Keystore / Backend B2B → KMS-encrypted DB or Vault / Short-term temp → Redis encrypted + TTL</li><li>Trade-off: 红线 — 永远不进 URL, log, localStorage</li><li>Tools: HashiCorp Vault (自建首选), AWS Secrets Manager, GCP Secret Manager, Azure Key Vault</li></ul>
+<p><strong>Framework 3</strong>: Middleware placement 3 options</p>
+<ul><li>When: token 管理放哪</li><li>Algorithm: SDK lib (小团队 &lt; 5 services) / Sidecar proxy Envoy (Service Mesh 已跑) / Dedicated Token Service (multi-tenant 强合规, ⭐ enterprise default)</li><li>Trade-off: SDK 简单但散乱, Sidecar 运维 vs 透明, Dedicated 单点 vs 集中</li><li>Tools: 字节 / 阿里规模 — Dedicated Service + SDK 混合, Envoy/Istio for sidecar pattern</li></ul>
+<p><strong>Framework 4</strong>: Failure mode 5 套路</p>
+<ul><li>When: production deployment</li><li>Algorithm: 1) Token expire mid-call → preempt 5 min + auto retry once / 2) Refresh race → distributed lock per tenant (Redis SETNX) / 3) Revocation → cache invalidate + reauth_required flag / 4) Clock skew → 60s buffer + NTP / 5) Token endpoint down → cache 兜底 continue</li><li>Trade-off: lock 增 latency, 但 thundering herd 灾难大</li><li>Tools: Go singleflight.Group / Caffeine LoadingCache / asyncio.Lock + Redis</li></ul>
+<p><strong>Framework 5</strong>: Multi-tenant secrets 6 原则</p>
+<ul><li>When: 1000 customer 各自接 Salesforce</li><li>Algorithm: 1) Per-tenant DEK (KMS derive) / 2) 严格隔离 (RLS / 强制 WHERE tenant_id) / 3) Vault / Secrets Manager 不放 app DB / 4) Audit log 元数据 / 5) Least privilege IAM / 6) Rotation 自动化</li><li>Trade-off: per-tenant DEK 贵, 但跨 tenant leak 致命</li><li>Tools: HashiCorp Vault context-bound key derivation, Postgres RLS, Audit + SOC2 dashboard</li></ul>
+<h4>关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Choose grant type:
+有 user 参与? → YES → authorization_code + PKCE (99% case)
+              → NO  → client_credentials (service-to-service)
+IoT/TV/CLI? → device_code
+[废弃] implicit / password — 不要碰
+
+Storage decision:
+Browser app  → httpOnly + Secure + SameSite Cookie
+Mobile app   → Keychain / Keystore
+Backend B2B  → KMS-encrypted DB or Vault
+Short temp   → Redis encrypted + TTL
+
+Middleware:
+&lt; 5 services            → SDK lib
+Service Mesh 已跑       → Sidecar proxy
+Multi-tenant 强合规     → Dedicated Token Service ⭐
+
+Refresh race?
+Yes  → distributed lock per tenant (Redis SETNX)
+       singleflight on holder, others wait/re-read
+
+Customer 不许 store refresh_token?
+Option 1: Token broker on customer side
+Option 2: HSM with customer-controlled KEK (BYOK)
+Option 3: OAuth OBO (short-lived per-request)</code></pre>
+<h4>Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: 4 Grant Types</strong></p>
+<ul><li>核心解法: authorization_code with PKCE (99% case) / client_credentials (no user) / refresh_token (rotate) / device_code (IoT/CLI); implicit + password 已废弃</li><li>Top 3 gotchas: client_secret 永远后端 / PKCE 所有 auth_code 都加 (不仅 mobile) / refresh rotation on use (旧立刻失效)</li><li>Tools: authlib, Spring Security OAuth, oauth2-proxy</li></ul>
+<p><strong>Problem 2: Token Storage + Rotation</strong></p>
+<ul><li>核心解法: storage 按场景 (Cookie/Keychain/Vault/Redis), refresh token rotation (旧立刻作废), client_secret rotation 90d 双 secret 共存</li><li>Top 3 gotchas: 不进 URL / log / localStorage / refresh reuse detection 偷探测 → revoke 全链 / KMS + Vault for client_secret 不放 DB</li><li>Tools: Vault auto-rotation, KMS DEK derive, HSM for high-stakes</li></ul>
+<p><strong>Problem 3: Middleware placement</strong></p>
+<ul><li>核心解法: SDK (小团队) / Sidecar Envoy (Service Mesh) / Dedicated Token Service (multi-tenant 强合规, ⭐ enterprise)</li><li>Top 3 gotchas: Token Service 是 SPOF, 必 HA + local cache 兜底 / Read replica for token DB / async refresh 5min 之前 warm</li><li>Tools: Envoy/Istio sidecar, gRPC Token Service, Redis local cache 30s TTL</li></ul>
+<p><strong>Problem 4: Failure modes (5 套路)</strong></p>
+<ul><li>核心解法: preempt 5min + auto retry once (mid-call), distributed lock per-tenant (refresh race), cache invalidate + reauth flag (revocation), 60s NTP buffer (clock skew), cache 兜底 (endpoint down)</li><li>Top 3 gotchas: 没 lock → thundering herd refresh / 没 preempt → 边界 401 / 没 cache fallback → 上游故障跟着挂</li><li>Tools: Redis SETNX, Go singleflight, NTP chronyd</li></ul>
+<p><strong>Problem 5: Multi-tenant secrets</strong></p>
+<ul><li>核心解法: per-tenant DEK / RLS or 强制 WHERE / Vault central / audit log 元数据 / least priv IAM / rotation cron 自动</li><li>Top 3 gotchas: cross-tenant SQL injection / token 进 log / no audit on read (合规 fail)</li><li>Tools: HashiCorp Vault per-tenant transit engine, Postgres RLS, audit immutable log</li></ul>
+<h4>Production gotchas (top 15)</h4>
+<ol><li>OAuth 2.0 当 single thing (4 grant 不分)</li><li>每 service 内嵌 SDK (auth 散乱, rotate 难)</li><li>没 refresh race 处理 (thundering herd)</li><li>明文存 token (security violation)</li><li>不处理 clock skew (经典 30-60s buffer fix)</li><li>没 multi-tenant key isolation</li><li>没 monitor 401/429 rate (silent 上游问题)</li><li>PKCE 只给 mobile (现在 2026 ALL auth_code 必加)</li><li>客户改密码后 refresh_token 失效 silent (必须 reauth_required flag)</li><li>Token endpoint down 跟着挂 (cache 兜底 missing)</li><li>Cross-tenant token leak via shared cache key</li><li>Log redact 漏掉 token (Sentry / APM trace 也要 redact)</li><li>No tokenized DB column field-level encryption</li><li>No OBO for compliance-strict customer</li><li>大客户 rate limit 不谈 quota tier upgrade</li></ol>
+<h4>简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Token exchange + refresh</td><td>Voice agent 7 markets</td><td>每市场 repayment 系统 — OAuth 2.0 / HMAC / IP-allowlisted JWT 混合</td></tr><tr><td>Multi-tenant secrets in HSM</td><td>BNPL chatbot</td><td>TikTok internal multi-service per-market DEK</td></tr><tr><td>Distributed lock on refresh</td><td>Voice agent thundering herd</td><td>per-tenant Redis SETNX + 5s wait</td></tr><tr><td>ConvFinQA: secure API key</td><td><code>.env</code> + os.environ pattern, never hardcoded</td></tr><tr><td>Token Service central pattern</td><td>Internal Agent Platform shared service</td><td>共享 token middleware for cross-team</td></tr><tr><td>Clock skew 30s buffer</td><td>Voice agent international</td><td>NTP 同步 + 30-60s tolerance</td></tr><tr><td>Composite + Bulk API</td><td>TikTok Salesforce integration</td><td>10k records / req + 25 ops / req mitigate rate limit</td></tr></tbody></table>
+<h4>面试现场 quotables (top 8)</h4>
+<ol><li>"OAuth 2.0 是授权协议不是认证协议. Authorization_code with PKCE 是 2026 best practice, 不仅 mobile, 所有 auth_code 都加."</li><li>"Refresh token rotation on use — 旧的立刻作废 + reuse detection → revoke 整链. 偷一次就被发现."</li><li>"Distributed lock per tenant on refresh prevents thundering herd. Without it, 10 concurrent 401 → 10 refresh → 9 失败 → 整链被 revoke = 灾难."</li><li>"Token endpoint down 不能跟着挂. Cache 30s TTL + 故障期间 serve stale token until expire."</li><li>"Per-tenant DEK (KMS derive) + 严格 WHERE tenant_id + Vault central + audit log + least priv. 6 原则缺一不可."</li><li>"Voice agent 7 markets — multi-tenant token mgmt. Trickiest was clock skew between our service + customer's auth server. 30s NTP buffer fixed 95% premature expiry."</li><li>"Customer 不许 store refresh_token: token broker on customer side / HSM with customer KEK / OAuth OBO short-lived per request."</li><li>"Rate limit mitigation: Bulk API 10k records/req + Composite 25 ops/req + CDC subscription not polling + backpressure queue + tier upgrade negotiate."</li></ol>
+<h4>红线 (top 10 anti-patterns)</h4>
+<ol><li>implicit / password grant (已废弃)</li><li>明文 / 进 URL / 进 log token</li><li>Service account super-perms 跨 tenant</li><li>PKCE 只给 mobile (现在 ALL auth_code 必加)</li><li>不处理 refresh race</li><li>没 client_secret rotation</li><li>不验 webhook signature</li><li>Customer 改密码 / revoke 不发现 (no reauth flag)</li><li>Token endpoint down 跟着挂 (no cache fallback)</li><li>No tokenized DB column field-level encryption</li></ol>
+<h4>Token lifetime cheat (主流 CRM)</h4>
+<table class="md-table"><thead><tr><th>CRM</th><th>Access TTL</th><th>Refresh TTL</th><th>Rotation?</th><th>Rate limit / org</th></tr></thead><tbody><tr><td>Salesforce</td><td>2h (默认 15min-24h 可配)</td><td>永久 (revoke 才失效)</td><td>可选 enable</td><td>5 req/sec/app/org (Bulk API 不算)</td></tr><tr><td>HubSpot</td><td>30min</td><td>6 months idle</td><td>是</td><td>100 req/10s/app</td></tr><tr><td>Microsoft Dynamics 365</td><td>1h</td><td>90d idle</td><td>可选</td><td>varies by license</td></tr><tr><td>Pipedrive</td><td>1h</td><td>永久</td><td>no</td><td>100 req/10s</td></tr><tr><td>Zoho CRM</td><td>1h</td><td>永久 (no rotation)</td><td>no</td><td>10K calls/day</td></tr></tbody></table>
+<h4>Storage matrix detail</h4>
+<table class="md-table"><thead><tr><th>场景</th><th>推荐</th><th>不能用</th></tr></thead><tbody><tr><td>Browser web app</td><td>httpOnly + Secure + SameSite=Lax Cookie</td><td>localStorage (XSS 一锅端)</td></tr><tr><td>Mobile iOS</td><td>iOS Keychain (kSecAttrAccessibleAfterFirstUnlock)</td><td>UserDefaults</td></tr><tr><td>Mobile Android</td><td>Android Keystore (hardware-backed)</td><td>SharedPreferences (明文)</td></tr><tr><td>Backend (B2B SaaS)</td><td>KMS-encrypted DB + Vault Transit</td><td>App config file, 明文 DB column</td></tr><tr><td>Short-term temp</td><td>Redis encrypted + TTL</td><td>普通 log, APM trace, Sentry</td></tr></tbody></table>
+<h4>Failure modes 5 套路 + remediation</h4>
+<table class="md-table"><thead><tr><th>Failure</th><th>Symptom</th><th>Remediation</th></tr></thead><tbody><tr><td>Token expire mid-call</td><td>14:59:59.5 valid → 15:00:00 server side 过期 → 401</td><td>preempt refresh 5min before exp + auto retry once on 401</td></tr><tr><td>Refresh race</td><td>10 并发 401 → 10 refresh → 9 失败 (旋转 rotation)</td><td>dlock per-tenant (Redis SETNX 10s timeout), singleflight</td></tr><tr><td>Revocation</td><td>Customer revoke 后 cache 还有, 全 401</td><td>cache.delete + db.status='reauth_required' + notify + pause scheduled jobs</td></tr><tr><td>Clock skew</td><td>server 时间差 30s, JWT exp check fail</td><td>NTP + 60s buffer in JWT validation</td></tr><tr><td>Token endpoint down</td><td>Salesforce token endpoint 5xx</td><td>cache 兜底 serve stale valid token until expire</td></tr><tr><td>refresh_token expire (90d idle)</td><td>refresh 也失效</td><td>reauth flow, customer 必须 re-OAuth</td></tr></tbody></table>
+<h4>4 grant types selection table</h4>
+<table class="md-table"><thead><tr><th>Grant type</th><th>Use case</th><th>Has user?</th><th>Has refresh_token?</th><th>Browser involved?</th><th>Best practice</th></tr></thead><tbody><tr><td>authorization_code</td><td>User delegation (CRM, SaaS)</td><td>YES</td><td>YES</td><td>YES</td><td>+ PKCE (all flows, not just mobile)</td></tr><tr><td>client_credentials</td><td>Service-to-service, no user</td><td>NO</td><td>NO</td><td>NO</td><td>mTLS for internal as alternative</td></tr><tr><td>refresh_token</td><td>Continue session without re-login</td><td>YES (cached)</td><td>input</td><td>NO</td><td>Rotate on use (旋转)</td></tr><tr><td>device_code</td><td>IoT / CLI / TV (no browser)</td><td>YES</td><td>YES</td><td>YES (separate device)</td><td>Used by gh CLI, AWS CLI</td></tr><tr><td>[废弃] implicit</td><td>Mobile (old)</td><td>YES</td><td>NO</td><td>YES</td><td>Replaced by PKCE</td></tr><tr><td>[废弃] password (ROPC)</td><td>Migration only</td><td>YES</td><td>YES</td><td>NO</td><td>OAuth anti-pattern</td></tr></tbody></table>
+<h4>Multi-tenant secrets 6 原则</h4>
+<table class="md-table"><thead><tr><th>Principle</th><th>Implementation</th></tr></thead><tbody><tr><td>1. Per-tenant DEK</td><td>KMS derive (master_key, context=tenant_id)</td></tr><tr><td>2. 严格隔离</td><td>Postgres RLS + ORM 强制 WHERE tenant_id</td></tr><tr><td>3. Vault / Secrets Manager central</td><td>Not in app DB</td></tr><tr><td>4. Audit log 元数据</td><td>actor + on_behalf_of + tool + ts, no raw token</td></tr><tr><td>5. Least privilege IAM</td><td>TTS handler only reads its tenant token</td></tr><tr><td>6. Rotation 自动化</td><td>cron: access &lt; 10min → refresh; refresh &lt; 7day → notify customer; client_secret &gt; 90d → rotate</td></tr></tbody></table>
+<h4>Rate limit mitigation tactics (Salesforce-style)</h4>
+<table class="md-table"><thead><tr><th>Tactic</th><th>Reduction</th><th>Example</th></tr></thead><tbody><tr><td>Bulk API</td><td>10k records / req</td><td>Salesforce Bulk 2.0</td></tr><tr><td>Composite REST</td><td>25 ops / req</td><td>Salesforce Composite</td></tr><tr><td>CDC subscription</td><td>event-driven (push) replace polling</td><td>Salesforce CDC</td></tr><tr><td>Backpressure queue</td><td>dampening burst</td><td>rabbitmq / Kafka</td></tr><tr><td>Quota tier upgrade</td><td>+ Salesforce account team</td><td>enterprise tier</td></tr><tr><td>Cache + dedup</td><td>duplicate read collapse</td><td>Redis read-through</td></tr></tbody></table>
+<h4>Middleware placement decision</h4>
+<table class="md-table"><thead><tr><th>Team size</th><th>Pattern</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>&lt; 5 services</td><td>SDK lib</td><td>简单, 零网络跳数</td><td>token 散落多进程内存, multi-lang 多套 SDK</td></tr><tr><td>Service Mesh 已跑</td><td>Sidecar (Envoy)</td><td>服务不感知 OAuth, 一处升级</td><td>Service Mesh 运维复杂</td></tr><tr><td>Multi-tenant 强合规 ⭐</td><td>Dedicated Token Service</td><td>单一职责, 集中管理, audit clean</td><td>SPOF, +1 跨网络调用</td></tr><tr><td>Hybrid (字节 / 阿里规模)</td><td>Dedicated Service + local SDK cache</td><td>Both</td><td>复杂</td></tr></tbody></table>
+<h4>Audit log fields (OAuth specific)</h4>
+<table class="md-table"><thead><tr><th>Field</th><th>Example</th></tr></thead><tbody><tr><td>ts</td><td>2026-05-21T14:30:00Z</td></tr><tr><td>actor</td><td>service:tts-handler</td></tr><tr><td>action</td><td>token.read / token.refresh / token.revoke</td></tr><tr><td>tenant_id</td><td>tenant_abc</td></tr><tr><td>purpose</td><td>salesforce_api_call</td></tr><tr><td>outcome</td><td>success / failure</td></tr><tr><td>scope_used</td><td>["read:contacts", "write:calls"]</td></tr><tr><td>token_id_hash</td><td>sha256 (not raw token)</td></tr><tr><td>api_endpoint</td><td>/services/data/v58.0/sobjects/Account</td></tr></tbody></table>
+<h4>4 customer auth scenarios (你的实际经验)</h4>
+<table class="md-table"><thead><tr><th>Customer scenario</th><th>Auth pattern</th></tr></thead><tbody><tr><td>Standard SaaS (most)</td><td>OAuth 2.0 authorization_code + PKCE</td></tr><tr><td>Compliance-strict (cannot store refresh)</td><td>OAuth OBO (on-behalf-of), short-lived per request</td></tr><tr><td>Enterprise BYOK</td><td>HSM with customer-controlled KEK</td></tr><tr><td>Behind firewall</td><td>Token broker on customer side, we call their service</td></tr><tr><td>Legacy partner (rare)</td><td>OAuth 1.0a HMAC-signed (deprecated but still seen)</td></tr><tr><td>Internal service-to-service</td><td>mTLS preferred over OAuth</td></tr></tbody></table>
+<h4>Common error reasons + retry decision</h4>
+<table class="md-table"><thead><tr><th>Error</th><th>Retry?</th><th>Action</th></tr></thead><tbody><tr><td>401 invalid_token</td><td>YES once after refresh</td><td>refresh + retry</td></tr><tr><td>401 invalid_grant</td><td>NO</td><td>reauth flow</td></tr><tr><td>403 insufficient_scope</td><td>NO</td><td>upgrade scope through customer flow</td></tr><tr><td>429 rate_limit</td><td>YES with Retry-After</td><td>respect header</td></tr><tr><td>500-504 transient</td><td>YES exponential backoff up to 3</td><td>jittered</td></tr><tr><td>Other 4xx</td><td>NO</td><td>log + alert</td></tr><tr><td>Network timeout</td><td>YES with backoff</td><td>+ cache fallback</td></tr><tr><td>Clock skew rejection</td><td>NO</td><td>NTP sync + 60s buffer</td></tr></tbody></table>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-gfde-t4-permissions-recovery.html">← T4.4 · permissions + recovery — 复习速查</a>
+    <a href="review-webhook-flaky-clients.html">Tech #2 · Reliable Webhook — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Tech #1 · OAuth 2.0 CRM Integration — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/oauth-crm-platform-integration.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`oauth-crm-platform-integration.html`](questions/oauth-crm-platform-integration.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 核心心智模型 (1 sentence)
+
+OAuth 2.0 CRM ↔ Platform integration = "4 grant types (authorization_code with PKCE / client_credentials / refresh_token rotation / device_code) × 4 storage 层 (httpOnly cookie / Keychain / KMS+vault / Redis encrypted) × 3 middleware pattern (SDK / sidecar / dedicated Token Service) + per-tenant DEK + distributed lock on refresh + 30s clock skew buffer + cache 兜底 + composite + Bulk rate-limit mitigation", token lifetime: access 1-24h short / refresh 30d-perm rotate / auth_code 10min one-shot.
+
+### 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| OAuth 2.0 | 授权协议 (非认证), 让 A 应用代表 user 访问 B 数据 | SaaS 互联标配 |
+| Grant type | 怎么拿到 token (4 种生产场景) | 流程选型 |
+| Access token | 短期 (1-24h), 每次 API 调用 Header | 工作 token |
+| Refresh token | 长期 (30d-perm), 换新 access token | 续命 |
+| Auth code | 一次性 10min, 换 access token | authorization_code 流程 |
+| PKCE | Proof Key for Code Exchange, 移动+SPA 防 code 截获 | 2026 best practice for ALL auth_code |
+| Scope | 权限范围声明, 用户授权时看到 | 最小权限 |
+| Token rotation | refresh 每用换新, 旧的失效 | 安全升级 |
+| Reuse detection | 同 refresh_token 用 2 次 → revoke 全链 | 防偷 |
+| Distributed lock | Redis SETNX per-tenant 防 thundering herd refresh | 高并发 |
+| Singleflight | 多并发 refresh 收敛为 1 个 | Go std lib / Caffeine |
+| Clock skew buffer | NTP + 60s 容差 | JWT exp check |
+| OBO (On-Behalf-Of) | 短期 narrow token, 不存 refresh | 高合规 customer |
+| Composite REST | 25 ops/请求 | Salesforce rate limit |
+| Bulk API | 10k records/请求 | Salesforce 大量数据 |
+| CDC subscription | Change Data Capture push 替 polling | 不踩限流 |
+| HSM | Hardware Security Module 加 client_secret | enterprise compliance |
+
+### 5 个核心 framework / pattern
+
+**Framework 1**: 4 grant types selection
+- When: 流程开始
+- Algorithm: authorization_code (user delegation, 99% CRM) + PKCE / client_credentials (service-to-service, no user) / refresh_token (续命, rotate on use) / device_code (IoT/TV/CLI)
+- Trade-off: implicit / password 已废弃 — 绝不要用
+- Tools: authlib (Python), Spring Security OAuth (Java), golang.org/x/oauth2
+
+**Framework 2**: Token storage 4 场景
+- When: 持久化 token
+- Algorithm: Browser → httpOnly+Secure+SameSite Cookie / Mobile → iOS Keychain or Android Keystore / Backend B2B → KMS-encrypted DB or Vault / Short-term temp → Redis encrypted + TTL
+- Trade-off: 红线 — 永远不进 URL, log, localStorage
+- Tools: HashiCorp Vault (自建首选), AWS Secrets Manager, GCP Secret Manager, Azure Key Vault
+
+**Framework 3**: Middleware placement 3 options
+- When: token 管理放哪
+- Algorithm: SDK lib (小团队 < 5 services) / Sidecar proxy Envoy (Service Mesh 已跑) / Dedicated Token Service (multi-tenant 强合规, ⭐ enterprise default)
+- Trade-off: SDK 简单但散乱, Sidecar 运维 vs 透明, Dedicated 单点 vs 集中
+- Tools: 字节 / 阿里规模 — Dedicated Service + SDK 混合, Envoy/Istio for sidecar pattern
+
+**Framework 4**: Failure mode 5 套路
+- When: production deployment
+- Algorithm: 1) Token expire mid-call → preempt 5 min + auto retry once / 2) Refresh race → distributed lock per tenant (Redis SETNX) / 3) Revocation → cache invalidate + reauth_required flag / 4) Clock skew → 60s buffer + NTP / 5) Token endpoint down → cache 兜底 continue
+- Trade-off: lock 增 latency, 但 thundering herd 灾难大
+- Tools: Go singleflight.Group / Caffeine LoadingCache / asyncio.Lock + Redis
+
+**Framework 5**: Multi-tenant secrets 6 原则
+- When: 1000 customer 各自接 Salesforce
+- Algorithm: 1) Per-tenant DEK (KMS derive) / 2) 严格隔离 (RLS / 强制 WHERE tenant_id) / 3) Vault / Secrets Manager 不放 app DB / 4) Audit log 元数据 / 5) Least privilege IAM / 6) Rotation 自动化
+- Trade-off: per-tenant DEK 贵, 但跨 tenant leak 致命
+- Tools: HashiCorp Vault context-bound key derivation, Postgres RLS, Audit + SOC2 dashboard
+
+### 关键决策树 (ASCII)
+
+```
+Choose grant type:
+有 user 参与? → YES → authorization_code + PKCE (99% case)
+              → NO  → client_credentials (service-to-service)
+IoT/TV/CLI? → device_code
+[废弃] implicit / password — 不要碰
+
+Storage decision:
+Browser app  → httpOnly + Secure + SameSite Cookie
+Mobile app   → Keychain / Keystore
+Backend B2B  → KMS-encrypted DB or Vault
+Short temp   → Redis encrypted + TTL
+
+Middleware:
+< 5 services            → SDK lib
+Service Mesh 已跑       → Sidecar proxy
+Multi-tenant 强合规     → Dedicated Token Service ⭐
+
+Refresh race?
+Yes  → distributed lock per tenant (Redis SETNX)
+       singleflight on holder, others wait/re-read
+
+Customer 不许 store refresh_token?
+Option 1: Token broker on customer side
+Option 2: HSM with customer-controlled KEK (BYOK)
+Option 3: OAuth OBO (short-lived per-request)
+```
+
+### Part 2 五个深度问题速查
+
+**Problem 1: 4 Grant Types**
+- 核心解法: authorization_code with PKCE (99% case) / client_credentials (no user) / refresh_token (rotate) / device_code (IoT/CLI); implicit + password 已废弃
+- Top 3 gotchas: client_secret 永远后端 / PKCE 所有 auth_code 都加 (不仅 mobile) / refresh rotation on use (旧立刻失效)
+- Tools: authlib, Spring Security OAuth, oauth2-proxy
+
+**Problem 2: Token Storage + Rotation**
+- 核心解法: storage 按场景 (Cookie/Keychain/Vault/Redis), refresh token rotation (旧立刻作废), client_secret rotation 90d 双 secret 共存
+- Top 3 gotchas: 不进 URL / log / localStorage / refresh reuse detection 偷探测 → revoke 全链 / KMS + Vault for client_secret 不放 DB
+- Tools: Vault auto-rotation, KMS DEK derive, HSM for high-stakes
+
+**Problem 3: Middleware placement**
+- 核心解法: SDK (小团队) / Sidecar Envoy (Service Mesh) / Dedicated Token Service (multi-tenant 强合规, ⭐ enterprise)
+- Top 3 gotchas: Token Service 是 SPOF, 必 HA + local cache 兜底 / Read replica for token DB / async refresh 5min 之前 warm
+- Tools: Envoy/Istio sidecar, gRPC Token Service, Redis local cache 30s TTL
+
+**Problem 4: Failure modes (5 套路)**
+- 核心解法: preempt 5min + auto retry once (mid-call), distributed lock per-tenant (refresh race), cache invalidate + reauth flag (revocation), 60s NTP buffer (clock skew), cache 兜底 (endpoint down)
+- Top 3 gotchas: 没 lock → thundering herd refresh / 没 preempt → 边界 401 / 没 cache fallback → 上游故障跟着挂
+- Tools: Redis SETNX, Go singleflight, NTP chronyd
+
+**Problem 5: Multi-tenant secrets**
+- 核心解法: per-tenant DEK / RLS or 强制 WHERE / Vault central / audit log 元数据 / least priv IAM / rotation cron 自动
+- Top 3 gotchas: cross-tenant SQL injection / token 进 log / no audit on read (合规 fail)
+- Tools: HashiCorp Vault per-tenant transit engine, Postgres RLS, audit immutable log
+
+### Production gotchas (top 15)
+
+1. OAuth 2.0 当 single thing (4 grant 不分)
+2. 每 service 内嵌 SDK (auth 散乱, rotate 难)
+3. 没 refresh race 处理 (thundering herd)
+4. 明文存 token (security violation)
+5. 不处理 clock skew (经典 30-60s buffer fix)
+6. 没 multi-tenant key isolation
+7. 没 monitor 401/429 rate (silent 上游问题)
+8. PKCE 只给 mobile (现在 2026 ALL auth_code 必加)
+9. 客户改密码后 refresh_token 失效 silent (必须 reauth_required flag)
+10. Token endpoint down 跟着挂 (cache 兜底 missing)
+11. Cross-tenant token leak via shared cache key
+12. Log redact 漏掉 token (Sentry / APM trace 也要 redact)
+13. No tokenized DB column field-level encryption
+14. No OBO for compliance-strict customer
+15. 大客户 rate limit 不谈 quota tier upgrade
+
+### 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Token exchange + refresh | Voice agent 7 markets | 每市场 repayment 系统 — OAuth 2.0 / HMAC / IP-allowlisted JWT 混合 |
+| Multi-tenant secrets in HSM | BNPL chatbot | TikTok internal multi-service per-market DEK |
+| Distributed lock on refresh | Voice agent thundering herd | per-tenant Redis SETNX + 5s wait |
+| ConvFinQA: secure API key | `.env` + os.environ pattern, never hardcoded |
+| Token Service central pattern | Internal Agent Platform shared service | 共享 token middleware for cross-team |
+| Clock skew 30s buffer | Voice agent international | NTP 同步 + 30-60s tolerance |
+| Composite + Bulk API | TikTok Salesforce integration | 10k records / req + 25 ops / req mitigate rate limit |
+
+### 面试现场 quotables (top 8)
+
+1. "OAuth 2.0 是授权协议不是认证协议. Authorization_code with PKCE 是 2026 best practice, 不仅 mobile, 所有 auth_code 都加."
+2. "Refresh token rotation on use — 旧的立刻作废 + reuse detection → revoke 整链. 偷一次就被发现."
+3. "Distributed lock per tenant on refresh prevents thundering herd. Without it, 10 concurrent 401 → 10 refresh → 9 失败 → 整链被 revoke = 灾难."
+4. "Token endpoint down 不能跟着挂. Cache 30s TTL + 故障期间 serve stale token until expire."
+5. "Per-tenant DEK (KMS derive) + 严格 WHERE tenant_id + Vault central + audit log + least priv. 6 原则缺一不可."
+6. "Voice agent 7 markets — multi-tenant token mgmt. Trickiest was clock skew between our service + customer's auth server. 30s NTP buffer fixed 95% premature expiry."
+7. "Customer 不许 store refresh_token: token broker on customer side / HSM with customer KEK / OAuth OBO short-lived per request."
+8. "Rate limit mitigation: Bulk API 10k records/req + Composite 25 ops/req + CDC subscription not polling + backpressure queue + tier upgrade negotiate."
+
+### 红线 (top 10 anti-patterns)
+
+1. implicit / password grant (已废弃)
+2. 明文 / 进 URL / 进 log token
+3. Service account super-perms 跨 tenant
+4. PKCE 只给 mobile (现在 ALL auth_code 必加)
+5. 不处理 refresh race
+6. 没 client_secret rotation
+7. 不验 webhook signature
+8. Customer 改密码 / revoke 不发现 (no reauth flag)
+9. Token endpoint down 跟着挂 (no cache fallback)
+10. No tokenized DB column field-level encryption
+
+### Token lifetime cheat (主流 CRM)
+
+| CRM | Access TTL | Refresh TTL | Rotation? | Rate limit / org |
+|---|---|---|---|---|
+| Salesforce | 2h (默认 15min-24h 可配) | 永久 (revoke 才失效) | 可选 enable | 5 req/sec/app/org (Bulk API 不算) |
+| HubSpot | 30min | 6 months idle | 是 | 100 req/10s/app |
+| Microsoft Dynamics 365 | 1h | 90d idle | 可选 | varies by license |
+| Pipedrive | 1h | 永久 | no | 100 req/10s |
+| Zoho CRM | 1h | 永久 (no rotation) | no | 10K calls/day |
+
+### Storage matrix detail
+
+| 场景 | 推荐 | 不能用 |
+|---|---|---|
+| Browser web app | httpOnly + Secure + SameSite=Lax Cookie | localStorage (XSS 一锅端) |
+| Mobile iOS | iOS Keychain (kSecAttrAccessibleAfterFirstUnlock) | UserDefaults |
+| Mobile Android | Android Keystore (hardware-backed) | SharedPreferences (明文) |
+| Backend (B2B SaaS) | KMS-encrypted DB + Vault Transit | App config file, 明文 DB column |
+| Short-term temp | Redis encrypted + TTL | 普通 log, APM trace, Sentry |
+
+### Failure modes 5 套路 + remediation
+
+| Failure | Symptom | Remediation |
+|---|---|---|
+| Token expire mid-call | 14:59:59.5 valid → 15:00:00 server side 过期 → 401 | preempt refresh 5min before exp + auto retry once on 401 |
+| Refresh race | 10 并发 401 → 10 refresh → 9 失败 (旋转 rotation) | dlock per-tenant (Redis SETNX 10s timeout), singleflight |
+| Revocation | Customer revoke 后 cache 还有, 全 401 | cache.delete + db.status='reauth_required' + notify + pause scheduled jobs |
+| Clock skew | server 时间差 30s, JWT exp check fail | NTP + 60s buffer in JWT validation |
+| Token endpoint down | Salesforce token endpoint 5xx | cache 兜底 serve stale valid token until expire |
+| refresh_token expire (90d idle) | refresh 也失效 | reauth flow, customer 必须 re-OAuth |
+
+### 4 grant types selection table
+
+| Grant type | Use case | Has user? | Has refresh_token? | Browser involved? | Best practice |
+|---|---|---|---|---|---|
+| authorization_code | User delegation (CRM, SaaS) | YES | YES | YES | + PKCE (all flows, not just mobile) |
+| client_credentials | Service-to-service, no user | NO | NO | NO | mTLS for internal as alternative |
+| refresh_token | Continue session without re-login | YES (cached) | input | NO | Rotate on use (旋转) |
+| device_code | IoT / CLI / TV (no browser) | YES | YES | YES (separate device) | Used by gh CLI, AWS CLI |
+| [废弃] implicit | Mobile (old) | YES | NO | YES | Replaced by PKCE |
+| [废弃] password (ROPC) | Migration only | YES | YES | NO | OAuth anti-pattern |
+
+### Multi-tenant secrets 6 原则
+
+| Principle | Implementation |
+|---|---|
+| 1. Per-tenant DEK | KMS derive (master_key, context=tenant_id) |
+| 2. 严格隔离 | Postgres RLS + ORM 强制 WHERE tenant_id |
+| 3. Vault / Secrets Manager central | Not in app DB |
+| 4. Audit log 元数据 | actor + on_behalf_of + tool + ts, no raw token |
+| 5. Least privilege IAM | TTS handler only reads its tenant token |
+| 6. Rotation 自动化 | cron: access < 10min → refresh; refresh < 7day → notify customer; client_secret > 90d → rotate |
+
+### Rate limit mitigation tactics (Salesforce-style)
+
+| Tactic | Reduction | Example |
+|---|---|---|
+| Bulk API | 10k records / req | Salesforce Bulk 2.0 |
+| Composite REST | 25 ops / req | Salesforce Composite |
+| CDC subscription | event-driven (push) replace polling | Salesforce CDC |
+| Backpressure queue | dampening burst | rabbitmq / Kafka |
+| Quota tier upgrade | + Salesforce account team | enterprise tier |
+| Cache + dedup | duplicate read collapse | Redis read-through |
+
+### Middleware placement decision
+
+| Team size | Pattern | Pros | Cons |
+|---|---|---|---|
+| < 5 services | SDK lib | 简单, 零网络跳数 | token 散落多进程内存, multi-lang 多套 SDK |
+| Service Mesh 已跑 | Sidecar (Envoy) | 服务不感知 OAuth, 一处升级 | Service Mesh 运维复杂 |
+| Multi-tenant 强合规 ⭐ | Dedicated Token Service | 单一职责, 集中管理, audit clean | SPOF, +1 跨网络调用 |
+| Hybrid (字节 / 阿里规模) | Dedicated Service + local SDK cache | Both | 复杂 |
+
+### Audit log fields (OAuth specific)
+
+| Field | Example |
+|---|---|
+| ts | 2026-05-21T14:30:00Z |
+| actor | service:tts-handler |
+| action | token.read / token.refresh / token.revoke |
+| tenant_id | tenant_abc |
+| purpose | salesforce_api_call |
+| outcome | success / failure |
+| scope_used | ["read:contacts", "write:calls"] |
+| token_id_hash | sha256 (not raw token) |
+| api_endpoint | /services/data/v58.0/sobjects/Account |
+
+### 4 customer auth scenarios (你的实际经验)
+
+| Customer scenario | Auth pattern |
+|---|---|
+| Standard SaaS (most) | OAuth 2.0 authorization_code + PKCE |
+| Compliance-strict (cannot store refresh) | OAuth OBO (on-behalf-of), short-lived per request |
+| Enterprise BYOK | HSM with customer-controlled KEK |
+| Behind firewall | Token broker on customer side, we call their service |
+| Legacy partner (rare) | OAuth 1.0a HMAC-signed (deprecated but still seen) |
+| Internal service-to-service | mTLS preferred over OAuth |
+
+### Common error reasons + retry decision
+
+| Error | Retry? | Action |
+|---|---|---|
+| 401 invalid_token | YES once after refresh | refresh + retry |
+| 401 invalid_grant | NO | reauth flow |
+| 403 insufficient_scope | NO | upgrade scope through customer flow |
+| 429 rate_limit | YES with Retry-After | respect header |
+| 500-504 transient | YES exponential backoff up to 3 | jittered |
+| Other 4xx | NO | log + alert |
+| Network timeout | YES with backoff | + cache fallback |
+| Clock skew rejection | NO | NTP sync + 60s buffer |
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

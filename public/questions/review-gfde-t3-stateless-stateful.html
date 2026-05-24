@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T3.1 · stateless vs stateful — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / T3.1 · stateless vs stateful — 复习速查</div>
+  <h1>T3.1 · stateless vs stateful — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-gfde-t3-stateless-stateful.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-gfde-t3-stateless-stateful.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [gfde-t3-stateless-stateful] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>T3.1 · stateless vs stateful — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/gfde-t3-stateless-stateful.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/gfde-t3-stateless-stateful.html"><code>gfde-t3-stateless-stateful.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页 4-axis / 5 Problem / 全部 production 数字. 比 Cheat Sheet 详细 3x, 是面试前一晚的 last-look 版本.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<p><strong>默认 stateless + client 带 conv_id + Redis hybrid + KV cache hint</strong>, voice / 强延迟才用 stateful WebSocket; "stateless" 是 API 语义而非 backend 实现, 真实生产里 stateful 优化 (KV cache, prefix tree) 是隐藏第 4 层.</p>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>Stateless API</td><td>Server 不存 session, client 带 conv_id, 每次 rebuild from DB</td><td>默认 95% LLM 场景</td></tr><tr><td>Stateful single</td><td>Sticky session, in-process state, pod 死则丢部分</td><td>voice 单节点</td></tr><tr><td>Stateful Active-Active</td><td>Replicated state, &lt; 1s failover, cost 3x</td><td>&lt; 500ms 强延迟 + multi-region</td></tr><tr><td>KV cache</td><td>GPU 显存里 attention key/value, 决定 TTFT</td><td>vLLM PagedAttention 自动</td></tr><tr><td>Prefix cache</td><td>Conv 前缀 reuse, 同 conv_id 命中 60-85%</td><td>vLLM enable-prefix-caching</td></tr><tr><td>WebSocket session</td><td>长连接 server 持 ASR/TTS pipeline</td><td>voice 强 latency</td></tr><tr><td>conv_id hint</td><td>Request 带 conv_id, vLLM extra_body 提示 prefix lookup</td><td>多轮对话提速 50%</td></tr><tr><td>Sticky LB</td><td>Hash by conv_id 路由到固定 pod (Envoy / Linkerd)</td><td>KV cache locality</td></tr><tr><td>Idempotency key</td><td>client_msg_id UUID, DB unique constraint</td><td>重试不双发</td></tr><tr><td>Write-ahead</td><td>DB write before LLM call (state durable then call)</td><td>failover 0 loss</td></tr><tr><td>Checkpoint lag</td><td>Stateful pod backup interval (5-30s 典型)</td><td>决定 failover 数据丢失</td></tr><tr><td>TTFT</td><td>Time-to-first-token, 用户感知首字延迟</td><td>voice &lt; 300ms, chat &lt; 1s</td></tr><tr><td>TPOT</td><td>Time-per-output-token, 后续 token 平均延迟</td><td>30-100ms 典型</td></tr><tr><td>Hybrid backend</td><td>API 层 stateless + Redis L1 + Postgres L3 + vLLM KV L4</td><td>你的 BNPL chatbot</td></tr><tr><td>RadixAttention</td><td>SGLang 的 prefix tree, multi-turn cache hit 更佳</td><td>多轮 chatbot</td></tr></tbody></table>
+<h4>🎯 4 个核心 framework</h4>
+<p><strong>Framework 1: 4-Axis 对比 (Latency / Scale / Cost / Failover)</strong></p>
+<ul><li>When: 面试官问 "stateless vs stateful 怎么选"</li><li>Algorithm: 列 4 维度, 对比 stateless vs stateful single vs AA</li><li>Trade-off: 没有银弹, 不同维度 winner 不同</li><li>Tools: 量化数字 — TTFT, QPS/pod, $/M token, failover RTO</li></ul>
+<p><strong>Framework 2: Hybrid 4-Tier Cache</strong></p>
+<ul><li>When: production LLM serving any scale</li><li>Algorithm: L1 in-process LRU (1K conv 95% hit) → L2 Redis warm (10K 1h TTL) → L3 Postgres cold → L4 vLLM KV</li><li>Trade-off: 更多层 = 更复杂 invalidation</li><li>Tools: Caffeine / Guava (L1), Redis Cluster (L2), Postgres (L3), vLLM (L4)</li></ul>
+<p><strong>Framework 3: DB Write-Ahead Idempotency Protocol</strong></p>
+<ul><li>When: 任何 mutation + retry</li><li>Algorithm: load → append user_msg → DB write → LLM call → append response → DB write (双写)</li><li>Trade-off: 2 DB write/req, 但 0 loss on crash</li><li>Tools: Postgres + Redis SETNX (lock), client_msg_id UUID</li></ul>
+<p><strong>Framework 4: KV Cache + Conv_id Hint + Sticky Routing</strong></p>
+<ul><li>When: 多轮对话 + self-host vLLM</li><li>Algorithm: client 带 conv_id → Envoy sticky hash → vLLM extra_body={"conversation_id": id} → prefix cache 命中</li><li>Trade-off: sticky pod 死 → re-warm 200-500ms (small loss)</li><li>Tools: Envoy hash-based, vLLM 0.6, SGLang RadixAttn</li></ul>
+<h4>🌳 关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Stateful or Stateless?
+  ├─ Latency &lt; 500ms 必需? (voice / gaming)
+  │   └─ yes ── Stateful WebSocket single OR AA
+  ├─ Multi-region failover &lt; 1s required?
+  │   └─ yes ── AA (3x cost)
+  ├─ Long-running workflow (hours/days)?
+  │   └─ yes ── Stateful via Temporal workflow
+  └─ default ── Stateless + hybrid backend (95% 场景) ⭐
+
+KV cache hit rate optimization?
+  ├─ No hint, random LB         30-50%
+  ├─ Auto prefix cache (vLLM)   50-70%
+  ├─ + conv_id hint              70-80%
+  └─ + sticky routing            80-85% ⭐</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: 4-axis 深度对比 — Latency / Scale / Cost / Failover</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Stateless API:    p99 200-1200ms, infinite scale, wire 10x, &lt; 1s failover 0 loss
+Stateful single:  p99 150-350ms, 100K+ pods ok, wire 1x, 5-30s failover lose checkpoint
+Stateful AA:      p99 150-350ms, 100K+, wire 1x, &lt; 1s failover 3x cost</code></pre>
+<ul><li>核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA</li><li>Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢</li><li>Tools: Locust / k6 latency benchmark, AWS CloudWatch RTO/RPO, Envoy active-active</li></ul>
+<p><strong>Problem 2: Hybrid Pattern — Logically Stateless + 4-Tier Cache</strong></p>
+<pre class="language-python"><code class="language-python">def serve(req):
+    conv_id = req.conv_id
+    # L1 in-process LRU
+    msgs = local_lru.get(conv_id)
+    if not msgs:
+        # L2 Redis warm
+        msgs = redis.get(f"conv:{conv_id}")
+        if not msgs:
+            # L3 Postgres cold source of truth
+            msgs = pg.fetch_history(conv_id)
+            redis.setex(f"conv:{conv_id}", 3600, msgs)
+        local_lru.put(conv_id, msgs)
+    # L4 vLLM KV cache via hint
+    resp = vllm.complete(msgs + [req.user_msg],
+                         extra_body={"conversation_id": conv_id})
+    # write-ahead pattern
+    pg.append(conv_id, req.user_msg)  # before LLM call ideally
+    pg.append(conv_id, resp.text)
+    return resp</code></pre>
+<ul><li>Top 3 gotchas: (1) L1 stale on pod different (2) Redis evict 用 LRU not random (3) DB write 必须 before LLM 不 after</li><li>Tools: Caffeine/Guava, Redis Cluster + DragonFly, Postgres logical replication, vLLM 0.6</li></ul>
+<p><strong>Problem 3: KV Cache Reuse Engineering</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">KV cache 原理: attention 的 K/V 矩阵 = past token 计算结果, GPU 显存
+vLLM PagedAttention: block 16 token 切分, 类似 OS 页表, 多 req 共享 page
+命中条件: 完全相同 prefix token 序列 (system prompt + history)
+hint 协议: extra_body={"conversation_id": "c123"} → vLLM lookup block table
+sticky routing: hash(conv_id) % N → 固定 pod, KV 在该 GPU 显存
+失效: KV evict (LRU when full), pod 死 (lost), prompt 改 (cache invalid)</code></pre>
+<ul><li>Top 3 gotchas: (1) 不传 conv_id → 0 hit (2) sticky pod 死 → re-warm 200ms (3) prompt 微改 → all cache invalid</li><li>Tools: vLLM <code>--enable-prefix-caching --max-num-batched-tokens</code>, SGLang RadixAttn, Envoy hash-based</li></ul>
+<p><strong>Problem 4: Per-Use-Case Decisions</strong></p>
+<table class="md-table"><thead><tr><th>Use case</th><th>选</th><th>关键参数</th></tr></thead><tbody><tr><td>Chat REST (SaaS chatbot)</td><td>Stateless + hybrid</td><td>TTL 1h Redis, sticky optional</td></tr><tr><td>Voice WSS (telephony)</td><td>Strict stateful single</td><td>WebSocket sticky, checkpoint 5s, TTFT &lt; 300ms</td></tr><tr><td>Coding agent (Cursor)</td><td>Sticky hybrid + checkpoint</td><td>session 30min, file context in L2</td></tr><tr><td>Workflow (Temporal)</td><td>Stateful via engine</td><td>activity timeout, retry policy</td></tr><tr><td>Multi-user collab</td><td>Document-bound + CRDT</td><td>Y.js / Automerge</td></tr></tbody></table>
+<ul><li>Top 3 gotchas: (1) Voice 用 stateless → TTFT 800ms 客户砸单 (2) Chat 用 stateful → scale 100K+ 难 (3) Coding agent 没 sticky → file context 重读 GB/min</li><li>Tools: Envoy WebSocket, Temporal SDK, Y.js CRDT, vLLM extra_body</li></ul>
+<p><strong>Problem 5: Failover Mechanics</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Stateless full flow:
+  1. Client retry with same client_msg_id
+  2. New pod fetch DB state
+  3. Redis SETNX in-flight lock
+  4. DB unique constraint backup
+  5. Return cached response if duplicate
+  → 0 message loss
+
+Stateful single:
+  - Checkpoint 5-30s interval (snapshot to S3)
+  - Pod die → spare pod load snapshot + replay WAL
+  - Lose 5-30s data + 200-500ms TTFT cold start
+
+Active-Active:
+  - Replicate delta (operation log) cross-region &lt; 1s
+  - Conflict: last-write-wins or vector clock CRDT
+  - 3x cost for replicas</code></pre>
+<ul><li>Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写</li><li>Tools: AWS S3 for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li><strong>Stateless API 强制 sticky</strong>: 违反 stateless 假设, 单 pod 挂全体 user 受影响</li><li><strong>Stateful 无 failover plan</strong>: 死一个 pod 丢一晚 session</li><li><strong>不传 conv_id 给 LLM</strong>: KV cache 0 hit, TTFT 翻倍</li><li><strong>每 turn 重传 50K token (no cache hint)</strong>: cost 5x, latency 大</li><li><strong>In-memory only state (无 DB backup)</strong>: pod 死 = data gone</li><li><strong>DB write 在 LLM call 之后</strong>: crash 时 LLM 已 mutate downstream 但 state 没存</li><li><strong>Idempotency key 缺失</strong>: retry 双发 SMS / 双扣款</li><li><strong>State 无 size cap</strong>: 100MB session blob, GC 拖死</li><li><strong>Conv &gt; 100 turn 不 summarize</strong>: token cost 线性涨</li><li><strong>Active-Active conflict resolution 没设计</strong>: split-brain 时数据 corrupt</li><li><strong>Voice 用 REST polling 不 WebSocket</strong>: TTFT 1.5s, 客户体验糟</li><li><strong>Sticky LB 没 hash by conv_id</strong>: pod 平均分配 cache 但 same conv 跨 pod</li><li><strong>Checkpoint 30s + RPO 0 矛盾</strong>: 选 SLA 时不算 RPO</li><li><strong>Prompt 微改 → cache 全失效</strong>: 没意识到 cache key 是 token 序列</li><li><strong>Cross-region replication lag &gt; 5s</strong>: AA 失效但仍 routes traffic</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Stateful WebSocket voice</td><td>Voice agent 7 markets</td><td>"WSS sticky, TTFT 280ms, single-pod failover 200ms re-warm"</td></tr><tr><td>Stateless hybrid 4-tier</td><td>BNPL chatbot</td><td>"Stateless API + Redis 1h + Postgres source + vLLM KV hint, 80% prefix hit"</td></tr><tr><td>Idempotency + write-ahead</td><td>TikTok PayLater</td><td>"client_msg_id UUID + Redis SETNX + Postgres unique, 0 double charge in 6M txn"</td></tr><tr><td>KV cache locality</td><td>Voice agent</td><td>"Envoy sticky hash(conv_id), vLLM RadixAttn, TTFT 800ms→280ms 65% drop"</td></tr><tr><td>Active-Active failover</td><td>Voice agent multi-region</td><td>"ID region down → KL takeover, &lt; 1s failover, 3x replica cost justified by SLA"</td></tr><tr><td>Workflow as state</td><td>Indonesia refund</td><td>"Temporal workflow_id durable state, 5-step refund 任意 step crash auto-resume"</td></tr><tr><td>State size cap</td><td>Internal Agent Platform</td><td>"Conv &gt; 100 turn → summarize older 用 Haiku, blob &lt; 5MB hard cap"</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"Default stateless + hybrid backend; voice / 强延迟才考虑 stateful"</li><li>"Stateless 是 API 语义, 不是 backend 实现; vLLM prefix cache + sticky 是隐藏第 4 层 stateful 优化"</li><li>"DB write-ahead before LLM call — 否则 crash 时 LLM 已 mutate 但 state 没存"</li><li>"Idempotency 3 层: Redis SETNX (fast) + DB unique (durable) + vendor key (Stripe)"</li><li>"conv_id hint + sticky routing → KV cache hit 50% → 80-85%, TTFT 减半"</li><li>"Voice agent TTFT 280ms 不是 LLM 优化, 是 WSS sticky + KV 持久 + ASR/TTS pipeline 协同"</li><li>"Active-Active 3x cost, 只有 &lt; 1s failover SLA 才值得"</li><li>"Conv 100+ turn 不 summarize → token cost 线性涨, blob &gt; 100MB GC 拖死"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>Stateless API 强制 sticky (自相矛盾)</li><li>Stateful 无 failover plan (单点)</li><li>不传 conv_id (KV cache 0 hit)</li><li>每 turn 重传 50K token without cache hint (cost 5x)</li><li>In-memory only state (pod die = lost)</li><li>DB write 在 LLM call 之后 (crash 时 inconsistent)</li><li>Idempotency key 缺失 (retry 双发)</li><li>State 无 size cap (100MB blob)</li><li>Voice 用 REST polling (TTFT 1.5s)</li><li>AA split-brain 没 conflict resolution</li></ol>
+<h4>📊 KV cache 数学 + 关键数字</h4>
+<pre class="language-plaintext"><code class="language-plaintext">模型 KV cache size per token:
+  Llama 7B  FP16: 0.5 MB/token
+  Llama 70B FP16: 5 MB/token
+  Llama 7B  FP8:  0.25 MB/token
+  Llama 70B FP8:  2.5 MB/token
+
+GPU mem budget (A100 80GB FP8):
+  Model weight 70B FP8: 70GB (single GPU 不够, 必须 TP)
+  TP=8 H100: each GPU 持 ~9GB weight, 剩 71GB for KV
+  KV budget: 71GB / 2.5MB = 28K token concurrent (across all sessions)
+  → 100 active sessions × 280 token avg
+
+vLLM prefix cache hit rate (production 实测):
+  No hint, random LB:       30-50%
+  Auto prefix cache only:   50-70%
+  + conv_id hint:            70-80%
+  + sticky routing (Envoy hash conv_id): 80-85% ⭐</code></pre>
+<h4>🧰 2026 工具栈 quick lookup</h4>
+<table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你简历</th></tr></thead><tbody><tr><td>Stateless API framework</td><td>FastAPI / Express</td><td>Go Gin, Rust Axum</td><td>FastAPI</td></tr><tr><td>L1 in-process cache</td><td>Caffeine / Guava</td><td>LRU dict</td><td>Caffeine</td></tr><tr><td>L2 warm cache</td><td>Redis Cluster</td><td>DragonFly, KeyDB</td><td>Redis</td></tr><tr><td>L3 cold store</td><td>Postgres</td><td>DynamoDB, Cassandra</td><td>Postgres</td></tr><tr><td>L4 KV cache (LLM)</td><td>vLLM PagedAttn</td><td>SGLang RadixAttn, TensorRT-LLM</td><td>vLLM + SGLang ✅</td></tr><tr><td>Sticky LB</td><td>Envoy hash</td><td>HAProxy, NGINX consistent hash</td><td>Envoy</td></tr><tr><td>WebSocket</td><td>Envoy WS / Socket.io</td><td>uWebSockets</td><td>Envoy</td></tr><tr><td>Workflow engine</td><td>Temporal</td><td>DBOS, Inngest</td><td>Temporal ✅</td></tr><tr><td>Idempotency</td><td>Redis SETNX + DB unique</td><td>Vendor Idempotency-Key</td><td>Redis + Postgres</td></tr><tr><td>CRDT</td><td>Y.js / Automerge</td><td>Loro</td><td>—</td></tr></tbody></table>
+<h4>🎬 45-min 节奏 (T3.1 专属)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">0-5    Clarify    "voice or chat? p99 latency? failover RTO/RPO?
+                  Multi-region? Tenant isolation? Compliance?"
+5-10   Mental     "Default stateless + hybrid; voice 例外"; 画 ASCII
+10-25  4-axis     Latency/Scale/Cost/Failover 表展开 + 数字
+25-35  Hybrid impl  4-tier cache + write-ahead + idempotency code
+35-42  Failover    Stateless 0 loss vs Stateful 5-30s vs AA &lt; 1s
+42-45  Resume      "Voice agent TTFT 280ms; BNPL 80% prefix hit"</code></pre>
+<h4>🔢 关键 production 数字 (你的简历项目)</h4>
+<ul><li>Voice agent TTFT: 800ms → 280ms (65% drop via WSS + KV sticky)</li><li>BNPL chatbot prefix cache hit: 80% (conv_id hint + Envoy sticky hash)</li><li>Indonesia refund workflow: 156K processed, Temporal durable state</li><li>TikTok PayLater idempotency: 0 double-charge in 6M transactions</li><li>Voice agent failover: &lt; 1s (AA setup multi-region, 3x cost justified)</li><li>BNPL session blob avg: 12KB (Redis 1h TTL, 95% L1 hit, 5% L2)</li><li>Conv &gt; 100 turn summarize threshold: Haiku $1/$5 召叫 1 次省 90%</li></ul>
+<h4>🧠 mental model anchors</h4>
+<ul><li>"Stateless API 是 API 语义, backend hidden 优化 stateful (KV cache)"</li><li>"Default stateless, voice 例外, &lt; 500ms latency 才考虑 sticky stateful"</li><li>"Hybrid 4-tier cache is 95% scenarios"</li><li>"Write-ahead DB before LLM call, idempotency 3 层"</li><li>"conv_id hint + Envoy sticky hash → KV cache 50% → 85%"</li><li>"AA 3x cost, 只有 &lt; 1s failover SLA 才合理"</li></ul>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-gfde-t3-overview.html">← T3 · LLM System Design 全景 — 复习速查</a>
+    <a href="review-gfde-t3-mcp-api-proxy.html">T3.2 · MCP / API proxy — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## T3.1 · stateless vs stateful — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t3-stateless-stateful.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`gfde-t3-stateless-stateful.html`](questions/gfde-t3-stateless-stateful.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页 4-axis / 5 Problem / 全部 production 数字. 比 Cheat Sheet 详细 3x, 是面试前一晚的 last-look 版本.
+
+### 🧠 核心心智模型 (1 sentence)
+
+**默认 stateless + client 带 conv_id + Redis hybrid + KV cache hint**, voice / 强延迟才用 stateful WebSocket; "stateless" 是 API 语义而非 backend 实现, 真实生产里 stateful 优化 (KV cache, prefix tree) 是隐藏第 4 层.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| Stateless API | Server 不存 session, client 带 conv_id, 每次 rebuild from DB | 默认 95% LLM 场景 |
+| Stateful single | Sticky session, in-process state, pod 死则丢部分 | voice 单节点 |
+| Stateful Active-Active | Replicated state, < 1s failover, cost 3x | < 500ms 强延迟 + multi-region |
+| KV cache | GPU 显存里 attention key/value, 决定 TTFT | vLLM PagedAttention 自动 |
+| Prefix cache | Conv 前缀 reuse, 同 conv_id 命中 60-85% | vLLM enable-prefix-caching |
+| WebSocket session | 长连接 server 持 ASR/TTS pipeline | voice 强 latency |
+| conv_id hint | Request 带 conv_id, vLLM extra_body 提示 prefix lookup | 多轮对话提速 50% |
+| Sticky LB | Hash by conv_id 路由到固定 pod (Envoy / Linkerd) | KV cache locality |
+| Idempotency key | client_msg_id UUID, DB unique constraint | 重试不双发 |
+| Write-ahead | DB write before LLM call (state durable then call) | failover 0 loss |
+| Checkpoint lag | Stateful pod backup interval (5-30s 典型) | 决定 failover 数据丢失 |
+| TTFT | Time-to-first-token, 用户感知首字延迟 | voice < 300ms, chat < 1s |
+| TPOT | Time-per-output-token, 后续 token 平均延迟 | 30-100ms 典型 |
+| Hybrid backend | API 层 stateless + Redis L1 + Postgres L3 + vLLM KV L4 | 你的 BNPL chatbot |
+| RadixAttention | SGLang 的 prefix tree, multi-turn cache hit 更佳 | 多轮 chatbot |
+
+### 🎯 4 个核心 framework
+
+**Framework 1: 4-Axis 对比 (Latency / Scale / Cost / Failover)**
+- When: 面试官问 "stateless vs stateful 怎么选"
+- Algorithm: 列 4 维度, 对比 stateless vs stateful single vs AA
+- Trade-off: 没有银弹, 不同维度 winner 不同
+- Tools: 量化数字 — TTFT, QPS/pod, $/M token, failover RTO
+
+**Framework 2: Hybrid 4-Tier Cache**
+- When: production LLM serving any scale
+- Algorithm: L1 in-process LRU (1K conv 95% hit) → L2 Redis warm (10K 1h TTL) → L3 Postgres cold → L4 vLLM KV
+- Trade-off: 更多层 = 更复杂 invalidation
+- Tools: Caffeine / Guava (L1), Redis Cluster (L2), Postgres (L3), vLLM (L4)
+
+**Framework 3: DB Write-Ahead Idempotency Protocol**
+- When: 任何 mutation + retry
+- Algorithm: load → append user_msg → DB write → LLM call → append response → DB write (双写)
+- Trade-off: 2 DB write/req, 但 0 loss on crash
+- Tools: Postgres + Redis SETNX (lock), client_msg_id UUID
+
+**Framework 4: KV Cache + Conv_id Hint + Sticky Routing**
+- When: 多轮对话 + self-host vLLM
+- Algorithm: client 带 conv_id → Envoy sticky hash → vLLM extra_body={"conversation_id": id} → prefix cache 命中
+- Trade-off: sticky pod 死 → re-warm 200-500ms (small loss)
+- Tools: Envoy hash-based, vLLM 0.6, SGLang RadixAttn
+
+### 🌳 关键决策树 (ASCII)
+
+```
+Stateful or Stateless?
+  ├─ Latency < 500ms 必需? (voice / gaming)
+  │   └─ yes ── Stateful WebSocket single OR AA
+  ├─ Multi-region failover < 1s required?
+  │   └─ yes ── AA (3x cost)
+  ├─ Long-running workflow (hours/days)?
+  │   └─ yes ── Stateful via Temporal workflow
+  └─ default ── Stateless + hybrid backend (95% 场景) ⭐
+
+KV cache hit rate optimization?
+  ├─ No hint, random LB         30-50%
+  ├─ Auto prefix cache (vLLM)   50-70%
+  ├─ + conv_id hint              70-80%
+  └─ + sticky routing            80-85% ⭐
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: 4-axis 深度对比 — Latency / Scale / Cost / Failover**
+
+```
+Stateless API:    p99 200-1200ms, infinite scale, wire 10x, < 1s failover 0 loss
+Stateful single:  p99 150-350ms, 100K+ pods ok, wire 1x, 5-30s failover lose checkpoint
+Stateful AA:      p99 150-350ms, 100K+, wire 1x, < 1s failover 3x cost
+```
+- 核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA
+- Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢
+- Tools: Locust / k6 latency benchmark, AWS CloudWatch RTO/RPO, Envoy active-active
+
+**Problem 2: Hybrid Pattern — Logically Stateless + 4-Tier Cache**
+
+```python
+def serve(req):
+    conv_id = req.conv_id
+    # L1 in-process LRU
+    msgs = local_lru.get(conv_id)
+    if not msgs:
+        # L2 Redis warm
+        msgs = redis.get(f"conv:{conv_id}")
+        if not msgs:
+            # L3 Postgres cold source of truth
+            msgs = pg.fetch_history(conv_id)
+            redis.setex(f"conv:{conv_id}", 3600, msgs)
+        local_lru.put(conv_id, msgs)
+    # L4 vLLM KV cache via hint
+    resp = vllm.complete(msgs + [req.user_msg],
+                         extra_body={"conversation_id": conv_id})
+    # write-ahead pattern
+    pg.append(conv_id, req.user_msg)  # before LLM call ideally
+    pg.append(conv_id, resp.text)
+    return resp
+```
+- Top 3 gotchas: (1) L1 stale on pod different (2) Redis evict 用 LRU not random (3) DB write 必须 before LLM 不 after
+- Tools: Caffeine/Guava, Redis Cluster + DragonFly, Postgres logical replication, vLLM 0.6
+
+**Problem 3: KV Cache Reuse Engineering**
+
+```
+KV cache 原理: attention 的 K/V 矩阵 = past token 计算结果, GPU 显存
+vLLM PagedAttention: block 16 token 切分, 类似 OS 页表, 多 req 共享 page
+命中条件: 完全相同 prefix token 序列 (system prompt + history)
+hint 协议: extra_body={"conversation_id": "c123"} → vLLM lookup block table
+sticky routing: hash(conv_id) % N → 固定 pod, KV 在该 GPU 显存
+失效: KV evict (LRU when full), pod 死 (lost), prompt 改 (cache invalid)
+```
+- Top 3 gotchas: (1) 不传 conv_id → 0 hit (2) sticky pod 死 → re-warm 200ms (3) prompt 微改 → all cache invalid
+- Tools: vLLM `--enable-prefix-caching --max-num-batched-tokens`, SGLang RadixAttn, Envoy hash-based
+
+**Problem 4: Per-Use-Case Decisions**
+
+| Use case | 选 | 关键参数 |
+|---|---|---|
+| Chat REST (SaaS chatbot) | Stateless + hybrid | TTL 1h Redis, sticky optional |
+| Voice WSS (telephony) | Strict stateful single | WebSocket sticky, checkpoint 5s, TTFT < 300ms |
+| Coding agent (Cursor) | Sticky hybrid + checkpoint | session 30min, file context in L2 |
+| Workflow (Temporal) | Stateful via engine | activity timeout, retry policy |
+| Multi-user collab | Document-bound + CRDT | Y.js / Automerge |
+
+- Top 3 gotchas: (1) Voice 用 stateless → TTFT 800ms 客户砸单 (2) Chat 用 stateful → scale 100K+ 难 (3) Coding agent 没 sticky → file context 重读 GB/min
+- Tools: Envoy WebSocket, Temporal SDK, Y.js CRDT, vLLM extra_body
+
+**Problem 5: Failover Mechanics**
+
+```
+Stateless full flow:
+  1. Client retry with same client_msg_id
+  2. New pod fetch DB state
+  3. Redis SETNX in-flight lock
+  4. DB unique constraint backup
+  5. Return cached response if duplicate
+  → 0 message loss
+
+Stateful single:
+  - Checkpoint 5-30s interval (snapshot to S3)
+  - Pod die → spare pod load snapshot + replay WAL
+  - Lose 5-30s data + 200-500ms TTFT cold start
+
+Active-Active:
+  - Replicate delta (operation log) cross-region < 1s
+  - Conflict: last-write-wins or vector clock CRDT
+  - 3x cost for replicas
+```
+- Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写
+- Tools: AWS S3 for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey
+
+### 🔥 Production gotchas (top 15)
+
+1. **Stateless API 强制 sticky**: 违反 stateless 假设, 单 pod 挂全体 user 受影响
+2. **Stateful 无 failover plan**: 死一个 pod 丢一晚 session
+3. **不传 conv_id 给 LLM**: KV cache 0 hit, TTFT 翻倍
+4. **每 turn 重传 50K token (no cache hint)**: cost 5x, latency 大
+5. **In-memory only state (无 DB backup)**: pod 死 = data gone
+6. **DB write 在 LLM call 之后**: crash 时 LLM 已 mutate downstream 但 state 没存
+7. **Idempotency key 缺失**: retry 双发 SMS / 双扣款
+8. **State 无 size cap**: 100MB session blob, GC 拖死
+9. **Conv > 100 turn 不 summarize**: token cost 线性涨
+10. **Active-Active conflict resolution 没设计**: split-brain 时数据 corrupt
+11. **Voice 用 REST polling 不 WebSocket**: TTFT 1.5s, 客户体验糟
+12. **Sticky LB 没 hash by conv_id**: pod 平均分配 cache 但 same conv 跨 pod
+13. **Checkpoint 30s + RPO 0 矛盾**: 选 SLA 时不算 RPO
+14. **Prompt 微改 → cache 全失效**: 没意识到 cache key 是 token 序列
+15. **Cross-region replication lag > 5s**: AA 失效但仍 routes traffic
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Stateful WebSocket voice | Voice agent 7 markets | "WSS sticky, TTFT 280ms, single-pod failover 200ms re-warm" |
+| Stateless hybrid 4-tier | BNPL chatbot | "Stateless API + Redis 1h + Postgres source + vLLM KV hint, 80% prefix hit" |
+| Idempotency + write-ahead | TikTok PayLater | "client_msg_id UUID + Redis SETNX + Postgres unique, 0 double charge in 6M txn" |
+| KV cache locality | Voice agent | "Envoy sticky hash(conv_id), vLLM RadixAttn, TTFT 800ms→280ms 65% drop" |
+| Active-Active failover | Voice agent multi-region | "ID region down → KL takeover, < 1s failover, 3x replica cost justified by SLA" |
+| Workflow as state | Indonesia refund | "Temporal workflow_id durable state, 5-step refund 任意 step crash auto-resume" |
+| State size cap | Internal Agent Platform | "Conv > 100 turn → summarize older 用 Haiku, blob < 5MB hard cap" |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "Default stateless + hybrid backend; voice / 强延迟才考虑 stateful"
+2. "Stateless 是 API 语义, 不是 backend 实现; vLLM prefix cache + sticky 是隐藏第 4 层 stateful 优化"
+3. "DB write-ahead before LLM call — 否则 crash 时 LLM 已 mutate 但 state 没存"
+4. "Idempotency 3 层: Redis SETNX (fast) + DB unique (durable) + vendor key (Stripe)"
+5. "conv_id hint + sticky routing → KV cache hit 50% → 80-85%, TTFT 减半"
+6. "Voice agent TTFT 280ms 不是 LLM 优化, 是 WSS sticky + KV 持久 + ASR/TTS pipeline 协同"
+7. "Active-Active 3x cost, 只有 < 1s failover SLA 才值得"
+8. "Conv 100+ turn 不 summarize → token cost 线性涨, blob > 100MB GC 拖死"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. Stateless API 强制 sticky (自相矛盾)
+2. Stateful 无 failover plan (单点)
+3. 不传 conv_id (KV cache 0 hit)
+4. 每 turn 重传 50K token without cache hint (cost 5x)
+5. In-memory only state (pod die = lost)
+6. DB write 在 LLM call 之后 (crash 时 inconsistent)
+7. Idempotency key 缺失 (retry 双发)
+8. State 无 size cap (100MB blob)
+9. Voice 用 REST polling (TTFT 1.5s)
+10. AA split-brain 没 conflict resolution
+
+### 📊 KV cache 数学 + 关键数字
+
+```
+模型 KV cache size per token:
+  Llama 7B  FP16: 0.5 MB/token
+  Llama 70B FP16: 5 MB/token
+  Llama 7B  FP8:  0.25 MB/token
+  Llama 70B FP8:  2.5 MB/token
+
+GPU mem budget (A100 80GB FP8):
+  Model weight 70B FP8: 70GB (single GPU 不够, 必须 TP)
+  TP=8 H100: each GPU 持 ~9GB weight, 剩 71GB for KV
+  KV budget: 71GB / 2.5MB = 28K token concurrent (across all sessions)
+  → 100 active sessions × 280 token avg
+
+vLLM prefix cache hit rate (production 实测):
+  No hint, random LB:       30-50%
+  Auto prefix cache only:   50-70%
+  + conv_id hint:            70-80%
+  + sticky routing (Envoy hash conv_id): 80-85% ⭐
+```
+
+### 🧰 2026 工具栈 quick lookup
+
+| 类别 | 默认 | Alt | 你简历 |
+|---|---|---|---|
+| Stateless API framework | FastAPI / Express | Go Gin, Rust Axum | FastAPI |
+| L1 in-process cache | Caffeine / Guava | LRU dict | Caffeine |
+| L2 warm cache | Redis Cluster | DragonFly, KeyDB | Redis |
+| L3 cold store | Postgres | DynamoDB, Cassandra | Postgres |
+| L4 KV cache (LLM) | vLLM PagedAttn | SGLang RadixAttn, TensorRT-LLM | vLLM + SGLang ✅ |
+| Sticky LB | Envoy hash | HAProxy, NGINX consistent hash | Envoy |
+| WebSocket | Envoy WS / Socket.io | uWebSockets | Envoy |
+| Workflow engine | Temporal | DBOS, Inngest | Temporal ✅ |
+| Idempotency | Redis SETNX + DB unique | Vendor Idempotency-Key | Redis + Postgres |
+| CRDT | Y.js / Automerge | Loro | — |
+
+### 🎬 45-min 节奏 (T3.1 专属)
+
+```
+0-5    Clarify    "voice or chat? p99 latency? failover RTO/RPO?
+                  Multi-region? Tenant isolation? Compliance?"
+5-10   Mental     "Default stateless + hybrid; voice 例外"; 画 ASCII
+10-25  4-axis     Latency/Scale/Cost/Failover 表展开 + 数字
+25-35  Hybrid impl  4-tier cache + write-ahead + idempotency code
+35-42  Failover    Stateless 0 loss vs Stateful 5-30s vs AA < 1s
+42-45  Resume      "Voice agent TTFT 280ms; BNPL 80% prefix hit"
+```
+
+### 🔢 关键 production 数字 (你的简历项目)
+
+- Voice agent TTFT: 800ms → 280ms (65% drop via WSS + KV sticky)
+- BNPL chatbot prefix cache hit: 80% (conv_id hint + Envoy sticky hash)
+- Indonesia refund workflow: 156K processed, Temporal durable state
+- TikTok PayLater idempotency: 0 double-charge in 6M transactions
+- Voice agent failover: < 1s (AA setup multi-region, 3x cost justified)
+- BNPL session blob avg: 12KB (Redis 1h TTL, 95% L1 hit, 5% L2)
+- Conv > 100 turn summarize threshold: Haiku $1/$5 召叫 1 次省 90%
+
+### 🧠 mental model anchors
+
+- "Stateless API 是 API 语义, backend hidden 优化 stateful (KV cache)"
+- "Default stateless, voice 例外, < 500ms latency 才考虑 sticky stateful"
+- "Hybrid 4-tier cache is 95% scenarios"
+- "Write-ahead DB before LLM call, idempotency 3 层"
+- "conv_id hint + Envoy sticky hash → KV cache 50% → 85%"
+- "AA 3x cost, 只有 < 1s failover SLA 才合理"
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

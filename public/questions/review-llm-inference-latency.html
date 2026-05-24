@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Deep Dive #3 · LLM Inference Latency — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / AI Deep Dive #3 · LLM Inference Latency — 复习速查</div>
+  <h1>AI Deep Dive #3 · LLM Inference Latency — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-llm-inference-latency.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-llm-inference-latency.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [llm-inference-latency] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>AI Deep Dive #3 · LLM Inference Latency — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/llm-inference-latency.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/llm-inference-latency.html"><code>llm-inference-latency.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<blockquote><p><strong>LLM latency debug = instrument first (per-stage OTel spans), 不靠猜</strong>. 区分 TTFT (UX for streaming) vs TPOT (flow fluency), 知道 7 stages (gateway / RAG / rerank / tokenize / queue / prefill / decode / post-process), 选对应 optimization (prefix cache for TTFT, quantization for TPOT). Diagnostic ladder 从便宜到贵: OTel → vLLM metrics → PyTorch Profiler → Nsight Systems → Nsight Compute.</p></blockquote>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>TTFT</td><td>Time-To-First-Token</td><td>streaming UX</td></tr><tr><td>TPOT / ITL</td><td>Time-Per-Output-Token</td><td>flow fluency</td></tr><tr><td>TTLT</td><td>Time-To-Last-Token (total)</td><td>user 总 wait</td></tr><tr><td>Throughput</td><td>tokens/sec aggregate</td><td>capacity planning</td></tr><tr><td>Prefill</td><td>一次性 forward 算 KV cache, O(N²)</td><td>compute-bound</td></tr><tr><td>Decode</td><td>自回归生成, 一次一 token</td><td>memory-bandwidth-bound</td></tr><tr><td>KV cache</td><td>key/value cache per token</td><td>decode 必读</td></tr><tr><td>Continuous batching</td><td>vLLM 动态混合 prefill + decode</td><td>GPU 利用率拉满</td></tr><tr><td>PagedAttention</td><td>KV cache 分页存储</td><td>KV 效率 90%+</td></tr><tr><td>Prefix caching</td><td>共享 system prompt KV</td><td>TTFT 50-90% save</td></tr><tr><td>Chunked prefill</td><td>长 prefill 切片不阻塞 decode</td><td>SGLang default</td></tr><tr><td>Speculative decoding</td><td>小 draft + 大 verify</td><td>2-3x decode speed</td></tr><tr><td>Tensor Parallel (TP)</td><td>一层切到多卡</td><td>layer 太大</td></tr><tr><td>Pipeline Parallel (PP)</td><td>不同层在不同卡</td><td>very deep model</td></tr><tr><td>AWQ / GPTQ</td><td>INT4 weight quantization</td><td>4x memory 2x speed</td></tr><tr><td>FP8 / INT8</td><td>half/quarter precision</td><td>2x throughput</td></tr><tr><td>vLLM / SGLang</td><td>主流 LLM serving</td><td>continuous batching</td></tr><tr><td>TensorRT-LLM</td><td>NVIDIA 闭源 serving</td><td>最快但锁定 NVIDIA</td></tr><tr><td>Nsight Systems</td><td>GPU profiler</td><td>kernel timeline</td></tr></tbody></table>
+<h4>🎯 5 个核心 framework</h4>
+<p><strong>Framework 1</strong>: 7-Stage Pipeline + Latency Budget</p>
+<ul><li>When: 任何 LLM serving 系统</li><li>Algorithm:</li><li>LB + Gateway 5-10ms</li><li>Token Service 10-50ms</li><li>RAG retrieve 30-100ms</li><li>Rerank 50-200ms</li><li>Queue wait 0-500ms</li><li>Prefill 100-500ms (long prompt, O(N²))</li><li>Decode 30ms/token × N</li><li>Post-process 5-20ms</li><li>Egress 2-5ms</li><li>Trade-off: 每 stage SLO budget 总和 &lt;= 总 target</li><li>Tools: OpenTelemetry spans, Grafana per-stage dashboard</li></ul>
+<p><strong>Framework 2</strong>: TTFT vs TPOT Diagnostic</p>
+<ul><li>When: 用户投诉 "slow"</li><li>Algorithm:</li><li>TTFT 高 → prefill 慢 / prefix cache miss / queue wait → 加 prefix cache, chunked prefill, scale capacity</li><li>TPOT 慢 → memory bandwidth / batch contention → quantization (AWQ INT4), speculative decoding</li><li>某 slice 慢 → hot tenant / specific query pattern → 看 per-slice p99 metric</li><li>Cold start spike → 服务重启 KV cache empty → keepalive, scheduled warmup</li><li>Trade-off: 优化 prefill 跟 decode 是不同问题, 一刀切优化错</li><li>Tools: Diff TTFT vs total, time-series alert by slice</li></ul>
+<p><strong>Framework 3</strong>: Diagnostic Ladder (Cheap → Expensive)</p>
+<ul><li>When: instrument → drill down</li><li>Algorithm:</li></ul>
+<ol><li>Per-stage OTel spans (always on, 1ms cost) ← must have</li><li>vLLM /metrics endpoint (Prometheus scrape)</li><li>PyTorch Profiler (per-incident, on demand)</li><li>NVIDIA Nsight Systems (deep dive, GPU timeline)</li><li>NVIDIA Nsight Compute (kernel-level, 最深)</li></ol>
+<ul><li>Trade-off: 深度 vs 时间, 永远 cheap first</li><li>Tools: OpenTelemetry, Prometheus, Jaeger, py-spy, Nsight</li></ul>
+<p><strong>Framework 4</strong>: Optimization Levers (Priority Order)</p>
+<ul><li>When: 找到 bottleneck 后</li><li>Algorithm:</li></ul>
+<ol><li>Continuous batching (free, vLLM default)</li><li>Prefix caching (50-90% TTFT save on shared sys prompt)</li><li>Chunked prefill (decode 不被长 prefill 阻塞)</li><li>Quantization (AWQ INT4: 4x memory, 2x speed)</li><li>Speculative decoding (2-3x decode 速度 if accept_rate 高)</li><li>PagedAttention (default, KV efficiency 90%+)</li><li>Tensor/Pipeline parallelism (大 model)</li></ol>
+<ul><li>Trade-off: 每个 lever 收益边际递减, 先 quick win</li><li>Tools: vLLM flags (enable_prefix_caching, chunked_prefill), AWQ checkpoint, SpecDec draft model</li></ul>
+<p><strong>Framework 5</strong>: Multi-Stage Pipeline Latency (RAG + Rerank + LLM + Tool)</p>
+<ul><li>When: agentic 系统</li><li>Algorithm:</li><li>Per-stage SLO budget (e.g., 3s total → 200ms RAG / 200ms rerank / 1.5s LLM / 1s tool / 100ms post)</li><li>Parallelize independent stages (RAG + tool 并行)</li><li>Cascade routing (简单 query → skip rerank, 复杂 → 全 pipeline)</li><li>Stream early ACK + tokens (用户看 "Thinking..." 立即)</li><li>Cache embedding / retrieval / response separately</li><li>Trade-off: parallelization 增加复杂度, 但 P99 reduce 50%+</li><li>Tools: asyncio.gather, Redis cache layered, OTel span tree</li></ul>
+<h4>🌳 关键决策树</h4>
+<pre class="language-plaintext"><code class="language-plaintext">用户报 slow, 第一步?
+├── 看 dashboard total p99 vs baseline
+├── 区分 TTFT 高还是 TPOT 慢?
+│   ├── TTFT 高 → drill prefill / RAG / queue
+│   ├── TPOT 慢 → drill decode / batch contention
+│   └── 总 high 但 TTFT TPOT 都 normal? → 看 RAG / tool / post-process
+└── per-slice (user / tenant / region)? → hot 现象?
+
+TTFT 高 root cause?
+├── prefix_cache_hit_rate 低? → enable prefix caching
+├── num_requests_waiting 高? → queue wait, scale up
+├── prompt 长? → chunked prefill, shorter prompt
+├── 冷启 / restart? → keepalive, warmup
+└── RAG 慢? → vector DB metrics
+
+TPOT 慢 root cause?
+├── gpu_cache_usage_perc &gt; 90%? → KV pressure, scale or reduce max output
+├── batch size 大? → tensor parallel tune
+├── memory bandwidth bound? → quantization AWQ INT4
+├── model 大 (70B+)? → speculative decoding 7B draft
+└── GPU 共享? → 独占 instance
+
+Cold start spike?
+├── KV cache empty → keepalive + scheduled warmup
+├── Model weights from disk → preload, RAMdisk
+└── First batch suboptimal → run synthetic warmup queries</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: TTFT vs TPOT Latency Breakdown</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  TTFT = network + auth + RAG + tokenize + queue_wait + prefill
+  TPOT = model_forward / output_token (decode step)
+  TTLT = TTFT + N_output_tokens * TPOT
+  
+  Stream metric (latency by token):
+    token_1_time = TTFT (key UX moment)
+    token_2_time - token_1_time = TPOT_1
+    ...
+  
+  Per-stage OTel spans:
+    span.start("rag_retrieve") ... span.end()
+    span.start("rerank") ... span.end()
+    span.start("llm_prefill") ... span.end()
+    span.start("llm_decode") ... span.end()</code></pre>
+<ul><li>Top 3 gotchas: 混淆 TTFT vs TPOT / 没 stream metric (只看 total) / OTel 没 per-stage span</li><li>Tools: OpenTelemetry, OTLP exporter, Jaeger / Tempo, Grafana</li></ul>
+<p><strong>Problem 2: Diagnostic Tools (Nsight, OTel, vLLM Metrics)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  vLLM /metrics endpoint:
+    num_requests_running, num_requests_waiting (queue depth)
+    gpu_cache_usage_perc (KV pressure, &gt; 90% alert)
+    num_preemptions_total (slow request killed)
+    time_to_first_token_seconds (histogram)
+    prefix_cache_hit_rate
+  
+  Nsight Systems:
+    nsys profile -t cuda,nvtx,osrt python serve.py
+    See: prefill kernel time, decode kernel time, host-side overhead
+  
+  PyTorch Profiler:
+    with torch.profiler.profile() as prof:
+      llm.generate(prompts)
+    prof.export_chrome_trace("trace.json")
+  
+  OTel global setup:
+    from opentelemetry import trace
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("rag_retrieve"):
+      ...</code></pre>
+<ul><li>Top 3 gotchas: 没 vLLM /metrics enabled / Nsight 没装就 debug / OTel 全 on full request 浪费</li><li>Tools: vLLM Prometheus, Nsight Systems / Compute, py-spy, PyTorch Profiler</li></ul>
+<p><strong>Problem 3: Optimization Levers</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # 1. Continuous batching (vLLM default)
+  # 2. Prefix caching
+  llm = LLM(model="meta-llama/Llama-3.1-70B", enable_prefix_caching=True)
+  # 3. Chunked prefill (decode 不被阻塞)
+  llm = LLM(..., enable_chunked_prefill=True, max_num_batched_tokens=8192)
+  # 4. Quantization
+  llm = LLM(model="...-AWQ", quantization="awq", dtype="float16")
+  # 5. Speculative decoding
+  llm = LLM(model="70B", speculative_model="7B-draft", num_speculative_tokens=5)</code></pre>
+<ul><li>Top 3 gotchas: 不知 prefix caching flag (vLLM 0.6 默认 off) / quantization 不 verify quality drop / spec decode accept_rate 没量化</li><li>Tools: vLLM config, AWQ / GPTQ quantized weights, SGLang alternative, TensorRT-LLM 极致</li></ul>
+<p><strong>Problem 4: System Bottlenecks (Network, GPU Memory, KV Cache, Scheduling)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Memory bandwidth (decode 主要瓶颈):
+    quantize to INT4 → 2x speed
+    smaller model + spec decode
+  
+  Compute (prefill 主要瓶颈):
+    prefix cache 50-90% save
+    chunked prefill
+    shorter prompt
+  
+  Network (cross-region):
+    co-locate gateway with serving
+    gRPC &gt; REST
+    HTTP/2 multiplexing
+  
+  KV cache full:
+    scale up GPU
+    reduce max_output_tokens
+    offload to CPU (PagedAttention)
+    preempt long-running, return error
+  
+  Scheduling (FIFO 不 fair):
+    custom scheduler for tenant quota
+    priority queue for premium tier
+    SLO-aware admission control</code></pre>
+<ul><li>Top 3 gotchas: 不区分 memory vs compute bound / KV cache 满 OOM / scheduling FIFO 一个 tenant 占死</li><li>Tools: vLLM scheduler config, NVLink topology, NVMe for weights, GPU monitoring</li></ul>
+<p><strong>Problem 5: Multi-Stage Pipeline Latency</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # Per-stage SLO budget
+  budget = {
+    'rag': 200, 'rerank': 200, 'llm': 1500, 'tool': 1000, 'post': 100
+  }  # ms
+  
+  # Parallelize independent stages
+  rag_task, tool_task = await asyncio.gather(
+    rag_retrieve(query),
+    tool_call_async(query)
+  )
+  
+  # Cascade routing
+  if simple_query(query):
+    return await llm.complete(query)  # skip rerank
+  else:
+    chunks = await rag_retrieve(query)
+    chunks = await rerank(chunks)
+    return await llm.complete_with_chunks(query, chunks)
+  
+  # Stream early
+  await stream.send("Thinking...")  # ACK immediately
+  async for token in llm.stream(prompt):
+    await stream.send(token)
+  
+  # Cache layered
+  embedding_cache (1h TTL)
+  retrieval_cache (5min TTL, query hash)
+  response_cache (30s TTL, full query hash)</code></pre>
+<ul><li>Top 3 gotchas: 顺序 stage 不 parallelize / 简单 query 全 pipeline 走 / 没 stream ACK 用户卡顿感</li><li>Tools: asyncio.gather, Redis layered cache, streaming SSE / WebSocket</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>没 per-stage timing 就 debug → 浪费小时猜</li><li>上 hardware fix 先 → 钱浪费</li><li>不知 vLLM features → 免费 optim 没用</li><li>没 GPU memory monitoring → KV cache 满了不知道</li><li>没 canary / SLO → 同样问题复发</li><li>Test fix on 1 request → 生产 load 完全不同</li><li>Config drift 不 diff → 隐性 regression (vLLM 0.5→0.6 prefix cache 默认 off)</li><li>混淆 TTFT vs TPOT → 优化错方向</li><li>没 stream ACK → 用户感知 latency 是 TTFT, 不是 total</li><li>KV cache 满 preempt long-running → P99 显著退步</li><li>FIFO scheduling 一个 tenant 占死 → 其他 tenant SLO 爆</li><li>Cold start spike 没 keepalive → 重启后 1 分钟 P99 高</li><li>冷数据从 disk 加载 → preload 到 RAM</li><li>Cross-region call → co-locate, gRPC</li><li>没 per-tenant metric → hot tenant 不知道</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>TTFT debug 实战</td><td>Voice agent vLLM 0.5→0.6 升级</td><td>prefix cache 默认 off, TTFT 4x</td></tr><tr><td>Streaming UX</td><td>Voice agent</td><td>p99 &lt; 800ms streaming critical</td></tr><tr><td>vLLM production</td><td>Voice agent + BNPL</td><td>continuous batching, prefix caching</td></tr><tr><td>Speculative decoding</td><td>Voice agent 70B model</td><td>7B draft accept_rate &gt; 70%</td></tr><tr><td>OTel per-stage span</td><td>Voice agent</td><td>day-1 instrumented</td></tr><tr><td>Multi-stage pipeline</td><td>BNPL chatbot</td><td>RAG + rerank + LLM + tool parallel</td></tr><tr><td>Cascade routing</td><td>BNPL intent</td><td>简单 skip rerank</td></tr><tr><td>KV cache management</td><td>Voice agent peak load</td><td>preemption avoid via scale up</td></tr><tr><td>Per-tenant SLO</td><td>Voice agent 7 markets</td><td>quota + priority queue</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"First action is instrumentation — per-stage OTel spans cost 1ms but save hours of guessing"</li><li>"TTFT vs TPOT — different bottlenecks, different fixes. Prefix caching for TTFT, quantization for TPOT"</li><li>"vLLM 0.5→0.6 default changed — prefix caching went from on to off. Voice agent TTFT 4x. Config diff is the first thing I check after a regression"</li><li>"Diagnostic ladder cheap to expensive — OTel → vLLM metrics → PyTorch Profiler → Nsight Systems → Nsight Compute"</li><li>"Prefill is compute-bound O(N²), decode is memory-bandwidth-bound. Different bottlenecks, different optimization"</li><li>"KV cache full at 90%+ → preemption kicks in, P99 explodes. Scale GPU or reduce max output"</li><li>"Multi-stage agentic — parallelize independent stages, cascade routing for simple queries, stream early ACK so user sees 'Thinking...'"</li><li>"I'd never test fix on 1 request — production load distribution is completely different. Synthetic canary 100 queries every 5 min"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>没 per-stage timing 就 debug</li><li>上 hardware fix 先</li><li>不知 vLLM features</li><li>没 GPU memory monitoring</li><li>没 canary / SLO</li><li>Test fix on 1 request</li><li>Config drift 不 diff</li><li>混淆 TTFT vs TPOT</li><li>没 stream ACK</li><li>FIFO scheduling 一个 tenant 占死</li></ol>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-dataset-100x.html">← AI Deep Dive #2 · Dataset 100x — 复习速查</a>
+    <a href="review-rag-vs-ft-vs-pe.html">AI Deep Dive #4 · RAG vs FT vs PE — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## AI Deep Dive #3 · LLM Inference Latency — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/llm-inference-latency.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`llm-inference-latency.html`](questions/llm-inference-latency.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **LLM latency debug = instrument first (per-stage OTel spans), 不靠猜**. 区分 TTFT (UX for streaming) vs TPOT (flow fluency), 知道 7 stages (gateway / RAG / rerank / tokenize / queue / prefill / decode / post-process), 选对应 optimization (prefix cache for TTFT, quantization for TPOT). Diagnostic ladder 从便宜到贵: OTel → vLLM metrics → PyTorch Profiler → Nsight Systems → Nsight Compute.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| TTFT | Time-To-First-Token | streaming UX |
+| TPOT / ITL | Time-Per-Output-Token | flow fluency |
+| TTLT | Time-To-Last-Token (total) | user 总 wait |
+| Throughput | tokens/sec aggregate | capacity planning |
+| Prefill | 一次性 forward 算 KV cache, O(N²) | compute-bound |
+| Decode | 自回归生成, 一次一 token | memory-bandwidth-bound |
+| KV cache | key/value cache per token | decode 必读 |
+| Continuous batching | vLLM 动态混合 prefill + decode | GPU 利用率拉满 |
+| PagedAttention | KV cache 分页存储 | KV 效率 90%+ |
+| Prefix caching | 共享 system prompt KV | TTFT 50-90% save |
+| Chunked prefill | 长 prefill 切片不阻塞 decode | SGLang default |
+| Speculative decoding | 小 draft + 大 verify | 2-3x decode speed |
+| Tensor Parallel (TP) | 一层切到多卡 | layer 太大 |
+| Pipeline Parallel (PP) | 不同层在不同卡 | very deep model |
+| AWQ / GPTQ | INT4 weight quantization | 4x memory 2x speed |
+| FP8 / INT8 | half/quarter precision | 2x throughput |
+| vLLM / SGLang | 主流 LLM serving | continuous batching |
+| TensorRT-LLM | NVIDIA 闭源 serving | 最快但锁定 NVIDIA |
+| Nsight Systems | GPU profiler | kernel timeline |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: 7-Stage Pipeline + Latency Budget
+- When: 任何 LLM serving 系统
+- Algorithm:
+  - LB + Gateway 5-10ms
+  - Token Service 10-50ms
+  - RAG retrieve 30-100ms
+  - Rerank 50-200ms
+  - Queue wait 0-500ms
+  - Prefill 100-500ms (long prompt, O(N²))
+  - Decode 30ms/token × N
+  - Post-process 5-20ms
+  - Egress 2-5ms
+- Trade-off: 每 stage SLO budget 总和 <= 总 target
+- Tools: OpenTelemetry spans, Grafana per-stage dashboard
+
+**Framework 2**: TTFT vs TPOT Diagnostic
+- When: 用户投诉 "slow"
+- Algorithm:
+  - TTFT 高 → prefill 慢 / prefix cache miss / queue wait → 加 prefix cache, chunked prefill, scale capacity
+  - TPOT 慢 → memory bandwidth / batch contention → quantization (AWQ INT4), speculative decoding
+  - 某 slice 慢 → hot tenant / specific query pattern → 看 per-slice p99 metric
+  - Cold start spike → 服务重启 KV cache empty → keepalive, scheduled warmup
+- Trade-off: 优化 prefill 跟 decode 是不同问题, 一刀切优化错
+- Tools: Diff TTFT vs total, time-series alert by slice
+
+**Framework 3**: Diagnostic Ladder (Cheap → Expensive)
+- When: instrument → drill down
+- Algorithm:
+  1. Per-stage OTel spans (always on, 1ms cost) ← must have
+  2. vLLM /metrics endpoint (Prometheus scrape)
+  3. PyTorch Profiler (per-incident, on demand)
+  4. NVIDIA Nsight Systems (deep dive, GPU timeline)
+  5. NVIDIA Nsight Compute (kernel-level, 最深)
+- Trade-off: 深度 vs 时间, 永远 cheap first
+- Tools: OpenTelemetry, Prometheus, Jaeger, py-spy, Nsight
+
+**Framework 4**: Optimization Levers (Priority Order)
+- When: 找到 bottleneck 后
+- Algorithm:
+  1. Continuous batching (free, vLLM default)
+  2. Prefix caching (50-90% TTFT save on shared sys prompt)
+  3. Chunked prefill (decode 不被长 prefill 阻塞)
+  4. Quantization (AWQ INT4: 4x memory, 2x speed)
+  5. Speculative decoding (2-3x decode 速度 if accept_rate 高)
+  6. PagedAttention (default, KV efficiency 90%+)
+  7. Tensor/Pipeline parallelism (大 model)
+- Trade-off: 每个 lever 收益边际递减, 先 quick win
+- Tools: vLLM flags (enable_prefix_caching, chunked_prefill), AWQ checkpoint, SpecDec draft model
+
+**Framework 5**: Multi-Stage Pipeline Latency (RAG + Rerank + LLM + Tool)
+- When: agentic 系统
+- Algorithm:
+  - Per-stage SLO budget (e.g., 3s total → 200ms RAG / 200ms rerank / 1.5s LLM / 1s tool / 100ms post)
+  - Parallelize independent stages (RAG + tool 并行)
+  - Cascade routing (简单 query → skip rerank, 复杂 → 全 pipeline)
+  - Stream early ACK + tokens (用户看 "Thinking..." 立即)
+  - Cache embedding / retrieval / response separately
+- Trade-off: parallelization 增加复杂度, 但 P99 reduce 50%+
+- Tools: asyncio.gather, Redis cache layered, OTel span tree
+
+### 🌳 关键决策树
+
+```
+用户报 slow, 第一步?
+├── 看 dashboard total p99 vs baseline
+├── 区分 TTFT 高还是 TPOT 慢?
+│   ├── TTFT 高 → drill prefill / RAG / queue
+│   ├── TPOT 慢 → drill decode / batch contention
+│   └── 总 high 但 TTFT TPOT 都 normal? → 看 RAG / tool / post-process
+└── per-slice (user / tenant / region)? → hot 现象?
+
+TTFT 高 root cause?
+├── prefix_cache_hit_rate 低? → enable prefix caching
+├── num_requests_waiting 高? → queue wait, scale up
+├── prompt 长? → chunked prefill, shorter prompt
+├── 冷启 / restart? → keepalive, warmup
+└── RAG 慢? → vector DB metrics
+
+TPOT 慢 root cause?
+├── gpu_cache_usage_perc > 90%? → KV pressure, scale or reduce max output
+├── batch size 大? → tensor parallel tune
+├── memory bandwidth bound? → quantization AWQ INT4
+├── model 大 (70B+)? → speculative decoding 7B draft
+└── GPU 共享? → 独占 instance
+
+Cold start spike?
+├── KV cache empty → keepalive + scheduled warmup
+├── Model weights from disk → preload, RAMdisk
+└── First batch suboptimal → run synthetic warmup queries
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: TTFT vs TPOT Latency Breakdown**
+- 核心解法:
+  ```
+  TTFT = network + auth + RAG + tokenize + queue_wait + prefill
+  TPOT = model_forward / output_token (decode step)
+  TTLT = TTFT + N_output_tokens * TPOT
+  
+  Stream metric (latency by token):
+    token_1_time = TTFT (key UX moment)
+    token_2_time - token_1_time = TPOT_1
+    ...
+  
+  Per-stage OTel spans:
+    span.start("rag_retrieve") ... span.end()
+    span.start("rerank") ... span.end()
+    span.start("llm_prefill") ... span.end()
+    span.start("llm_decode") ... span.end()
+  ```
+- Top 3 gotchas: 混淆 TTFT vs TPOT / 没 stream metric (只看 total) / OTel 没 per-stage span
+- Tools: OpenTelemetry, OTLP exporter, Jaeger / Tempo, Grafana
+
+**Problem 2: Diagnostic Tools (Nsight, OTel, vLLM Metrics)**
+- 核心解法:
+  ```
+  vLLM /metrics endpoint:
+    num_requests_running, num_requests_waiting (queue depth)
+    gpu_cache_usage_perc (KV pressure, > 90% alert)
+    num_preemptions_total (slow request killed)
+    time_to_first_token_seconds (histogram)
+    prefix_cache_hit_rate
+  
+  Nsight Systems:
+    nsys profile -t cuda,nvtx,osrt python serve.py
+    See: prefill kernel time, decode kernel time, host-side overhead
+  
+  PyTorch Profiler:
+    with torch.profiler.profile() as prof:
+      llm.generate(prompts)
+    prof.export_chrome_trace("trace.json")
+  
+  OTel global setup:
+    from opentelemetry import trace
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("rag_retrieve"):
+      ...
+  ```
+- Top 3 gotchas: 没 vLLM /metrics enabled / Nsight 没装就 debug / OTel 全 on full request 浪费
+- Tools: vLLM Prometheus, Nsight Systems / Compute, py-spy, PyTorch Profiler
+
+**Problem 3: Optimization Levers**
+- 核心解法:
+  ```python
+  # 1. Continuous batching (vLLM default)
+  # 2. Prefix caching
+  llm = LLM(model="meta-llama/Llama-3.1-70B", enable_prefix_caching=True)
+  # 3. Chunked prefill (decode 不被阻塞)
+  llm = LLM(..., enable_chunked_prefill=True, max_num_batched_tokens=8192)
+  # 4. Quantization
+  llm = LLM(model="...-AWQ", quantization="awq", dtype="float16")
+  # 5. Speculative decoding
+  llm = LLM(model="70B", speculative_model="7B-draft", num_speculative_tokens=5)
+  ```
+- Top 3 gotchas: 不知 prefix caching flag (vLLM 0.6 默认 off) / quantization 不 verify quality drop / spec decode accept_rate 没量化
+- Tools: vLLM config, AWQ / GPTQ quantized weights, SGLang alternative, TensorRT-LLM 极致
+
+**Problem 4: System Bottlenecks (Network, GPU Memory, KV Cache, Scheduling)**
+- 核心解法:
+  ```
+  Memory bandwidth (decode 主要瓶颈):
+    quantize to INT4 → 2x speed
+    smaller model + spec decode
+  
+  Compute (prefill 主要瓶颈):
+    prefix cache 50-90% save
+    chunked prefill
+    shorter prompt
+  
+  Network (cross-region):
+    co-locate gateway with serving
+    gRPC > REST
+    HTTP/2 multiplexing
+  
+  KV cache full:
+    scale up GPU
+    reduce max_output_tokens
+    offload to CPU (PagedAttention)
+    preempt long-running, return error
+  
+  Scheduling (FIFO 不 fair):
+    custom scheduler for tenant quota
+    priority queue for premium tier
+    SLO-aware admission control
+  ```
+- Top 3 gotchas: 不区分 memory vs compute bound / KV cache 满 OOM / scheduling FIFO 一个 tenant 占死
+- Tools: vLLM scheduler config, NVLink topology, NVMe for weights, GPU monitoring
+
+**Problem 5: Multi-Stage Pipeline Latency**
+- 核心解法:
+  ```python
+  # Per-stage SLO budget
+  budget = {
+    'rag': 200, 'rerank': 200, 'llm': 1500, 'tool': 1000, 'post': 100
+  }  # ms
+  
+  # Parallelize independent stages
+  rag_task, tool_task = await asyncio.gather(
+    rag_retrieve(query),
+    tool_call_async(query)
+  )
+  
+  # Cascade routing
+  if simple_query(query):
+    return await llm.complete(query)  # skip rerank
+  else:
+    chunks = await rag_retrieve(query)
+    chunks = await rerank(chunks)
+    return await llm.complete_with_chunks(query, chunks)
+  
+  # Stream early
+  await stream.send("Thinking...")  # ACK immediately
+  async for token in llm.stream(prompt):
+    await stream.send(token)
+  
+  # Cache layered
+  embedding_cache (1h TTL)
+  retrieval_cache (5min TTL, query hash)
+  response_cache (30s TTL, full query hash)
+  ```
+- Top 3 gotchas: 顺序 stage 不 parallelize / 简单 query 全 pipeline 走 / 没 stream ACK 用户卡顿感
+- Tools: asyncio.gather, Redis layered cache, streaming SSE / WebSocket
+
+### 🔥 Production gotchas (top 15)
+
+1. 没 per-stage timing 就 debug → 浪费小时猜
+2. 上 hardware fix 先 → 钱浪费
+3. 不知 vLLM features → 免费 optim 没用
+4. 没 GPU memory monitoring → KV cache 满了不知道
+5. 没 canary / SLO → 同样问题复发
+6. Test fix on 1 request → 生产 load 完全不同
+7. Config drift 不 diff → 隐性 regression (vLLM 0.5→0.6 prefix cache 默认 off)
+8. 混淆 TTFT vs TPOT → 优化错方向
+9. 没 stream ACK → 用户感知 latency 是 TTFT, 不是 total
+10. KV cache 满 preempt long-running → P99 显著退步
+11. FIFO scheduling 一个 tenant 占死 → 其他 tenant SLO 爆
+12. Cold start spike 没 keepalive → 重启后 1 分钟 P99 高
+13. 冷数据从 disk 加载 → preload 到 RAM
+14. Cross-region call → co-locate, gRPC
+15. 没 per-tenant metric → hot tenant 不知道
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| TTFT debug 实战 | Voice agent vLLM 0.5→0.6 升级 | prefix cache 默认 off, TTFT 4x |
+| Streaming UX | Voice agent | p99 < 800ms streaming critical |
+| vLLM production | Voice agent + BNPL | continuous batching, prefix caching |
+| Speculative decoding | Voice agent 70B model | 7B draft accept_rate > 70% |
+| OTel per-stage span | Voice agent | day-1 instrumented |
+| Multi-stage pipeline | BNPL chatbot | RAG + rerank + LLM + tool parallel |
+| Cascade routing | BNPL intent | 简单 skip rerank |
+| KV cache management | Voice agent peak load | preemption avoid via scale up |
+| Per-tenant SLO | Voice agent 7 markets | quota + priority queue |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "First action is instrumentation — per-stage OTel spans cost 1ms but save hours of guessing"
+2. "TTFT vs TPOT — different bottlenecks, different fixes. Prefix caching for TTFT, quantization for TPOT"
+3. "vLLM 0.5→0.6 default changed — prefix caching went from on to off. Voice agent TTFT 4x. Config diff is the first thing I check after a regression"
+4. "Diagnostic ladder cheap to expensive — OTel → vLLM metrics → PyTorch Profiler → Nsight Systems → Nsight Compute"
+5. "Prefill is compute-bound O(N²), decode is memory-bandwidth-bound. Different bottlenecks, different optimization"
+6. "KV cache full at 90%+ → preemption kicks in, P99 explodes. Scale GPU or reduce max output"
+7. "Multi-stage agentic — parallelize independent stages, cascade routing for simple queries, stream early ACK so user sees 'Thinking...'"
+8. "I'd never test fix on 1 request — production load distribution is completely different. Synthetic canary 100 queries every 5 min"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. 没 per-stage timing 就 debug
+2. 上 hardware fix 先
+3. 不知 vLLM features
+4. 没 GPU memory monitoring
+5. 没 canary / SLO
+6. Test fix on 1 request
+7. Config drift 不 diff
+8. 混淆 TTFT vs TPOT
+9. 没 stream ACK
+10. FIFO scheduling 一个 tenant 占死
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

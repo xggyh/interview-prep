@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tech #5 · Multi-tenant SLA Monitoring — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / Tech #5 · Multi-tenant SLA Monitoring — 复习速查</div>
+  <h1>Tech #5 · Multi-tenant SLA Monitoring — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-multitenant-monitoring-slas.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-multitenant-monitoring-slas.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [multitenant-monitoring-slas] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Tech #5 · Multi-tenant SLA Monitoring — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/multitenant-monitoring-slas.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/multitenant-monitoring-slas.html"><code>multitenant-monitoring-slas.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>核心心智模型 (1 sentence)</h4>
+<p>Multi-tenant SaaS monitoring = "3 层 isolation (gateway token bucket / app DB pool &amp; WFQ / physical dedicated for Gold) + per-tenant SLI 但严控 cardinality (top-N tenant 全量 + 长尾 aggregated bucket + Mimir/Cortex 横扩) + tier-based threshold (Gold 99.99%/200ms / Silver 99.9%/500ms / Bronze 99%/1s) + multi-window burn rate alert (1h@14x / 6h@7x / 1d@3x / 3d@1x) + 自助 dashboard + 自动 credit + 严格 billing audit (独立 DB / WORM / HMAC-signed / 13 month)", 1 个 noisy bronze 不能拖 Gold.</p>
+<h4>术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>SLI</td><td>Service Level Indicator, 一个测量值</td><td>事实</td></tr><tr><td>SLO</td><td>Service Level Objective, 内部目标 (99.9%)</td><td>aspirational</td></tr><tr><td>SLA</td><td>Service Level Agreement, 合同承诺 (99.5%) + breach credit</td><td>法律</td></tr><tr><td>Error budget</td><td>1 - SLO, 月预算</td><td>43min/month for 99.9%</td></tr><tr><td>Burn rate</td><td>EB 消耗速率, 10x = 4天烧光</td><td>multi-window alert</td></tr><tr><td>Cardinality</td><td>metric label 组合总数</td><td>10K tenant × 100 metric = 危险</td></tr><tr><td>Noisy neighbor</td><td>1 个 tenant 占光资源拖死全场</td><td>隔离的对象</td></tr><tr><td>Token bucket</td><td>per-tenant rate limit (refill + capacity)</td><td>API Gateway L1</td></tr><tr><td>WFQ</td><td>Weighted Fair Queueing, priority class</td><td>App L2</td></tr><tr><td>Dedicated replica</td><td>Gold tier 独享 Kubernetes node pool (taint+toleration)</td><td>L3 物理隔离</td></tr><tr><td>Tier threshold</td><td>同 metric 不同 tier 不同 threshold</td><td>per-tier monitoring</td></tr><tr><td>Streaming aggregation</td><td>Flink 1-min rollup per tenant per metric</td><td>cardinality 控制</td></tr><tr><td>Mimir / Cortex / Thanos</td><td>Prometheus 横扩 multi-tenant</td><td>&gt; 10M ts 需要</td></tr><tr><td>WORM</td><td>Write Once Read Many, billing 不可改</td><td>compliance</td></tr><tr><td>HMAC-signed invoice</td><td>防篡改</td><td>billing audit</td></tr><tr><td>Self-serve dashboard</td><td>customer 看 SLO compliance + EB + usage</td><td>transparency</td></tr><tr><td>Auto-credit</td><td>SLA breach 自动 trigger compensation</td><td>不手动 ask</td></tr></tbody></table>
+<h4>5 个核心 framework / pattern</h4>
+<p><strong>Framework 1</strong>: SLI / SLO / SLA / Error Budget Taxonomy</p>
+<ul><li>When: 定义 "好坏" 标准</li><li>Algorithm: SLI (event-based 计算) → SLO (内部 99.9%) → SLA (合同 99.5% + credit) → EB (1-SLO × total in window); SLA &lt; SLO 留 20-50% buffer</li><li>Trade-off: SLO 严但 buffer 大 vs 紧但 breach 概率高</li><li>Tools: Prometheus recording rules, Grafana SLO panel, custom EB tracker</li></ul>
+<p><strong>Framework 2</strong>: Multi-window multi-burn-rate alert (Google SRE)</p>
+<ul><li>When: catch fast burn + slow burn</li><li>Algorithm: 1h@14x → critical / 6h@7x → critical / 1d@3x → warning / 3d@1x → warning; 1h 14x 意味 4 天烧光全月 budget</li><li>Trade-off: 单 window 错过 slow burn 或 sudden burst</li><li>Tools: Alertmanager multi-rule, Grafana SLO module, PrometheusRule with burn_rate expression</li></ul>
+<p><strong>Framework 3</strong>: 3 isolation layers (gateway / app / physical)</p>
+<ul><li>When: multi-tenant infra</li><li>Algorithm: L1 Gateway (Envoy per-tenant token bucket by tier) / L2 App (per-tenant DB pool + memory + WFQ scheduler) / L3 Physical (Gold dedicated node pool, taint+toleration, autoscale 独立)</li><li>Trade-off: 3 层完全 isolation 贵, 但 1 个 noisy 拖死全场代价更大</li><li>Tools: Envoy / Kong, defaultdict(Semaphore), Kubernetes taint+toleration, separate autoscale group</li></ul>
+<p><strong>Framework 4</strong>: Cardinality control 5 策略</p>
+<ul><li>When: 10K+ tenant scale</li><li>Algorithm: 1) label limit (max 10 per metric) / 2) per-tenant only top-N metrics / 3) top-100 tenant full, 长尾 aggregated bucket / 4) endpoint bucket (not raw URL) / 5) streaming aggregation (Flink 1-min pre-rollup)</li><li>Trade-off: aggregated 失去细粒度 vs 系统能跑</li><li>Tools: Prometheus relabeling, Mimir/Cortex, Flink 1-min window aggregator</li></ul>
+<p><strong>Framework 5</strong>: Auto-credit on SLA breach</p>
+<ul><li>When: SLA breach detected</li><li>Algorithm: compute_credit (gap &lt; 0.01% → 10% / &lt; 0.1% → 25% / &lt; 1% → 50% / &gt; 1% → 100%); auto-issue credit note for next invoice; notify customer; record audit</li><li>Trade-off: 主动 credit 关系好 vs 不主动客户来 ask 关系崩</li><li>Tools: SLACreditEngine, billing DB separate, Stripe/Chargebee credit API</li></ul>
+<h4>关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Tier definition:
+Gold:   99.99% / 200ms / dedicated / 10K QPS / 24x7 support / 100% telemetry
+Silver: 99.9%  / 500ms / pooled priority A / 1K QPS / business hours / 50% telemetry
+Bronze: 99%    / 1s    / pooled priority B / 100 QPS / email digest / 10% telemetry
+
+Burn rate alert window:
+1h burn rate 14x → critical page (4天烧光)
+6h burn rate 7x  → critical
+1d burn rate 3x  → warning (10天烧光)
+3d burn rate 1x  → warning
+
+Cardinality strategy:
+&lt; 1K tenant + &lt; 1M ts → single Prometheus + recording rules
+&gt; 1K tenant → Mimir / Cortex (horizontal scale)
+Large SaaS, $$ → Datadog (less ops, more $$$)
+
+Storage tier:
+Hot: raw 7d, 1-min rollups 30d (Postgres/OpenSearch)
+Warm: 1-min 30-90d in SSD (S3 Parquet)
+Cold: 1-hour 1y, daily 3y+ (S3 Glacier)
+Per-tier retention: Bronze 30d, Silver 90d, Gold 1y
+
+Routing per severity:
+P0 (Gold SLA) → PagerDuty 24x7
+P1 (Silver / Gold non-SLA) → business hours
+P2 (Bronze) → Slack
+P3 (info) → daily digest
+Dedup 1h per (tenant × metric)</code></pre>
+<h4>Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: SLI / SLO / SLA + Error Budget</strong></p>
+<ul><li>核心解法: SLI 测量 → SLO 内部 → SLA 合同; SLA &lt; SLO 留 buffer; EB = (1-SLO)×total; multi-window burn (1h@14x / 6h@7x / 1d@3x / 3d@1x)</li><li>Top 3 gotchas: SLA=SLO 没 buffer / 单 window 错过 slow burn / 月跨期 EB 重置规则</li><li>Tools: Prometheus, Alertmanager, Grafana, custom EB tracker</li></ul>
+<p><strong>Problem 2: Per-tenant metrics + cardinality</strong></p>
+<ul><li>核心解法: 5 策略 (label limit / per-tenant top-N metric / 头长尾分 / endpoint bucket / streaming aggregation Flink); 10K tenant × 100 metric × 10 label = 10M ts 直接超 Prometheus 极限</li><li>Top 3 gotchas: Sampling 不可用于 billing / Mimir/Cortex 必要 &gt; 10M ts / endpoint raw URL 不可 bucket 必要</li><li>Tools: Flink 1-min rollup, Mimir, Datadog SaaS (省运维但 $$$)</li></ul>
+<p><strong>Problem 3: Tier-based monitoring</strong></p>
+<ul><li>核心解法: tier 定义价格 + 资源 + 监控 + alert; physical for Gold (taint + toleration K8s node pool); WFQ for shared Silver/Bronze</li><li>Top 3 gotchas: tier 物理 isolation 贵但 Gold 看 dedicated 心安 / 共享 pool 必有 priority class / per-tier threshold 不能 one-size-fits-all</li><li>Tools: K8s node pool, Envoy per-tenant rate limit, defaultdict priority queue</li></ul>
+<p><strong>Problem 4: Alert routing per-tenant</strong></p>
+<ul><li>核心解法: 3 strategy (aggregate / per-tier / per-tenant); 4 severity (P0 page 24x7 / P1 page business / P2 slack / P3 digest); dedup 1h per (tenant × metric); quarterly precision review</li><li>Top 3 gotchas: alert → #general no owner / 单 channel 全 fire / quarterly tune low-precision dead alerts</li><li>Tools: PagerDuty + Opsgenie + Slack + Alertmanager routing rules</li></ul>
+<p><strong>Problem 5: Customer dashboard + auto-credit + billing audit</strong></p>
+<ul><li>核心解法: self-serve dashboard (uptime + EB remaining + incidents + usage + recommendations + bill estimate); auto-credit ladder (gap &lt; 0.01% → 10%, &lt; 0.1% → 25%, etc.); billing 独立 DB + WORM + HMAC-signed + 13mo retention; 60d dispute window</li><li>Top 3 gotchas: telemetry + billing 同 DB → billing 受 retention 影响 / billing 永不 sample / dispute 必有 audit chain of custody</li><li>Tools: Stripe/Chargebee credit API, statuspage.io, BigQuery 独立 billing dataset, HMAC sign</li></ul>
+<h4>Production gotchas (top 15)</h4>
+<ol><li>Cardinality 失控 (10k × 100 × 10 = 10M ts)</li><li>Single shared infra for all tiers</li><li>没 rate limit at gateway (app 层被打爆)</li><li>没 quota per-tenant DB connections</li><li>Billing 跟 telemetry 同 DB</li><li>Aggregate at query time (slow + expensive)</li><li>没 dispute window / audit (customer 怒)</li><li>Sampling for billing (不可接受)</li><li>SLA = SLO (no buffer)</li><li>Burn rate alert 单 window (错过 fast 或 slow)</li><li>Tier 不可升级 (客户成长无 path)</li><li>Bronze tenant 受 DDoS 没 protect</li><li>没 hard ceiling within tier (Gold 也能爆)</li><li>Public status page 缺失 (客户 Twitter 发飙才知道)</li><li>Storage 一刀切 retention (Bronze 1y 浪费 / Gold 30d 不够)</li></ol>
+<h4>简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Per-tenant SLA tiers</td><td>Voice agent 7 markets</td><td>不同 latency/accuracy SLA per market</td></tr><tr><td>Noisy neighbor isolation</td><td>Voice agent Indonesia payday 5x burst</td><td>Top-3 markets dedicated → 不影响 Thailand/Korea</td></tr><tr><td>Token bucket rate limit</td><td>API gateway 自然 per-market</td><td>Envoy per-market refill rate</td></tr><tr><td>Per-tenant dashboard</td><td>Regional ops weekly review</td><td>自助看 SLO + usage + cost</td></tr><tr><td>Billing signal</td><td>ByteDance internal chargeback</td><td>per-region cost attribution</td></tr><tr><td>Cardinality control</td><td>Voice agent metric per market</td><td>top markets full, 长尾 aggregated</td></tr><tr><td>Burn rate alert multi-window</td><td>Voice agent 7 markets on-call</td><td>1h / 6h / 1d / 3d for fast + slow burn</td></tr><tr><td>Auto-credit</td><td>Indonesia SLA breach commission adjust</td><td>自动算 + 通知</td></tr><tr><td>Tier upgrade path</td><td>Bronze → Silver 自助升级</td><td>dashboard 内一键</td></tr></tbody></table>
+<h4>面试现场 quotables (top 8)</h4>
+<ol><li>"SLO &gt; SLA — 留 20-50% buffer. Burn rate alert multi-window: 1h@14x / 6h@7x / 1d@3x / 3d@1x. Catches fast burn + slow burn."</li><li>"3 isolation layers: L1 Gateway per-tenant token bucket + L2 App per-tenant DB pool &amp; WFQ + L3 Physical Gold dedicated node pool (K8s taint+toleration)."</li><li>"Cardinality control: top-100 tenant full per-tenant metric, 长尾 aggregated. Endpoint bucket (not raw URL). Streaming aggregation Flink 1-min pre-rollup. Mimir/Cortex when &gt; 10M ts."</li><li>"Billing 独立 DB. Never sample for billing. WORM + HMAC-signed. 13 month retention. 60d dispute window with self-serve CSV export."</li><li>"Voice agent 7 markets — Indonesia payday 5x traffic burst. Because top-3 markets had dedicated inference replicas, Thailand/Korea/Vietnam unaffected. Tier-based isolation = insurance not luxury."</li><li>"Per-market burn rate multi-window caught a slow degradation in Vietnam gradient over 48h that would have missed aggregate alert."</li><li>"Auto-credit ladder on SLA breach: gap &lt; 0.01% → 10% / &lt; 0.1% → 25% / &lt; 1% → 50% / &gt; 1% → 100%. Notify customer + audit log."</li><li>"Gold tenant 20x spike: hard ceiling within tier + autoscale dedicated infra + customer-facing alert + bill overage 1.5x. Even Gold has ceiling."</li></ol>
+<h4>红线 (top 10 anti-patterns)</h4>
+<ol><li>Cardinality 失控 (10M+ ts no control)</li><li>Single shared infra for all tiers</li><li>No per-tenant rate limit at gateway</li><li>Sampling for billing</li><li>SLA = SLO (no buffer)</li><li>单 window burn rate alert</li><li>Telemetry + billing 同 DB</li><li>No hard ceiling within tier</li><li>No dispute window / no audit chain</li><li>Public status page 缺失 (客户 Twitter 才知道)</li></ol>
+<h4>Tier definition (full table)</h4>
+<table class="md-table"><thead><tr><th>Aspect</th><th>Bronze</th><th>Silver</th><th>Gold</th></tr></thead><tbody><tr><td>Uptime SLA</td><td>99%</td><td>99.9%</td><td>99.99%</td></tr><tr><td>Latency p99</td><td>1000 ms</td><td>500 ms</td><td>200 ms</td></tr><tr><td>Rate limit</td><td>100 QPS</td><td>1000 QPS</td><td>10000 QPS</td></tr><tr><td>Burst</td><td>200 QPS / 60s</td><td>2000 QPS / 60s</td><td>20000 QPS / 60s</td></tr><tr><td>Isolation</td><td>Pooled (priority B)</td><td>Pooled (priority A)</td><td>Dedicated K8s node pool</td></tr><tr><td>DB pool</td><td>5 connections</td><td>50 connections</td><td>500 connections</td></tr><tr><td>Telemetry sample</td><td>10%</td><td>50%</td><td>100%</td></tr><tr><td>Alert routing</td><td>Email daily digest</td><td>Slack business hours</td><td>PagerDuty 24x7</td></tr><tr><td>Support response</td><td>24h</td><td>1h</td><td>15 min</td></tr><tr><td>Storage retention</td><td>30d</td><td>90d</td><td>1y</td></tr><tr><td>Credit ladder</td><td>5/15/30/60 %</td><td>10/25/50/100 %</td><td>10/25/50/100 %</td></tr></tbody></table>
+<h4>Multi-window burn rate alerts (Google SRE)</h4>
+<table class="md-table"><thead><tr><th>Window</th><th>Burn rate threshold</th><th>Time to exhaust budget</th><th>Severity</th></tr></thead><tbody><tr><td>1 h</td><td>14×</td><td>~ 2 days</td><td>Critical (page 24x7)</td></tr><tr><td>6 h</td><td>7×</td><td>~ 4 days</td><td>Critical</td></tr><tr><td>1 d</td><td>3×</td><td>~ 10 days</td><td>Warning</td></tr><tr><td>3 d</td><td>1×</td><td>~ 30 days (whole month)</td><td>Warning</td></tr></tbody></table>
+<h4>Cardinality control 5 strategies</h4>
+<table class="md-table"><thead><tr><th>Strategy</th><th>Implementation</th><th>Cardinality reduction</th></tr></thead><tbody><tr><td>Label limit</td><td>Prometheus max_label_names_per_series = 10</td><td>hard cap</td></tr><tr><td>Per-tenant only top-N metrics</td><td>PER_TENANT_METRICS list (billing + SLA only)</td><td>10x</td></tr><tr><td>Head + tail bucket</td><td>Top-100 tenant full, 长尾 aggregated_small</td><td>100x for long-tail</td></tr><tr><td>Endpoint bucket</td><td>/api/v1/agent/* → "agent"</td><td>50x</td></tr><tr><td>Streaming aggregation</td><td>Flink 1-min rollup per tenant</td><td>60x (raw event/min → 1/min)</td></tr></tbody></table>
+<h4>Routing + severity matrix</h4>
+<table class="md-table"><thead><tr><th>Tenant tier</th><th>Severity</th><th>Route</th><th>Escalation</th></tr></thead><tbody><tr><td>Gold</td><td>P0 SLA breach</td><td>PagerDuty oncall + CSM</td><td>15 min</td></tr><tr><td>Silver</td><td>P1 SLA breach</td><td>PagerDuty business hours</td><td>1h</td></tr><tr><td>Bronze</td><td>P2 SLA breach</td><td>Slack #tenant-alerts</td><td>none</td></tr><tr><td>Gold</td><td>P1 non-SLA</td><td>Slack #gold-watch</td><td>none</td></tr><tr><td>Any</td><td>P3 info</td><td>Email daily digest</td><td>none</td></tr></tbody></table>
+<h4>Auto-credit ladder (SLA breach)</h4>
+<table class="md-table"><thead><tr><th>Uptime gap</th><th>Credit %</th></tr></thead><tbody><tr><td>0 - 0.01% (99.9 → 99.89%)</td><td>10%</td></tr><tr><td>0.01 - 0.1%</td><td>25%</td></tr><tr><td>0.1 - 1%</td><td>50%</td></tr><tr><td>&gt; 1%</td><td>100% (基本免费一个月)</td></tr></tbody></table>
+<h4>工具栈</h4>
+<table class="md-table"><thead><tr><th>Component</th><th>Tools</th></tr></thead><tbody><tr><td>API Gateway</td><td>Envoy / Kong / Cloudflare Workers</td></tr><tr><td>Metric storage</td><td>Prometheus / Mimir / Cortex / Datadog (SaaS)</td></tr><tr><td>Visualization</td><td>Grafana / Datadog dashboard</td></tr><tr><td>Alert routing</td><td>Alertmanager / PagerDuty / Opsgenie</td></tr><tr><td>Streaming aggregation</td><td>Flink / Spark Streaming / Materialize</td></tr><tr><td>Time-series DB</td><td>ClickHouse / TimescaleDB / Druid</td></tr><tr><td>Status page</td><td>statuspage.io / Cachet self-hosted</td></tr><tr><td>Billing</td><td>Stripe / Chargebee / Metronome (usage-based)</td></tr></tbody></table>
+<h4>5 业务场景变体 (anchor stories)</h4>
+<table class="md-table"><thead><tr><th>Variant</th><th>Tenant model</th><th>Key challenge</th></tr></thead><tbody><tr><td>TikTok voice agent 7 markets</td><td>7 markets = 7 tenants</td><td>Indonesia / Vietnam Gold, Thailand / Philippines Silver, SG / MY Bronze, Korea pilot</td></tr><tr><td>BNPL chatbot merchant tenants</td><td>1000+ 商户, top 10% = 80% 流量</td><td>Top 商户 dedicated LLM endpoint, 长尾 shared</td></tr><tr><td>Internal Agent Platform</td><td>ByteDance team-as-tenant</td><td>cost chargeback per team, internal SLA</td></tr><tr><td>ConvFinQA fair share</td><td>researcher-as-tenant</td><td>WFQ instead of tiered</td></tr><tr><td>Cloudflare-style 10K+ SaaS</td><td>长尾极端</td><td>top 1% = 50% resources, Bronze 80% tenant only 5% 流量</td></tr></tbody></table>
+<h4>Storage tier strategy</h4>
+<table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use</th></tr></thead><tbody><tr><td>Hot</td><td>7d raw + 30d 1-min rollups</td><td>Postgres / OpenSearch</td><td>real-time query, alert</td></tr><tr><td>Warm</td><td>30-90d 1-min in SSD</td><td>S3 Parquet</td><td>slow query 调查</td></tr><tr><td>Cold</td><td>1y 1-hour, 3y+ daily</td><td>S3 Glacier</td><td>compliance retention</td></tr><tr><td>Per-tier retention</td><td>Bronze 30d / Silver 90d / Gold 1y</td><td>varies</td><td>tier-scaled</td></tr></tbody></table>
+<h4>Per-tier physical isolation (K8s)</h4>
+<table class="md-table"><thead><tr><th>Tier</th><th>Isolation</th><th>Method</th></tr></thead><tbody><tr><td>Gold</td><td>Dedicated node pool</td><td>K8s taint=tier:gold + toleration on Gold pods + nodeSelector</td></tr><tr><td>Silver</td><td>Pooled priority A</td><td>PriorityClass A + 80% slot quota</td></tr><tr><td>Bronze</td><td>Pooled priority B</td><td>PriorityClass B + 20% slot quota</td></tr><tr><td>All</td><td>Hard ceiling per tenant</td><td>even within tier, cap absolute QPS</td></tr></tbody></table>
+<h4>Billing requirements (合规)</h4>
+<table class="md-table"><thead><tr><th>Requirement</th><th>Implementation</th></tr></thead><tbody><tr><td>Independent DB</td><td>NOT same as telemetry (retention 不同)</td></tr><tr><td>WORM (Write Once Read Many)</td><td>append-only table, no UPDATE/DELETE</td></tr><tr><td>HMAC-signed events</td><td>hmac_sign(event, BILLING_KEY) on insert</td></tr><tr><td>13-month retention</td><td>1y for audit + 1 month buffer</td></tr><tr><td>Self-serve report</td><td>CSV export from customer dashboard</td></tr><tr><td>Crypto-signed invoice</td><td>monthly invoice HMAC for tamper</td></tr><tr><td>Double-entry consistency</td><td>telemetry vs billing 可对账</td></tr><tr><td>60-day dispute window</td><td>customer 可 challenge billing line</td></tr></tbody></table>
+<h4>Burn rate calculation example</h4>
+<table class="md-table"><thead><tr><th>Window</th><th>Window error rate</th><th>SLO target</th><th>Burn rate</th><th>Threshold</th></tr></thead><tbody><tr><td>1h</td><td>0.014</td><td>0.999</td><td>0.014 / 0.001 = 14×</td><td>critical</td></tr><tr><td>6h</td><td>0.007</td><td>0.999</td><td>7×</td><td>critical</td></tr><tr><td>1d</td><td>0.003</td><td>0.999</td><td>3×</td><td>warning</td></tr><tr><td>3d</td><td>0.001</td><td>0.999</td><td>1×</td><td>warning (sustained slow burn)</td></tr></tbody></table>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-data-pipeline-drift.html">← Tech #4 · Data Pipeline Drift Detection — 复习速查</a>
+    <a href="review-file-system-permissions.html">Tech #6 · File System Permissions — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Tech #5 · Multi-tenant SLA Monitoring — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/multitenant-monitoring-slas.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`multitenant-monitoring-slas.html`](questions/multitenant-monitoring-slas.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 核心心智模型 (1 sentence)
+
+Multi-tenant SaaS monitoring = "3 层 isolation (gateway token bucket / app DB pool & WFQ / physical dedicated for Gold) + per-tenant SLI 但严控 cardinality (top-N tenant 全量 + 长尾 aggregated bucket + Mimir/Cortex 横扩) + tier-based threshold (Gold 99.99%/200ms / Silver 99.9%/500ms / Bronze 99%/1s) + multi-window burn rate alert (1h@14x / 6h@7x / 1d@3x / 3d@1x) + 自助 dashboard + 自动 credit + 严格 billing audit (独立 DB / WORM / HMAC-signed / 13 month)", 1 个 noisy bronze 不能拖 Gold.
+
+### 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| SLI | Service Level Indicator, 一个测量值 | 事实 |
+| SLO | Service Level Objective, 内部目标 (99.9%) | aspirational |
+| SLA | Service Level Agreement, 合同承诺 (99.5%) + breach credit | 法律 |
+| Error budget | 1 - SLO, 月预算 | 43min/month for 99.9% |
+| Burn rate | EB 消耗速率, 10x = 4天烧光 | multi-window alert |
+| Cardinality | metric label 组合总数 | 10K tenant × 100 metric = 危险 |
+| Noisy neighbor | 1 个 tenant 占光资源拖死全场 | 隔离的对象 |
+| Token bucket | per-tenant rate limit (refill + capacity) | API Gateway L1 |
+| WFQ | Weighted Fair Queueing, priority class | App L2 |
+| Dedicated replica | Gold tier 独享 Kubernetes node pool (taint+toleration) | L3 物理隔离 |
+| Tier threshold | 同 metric 不同 tier 不同 threshold | per-tier monitoring |
+| Streaming aggregation | Flink 1-min rollup per tenant per metric | cardinality 控制 |
+| Mimir / Cortex / Thanos | Prometheus 横扩 multi-tenant | > 10M ts 需要 |
+| WORM | Write Once Read Many, billing 不可改 | compliance |
+| HMAC-signed invoice | 防篡改 | billing audit |
+| Self-serve dashboard | customer 看 SLO compliance + EB + usage | transparency |
+| Auto-credit | SLA breach 自动 trigger compensation | 不手动 ask |
+
+### 5 个核心 framework / pattern
+
+**Framework 1**: SLI / SLO / SLA / Error Budget Taxonomy
+- When: 定义 "好坏" 标准
+- Algorithm: SLI (event-based 计算) → SLO (内部 99.9%) → SLA (合同 99.5% + credit) → EB (1-SLO × total in window); SLA < SLO 留 20-50% buffer
+- Trade-off: SLO 严但 buffer 大 vs 紧但 breach 概率高
+- Tools: Prometheus recording rules, Grafana SLO panel, custom EB tracker
+
+**Framework 2**: Multi-window multi-burn-rate alert (Google SRE)
+- When: catch fast burn + slow burn
+- Algorithm: 1h@14x → critical / 6h@7x → critical / 1d@3x → warning / 3d@1x → warning; 1h 14x 意味 4 天烧光全月 budget
+- Trade-off: 单 window 错过 slow burn 或 sudden burst
+- Tools: Alertmanager multi-rule, Grafana SLO module, PrometheusRule with burn_rate expression
+
+**Framework 3**: 3 isolation layers (gateway / app / physical)
+- When: multi-tenant infra
+- Algorithm: L1 Gateway (Envoy per-tenant token bucket by tier) / L2 App (per-tenant DB pool + memory + WFQ scheduler) / L3 Physical (Gold dedicated node pool, taint+toleration, autoscale 独立)
+- Trade-off: 3 层完全 isolation 贵, 但 1 个 noisy 拖死全场代价更大
+- Tools: Envoy / Kong, defaultdict(Semaphore), Kubernetes taint+toleration, separate autoscale group
+
+**Framework 4**: Cardinality control 5 策略
+- When: 10K+ tenant scale
+- Algorithm: 1) label limit (max 10 per metric) / 2) per-tenant only top-N metrics / 3) top-100 tenant full, 长尾 aggregated bucket / 4) endpoint bucket (not raw URL) / 5) streaming aggregation (Flink 1-min pre-rollup)
+- Trade-off: aggregated 失去细粒度 vs 系统能跑
+- Tools: Prometheus relabeling, Mimir/Cortex, Flink 1-min window aggregator
+
+**Framework 5**: Auto-credit on SLA breach
+- When: SLA breach detected
+- Algorithm: compute_credit (gap < 0.01% → 10% / < 0.1% → 25% / < 1% → 50% / > 1% → 100%); auto-issue credit note for next invoice; notify customer; record audit
+- Trade-off: 主动 credit 关系好 vs 不主动客户来 ask 关系崩
+- Tools: SLACreditEngine, billing DB separate, Stripe/Chargebee credit API
+
+### 关键决策树 (ASCII)
+
+```
+Tier definition:
+Gold:   99.99% / 200ms / dedicated / 10K QPS / 24x7 support / 100% telemetry
+Silver: 99.9%  / 500ms / pooled priority A / 1K QPS / business hours / 50% telemetry
+Bronze: 99%    / 1s    / pooled priority B / 100 QPS / email digest / 10% telemetry
+
+Burn rate alert window:
+1h burn rate 14x → critical page (4天烧光)
+6h burn rate 7x  → critical
+1d burn rate 3x  → warning (10天烧光)
+3d burn rate 1x  → warning
+
+Cardinality strategy:
+< 1K tenant + < 1M ts → single Prometheus + recording rules
+> 1K tenant → Mimir / Cortex (horizontal scale)
+Large SaaS, $$ → Datadog (less ops, more $$$)
+
+Storage tier:
+Hot: raw 7d, 1-min rollups 30d (Postgres/OpenSearch)
+Warm: 1-min 30-90d in SSD (S3 Parquet)
+Cold: 1-hour 1y, daily 3y+ (S3 Glacier)
+Per-tier retention: Bronze 30d, Silver 90d, Gold 1y
+
+Routing per severity:
+P0 (Gold SLA) → PagerDuty 24x7
+P1 (Silver / Gold non-SLA) → business hours
+P2 (Bronze) → Slack
+P3 (info) → daily digest
+Dedup 1h per (tenant × metric)
+```
+
+### Part 2 五个深度问题速查
+
+**Problem 1: SLI / SLO / SLA + Error Budget**
+- 核心解法: SLI 测量 → SLO 内部 → SLA 合同; SLA < SLO 留 buffer; EB = (1-SLO)×total; multi-window burn (1h@14x / 6h@7x / 1d@3x / 3d@1x)
+- Top 3 gotchas: SLA=SLO 没 buffer / 单 window 错过 slow burn / 月跨期 EB 重置规则
+- Tools: Prometheus, Alertmanager, Grafana, custom EB tracker
+
+**Problem 2: Per-tenant metrics + cardinality**
+- 核心解法: 5 策略 (label limit / per-tenant top-N metric / 头长尾分 / endpoint bucket / streaming aggregation Flink); 10K tenant × 100 metric × 10 label = 10M ts 直接超 Prometheus 极限
+- Top 3 gotchas: Sampling 不可用于 billing / Mimir/Cortex 必要 > 10M ts / endpoint raw URL 不可 bucket 必要
+- Tools: Flink 1-min rollup, Mimir, Datadog SaaS (省运维但 $$$)
+
+**Problem 3: Tier-based monitoring**
+- 核心解法: tier 定义价格 + 资源 + 监控 + alert; physical for Gold (taint + toleration K8s node pool); WFQ for shared Silver/Bronze
+- Top 3 gotchas: tier 物理 isolation 贵但 Gold 看 dedicated 心安 / 共享 pool 必有 priority class / per-tier threshold 不能 one-size-fits-all
+- Tools: K8s node pool, Envoy per-tenant rate limit, defaultdict priority queue
+
+**Problem 4: Alert routing per-tenant**
+- 核心解法: 3 strategy (aggregate / per-tier / per-tenant); 4 severity (P0 page 24x7 / P1 page business / P2 slack / P3 digest); dedup 1h per (tenant × metric); quarterly precision review
+- Top 3 gotchas: alert → #general no owner / 单 channel 全 fire / quarterly tune low-precision dead alerts
+- Tools: PagerDuty + Opsgenie + Slack + Alertmanager routing rules
+
+**Problem 5: Customer dashboard + auto-credit + billing audit**
+- 核心解法: self-serve dashboard (uptime + EB remaining + incidents + usage + recommendations + bill estimate); auto-credit ladder (gap < 0.01% → 10%, < 0.1% → 25%, etc.); billing 独立 DB + WORM + HMAC-signed + 13mo retention; 60d dispute window
+- Top 3 gotchas: telemetry + billing 同 DB → billing 受 retention 影响 / billing 永不 sample / dispute 必有 audit chain of custody
+- Tools: Stripe/Chargebee credit API, statuspage.io, BigQuery 独立 billing dataset, HMAC sign
+
+### Production gotchas (top 15)
+
+1. Cardinality 失控 (10k × 100 × 10 = 10M ts)
+2. Single shared infra for all tiers
+3. 没 rate limit at gateway (app 层被打爆)
+4. 没 quota per-tenant DB connections
+5. Billing 跟 telemetry 同 DB
+6. Aggregate at query time (slow + expensive)
+7. 没 dispute window / audit (customer 怒)
+8. Sampling for billing (不可接受)
+9. SLA = SLO (no buffer)
+10. Burn rate alert 单 window (错过 fast 或 slow)
+11. Tier 不可升级 (客户成长无 path)
+12. Bronze tenant 受 DDoS 没 protect
+13. 没 hard ceiling within tier (Gold 也能爆)
+14. Public status page 缺失 (客户 Twitter 发飙才知道)
+15. Storage 一刀切 retention (Bronze 1y 浪费 / Gold 30d 不够)
+
+### 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Per-tenant SLA tiers | Voice agent 7 markets | 不同 latency/accuracy SLA per market |
+| Noisy neighbor isolation | Voice agent Indonesia payday 5x burst | Top-3 markets dedicated → 不影响 Thailand/Korea |
+| Token bucket rate limit | API gateway 自然 per-market | Envoy per-market refill rate |
+| Per-tenant dashboard | Regional ops weekly review | 自助看 SLO + usage + cost |
+| Billing signal | ByteDance internal chargeback | per-region cost attribution |
+| Cardinality control | Voice agent metric per market | top markets full, 长尾 aggregated |
+| Burn rate alert multi-window | Voice agent 7 markets on-call | 1h / 6h / 1d / 3d for fast + slow burn |
+| Auto-credit | Indonesia SLA breach commission adjust | 自动算 + 通知 |
+| Tier upgrade path | Bronze → Silver 自助升级 | dashboard 内一键 |
+
+### 面试现场 quotables (top 8)
+
+1. "SLO > SLA — 留 20-50% buffer. Burn rate alert multi-window: 1h@14x / 6h@7x / 1d@3x / 3d@1x. Catches fast burn + slow burn."
+2. "3 isolation layers: L1 Gateway per-tenant token bucket + L2 App per-tenant DB pool & WFQ + L3 Physical Gold dedicated node pool (K8s taint+toleration)."
+3. "Cardinality control: top-100 tenant full per-tenant metric, 长尾 aggregated. Endpoint bucket (not raw URL). Streaming aggregation Flink 1-min pre-rollup. Mimir/Cortex when > 10M ts."
+4. "Billing 独立 DB. Never sample for billing. WORM + HMAC-signed. 13 month retention. 60d dispute window with self-serve CSV export."
+5. "Voice agent 7 markets — Indonesia payday 5x traffic burst. Because top-3 markets had dedicated inference replicas, Thailand/Korea/Vietnam unaffected. Tier-based isolation = insurance not luxury."
+6. "Per-market burn rate multi-window caught a slow degradation in Vietnam gradient over 48h that would have missed aggregate alert."
+7. "Auto-credit ladder on SLA breach: gap < 0.01% → 10% / < 0.1% → 25% / < 1% → 50% / > 1% → 100%. Notify customer + audit log."
+8. "Gold tenant 20x spike: hard ceiling within tier + autoscale dedicated infra + customer-facing alert + bill overage 1.5x. Even Gold has ceiling."
+
+### 红线 (top 10 anti-patterns)
+
+1. Cardinality 失控 (10M+ ts no control)
+2. Single shared infra for all tiers
+3. No per-tenant rate limit at gateway
+4. Sampling for billing
+5. SLA = SLO (no buffer)
+6. 单 window burn rate alert
+7. Telemetry + billing 同 DB
+8. No hard ceiling within tier
+9. No dispute window / no audit chain
+10. Public status page 缺失 (客户 Twitter 才知道)
+
+### Tier definition (full table)
+
+| Aspect | Bronze | Silver | Gold |
+|---|---|---|---|
+| Uptime SLA | 99% | 99.9% | 99.99% |
+| Latency p99 | 1000 ms | 500 ms | 200 ms |
+| Rate limit | 100 QPS | 1000 QPS | 10000 QPS |
+| Burst | 200 QPS / 60s | 2000 QPS / 60s | 20000 QPS / 60s |
+| Isolation | Pooled (priority B) | Pooled (priority A) | Dedicated K8s node pool |
+| DB pool | 5 connections | 50 connections | 500 connections |
+| Telemetry sample | 10% | 50% | 100% |
+| Alert routing | Email daily digest | Slack business hours | PagerDuty 24x7 |
+| Support response | 24h | 1h | 15 min |
+| Storage retention | 30d | 90d | 1y |
+| Credit ladder | 5/15/30/60 % | 10/25/50/100 % | 10/25/50/100 % |
+
+### Multi-window burn rate alerts (Google SRE)
+
+| Window | Burn rate threshold | Time to exhaust budget | Severity |
+|---|---|---|---|
+| 1 h | 14× | ~ 2 days | Critical (page 24x7) |
+| 6 h | 7× | ~ 4 days | Critical |
+| 1 d | 3× | ~ 10 days | Warning |
+| 3 d | 1× | ~ 30 days (whole month) | Warning |
+
+### Cardinality control 5 strategies
+
+| Strategy | Implementation | Cardinality reduction |
+|---|---|---|
+| Label limit | Prometheus max_label_names_per_series = 10 | hard cap |
+| Per-tenant only top-N metrics | PER_TENANT_METRICS list (billing + SLA only) | 10x |
+| Head + tail bucket | Top-100 tenant full, 长尾 aggregated_small | 100x for long-tail |
+| Endpoint bucket | /api/v1/agent/* → "agent" | 50x |
+| Streaming aggregation | Flink 1-min rollup per tenant | 60x (raw event/min → 1/min) |
+
+### Routing + severity matrix
+
+| Tenant tier | Severity | Route | Escalation |
+|---|---|---|---|
+| Gold | P0 SLA breach | PagerDuty oncall + CSM | 15 min |
+| Silver | P1 SLA breach | PagerDuty business hours | 1h |
+| Bronze | P2 SLA breach | Slack #tenant-alerts | none |
+| Gold | P1 non-SLA | Slack #gold-watch | none |
+| Any | P3 info | Email daily digest | none |
+
+### Auto-credit ladder (SLA breach)
+
+| Uptime gap | Credit % |
+|---|---|
+| 0 - 0.01% (99.9 → 99.89%) | 10% |
+| 0.01 - 0.1% | 25% |
+| 0.1 - 1% | 50% |
+| > 1% | 100% (基本免费一个月) |
+
+### 工具栈
+
+| Component | Tools |
+|---|---|
+| API Gateway | Envoy / Kong / Cloudflare Workers |
+| Metric storage | Prometheus / Mimir / Cortex / Datadog (SaaS) |
+| Visualization | Grafana / Datadog dashboard |
+| Alert routing | Alertmanager / PagerDuty / Opsgenie |
+| Streaming aggregation | Flink / Spark Streaming / Materialize |
+| Time-series DB | ClickHouse / TimescaleDB / Druid |
+| Status page | statuspage.io / Cachet self-hosted |
+| Billing | Stripe / Chargebee / Metronome (usage-based) |
+
+### 5 业务场景变体 (anchor stories)
+
+| Variant | Tenant model | Key challenge |
+|---|---|---|
+| TikTok voice agent 7 markets | 7 markets = 7 tenants | Indonesia / Vietnam Gold, Thailand / Philippines Silver, SG / MY Bronze, Korea pilot |
+| BNPL chatbot merchant tenants | 1000+ 商户, top 10% = 80% 流量 | Top 商户 dedicated LLM endpoint, 长尾 shared |
+| Internal Agent Platform | ByteDance team-as-tenant | cost chargeback per team, internal SLA |
+| ConvFinQA fair share | researcher-as-tenant | WFQ instead of tiered |
+| Cloudflare-style 10K+ SaaS | 长尾极端 | top 1% = 50% resources, Bronze 80% tenant only 5% 流量 |
+
+### Storage tier strategy
+
+| Tier | Retention | Storage | Use |
+|---|---|---|---|
+| Hot | 7d raw + 30d 1-min rollups | Postgres / OpenSearch | real-time query, alert |
+| Warm | 30-90d 1-min in SSD | S3 Parquet | slow query 调查 |
+| Cold | 1y 1-hour, 3y+ daily | S3 Glacier | compliance retention |
+| Per-tier retention | Bronze 30d / Silver 90d / Gold 1y | varies | tier-scaled |
+
+### Per-tier physical isolation (K8s)
+
+| Tier | Isolation | Method |
+|---|---|---|
+| Gold | Dedicated node pool | K8s taint=tier:gold + toleration on Gold pods + nodeSelector |
+| Silver | Pooled priority A | PriorityClass A + 80% slot quota |
+| Bronze | Pooled priority B | PriorityClass B + 20% slot quota |
+| All | Hard ceiling per tenant | even within tier, cap absolute QPS |
+
+### Billing requirements (合规)
+
+| Requirement | Implementation |
+|---|---|
+| Independent DB | NOT same as telemetry (retention 不同) |
+| WORM (Write Once Read Many) | append-only table, no UPDATE/DELETE |
+| HMAC-signed events | hmac_sign(event, BILLING_KEY) on insert |
+| 13-month retention | 1y for audit + 1 month buffer |
+| Self-serve report | CSV export from customer dashboard |
+| Crypto-signed invoice | monthly invoice HMAC for tamper |
+| Double-entry consistency | telemetry vs billing 可对账 |
+| 60-day dispute window | customer 可 challenge billing line |
+
+### Burn rate calculation example
+
+| Window | Window error rate | SLO target | Burn rate | Threshold |
+|---|---|---|---|---|
+| 1h | 0.014 | 0.999 | 0.014 / 0.001 = 14× | critical |
+| 6h | 0.007 | 0.999 | 7× | critical |
+| 1d | 0.003 | 0.999 | 3× | warning |
+| 3d | 0.001 | 0.999 | 1× | warning (sustained slow burn) |
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

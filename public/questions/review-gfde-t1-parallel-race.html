@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T1.3 · parallel tools + race conditions — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / T1.3 · parallel tools + race conditions — 复习速查</div>
+  <h1>T1.3 · parallel tools + race conditions — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-gfde-t1-parallel-race.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-gfde-t1-parallel-race.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [gfde-t1-parallel-race] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>T1.3 · parallel tools + race conditions — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/gfde-t1-parallel-race.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/gfde-t1-parallel-race.html"><code>gfde-t1-parallel-race.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha. 不含 prose, 全是 compressed structure (tables / code / one-liners).</p></blockquote>
+<h4>核心心智模型 (1 sentence)</h4>
+<p>Parallel tool execution = 「tool annotation (safety/resources/side_effects) → 静态 DAG analysis → 拓扑 wave 分层 → wave 内 parallel + per-resource distributed lock (sorted by key, fenced token, re-entrant) → DB-layer CAS 兜底 → return_exceptions partial-success → distributed trace + property-based test for race debug」. 5 层缺 1 都数据腐败.</p>
+<h4>术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>Race condition</td><td>并发读写同 resource, 结果依赖顺序</td><td>多 tool 并发</td></tr><tr><td>WAW</td><td>write-after-write 同 resource (最常见)</td><td>必 serialize</td></tr><tr><td>RAW</td><td>read-after-write (read 看 stale)</td><td>必 serialize</td></tr><tr><td>WAR</td><td>write-after-read (write 后 read 别人写的)</td><td>serialize</td></tr><tr><td>RAR</td><td>read-after-read</td><td>parallel safe</td></tr><tr><td>Disjoint resources</td><td>无共享 resource</td><td>parallel safe</td></tr><tr><td>DAG</td><td>dependency graph, 拓扑 sort 后 wave 化</td><td>scheduling</td></tr><tr><td>Topological sort</td><td>无依赖节点先, 分 wave</td><td>scheduler</td></tr><tr><td>Wave</td><td>DAG 同层无依赖的一组 tool</td><td>parallel 单位</td></tr><tr><td>Distributed lock</td><td>跨进程 / 机器互斥</td><td>shared resource write</td></tr><tr><td>SETNX</td><td>Redis atomic NX flag</td><td>lock 实现</td></tr><tr><td>Redlock</td><td>Redis cluster 分布式锁算法</td><td>HA Redis</td></tr><tr><td>Fencing token</td><td>单调递增 token storage 拒 stale</td><td>Redlock 不安全场景 (Kleppmann)</td></tr><tr><td>Re-entrant</td><td>同 owner 重复 acquire OK</td><td>self-deadlock 防</td></tr><tr><td>AB-BA deadlock</td><td>A 拿 R1 等 R2, B 拿 R2 等 R1</td><td>sort by key 防</td></tr><tr><td>CAS</td><td>compare-and-set version 列 expect</td><td>DB optimistic concurrency</td></tr><tr><td>Bulkhead</td><td>per-tenant 资源隔离</td><td>噪声邻居</td></tr><tr><td>Resource template</td><td><code>user_profile:{user_id}</code></td><td>动态 lock key</td></tr><tr><td>Heartbeat extend</td><td>TTL 长 op periodic 延期</td><td>防 TTL 到期 release</td></tr><tr><td>return_exceptions</td><td>asyncio.gather 不中断, 收集异常</td><td>partial success</td></tr><tr><td>Hypothesis</td><td>Python property-based test</td><td>race invariant</td></tr><tr><td>Chaos engineering</td><td>注入 latency/fail 放大 race</td><td>debug 难复现 race</td></tr></tbody></table>
+<h4>N 个核心 framework / pattern</h4>
+<p><strong>Framework 1: Tool Annotation System</strong></p>
+<ul><li>When: tool registration</li><li>Algorithm: <code>safety: read|write|destructive</code>, <code>side_effects: bool</code>, <code>idempotent: bool</code>, <code>resources: ['user_profile:{user_id}']</code> template, <code>timeout_sec</code>, <code>max_concurrent_per_tenant</code>, <code>critical: bool</code></li><li>Trade-off: 手写 annotation 累 vs 自动推断不准</li><li>Tools: Python <code>@tool</code> decorator, Pydantic schema, MCP standardized metadata, AST lint pre-commit</li></ul>
+<p><strong>Framework 2: DAG + Topological Wave Scheduling</strong></p>
+<ul><li>When: LLM emit 多 tool 一 turn</li><li>Algorithm: build DAG by resource conflict (WAW/RAW/WAR edge, RAR/disjoint none) → topological sort → group into waves</li><li>Trade-off: LLM emit order vs scheduler reorder (要保留 LLM 显式意图)</li><li>Tools: networkx (Python), gonum graph (Go), Temporal / Airflow / Prefect workflow DAG</li></ul>
+<p><strong>Framework 3: Per-Resource Distributed Lock</strong></p>
+<ul><li>When: WAW / write-shared-resource</li><li>Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)</li><li>Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性</li><li>Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, AWS DynamoDB conditional write</li></ul>
+<p><strong>Framework 4: Failure Isolation + Cancellation</strong></p>
+<ul><li>When: wave 执行</li><li>Algorithm: <code>asyncio.gather(return_exceptions=True)</code> → partial success; critical tool fail → abort wave; cancellation via CallContext.cancel_event + asyncio.shield</li><li>Trade-off: 1 fail abort all (strict) vs 部分 success 给 LLM (灵活)</li><li>Tools: asyncio.gather/wait_for/shield, anyio (cross-framework cancellation), trio cancel scope tree</li></ul>
+<p><strong>Framework 5: Observability for Race Debug</strong></p>
+<ul><li>When: 1/1000 race incident</li><li>Algorithm: OpenTelemetry span per tool with lock_acquire_ms/execute_ms → resource_access_log (who touched what when) → property-based test (hypothesis random sequences invariant serializable) → chaos replay (inject 50ms latency)</li><li>Trade-off: 100% trace overhead vs sampled trace miss race</li><li>Tools: OpenTelemetry + Jaeger/Tempo/Datadog/Honeycomb, hypothesis (Python), QuickCheck (Haskell), Chaos Mesh, pyspy, replay from prod traces</li></ul>
+<h4>关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">2 tools concurrent:
+├─ read + read same resource → PARALLEL ✓
+├─ read + read different resource → PARALLEL ✓
+├─ read + write same resource → SERIALIZE (RAW)
+├─ read + write different resource → PARALLEL ✓
+├─ write + write same resource → SERIALIZE (WAW)
+├─ write + write different resource → PARALLEL ✓
+└─ destructive ANY → SERIALIZE + confirm gate</code></pre>
+<pre class="language-plaintext"><code class="language-plaintext">Lock granularity:
+├─ tool_name only → 太粗 (update_user(u1) 和 update_user(u2) 不能 parallel)
+├─ resource_key (tool, resource_id) ⭐ → 对的粒度
+└─ DB row-level → 最细但 lock 数量爆</code></pre>
+<pre class="language-plaintext"><code class="language-plaintext">Production race 1/1000 debug:
+├─ Get trace_id → distributed trace timeline
+├─ resource_access_log for resource X
+├─ Replay with chaos (50ms inject)
+├─ Property test random sequences
+└─ CAS retry log = version mismatch</code></pre>
+<h4>Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: Tool Annotation System</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">@tool(
+    safety='write',
+    resources=['user_profile:{user_id}'],
+    side_effects=True,
+    idempotent=True,
+    timeout_sec=5.0,
+    max_concurrent_per_tenant=10,
+    critical=True,
+)
+def update_user_email(user_id, email): ...
+
+def resolve_resources(meta, args):
+    return [tpl.format(**args) for tpl in meta.resources]</code></pre>
+<ul><li>Top 3 gotchas:</li></ul>
+<ol><li>没 annotation → scheduler 退化全 serial 或全 parallel disaster</li><li>Resource template 不准 → lock 错 resource, race 没防</li><li>side_effects vs idempotent 混淆 — read 也可能 side_effect (counter)</li></ol>
+<ul><li>Tools: Pydantic schema, MCP annotation 扩展, OpenAPI x-safety/x-reversibility, AST lint pre-commit</li></ul>
+<p><strong>Problem 2: DAG + Topological Scheduling</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">def build_dag(tool_calls):
+    for i, j in pairs:
+        if conflict_type(tc_i, tc_j) in ['WAW','RAW','WAR']:
+            graph.add_edge(tc_i.id, tc_j.id)
+    return graph
+
+def schedule_waves(graph):
+    waves = []
+    while remaining:
+        wave = [n for n in remaining if no incoming from remaining]
+        waves.append(wave); remaining -= wave
+    return waves
+
+# 保留 LLM emit 顺序 (即使可重排, 显式意图优先)</code></pre>
+<ul><li>Top 3 gotchas:</li></ul>
+<ol><li>LLM 不显式 declare deps → scheduler 只能从 resource overlap 推 → 漏 logical dep</li><li>Mid-wave failure → 后续 wave 依赖 failed tool output → skip with reason</li><li>2 个 write 同 resource LLM 顺序 emit → 保留 LLM 顺序不要 reorder</li></ol>
+<ul><li>Tools: networkx Python, asyncio.gather wave parallel, Temporal/Airflow DAG, MCP <code>depends_on</code> field</li></ul>
+<p><strong>Problem 3: Per-Resource Distributed Lock + Sort + Fence + Re-entrant</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">async def call_with_lock(tool, args):
+    resources = resolve_resources(tool.meta, args)
+    locks = [DistributedLock(redis, r, ttl=30) for r in resources]
+    locks.sort(key=lambda l: l.key)  # anti AB-BA deadlock
+    acquired = []
+    try:
+        for lock in locks:
+            ok = await lock.acquire(timeout=5)
+            if not ok: raise LockAcquireTimeout
+            acquired.append(lock)
+        return await tool(**args)
+    finally:
+        for lock in reversed(acquired): await lock.release()
+# Lua DEL check token (TTL 过期不误删)
+# Heartbeat extend TTL (long op)
+# Re-entrant by owner_id (same caller re-acquire OK)
+# Fencing token at storage (Kleppmann pattern)</code></pre>
+<ul><li>Top 3 gotchas:</li></ul>
+<ol><li>Lock without sort → AB-BA deadlock (A 拿 R1 等 R2, B 拿 R2 等 R1)</li><li>TTL 过期 mid-execute → 锁失效 → 别人拿走 → 需 heartbeat extend</li><li>单 Redis instance → Redlock for HA cluster; clock drift/GC pause → fencing token at storage</li></ol>
+<ul><li>Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, Hazelcast/Curator enterprise</li></ul>
+<p><strong>Problem 4: Failure Isolation — return_exceptions, Partial Success, Cancellation</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">results = await asyncio.gather(
+    *[execute_with_cancel(tc, ctx) for tc in wave],
+    return_exceptions=True
+)
+# results = [&lt;value&gt;, ExceptionA, ...]
+successes = [r for r in results if not isinstance(r, Exception)]
+failures = [r for r in results if isinstance(r, Exception)]
+# Critical tool fail → abort wave; non-critical → mark, continue
+
+# Cancellation via ctx.cancel_event:
+done, pending = await asyncio.wait([task, cancel_task],
+                                    return_when=FIRST_COMPLETED)
+if cancel_task in done: task.cancel()</code></pre>
+<ul><li>Top 3 gotchas:</li></ul>
+<ol><li>默认 <code>gather</code> 1 fail 全部抛 → 必加 <code>return_exceptions=True</code></li><li>Cancellation 内部 tool 没 honor (长 SQL) → 需 KILL QUERY + httpx cancel</li><li>Critical vs non-critical 没区分 → 任一 fail abort 太严</li></ol>
+<ul><li>Tools: asyncio.gather/wait_for/shield, anyio cancellation, trio scope tree, OpenTelemetry trace cancellation reason</li></ul>
+<p><strong>Problem 5: Observability + Property Test for Race Debug</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python"># Distributed trace per tool
+with tracer.start_as_current_span('tool.update_user_email',
+    attributes={'tool.resources': ..., 'lock.wait_ms': ...}): execute()
+
+# Property test
+@given(tool_sequence=st.lists(st.sampled_from(read_write_ops), min=2, max=10))
+async def test_no_lost_updates(seq):
+    actual = await scheduler.execute(seq)
+    for perm in itertools.permutations(seq):
+        if states_equal(simulate_serial(perm), actual): return
+    fail('non-serializable')
+
+# Chaos: 10% chance inject 50-500ms latency</code></pre>
+<ul><li>Top 3 gotchas:</li></ul>
+<ol><li>Race 1/1000 复现极难 → property test + chaos amplify 100x</li><li>没 resource access log → incident 后查不到根因</li><li>CAS retry 不记 log → version mismatch 是 race signal 看不到</li></ol>
+<ul><li>Tools: OpenTelemetry + Jaeger/Tempo/Datadog, hypothesis (Python) + QuickCheck (Haskell) + RapidCheck (C++), Chaos Mesh/Gremlin/Litmus, replay from prod traces, pyspy/async-profiler</li></ul>
+<h4>Production gotchas (top 15)</h4>
+<ol><li>All-parallel without read/write split → WAW race</li><li>Lock without sort → AB-BA deadlock</li><li>Lock without timeout → stuck forever</li><li>No return_exceptions=True → 1 fail abort all</li><li>No per-tool concurrency limit → DDOS downstream</li><li>Tools not annotated → scheduler 决策无信息 → 全 serial</li><li>No CAS at DB layer → silent override 写丢</li><li>Resource template 不准 → lock 错 resource</li><li>Read-after-write 接受 stale 没标记 → LLM 当 fresh</li><li>Distributed lock 单 Redis instance → Redis 挂锁全失</li><li>Single-process mutex 跨 process 无效</li><li>同 agent 同 turn 重复 emit 同 tool → self-deadlock (需 re-entrant)</li><li>No cancellation propagation → agent abort 后 in-flight 仍跑</li><li>No observability → race 1/1000 不可 debug</li><li>Worker crash mid-execute TTL 过期前 → lock 误失效 (heartbeat extend)</li></ol>
+<h4>简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Annotation</td><td>Internal Agent Platform tool registry</td><td>"MCP-style metadata: safety/resources/idempotent/timeout/critical. PR review 强制 annotation 跟 source 一致"</td></tr><tr><td>DAG scheduling</td><td>BNPL chatbot intent fanout</td><td>"5 sub-agent emit, scheduler 4 read parallel + 1 write sequential per user_id"</td></tr><tr><td>Per-resource lock</td><td>BNPL user_profile 多 tool 写</td><td>"Redis SETNX with sorted acquisition. 一次 deadlock incident: agent for-loop 同 tool 重复 emit → self-deadlock → fix re-entrant by session_id"</td></tr><tr><td>Property test</td><td>Pre-prod race detection</td><td>"Hypothesis 生成随机 sequences, invariant = final state = some serial order, 抓到 3 race bugs"</td></tr><tr><td>Chaos</td><td>Voice agent staging</td><td>"10% chance inject 50-500ms latency to lock acquire, race condition reproduce rate from 1/1000 → 1/10"</td></tr><tr><td>Trace debug</td><td>Multi-region voice agent</td><td>"Jaeger 看 lock_acquire_ms 长说明 contention; multi tool 重叠时 disjoint resource confirmed"</td></tr><tr><td>Cancellation</td><td>Voice agent 用户挂电话</td><td>"ctx.cancel_event + KILL QUERY + httpx cancel; lock release on cleanup"</td></tr></tbody></table>
+<h4>面试现场 quotables (top 8)</h4>
+<blockquote><p>"Parallel tool 不是 silver bullet. Amdahl's law: 4 tool parallel + 1 serial = 2x speedup 不是 5x. 必须 measure 实际 gain."</p></blockquote>
+<blockquote><p>"Lock granularity = (tool_name, resource_id) 对. 不是 tool_name 太粗 (update_user(u1) 和 update_user(u2) 不能 parallel). 不是 DB row 太细 (lock 数量爆)."</p></blockquote>
+<blockquote><p>"Lock sort by key 是 AB-BA deadlock 防御标准. A 和 B 都按字母序拿锁, 没有循环依赖."</p></blockquote>
+<blockquote><p>"Redlock 在 clock drift / GC pause 下不安全 (Kleppmann 名文). 高安全场景用 fencing token at storage layer."</p></blockquote>
+<blockquote><p>"return_exceptions=True 是 asyncio.gather 必备. 否则 1 fail 全部抛, 其他 task 还在跑你只看到 1 个 exception, 不知道其他是 success 还是 fail."</p></blockquote>
+<blockquote><p>"Cancellation 不是单方向. Agent abort → cancel propagation → tool 内部必须 honor (长 SQL 用 KILL QUERY, 长 HTTP 用 httpx cancel). 否则资源 leak."</p></blockquote>
+<blockquote><p>"Race 1/1000 production 复现极难. Property-based test + chaos engineering 是唯一可靠工具. Hypothesis 生成随机 sequences, invariant = serializability."</p></blockquote>
+<blockquote><p>"BNPL chatbot 一个 production race: agent for-loop bug 同 session 重复 emit 同 tool → 同 owner self-deadlock. Fix 是 re-entrant lock by owner_id = session_id."</p></blockquote>
+<h4>红线 (top 10 anti-patterns)</h4>
+<ol><li>Parallel without read/write split (race 必然)</li><li>Lock without sort (AB-BA deadlock)</li><li>No CAS at DB layer (silent override)</li><li>1 failure aborts all (no return_exceptions)</li><li>No annotation (scheduler 没信息)</li><li>Single-process mutex in distributed system</li><li>No re-entrant for same-owner (self-deadlock)</li><li>No cancellation (agent abort 但 tools 仍跑)</li><li>No observability for race (incident 不可 debug)</li><li>No property test (race bug 到 prod)</li></ol>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-gfde-t1-retry-fallback.html">← T1.2 · retry / timeout / fallback — 复习速查</a>
+    <a href="review-gfde-t1-destructive-tools.html">T1.4 · destructive tools wrapping — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## T1.3 · parallel tools + race conditions — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t1-parallel-race.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`gfde-t1-parallel-race.html`](questions/gfde-t1-parallel-race.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+> 不含 prose, 全是 compressed structure (tables / code / one-liners).
+
+### 核心心智模型 (1 sentence)
+
+Parallel tool execution = 「tool annotation (safety/resources/side_effects) → 静态 DAG analysis → 拓扑 wave 分层 → wave 内 parallel + per-resource distributed lock (sorted by key, fenced token, re-entrant) → DB-layer CAS 兜底 → return_exceptions partial-success → distributed trace + property-based test for race debug」. 5 层缺 1 都数据腐败.
+
+### 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| Race condition | 并发读写同 resource, 结果依赖顺序 | 多 tool 并发 |
+| WAW | write-after-write 同 resource (最常见) | 必 serialize |
+| RAW | read-after-write (read 看 stale) | 必 serialize |
+| WAR | write-after-read (write 后 read 别人写的) | serialize |
+| RAR | read-after-read | parallel safe |
+| Disjoint resources | 无共享 resource | parallel safe |
+| DAG | dependency graph, 拓扑 sort 后 wave 化 | scheduling |
+| Topological sort | 无依赖节点先, 分 wave | scheduler |
+| Wave | DAG 同层无依赖的一组 tool | parallel 单位 |
+| Distributed lock | 跨进程 / 机器互斥 | shared resource write |
+| SETNX | Redis atomic NX flag | lock 实现 |
+| Redlock | Redis cluster 分布式锁算法 | HA Redis |
+| Fencing token | 单调递增 token storage 拒 stale | Redlock 不安全场景 (Kleppmann) |
+| Re-entrant | 同 owner 重复 acquire OK | self-deadlock 防 |
+| AB-BA deadlock | A 拿 R1 等 R2, B 拿 R2 等 R1 | sort by key 防 |
+| CAS | compare-and-set version 列 expect | DB optimistic concurrency |
+| Bulkhead | per-tenant 资源隔离 | 噪声邻居 |
+| Resource template | `user_profile:{user_id}` | 动态 lock key |
+| Heartbeat extend | TTL 长 op periodic 延期 | 防 TTL 到期 release |
+| return_exceptions | asyncio.gather 不中断, 收集异常 | partial success |
+| Hypothesis | Python property-based test | race invariant |
+| Chaos engineering | 注入 latency/fail 放大 race | debug 难复现 race |
+
+### N 个核心 framework / pattern
+
+**Framework 1: Tool Annotation System**
+- When: tool registration
+- Algorithm: `safety: read|write|destructive`, `side_effects: bool`, `idempotent: bool`, `resources: ['user_profile:{user_id}']` template, `timeout_sec`, `max_concurrent_per_tenant`, `critical: bool`
+- Trade-off: 手写 annotation 累 vs 自动推断不准
+- Tools: Python `@tool` decorator, Pydantic schema, MCP standardized metadata, AST lint pre-commit
+
+**Framework 2: DAG + Topological Wave Scheduling**
+- When: LLM emit 多 tool 一 turn
+- Algorithm: build DAG by resource conflict (WAW/RAW/WAR edge, RAR/disjoint none) → topological sort → group into waves
+- Trade-off: LLM emit order vs scheduler reorder (要保留 LLM 显式意图)
+- Tools: networkx (Python), gonum graph (Go), Temporal / Airflow / Prefect workflow DAG
+
+**Framework 3: Per-Resource Distributed Lock**
+- When: WAW / write-shared-resource
+- Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)
+- Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性
+- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, AWS DynamoDB conditional write
+
+**Framework 4: Failure Isolation + Cancellation**
+- When: wave 执行
+- Algorithm: `asyncio.gather(return_exceptions=True)` → partial success; critical tool fail → abort wave; cancellation via CallContext.cancel_event + asyncio.shield
+- Trade-off: 1 fail abort all (strict) vs 部分 success 给 LLM (灵活)
+- Tools: asyncio.gather/wait_for/shield, anyio (cross-framework cancellation), trio cancel scope tree
+
+**Framework 5: Observability for Race Debug**
+- When: 1/1000 race incident
+- Algorithm: OpenTelemetry span per tool with lock_acquire_ms/execute_ms → resource_access_log (who touched what when) → property-based test (hypothesis random sequences invariant serializable) → chaos replay (inject 50ms latency)
+- Trade-off: 100% trace overhead vs sampled trace miss race
+- Tools: OpenTelemetry + Jaeger/Tempo/Datadog/Honeycomb, hypothesis (Python), QuickCheck (Haskell), Chaos Mesh, pyspy, replay from prod traces
+
+### 关键决策树 (ASCII)
+
+```
+2 tools concurrent:
+├─ read + read same resource → PARALLEL ✓
+├─ read + read different resource → PARALLEL ✓
+├─ read + write same resource → SERIALIZE (RAW)
+├─ read + write different resource → PARALLEL ✓
+├─ write + write same resource → SERIALIZE (WAW)
+├─ write + write different resource → PARALLEL ✓
+└─ destructive ANY → SERIALIZE + confirm gate
+```
+
+```
+Lock granularity:
+├─ tool_name only → 太粗 (update_user(u1) 和 update_user(u2) 不能 parallel)
+├─ resource_key (tool, resource_id) ⭐ → 对的粒度
+└─ DB row-level → 最细但 lock 数量爆
+```
+
+```
+Production race 1/1000 debug:
+├─ Get trace_id → distributed trace timeline
+├─ resource_access_log for resource X
+├─ Replay with chaos (50ms inject)
+├─ Property test random sequences
+└─ CAS retry log = version mismatch
+```
+
+### Part 2 五个深度问题速查
+
+**Problem 1: Tool Annotation System**
+- 核心解法:
+```python
+@tool(
+    safety='write',
+    resources=['user_profile:{user_id}'],
+    side_effects=True,
+    idempotent=True,
+    timeout_sec=5.0,
+    max_concurrent_per_tenant=10,
+    critical=True,
+)
+def update_user_email(user_id, email): ...
+
+def resolve_resources(meta, args):
+    return [tpl.format(**args) for tpl in meta.resources]
+```
+- Top 3 gotchas:
+  1. 没 annotation → scheduler 退化全 serial 或全 parallel disaster
+  2. Resource template 不准 → lock 错 resource, race 没防
+  3. side_effects vs idempotent 混淆 — read 也可能 side_effect (counter)
+- Tools: Pydantic schema, MCP annotation 扩展, OpenAPI x-safety/x-reversibility, AST lint pre-commit
+
+**Problem 2: DAG + Topological Scheduling**
+- 核心解法:
+```python
+def build_dag(tool_calls):
+    for i, j in pairs:
+        if conflict_type(tc_i, tc_j) in ['WAW','RAW','WAR']:
+            graph.add_edge(tc_i.id, tc_j.id)
+    return graph
+
+def schedule_waves(graph):
+    waves = []
+    while remaining:
+        wave = [n for n in remaining if no incoming from remaining]
+        waves.append(wave); remaining -= wave
+    return waves
+
+# 保留 LLM emit 顺序 (即使可重排, 显式意图优先)
+```
+- Top 3 gotchas:
+  1. LLM 不显式 declare deps → scheduler 只能从 resource overlap 推 → 漏 logical dep
+  2. Mid-wave failure → 后续 wave 依赖 failed tool output → skip with reason
+  3. 2 个 write 同 resource LLM 顺序 emit → 保留 LLM 顺序不要 reorder
+- Tools: networkx Python, asyncio.gather wave parallel, Temporal/Airflow DAG, MCP `depends_on` field
+
+**Problem 3: Per-Resource Distributed Lock + Sort + Fence + Re-entrant**
+- 核心解法:
+```python
+async def call_with_lock(tool, args):
+    resources = resolve_resources(tool.meta, args)
+    locks = [DistributedLock(redis, r, ttl=30) for r in resources]
+    locks.sort(key=lambda l: l.key)  # anti AB-BA deadlock
+    acquired = []
+    try:
+        for lock in locks:
+            ok = await lock.acquire(timeout=5)
+            if not ok: raise LockAcquireTimeout
+            acquired.append(lock)
+        return await tool(**args)
+    finally:
+        for lock in reversed(acquired): await lock.release()
+# Lua DEL check token (TTL 过期不误删)
+# Heartbeat extend TTL (long op)
+# Re-entrant by owner_id (same caller re-acquire OK)
+# Fencing token at storage (Kleppmann pattern)
+```
+- Top 3 gotchas:
+  1. Lock without sort → AB-BA deadlock (A 拿 R1 等 R2, B 拿 R2 等 R1)
+  2. TTL 过期 mid-execute → 锁失效 → 别人拿走 → 需 heartbeat extend
+  3. 单 Redis instance → Redlock for HA cluster; clock drift/GC pause → fencing token at storage
+- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, Hazelcast/Curator enterprise
+
+**Problem 4: Failure Isolation — return_exceptions, Partial Success, Cancellation**
+- 核心解法:
+```python
+results = await asyncio.gather(
+    *[execute_with_cancel(tc, ctx) for tc in wave],
+    return_exceptions=True
+)
+# results = [<value>, ExceptionA, ...]
+successes = [r for r in results if not isinstance(r, Exception)]
+failures = [r for r in results if isinstance(r, Exception)]
+# Critical tool fail → abort wave; non-critical → mark, continue
+
+# Cancellation via ctx.cancel_event:
+done, pending = await asyncio.wait([task, cancel_task],
+                                    return_when=FIRST_COMPLETED)
+if cancel_task in done: task.cancel()
+```
+- Top 3 gotchas:
+  1. 默认 `gather` 1 fail 全部抛 → 必加 `return_exceptions=True`
+  2. Cancellation 内部 tool 没 honor (长 SQL) → 需 KILL QUERY + httpx cancel
+  3. Critical vs non-critical 没区分 → 任一 fail abort 太严
+- Tools: asyncio.gather/wait_for/shield, anyio cancellation, trio scope tree, OpenTelemetry trace cancellation reason
+
+**Problem 5: Observability + Property Test for Race Debug**
+- 核心解法:
+```python
+# Distributed trace per tool
+with tracer.start_as_current_span('tool.update_user_email',
+    attributes={'tool.resources': ..., 'lock.wait_ms': ...}): execute()
+
+# Property test
+@given(tool_sequence=st.lists(st.sampled_from(read_write_ops), min=2, max=10))
+async def test_no_lost_updates(seq):
+    actual = await scheduler.execute(seq)
+    for perm in itertools.permutations(seq):
+        if states_equal(simulate_serial(perm), actual): return
+    fail('non-serializable')
+
+# Chaos: 10% chance inject 50-500ms latency
+```
+- Top 3 gotchas:
+  1. Race 1/1000 复现极难 → property test + chaos amplify 100x
+  2. 没 resource access log → incident 后查不到根因
+  3. CAS retry 不记 log → version mismatch 是 race signal 看不到
+- Tools: OpenTelemetry + Jaeger/Tempo/Datadog, hypothesis (Python) + QuickCheck (Haskell) + RapidCheck (C++), Chaos Mesh/Gremlin/Litmus, replay from prod traces, pyspy/async-profiler
+
+### Production gotchas (top 15)
+
+1. All-parallel without read/write split → WAW race
+2. Lock without sort → AB-BA deadlock
+3. Lock without timeout → stuck forever
+4. No return_exceptions=True → 1 fail abort all
+5. No per-tool concurrency limit → DDOS downstream
+6. Tools not annotated → scheduler 决策无信息 → 全 serial
+7. No CAS at DB layer → silent override 写丢
+8. Resource template 不准 → lock 错 resource
+9. Read-after-write 接受 stale 没标记 → LLM 当 fresh
+10. Distributed lock 单 Redis instance → Redis 挂锁全失
+11. Single-process mutex 跨 process 无效
+12. 同 agent 同 turn 重复 emit 同 tool → self-deadlock (需 re-entrant)
+13. No cancellation propagation → agent abort 后 in-flight 仍跑
+14. No observability → race 1/1000 不可 debug
+15. Worker crash mid-execute TTL 过期前 → lock 误失效 (heartbeat extend)
+
+### 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Annotation | Internal Agent Platform tool registry | "MCP-style metadata: safety/resources/idempotent/timeout/critical. PR review 强制 annotation 跟 source 一致" |
+| DAG scheduling | BNPL chatbot intent fanout | "5 sub-agent emit, scheduler 4 read parallel + 1 write sequential per user_id" |
+| Per-resource lock | BNPL user_profile 多 tool 写 | "Redis SETNX with sorted acquisition. 一次 deadlock incident: agent for-loop 同 tool 重复 emit → self-deadlock → fix re-entrant by session_id" |
+| Property test | Pre-prod race detection | "Hypothesis 生成随机 sequences, invariant = final state = some serial order, 抓到 3 race bugs" |
+| Chaos | Voice agent staging | "10% chance inject 50-500ms latency to lock acquire, race condition reproduce rate from 1/1000 → 1/10" |
+| Trace debug | Multi-region voice agent | "Jaeger 看 lock_acquire_ms 长说明 contention; multi tool 重叠时 disjoint resource confirmed" |
+| Cancellation | Voice agent 用户挂电话 | "ctx.cancel_event + KILL QUERY + httpx cancel; lock release on cleanup" |
+
+### 面试现场 quotables (top 8)
+
+> "Parallel tool 不是 silver bullet. Amdahl's law: 4 tool parallel + 1 serial = 2x speedup 不是 5x. 必须 measure 实际 gain."
+
+> "Lock granularity = (tool_name, resource_id) 对. 不是 tool_name 太粗 (update_user(u1) 和 update_user(u2) 不能 parallel). 不是 DB row 太细 (lock 数量爆)."
+
+> "Lock sort by key 是 AB-BA deadlock 防御标准. A 和 B 都按字母序拿锁, 没有循环依赖."
+
+> "Redlock 在 clock drift / GC pause 下不安全 (Kleppmann 名文). 高安全场景用 fencing token at storage layer."
+
+> "return_exceptions=True 是 asyncio.gather 必备. 否则 1 fail 全部抛, 其他 task 还在跑你只看到 1 个 exception, 不知道其他是 success 还是 fail."
+
+> "Cancellation 不是单方向. Agent abort → cancel propagation → tool 内部必须 honor (长 SQL 用 KILL QUERY, 长 HTTP 用 httpx cancel). 否则资源 leak."
+
+> "Race 1/1000 production 复现极难. Property-based test + chaos engineering 是唯一可靠工具. Hypothesis 生成随机 sequences, invariant = serializability."
+
+> "BNPL chatbot 一个 production race: agent for-loop bug 同 session 重复 emit 同 tool → 同 owner self-deadlock. Fix 是 re-entrant lock by owner_id = session_id."
+
+### 红线 (top 10 anti-patterns)
+
+1. Parallel without read/write split (race 必然)
+2. Lock without sort (AB-BA deadlock)
+3. No CAS at DB layer (silent override)
+4. 1 failure aborts all (no return_exceptions)
+5. No annotation (scheduler 没信息)
+6. Single-process mutex in distributed system
+7. No re-entrant for same-owner (self-deadlock)
+8. No cancellation (agent abort 但 tools 仍跑)
+9. No observability for race (incident 不可 debug)
+10. No property test (race bug 到 prod)
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

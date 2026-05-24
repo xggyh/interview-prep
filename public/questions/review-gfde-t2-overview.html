@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T2 · RAG / Context 全景 — 复习速查 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Review / T2 · RAG / Context 全景 — 复习速查</div>
+  <h1>T2 · RAG / Context 全景 — 复习速查</h1>
+  <div class="header-meta">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>Review</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/review-gfde-t2-overview.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/review-gfde-t2-overview.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">复习速查页, 抽自原 [gfde-t2-overview] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>T2 · RAG / Context 全景 — 复习速查</h3>
+<blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/gfde-t2-overview.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
+<p><strong>原页面</strong>: <a href="questions/gfde-t2-overview.html"><code>gfde-t2-overview.html</code></a></p>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<p>2026 RAG = <strong>query understanding → routing → multi-source retrieval → fusion → rerank → context assembly → grounded generation → post-eval</strong>, 是 7-step pipeline 而非 "embed + vector DB"; 每步都有 design choice + cost knob, FDE 题深 dive 一步.</p>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td><strong>Dense retrieval</strong></td><td>Embed query → cosine vs doc embeddings</td><td>语义 / paraphrase / synonym</td></tr><tr><td><strong>Sparse retrieval (BM25)</strong></td><td>tf-idf lexical match</td><td>SKU / 人名 / 编号 / exact match</td></tr><tr><td><strong>Hybrid search</strong></td><td>Dense + Sparse 并行 + fusion</td><td>生产 default</td></tr><tr><td><strong>RRF</strong></td><td>Rank-based fusion, score = Σ 1/(k+rank), k=60</td><td>无需 calibrate, robust 默认</td></tr><tr><td><strong>Cross-encoder</strong></td><td>联合 [q;d] 过 transformer, 50-200ms/pair</td><td>重排 top-50 → top-10</td></tr><tr><td><strong>ColBERT</strong></td><td>Multi-vector per doc, MaxSim 操作</td><td>极致 precision, 存储 10x</td></tr><tr><td><strong>HyDE</strong></td><td>LLM 生成假答案 → embed assumed answer</td><td>Query-doc 分布差异大</td></tr><tr><td><strong>Multi-query</strong></td><td>LLM 生成 3-5 query 变体, RRF 合并</td><td>词汇不匹配</td></tr><tr><td><strong>Decompose</strong></td><td>把 multi-hop 拆成 sub-question</td><td>复杂推理</td></tr><tr><td><strong>Late chunking</strong></td><td>先 embed 整 doc, 再切 chunk-embedding</td><td>长文+小 chunk 同享上下文</td></tr><tr><td><strong>Contextual Retrieval</strong></td><td>Anthropic 2024, 每 chunk 加 doc summary</td><td>+35-49% recall</td></tr><tr><td><strong>GraphRAG</strong></td><td>KG 增强 RAG, entity edge expand</td><td>关系型 query</td></tr><tr><td><strong>Lost in middle</strong></td><td>中部内容被 LLM 忽视</td><td>Long context 通用问题</td></tr><tr><td><strong>Self-RAG</strong></td><td>LLM 决定 retrieve / 不 retrieve / retrieve N 次</td><td>Adaptive 触发</td></tr><tr><td><strong>Prefix cache</strong></td><td>Anthropic 5min / Gemini 1h, cache hit ~10% 价</td><td>长 prefix reuse</td></tr></tbody></table>
+<h4>🎯 6 个核心 sub-topic Framework</h4>
+<p><strong>Framework T2.1</strong>: Hybrid Search</p>
+<ul><li>When: 任何 production retrieval (default)</li><li>Algorithm: Dense + BM25 并行 asyncio.gather → RRF k=60 → cross-encoder rerank top-50→10</li><li>Trade-off: +50-80ms latency, +8-12% recall</li><li>Tools: Qdrant + OpenSearch + bge-reranker-v2-m3</li></ul>
+<p><strong>Framework T2.2</strong>: Chunking Decision</p>
+<ul><li>When: 文档接入 pipeline</li><li>Algorithm: by doc type → fixed/recursive/heading/late/AST; size 512 + overlap 64 default</li><li>Trade-off: 越结构化 chunker 准但 indexing 慢</li><li>Tools: LlamaParse, unstructured, tree-sitter, jina-embeddings-v3</li></ul>
+<p><strong>Framework T2.3</strong>: Context Window Mgmt</p>
+<ul><li>When: Multi-turn agent / long session</li><li>Algorithm: sliding + summarize + hierarchical 4-tier + RAG-on-history</li><li>Trade-off: aggressive compress 失细节, lazy compress 爆 budget</li><li>Tools: LangChain ConversationSummaryBufferMemory, MemGPT, LlamaIndex memory</li></ul>
+<p><strong>Framework T2.4</strong>: Tool Output → Prompt</p>
+<ul><li>When: Tool result &gt; 1K token / 含 PII / untrusted source</li><li>Algorithm: schema validate → truncate by intent → XML wrap trust → provenance + row_id</li><li>Trade-off: 多层包装增 token, 但 inject defense + 可 cite</li><li>Tools: presidio, pydantic schema, XML namespace</li></ul>
+<p><strong>Framework T2.5</strong>: Reranking</p>
+<ul><li>When: Recall 已够 (top-50+), precision 不足</li><li>Algorithm: cascade bi → bge-base → bge-large/Cohere → optional LLM-judge</li><li>Trade-off: +60-200ms, +8-15% NDCG; cache 30-40% hit 抵消</li><li>Tools: bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT</li></ul>
+<p><strong>Framework T2.6</strong>: Long-context vs RAG</p>
+<ul><li>When: 大 corpus + cost / 多 hop / 多租户 决策</li><li>Algorithm: 决策树 by corpus size × cost × multi-hop × freshness</li><li>Trade-off: long-ctx 简单贵, RAG 复杂便宜, hybrid 折中</li><li>Tools: Gemini 3 Pro 2M, Claude 200K, Anthropic prompt cache</li></ul>
+<h4>🌳 关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Q: corpus size?
+├── &lt; 200K, static, low-vol  → Long-context + prefix cache ⭐
+├── &lt; 2M, multi-tenant       → Hybrid (RAG narrow → long-ctx)
+├── 200K-2M, single tenant   → Gemini 3 Pro 2M direct
+└── &gt; 2M                     → Pure RAG
+       ├── Latency tight     → Dense only
+       ├── Quality top       → Hybrid + Rerank
+       └── Multi-tenant      → Per-tenant shard
+
+Q: chunking strategy?
+├── Pure prose       → Recursive 512+64 ⭐
+├── Markdown / HTML  → Heading-aware
+├── PDF complex      → LlamaParse + doc-structure
+├── Code             → tree-sitter function-level
+├── Chat logs        → Turn-aware 3-5 turn
+└── Long-range ctx   → Late chunking (Jina v3)</code></pre>
+<h4>⚙️ Part 2 五个深度框架速查</h4>
+<p><strong>Framework 1: 7-step Pipeline (Step 1-7)</strong></p>
+<ul><li>Step 1 Query Understanding: rewrite + pronoun + multi-query + HyDE</li><li>Step 2 Routing: skip / SQL / dense / sparse / graph / API</li><li>Step 3 Multi-retrieval: dense ∥ BM25 ∥ KG ∥ tool, asyncio.gather</li><li>Step 4 Fusion + Rerank: RRF k=60 → cross-encoder cascade</li><li>Step 5 Assembly: token budget (40 history / 60 retrieved); Lost-in-middle defense</li><li>Step 6 Generation: cite [doc-id]; system reminder ground-only</li><li>Step 7 Post-eval: faithfulness LLM judge, thumbs, slice metrics</li><li>Tools: Phoenix, LangSmith, Langfuse</li></ul>
+<p><strong>Framework 2: Chunking decision tree</strong></p>
+<ul><li>5 strategies: fixed / recursive / doc-structure / semantic / late</li><li>Recall: 65% → 72% → 78-85% → 80-87% → 85-92%</li><li>实战 default: Recursive 512+64; Quality 上限: Late chunking</li></ul>
+<p><strong>Framework 3: 5 retrieval methods 量化对比</strong></p>
+<ul><li>Dense: 75-85% recall, 10ms</li><li>BM25: 60-75%, 5ms</li><li>Hybrid: 82-90%, 12ms ⭐</li><li>+ Rerank: 90-97%, +60ms</li><li>ColBERT: 92-98%, 30ms, 10x storage</li></ul>
+<p><strong>Framework 4: Long-ctx vs RAG cost math</strong></p>
+<ul><li>Pure long-ctx (Gemini 3 Pro 500K corpus): $1/q; with cache $0.10</li><li>Pure RAG: $0.011/q</li><li>Hybrid: $0.25/q (RAG narrow → long-ctx within)</li><li>100 q/day breakeven: long-ctx + cache OK; 100K q/day: RAG wins</li></ul>
+<p><strong>Framework 5: Production gotcha map</strong></p>
+<ul><li>12 gotchas: drift / chunk-cut / BM25-stopword / PDF / multilingual / cache / cross-tenant / lost-middle / hallucinate-cite / vector-scale / rate-limit / chunk-too-long</li><li>全部需在 design 时打补丁</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>Embedding model drift on re-index → versioned blue/green migration</li><li>Chunk cuts entity (e.g., 订单号一半) → overlap 64 + parent doc ref</li><li>BM25 stopword 过 ("how to" 被砍) → custom stopword per domain</li><li>PDF parse 丢表格 → LlamaParse / Azure Document Intelligence</li><li>Multilingual mix → gemini-embedding-001 / voyage-multilingual-3</li><li>Stale cache (doc 更新但 cache 还在) → doc-version-aware cache key</li><li>Cross-tenant leak → 必须 retrieval-time filter, 不能 post-rank filter</li><li>Lost-in-middle (中部 30-40% gap) → 顺序 system → history → retrieved → query</li><li>Hallucinated citation [doc-99] 不存在 → regex post-validate, retry</li><li>Vector DB 容量爆 (10M × 1536 × 4B = 60GB+) → int8 / binary quantization</li><li>Embedding rate limit (1M doc OpenAI 限流) → batch 1-2K + exp retry</li><li>Retrieved chunk 太长占 prompt → truncate + per-chunk summarize</li><li>Prompt injection in retrieved → XML wrap trust="untrusted" + system reminder</li><li>Multi-tenant index 共享 → tenant_id 强制 metadata filter</li><li>Reranker 全量上 (top-1000) → cascade narrow first 才合理</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Hybrid Search</td><td>BNPL chatbot</td><td>Order# 类查询 dense miss 22%, +BM25 hybrid+RRF 升 89%, +rerank 92%</td></tr><tr><td>Chunking</td><td>BNPL FAQ Confluence</td><td>Fixed-512 → heading-aware, recall 72→87%, 表格 chunk type 标</td></tr><tr><td>Context Mgmt</td><td>Voice agent 7 markets</td><td>10-20 turn 20K+ tok, hierarchical 4-tier + RAG-on-history, token 减半</td></tr><tr><td>Tool Output</td><td>ConvFinQA 5 calc tools</td><td>XML wrap calc result + system reminder "use exact", hallucinate -40%</td></tr><tr><td>Reranking</td><td>BNPL chatbot A/B</td><td>hybrid vs hybrid+bge-rerank, faithfulness +12%, thumbs +15%, +60ms hide in stream</td></tr><tr><td>Long-ctx vs RAG</td><td>ConvFinQA 多财报</td><td>Per-customer RAG top-3 → Claude 200K, quality + multi-tenant</td></tr><tr><td>Agent Platform</td><td>Internal</td><td>Tool result schema registry + provenance + per-tenant quota</td></tr><tr><td>Indonesia refund</td><td>TikTok PayLater</td><td>Refund tier policy doc chunk + heading-aware, slice recall +15pp</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<blockquote><p>"RAG isn't embed-and-query — it's a 7-step pipeline where each step is a design knob."</p></blockquote>
+<blockquote><p>"I picked hybrid + RRF over pure dense because users queried order numbers, and dense missed 22% of those."</p></blockquote>
+<blockquote><p>"Reranker only earns its 60ms when first-stage recall is already at top-50 and precision is the bottleneck."</p></blockquote>
+<blockquote><p>"Lost-in-middle isn't a 2022 paper artifact — Gemini 3 Pro at 2M still shows 30-40% mid-position recall gap."</p></blockquote>
+<blockquote><p>"On ConvFinQA we initially tried long-context, but multi-tenancy forced us to RAG-narrow → long-ctx hybrid."</p></blockquote>
+<blockquote><p>"Prefix caching changes the long-context math — Anthropic 5-min cache cuts repeat-prefix cost 10x."</p></blockquote>
+<blockquote><p>"Citation hallucination is real: 8% of LLM answers cited [doc-X] that didn't exist. We regex post-validate."</p></blockquote>
+<blockquote><p>"On chunking, the right answer is 'depends on doc type' — recursive for prose, heading-aware for markdown, AST for code, late chunking for long-range context."</p></blockquote>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>"RAG = vector DB + cosine top-K" (2022 view)</li><li>Always rerank (60ms cost without justification)</li><li>"Long-context killed RAG" (cost / multi-tenant / freshness)</li><li>Larger chunk = better (dilution destroys precision)</li><li>No cost math in answer (FDE 必扣分)</li><li>No multi-tenant filter (cross-tenant leak)</li><li>Post-rank metadata filter (loses top-k)</li><li>Pure dense for SKU / 编号 / 人名 (BM25 必须并)</li><li>No eval set (sweep without ground truth = 玄学)</li><li>Ignore Lost-in-middle (mid-context gap real even in 2M)</li></ol>
+<h4>🛠️ Tool zoo (2026)</h4>
+<table class="md-table"><thead><tr><th>类别</th><th>Tool</th><th>一句话</th></tr></thead><tbody><tr><td>Vector DB</td><td>Qdrant, Pinecone, Weaviate, Milvus, pgvector, FAISS</td><td>Qdrant 自部署首选, Pinecone SaaS</td></tr><tr><td>Sparse / BM25</td><td>OpenSearch, Elasticsearch, Vespa, Lucene</td><td>OpenSearch 开源默认</td></tr><tr><td>Embedding</td><td>gemini-embedding-001, text-embedding-3, bge-large, voyage-3</td><td>Gemini 多语好, bge 自部署</td></tr><tr><td>Reranker</td><td>bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT</td><td>bge multilingual free 起步</td></tr><tr><td>PDF parse</td><td>LlamaParse, unstructured, pymupdf, Azure Doc Intelligence</td><td>LlamaParse 表格强</td></tr><tr><td>Code AST</td><td>tree-sitter</td><td>必备</td></tr><tr><td>PII</td><td>presidio (Microsoft)</td><td>自实现 mask 函数兜底</td></tr><tr><td>Tracing</td><td>Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry</td><td>Phoenix 开源</td></tr><tr><td>Prompt cache</td><td>Anthropic 5min, Gemini 1h, OpenAI 5min</td><td>90% off cached input</td></tr><tr><td>Frameworks</td><td>LangChain, LlamaIndex, Haystack, DSPy</td><td>DSPy 程序化 prompt opt</td></tr><tr><td>Eval</td><td>BEIR, MTEB, Ragas, Phoenix eval</td><td>Ragas faithfulness/context-recall</td></tr></tbody></table>
+<h4>📊 Mini cost calculator (2026)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Per-query cost:
+  cost = (input_tok × in_price) + (output_tok × out_price)
+  
+  Gemini 3 Pro:    in $2 (≤200K) / $4 (&gt;200K) / out $12 per 1M
+  Gemini 3 Flash:  in $0.50 / out $3
+  Claude Opus 4.7: in $5 / out $25
+  Claude Sonnet 4.6: in $3 / out $15
+  Claude Haiku 4.5: in $1 / out $5
+  GPT-5.5:         in $5 / out $30
+
+Prefix cache:
+  write surcharge 1.25-2x in price
+  hit 0.10x in price
+  Anthropic TTL 5min, Gemini 1h
+
+Embedding:
+  gemini-embedding-001: $0.025 / 1M token
+  text-embedding-3-large: $0.13 / 1M
+  bge-large self-host: GPU $ amortized
+
+Vector DB (Pinecone serverless):
+  storage $0.33 / GB / month
+  query $0.40 / 1M ops</code></pre>
+<h4>🎬 45-min answer rhythm (T2 通用)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">0-5    Clarify: corpus / doc type / tenancy / freshness / SLA / QPS
+5-10   Mental model: 7-step pipeline 画图 + "RAG ≠ vector DB"
+10-25  Deep-dive 1 sub-topic (面试官 zoom-in) + Pattern A/B/C/D/E
+25-35  Tradeoffs + cost math (Section 8 cost table)
+35-42  2026 trends: Contextual Retrieval / Late chunking / GraphRAG / prompt cache
+42-45  简历 quote (BNPL / Voice agent / ConvFinQA / Indonesia refund)</code></pre>
+<h4>🔑 7-step pipeline mnemonic</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Q  Query understanding    (rewrite / multi-q / HyDE / decompose)
+R  Routing                (skip / SQL / dense / sparse / KG / API)
+M  Multi-source retrieve  (parallel asyncio.gather)
+F  Fusion + rerank        (RRF k=60 → cross-encoder cascade)
+A  Assembly               (token budget + Lost-in-middle defense)
+G  Generation             (cite chunk_id + system reminder ground-only)
+P  Post-eval              (faithfulness / thumbs / slice / regression)</code></pre>
+<pre class="language-plaintext"><code class="language-plaintext"></code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="review-gfde-t1-tool-output-validation.html">← T1.5 · tool output 验证 + 防注入 — 复习速查</a>
+    <a href="review-gfde-t2-hybrid-search.html">T2.1 · hybrid search 60→90% recall — 复习速查 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## T2 · RAG / Context 全景 — 复习速查
+
+> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t2-overview.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+
+**原页面**: [`gfde-t2-overview.html`](questions/gfde-t2-overview.html)
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+2026 RAG = **query understanding → routing → multi-source retrieval → fusion → rerank → context assembly → grounded generation → post-eval**, 是 7-step pipeline 而非 "embed + vector DB"; 每步都有 design choice + cost knob, FDE 题深 dive 一步.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| **Dense retrieval** | Embed query → cosine vs doc embeddings | 语义 / paraphrase / synonym |
+| **Sparse retrieval (BM25)** | tf-idf lexical match | SKU / 人名 / 编号 / exact match |
+| **Hybrid search** | Dense + Sparse 并行 + fusion | 生产 default |
+| **RRF** | Rank-based fusion, score = Σ 1/(k+rank), k=60 | 无需 calibrate, robust 默认 |
+| **Cross-encoder** | 联合 [q;d] 过 transformer, 50-200ms/pair | 重排 top-50 → top-10 |
+| **ColBERT** | Multi-vector per doc, MaxSim 操作 | 极致 precision, 存储 10x |
+| **HyDE** | LLM 生成假答案 → embed assumed answer | Query-doc 分布差异大 |
+| **Multi-query** | LLM 生成 3-5 query 变体, RRF 合并 | 词汇不匹配 |
+| **Decompose** | 把 multi-hop 拆成 sub-question | 复杂推理 |
+| **Late chunking** | 先 embed 整 doc, 再切 chunk-embedding | 长文+小 chunk 同享上下文 |
+| **Contextual Retrieval** | Anthropic 2024, 每 chunk 加 doc summary | +35-49% recall |
+| **GraphRAG** | KG 增强 RAG, entity edge expand | 关系型 query |
+| **Lost in middle** | 中部内容被 LLM 忽视 | Long context 通用问题 |
+| **Self-RAG** | LLM 决定 retrieve / 不 retrieve / retrieve N 次 | Adaptive 触发 |
+| **Prefix cache** | Anthropic 5min / Gemini 1h, cache hit ~10% 价 | 长 prefix reuse |
+
+### 🎯 6 个核心 sub-topic Framework
+
+**Framework T2.1**: Hybrid Search
+- When: 任何 production retrieval (default)
+- Algorithm: Dense + BM25 并行 asyncio.gather → RRF k=60 → cross-encoder rerank top-50→10
+- Trade-off: +50-80ms latency, +8-12% recall
+- Tools: Qdrant + OpenSearch + bge-reranker-v2-m3
+
+**Framework T2.2**: Chunking Decision
+- When: 文档接入 pipeline
+- Algorithm: by doc type → fixed/recursive/heading/late/AST; size 512 + overlap 64 default
+- Trade-off: 越结构化 chunker 准但 indexing 慢
+- Tools: LlamaParse, unstructured, tree-sitter, jina-embeddings-v3
+
+**Framework T2.3**: Context Window Mgmt
+- When: Multi-turn agent / long session
+- Algorithm: sliding + summarize + hierarchical 4-tier + RAG-on-history
+- Trade-off: aggressive compress 失细节, lazy compress 爆 budget
+- Tools: LangChain ConversationSummaryBufferMemory, MemGPT, LlamaIndex memory
+
+**Framework T2.4**: Tool Output → Prompt
+- When: Tool result > 1K token / 含 PII / untrusted source
+- Algorithm: schema validate → truncate by intent → XML wrap trust → provenance + row_id
+- Trade-off: 多层包装增 token, 但 inject defense + 可 cite
+- Tools: presidio, pydantic schema, XML namespace
+
+**Framework T2.5**: Reranking
+- When: Recall 已够 (top-50+), precision 不足
+- Algorithm: cascade bi → bge-base → bge-large/Cohere → optional LLM-judge
+- Trade-off: +60-200ms, +8-15% NDCG; cache 30-40% hit 抵消
+- Tools: bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT
+
+**Framework T2.6**: Long-context vs RAG
+- When: 大 corpus + cost / 多 hop / 多租户 决策
+- Algorithm: 决策树 by corpus size × cost × multi-hop × freshness
+- Trade-off: long-ctx 简单贵, RAG 复杂便宜, hybrid 折中
+- Tools: Gemini 3 Pro 2M, Claude 200K, Anthropic prompt cache
+
+### 🌳 关键决策树 (ASCII)
+
+```
+Q: corpus size?
+├── < 200K, static, low-vol  → Long-context + prefix cache ⭐
+├── < 2M, multi-tenant       → Hybrid (RAG narrow → long-ctx)
+├── 200K-2M, single tenant   → Gemini 3 Pro 2M direct
+└── > 2M                     → Pure RAG
+       ├── Latency tight     → Dense only
+       ├── Quality top       → Hybrid + Rerank
+       └── Multi-tenant      → Per-tenant shard
+
+Q: chunking strategy?
+├── Pure prose       → Recursive 512+64 ⭐
+├── Markdown / HTML  → Heading-aware
+├── PDF complex      → LlamaParse + doc-structure
+├── Code             → tree-sitter function-level
+├── Chat logs        → Turn-aware 3-5 turn
+└── Long-range ctx   → Late chunking (Jina v3)
+```
+
+### ⚙️ Part 2 五个深度框架速查
+
+**Framework 1: 7-step Pipeline (Step 1-7)**
+- Step 1 Query Understanding: rewrite + pronoun + multi-query + HyDE
+- Step 2 Routing: skip / SQL / dense / sparse / graph / API
+- Step 3 Multi-retrieval: dense ∥ BM25 ∥ KG ∥ tool, asyncio.gather
+- Step 4 Fusion + Rerank: RRF k=60 → cross-encoder cascade
+- Step 5 Assembly: token budget (40 history / 60 retrieved); Lost-in-middle defense
+- Step 6 Generation: cite [doc-id]; system reminder ground-only
+- Step 7 Post-eval: faithfulness LLM judge, thumbs, slice metrics
+- Tools: Phoenix, LangSmith, Langfuse
+
+**Framework 2: Chunking decision tree**
+- 5 strategies: fixed / recursive / doc-structure / semantic / late
+- Recall: 65% → 72% → 78-85% → 80-87% → 85-92%
+- 实战 default: Recursive 512+64; Quality 上限: Late chunking
+
+**Framework 3: 5 retrieval methods 量化对比**
+- Dense: 75-85% recall, 10ms
+- BM25: 60-75%, 5ms
+- Hybrid: 82-90%, 12ms ⭐
+- + Rerank: 90-97%, +60ms
+- ColBERT: 92-98%, 30ms, 10x storage
+
+**Framework 4: Long-ctx vs RAG cost math**
+- Pure long-ctx (Gemini 3 Pro 500K corpus): $1/q; with cache $0.10
+- Pure RAG: $0.011/q
+- Hybrid: $0.25/q (RAG narrow → long-ctx within)
+- 100 q/day breakeven: long-ctx + cache OK; 100K q/day: RAG wins
+
+**Framework 5: Production gotcha map**
+- 12 gotchas: drift / chunk-cut / BM25-stopword / PDF / multilingual / cache / cross-tenant / lost-middle / hallucinate-cite / vector-scale / rate-limit / chunk-too-long
+- 全部需在 design 时打补丁
+
+### 🔥 Production gotchas (top 15)
+
+1. Embedding model drift on re-index → versioned blue/green migration
+2. Chunk cuts entity (e.g., 订单号一半) → overlap 64 + parent doc ref
+3. BM25 stopword 过 ("how to" 被砍) → custom stopword per domain
+4. PDF parse 丢表格 → LlamaParse / Azure Document Intelligence
+5. Multilingual mix → gemini-embedding-001 / voyage-multilingual-3
+6. Stale cache (doc 更新但 cache 还在) → doc-version-aware cache key
+7. Cross-tenant leak → 必须 retrieval-time filter, 不能 post-rank filter
+8. Lost-in-middle (中部 30-40% gap) → 顺序 system → history → retrieved → query
+9. Hallucinated citation [doc-99] 不存在 → regex post-validate, retry
+10. Vector DB 容量爆 (10M × 1536 × 4B = 60GB+) → int8 / binary quantization
+11. Embedding rate limit (1M doc OpenAI 限流) → batch 1-2K + exp retry
+12. Retrieved chunk 太长占 prompt → truncate + per-chunk summarize
+13. Prompt injection in retrieved → XML wrap trust="untrusted" + system reminder
+14. Multi-tenant index 共享 → tenant_id 强制 metadata filter
+15. Reranker 全量上 (top-1000) → cascade narrow first 才合理
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Hybrid Search | BNPL chatbot | Order# 类查询 dense miss 22%, +BM25 hybrid+RRF 升 89%, +rerank 92% |
+| Chunking | BNPL FAQ Confluence | Fixed-512 → heading-aware, recall 72→87%, 表格 chunk type 标 |
+| Context Mgmt | Voice agent 7 markets | 10-20 turn 20K+ tok, hierarchical 4-tier + RAG-on-history, token 减半 |
+| Tool Output | ConvFinQA 5 calc tools | XML wrap calc result + system reminder "use exact", hallucinate -40% |
+| Reranking | BNPL chatbot A/B | hybrid vs hybrid+bge-rerank, faithfulness +12%, thumbs +15%, +60ms hide in stream |
+| Long-ctx vs RAG | ConvFinQA 多财报 | Per-customer RAG top-3 → Claude 200K, quality + multi-tenant |
+| Agent Platform | Internal | Tool result schema registry + provenance + per-tenant quota |
+| Indonesia refund | TikTok PayLater | Refund tier policy doc chunk + heading-aware, slice recall +15pp |
+
+### 🎤 面试现场 quotables (top 8)
+
+> "RAG isn't embed-and-query — it's a 7-step pipeline where each step is a design knob."
+
+> "I picked hybrid + RRF over pure dense because users queried order numbers, and dense missed 22% of those."
+
+> "Reranker only earns its 60ms when first-stage recall is already at top-50 and precision is the bottleneck."
+
+> "Lost-in-middle isn't a 2022 paper artifact — Gemini 3 Pro at 2M still shows 30-40% mid-position recall gap."
+
+> "On ConvFinQA we initially tried long-context, but multi-tenancy forced us to RAG-narrow → long-ctx hybrid."
+
+> "Prefix caching changes the long-context math — Anthropic 5-min cache cuts repeat-prefix cost 10x."
+
+> "Citation hallucination is real: 8% of LLM answers cited [doc-X] that didn't exist. We regex post-validate."
+
+> "On chunking, the right answer is 'depends on doc type' — recursive for prose, heading-aware for markdown, AST for code, late chunking for long-range context."
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. "RAG = vector DB + cosine top-K" (2022 view)
+2. Always rerank (60ms cost without justification)
+3. "Long-context killed RAG" (cost / multi-tenant / freshness)
+4. Larger chunk = better (dilution destroys precision)
+5. No cost math in answer (FDE 必扣分)
+6. No multi-tenant filter (cross-tenant leak)
+7. Post-rank metadata filter (loses top-k)
+8. Pure dense for SKU / 编号 / 人名 (BM25 必须并)
+9. No eval set (sweep without ground truth = 玄学)
+10. Ignore Lost-in-middle (mid-context gap real even in 2M)
+
+### 🛠️ Tool zoo (2026)
+
+| 类别 | Tool | 一句话 |
+|---|---|---|
+| Vector DB | Qdrant, Pinecone, Weaviate, Milvus, pgvector, FAISS | Qdrant 自部署首选, Pinecone SaaS |
+| Sparse / BM25 | OpenSearch, Elasticsearch, Vespa, Lucene | OpenSearch 开源默认 |
+| Embedding | gemini-embedding-001, text-embedding-3, bge-large, voyage-3 | Gemini 多语好, bge 自部署 |
+| Reranker | bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT | bge multilingual free 起步 |
+| PDF parse | LlamaParse, unstructured, pymupdf, Azure Doc Intelligence | LlamaParse 表格强 |
+| Code AST | tree-sitter | 必备 |
+| PII | presidio (Microsoft) | 自实现 mask 函数兜底 |
+| Tracing | Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry | Phoenix 开源 |
+| Prompt cache | Anthropic 5min, Gemini 1h, OpenAI 5min | 90% off cached input |
+| Frameworks | LangChain, LlamaIndex, Haystack, DSPy | DSPy 程序化 prompt opt |
+| Eval | BEIR, MTEB, Ragas, Phoenix eval | Ragas faithfulness/context-recall |
+
+### 📊 Mini cost calculator (2026)
+
+```
+Per-query cost:
+  cost = (input_tok × in_price) + (output_tok × out_price)
+  
+  Gemini 3 Pro:    in $2 (≤200K) / $4 (>200K) / out $12 per 1M
+  Gemini 3 Flash:  in $0.50 / out $3
+  Claude Opus 4.7: in $5 / out $25
+  Claude Sonnet 4.6: in $3 / out $15
+  Claude Haiku 4.5: in $1 / out $5
+  GPT-5.5:         in $5 / out $30
+
+Prefix cache:
+  write surcharge 1.25-2x in price
+  hit 0.10x in price
+  Anthropic TTL 5min, Gemini 1h
+
+Embedding:
+  gemini-embedding-001: $0.025 / 1M token
+  text-embedding-3-large: $0.13 / 1M
+  bge-large self-host: GPU $ amortized
+
+Vector DB (Pinecone serverless):
+  storage $0.33 / GB / month
+  query $0.40 / 1M ops
+```
+
+### 🎬 45-min answer rhythm (T2 通用)
+
+```
+0-5    Clarify: corpus / doc type / tenancy / freshness / SLA / QPS
+5-10   Mental model: 7-step pipeline 画图 + "RAG ≠ vector DB"
+10-25  Deep-dive 1 sub-topic (面试官 zoom-in) + Pattern A/B/C/D/E
+25-35  Tradeoffs + cost math (Section 8 cost table)
+35-42  2026 trends: Contextual Retrieval / Late chunking / GraphRAG / prompt cache
+42-45  简历 quote (BNPL / Voice agent / ConvFinQA / Indonesia refund)
+```
+
+### 🔑 7-step pipeline mnemonic
+
+```
+Q  Query understanding    (rewrite / multi-q / HyDE / decompose)
+R  Routing                (skip / SQL / dense / sparse / KG / API)
+M  Multi-source retrieve  (parallel asyncio.gather)
+F  Fusion + rerank        (RRF k=60 → cross-encoder cascade)
+A  Assembly               (token budget + Lost-in-middle defense)
+G  Generation             (cite chunk_id + system reminder ground-only)
+P  Post-eval              (faithfulness / thumbs / slice / regression)
+```
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

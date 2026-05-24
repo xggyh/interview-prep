@@ -6,21 +6,21 @@
 <title>AI Agent Cookbook · Recipes for production agent systems</title>
 <meta name="description" content="Personal study notes on production AI agents — tool calling, RAG, context management, LLM serving, FDE delivery patterns.">
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="assets/style.css?v=0721b730">
+<link rel="stylesheet" href="assets/style.css?v=e649d488">
 </head>
 <body>
 <header class="site-header">
   <div class="container">
     <h1><a href="index.html">🍳 AI Agent Cookbook</a></h1>
-    <div class="meta">243 recipes · Tool Calling · RAG · LLM Eng · Delivery</div>
+    <div class="meta">292 recipes · Tool Calling · RAG · LLM Eng · Delivery</div>
     <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
   </div>
 </header>
 <main class="container">
   <div class="intro">
     <h2>Recipes for production agent systems</h2>
-    <p>A personal study log on building real agent systems — gathered from production debugging notes, papers, and post-mortems. Each entry covers the problem, the framework I use, a sample walk-through, common pitfalls, and follow-up directions. Filter by topic / depth, sorted by recency. 243 entries total.</p>
-    <div class="stats"><span class="stat"><strong>27</strong> Google FDE</span> <span class="stat"><strong>24</strong> FDE</span> <span class="stat"><strong>1</strong> Guide</span> <span class="stat"><strong>94</strong> Coding</span> <span class="stat"><strong>56</strong> System Design</span> <span class="stat"><strong>26</strong> Googlyness</span> <span class="stat"><strong>6</strong> People Management</span> <span class="stat"><strong>1</strong> Behavioral</span> <span class="stat"><strong>3</strong> Low Level Design</span> <span class="stat"><strong>2</strong> Product Architecture</span> <span class="stat"><strong>1</strong> Mobile System Design</span> <span class="stat"><strong>1</strong> ML System Design</span> <span class="stat"><strong>1</strong> Technical Project Retrospective</span></div>
+    <p>A personal study log on building real agent systems — gathered from production debugging notes, papers, and post-mortems. Each entry covers the problem, the framework I use, a sample walk-through, common pitfalls, and follow-up directions. Filter by topic / depth, sorted by recency. 292 entries total.</p>
+    <div class="stats"><span class="stat"><strong>49</strong> Review</span> <span class="stat"><strong>27</strong> Google FDE</span> <span class="stat"><strong>24</strong> FDE</span> <span class="stat"><strong>1</strong> Guide</span> <span class="stat"><strong>94</strong> Coding</span> <span class="stat"><strong>56</strong> System Design</span> <span class="stat"><strong>26</strong> Googlyness</span> <span class="stat"><strong>6</strong> People Management</span> <span class="stat"><strong>1</strong> Behavioral</span> <span class="stat"><strong>3</strong> Low Level Design</span> <span class="stat"><strong>2</strong> Product Architecture</span> <span class="stat"><strong>1</strong> Mobile System Design</span> <span class="stat"><strong>1</strong> ML System Design</span> <span class="stat"><strong>1</strong> Technical Project Retrospective</span></div>
   </div>
 
   <details class="self-intro">
@@ -36,11 +36,11 @@
 
   <div class="filter-bar">
     <span class="filter-label">公司：</span>
-    <button class="active" data-cfilter="all">全部公司 (243)</button><button data-cfilter="Google FDE" style="--c:#1a73e8">Google FDE (27)</button><button data-cfilter="Google L5" style="--c:#0f9d58">Google L5 (13)</button><button data-cfilter="FDE" style="--c:#dc2626">FDE (24)</button><button data-cfilter="OpenAI" style="--c:#10a37f">OpenAI (45)</button><button data-cfilter="Google" style="--c:#4285f4">Google (151)</button>
+    <button class="active" data-cfilter="all">全部公司 (292)</button><button data-cfilter="Google FDE" style="--c:#1a73e8">Google FDE (27)</button><button data-cfilter="Google L5" style="--c:#0f9d58">Google L5 (13)</button><button data-cfilter="FDE" style="--c:#dc2626">FDE (24)</button><button data-cfilter="OpenAI" style="--c:#10a37f">OpenAI (45)</button><button data-cfilter="Google" style="--c:#4285f4">Google (151)</button>
   </div>
   <div class="filter-bar">
     <span class="filter-label">类型：</span>
-    <button class="active" data-tfilter="all">全部类型 (243)</button><button data-tfilter="Google FDE">Google FDE (27)</button><button data-tfilter="FDE">FDE (24)</button><button data-tfilter="Guide">Guide (1)</button><button data-tfilter="Coding">Coding (94)</button><button data-tfilter="System Design">System Design (56)</button><button data-tfilter="Googlyness">Googlyness (26)</button><button data-tfilter="People Management">People Management (6)</button><button data-tfilter="Behavioral">Behavioral (1)</button><button data-tfilter="Low Level Design">Low Level Design (3)</button><button data-tfilter="Product Architecture">Product Architecture (2)</button><button data-tfilter="Mobile System Design">Mobile System Design (1)</button><button data-tfilter="ML System Design">ML System Design (1)</button><button data-tfilter="Technical Project Retrospective">Technical Project Retrospective (1)</button>
+    <button class="active" data-tfilter="all">全部类型 (292)</button><button data-tfilter="Review">Review (49)</button><button data-tfilter="Google FDE">Google FDE (27)</button><button data-tfilter="FDE">FDE (24)</button><button data-tfilter="Guide">Guide (1)</button><button data-tfilter="Coding">Coding (94)</button><button data-tfilter="System Design">System Design (56)</button><button data-tfilter="Googlyness">Googlyness (26)</button><button data-tfilter="People Management">People Management (6)</button><button data-tfilter="Behavioral">Behavioral (1)</button><button data-tfilter="Low Level Design">Low Level Design (3)</button><button data-tfilter="Product Architecture">Product Architecture (2)</button><button data-tfilter="Mobile System Design">Mobile System Design (1)</button><button data-tfilter="ML System Design">ML System Design (1)</button><button data-tfilter="Technical Project Retrospective">Technical Project Retrospective (1)</button>
   </div>
   <div class="filter-bar">
     <span class="filter-label">深度：</span>
@@ -52,6 +52,545 @@
   </div>
 
   <div class="q-grid" id="q-grid">
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1 · agent tool calling 全景 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-overview.html">T1 · Agent Tool Calling 全景 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-overview] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1.1 · idempotent tool 接口 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-idempotency.html">T1.1 · idempotent tool 接口 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-idempotency] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1.2 · retry / timeout / fallback — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-retry-fallback.html">T1.2 · retry / timeout / fallback — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-retry-fallback] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1.3 · parallel tools + race conditions — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-parallel-race.html">T1.3 · parallel tools + race conditions — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-parallel-race] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1.4 · destructive tools wrapping — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-destructive-tools.html">T1.4 · destructive tools wrapping — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-destructive-tools] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t1.5 · tool output 验证 + 防注入 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t1-tool-output-validation.html">T1.5 · tool output 验证 + 防注入 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t1-tool-output-validation] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2 · rag / context 全景 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-overview.html">T2 · RAG / Context 全景 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-overview] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.1 · hybrid search 60→90% recall — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-hybrid-search.html">T2.1 · hybrid search 60→90% recall — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-hybrid-search] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.2 · chunking decision — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-chunking-decision.html">T2.2 · chunking decision — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-chunking-decision] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.3 · context window 管理 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-context-window-mgmt.html">T2.3 · context window 管理 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-context-window-mgmt] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.4 · tool output → llm prompt — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-tool-output-prompt.html">T2.4 · tool output → LLM prompt — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-tool-output-prompt] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.5 · reranking 架构 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-reranking.html">T2.5 · reranking 架构 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-reranking] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t2.6 · long context vs rag — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t2-long-context-vs-rag.html">T2.6 · long context vs RAG — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t2-long-context-vs-rag] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3 · llm system design 全景 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-overview.html">T3 · LLM System Design 全景 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-overview] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.1 · stateless vs stateful — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-stateless-stateful.html">T3.1 · stateless vs stateful — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-stateless-stateful] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.2 · mcp / api proxy — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-mcp-api-proxy.html">T3.2 · MCP / API proxy — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-mcp-api-proxy] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.3 · 1m qps llm serving — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-high-throughput.html">T3.3 · 1M QPS LLM serving — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-high-throughput] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.4 · observability stack — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-observability.html">T3.4 · observability stack — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-observability] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.5 · rate limit / queue / cache — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-rate-limit-queue-cache.html">T3.5 · rate limit / queue / cache — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-rate-limit-queue-cache] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t3.6 · eventual consistency — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t3-eventual-consistency.html">T3.6 · eventual consistency — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t3-eventual-consistency] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t4 · fde delivery 全景 — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t4-overview.html">T4 · FDE Delivery 全景 — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t4-overview] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t4.1 · customer scoping — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t4-customer-scoping.html">T4.1 · customer scoping — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t4-customer-scoping] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t4.2 · workflow abstraction — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t4-workflow-abstraction.html">T4.2 · workflow abstraction — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t4-workflow-abstraction] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t4.3 · human-agent interaction — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t4-human-agent-interaction.html">T4.3 · human-agent interaction — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t4-human-agent-interaction] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="t4.4 · permissions + recovery — 复习速查">
+  <a class="q-title" href="questions/review-gfde-t4-permissions-recovery.html">T4.4 · permissions + recovery — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [gfde-t4-permissions-recovery] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #1 · oauth 2.0 crm integration — 复习速查">
+  <a class="q-title" href="questions/review-oauth-crm-platform-integration.html">Tech #1 · OAuth 2.0 CRM Integration — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [oauth-crm-platform-integration] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #2 · reliable webhook — 复习速查">
+  <a class="q-title" href="questions/review-webhook-flaky-clients.html">Tech #2 · Reliable Webhook — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [webhook-flaky-clients] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #3 · debug agent staging vs prod — 复习速查">
+  <a class="q-title" href="questions/review-debug-staging-vs-prod.html">Tech #3 · Debug Agent Staging vs Prod — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [debug-staging-vs-prod] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #4 · data pipeline drift detection — 复习速查">
+  <a class="q-title" href="questions/review-data-pipeline-drift.html">Tech #4 · Data Pipeline Drift Detection — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [data-pipeline-drift] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #5 · multi-tenant sla monitoring — 复习速查">
+  <a class="q-title" href="questions/review-multitenant-monitoring-slas.html">Tech #5 · Multi-tenant SLA Monitoring — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [multitenant-monitoring-slas] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="tech #6 · file system permissions — 复习速查">
+  <a class="q-title" href="questions/review-file-system-permissions.html">Tech #6 · File System Permissions — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [file-system-permissions] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="case #1 · 911 emergency response — 复习速查">
+  <a class="q-title" href="questions/review-911-emergency-response.html">Case #1 · 911 Emergency Response — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [911-emergency-response] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="case #2 · logistics ai rerouting — 复习速查">
+  <a class="q-title" href="questions/review-logistics-ai-rerouting.html">Case #2 · Logistics AI Rerouting — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [logistics-ai-rerouting] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="case #3 · healthcare adoption — 复习速查">
+  <a class="q-title" href="questions/review-healthcare-12pct-adoption.html">Case #3 · Healthcare Adoption — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [healthcare-12pct-adoption] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="case #4 · legacy erp integration — 复习速查">
+  <a class="q-title" href="questions/review-legacy-erp-no-api.html">Case #4 · Legacy ERP Integration — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [legacy-erp-no-api] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="case #5 · model worse than manual — 复习速查">
+  <a class="q-title" href="questions/review-model-worse-than-manual.html">Case #5 · Model Worse Than Manual — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [model-worse-than-manual] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="client sim #1 · demo fails before execs — 复习速查">
+  <a class="q-title" href="questions/review-live-demo-fails-execs.html">Client Sim #1 · Demo Fails Before Execs — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [live-demo-fails-execs] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="client sim #2 · 6-week feature in 3 days — 复习速查">
+  <a class="q-title" href="questions/review-six-weeks-in-three-days.html">Client Sim #2 · 6-Week Feature in 3 Days — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [six-weeks-in-three-days] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="client sim #3 · recurring fix failure — 复习速查">
+  <a class="q-title" href="questions/review-recurring-fix-failure.html">Client Sim #3 · Recurring Fix Failure — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [recurring-fix-failure] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="client sim #4 · cfo model variability — 复习速查">
+  <a class="q-title" href="questions/review-cfo-model-variability.html">Client Sim #4 · CFO Model Variability — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [cfo-model-variability] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="client sim #5 · it blocks security — 复习速查">
+  <a class="q-title" href="questions/review-it-blocks-security.html">Client Sim #5 · IT Blocks Security — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [it-blocks-security] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="ai deep dive #1 · why that chunking — 复习速查">
+  <a class="q-title" href="questions/review-why-chunking-strategy.html">AI Deep Dive #1 · Why That Chunking — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [why-chunking-strategy] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="ai deep dive #2 · dataset 100x — 复习速查">
+  <a class="q-title" href="questions/review-dataset-100x.html">AI Deep Dive #2 · Dataset 100x — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [dataset-100x] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="ai deep dive #3 · llm inference latency — 复习速查">
+  <a class="q-title" href="questions/review-llm-inference-latency.html">AI Deep Dive #3 · LLM Inference Latency — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [llm-inference-latency] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="ai deep dive #4 · rag vs ft vs pe — 复习速查">
+  <a class="q-title" href="questions/review-rag-vs-ft-vs-pe.html">AI Deep Dive #4 · RAG vs FT vs PE — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [rag-vs-ft-vs-pe] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="ai deep dive #5 · how know ai working — 复习速查">
+  <a class="q-title" href="questions/review-how-know-ai-working.html">AI Deep Dive #5 · How Know AI Working — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [how-know-ai-working] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="recruiter #1 · why fde specifically — 复习速查">
+  <a class="q-title" href="questions/review-why-fde-specifically.html">Recruiter #1 · Why FDE Specifically — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [why-fde-specifically] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="recruiter #2 · handle ambiguity — 复习速查">
+  <a class="q-title" href="questions/review-handle-ambiguity.html">Recruiter #2 · Handle Ambiguity — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [handle-ambiguity] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="Review" data-companies="Review" data-deep="0" data-reports="10" data-recency="2026053" data-title="solution design #1 · customer clarifying q — 复习速查">
+  <a class="q-title" href="questions/review-customer-clarifying-questions.html">Solution Design #1 · Customer Clarifying Q — 复习速查</a>
+  <div class="q-tags">
+    <span class="tag tag-review">Review</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="Review: 10 人报告">Review 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">复习速查页, 抽自原 [customer-clarifying-questions] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
 <div class="q-card is-deep" data-type="System Design" data-companies="OpenAI|Google" data-deep="1" data-reports="59" data-recency="2026052" data-title="design online chess">
   <a class="q-title" href="questions/cm4szywgj003ivszmblm3pmoa.html">Design Online Chess</a>
   <div class="q-tags">
