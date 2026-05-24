@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Technical #1 · OAuth 2.0 Integration (CRM ↔ Platform API) · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -102,7 +102,7 @@
     │  8. token 过期后用 refresh_token 换新的 │
     │                          │ ◄──────────►│</code></pre>
 <p><strong>几个关键 token</strong>:</p>
-<table class="md-table"><thead><tr><th>Token</th><th>寿命</th><th>用途</th></tr></thead><tbody><tr><td><strong>access_token</strong></td><td>短 (1h–24h)</td><td>每次 API 调用带上</td></tr><tr><td><strong>refresh_token</strong></td><td>长 (30天–永久)</td><td>access_token 过期时换新的, 不需要用户重新登录</td></tr><tr><td><strong>auth_code</strong></td><td>极短 (10 分钟)</td><td>一次性, 换 access_token 用</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Token</th><th>寿命</th><th>用途</th></tr></thead><tbody><tr><td><strong>access_token</strong></td><td>短 (1h–24h)</td><td>每次 API 调用带上</td></tr><tr><td><strong>refresh_token</strong></td><td>长 (30天–永久)</td><td>access_token 过期时换新的, 不需要用户重新登录</td></tr><tr><td><strong>auth_code</strong></td><td>极短 (10 分钟)</td><td>一次性, 换 access_token 用</td></tr></tbody></table></div>
 <p><strong>Scope</strong> (权限范围): 授权时声明「我要读 contacts、写 calls」, 用户能看到这个清单再决定同不同意.</p>
 <hr />
 <h3>4. 具体业务场景 (CRM ↔ Platform API 双向)</h3>
@@ -126,7 +126,7 @@
 <p><strong>作为调用方</strong> (你想去消费别家 platform API): 逻辑对称, 你是 OAuth client, 对方是 OAuth server.</p>
 <hr />
 <h3>6. 几个容易踩的坑</h3>
-<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>token 存储</strong>: 必须加密</td><td>token 泄漏 = 数据泄漏. 用 KMS / HashiCorp Vault / AWS Secrets Manager</td></tr><tr><td>2</td><td><strong>scope 最小化</strong></td><td>只申请你真正需要的权限. 不要图省事申请 <code>*</code>, 会让客户审批阶段过不了</td></tr><tr><td>3</td><td><strong>多租户隔离</strong></td><td>每个企业客户的 token 必须严格按 <code>tenant_id</code> 隔离. 跨租户调用是经典安全事故</td></tr><tr><td>4</td><td><strong>rate limit 处理</strong></td><td>Salesforce 这类 API 有严格限流 (per app per org), 需要做 backoff + queue</td></tr><tr><td>5</td><td><strong>PKCE</strong></td><td>移动端 / SPA 不能存 <code>client_secret</code>, 要用 OAuth 2.0 的 PKCE 扩展</td></tr><tr><td>6</td><td><strong>refresh_token 旋转</strong></td><td>高安全场景下每次 refresh 都换新 refresh_token, 旧的失效</td></tr><tr><td>7</td><td><strong>webhook 验签</strong></td><td>CRM 推 webhook 给你时要校验签名, 否则任何人都能伪造事件</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>token 存储</strong>: 必须加密</td><td>token 泄漏 = 数据泄漏. 用 KMS / HashiCorp Vault / AWS Secrets Manager</td></tr><tr><td>2</td><td><strong>scope 最小化</strong></td><td>只申请你真正需要的权限. 不要图省事申请 <code>*</code>, 会让客户审批阶段过不了</td></tr><tr><td>3</td><td><strong>多租户隔离</strong></td><td>每个企业客户的 token 必须严格按 <code>tenant_id</code> 隔离. 跨租户调用是经典安全事故</td></tr><tr><td>4</td><td><strong>rate limit 处理</strong></td><td>Salesforce 这类 API 有严格限流 (per app per org), 需要做 backoff + queue</td></tr><tr><td>5</td><td><strong>PKCE</strong></td><td>移动端 / SPA 不能存 <code>client_secret</code>, 要用 OAuth 2.0 的 PKCE 扩展</td></tr><tr><td>6</td><td><strong>refresh_token 旋转</strong></td><td>高安全场景下每次 refresh 都换新 refresh_token, 旧的失效</td></tr><tr><td>7</td><td><strong>webhook 验签</strong></td><td>CRM 推 webhook 给你时要校验签名, 否则任何人都能伪造事件</td></tr></tbody></table></div>
 <hr />
 <h1>Part 2 · 5 个深度工程问题 (面试 / 架构评审硬核细节)</h1>
 <h3>⚙️ Problem 1: 4 个 Grant Types</h3>
@@ -178,7 +178,7 @@
 <p><strong>这块是生产事故重灾区.</strong></p>
 <h4>2.1 存哪里</h4>
 <p>按场景:</p>
-<table class="md-table"><thead><tr><th>场景</th><th>推荐存储</th><th>不能用</th></tr></thead><tbody><tr><td>浏览器 Web 应用</td><td><code>httpOnly + Secure + SameSite Cookie</code></td><td>localStorage (XSS 一锅端)</td></tr><tr><td>移动 App</td><td>iOS Keychain / Android Keystore</td><td>SharedPreferences 明文</td></tr><tr><td>后端服务 (B2B 集成)</td><td><strong>加密数据库 + KMS / Vault / Secrets Manager</strong></td><td>明文数据库、配置文件</td></tr><tr><td>短期临时</td><td>Redis (加密 + TTL)</td><td>普通日志、监控 metric label</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>场景</th><th>推荐存储</th><th>不能用</th></tr></thead><tbody><tr><td>浏览器 Web 应用</td><td><code>httpOnly + Secure + SameSite Cookie</code></td><td>localStorage (XSS 一锅端)</td></tr><tr><td>移动 App</td><td>iOS Keychain / Android Keystore</td><td>SharedPreferences 明文</td></tr><tr><td>后端服务 (B2B 集成)</td><td><strong>加密数据库 + KMS / Vault / Secrets Manager</strong></td><td>明文数据库、配置文件</td></tr><tr><td>短期临时</td><td>Redis (加密 + TTL)</td><td>普通日志、监控 metric label</td></tr></tbody></table></div>
 <p><strong>核心原则</strong>:</p>
 <ul><li><strong>必须加密</strong> (at-rest encryption), 用 KMS 管密钥</li><li>永远<strong>不要进日志</strong>, error message、APM 追踪、Sentry 报错都要 redact</li><li><strong>不要进 URL</strong>, 只能进 Header (<code>Authorization: Bearer xxx</code>) 或 POST body</li></ul>
 <h4>2.2 Rotation (轮换 / 旋转)</h4>
@@ -233,7 +233,7 @@
 <p><strong>缺点</strong>:</p>
 <ul><li>单点故障, 要做 HA</li><li>多一次内部网络调用</li><li>跨网络的延迟</li></ul>
 <h4>怎么选</h4>
-<table class="md-table"><thead><tr><th>团队规模</th><th>选什么</th></tr></thead><tbody><tr><td>小 (&lt; 5 服务)</td><td>SDK 模式</td></tr><tr><td>中 (已经在跑 Service Mesh)</td><td>Sidecar 模式</td></tr><tr><td>大 (多租户 SaaS, 强合规)</td><td>Dedicated Service</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>团队规模</th><th>选什么</th></tr></thead><tbody><tr><td>小 (&lt; 5 服务)</td><td>SDK 模式</td></tr><tr><td>中 (已经在跑 Service Mesh)</td><td>Sidecar 模式</td></tr><tr><td>大 (多租户 SaaS, 强合规)</td><td>Dedicated Service</td></tr></tbody></table></div>
 <p><strong>字节 / 阿里这种规模</strong>一般是 <strong>Dedicated Service + SDK 混合</strong>: 核心租户态在专用服务, 业务侧用统一 SDK 调它.</p>
 <hr />
 <h3>⚙️ Problem 4: Failure Modes (Token Expire / Refresh Race / Revocation)</h3>
@@ -316,7 +316,7 @@ tenant_specific_key = KMS_derive(master_key, tenant_id)</code></pre>
 <ul><li>Row Level Security (PostgreSQL RLS)</li><li>每个租户独立 schema 或独立 DB</li><li>ORM 层强制注入 <code>tenant_id</code> 过滤</li></ul>
 <p><strong>(c) Secrets Manager 集中存储</strong></p>
 <p>不要把 token 写到自己服务的数据库里, 用专门的 secrets manager:</p>
-<table class="md-table"><thead><tr><th>工具</th><th>适用</th></tr></thead><tbody><tr><td>HashiCorp Vault</td><td>自建首选, 功能最全</td></tr><tr><td>AWS Secrets Manager / Parameter Store</td><td>AWS 上</td></tr><tr><td>GCP Secret Manager</td><td>GCP 上</td></tr><tr><td>Azure Key Vault</td><td>Azure 上</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>工具</th><th>适用</th></tr></thead><tbody><tr><td>HashiCorp Vault</td><td>自建首选, 功能最全</td></tr><tr><td>AWS Secrets Manager / Parameter Store</td><td>AWS 上</td></tr><tr><td>GCP Secret Manager</td><td>GCP 上</td></tr><tr><td>Azure Key Vault</td><td>Azure 上</td></tr></tbody></table></div>
 <p>它们提供: 自动轮换、审计日志、细粒度 IAM、HSM 加持</p>
 <p><strong>(d) Audit Log (审计日志)</strong></p>
 <p>每次 token 被读 / 写 / 刷新都记日志 (只记元数据, 不记 token 本身):</p>
@@ -382,11 +382,11 @@ tenant_specific_key = KMS_derive(master_key, tenant_id)</code></pre>
 <blockquote><p>"QPS to CRM and from CRM? Rate limits on their side? Bursty or sustained?"</p></blockquote>
 <hr />
 <h3>5 步框架 (sample 45-min answer 节奏)</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + grant + version + volume</td></tr><tr><td>5-20 min</td><td>Token exchange flow (画 sequence diagram) + grant type 选择</td></tr><tr><td>20-30 min</td><td>Middleware placement (Token Service + SDK 混合)</td></tr><tr><td>30-40 min</td><td>Failure modes (refresh race / expire mid-call / revocation)</td></tr><tr><td>40-55 min</td><td>Multi-tenant secrets (per-tenant DEK + Vault + audit)</td></tr><tr><td>55-60 min</td><td>Production hardening (monitor 401/429, dashboard, test harness)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + grant + version + volume</td></tr><tr><td>5-20 min</td><td>Token exchange flow (画 sequence diagram) + grant type 选择</td></tr><tr><td>20-30 min</td><td>Middleware placement (Token Service + SDK 混合)</td></tr><tr><td>30-40 min</td><td>Failure modes (refresh race / expire mid-call / revocation)</td></tr><tr><td>40-55 min</td><td>Multi-tenant secrets (per-tenant DEK + Vault + audit)</td></tr><tr><td>55-60 min</td><td>Production hardening (monitor 401/429, dashboard, test harness)</td></tr></tbody></table></div>
 <hr />
 <h3>简历专属 reframe</h3>
 <p>你的 <strong>voice agent 7 markets</strong> + <strong>BNPL chatbot</strong> 都有 enterprise auth:</p>
-<table class="md-table"><thead><tr><th>OAuth 题</th><th>你的经验</th></tr></thead><tbody><tr><td>Token exchange + refresh</td><td>你的 voice agent 集成 7 个市场的 repayment 系统 — 各自不同 auth</td></tr><tr><td>Multi-tenant secrets in HSM</td><td>BNPL chatbot 跨 ByteDance internal 多 service</td></tr><tr><td>Distributed lock on refresh</td><td>Voice agent 你做过 thundering herd 类似问题</td></tr><tr><td>ConvFinQA: secure API key handling</td><td>你做过 <code>.env</code> + os.environ 模式, not hardcoded</td></tr><tr><td>Token Service central pattern</td><td>你的 internal Agent Platform 应该有共享 service 设计</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>OAuth 题</th><th>你的经验</th></tr></thead><tbody><tr><td>Token exchange + refresh</td><td>你的 voice agent 集成 7 个市场的 repayment 系统 — 各自不同 auth</td></tr><tr><td>Multi-tenant secrets in HSM</td><td>BNPL chatbot 跨 ByteDance internal 多 service</td></tr><tr><td>Distributed lock on refresh</td><td>Voice agent 你做过 thundering herd 类似问题</td></tr><tr><td>ConvFinQA: secure API key handling</td><td>你做过 <code>.env</code> + os.environ 模式, not hardcoded</td></tr><tr><td>Token Service central pattern</td><td>你的 internal Agent Platform 应该有共享 service 设计</td></tr></tbody></table></div>
 <p><strong>主动 quote</strong>:</p>
 <blockquote><p>"I've implemented this pattern across 7 markets for the voice agent — each market's repayment system had different auth (some OAuth 2.0, some HMAC, some IP-allowlisted JWT). We centralized into a Token Service with per-tenant DEK encryption + distributed refresh lock. The trickiest failure mode I hit was <strong>clock skew between our service and the customer's auth server</strong> — a 30s buffer fixed 95% of premature-expiry incidents."</p></blockquote>
 <hr />

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a MapReduce Shuffler · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>MapReduce</strong></td><td>Google 提的"map → shuffle → reduce"分布式计算模型</td><td>分发问题给工人，最后汇总</td></tr><tr><td><strong>Mapper</strong></td><td>第一阶段的 worker，把 input 切成 (key, value) 对</td><td>流水线第一步：拆零件</td></tr><tr><td><strong>Reducer</strong></td><td>第二阶段的 worker，对同 key 的所有 value 做汇总</td><td>流水线第二步：合并同类</td></tr><tr><td><strong>Shuffle</strong></td><td>Map → Reduce 之间的"数据重新分组"过程</td><td>工厂里把零件按类别送到对应工人</td></tr><tr><td><strong>Partition</strong></td><td>一个 reducer 对应一个 partition；按 hash(key) 决定</td><td>"姓 A 的零件给 1 号工人"</td></tr><tr><td><strong>Combiner</strong></td><td>Mapper 端的 mini-reducer，减少传输量</td><td>工人 1 自己先把同类零件合一遍再发</td></tr><tr><td><strong>Spill</strong></td><td>mapper 内存满了把数据 dump 到本地磁盘</td><td>工人桌子塞满了暂时放到地上</td></tr><tr><td><strong>Skew</strong></td><td>某个 key 特别多 → 某个 reducer 过载</td><td>80% 的零件都是型号 A</td></tr><tr><td><strong>Push shuffle</strong></td><td>mapper 主动推数据到 reducer</td><td>工厂工人主动送货</td></tr><tr><td><strong>Pull shuffle</strong></td><td>reducer 来拉</td><td>下游工人去取</td></tr><tr><td><strong>Hadoop / Spark / Tez</strong></td><td>主流实现框架</td><td>不同工厂的运营方式</td></tr><tr><td><strong>HDFS</strong></td><td>分布式文件系统，input 数据在这</td><td>仓库</td></tr><tr><td><strong>YARN / Mesos</strong></td><td>资源调度器，分配机器给 mapper / reducer</td><td>工厂调度员</td></tr><tr><td><strong>External sort</strong></td><td>内存装不下，借助磁盘排序</td><td>桌面排不下纸张，借助抽屉分组</td></tr><tr><td><strong>Backpressure</strong></td><td>下游处理不过来，让上游降速</td><td>流水线下游堵了，前段停一停</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>MapReduce</strong></td><td>Google 提的"map → shuffle → reduce"分布式计算模型</td><td>分发问题给工人，最后汇总</td></tr><tr><td><strong>Mapper</strong></td><td>第一阶段的 worker，把 input 切成 (key, value) 对</td><td>流水线第一步：拆零件</td></tr><tr><td><strong>Reducer</strong></td><td>第二阶段的 worker，对同 key 的所有 value 做汇总</td><td>流水线第二步：合并同类</td></tr><tr><td><strong>Shuffle</strong></td><td>Map → Reduce 之间的"数据重新分组"过程</td><td>工厂里把零件按类别送到对应工人</td></tr><tr><td><strong>Partition</strong></td><td>一个 reducer 对应一个 partition；按 hash(key) 决定</td><td>"姓 A 的零件给 1 号工人"</td></tr><tr><td><strong>Combiner</strong></td><td>Mapper 端的 mini-reducer，减少传输量</td><td>工人 1 自己先把同类零件合一遍再发</td></tr><tr><td><strong>Spill</strong></td><td>mapper 内存满了把数据 dump 到本地磁盘</td><td>工人桌子塞满了暂时放到地上</td></tr><tr><td><strong>Skew</strong></td><td>某个 key 特别多 → 某个 reducer 过载</td><td>80% 的零件都是型号 A</td></tr><tr><td><strong>Push shuffle</strong></td><td>mapper 主动推数据到 reducer</td><td>工厂工人主动送货</td></tr><tr><td><strong>Pull shuffle</strong></td><td>reducer 来拉</td><td>下游工人去取</td></tr><tr><td><strong>Hadoop / Spark / Tez</strong></td><td>主流实现框架</td><td>不同工厂的运营方式</td></tr><tr><td><strong>HDFS</strong></td><td>分布式文件系统，input 数据在这</td><td>仓库</td></tr><tr><td><strong>YARN / Mesos</strong></td><td>资源调度器，分配机器给 mapper / reducer</td><td>工厂调度员</td></tr><tr><td><strong>External sort</strong></td><td>内存装不下，借助磁盘排序</td><td>桌面排不下纸张，借助抽屉分组</td></tr><tr><td><strong>Backpressure</strong></td><td>下游处理不过来，让上游降速</td><td>流水线下游堵了，前段停一停</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质</h3>
 <p><strong>MapReduce Shuffler</strong> = 把 N 个 mapper 产生的 (key, value) 对，<strong>按 key 重新分组 + 排序</strong>，分发给 M 个 reducer。</p>
@@ -59,7 +59,7 @@
 <h4>Functional</h4>
 <ul><li>N 个 mapper 产生 (k, v) 对</li><li>按 <code>partition = hash(k) % M</code> 分发到 M 个 reducer</li><li>每个 reducer 收到的数据按 k 排序</li><li>支持 combiner（mapper 端预聚合）</li><li>支持 secondary sort（按 (k, v) 排序）</li></ul>
 <h4>Non-functional</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Throughput</strong></td><td>TB/s aggregate shuffle bandwidth</td></tr><tr><td><strong>Latency</strong></td><td>shuffle 完成时间 &lt; total job 的 30%</td></tr><tr><td><strong>Fault tolerance</strong></td><td>任一 mapper/reducer 挂可 retry</td></tr><tr><td><strong>Scale</strong></td><td>10k mappers × 10k reducers (Google 级)</td></tr><tr><td><strong>Memory</strong></td><td>单 mapper 内存 ≤ 4GB</td></tr><tr><td><strong>Skew</strong></td><td>单 partition 大小不超过 average 10×</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Throughput</strong></td><td>TB/s aggregate shuffle bandwidth</td></tr><tr><td><strong>Latency</strong></td><td>shuffle 完成时间 &lt; total job 的 30%</td></tr><tr><td><strong>Fault tolerance</strong></td><td>任一 mapper/reducer 挂可 retry</td></tr><tr><td><strong>Scale</strong></td><td>10k mappers × 10k reducers (Google 级)</td></tr><tr><td><strong>Memory</strong></td><td>单 mapper 内存 ≤ 4GB</td></tr><tr><td><strong>Skew</strong></td><td>单 partition 大小不超过 average 10×</td></tr></tbody></table></div>
 <hr />
 <h3>3. 容量估算</h3>
 <p>假设：</p>
@@ -159,7 +159,7 @@ index: [partition_0_offset, partition_0_size]
 <p>Reducer 处理 <code>key__0</code> ... <code>key__9</code> → 输出 10 个 partial results → second reduce stage 合 final。</p>
 <p><strong>Spark adaptive</strong>: runtime detect skew → split single partition into N → schedule multiple reducer tasks。</p>
 <h4>Deep Dive 6: Push vs Pull</h4>
-<table class="md-table"><thead><tr><th>Aspect</th><th>Pull (Hadoop)</th><th>Push (Magnet)</th></tr></thead><tbody><tr><td>Connections</td><td>N×M</td><td>N + M</td></tr><tr><td>Random IO</td><td>many small reads</td><td>sequential reads</td></tr><tr><td>Reducer latency</td><td>wait for slowest mapper</td><td>mostly already merged</td></tr><tr><td>Implementation</td><td>simpler</td><td>needs push-merger service</td></tr><tr><td>Failure</td><td>re-fetch from mapper</td><td>merger has data, simpler</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Aspect</th><th>Pull (Hadoop)</th><th>Push (Magnet)</th></tr></thead><tbody><tr><td>Connections</td><td>N×M</td><td>N + M</td></tr><tr><td>Random IO</td><td>many small reads</td><td>sequential reads</td></tr><tr><td>Reducer latency</td><td>wait for slowest mapper</td><td>mostly already merged</td></tr><tr><td>Implementation</td><td>simpler</td><td>needs push-merger service</td></tr><tr><td>Failure</td><td>re-fetch from mapper</td><td>merger has data, simpler</td></tr></tbody></table></div>
 <p><strong>STAFF 答</strong>：选 push-based。push-merger 跑在每个 cluster node，merge 同 partition data。Reducer 只 fetch merged。Spark 3.1+ 默认是 push shuffle。</p>
 <h4>Deep Dive 7: Combiner Trade-off</h4>
 <p><strong>Combiner 提速 5-100×</strong>，但有坑：</p>
@@ -167,7 +167,7 @@ index: [partition_0_offset, partition_0_size]
 <p><strong>实战</strong>：写 word count 必加 combiner；写复杂 aggregation 想清楚再加。</p>
 <hr />
 <h3>6. 45 分钟节奏</h3>
-<table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清 + NFR（强调 shuffle 是 bottleneck）</td></tr><tr><td>5-10min</td><td>容量估算（10k×10k mappers/reducers, 100 TB data）</td></tr><tr><td>10-20min</td><td>高层架构 step 1→6（spill / combiner / push）</td></tr><tr><td>20-35min</td><td>Deep dives: sort / network / memory / skew</td></tr><tr><td>35-45min</td><td>fault tolerance / push vs pull</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清 + NFR（强调 shuffle 是 bottleneck）</td></tr><tr><td>5-10min</td><td>容量估算（10k×10k mappers/reducers, 100 TB data）</td></tr><tr><td>10-20min</td><td>高层架构 step 1→6（spill / combiner / push）</td></tr><tr><td>20-35min</td><td>Deep dives: sort / network / memory / skew</td></tr><tr><td>35-45min</td><td>fault tolerance / push vs pull</td></tr></tbody></table></div>
 <hr />
 <h3>7. 样板讲解稿</h3>
 <blockquote><p>MapReduce Shuffler 是 MR job 50%+ 时间花费的地方。我会讲 Hadoop pull-based shuffle，演进到 Spark/Magnet push-based。</p>

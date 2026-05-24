@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a fast food restaurant chain management system · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>POS</strong></td><td>Point of Sale，收银机 + 软件</td><td>收银台</td></tr><tr><td><strong>Kitchen Display System (KDS)</strong></td><td>后厨显示器，显示订单 + 状态</td><td>厨房的电子菜单</td></tr><tr><td><strong>Edge server</strong></td><td>装在门店本地的小服务器，offline 也能 work</td><td>门店保险柜</td></tr><tr><td><strong>Inventory</strong></td><td>库存（牛肉饼 / 面包 / 番茄酱）</td><td>仓库存货</td></tr><tr><td><strong>Eventual consistency</strong></td><td>数据各点最终会一致，但短期可能不同步</td><td>全国分店每天对一次账</td></tr><tr><td><strong>Edge computing</strong></td><td>在边缘（门店）处理，不全靠云</td><td>门店自给自足</td></tr><tr><td><strong>CDC</strong></td><td>DB 变化通知</td><td>"我加菜单了，告诉云"</td></tr><tr><td><strong>Multi-tenant</strong></td><td>不同 franchisee（加盟商）数据隔离</td><td>一栋楼多家公司</td></tr><tr><td><strong>Saga</strong></td><td>分布式事务，每步 compensating</td><td>接力跑跑错往回跑</td></tr><tr><td><strong>Loyalty program</strong></td><td>会员积分 / 优惠</td><td>集邮票</td></tr><tr><td><strong>PCI DSS</strong></td><td>支付卡数据合规标准</td><td>银行级别安全规范</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>POS</strong></td><td>Point of Sale，收银机 + 软件</td><td>收银台</td></tr><tr><td><strong>Kitchen Display System (KDS)</strong></td><td>后厨显示器，显示订单 + 状态</td><td>厨房的电子菜单</td></tr><tr><td><strong>Edge server</strong></td><td>装在门店本地的小服务器，offline 也能 work</td><td>门店保险柜</td></tr><tr><td><strong>Inventory</strong></td><td>库存（牛肉饼 / 面包 / 番茄酱）</td><td>仓库存货</td></tr><tr><td><strong>Eventual consistency</strong></td><td>数据各点最终会一致，但短期可能不同步</td><td>全国分店每天对一次账</td></tr><tr><td><strong>Edge computing</strong></td><td>在边缘（门店）处理，不全靠云</td><td>门店自给自足</td></tr><tr><td><strong>CDC</strong></td><td>DB 变化通知</td><td>"我加菜单了，告诉云"</td></tr><tr><td><strong>Multi-tenant</strong></td><td>不同 franchisee（加盟商）数据隔离</td><td>一栋楼多家公司</td></tr><tr><td><strong>Saga</strong></td><td>分布式事务，每步 compensating</td><td>接力跑跑错往回跑</td></tr><tr><td><strong>Loyalty program</strong></td><td>会员积分 / 优惠</td><td>集邮票</td></tr><tr><td><strong>PCI DSS</strong></td><td>支付卡数据合规标准</td><td>银行级别安全规范</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质 — 这是什么问题</h3>
 <p><strong>Fast Food Restaurant Chain Management System</strong> = 一套软件，让一个连锁餐厅集团（McDonalds 40k 店 / Subway 40k 店 / 蜜雪冰城 38k 店）运营：</p>

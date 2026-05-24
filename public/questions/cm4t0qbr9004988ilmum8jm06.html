@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design an Online Game Leaderboard · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Leaderboard / Ranking</strong></td><td>按分数排序的列表</td><td>班级成绩榜</td></tr><tr><td><strong>Top-N global</strong></td><td>全游戏排名前 N</td><td>全国高考排名</td></tr><tr><td><strong>Around-me</strong></td><td>我前后 ±50 名是谁</td><td>"你在班里第 12 名，11/13/14 名是 X/Y/Z"</td></tr><tr><td><strong>Sorted Set (ZSET)</strong></td><td>Redis 的"按 score 排序的 set"，O(log N) 操作</td><td>自动排好的排行榜</td></tr><tr><td><strong>Skip List</strong></td><td>ZSET 底层实现，O(log N) 插入/查询/排名</td><td>多层索引的链表</td></tr><tr><td><strong>Percentile rank</strong></td><td>你超过百分之几玩家</td><td>"你比 85% 玩家强"</td></tr><tr><td><strong>Sharding by user / by score</strong></td><td>按用户分库 vs 按分数分库</td><td>按姓氏分 vs 按成绩分</td></tr><tr><td><strong>CDN edge caching</strong></td><td>静态排行榜缓存到全球边缘</td><td>全球便利店都备着今日热销榜</td></tr><tr><td><strong>Real-time vs near-real-time</strong></td><td>即时更新 vs 几秒延迟</td><td>直播比分 vs 5 分钟一次刷新</td></tr><tr><td><strong>Idempotency</strong></td><td>同操作重复执行结果不变</td><td>重新提交分数不会重复加</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Leaderboard / Ranking</strong></td><td>按分数排序的列表</td><td>班级成绩榜</td></tr><tr><td><strong>Top-N global</strong></td><td>全游戏排名前 N</td><td>全国高考排名</td></tr><tr><td><strong>Around-me</strong></td><td>我前后 ±50 名是谁</td><td>"你在班里第 12 名，11/13/14 名是 X/Y/Z"</td></tr><tr><td><strong>Sorted Set (ZSET)</strong></td><td>Redis 的"按 score 排序的 set"，O(log N) 操作</td><td>自动排好的排行榜</td></tr><tr><td><strong>Skip List</strong></td><td>ZSET 底层实现，O(log N) 插入/查询/排名</td><td>多层索引的链表</td></tr><tr><td><strong>Percentile rank</strong></td><td>你超过百分之几玩家</td><td>"你比 85% 玩家强"</td></tr><tr><td><strong>Sharding by user / by score</strong></td><td>按用户分库 vs 按分数分库</td><td>按姓氏分 vs 按成绩分</td></tr><tr><td><strong>CDN edge caching</strong></td><td>静态排行榜缓存到全球边缘</td><td>全球便利店都备着今日热销榜</td></tr><tr><td><strong>Real-time vs near-real-time</strong></td><td>即时更新 vs 几秒延迟</td><td>直播比分 vs 5 分钟一次刷新</td></tr><tr><td><strong>Idempotency</strong></td><td>同操作重复执行结果不变</td><td>重新提交分数不会重复加</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质</h3>
 <p><strong>Online Game Leaderboard</strong> = 百万玩家实时 ranking，按 score 排序，支持多种查询：</p>
@@ -58,9 +58,9 @@
 <hr />
 <h3>2. 需求拆解</h3>
 <h4>Functional</h4>
-<table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>UpdateScore(user_id, score, board_id)</code></td><td>更新玩家分数</td></tr><tr><td><code>GetTopN(board_id, n) -&gt; player[]</code></td><td>前 N</td></tr><tr><td><code>GetAroundMe(board_id, user_id, range) -&gt; player[]</code></td><td>我前后 ±range</td></tr><tr><td><code>GetRank(board_id, user_id) -&gt; rank</code></td><td>我第几名</td></tr><tr><td><code>GetByFriends(user_id, friend_list) -&gt; player[]</code></td><td>朋友间排名</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>UpdateScore(user_id, score, board_id)</code></td><td>更新玩家分数</td></tr><tr><td><code>GetTopN(board_id, n) -&gt; player[]</code></td><td>前 N</td></tr><tr><td><code>GetAroundMe(board_id, user_id, range) -&gt; player[]</code></td><td>我前后 ±range</td></tr><tr><td><code>GetRank(board_id, user_id) -&gt; rank</code></td><td>我第几名</td></tr><tr><td><code>GetByFriends(user_id, friend_list) -&gt; player[]</code></td><td>朋友间排名</td></tr></tbody></table></div>
 <h4>Non-functional</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>更新延迟</strong></td><td>&lt; 100 ms (score 更新到榜单生效)</td></tr><tr><td><strong>查询 latency</strong></td><td>p99 &lt; 50 ms</td></tr><tr><td><strong>Scale</strong></td><td>1B players × 10 boards = 10B player-board entries</td></tr><tr><td><strong>Throughput</strong></td><td>100k score updates/sec sustained, 500k peak</td></tr><tr><td><strong>Read</strong></td><td>1M reads/sec (top-N / around-me)</td></tr><tr><td><strong>Hot path</strong></td><td>90% read 在 top 100 / top 1000</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>更新延迟</strong></td><td>&lt; 100 ms (score 更新到榜单生效)</td></tr><tr><td><strong>查询 latency</strong></td><td>p99 &lt; 50 ms</td></tr><tr><td><strong>Scale</strong></td><td>1B players × 10 boards = 10B player-board entries</td></tr><tr><td><strong>Throughput</strong></td><td>100k score updates/sec sustained, 500k peak</td></tr><tr><td><strong>Read</strong></td><td>1M reads/sec (top-N / around-me)</td></tr><tr><td><strong>Hot path</strong></td><td>90% read 在 top 100 / top 1000</td></tr></tbody></table></div>
 <hr />
 <h3>3. 容量估算</h3>
 <ul><li><strong>Players</strong>: 1B</li><li><strong>Boards</strong>: 10 (global / weekly / friends / country × 5)</li><li><strong>Total entries</strong>: 10B (player + board + score)</li><li><strong>Each entry</strong>: 50 B (user_id 8 + score 8 + meta 30) → <strong>500 GB</strong> total</li><li><strong>Memory feasibility</strong>: 500 GB ÷ 256 GB/node = 2 nodes → 单 Redis cluster 能装！但要分 shard。</li></ul>
@@ -69,7 +69,7 @@
 <h3>4. 关键设计 — 用 Redis ZSET</h3>
 <h4>4.1 Why ZSET</h4>
 <p>Redis ZSET 完美匹配 leaderboard 需求：</p>
-<table class="md-table"><thead><tr><th>操作</th><th>Redis 命令</th><th>复杂度</th></tr></thead><tbody><tr><td>更新分数</td><td><code>ZADD board user_id score</code></td><td>O(log N)</td></tr><tr><td>取 top-N</td><td><code>ZREVRANGE board 0 N-1</code></td><td>O(log N + N)</td></tr><tr><td>取 around-me</td><td><code>ZREVRANK + ZREVRANGE</code></td><td>O(log N + range)</td></tr><tr><td>取 rank</td><td><code>ZREVRANK board user_id</code></td><td>O(log N)</td></tr><tr><td>移除</td><td><code>ZREM board user_id</code></td><td>O(log N)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>操作</th><th>Redis 命令</th><th>复杂度</th></tr></thead><tbody><tr><td>更新分数</td><td><code>ZADD board user_id score</code></td><td>O(log N)</td></tr><tr><td>取 top-N</td><td><code>ZREVRANGE board 0 N-1</code></td><td>O(log N + N)</td></tr><tr><td>取 around-me</td><td><code>ZREVRANK + ZREVRANGE</code></td><td>O(log N + range)</td></tr><tr><td>取 rank</td><td><code>ZREVRANK board user_id</code></td><td>O(log N)</td></tr><tr><td>移除</td><td><code>ZREM board user_id</code></td><td>O(log N)</td></tr></tbody></table></div>
 <p><strong>底层是 skip list + hash table</strong>，所有操作 sub-millisecond。</p>
 <h4>4.2 Single Redis 限制</h4>
 <ul><li>单 Redis instance 内存 ~256 GB → 装 5B entries</li><li>单 Redis CPU ~100k QPS → 不够 peak</li></ul>
@@ -131,7 +131,7 @@ shard_N: rank 100M - 1B      (top scores)</code></pre>
 <ol><li><strong>Overlap shards</strong>：shard_i 包括 score 90000-110000，shard_i+1 包括 100000-200000 → 写双份，读时只读"主 shard"</li><li><strong>Hysteresis</strong>：score 上涨到 100100 才升 shard，跌回 99900 才降 shard → 防 churn</li><li><strong>Periodic rebalance</strong>：每天 batch 跑一次正确分 shard，不实时迁移</li></ol>
 <h4>Deep Dive 4: 实时性 trade-off</h4>
 <p><strong>Score 更新 → 榜单可见</strong>多久？</p>
-<table class="md-table"><thead><tr><th>方案</th><th>延迟</th><th>复杂度</th></tr></thead><tbody><tr><td>同步写 ZSET</td><td>&lt; 10 ms</td><td>简单，但 peak 写量大时 Redis 过载</td></tr><tr><td>Kafka 缓冲 + worker 处理</td><td>50-500 ms</td><td>削峰，可扩展</td></tr><tr><td>Batch every 10s</td><td>10s</td><td>极简，但实时性差</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>方案</th><th>延迟</th><th>复杂度</th></tr></thead><tbody><tr><td>同步写 ZSET</td><td>&lt; 10 ms</td><td>简单，但 peak 写量大时 Redis 过载</td></tr><tr><td>Kafka 缓冲 + worker 处理</td><td>50-500 ms</td><td>削峰，可扩展</td></tr><tr><td>Batch every 10s</td><td>10s</td><td>极简，但实时性差</td></tr></tbody></table></div>
 <p><strong>STAFF 答</strong>：Kafka 缓冲，p99 &lt; 100 ms 用户感知不到。</p>
 <h4>Deep Dive 5: Anti-Cheat</h4>
 <p><strong>典型 cheat</strong>：发 fake 高分 → 直接占榜首。</p>
@@ -152,7 +152,7 @@ Page 2: ZREVRANGE 100 199
 <ul><li>用 <code>score + user_id</code> as cursor (not offset)</li><li>Page 2: <code>ZREVRANGEBYSCORE &lt; cursor LIMIT 100</code></li><li>这种是 stable pagination，新分数加入不影响已加载</li></ul>
 <hr />
 <h3>7. 45 分钟节奏</h3>
-<table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：board 数量、用户量、real-time 要求</td></tr><tr><td>5-10min</td><td>容量：1B players × 10 boards = 500 GB, 100k write QPS</td></tr><tr><td>10-15min</td><td>数据结构选择 Redis ZSET，复杂度分析</td></tr><tr><td>15-25min</td><td>高层架构：单 ZSET → 多 board → sharding → Kafka 削峰</td></tr><tr><td>25-40min</td><td>Deep dives: friends leaderboard / around-me / sharding boundary / anti-cheat</td></tr><tr><td>40-45min</td><td>seasonal reset / pagination / monitoring</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：board 数量、用户量、real-time 要求</td></tr><tr><td>5-10min</td><td>容量：1B players × 10 boards = 500 GB, 100k write QPS</td></tr><tr><td>10-15min</td><td>数据结构选择 Redis ZSET，复杂度分析</td></tr><tr><td>15-25min</td><td>高层架构：单 ZSET → 多 board → sharding → Kafka 削峰</td></tr><tr><td>25-40min</td><td>Deep dives: friends leaderboard / around-me / sharding boundary / anti-cheat</td></tr><tr><td>40-45min</td><td>seasonal reset / pagination / monitoring</td></tr></tbody></table></div>
 <hr />
 <h3>8. 样板讲解稿</h3>
 <blockquote><p>这道题核心选择是数据结构 —— <strong>Redis ZSET (sorted set, skip list 实现)</strong> 几乎是完美匹配：</p>

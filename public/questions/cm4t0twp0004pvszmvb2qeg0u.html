@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a Top-K System · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Top-K</strong></td><td>找前 K 个最热 item</td><td>排行榜 Top-10</td></tr><tr><td><strong>Stream</strong></td><td>持续来的数据流（vs batch 一次性）</td><td>不断流的水 vs 一桶水</td></tr><tr><td><strong>Min-Heap</strong></td><td>维护"最小值在堆顶"的数据结构，O(log K) 操作</td><td>排排坐，最小的在前</td></tr><tr><td><strong>Count-Min Sketch (CMS)</strong></td><td>用概率数据结构估计 counter，内存极省</td><td>漏勺 — 大颗粒精准、小可能漏</td></tr><tr><td><strong>HyperLogLog</strong></td><td>估"distinct count"的 sketch</td><td>估"人群里有几种 dress"</td></tr><tr><td><strong>Heavy hitter</strong></td><td>出现次数远超均值的元素</td><td>一群人里最高的几个</td></tr><tr><td><strong>Sliding window</strong></td><td>时间窗口"滑动"，老数据过期</td><td>一辆缓行的车 5 分钟视野</td></tr><tr><td><strong>Tumbling window</strong></td><td>时间窗口"接力"，互不重叠</td><td>钟表分针一格一格走</td></tr><tr><td><strong>Misra-Gries</strong></td><td>算法，O(K) 内存找候选 heavy hitter</td><td>选举筹码法</td></tr><tr><td><strong>Space-Saving</strong></td><td>类似 Misra-Gries 的 O(K) 算法，更精确</td><td>改进版筹码法</td></tr><tr><td><strong>Flink / Kafka Streams</strong></td><td>业界主流流处理框架</td><td>流水线运营商</td></tr><tr><td><strong>Sketch merging</strong></td><td>多个 shard 的 sketch 合并得 global</td><td>多分公司销售榜合一份</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Top-K</strong></td><td>找前 K 个最热 item</td><td>排行榜 Top-10</td></tr><tr><td><strong>Stream</strong></td><td>持续来的数据流（vs batch 一次性）</td><td>不断流的水 vs 一桶水</td></tr><tr><td><strong>Min-Heap</strong></td><td>维护"最小值在堆顶"的数据结构，O(log K) 操作</td><td>排排坐，最小的在前</td></tr><tr><td><strong>Count-Min Sketch (CMS)</strong></td><td>用概率数据结构估计 counter，内存极省</td><td>漏勺 — 大颗粒精准、小可能漏</td></tr><tr><td><strong>HyperLogLog</strong></td><td>估"distinct count"的 sketch</td><td>估"人群里有几种 dress"</td></tr><tr><td><strong>Heavy hitter</strong></td><td>出现次数远超均值的元素</td><td>一群人里最高的几个</td></tr><tr><td><strong>Sliding window</strong></td><td>时间窗口"滑动"，老数据过期</td><td>一辆缓行的车 5 分钟视野</td></tr><tr><td><strong>Tumbling window</strong></td><td>时间窗口"接力"，互不重叠</td><td>钟表分针一格一格走</td></tr><tr><td><strong>Misra-Gries</strong></td><td>算法，O(K) 内存找候选 heavy hitter</td><td>选举筹码法</td></tr><tr><td><strong>Space-Saving</strong></td><td>类似 Misra-Gries 的 O(K) 算法，更精确</td><td>改进版筹码法</td></tr><tr><td><strong>Flink / Kafka Streams</strong></td><td>业界主流流处理框架</td><td>流水线运营商</td></tr><tr><td><strong>Sketch merging</strong></td><td>多个 shard 的 sketch 合并得 global</td><td>多分公司销售榜合一份</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质</h3>
 <p><strong>Top-K System</strong> = 从持续 event 流中<strong>实时找 top K items by count</strong>。Generic framework，可应用：</p>
@@ -56,9 +56,9 @@
 <hr />
 <h3>2. 需求拆解</h3>
 <h4>Functional</h4>
-<table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>Record(item, count=1)</code></td><td>记录一次 event</td></tr><tr><td><code>GetTopK(window, K) -&gt; [(item, count)]</code></td><td>查询 top-K</td></tr><tr><td><code>GetCount(item, window) -&gt; count</code></td><td>单 item 计数估计</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>Record(item, count=1)</code></td><td>记录一次 event</td></tr><tr><td><code>GetTopK(window, K) -&gt; [(item, count)]</code></td><td>查询 top-K</td></tr><tr><td><code>GetCount(item, window) -&gt; count</code></td><td>单 item 计数估计</td></tr></tbody></table></div>
 <h4>Non-functional</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Event throughput</strong></td><td>1M events/sec sustained</td></tr><tr><td><strong>Query latency</strong></td><td>p99 &lt; 100 ms</td></tr><tr><td><strong>Memory</strong></td><td>O(K log N) per shard，不能 O(N)</td></tr><tr><td><strong>Accuracy</strong></td><td>top-K precision ≥ 95%</td></tr><tr><td><strong>Windows</strong></td><td>1 min, 5 min, 1 hour, 1 day</td></tr><tr><td><strong>Update latency</strong></td><td>&lt; 5 s (event → top-K updated)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Event throughput</strong></td><td>1M events/sec sustained</td></tr><tr><td><strong>Query latency</strong></td><td>p99 &lt; 100 ms</td></tr><tr><td><strong>Memory</strong></td><td>O(K log N) per shard，不能 O(N)</td></tr><tr><td><strong>Accuracy</strong></td><td>top-K precision ≥ 95%</td></tr><tr><td><strong>Windows</strong></td><td>1 min, 5 min, 1 hour, 1 day</td></tr><tr><td><strong>Update latency</strong></td><td>&lt; 5 s (event → top-K updated)</td></tr></tbody></table></div>
 <hr />
 <h3>3. 容量估算</h3>
 <ul><li><strong>Events</strong>: 1M /s × 86400 = 86B events/day</li><li><strong>Distinct items</strong>: 10M (e.g., distinct search queries / hashtags)</li><li><strong>Naive count</strong>: 10M items × 100 B = 1 GB total per window — actually doable for in-memory</li><li><strong>Multi-window</strong>: 4 windows × 1 GB = 4 GB — fine</li></ul>
@@ -185,7 +185,7 @@ on record(item):
 <p>Top-K query 100k QPS → cache aggregated result in Redis with TTL 10s。Recompute from raw counters every 10s。</p>
 <hr />
 <h3>6. 45 分钟节奏</h3>
-<table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：what's the item? how many distinct? how many windows?</td></tr><tr><td>5-10min</td><td>容量：1M events/s, 10M distinct items, K=100</td></tr><tr><td>10-15min</td><td>算法选择：min-heap vs CMS vs Space-Saving，trade-off</td></tr><tr><td>15-25min</td><td>高层架构：partition by item → shard → aggregator → cache</td></tr><tr><td>25-40min</td><td>Deep dives: sliding window / shard merge / skew / exact vs approx</td></tr><tr><td>40-45min</td><td>multi-region / hot path</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：what's the item? how many distinct? how many windows?</td></tr><tr><td>5-10min</td><td>容量：1M events/s, 10M distinct items, K=100</td></tr><tr><td>10-15min</td><td>算法选择：min-heap vs CMS vs Space-Saving，trade-off</td></tr><tr><td>15-25min</td><td>高层架构：partition by item → shard → aggregator → cache</td></tr><tr><td>25-40min</td><td>Deep dives: sliding window / shard merge / skew / exact vs approx</td></tr><tr><td>40-45min</td><td>multi-region / hot path</td></tr></tbody></table></div>
 <hr />
 <h3>7. 样板讲解稿</h3>
 <blockquote><p>Top-K 框架 generic 适用 trending hashtags / top queries / spam IPs 等。核心是 <strong>stream processing + sketch + sliding window</strong>。</p>

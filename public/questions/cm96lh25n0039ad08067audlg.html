@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a News Aggregator System · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Web crawler</strong></td><td>自动抓网页的程序</td><td>派去全网"剪报"的实习生</td></tr><tr><td><strong>RSS / Atom feed</strong></td><td>新闻站点提供的"机器可读"摘要源</td><td>报社直接给摘要</td></tr><tr><td><strong>Dedup</strong></td><td>多个源报道同一新闻，合并成一条</td><td>把 5 份不同报纸的同一篇报道合一份</td></tr><tr><td><strong>Clustering / Event grouping</strong></td><td>把同一事件的多篇文章聚成一个 cluster</td><td>把所有写"苹果发布会"的文章合一组</td></tr><tr><td><strong>Embedding</strong></td><td>文本 → 高维向量，相似文本向量近</td><td>把文章变成"指纹"</td></tr><tr><td><strong>MinHash / SimHash</strong></td><td>近似 dedup 的 hash 算法</td><td>给文章按内容相似度打指纹</td></tr><tr><td><strong>TF-IDF</strong></td><td>老式文本相似度算法</td><td>老式"找重点词"打分</td></tr><tr><td><strong>Personalization</strong></td><td>基于用户兴趣排序推荐</td><td>个性化报纸</td></tr><tr><td><strong>Collaborative filtering</strong></td><td>用户行为相似的推荐</td><td>"看这条的人也看了 X"</td></tr><tr><td><strong>Content-based filtering</strong></td><td>内容标签匹配用户兴趣</td><td>喜欢科技 → 推科技新闻</td></tr><tr><td><strong>CDN</strong></td><td>内容全球分发</td><td>在每个城市都开报亭</td></tr><tr><td><strong>Trending / Top stories</strong></td><td>热点新闻列表</td><td>报纸头版</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Web crawler</strong></td><td>自动抓网页的程序</td><td>派去全网"剪报"的实习生</td></tr><tr><td><strong>RSS / Atom feed</strong></td><td>新闻站点提供的"机器可读"摘要源</td><td>报社直接给摘要</td></tr><tr><td><strong>Dedup</strong></td><td>多个源报道同一新闻，合并成一条</td><td>把 5 份不同报纸的同一篇报道合一份</td></tr><tr><td><strong>Clustering / Event grouping</strong></td><td>把同一事件的多篇文章聚成一个 cluster</td><td>把所有写"苹果发布会"的文章合一组</td></tr><tr><td><strong>Embedding</strong></td><td>文本 → 高维向量，相似文本向量近</td><td>把文章变成"指纹"</td></tr><tr><td><strong>MinHash / SimHash</strong></td><td>近似 dedup 的 hash 算法</td><td>给文章按内容相似度打指纹</td></tr><tr><td><strong>TF-IDF</strong></td><td>老式文本相似度算法</td><td>老式"找重点词"打分</td></tr><tr><td><strong>Personalization</strong></td><td>基于用户兴趣排序推荐</td><td>个性化报纸</td></tr><tr><td><strong>Collaborative filtering</strong></td><td>用户行为相似的推荐</td><td>"看这条的人也看了 X"</td></tr><tr><td><strong>Content-based filtering</strong></td><td>内容标签匹配用户兴趣</td><td>喜欢科技 → 推科技新闻</td></tr><tr><td><strong>CDN</strong></td><td>内容全球分发</td><td>在每个城市都开报亭</td></tr><tr><td><strong>Trending / Top stories</strong></td><td>热点新闻列表</td><td>报纸头版</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质</h3>
 <p><strong>News Aggregator</strong> = 抓取全球新闻源 → 去重 → 聚类同事件 → 个性化推荐 → 实时分发。</p>
@@ -57,9 +57,9 @@
 <hr />
 <h3>2. 需求拆解</h3>
 <h4>Functional</h4>
-<table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>GetFeed(user_id, category?, page) -&gt; articles[]</code></td><td>个性化首页</td></tr><tr><td><code>GetTrending(region?, category?) -&gt; articles[]</code></td><td>当下热门</td></tr><tr><td><code>GetArticle(article_id) -&gt; details</code></td><td>文章详情</td></tr><tr><td><code>MarkRead / Like / Save</code></td><td>用户行为</td></tr><tr><td><code>Subscribe(category / source)</code></td><td>订阅</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>GetFeed(user_id, category?, page) -&gt; articles[]</code></td><td>个性化首页</td></tr><tr><td><code>GetTrending(region?, category?) -&gt; articles[]</code></td><td>当下热门</td></tr><tr><td><code>GetArticle(article_id) -&gt; details</code></td><td>文章详情</td></tr><tr><td><code>MarkRead / Like / Save</code></td><td>用户行为</td></tr><tr><td><code>Subscribe(category / source)</code></td><td>订阅</td></tr></tbody></table></div>
 <h4>Non-functional</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Freshness</strong></td><td>突发新闻 &lt; 5 min 全球可见</td></tr><tr><td><strong>Personalization</strong></td><td>feed 加载 p99 &lt; 500 ms</td></tr><tr><td><strong>Scale</strong></td><td>1B users, 1M articles/day, 100 languages</td></tr><tr><td><strong>Dedup precision</strong></td><td>同新闻被合并率 &gt; 95%</td></tr><tr><td><strong>Availability</strong></td><td>99.99% read</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>Freshness</strong></td><td>突发新闻 &lt; 5 min 全球可见</td></tr><tr><td><strong>Personalization</strong></td><td>feed 加载 p99 &lt; 500 ms</td></tr><tr><td><strong>Scale</strong></td><td>1B users, 1M articles/day, 100 languages</td></tr><tr><td><strong>Dedup precision</strong></td><td>同新闻被合并率 &gt; 95%</td></tr><tr><td><strong>Availability</strong></td><td>99.99% read</td></tr></tbody></table></div>
 <hr />
 <h3>3. 容量估算</h3>
 <ul><li><strong>Sources</strong>: 10k news sites + 100k blogs + RSS = 1M crawl targets</li><li><strong>Articles/day</strong>: 1M new (after dedup → 100k unique events)</li><li><strong>Storage</strong>: 1M × 5KB = 5GB/day → 2TB/year text + 10TB/year images</li><li><strong>Users</strong>: 1B MAU × 50% DAU = 500M DAU</li><li><strong>Feed reads</strong>: 500M × 10 reads/day = 5B/day = <strong>60k QPS sustained, 200k peak</strong></li><li><strong>Crawl rate</strong>: 1M sources × 1 visit/hour = 280/sec sustained</li></ul>
@@ -184,7 +184,7 @@ Article text → │ Item Tower (BERT)│ → item_vec [128]
 <p><strong>Cache invalidate</strong> on breaking news: targeted invalidate by region + category。</p>
 <hr />
 <h3>6. 45 分钟节奏</h3>
-<table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：sources? languages? real-time?</td></tr><tr><td>5-10min</td><td>容量：1M crawls/day, 1B users, 60k QPS sustained</td></tr><tr><td>10-20min</td><td>高层架构：Crawler → Extraction → Dedup → Cluster → Personalization → Delivery</td></tr><tr><td>20-35min</td><td>Deep dives: SimHash / clustering / two-tower / index</td></tr><tr><td>35-45min</td><td>multi-language / moderation / breaking news / cache</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：sources? languages? real-time?</td></tr><tr><td>5-10min</td><td>容量：1M crawls/day, 1B users, 60k QPS sustained</td></tr><tr><td>10-20min</td><td>高层架构：Crawler → Extraction → Dedup → Cluster → Personalization → Delivery</td></tr><tr><td>20-35min</td><td>Deep dives: SimHash / clustering / two-tower / index</td></tr><tr><td>35-45min</td><td>multi-language / moderation / breaking news / cache</td></tr></tbody></table></div>
 <hr />
 <h3>7. 样板讲解稿</h3>
 <blockquote><p>News aggregator 实际是 4 个独立 pipeline 串起来：(1) crawl, (2) extract+dedup+cluster, (3) personalize, (4) deliver.</p>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design an Image Uploader · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Blob storage / S3</strong></td><td>存大文件（图片 / 视频）的云服务，按对象 key 访问</td><td>自助仓储</td></tr><tr><td><strong>Multipart upload</strong></td><td>把大文件切成小块分别上传，最后合并</td><td>大象切块装冰箱</td></tr><tr><td><strong>Presigned URL</strong></td><td>时效性 token + URL，让 client <strong>直接上传到 S3</strong> 而无需走 backend</td><td>一次性入场券</td></tr><tr><td><strong>CDN</strong></td><td>把文件缓存到全球边缘节点，用户从最近的取</td><td>全球连锁加盟店</td></tr><tr><td><strong>EXIF</strong></td><td>照片元数据（拍摄时间 / GPS / 相机型号），相机自动写入</td><td>照片"出生证"</td></tr><tr><td><strong>WebP / AVIF</strong></td><td>比 JPEG 更高效的现代图片格式（小 30-50%）</td><td>同样照片用更小盒装</td></tr><tr><td><strong>Thumbnail / Variant</strong></td><td>缩略图 / 不同尺寸版本（128/512/1024px）</td><td>一张照片印成不同大小</td></tr><tr><td><strong>Worker / Lambda</strong></td><td>异步执行任务的服务（vs 同步 API）</td><td>后厨而不是前台</td></tr><tr><td><strong>Idempotency</strong></td><td>同一操作做 N 次结果跟 1 次一样</td><td>按 N 次按钮 = 1 次电梯</td></tr><tr><td><strong>NSFW</strong></td><td>Not Safe For Work，违规 / 成人 / 暴力内容</td><td>不雅照片</td></tr><tr><td><strong>Perceptual hash</strong></td><td>基于图片内容算"视觉指纹"，类似图片 hash 相近</td><td>油画上的签名</td></tr><tr><td><strong>DRM</strong></td><td>Digital Rights Management，防盗 / 防截图</td><td>电影院的"禁止录像"</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Blob storage / S3</strong></td><td>存大文件（图片 / 视频）的云服务，按对象 key 访问</td><td>自助仓储</td></tr><tr><td><strong>Multipart upload</strong></td><td>把大文件切成小块分别上传，最后合并</td><td>大象切块装冰箱</td></tr><tr><td><strong>Presigned URL</strong></td><td>时效性 token + URL，让 client <strong>直接上传到 S3</strong> 而无需走 backend</td><td>一次性入场券</td></tr><tr><td><strong>CDN</strong></td><td>把文件缓存到全球边缘节点，用户从最近的取</td><td>全球连锁加盟店</td></tr><tr><td><strong>EXIF</strong></td><td>照片元数据（拍摄时间 / GPS / 相机型号），相机自动写入</td><td>照片"出生证"</td></tr><tr><td><strong>WebP / AVIF</strong></td><td>比 JPEG 更高效的现代图片格式（小 30-50%）</td><td>同样照片用更小盒装</td></tr><tr><td><strong>Thumbnail / Variant</strong></td><td>缩略图 / 不同尺寸版本（128/512/1024px）</td><td>一张照片印成不同大小</td></tr><tr><td><strong>Worker / Lambda</strong></td><td>异步执行任务的服务（vs 同步 API）</td><td>后厨而不是前台</td></tr><tr><td><strong>Idempotency</strong></td><td>同一操作做 N 次结果跟 1 次一样</td><td>按 N 次按钮 = 1 次电梯</td></tr><tr><td><strong>NSFW</strong></td><td>Not Safe For Work，违规 / 成人 / 暴力内容</td><td>不雅照片</td></tr><tr><td><strong>Perceptual hash</strong></td><td>基于图片内容算"视觉指纹"，类似图片 hash 相近</td><td>油画上的签名</td></tr><tr><td><strong>DRM</strong></td><td>Digital Rights Management，防盗 / 防截图</td><td>电影院的"禁止录像"</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质 — 这是什么问题</h3>
 <p><strong>Image Uploader</strong> = 让用户从 mobile / web 把图片传到云端 → 服务端处理（多分辨率 / 压缩 / 安全检测）→ 返回 URL 供后续展示。</p>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 588. Design In-Memory File System · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -111,7 +111,7 @@ class FileSystem:
             cur = cur.children[p]
         return cur.content</code></pre>
 <h3>复杂度</h3>
-<table class="md-table"><thead><tr><th>操作</th><th>时间</th></tr></thead><tbody><tr><td>ls</td><td>O(P + K log K)，P = path 长度（分段数），K = 该目录子项数（sort）</td></tr><tr><td>mkdir</td><td>O(P)</td></tr><tr><td>addContentToFile</td><td>O(P + L)，L = content 长度</td></tr><tr><td>readContentFromFile</td><td>O(P + L)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>操作</th><th>时间</th></tr></thead><tbody><tr><td>ls</td><td>O(P + K log K)，P = path 长度（分段数），K = 该目录子项数（sort）</td></tr><tr><td>mkdir</td><td>O(P)</td></tr><tr><td>addContentToFile</td><td>O(P + L)，L = content 长度</td></tr><tr><td>readContentFromFile</td><td>O(P + L)</td></tr></tbody></table></div>
 <h3>关键设计点</h3>
 <h4>1. dir vs file 统一抽象</h4>
 <p>用一个 <code>Node</code> 类，<code>is_file</code> 标记是文件还是目录。文件没 children，目录没 content。也可以分两个 class 用 base class，更 OOP 但更繁琐。</p>

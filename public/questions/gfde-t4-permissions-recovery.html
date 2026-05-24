@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>T4.4 · 权限 / 安全边界 / 失败恢复 · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -166,7 +166,7 @@ Failure → L4 Recovery:
   - Email recall (60s window)</code></pre>
 <hr />
 <h3>4. 4-Layer Defense 分类表</h3>
-<table class="md-table"><thead><tr><th>Layer</th><th>Purpose</th><th>Key Components</th></tr></thead><tbody><tr><td><strong>L1 IAM</strong></td><td>Least privilege</td><td>OBO delegation, per-action scope, multi-tenant isolation, short TTL</td></tr><tr><td><strong>L2 Injection Defense</strong></td><td>Untrusted data discipline</td><td>Trust marking, system reminder, pattern detection, confirm UI, output validation</td></tr><tr><td><strong>L3 Audit</strong></td><td>Forensic + compliance</td><td>Immutable, hash-chained, actor + action + result, retention tiers</td></tr><tr><td><strong>L4 Recovery</strong></td><td>Undo destructive</td><td>Outbox, compensating handler per tool, bulk rollback, soft delete</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Layer</th><th>Purpose</th><th>Key Components</th></tr></thead><tbody><tr><td><strong>L1 IAM</strong></td><td>Least privilege</td><td>OBO delegation, per-action scope, multi-tenant isolation, short TTL</td></tr><tr><td><strong>L2 Injection Defense</strong></td><td>Untrusted data discipline</td><td>Trust marking, system reminder, pattern detection, confirm UI, output validation</td></tr><tr><td><strong>L3 Audit</strong></td><td>Forensic + compliance</td><td>Immutable, hash-chained, actor + action + result, retention tiers</td></tr><tr><td><strong>L4 Recovery</strong></td><td>Undo destructive</td><td>Outbox, compensating handler per tool, bulk rollback, soft delete</td></tr></tbody></table></div>
 <p><strong>Each layer is defense in depth</strong>: 攻击者必须 break all to fully compromise.</p>
 <hr />
 <h3>5. 具体业务场景 (5 个变体)</h3>
@@ -200,7 +200,7 @@ Failure → L4 Recovery:
 <ul><li>Anomaly detection (per-user baseline, 3x threshold)</li><li>Auto-pause on anomaly</li><li>10-step incident playbook</li><li>Tabletop exercise (mock incident drill)</li><li>Page rotation + escalation tree</li></ul>
 <hr />
 <h3>7. 易错坑表</h3>
-<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Service account super-perms</strong></td><td>Massive blast radius</td></tr><tr><td>2</td><td><strong>No OBO</strong></td><td>Agent permissions &gt; user permissions</td></tr><tr><td>3</td><td><strong>No prompt injection defense</strong></td><td>1 email = compromised agent</td></tr><tr><td>4</td><td><strong>No audit log</strong></td><td>Forensics impossible, 监管罚款</td></tr><tr><td>5</td><td><strong>No compensating action</strong></td><td>Recovery impossible</td></tr><tr><td>6</td><td><strong>No rate limit</strong></td><td>Incident-at-scale (10K errors before detect)</td></tr><tr><td>7</td><td><strong>Single-tenant code accessing multi-tenant</strong></td><td>Cross-tenant leak (致命)</td></tr><tr><td>8</td><td><strong>Trust LLM-controlled action</strong></td><td>Forgot to re-check scope at tool layer</td></tr><tr><td>9</td><td><strong>No anomaly detection</strong></td><td>Bug 烧 6 小时才被人发现</td></tr><tr><td>10</td><td><strong>Mutable audit log</strong></td><td>Tamper-able, 没法做合规</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Service account super-perms</strong></td><td>Massive blast radius</td></tr><tr><td>2</td><td><strong>No OBO</strong></td><td>Agent permissions &gt; user permissions</td></tr><tr><td>3</td><td><strong>No prompt injection defense</strong></td><td>1 email = compromised agent</td></tr><tr><td>4</td><td><strong>No audit log</strong></td><td>Forensics impossible, 监管罚款</td></tr><tr><td>5</td><td><strong>No compensating action</strong></td><td>Recovery impossible</td></tr><tr><td>6</td><td><strong>No rate limit</strong></td><td>Incident-at-scale (10K errors before detect)</td></tr><tr><td>7</td><td><strong>Single-tenant code accessing multi-tenant</strong></td><td>Cross-tenant leak (致命)</td></tr><tr><td>8</td><td><strong>Trust LLM-controlled action</strong></td><td>Forgot to re-check scope at tool layer</td></tr><tr><td>9</td><td><strong>No anomaly detection</strong></td><td>Bug 烧 6 小时才被人发现</td></tr><tr><td>10</td><td><strong>Mutable audit log</strong></td><td>Tamper-able, 没法做合规</td></tr></tbody></table></div>
 <hr />
 <h3>一句话总结 (Part 1)</h3>
 <blockquote><p><strong>Agent Security = "4-layer defense (IAM OBO + Injection trust-mark + Audit immutable + Recovery outbox-compensate) + multi-tenant per-DEK isolation + anomaly auto-pause + 10-step incident playbook"</strong>.</p>
@@ -499,7 +499,7 @@ for test in RED_TEAM_TESTS:
         'data_classification': action.data_class,  # 'pii' / 'phi' / 'public'
     })</code></pre>
 <h4>3.2 Storage Tiers</h4>
-<table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use Case</th></tr></thead><tbody><tr><td><strong>Hot</strong></td><td>90 days</td><td>Postgres / OpenSearch</td><td>Real-time query, alerts, ops dashboards</td></tr><tr><td><strong>Warm</strong></td><td>1 year</td><td>S3 + Parquet</td><td>Slow query for investigation</td></tr><tr><td><strong>Cold</strong></td><td>7 years</td><td>S3 Glacier</td><td>Compliance retention (financial / health)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use Case</th></tr></thead><tbody><tr><td><strong>Hot</strong></td><td>90 days</td><td>Postgres / OpenSearch</td><td>Real-time query, alerts, ops dashboards</td></tr><tr><td><strong>Warm</strong></td><td>1 year</td><td>S3 + Parquet</td><td>Slow query for investigation</td></tr><tr><td><strong>Cold</strong></td><td>7 years</td><td>S3 Glacier</td><td>Compliance retention (financial / health)</td></tr></tbody></table></div>
 <p><strong>Retention by data class</strong>:</p>
 <ul><li>Financial transactions: 7 years (SOX / 央行)</li><li>Healthcare: 7 years (HIPAA)</li><li>Personal data (EU): per GDPR retention guidance, typically 3-5 years</li><li>General logs: 1 year</li></ul>
 <h4>3.3 PII Redaction Strategy</h4>
@@ -892,7 +892,7 @@ async def agent_loop(ctx):
 <blockquote><p>"Multi-tenant SaaS or single-customer deploy? Multi-tenant isolation is hardest."</p></blockquote>
 <hr />
 <h3>5 步框架 (sample 45-min answer)</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify permissions / sensitivity / compliance / tenant model</td></tr><tr><td>5-15 min</td><td>L1 IAM (OBO + per-action scope + multi-tenant)</td></tr><tr><td>15-25 min</td><td>L2 Prompt injection defense (5 layers, examples)</td></tr><tr><td>25-35 min</td><td>L3 Audit + L4 Recovery (outbox + compensating + bulk rollback)</td></tr><tr><td>35-45 min</td><td>Multi-tenant isolation + incident response 10-step + tabletop</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify permissions / sensitivity / compliance / tenant model</td></tr><tr><td>5-15 min</td><td>L1 IAM (OBO + per-action scope + multi-tenant)</td></tr><tr><td>15-25 min</td><td>L2 Prompt injection defense (5 layers, examples)</td></tr><tr><td>25-35 min</td><td>L3 Audit + L4 Recovery (outbox + compensating + bulk rollback)</td></tr><tr><td>35-45 min</td><td>Multi-tenant isolation + incident response 10-step + tabletop</td></tr></tbody></table></div>
 <hr />
 <h3>我会这样答 (sample 完整应答)</h3>
 <blockquote><p>"Clarify — <em>[假设: agent acts OBO user, mixed PII + financial data, SOC2 + GDPR, multi-tenant SaaS, worst-case 10K wrong actions in 1 hour, 24/7 oncall]</em>.</p>
@@ -923,7 +923,7 @@ async def agent_loop(ctx):
 <p>前面 Section 5 场景 E 已展开. 关键: anonymous + narrow scope, no write tools, rate limit by IP, brand safety output filter, cost cap.</p>
 <hr />
 <h3>简历专属 reframe</h3>
-<table class="md-table"><thead><tr><th>题点</th><th>你做过的具体动作</th></tr></thead><tbody><tr><td>IAM OBO</td><td>TikTok payment — user OAuth scoping, agent 永远 ≤ user perms</td></tr><tr><td>Multi-tenant isolation</td><td>Voice agent 7 markets + BNPL chatbot — natural multi-tenant, per-market DEK</td></tr><tr><td>Prompt injection</td><td>Voice agent — user adversarial input testing, scripted attack rotation</td></tr><tr><td>Audit trail</td><td>债务催收合规 — 7-year retention, hash-chained, every action</td></tr><tr><td>Recovery / compensating</td><td>Refund flow — natural compensation logic per refund type</td></tr><tr><td>Rate limit + anomaly</td><td>TikTok payment — fraud detection layered + 3x baseline anomaly</td></tr><tr><td>Incident response</td><td>Voice agent ASR cascade outage (Indonesia provider 40min) — playbook executed</td></tr><tr><td>Tabletop drill</td><td>Quarterly red-team for payment workflows</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>题点</th><th>你做过的具体动作</th></tr></thead><tbody><tr><td>IAM OBO</td><td>TikTok payment — user OAuth scoping, agent 永远 ≤ user perms</td></tr><tr><td>Multi-tenant isolation</td><td>Voice agent 7 markets + BNPL chatbot — natural multi-tenant, per-market DEK</td></tr><tr><td>Prompt injection</td><td>Voice agent — user adversarial input testing, scripted attack rotation</td></tr><tr><td>Audit trail</td><td>债务催收合规 — 7-year retention, hash-chained, every action</td></tr><tr><td>Recovery / compensating</td><td>Refund flow — natural compensation logic per refund type</td></tr><tr><td>Rate limit + anomaly</td><td>TikTok payment — fraud detection layered + 3x baseline anomaly</td></tr><tr><td>Incident response</td><td>Voice agent ASR cascade outage (Indonesia provider 40min) — playbook executed</td></tr><tr><td>Tabletop drill</td><td>Quarterly red-team for payment workflows</td></tr></tbody></table></div>
 <p><strong>主动 quote</strong> (面试 30-sec):</p>
 <blockquote><p>"On TikTok Global Payment, this exact framework was required for compliance.</p>
 <p><strong>IAM</strong>: agent OBO user's OAuth scope, never service account. Per-action scope check at tool layer (last line of defense even if LLM tricked).</p>

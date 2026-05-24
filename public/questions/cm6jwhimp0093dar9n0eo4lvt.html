@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a Server Health Monitoring System · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,14 +44,14 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Metric</strong></td><td>数字型时序数据（CPU 80%, mem 4GB）</td><td>体温 / 血压</td></tr><tr><td><strong>TSDB (Time-Series DB)</strong></td><td>专门存时序数据的数据库</td><td>病历表（按时间排）</td></tr><tr><td><strong>Prometheus</strong></td><td>业界最主流开源 TSDB，pull-based</td><td>自动测体温的医院</td></tr><tr><td><strong>VictoriaMetrics / Thanos</strong></td><td>Prometheus 的 scale 化版本</td><td>多家医院联网</td></tr><tr><td><strong>Grafana</strong></td><td>时序数据可视化工具，看 dashboard</td><td>体检报告</td></tr><tr><td><strong>Pull vs Push</strong></td><td>Server pull (Prometheus 主动来取) vs Agent push (Server 主动发)</td><td>主动问诊 vs 主动汇报</td></tr><tr><td><strong>OpenTelemetry (OTel)</strong></td><td>业界 metric/log/trace 三合一标准</td><td>通用医疗记录格式</td></tr><tr><td><strong>Cardinality</strong></td><td>不同 series 的数量（label 组合越多 cardinality 越高）</td><td>一个抽屉多少种纽扣</td></tr><tr><td><strong>SLO / Error Budget</strong></td><td>Service Level Objective + 还能容忍多少 outage</td><td>"99.9% 在线 = 一年最多 8.7 小时挂"</td></tr><tr><td><strong>Anomaly detection</strong></td><td>检测"指标突然异常"，比阈值更智能</td><td>体温微微反常的提醒</td></tr><tr><td><strong>Downsampling</strong></td><td>时序数据从精细粒度合并到粗粒度（1s → 1min → 1h）</td><td>高清照片转缩略图</td></tr><tr><td><strong>PagerDuty</strong></td><td>业界 on-call alert 工具</td><td>自动喊医生</td></tr><tr><td><strong>High Cardinality 警告</strong></td><td>label 含 user_id 这种 → series 爆炸</td><td>每个病人写一份独立病历</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Metric</strong></td><td>数字型时序数据（CPU 80%, mem 4GB）</td><td>体温 / 血压</td></tr><tr><td><strong>TSDB (Time-Series DB)</strong></td><td>专门存时序数据的数据库</td><td>病历表（按时间排）</td></tr><tr><td><strong>Prometheus</strong></td><td>业界最主流开源 TSDB，pull-based</td><td>自动测体温的医院</td></tr><tr><td><strong>VictoriaMetrics / Thanos</strong></td><td>Prometheus 的 scale 化版本</td><td>多家医院联网</td></tr><tr><td><strong>Grafana</strong></td><td>时序数据可视化工具，看 dashboard</td><td>体检报告</td></tr><tr><td><strong>Pull vs Push</strong></td><td>Server pull (Prometheus 主动来取) vs Agent push (Server 主动发)</td><td>主动问诊 vs 主动汇报</td></tr><tr><td><strong>OpenTelemetry (OTel)</strong></td><td>业界 metric/log/trace 三合一标准</td><td>通用医疗记录格式</td></tr><tr><td><strong>Cardinality</strong></td><td>不同 series 的数量（label 组合越多 cardinality 越高）</td><td>一个抽屉多少种纽扣</td></tr><tr><td><strong>SLO / Error Budget</strong></td><td>Service Level Objective + 还能容忍多少 outage</td><td>"99.9% 在线 = 一年最多 8.7 小时挂"</td></tr><tr><td><strong>Anomaly detection</strong></td><td>检测"指标突然异常"，比阈值更智能</td><td>体温微微反常的提醒</td></tr><tr><td><strong>Downsampling</strong></td><td>时序数据从精细粒度合并到粗粒度（1s → 1min → 1h）</td><td>高清照片转缩略图</td></tr><tr><td><strong>PagerDuty</strong></td><td>业界 on-call alert 工具</td><td>自动喊医生</td></tr><tr><td><strong>High Cardinality 警告</strong></td><td>label 含 user_id 这种 → series 爆炸</td><td>每个病人写一份独立病历</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质 — 这是什么问题</h3>
 <p><strong>Server Health Monitoring</strong> = 把成千上万服务器的 CPU / mem / disk / network / 服务状态<strong>实时收集 + 存储 + alert + 可视化</strong>。</p>
 <p><strong>典型场景</strong>：</p>
 <ul><li>Google SRE 监控自家数据中心所有服务器</li><li>AWS / GCP 给客户提供 EC2 / VM 监控</li><li>自建私有云的运维团队</li></ul>
 <p><strong>为什么这道题区别于 Logger System</strong>：</p>
-<table class="md-table"><thead><tr><th>维度</th><th>Logger</th><th>Metric Monitoring</th></tr></thead><tbody><tr><td>数据形式</td><td>文本事件</td><td>数字时序</td></tr><tr><td>主要用途</td><td>Debug / audit</td><td>Health / alert</td></tr><tr><td>Query</td><td>全文 + filter</td><td>Aggregation (avg, sum, p99)</td></tr><tr><td>保留</td><td>30 天热 + 1 年冷</td><td>1 day fine + 1 year downsampled</td></tr><tr><td>Cardinality 痛</td><td>中等</td><td>极痛</td></tr><tr><td>数据量</td><td>大（文本）</td><td>中等（数字）</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Logger</th><th>Metric Monitoring</th></tr></thead><tbody><tr><td>数据形式</td><td>文本事件</td><td>数字时序</td></tr><tr><td>主要用途</td><td>Debug / audit</td><td>Health / alert</td></tr><tr><td>Query</td><td>全文 + filter</td><td>Aggregation (avg, sum, p99)</td></tr><tr><td>保留</td><td>30 天热 + 1 年冷</td><td>1 day fine + 1 year downsampled</td></tr><tr><td>Cardinality 痛</td><td>中等</td><td>极痛</td></tr><tr><td>数据量</td><td>大（文本）</td><td>中等（数字）</td></tr></tbody></table></div>
 <p>考点：<strong>TSDB 存储 + cardinality 控制 + alert engine + SLO</strong>。</p>
 <hr />
 <h3>2. 需求拆解 — 面试第一步问什么</h3>
@@ -187,7 +187,7 @@ Series 数 = 5 × 100 × 20 = 10,000</code></pre>
 Series 数 = 5 × 100 × 20 × 1B = 10^13 → TSDB 崩溃</code></pre>
 <p>→ <strong>never put user_id / request_id 当 label！</strong></p>
 <h4>5.2 TSDB 选型</h4>
-<table class="md-table"><thead><tr><th>选项</th><th>优势</th><th>劣势</th></tr></thead><tbody><tr><td><strong>Prometheus</strong> (单机)</td><td>标准、简单</td><td>scale 不到 100k+ series</td></tr><tr><td><strong>VictoriaMetrics</strong></td><td>高写入 / 低存储 / Prom-compat</td><td>较新</td></tr><tr><td><strong>Thanos</strong></td><td>Prometheus + S3 长期存储</td><td>复杂</td></tr><tr><td><strong>InfluxDB</strong></td><td>SQL-like，商业版强</td><td>open source 写慢</td></tr><tr><td><strong>TimescaleDB</strong></td><td>Postgres extension，SQL 友好</td><td>scale 受 Postgres 限</td></tr><tr><td><strong>Datadog / 商业 SaaS</strong></td><td>不操心，包邮</td><td>$$$$</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>优势</th><th>劣势</th></tr></thead><tbody><tr><td><strong>Prometheus</strong> (单机)</td><td>标准、简单</td><td>scale 不到 100k+ series</td></tr><tr><td><strong>VictoriaMetrics</strong></td><td>高写入 / 低存储 / Prom-compat</td><td>较新</td></tr><tr><td><strong>Thanos</strong></td><td>Prometheus + S3 长期存储</td><td>复杂</td></tr><tr><td><strong>InfluxDB</strong></td><td>SQL-like，商业版强</td><td>open source 写慢</td></tr><tr><td><strong>TimescaleDB</strong></td><td>Postgres extension，SQL 友好</td><td>scale 受 Postgres 限</td></tr><tr><td><strong>Datadog / 商业 SaaS</strong></td><td>不操心，包邮</td><td>$$$$</td></tr></tbody></table></div>
 <p><strong>面试推荐</strong>：先讲 Prometheus / VictoriaMetrics + Thanos for long-term。</p>
 <h4>5.3 Multi-resolution</h4>
 <pre class="language-python"><code class="language-python"># Continuous Aggregation (downsampling job)

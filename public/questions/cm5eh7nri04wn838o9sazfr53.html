@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 347. Top K Frequent Elements · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -43,7 +43,7 @@
 <p><strong>LC 347 Top K Frequent Elements</strong>：给数组 <code>nums</code> 和整数 <code>k</code>，返回<strong>出现频率前 k 高</strong>的元素。Google 高频经典。</p>
 <h3>解题切入点</h3>
 <p>三种主流解法，按复杂度递减：</p>
-<table class="md-table"><thead><tr><th>方法</th><th>时间</th><th>空间</th><th>适用</th></tr></thead><tbody><tr><td>Sort by freq</td><td>O(N log N)</td><td>O(N)</td><td>k 接近 N</td></tr><tr><td><strong>Heap (size k)</strong></td><td><strong>O(N log k)</strong></td><td>O(N + k)</td><td>k ≪ N</td></tr><tr><td><strong>Bucket sort</strong></td><td><strong>O(N)</strong></td><td>O(N)</td><td>频率范围 ≤ N（即 ≤ N 种 freq）</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>方法</th><th>时间</th><th>空间</th><th>适用</th></tr></thead><tbody><tr><td>Sort by freq</td><td>O(N log N)</td><td>O(N)</td><td>k 接近 N</td></tr><tr><td><strong>Heap (size k)</strong></td><td><strong>O(N log k)</strong></td><td>O(N + k)</td><td>k ≪ N</td></tr><tr><td><strong>Bucket sort</strong></td><td><strong>O(N)</strong></td><td>O(N)</td><td>频率范围 ≤ N（即 ≤ N 种 freq）</td></tr></tbody></table></div>
 <p>面试期望 <strong>heap</strong> 或 <strong>bucket sort</strong>。两个都得熟。</p>
 <h3>Python 实现 — 推荐 Bucket Sort</h3>
 <pre class="language-python"><code class="language-python">from collections import Counter
@@ -85,7 +85,7 @@ class Solution:
 <h3>复杂度对比</h3>
 <pre class="language-plaintext"><code class="language-plaintext">N = nums.length
 unique count u &lt;= N</code></pre>
-<table class="md-table"><thead><tr><th>方法</th><th>时间</th><th>空间</th></tr></thead><tbody><tr><td>Sort</td><td>O(u log u)</td><td>O(u)</td></tr><tr><td>Heap</td><td>O(u log k)</td><td>O(u + k)</td></tr><tr><td>Bucket</td><td><strong>O(N)</strong></td><td>O(N)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>方法</th><th>时间</th><th>空间</th></tr></thead><tbody><tr><td>Sort</td><td>O(u log u)</td><td>O(u)</td></tr><tr><td>Heap</td><td>O(u log k)</td><td>O(u + k)</td></tr><tr><td>Bucket</td><td><strong>O(N)</strong></td><td>O(N)</td></tr></tbody></table></div>
 <h3>边界 case</h3>
 <pre class="language-python"><code class="language-python">assert sorted(Solution().topKFrequent([1,1,1,2,2,3], 2)) == [1, 2]
 assert Solution().topKFrequent([1], 1) == [1]

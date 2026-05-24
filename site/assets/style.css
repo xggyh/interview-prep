@@ -1,15 +1,24 @@
 /* ---- Reset / base ---- */
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body {
+  margin: 0; padding: 0;
+  /* Prevent stray inline content (long URLs, code identifiers) from pushing the
+     page wider than the viewport — fixes mobile "drag-side / misaligned border" bug. */
+  overflow-x: hidden;
+  max-width: 100%;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.65;
   color: #1f2328;
   background: #fafbfc;
   font-size: 16px;
+  /* Long unbroken strings (URLs, identifiers, hashes) wrap instead of overflow. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 img { max-width: 100%; height: auto; }
-a { color: #0969da; text-decoration: none; }
+a { color: #0969da; text-decoration: none; word-break: break-word; }
 a:hover { text-decoration: underline; }
 
 /* ---- Header ---- */
@@ -161,11 +170,18 @@ pre[class*="language-"] {
   background: #0d1117 !important;
 }
 
-/* Markdown tables */
+/* Markdown tables — wrapped in .table-wrap on mobile so wide tables
+   scroll within their own box instead of pushing the whole page wider. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  margin: 14px 0;
+}
 .md-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 14px 0;
+  margin: 0;
   font-size: 14px;
 }
 .md-table th, .md-table td {
@@ -173,6 +189,18 @@ pre[class*="language-"] {
   padding: 8px 12px;
   text-align: left;
   vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  /* On phones, tables get a min-width so columns stay readable, but the
+     wrapper allows horizontal scroll just for the table — page borders stay aligned. */
+  .md-table { min-width: 480px; font-size: 13px; }
+  .md-table th, .md-table td { padding: 6px 8px; }
+  /* Slightly more breathing room around long code blocks too */
+  pre[class*="language-"] { font-size: 12.5px; padding: 12px; }
+  .container { padding: 16px 14px 60px; }
+  .section { padding: 16px 18px; }
 }
 .md-table th {
   background: #f6f8fa;

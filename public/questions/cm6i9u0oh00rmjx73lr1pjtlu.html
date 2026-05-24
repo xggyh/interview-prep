@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a Navigation/Mapping System · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Routing</strong></td><td>找两点间最优路线</td><td>走迷宫找出口</td></tr><tr><td><strong>Graph</strong></td><td>由 node + edge 组成的数据结构。地图：node = 路口，edge = 路段</td><td>蜘蛛网</td></tr><tr><td><strong>Dijkstra</strong></td><td>经典最短路径算法，从起点扩散</td><td>漫水法找门</td></tr><tr><td><strong>A</strong>*</td><td>Dijkstra + heuristic，扩散有方向感更快</td><td>用指南针的漫水法</td></tr><tr><td><strong>Contraction Hierarchies (CH)</strong></td><td>预处理 graph 加 shortcut 边，查询超快</td><td>主城与城外修高速</td></tr><tr><td><strong>OSM (OpenStreetMap)</strong></td><td>开源全球地图数据</td><td>维基百科的地图版</td></tr><tr><td><strong>ETA</strong></td><td>Estimated Time of Arrival</td><td>"预计 1 小时到"</td></tr><tr><td><strong>Geohash / S2 / H3</strong></td><td>把地球切成 grid 的索引体系</td><td>经纬度的"邮编"</td></tr><tr><td><strong>Tile</strong></td><td>地图渲染的小方块 (256×256 像素)，按 zoom 层切</td><td>拼图的一片</td></tr><tr><td><strong>Vector tile</strong></td><td>地图 tile 用矢量描述（点线面），客户端渲染</td><td>矢量图 vs 位图</td></tr><tr><td><strong>Reverse geocoding</strong></td><td>把 GPS 转地址</td><td>(37.4, -122.0) → "Mountain View, CA"</td></tr><tr><td><strong>POI</strong></td><td>Point of Interest，餐厅 / 加油站 / 地标</td><td>地图上的兴趣点</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Routing</strong></td><td>找两点间最优路线</td><td>走迷宫找出口</td></tr><tr><td><strong>Graph</strong></td><td>由 node + edge 组成的数据结构。地图：node = 路口，edge = 路段</td><td>蜘蛛网</td></tr><tr><td><strong>Dijkstra</strong></td><td>经典最短路径算法，从起点扩散</td><td>漫水法找门</td></tr><tr><td><strong>A</strong>*</td><td>Dijkstra + heuristic，扩散有方向感更快</td><td>用指南针的漫水法</td></tr><tr><td><strong>Contraction Hierarchies (CH)</strong></td><td>预处理 graph 加 shortcut 边，查询超快</td><td>主城与城外修高速</td></tr><tr><td><strong>OSM (OpenStreetMap)</strong></td><td>开源全球地图数据</td><td>维基百科的地图版</td></tr><tr><td><strong>ETA</strong></td><td>Estimated Time of Arrival</td><td>"预计 1 小时到"</td></tr><tr><td><strong>Geohash / S2 / H3</strong></td><td>把地球切成 grid 的索引体系</td><td>经纬度的"邮编"</td></tr><tr><td><strong>Tile</strong></td><td>地图渲染的小方块 (256×256 像素)，按 zoom 层切</td><td>拼图的一片</td></tr><tr><td><strong>Vector tile</strong></td><td>地图 tile 用矢量描述（点线面），客户端渲染</td><td>矢量图 vs 位图</td></tr><tr><td><strong>Reverse geocoding</strong></td><td>把 GPS 转地址</td><td>(37.4, -122.0) → "Mountain View, CA"</td></tr><tr><td><strong>POI</strong></td><td>Point of Interest，餐厅 / 加油站 / 地标</td><td>地图上的兴趣点</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质 — 这是什么问题</h3>
 <p><strong>Navigation / Mapping System</strong> = Google Maps / Apple Maps / Waze 这类应用：</p>

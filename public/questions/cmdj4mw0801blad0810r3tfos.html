@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a distributed system for getting the slowest query from Google search · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,14 +44,14 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Search query</strong></td><td>用户在 Google 搜索框输入的文本</td><td>"OpenAI 招聘"</td></tr><tr><td><strong>Query latency</strong></td><td>一次 search 从发出到收到结果的耗时</td><td>点菜到上菜的时间</td></tr><tr><td><strong>p99 latency</strong></td><td>99% 请求快于这值（剩 1% 慢于）</td><td>班级 99% 同学成绩</td></tr><tr><td><strong>Heavy hitter</strong></td><td>出现频繁的 item，需要专门跟踪</td><td>网红 hashtag</td></tr><tr><td><strong>Sampling</strong></td><td>不存全部，随机抽样部分</td><td>民意调查</td></tr><tr><td><strong>HDR Histogram</strong></td><td>高动态范围直方图，省内存算 percentile</td><td>体重分布图</td></tr><tr><td><strong>T-digest</strong></td><td>流式 percentile 算法</td><td>滚动算中位数</td></tr><tr><td><strong>Query template</strong></td><td>类似 query 的归一化形式（"OpenAI X" 都同 template）</td><td>公式模板</td></tr><tr><td><strong>Stream processor</strong></td><td>实时处理流数据的服务（Flink / Spark Streaming）</td><td>流水线工人</td></tr><tr><td><strong>TSDB</strong></td><td>时序数据库</td><td>体重记录本</td></tr><tr><td><strong>Regression</strong></td><td>性能突然变差</td><td>病情突然加重</td></tr><tr><td><strong>A/B test</strong></td><td>同时跑两版对比</td><td>实验组对照组</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Search query</strong></td><td>用户在 Google 搜索框输入的文本</td><td>"OpenAI 招聘"</td></tr><tr><td><strong>Query latency</strong></td><td>一次 search 从发出到收到结果的耗时</td><td>点菜到上菜的时间</td></tr><tr><td><strong>p99 latency</strong></td><td>99% 请求快于这值（剩 1% 慢于）</td><td>班级 99% 同学成绩</td></tr><tr><td><strong>Heavy hitter</strong></td><td>出现频繁的 item，需要专门跟踪</td><td>网红 hashtag</td></tr><tr><td><strong>Sampling</strong></td><td>不存全部，随机抽样部分</td><td>民意调查</td></tr><tr><td><strong>HDR Histogram</strong></td><td>高动态范围直方图，省内存算 percentile</td><td>体重分布图</td></tr><tr><td><strong>T-digest</strong></td><td>流式 percentile 算法</td><td>滚动算中位数</td></tr><tr><td><strong>Query template</strong></td><td>类似 query 的归一化形式（"OpenAI X" 都同 template）</td><td>公式模板</td></tr><tr><td><strong>Stream processor</strong></td><td>实时处理流数据的服务（Flink / Spark Streaming）</td><td>流水线工人</td></tr><tr><td><strong>TSDB</strong></td><td>时序数据库</td><td>体重记录本</td></tr><tr><td><strong>Regression</strong></td><td>性能突然变差</td><td>病情突然加重</td></tr><tr><td><strong>A/B test</strong></td><td>同时跑两版对比</td><td>实验组对照组</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质 — 这是什么问题</h3>
 <p><strong>Distributed system for getting the slowest query from Google search</strong> = 从 Google search 每天 <strong>10B+ 次查询</strong>里找出"哪些 query 让 search service 最慢"，作为性能优化目标。</p>
 <p><strong>为什么需要这个系统</strong>：</p>
 <ol><li><strong>Performance bug 难定位</strong>：search 总体 p99 涨 50ms，但是哪种 query 慢？需要找到 outlier。</li><li><strong>Regression detection</strong>：新版本上线后某种 query 突然变慢</li><li><strong>Optimization prioritization</strong>：开发资源有限，先优化最慢的 N 个 query 类型，性价比最高</li><li><strong>SLO accountability</strong>：定 SLO "all queries &lt; 500ms"，超时哪些？</li></ol>
 <p><strong>与 trending hashtag (cm7honmgk0278imqn03o95rtg) 区别</strong>：</p>
-<table class="md-table"><thead><tr><th>维度</th><th>Trending Hashtag</th><th>Slowest Query</th></tr></thead><tbody><tr><td>信号</td><td>count (出现次数)</td><td>latency (耗时)</td></tr><tr><td>算 top-K by</td><td>frequency</td><td>latency (max / p99)</td></tr><tr><td>关心的 entity</td><td>hashtag 字符串</td><td>query template</td></tr><tr><td>用户</td><td>end user (前端展示)</td><td>内部工程师 (debug)</td></tr><tr><td>实时性</td><td>1 min</td><td>5-15 min OK</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Trending Hashtag</th><th>Slowest Query</th></tr></thead><tbody><tr><td>信号</td><td>count (出现次数)</td><td>latency (耗时)</td></tr><tr><td>算 top-K by</td><td>frequency</td><td>latency (max / p99)</td></tr><tr><td>关心的 entity</td><td>hashtag 字符串</td><td>query template</td></tr><tr><td>用户</td><td>end user (前端展示)</td><td>内部工程师 (debug)</td></tr><tr><td>实时性</td><td>1 min</td><td>5-15 min OK</td></tr></tbody></table></div>
 <p>考点：<strong>streaming top-K by metric + sampling + query normalization + regression detection</strong>。</p>
 <hr />
 <h3>2. 需求拆解 — 面试第一步问什么</h3>

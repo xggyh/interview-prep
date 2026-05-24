@@ -211,7 +211,7 @@ def md_to_html(md: str) -> str:
                         for k, c in enumerate(row)
                     ) + "</tr>" for row in body_rows
                 )
-                out.append(f'<table class="md-table"><thead>{thead}</thead><tbody>{tbody}</tbody></table>')
+                out.append(f'<div class="table-wrap"><table class="md-table"><thead>{thead}</thead><tbody>{tbody}</tbody></table></div>')
                 continue
 
         # Bullet list

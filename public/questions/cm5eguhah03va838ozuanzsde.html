@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Leetcode 2408. Design SQL · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -130,7 +130,7 @@ HAVING COUNT(*) &gt; 5;</code></pre>
 FROM data
 GROUP BY year;</code></pre>
 <h3>写 SQL 题的检查清单</h3>
-<table class="md-table"><thead><tr><th>检查点</th><th>错过的常见后果</th></tr></thead><tbody><tr><td>NULL 处理</td><td><code>WHERE col != 'X'</code> 会过滤 NULL；用 <code>IS NOT NULL</code> 显式</td></tr><tr><td>Distinct vs not</td><td><code>COUNT(*)</code> vs <code>COUNT(DISTINCT x)</code> 完全不同</td></tr><tr><td>Group by 列匹配</td><td>SELECT 非聚合列必须在 GROUP BY 里</td></tr><tr><td>窗口函数 vs 聚合</td><td><code>MAX(x) OVER ()</code> 跟 <code>MAX(x) GROUP BY ...</code> 行为不同</td></tr><tr><td>自 JOIN 别名</td><td><code>FROM emp e1 JOIN emp e2</code> 必须用 e1/e2 区分</td></tr><tr><td>INNER vs LEFT</td><td>期待 outer 时用了 inner 会漏行</td></tr><tr><td>ORDER BY 在 UNION</td><td>ORDER BY 只能在最外层</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>检查点</th><th>错过的常见后果</th></tr></thead><tbody><tr><td>NULL 处理</td><td><code>WHERE col != 'X'</code> 会过滤 NULL；用 <code>IS NOT NULL</code> 显式</td></tr><tr><td>Distinct vs not</td><td><code>COUNT(*)</code> vs <code>COUNT(DISTINCT x)</code> 完全不同</td></tr><tr><td>Group by 列匹配</td><td>SELECT 非聚合列必须在 GROUP BY 里</td></tr><tr><td>窗口函数 vs 聚合</td><td><code>MAX(x) OVER ()</code> 跟 <code>MAX(x) GROUP BY ...</code> 行为不同</td></tr><tr><td>自 JOIN 别名</td><td><code>FROM emp e1 JOIN emp e2</code> 必须用 e1/e2 区分</td></tr><tr><td>INNER vs LEFT</td><td>期待 outer 时用了 inner 会漏行</td></tr><tr><td>ORDER BY 在 UNION</td><td>ORDER BY 只能在最外层</td></tr></tbody></table></div>
 <h3>易错点</h3>
 <div class="callout callout-pitfall"><strong>易错点 / Red Flag</strong><p>❌ LC 2408 用 list 存 rows —— 删除后 rowId 失效； ❌ SQL 查询直接 SELECT TOP 3 期待 per-group —— 实际是 global top 3；必须窗口函数； ❌ NULL 比较用 <code>=</code> —— NULL 不等于任何值，包括 NULL 自己； ❌ JOIN 没有 ON 条件 —— 笛卡尔积，几行变几亿； ❌ GROUP BY 写漏列 —— MySQL 早期会随便返回某行值，严格模式直接报错。</p></div>
 <div class="callout callout-key"><strong>核心要点</strong><p>SQL 题不是考你"记不记得语法"，是考<strong>你能不能把需求拆解成 SQL 算子序列</strong>。窗口函数（ROW_NUMBER / RANK / LAG / LEAD / SUM OVER）是中级 SQL 必杀技 —— 80% 的"per-group X" 都靠它。</p></div>

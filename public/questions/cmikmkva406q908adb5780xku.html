@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Design a photo search application · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
   <section class="section">
     <h2>我的思路与解法</h2>
     <h3>0. 在开始之前 — 你需要知道的概念</h3>
-<table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Image embedding</strong></td><td>图片 → 高维向量 (e.g., 512 维)</td><td>图片的"指纹"</td></tr><tr><td><strong>CNN (ResNet/EfficientNet)</strong></td><td>卷积神经网络，从像素学 visual feature</td><td>视觉系统</td></tr><tr><td><strong>CLIP</strong></td><td>OpenAI 模型，把 image 和 text embed 到同一空间</td><td>让"狗"文本和"狗"图片向量接近</td></tr><tr><td><strong>ANN (Approximate Nearest Neighbor)</strong></td><td>近似最近邻搜索，亿级向量秒级查</td><td>"找最像的"快速查</td></tr><tr><td><strong>FAISS / Milvus / Pinecone</strong></td><td>业界主流 vector DB</td><td>向量数据库品牌</td></tr><tr><td><strong>HNSW</strong></td><td>Hierarchical Navigable Small World，最常用 ANN 算法</td><td>图结构搜索</td></tr><tr><td><strong>Reverse image search</strong></td><td>上传图找类似图</td><td>Google 图片识图</td></tr><tr><td><strong>Text-to-image search</strong></td><td>文字描述找图</td><td>"夕阳海边" → 找到相关图</td></tr><tr><td><strong>OCR</strong></td><td>图中提取文字</td><td>看图认字</td></tr><tr><td><strong>Object detection</strong></td><td>检测图中物体并 bounding box</td><td>找出"猫在哪格"</td></tr><tr><td><strong>Semantic search</strong></td><td>按"含义"搜，非关键词</td><td>搜"快乐" 找到笑脸</td></tr><tr><td><strong>Multi-modal</strong></td><td>跨模态 (text + image) 检索</td><td>"用文字找图 / 用图找文字"</td></tr><tr><td><strong>Quantization (PQ)</strong></td><td>Product Quantization，向量压缩节省内存</td><td>把高清画变低分辨率指纹</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>名词</th><th>一句话解释</th><th>类比</th></tr></thead><tbody><tr><td><strong>Image embedding</strong></td><td>图片 → 高维向量 (e.g., 512 维)</td><td>图片的"指纹"</td></tr><tr><td><strong>CNN (ResNet/EfficientNet)</strong></td><td>卷积神经网络，从像素学 visual feature</td><td>视觉系统</td></tr><tr><td><strong>CLIP</strong></td><td>OpenAI 模型，把 image 和 text embed 到同一空间</td><td>让"狗"文本和"狗"图片向量接近</td></tr><tr><td><strong>ANN (Approximate Nearest Neighbor)</strong></td><td>近似最近邻搜索，亿级向量秒级查</td><td>"找最像的"快速查</td></tr><tr><td><strong>FAISS / Milvus / Pinecone</strong></td><td>业界主流 vector DB</td><td>向量数据库品牌</td></tr><tr><td><strong>HNSW</strong></td><td>Hierarchical Navigable Small World，最常用 ANN 算法</td><td>图结构搜索</td></tr><tr><td><strong>Reverse image search</strong></td><td>上传图找类似图</td><td>Google 图片识图</td></tr><tr><td><strong>Text-to-image search</strong></td><td>文字描述找图</td><td>"夕阳海边" → 找到相关图</td></tr><tr><td><strong>OCR</strong></td><td>图中提取文字</td><td>看图认字</td></tr><tr><td><strong>Object detection</strong></td><td>检测图中物体并 bounding box</td><td>找出"猫在哪格"</td></tr><tr><td><strong>Semantic search</strong></td><td>按"含义"搜，非关键词</td><td>搜"快乐" 找到笑脸</td></tr><tr><td><strong>Multi-modal</strong></td><td>跨模态 (text + image) 检索</td><td>"用文字找图 / 用图找文字"</td></tr><tr><td><strong>Quantization (PQ)</strong></td><td>Product Quantization，向量压缩节省内存</td><td>把高清画变低分辨率指纹</td></tr></tbody></table></div>
 <hr />
 <h3>1. 题目本质</h3>
 <p><strong>Photo Search Application</strong> = 用户上传 photo 或输入 text → 搜索匹配的 photos。</p>
@@ -57,11 +57,11 @@
 <hr />
 <h3>2. 需求拆解</h3>
 <h4>Functional</h4>
-<table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>SearchByImage(image) -&gt; similar_images[]</code></td><td>反向图搜</td></tr><tr><td><code>SearchByText(query) -&gt; images[]</code></td><td>文字搜图</td></tr><tr><td><code>UploadImage(image, metadata) -&gt; image_id</code></td><td>索引新图</td></tr><tr><td><code>GetSimilar(image_id) -&gt; similar[]</code></td><td>"更多类似"</td></tr><tr><td><code>FilterByObject(query="dog")</code></td><td>物体过滤</td></tr><tr><td><code>OCRSearch("invoice 2024")</code></td><td>图中文字搜</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>API</th><th>含义</th></tr></thead><tbody><tr><td><code>SearchByImage(image) -&gt; similar_images[]</code></td><td>反向图搜</td></tr><tr><td><code>SearchByText(query) -&gt; images[]</code></td><td>文字搜图</td></tr><tr><td><code>UploadImage(image, metadata) -&gt; image_id</code></td><td>索引新图</td></tr><tr><td><code>GetSimilar(image_id) -&gt; similar[]</code></td><td>"更多类似"</td></tr><tr><td><code>FilterByObject(query="dog")</code></td><td>物体过滤</td></tr><tr><td><code>OCRSearch("invoice 2024")</code></td><td>图中文字搜</td></tr></tbody></table></div>
 <p><strong>澄清要点</strong>：</p>
 <ul><li>Scope：personal album（10k photos）还是 web global（10B photos）？</li><li>是否需要 OCR / object detection？</li><li>Image vs video?</li><li>Privacy: device-local vs cloud?</li></ul>
 <h4>Non-functional</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>查询 latency</strong></td><td>p99 &lt; 500 ms</td></tr><tr><td><strong>Scale</strong></td><td>10B images (web) or 10k-1M per user (personal)</td></tr><tr><td><strong>Index latency</strong></td><td>new upload searchable in 5 min</td></tr><tr><td><strong>Recall@10</strong></td><td>&gt; 90% (top 10 中有 90% 真正相关)</td></tr><tr><td><strong>Storage</strong></td><td>image bytes + embeddings + index</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>目标</th></tr></thead><tbody><tr><td><strong>查询 latency</strong></td><td>p99 &lt; 500 ms</td></tr><tr><td><strong>Scale</strong></td><td>10B images (web) or 10k-1M per user (personal)</td></tr><tr><td><strong>Index latency</strong></td><td>new upload searchable in 5 min</td></tr><tr><td><strong>Recall@10</strong></td><td>&gt; 90% (top 10 中有 90% 真正相关)</td></tr><tr><td><strong>Storage</strong></td><td>image bytes + embeddings + index</td></tr></tbody></table></div>
 <hr />
 <h3>3. 容量估算</h3>
 <h4>Personal Album (Google Photos)</h4>
@@ -116,7 +116,7 @@ Image bytes: S3 (cold), CDN edge (hot)</code></pre>
 <p><strong>Inference cost</strong>:</p>
 <ul><li>CLIP ViT-B/32: ~50ms / image on GPU</li><li>1M images/day → 1 GPU 处理够，10B all-history → batch 处理几周</li></ul>
 <h4>Deep Dive 2: ANN Index — HNSW vs IVF-PQ</h4>
-<table class="md-table"><thead><tr><th>算法</th><th>内存</th><th>速度</th><th>Recall</th></tr></thead><tbody><tr><td><strong>HNSW</strong></td><td>高 (~4× raw)</td><td>极快</td><td>95-99%</td></tr><tr><td><strong>IVF (FAISS)</strong></td><td>中</td><td>快</td><td>90-95%</td></tr><tr><td><strong>IVF-PQ</strong></td><td>低 (16× compress)</td><td>中</td><td>85-90%</td></tr><tr><td><strong>DiskANN / SPANN</strong></td><td>极低 (用 SSD)</td><td>中</td><td>90%</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>算法</th><th>内存</th><th>速度</th><th>Recall</th></tr></thead><tbody><tr><td><strong>HNSW</strong></td><td>高 (~4× raw)</td><td>极快</td><td>95-99%</td></tr><tr><td><strong>IVF (FAISS)</strong></td><td>中</td><td>快</td><td>90-95%</td></tr><tr><td><strong>IVF-PQ</strong></td><td>低 (16× compress)</td><td>中</td><td>85-90%</td></tr><tr><td><strong>DiskANN / SPANN</strong></td><td>极低 (用 SSD)</td><td>中</td><td>90%</td></tr></tbody></table></div>
 <p><strong>10B images full embedding</strong>: 10B × 512 × 4 = <strong>20 TB</strong>。HNSW 4× = 80 TB → 几十台机器内存。</p>
 <p><strong>PQ 压缩</strong>: 10B × 32 B (PQ-compressed) = <strong>320 GB</strong> → 5 台机器 RAM。Recall ~90%。</p>
 <p><strong>STAFF 答</strong>: IVF-PQ for global scale (cost), HNSW for hot tier / per-user index (small).</p>
@@ -148,7 +148,7 @@ Image bytes: S3 (cold), CDN edge (hot)</code></pre>
 <ul><li>Crawler 只索引 public images</li><li>Honors <code>robots-noimageindex</code></li><li>Right-to-be-forgotten (GDPR)：删除原图 + 索引 + cache</li></ul>
 <hr />
 <h3>6. 45 分钟节奏</h3>
-<table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：personal vs web global? text+image? OCR?</td></tr><tr><td>5-10min</td><td>容量：10B images, 20 TB embeddings, 5 PB images</td></tr><tr><td>10-20min</td><td>高层架构：indexing pipeline + query pipeline</td></tr><tr><td>20-35min</td><td>Deep dives: CLIP / IVF-PQ / sharding / OCR / face</td></tr><tr><td>35-45min</td><td>privacy / cold start / personalization</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时间</th><th>阶段</th></tr></thead><tbody><tr><td>0-5min</td><td>澄清：personal vs web global? text+image? OCR?</td></tr><tr><td>5-10min</td><td>容量：10B images, 20 TB embeddings, 5 PB images</td></tr><tr><td>10-20min</td><td>高层架构：indexing pipeline + query pipeline</td></tr><tr><td>20-35min</td><td>Deep dives: CLIP / IVF-PQ / sharding / OCR / face</td></tr><tr><td>35-45min</td><td>privacy / cold start / personalization</td></tr></tbody></table></div>
 <hr />
 <h3>7. 样板讲解稿</h3>
 <blockquote><p>Photo search 关键是 <strong>embedding + vector search</strong>：图 → CLIP embed → ANN index → 查询。</p>

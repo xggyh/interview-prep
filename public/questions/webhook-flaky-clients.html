@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Technical #5 · Reliable Webhook with Flaky Clients · AI Agent Cookbook</title>
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="../assets/style.css?v=e649d488">
+<link rel="stylesheet" href="../assets/style.css?v=c5c44b8d">
 <link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
 </head>
 <body>
@@ -112,9 +112,9 @@
 <hr />
 <h3>4. 三个关键 ID / 概念分类表</h3>
 <p>每个 webhook 上有这 3 个 header, 各自解决一类问题:</p>
-<table class="md-table"><thead><tr><th>Header</th><th>寿命</th><th>用途</th><th>谁负责</th></tr></thead><tbody><tr><td><code>X-Event-Id</code></td><td>永久</td><td>客户端 dedup 防止双处理</td><td>Producer 生成, Consumer 使用</td></tr><tr><td><code>X-Signature</code></td><td>单次</td><td>HMAC 验真, 防伪造</td><td>Producer 签, Consumer 验</td></tr><tr><td><code>X-Timestamp</code></td><td>5 min 容差</td><td>防 replay attack</td><td>Producer 当前时间, Consumer 拒太老的</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Header</th><th>寿命</th><th>用途</th><th>谁负责</th></tr></thead><tbody><tr><td><code>X-Event-Id</code></td><td>永久</td><td>客户端 dedup 防止双处理</td><td>Producer 生成, Consumer 使用</td></tr><tr><td><code>X-Signature</code></td><td>单次</td><td>HMAC 验真, 防伪造</td><td>Producer 签, Consumer 验</td></tr><tr><td><code>X-Timestamp</code></td><td>5 min 容差</td><td>防 replay attack</td><td>Producer 当前时间, Consumer 拒太老的</td></tr></tbody></table></div>
 <p><strong>3 类 HTTP 响应状态码的 retry 决策</strong>:</p>
-<table class="md-table"><thead><tr><th>Status</th><th>含义</th><th>怎么处理</th></tr></thead><tbody><tr><td>2xx</td><td>成功</td><td>ACK, 不再 retry</td></tr><tr><td>408, 429, 5xx</td><td>临时故障</td><td>Retry with backoff</td></tr><tr><td>4xx (除 408/429)</td><td>客户端永久错误</td><td><strong>NOT retry</strong> (4xx 重试是浪费)</td></tr><tr><td>connection refused / timeout</td><td>网络层失败</td><td>Retry</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Status</th><th>含义</th><th>怎么处理</th></tr></thead><tbody><tr><td>2xx</td><td>成功</td><td>ACK, 不再 retry</td></tr><tr><td>408, 429, 5xx</td><td>临时故障</td><td>Retry with backoff</td></tr><tr><td>4xx (除 408/429)</td><td>客户端永久错误</td><td><strong>NOT retry</strong> (4xx 重试是浪费)</td></tr><tr><td>connection refused / timeout</td><td>网络层失败</td><td>Retry</td></tr></tbody></table></div>
 <hr />
 <h3>5. 具体业务场景</h3>
 <h4>场景 A: TikTok PayLater → 商户的 CRM (你的工作背景)</h4>
@@ -153,7 +153,7 @@
 <ol><li><strong>HTTPS endpoint</strong> + WAF</li><li><strong>签名验证</strong>: 不验签的 endpoint 是公开攻击面</li><li><strong>Idempotency</strong>: dedup by <code>event_id</code> (Redis 1h TTL + DB unique constraint)</li><li><strong>快速 ACK</strong>: 收到先返 200, 后台 async 处理 — 防 producer 重试压垮你</li><li><strong>Async processing</strong>: 入自己的 queue, 慢慢消费</li><li><strong>错误隔离</strong>: 单个事件处理失败不影响其他</li></ol>
 <hr />
 <h3>7. 几个容易踩的坑</h3>
-<table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>承诺 exactly-once 投递</strong></td><td>网络环境下不可能. 老老实实 at-least-once + 客户端 dedup</td></tr><tr><td>2</td><td><strong>No DLQ</strong></td><td>永远失败的事件在 retry 循环里浪费资源, 队列堵塞</td></tr><tr><td>3</td><td><strong>No jitter</strong></td><td>全部 worker 30s 后同时 retry → 客户端再次被打挂 (thundering herd)</td></tr><tr><td>4</td><td><strong>Retry on 4xx</strong></td><td>4xx 是 client 永久错误, retry 是浪费. 例外: 408 timeout, 429 rate limit</td></tr><tr><td>5</td><td><strong>No ordering 处理</strong></td><td><code>order.created</code> 和 <code>order.updated</code> 乱序到达, 客户端看到 "updated" 前还没 "created"</td></tr><tr><td>6</td><td><strong>No backpressure</strong></td><td>慢客户端 → 我方 queue depth 涨 → 内存涨 → OOM</td></tr><tr><td>7</td><td><strong>No HMAC signing</strong></td><td>攻击者可以伪造 webhook 给客户端, 触发非授权操作</td></tr><tr><td>8</td><td><strong>同步处理 inline</strong></td><td>Consumer 把业务逻辑写在 webhook handler 里 → 慢 → producer 超时 → 重试风暴</td></tr><tr><td>9</td><td><strong>明文记录 webhook body</strong></td><td>包含 PII, 日志泄漏风险</td></tr><tr><td>10</td><td><strong>客户端 URL 不可变</strong></td><td>客户改了域名 / 路径就废了, 提供 self-service config UI</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>承诺 exactly-once 投递</strong></td><td>网络环境下不可能. 老老实实 at-least-once + 客户端 dedup</td></tr><tr><td>2</td><td><strong>No DLQ</strong></td><td>永远失败的事件在 retry 循环里浪费资源, 队列堵塞</td></tr><tr><td>3</td><td><strong>No jitter</strong></td><td>全部 worker 30s 后同时 retry → 客户端再次被打挂 (thundering herd)</td></tr><tr><td>4</td><td><strong>Retry on 4xx</strong></td><td>4xx 是 client 永久错误, retry 是浪费. 例外: 408 timeout, 429 rate limit</td></tr><tr><td>5</td><td><strong>No ordering 处理</strong></td><td><code>order.created</code> 和 <code>order.updated</code> 乱序到达, 客户端看到 "updated" 前还没 "created"</td></tr><tr><td>6</td><td><strong>No backpressure</strong></td><td>慢客户端 → 我方 queue depth 涨 → 内存涨 → OOM</td></tr><tr><td>7</td><td><strong>No HMAC signing</strong></td><td>攻击者可以伪造 webhook 给客户端, 触发非授权操作</td></tr><tr><td>8</td><td><strong>同步处理 inline</strong></td><td>Consumer 把业务逻辑写在 webhook handler 里 → 慢 → producer 超时 → 重试风暴</td></tr><tr><td>9</td><td><strong>明文记录 webhook body</strong></td><td>包含 PII, 日志泄漏风险</td></tr><tr><td>10</td><td><strong>客户端 URL 不可变</strong></td><td>客户改了域名 / 路径就废了, 提供 self-service config UI</td></tr></tbody></table></div>
 <hr />
 <h3>一句话总结 (Part 1)</h3>
 <blockquote><p><strong>Reliable webhook = "at-least-once 投递 + 客户端 idempotent + 有限 retry + DLQ 兜底 + backpressure 保护两端"</strong>.</p>
@@ -162,7 +162,7 @@
 <h1>Part 2 · 5 个深度工程问题</h1>
 <h3>⚙️ Problem 1: At-least-once vs Exactly-once — 哪个 realistic</h3>
 <p><strong>有 3 种投递语义</strong>, 面试场要能讲清楚为啥选 at-least-once:</p>
-<table class="md-table"><thead><tr><th>语义</th><th>含义</th><th>现实可行吗</th></tr></thead><tbody><tr><td><strong>At-most-once</strong></td><td>最多 1 次, 可能丢</td><td>✓ 可行但糟糕 — 谁愿意丢 payment 通知</td></tr><tr><td><strong>At-least-once</strong></td><td>至少 1 次, 可能多次</td><td>✓ 标准做法</td></tr><tr><td><strong>Exactly-once</strong></td><td>恰好 1 次</td><td><strong>网络环境下不可能</strong> (有数学证明)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>语义</th><th>含义</th><th>现实可行吗</th></tr></thead><tbody><tr><td><strong>At-most-once</strong></td><td>最多 1 次, 可能丢</td><td>✓ 可行但糟糕 — 谁愿意丢 payment 通知</td></tr><tr><td><strong>At-least-once</strong></td><td>至少 1 次, 可能多次</td><td>✓ 标准做法</td></tr><tr><td><strong>Exactly-once</strong></td><td>恰好 1 次</td><td><strong>网络环境下不可能</strong> (有数学证明)</td></tr></tbody></table></div>
 <h4>为什么 exactly-once 是 fiction</h4>
 <pre class="language-plaintext"><code class="language-plaintext">Producer 发送 → Consumer 收到 → Consumer 处理 → Consumer 回 200
                                                        ↓
@@ -235,7 +235,7 @@ Total retry window ≈ 36 hours</code></pre>
   打到客户端的事件均匀分布在 12s 窗口内, 不会瞬时打爆</code></pre>
 <p><strong>实现</strong>: <code>delay = base_delay * 2^attempt * (1 + random(-0.2, 0.2))</code></p>
 <h4>Retry 决策表</h4>
-<table class="md-table"><thead><tr><th>Response</th><th>Retry?</th><th>原因</th></tr></thead><tbody><tr><td>200, 201, 202, 204</td><td>NO</td><td>成功</td></tr><tr><td>301, 302, 303</td><td>follow redirect</td><td>重定向 (不算 retry)</td></tr><tr><td>400</td><td>NO</td><td>客户端永久错误, 数据问题</td></tr><tr><td>401</td><td>NO*</td><td>签名问题, retry 也不会变 (* 但 alert 上来)</td></tr><tr><td>403</td><td>NO</td><td>权限拒绝</td></tr><tr><td>404</td><td>NO</td><td>URL 不存在</td></tr><tr><td>408 Timeout</td><td>YES</td><td>网络层 timeout</td></tr><tr><td>422 Unprocessable</td><td>NO</td><td>客户端数据格式问题</td></tr><tr><td>429 Rate Limit</td><td>YES (with Retry-After)</td><td>遵守对方限流提示</td></tr><tr><td>500, 502, 503, 504</td><td>YES</td><td>服务端临时</td></tr><tr><td>Connection refused</td><td>YES</td><td>服务暂时不可用</td></tr><tr><td>Connection timeout</td><td>YES</td><td>网络问题</td></tr><tr><td>SSL/TLS error</td><td>NO*</td><td>证书过期等 (alert 上来人解决)</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Response</th><th>Retry?</th><th>原因</th></tr></thead><tbody><tr><td>200, 201, 202, 204</td><td>NO</td><td>成功</td></tr><tr><td>301, 302, 303</td><td>follow redirect</td><td>重定向 (不算 retry)</td></tr><tr><td>400</td><td>NO</td><td>客户端永久错误, 数据问题</td></tr><tr><td>401</td><td>NO*</td><td>签名问题, retry 也不会变 (* 但 alert 上来)</td></tr><tr><td>403</td><td>NO</td><td>权限拒绝</td></tr><tr><td>404</td><td>NO</td><td>URL 不存在</td></tr><tr><td>408 Timeout</td><td>YES</td><td>网络层 timeout</td></tr><tr><td>422 Unprocessable</td><td>NO</td><td>客户端数据格式问题</td></tr><tr><td>429 Rate Limit</td><td>YES (with Retry-After)</td><td>遵守对方限流提示</td></tr><tr><td>500, 502, 503, 504</td><td>YES</td><td>服务端临时</td></tr><tr><td>Connection refused</td><td>YES</td><td>服务暂时不可用</td></tr><tr><td>Connection timeout</td><td>YES</td><td>网络问题</td></tr><tr><td>SSL/TLS error</td><td>NO*</td><td>证书过期等 (alert 上来人解决)</td></tr></tbody></table></div>
 <h4>Retry budget (防止 retry 占用过多资源)</h4>
 <pre class="language-python"><code class="language-python">class RetryBudget:
     """限制 retry 占总流量的比例, 防止退化成 retry-only-storm"""
@@ -262,7 +262,7 @@ def on_entity_deleted(entity_id):
 <hr />
 <h3>⚙️ Problem 3: Ordering Guarantees — Per-entity vs Global vs None</h3>
 <p><strong>三种 ordering</strong>:</p>
-<table class="md-table"><thead><tr><th>模式</th><th>保证</th><th>实现</th><th>代价</th></tr></thead><tbody><tr><td><strong>No ordering</strong></td><td>全乱序</td><td>任意并发投递</td><td>最简单, 但客户端必须容忍乱序</td></tr><tr><td><strong>Per-entity ordering</strong> ⭐</td><td>同 entity 顺序保证</td><td>Kafka partition by entity_id, 单 consumer</td><td>复杂度可控, 多数场景够</td></tr><tr><td><strong>Global ordering</strong></td><td>全局严格顺序</td><td>单 partition / 单 worker</td><td><strong>不可扩展</strong>, 几乎从不选</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>模式</th><th>保证</th><th>实现</th><th>代价</th></tr></thead><tbody><tr><td><strong>No ordering</strong></td><td>全乱序</td><td>任意并发投递</td><td>最简单, 但客户端必须容忍乱序</td></tr><tr><td><strong>Per-entity ordering</strong> ⭐</td><td>同 entity 顺序保证</td><td>Kafka partition by entity_id, 单 consumer</td><td>复杂度可控, 多数场景够</td></tr><tr><td><strong>Global ordering</strong></td><td>全局严格顺序</td><td>单 partition / 单 worker</td><td><strong>不可扩展</strong>, 几乎从不选</td></tr></tbody></table></div>
 <h4>Per-entity ordering 实现 (推荐)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">Kafka topic: webhook_events
 Partition key: hash(client_id, entity_id)
@@ -382,7 +382,7 @@ def deliver(event):
     can_replay: bool             # 是否允许 self-serve replay</code></pre>
 <p><strong>存储</strong>: S3 (cold storage) + 索引 entries in Postgres for query</p>
 <h4>5.2 Observability (4 维度)</h4>
-<table class="md-table"><thead><tr><th>维度</th><th>Metric</th><th>Alert 条件</th></tr></thead><tbody><tr><td><strong>Per-client delivery rate</strong></td><td>Success/min by client</td><td>&lt; 50% for &gt; 10 min → alert</td></tr><tr><td><strong>DLQ growth rate</strong></td><td>DLQ entries/min</td><td>&gt; 100/min sustained → page</td></tr><tr><td><strong>Queue depth</strong></td><td>Per-client in-flight</td><td>&gt; 80% of max → warn</td></tr><tr><td><strong>Latency p99</strong></td><td>First-attempt to ACK</td><td>&gt; 5s → investigate</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Metric</th><th>Alert 条件</th></tr></thead><tbody><tr><td><strong>Per-client delivery rate</strong></td><td>Success/min by client</td><td>&lt; 50% for &gt; 10 min → alert</td></tr><tr><td><strong>DLQ growth rate</strong></td><td>DLQ entries/min</td><td>&gt; 100/min sustained → page</td></tr><tr><td><strong>Queue depth</strong></td><td>Per-client in-flight</td><td>&gt; 80% of max → warn</td></tr><tr><td><strong>Latency p99</strong></td><td>First-attempt to ACK</td><td>&gt; 5s → investigate</td></tr></tbody></table></div>
 <p><strong>Dashboard 必备页面</strong>:</p>
 <ol><li><strong>Per-client health</strong>: success rate + queue depth + DLQ size</li><li><strong>Event-type breakdown</strong>: 哪类事件最常失败</li><li><strong>Time-series</strong>: 7-day trend of delivery success</li><li><strong>Failed event explorer</strong>: 可搜索 DLQ, 按 client / time / reason</li></ol>
 <h4>5.3 Self-serve replay</h4>
@@ -452,11 +452,11 @@ def deliver(event):
 <blockquote><p>"All clients behave similar, or 1% are slow + 1% always down + 98% fine? Long-tail behavior changes design."</p></blockquote>
 <hr />
 <h3>5 步框架 (sample 45-min answer)</h3>
-<table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + volume + ordering + tolerance</td></tr><tr><td>5-15 min</td><td>Core delivery model (Kafka + Worker + HTTP POST) + at-least-once 语义</td></tr><tr><td>15-25 min</td><td>Retry strategy (backoff + jitter + cap + budget + 4xx vs 5xx)</td></tr><tr><td>25-35 min</td><td>Ordering (per-entity partition) + Backpressure (adaptive per-client)</td></tr><tr><td>35-45 min</td><td>DLQ + observability + self-serve replay + customer experience</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>时长</th><th>阶段</th></tr></thead><tbody><tr><td>0-5 min</td><td>Clarify direction + volume + ordering + tolerance</td></tr><tr><td>5-15 min</td><td>Core delivery model (Kafka + Worker + HTTP POST) + at-least-once 语义</td></tr><tr><td>15-25 min</td><td>Retry strategy (backoff + jitter + cap + budget + 4xx vs 5xx)</td></tr><tr><td>25-35 min</td><td>Ordering (per-entity partition) + Backpressure (adaptive per-client)</td></tr><tr><td>35-45 min</td><td>DLQ + observability + self-serve replay + customer experience</td></tr></tbody></table></div>
 <hr />
 <h3>简历专属 reframe</h3>
 <p>你的 <strong>voice agent multi-region</strong> + <strong>BNPL chatbot retry logic</strong> 都涉及类似:</p>
-<table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>At-least-once + dedup</td><td>ConvFinQA agent retry with idempotency key (<code>client_msg_id</code>)</td></tr><tr><td>Exponential backoff + jitter</td><td>Voice agent ASR/TTS retry pipeline</td></tr><tr><td>DLQ pattern</td><td>Voice agent failed calls 上报系统</td></tr><tr><td>HMAC signing</td><td>Voice agent multi-tenant auth (类似)</td></tr><tr><td>Per-client backpressure</td><td>7 markets traffic asymmetry handling</td></tr><tr><td>Adaptive per-client</td><td>Voice agent 5% bad-network 客户自动降频</td></tr></tbody></table>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>At-least-once + dedup</td><td>ConvFinQA agent retry with idempotency key (<code>client_msg_id</code>)</td></tr><tr><td>Exponential backoff + jitter</td><td>Voice agent ASR/TTS retry pipeline</td></tr><tr><td>DLQ pattern</td><td>Voice agent failed calls 上报系统</td></tr><tr><td>HMAC signing</td><td>Voice agent multi-tenant auth (类似)</td></tr><tr><td>Per-client backpressure</td><td>7 markets traffic asymmetry handling</td></tr><tr><td>Adaptive per-client</td><td>Voice agent 5% bad-network 客户自动降频</td></tr></tbody></table></div>
 <p><strong>主动 quote</strong>:</p>
 <blockquote><p>"On the voice agent retry pipeline I built, we used <strong>exponential backoff with jitter + 7 retry attempts capped at 36h</strong> with DLQ to S3. The thing that surprised me was <strong>per-client behavioral fingerprinting</strong> — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: <strong>don't retry the same way for all clients</strong>, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."</p></blockquote>
 <hr />
