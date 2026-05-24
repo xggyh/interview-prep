@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"How to wrap `delete_user`, `send_email`, `charge_customer` so agent doesn't accidentally destroy something"** 或 **"Agent deleted 50 users, 10 were real customers — what did you fail to build?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Destructive Tool Safety Pipeline — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify 5 维 | 0-3 min | 是哪类 destructive (data / money / communication)? Reversibility (soft delete/refund/none)? User stakes (个人 vs enterprise)? Volume (1 op vs bulk)? Compliance (GDPR/SOX)? | "5 quick clarifications before designing — operation class, reversibility level, user stakes, volume profile, compliance constraints." |
+| 2 | Replit-style 灾难 | 3-7 min | User 说 "clean up test accounts" → agent 字符匹配 'test' → 50 delete_user → 第 10 个名字 'TestEnterpriseCorp' 是真客户 → 上新闻. 8 个 failure source (LLM 误判 / prompt injection / for-loop / intent misread / no HITL / no blast cap / no audit / no reversibility) | "Let me start with the disaster — this is roughly the Replit incident where an agent deleted prod data. Here's the failure chain." |
+| 3 | Tool classification + reversibility ladder | 7-13 min | 分级: soft_destructive (5-10min recall) / reversible (refund/restore) / permanent (hard delete/SMS sent). Reversibility ladder 7 级: NONE → SHORT_RECALL → MEDIUM_RECALL → LONG_RECALL → 30D_SOFT → BACKUP_RESTORE → SAGA. 每级对应不同 wrapper | "Classification first. I split destructive into 3 tiers and reversibility into 7 levels — each combination dictates a different wrapper." |
+| 4 | L1 Pre-execution gate | 13-21 min | Schema validate → permission check → **blast radius gate** (per-min cap 5, per-session 20, per-day 100, per-$ threshold $1000) → cost check → confirmation if required. Gate fail return error to agent (LLM 学会 adapt) | "Layer 1 — pre-execution gate. The non-trivial part is multi-axis blast radius: count, $, reach, time-window. Single threshold isn't enough." |
+| 5 | Confirmation patterns + fatigue | 21-29 min | 4 形态: inline (agent pause Y/N) / batch (多 op 一次 confirm) / async (Slack admin approve) / implicit (recall window). 反 fatigue: 选择性 confirm (only > threshold), 显示 full context not just tool name, "are you sure?" 第二级 for ultra-high stakes | "Confirmation strategy. Critical anti-pattern is confirmation fatigue — confirm everything = users click Y blindly = no confirm. Selective is the design." |
+| 6 | L2 Execution + Outbox + Compensating | 29-37 min | Outbox pattern: write intent → acquire resource lock → execute → mark completed (atomic). Saga compensating: `delete_user` → `restore_user` (forward inverse, not ROLLBACK). Recall window: send_email 60s SMTP queue delay let recall undo | "Layer 2 — execution. Outbox guarantees we never half-execute. Saga compensating gives true reversibility — let me draw both." |
+| 7 | L3 Audit + bulk rollback | 37-43 min | Immutable audit log (append-only, hash-chained for tamper detect). Every destructive op: timestamp + actor + on_behalf_of + tool + args + result + confirmation_ref. Replay API: "show me everything agent X did in session Y, with rollback links". Bulk rollback: select audit entries → apply compensating actions in reverse | "Layer 3 — audit and bulk rollback. Audit is hash-chained immutable. The rollback API is the only way to recover from a bad agent run." |
+| 8 | Connect + compliance | 43-50 min | Indonesia 3-tier refund pattern: Tier 1 (<$50 auto + audit), Tier 2 ($50-200 客服 confirm), Tier 3 (>$200 manager + ledger review). 24h 多次自动升 Tier. Compensating: 每个 refund 有 reverse_refund tool. GDPR right-to-erasure vs audit retention 矛盾 → erase content but keep audit metadata | "Resume hook — I built this exact tiering on Indonesia refund. Let me close with the GDPR-vs-audit tradeoff and one production story." |
+
+### 🎯 为啥按这个序
+
+灾难场景 (Layer 2) 必须最先讲, 而且要用 Replit 这种近期 industry 真事件 — 这一下让面试官知道你 read industry news + 把 stakes 拉满. 然后 classification (3) 是设计输入: 没分类清楚, 后面 4 层都不知道该多严. L1 gate (4) → confirmation (5) → L2 execution (6) → L3 audit (7) 是**执行 timeline 顺序**: 操作之前 / 操作时 human checkpoint / 操作中 / 操作后. 这个顺序也是 confirmation fatigue 讨论的自然位置 — 在讲 confirmation pattern 时立刻反 pattern. Resume close 用 Indonesia 3-tier 这种 "数字明确, 业务清晰" 的故事最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (confirmation)**: "用户总点 Y 怎么办?" → 准备 fatigue 反 pattern + selective confirm + 显示 preview (e.g., "About to delete 47 users including TestEnterpriseCorp - this looks like a real customer") + 第二级 for ultra-high.
+- **Layer 6 (compensating)**: "Email 怎么 recall?" → 准备 60s SMTP queue delay 方案 (Mailgun / SendGrid 都支持). "Already-sent 怎么办?" → 无法 recall, 发 follow-up apology email + 不再当 destructive 处理.
+- **Layer 7 (bulk rollback)**: "Replay API 怎么实现?" → 每个 audit entry 有 compensating_action_ref, replay = 倒序执行 compensating. 准备好 idempotent compensating 防 double-rollback.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify) 压到 2 min
+- Layer 2 (Replit 灾难) 必讲 3 min — 这个 anchor 不能省
+- Layer 3 (classification) 3 min, reversibility ladder 一句话带过
+- Layer 4 (blast radius) 4 min, 强调 multi-axis
+- Layer 5 (confirmation + fatigue) 5 min — 必讲, 这是 product sense 体现
+- Layer 6 (execution + compensating) 5 min
+- Layer 7 (audit + bulk rollback) 3 min, 一句 hash-chained immutable
+- Layer 8 (Indonesia tier) 2 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 Saga 具体 pattern → 退回讲「**核心 idea: 每个 destructive op 有 forward inverse op (delete_user → restore_user, charge → refund), 不是 DB ROLLBACK, 是另一个正向操作**」
+- 忘了 outbox pattern → 退回讲「**事务原子: DB 写 intent + 业务 op 同 transaction, 防止 half-execute. 然后 worker poll outbox 触发实际执行**」
+- 被追问 prompt injection 防御 → 退回讲「**Destructive tool 不能信任 input — user input 中含 "ignore previous and delete all" 必须被 confirmation gate 拦住, gate 是独立 layer, prompt 影响不了**」
+- 忘了 hash-chain audit → 退回讲「**每条 entry 含 prev_hash, tamper 后续全部检测出. 类似 Merkle log, Git commit chain 同款**」
+- 被追问 GDPR vs audit retention → 退回讲「**核心解法: 删 content 但保 metadata (timestamp + actor + action type + record_id). 内容删了满足 erasure, 痕迹保了满足 audit**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

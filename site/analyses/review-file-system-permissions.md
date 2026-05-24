@@ -6,6 +6,48 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"设计一个 hierarchical file system permission system, 支持 (a) Alice grants Bob read on folder X at T1, (b) revokes at T2, (c) check 'did Bob have access at T1.5 on file X/Y/Z' efficiently"** 我按这 7 层回答, 不跳序.
+
+### 📐 File System Permissions — 7 层 design
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify scope 3 question | 30s | 反问: (a) read-heavy vs write-heavy ratio? (b) deny precedence or override allowed? (c) max tree depth + branching factor? — 这 3 个 question 决定 schema | "Before design — 3 clarifying questions on read/write ratio, deny semantics, tree shape…" |
+| 2 | Data model: event-sourced ACL | 1.5 min | Per node, list of grant_event: `(file_id, principal, permission, action, granted_at, granted_by, valid_from, valid_to)`. Event sourced append-only — 天然 time-travel audit, never UPDATE never DELETE, revoke = new event with action=revoke. Postgres / DynamoDB | "Data model — append-only grant_event table per node, time-travel for free, revoke = new event not UPDATE…" |
+| 3 | Walk-up resolution algorithm | 2 min | Check access(file_id, principal, ts): traverse from file_id up to root, at each node fetch grants where principal IN (user OR user's groups) AND valid_from ≤ ts AND (valid_to IS NULL OR valid_to > ts), latest event by granted_at. Child override parent default; **deny precedence variant** — single deny anywhere in chain wins | "Walk-up — from file to root, latest-event-≤-ts per node, child overrides parent, optional deny-precedence…" |
+| 4 | Time-aware bisect query | 1.5 min | Query "at ts T, did principal P have access on F?" → binary search on sorted (granted_at) per node — O(log E) per node × depth = O(depth × log E). Index on (file_id, principal, granted_at) | "Time query — sorted by granted_at per node, bisect for latest ≤ ts, O(depth × log E)…" |
+| 5 | Production scale: cache + materialized | 1.5 min | Read-heavy → 2 optimization: (a) **write-time ancestor cache** — on grant, push event to descendant cache (denormalize, write amplification); (b) **read-time materialized view** — periodic batch recompute "effective permission at now" per (file, principal). Trade-off: write cache (real-time, write-heavy) vs materialized (stale, read-heavy with low staleness tolerance) | "Scale — write-time ancestor cache (write amplification) or read-time materialized view (staleness trade-off)…" |
+| 6 | Sharding + concurrency | 1 min | Shard by hash(root_folder_id) — keeps subtree together, cross-shard rare. Concurrency: per-file_id row lock on write (Postgres SELECT FOR UPDATE), read goes through cache (no lock). Conflict on simultaneous grant — latest granted_at wins, application enforces no contradictory grant at exact same ts (add nanosecond tiebreaker) | "Sharding — by root_folder_id keeps subtree colocated, per-file write lock, read via cache lock-free…" |
+| 7 | Resume hook | 1 min | "Concrete: Internal Agent Platform shared memory + permission abstraction. Per-agent memory tree (per-tenant root) with event-sourced ACL. Used across 200+ agent. Hierarchical scope (per-tenant → per-user → per-conversation), time-travel useful for incident replay ('what did agent see at T-5 min?'). Same pattern from filesystem permission generalizes to agent memory permission" | "Real example — Internal Agent Platform uses same event-sourced ACL for agent memory permission, time-travel for incident replay…" |
+
+### 🎯 为啥按这个序
+
+Clarify 第一 because permission system 有 5+ design path — 选错 path 花 30 min. Event-sourced ACL 是关键设计决策 (append-only → time-travel 自然, audit 自然). Walk-up + time-aware bisect 是算法核心. Scale optimization 是 "production-grade 还是 academic" 的 signal. Sharding + concurrency 是 distributed gotcha. Resume hook 用 Agent Platform 真案例 land (file system permission 概念 generalize 到 agent memory).
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 3 (walk-up + deny precedence)** — 必被追 "What if deny on parent but allow on child?" → 答 design decision — 2 variant: (a) **child override** (UNIX behavior, allow-wins per node), (b) **deny precedence** (AWS IAM behavior, explicit deny anywhere blocks). 我默认 child override for usability (folder owners can grant deeper), 但 enterprise / compliance system 用 deny precedence (security default). 客户 contract 必须 explicit.
+
+**Layer 5 (cache vs materialized)** — 追 "Which would you pick?" → 答: depends on R/W ratio + freshness tolerance. Read 100:1 write + sub-second freshness → write-time ancestor cache (push grant to descendants on grant). Read 10:1 + minute-level staleness → materialized view (batch recompute every 1 min). Both — write-time for security-critical perms + materialized for analytical query. 关键: 不写直查表 at production scale.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (clarify + event-sourced model)
+- 3-12 min: Layer 3+4 (walk-up + time-aware bisect)
+- 12-20 min: Layer 5+6 (cache/materialized + sharding)
+- 20-26 min: Layer 7 Agent Platform generalize
+- 26-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不熟 event-sourcing → "append-only log of state changes, current state = fold(events); 优点 audit + time travel + replay; trade-off 是 query 慢 (用 cache / materialized view)"
+- 被问 "how to garbage collect old events" → "tombstone snapshot at T_n, keep events from T_n onwards; compliance retention 7y minimum for finance, configurable per-tenant"
+- 不会画 schema → tables: `grant_event(id, file_id, principal_id, permission, action, valid_from, valid_to, granted_at, granted_by)` + index `(file_id, principal_id, granted_at DESC)` + `effective_permission_cache(file_id, principal_id, permission, updated_at)`
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

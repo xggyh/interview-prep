@@ -6,6 +6,45 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"为什么选这种 chunking 策略 / 你怎么决定 chunk_size / overlap"**, 我按这 7 层回答, 不跳序. **核心心法: 先 defend 选择 (不是凭感觉), 再展开 decision factors, 再 multi-modal 细节, 最后 eval-driven 闭环 + resume hook**.
+
+### 📐 Chunking Defense — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Defend 选择 (非 intuition) | 15s | 我选 structure-aware 300-500t + 30% overlap + metadata, 不是因为 default, 是因为 corpus profile + eval ablation 证明的 | "I never pick chunking without profiling — my default for markdown/wiki is structure-aware 300-500t, but the choice is eval-validated, not intuition" |
+| 2 | 5 Decision Factors | 30s | corpus 特征 (length P50/P99 / table / code / lang) → query pattern (entity 密度 / multi-hop / ID match) → retrieval method (joint design) → embed ctx limit → latency budget | "Five factors drove it: corpus length distribution, query pattern, retrieval method, embed context limit, and latency budget — one wrong, full redesign" |
+| 3 | Multi-modal subroutines | 30-45s | tables → integral + row + NL desc; code → AST tree-sitter; formula → LaTeX + NL; lists → header-replicated; image → CLIP + caption | "If the doc has tables I split chunkers — integral chunk plus row chunks plus NL description. Treating a table as prose loses the numbers" |
+| 4 | Metadata 深度 (chunk 身份证) | 20s | heading_path / doc_id / chunk_order / chunk_type / ACL pre-filter / tenant_id / freshness / lang / embed_model_version | "Every chunk carries an ID card — heading_path, ACL list pre-filter, freshness, embedding_model_version. Without ACL pre-filter users can enumerate doc existence" |
+| 5 | Eval-based ablation 证明 | 30s | 3-layer eval (retrieval recall@10/NDCG/MRR + generation LLM-judge kappa>0.6 + operational P99/cost) + 9-variant ablation + slice by lang/difficulty | "I ran 9-variant ablation — isolated chunk_size, overlap, hybrid alpha, rerank on/off. Sliced by language and query type. Recall@10 went from 0.61 to 0.83" |
+| 6 | Cost-quality Pareto | 15s | 不只挑最高 recall, 挑 Pareto front; rerank 不是默认开 (3-5x latency); embedding 升 large 不一定 worth | "I pick on the Pareto front, not max recall — rerank adds 3-5x latency, only worth it if budget allows" |
+| 7 | Resume hook | 15s | ConvFinQA 9-variant negative result (tables integral + BM25 数字) / BNPL FAQ Q-A 切 + lang metadata / Voice agent 7 markets BGE-M3 multilingual | "I lived this in ConvFinQA — 9-variant ablation, two of which were negative results. And BNPL chatbot — FAQ Q-A pair chunking with per-language metadata" |
+
+### 🎯 为啥按这个序
+
+**先 framework 再 cost 再 eval**: 面试官最怕听 "我用 512 因为 default". 先抛 5-factor framework 让他知道你不是凭感觉, 再 multi-modal 证明你见过真实文档, 最后 eval ablation + Pareto 证明你 production-grade. **Resume hook 放最后 1 句**, 让 follow-up 自然引到 ConvFinQA / BNPL.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (Eval ablation)**: "你 9 variants 是哪 9 个? 为什么 isolated change?" → 准备 chunk_size {300, 500, 800} × overlap {0%, 30%} × rerank {on, off} 矩阵, 加 2 个 baseline
+- **Layer 3 (Multi-modal tables)**: "ConvFinQA 怎么处理 cross-table 数字?" → integral table chunk + row sub-chunk + NL desc, 数字进 BM25, calculator agent verify
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s 内: "structure-aware 300-500t + 30% overlap + hybrid + rerank + metadata, eval-driven 不是 default"
+- 1 min: + 5 decision factors + multi-modal subroutines 一句话带过
+- 2 min: + ablation 9-variant 数据 + Pareto + ConvFinQA hook
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **不知道具体 corpus profile**: "It depends on the data — I'd run a profiling script first: length P99, table %, language mix, heading coverage. Without that I'd start with recursive 500t/50 overlap as a safe baseline and iterate"
+2. **被问到 late chunking / ColBERT 不熟**: "Late chunking with Jina v3 — I haven't shipped it production, but the principle is embed-before-split for context. ColBERT 5x storage, only if precision-critical"
+3. **被问到 1M+ scale**: "At 100M I'd distill embedding 768→256, tiered hot/cold, skip rerank or distill rerank model. Honestly I haven't run that scale myself — closest was Voice agent 7 markets, but per-market shard kept it manageable"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

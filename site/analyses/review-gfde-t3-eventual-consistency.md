@@ -5,6 +5,48 @@
 **原页面**: [`gfde-t3-eventual-consistency.html`](questions/gfde-t3-eventual-consistency.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"agent 跑 5-step workflow: create_order → reserve_inventory → charge_payment → send_email → schedule_shipping. Step 3 (charge) times out. 不知道是否扣了. Step 4-5 没跑. Design recovery"**, 我按这 9 层回答, 不跳序.
+
+### 📐 Agent Workflow Consistency — 9 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 为什么 2PC 不可行 | 1 min | 跨 vendor (Stripe / SendGrid / 内部 ERP) 没 global coordinator. Network partition 时 2PC 会无限 hang. CAP 下 AP 是 default, 必然 eventual | "Why 2PC fails — cross-vendor 没 global coordinator, network partition hang. CAP forces AP, eventual is the only path..." |
+| 2 | Verify-on-timeout 起手 | 2 min | Step 3 timeout 不等于失败. 立刻调 Stripe `get_payment_status(idempotency_key)` 看真实状态. **3 outcome: succeeded / failed / unknown**. Unknown 必须 retry 同 idem_key | "First action — verify-on-timeout. Stripe `get_status(idem_key)`. Timeout 不等于 failure, 3 outcomes..." |
+| 3 | Idempotency key 设计 | 2 min | Per-step idem_key, 不是 per-workflow. Key 格式: `{workflow_id}:{step_id}:{attempt_n}`. Stripe / SendGrid / Twilio 都支持 Idempotency-Key header. 24h TTL on provider side | "Idempotency-Key per step, format {workflow_id}:{step_id}:{attempt}. All major vendors support — Stripe / SendGrid / Twilio..." |
+| 4 | 3 pattern 速选 | 2 min | **Saga** < 5 step + clear undo. **Outbox** 跨服务 no framework, Kafka push. **Workflow engine (Temporal/DBOS) 5+ step / 长 / audit-heavy**. 这题 5 step + audit-required → **Temporal** | "3 patterns — Saga short, Outbox cross-service, Temporal 5+ step. 这题 5 step + audit → Temporal..." |
+| 5 | Temporal workflow as code | 3 min | `@workflow.defn` class, `execute_activity` 每步 durable. Retry policy per step (`maximum_attempts=3, exponential_backoff`). Crash 自动 replay from last checkpoint. Compensation 在 try/except 里写, framework 保证 reliable | "Temporal workflow as code — @workflow.defn, execute_activity 自动 durable + retry. Crash replay from checkpoint..." |
+| 6 | Order matters (irreversible 后置) | 2 min | Email 后置 — `send_email` 不能 undo (refund email 用户已读). `schedule_shipping` 也是. **Irreversible step 一定在 payment 确认后**. Compensate 顺序: inventory release → order cancel (payment refund 单独 manual path) | "Order critical — irreversible (email, ship) 必须 after payment confirmed. Compensate reverse: inventory → order, payment refund manual..." |
+| 7 | Compensation 自己失败怎么办 | 2 min | DLQ + ops manual intervention. 不能 silent fail. Alert PagerDuty + ticket 自动开. 财务级别 (refund > $200) 一定 human approval gate, 不全自动 | "Compensation 自己失败 → DLQ + PagerDuty + auto-ticket. 财务级别强制 human gate..." |
+| 8 | Step 3 具体 recovery flow | 2 min | (1) verify_status → unknown (2) retry charge same idem_key, get answer (3) succeeded → continue step 4-5 (4) failed → compensate step 1-2: inventory.release + order.cancel + alert user "payment failed, retry later" | "Concrete recovery: verify → retry same idem → if succeeded continue, if failed compensate inventory + order + alert..." |
+| 9 | 简历 resume hook | 90s | "Indonesia refund tier 3 (> $200) — 5-step Temporal workflow: lookup → risk → ledger → fund return → notify. Step 3 fail 自动 compensate 1-2, alert ops. **156K refund processed, 1.9% verify-on-timeout, 0 double-refund**. Temporal 比 hand-roll Saga dev velocity 3-4x, bug 少 70%" | "Indonesia refund tier 3 — Temporal 5-step. 156K processed, 1.9% verify-on-timeout, 0 double-refund..." |
+
+### 🎯 为啥按这个序
+
+2PC 不可行 直接关上面试官 "为什么不用 strong consistency" 的退路. Verify-on-timeout 是 timeout = unknown 这个核心洞察, 必须先讲. Idempotency key 是基础设施前提, 没它后面都白讲. 3 pattern 速选 是 framework, 这题答案是 Temporal — 要直接说出来. Temporal workflow as code 演示具体代码思维. Order matters 是踩过坑才知道 — irreversible 后置. Compensation 失败的 fallback 显示 ops mindset. Step 3 concrete recovery 是 "你能不能落地" 信号. 简历 hook 用 Indonesia refund 156K + 0 double-refund 是 hard number.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 5 (Temporal mechanics)** — 追问 "Temporal 怎么 replay 不重复执行 side effect?". 回答: workflow code 必须 deterministic, side effect 都在 `execute_activity` 里, activity 结果记录到 Temporal history. Replay 时跳过已记录 activity, 从下一个未执行的开始. **Layer 3 (idempotency)** 追问 "idem_key 多久 TTL?". Stripe 24h, SendGrid 24h, Twilio 5 days. 跨 TTL retry 行为不确定, 应在 workflow 层算 deadline 控制. **Layer 7 (compensation fail)** 追问 "DLQ 谁消费". 回答: ops team 有专门 runbook + dashboard, P0 alert PagerDuty, P1 ticket. 财务级别 human gate 必须.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 2PC 不行 + verify-on-timeout (2 min)
+2. Idempotency key + 3 pattern 选 Temporal (3 min)
+3. Temporal workflow as code + order matters (4 min)
+4. Step 3 concrete recovery flow (2 min)
+5. 简历: Indonesia refund 156K (1 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "为什么不用 saga 而用 Temporal"**: Saga 在 5+ step 时 hand-roll state machine 复杂 + bug 多. Temporal framework 帮你管 state + retry + compensation, dev velocity 3-4x. 短 workflow (< 3 step) 反而 Temporal overkill
+2. **被问 "exactly-once 怎么保证"**: 直接说 "exactly-once delivery 在分布式不存在, 只能 at-least-once + idempotency. Idempotency-Key 让 retry 安全, effectively-once"
+3. **被问 "Temporal vs DBOS vs Inngest"**: Temporal 最成熟 (Uber Cadence 起源), 生态强但 self-host 复杂; DBOS 轻量 MIT 起源, Postgres-native; Inngest serverless 优. 2026 enterprise default 是 Temporal Cloud
+4. **被问 "compensation 也 timeout 怎么办"**: 同样 verify-on-timeout 套路 — 调 status query 看 compensation 真实结果. 死循环时 fall back DLQ + human
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

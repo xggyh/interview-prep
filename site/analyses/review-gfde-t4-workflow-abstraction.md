@@ -6,6 +6,48 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"客户给你 12-step 人工 refund / onboarding / triage 流程, 哪些 agent 自动, 哪些 human, 怎么决定?"** 我按这 7 层回答, 不跳序.
+
+### 📐 Workflow Abstraction — 7 层 decompose-and-tier
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Atomic step decompose | 1 min | 把 12-step 拆成最小可独立 succeed/fail 的 atomic unit, 不混 "look up account + verify ID + email user" 三件事 — 一个 step 一个 verb 一个 side effect | "Step 0 — decompose the workflow into atomic operations, one verb one side effect per step…" |
+| 2 | 3-question per step (D/R/L) | 2 min | Q1 **D**eterministic? same input → same output (lookup yes / sentiment no); Q2 **R**eversible? has undo (mark_label yes / charge_card no); Q3 **L**atency class? realtime <2s vs async — 这 3 个 question 决定 owner | "For each atomic step I apply 3 questions — deterministic, reversible, latency-sensitive…" |
+| 3 | 4 outcome routing | 1 min | (Det+Rev) agent_auto; (Det+!Rev) agent_with_confirm UI; (!Det+Rev) agent_with_review human 10% sample; (!Det+!Rev) human_with_assist (agent prep but human commit) | "The 2×2 deterministic × reversible maps to 4 outcomes…" |
+| 4 | 4-phase trust ladder | 2 min | Phase 1 shadow (agent runs but doesn't commit, human does) → Phase 2 suggest (agent UI 高亮答案, human 1-click) → Phase 3 auto with safety net (agent 自动 commit + 10% audit sample) → Phase 4 full auto for that step class — 每 phase gate 是 measured accuracy + customer trust | "Trust is earned in 4 phases — shadow → suggest → auto-with-net → full auto…" |
+| 5 | Sub-step split for judgment | 1.5 min | 当一 step 是 !Det (judgment heavy), 不要 "全 human" — 拆成 (a) gather context (Det auto) + (b) propose recommendation (LLM with confidence) + (c) commit (human with assist), 80% 的 judgment 可以前置 auto | "When a step is judgment-heavy I sub-split it — gather/propose/commit — 80% can still auto…" |
+| 6 | Durable state + handoff | 1.5 min | Temporal-style workflow engine: 每 step 持久化 (resume after crash), handoff state包 (LLM context + audit trail + customer info) 走 explicit message bus, 不靠 in-memory — BNPL chatbot 用 Temporal 跑 90 天 zero state loss | "State must be durable — Temporal-like engine, every step checkpointed…" |
+| 7 | BNPL chatbot resume hook | 1 min | "Concrete: BNPL chatbot 12-step intent → routing → action. 3-question 分类 后 60% auto FAQ / 25% confirm (account change / settlement) / 15% human (dispute / fraud). Intent routing 70%→92% after 3-month iteration, agent-platform shared workflow abstraction reused 200+ time" | "Real example — BNPL chatbot: 60% auto / 25% confirm / 15% human, routing 70→92%…" |
+
+### 🎯 为啥按这个序
+
+Atomic decompose 在最前是因为 90% wrong-automation 是 step 没拆细 ("send email" 包含 lookup + compose + send + log). 3-question 然后 4 outcome 是机械化决策树, 面试官能跟. Trust ladder 在第 4 层是因为 "客户 day 1 不会让你 full auto" — 4 phase 是 ship 路径不是 ship 目标. Sub-step split 在第 5 层是 advanced technique (听完前 4 层的人才能 appreciate). Durable state 是 production gotcha. BNPL hook 收尾.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (4-phase trust ladder)** — 必被追 "How do you decide when to promote from phase 2 to phase 3?" → 答: per-step gate = (a) measured agent accuracy on last 1000 instances ≥ threshold (FAQ 99%, account 95%); (b) customer NPS unchanged or up; (c) zero P0 incident in last 4 weeks; (d) end-user team explicit sign-off. Promotion 是 quarterly, 不是 weekly.
+
+**Layer 6 (durable state + Temporal)** — 追 "Why Temporal not custom?" → 答: Temporal gives me (a) checkpoint per activity for free, (b) replay-from-failure (incident reconstruction), (c) versioning of workflow code (long-running flows don't break on deploy), (d) timer / signal / query primitives. Custom 我可能要 3-4 个月写到同等可靠性, Temporal day 1 production-grade.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (atomic decompose + 3-question)
+- 3-10 min: Layer 3+4 (4 outcome + trust ladder)
+- 10-18 min: Layer 5+6 (sub-step + Temporal state)
+- 18-25 min: Layer 7 (BNPL 60/25/15 + routing 70→92%)
+- 25-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不会判断 "is this step deterministic" → 反问 "if I run this step 100 times with identical input, do I get identical output 99%+ of the time?" — 这个具体化能立刻分类
+- 客户说 "we want 100% automation" → "100% automation is a goal we earn step-by-step through trust ladder, not a phase-1 promise. Promising it kills the project at first incident"
+- 不熟 Temporal → 退路 "any durable workflow engine — Temporal / DBOS / Inngest / Step Functions; key property is checkpoint + replay, not the vendor"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

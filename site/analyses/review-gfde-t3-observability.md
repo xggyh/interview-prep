@@ -5,6 +5,47 @@
 **原页面**: [`gfde-t3-observability.html`](questions/gfde-t3-observability.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"LLM agent in production misbehaving — sometimes wrong, slow, expensive. Can't reproduce locally. Design observability"**, 我按这 8 层回答, 不跳序.
+
+### 📐 LLM Observability — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 传统 obs 为什么不够 | 90s | RED method (Rate / Error / Duration) 只看 HTTP 5xx. LLM 失败是 **200 OK 但内容差** — dashboard 一片绿用户在骂. 这是 LLM-specific obs 的根本 motivation | "Traditional RED misses LLM's signature failure — 200 OK with bad content. Dashboard green, users complain..." |
+| 2 | 4-layer 框架 | 1 min | L1 OTel distributed trace / L2 LLM-specific prompt+completion log (LangSmith) / L3 cost track per (user, feature, model) / L4 eval-in-prod LLM-judge. 每层独立工具 | "4 layers stacked — trace, LLM log, cost, eval. Each layer has dedicated tooling..." |
+| 3 | L1 OTel trace 设计 | 2 min | span hierarchy: http.request → auth → rate_limit → cache.lookup → retrieve → llm.gen → tool.call×N → audit. 关键 attr: `llm.model`, `llm.input_tokens`, `llm.cost_usd`, `prompt_template_version`, `tenant.id` | "L1 is OpenTelemetry — span tree from HTTP all the way down. Critical attrs: model, tokens, cost, prompt_template_version..." |
+| 4 | L2 LLM-specific tracing | 3 min | OTel 不够细 — 需要 prompt 全文 + completion 全文 + tool call chain. LangSmith / Phoenix / Langfuse / Helicone 选型. **PII redact via Presidio at write-time**, 不能事后 | "L2 — OTel 看不到 prompt 内容. LangSmith logs full prompt + completion, PII redacted via Presidio before write..." |
+| 5 | L3 cost tracking | 2 min | Per (user, feature, model, day) Redis hincrby int(cost*10000). Per-tenant daily/monthly aggregate. Budget alert 80% / hard stop 100%. **用 provider response.usage 不是 estimate** (cached input 算错是常见 bug) | "L3 cost — per (user, feature, model, day) hash. Critical gotcha: 用 provider response.usage, 不是 token estimate..." |
+| 6 | L4 eval-in-prod | 3 min | 5% sample LLM-as-judge (faithfulness / relevance / safety / completeness). Calibrate to human eval weekly 100 条. Drift: 7-day MMD test on eval scores. **不做 = prompt-by-vibes** | "L4 — sampled LLM-judge 5%, calibrated to weekly 100 human-eval. MMD drift test daily. 没这层 = prompt-by-vibes..." |
+| 7 | Tail-based sampling | 2 min | 100% sample = TB/day. 策略: 1% baseline + **100% error + 100% slow (> p95) + 100% expensive (> $0.05) + 100% jailbreak attempt + 100% VIP user**. Honeycomb / Datadog / Tempo 都支持 | "Sampling — 1% baseline + 100% on 5 anomaly classes. Tail-based, Honeycomb supports natively..." |
+| 8 | 简历 resume hook | 90s | "Voice agent 7 markets weekly review: per-market p99, error by ASR/TTS/LLM segment, eval score (CER, intent acc), 用户 hangup rate. LangSmith **catch Indonesia prompt faithfulness drop 12% after LLM 升级 — pre-rollback alert**" | "On voice agent 7 markets, LangSmith caught Indonesian prompt faithfulness drop 12% pre-rollback — saved a regression..." |
+
+### 🎯 为啥按这个序
+
+传统 obs 不够 是 framing — 强制面试官接受 "LLM 需要新一层". 4 层框架是骨架. L1 OTel 必须先讲 (基础设施层), 关键 attribute list 显示你做过. L2 LangSmith 是 LLM-specific, PII redact at write-time 是 SOC2 要点. L3 cost 是 FDE 死穴, "用 provider.usage 不是 estimate" 是只有踩过坑才知道的细节. L4 eval-in-prod 是 staff signal — "prompt-by-vibes" 这句是 quotable. Tail-based sampling 显示你懂 100% log 的 TB/day economic. 简历 hook 用 Indonesia prompt drop 12% 是 concrete win.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 6 (eval-in-prod)** — 追问 "LLM-judge 怎么知道判断准?". 回答: weekly 抽 100 条人工 label → 算 LLM-judge agreement (Cohen's kappa > 0.6 acceptable), drift 时 re-prompt judge or 换 model. **Layer 4 (LangSmith)** 追问 "100K QPS 全 log prompt 哪里存得下". 回答: tail-based + PII redact + tier storage (hot 7 day → cold S3 90 day → glacier), 加 prompt content hash dedup. **Layer 3 (cost)** 追问 "cached input 怎么算". 回答: Anthropic / OpenAI / Google response 里都返回 cached_tokens, 单价 90% off (Anthropic) / 50% off (OpenAI) / 75% off (Google), 用 provider 返回值不自己估.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 传统 obs 不够 (1 min) + 4 layer 框架 (30s)
+2. L1 OTel + L2 LangSmith + L3 cost + L4 eval, 各 90s (6 min)
+3. Tail-based sampling + PII redact (2 min)
+4. 3 个 gotcha (cost dashboard wrong, eval drift, log explosion, 2 min)
+5. 简历: Indonesia prompt drop 12% (90s)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "为什么不只用 Datadog APM"**: Datadog 看 latency / error / RPS 强, 看不到 prompt 内容 + 没 LLM-as-judge eval + cost tracking 维度不够. 通常 Datadog + LangSmith 双 stack, OTel 作为桥
+2. **被问 "Helicone 还是 LangSmith 还是 Phoenix"**: Helicone 是 drop-in proxy, 无 code change, 快速接入但能力浅; LangSmith 强在 eval + LangChain 生态; Phoenix 开源自部署 + RAG-specific 强; Langfuse 开源 + prompt mgmt
+3. **被问 "PII redaction 用 LLM 不行吗"**: 可以但贵 + 慢 + 容易漏. 标准做法是 Presidio (regex + NER 混合, < 5ms per doc), LLM 只在边界 case (sensitive enough that miss = fine) 用作 fallback
+4. **被问 "eval-in-prod 100% sample 行不行"**: 不行. LLM-judge 自己一次调用 $0.001-0.01, 100K QPS × 全 eval = $100K/day, 而且 judge model 自己 latency 加 1-2s. 5% sample + 100% error 重保是平衡
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"How do you evaluate a re-routing AI agent (no historical labels, no A/B)?"**, 我按这 8 层回答, 不跳序. 这题考的不是 "ML 模型怎么训", 是 **eval methodology when labels lag 90 days**.
+
+### 📐 Logistics Re-routing Eval — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Clarify before solving | 1 min | 5 questions: agent decision space? (reroute/hold/split) \| warehouse count? \| SLA tier? \| current baseline (rule-based?)? \| data delay (SAP 30min)? | "Before I propose eval, I need to scope decision space. Five questions..." |
+| 2 | Metric anchor — CADR | 2 min | **CADR = Cost-Adjusted Delivery Rate** = (on-time deliveries) / (cost per package). 单一 metric 不行 — 必须 **stratified by**: SLA tier × region × decision type × package volume bucket | "Aggregate on-time-rate lies. I'd anchor on CADR but stratify on 4 axes — let me draw..." |
+| 3 | 3 counterfactual estimators | 4 min | 因为没 ground truth, 我用 3 个 estimators: **(a) Direct method (predict counterfactual outcome with regression)** → **(b) IPS (inverse propensity scoring, re-weight observed)** → **(c) Doubly robust (combine both, hedge bias)**. 三个一起跑, 看 agreement | "No labels means 3 counterfactual estimators, not 1. Direct + IPS + DR. If they agree I trust. If they diverge I dig..." |
+| 4 | LLM-as-judge for novel decisions | 3 min | 当 agent 做出 historical baseline 没做过的决策 (e.g. "split shipment to 3 warehouses"), 用 **LLM-as-judge with structured rubric**: (i) safety, (ii) cost, (iii) SLA compliance, (iv) operational feasibility. **不是给分**, 是给 4 个 binary flags | "For novel decisions counterfactuals fail. I'd use LLM-as-judge but not for scoring — for structured flagging on 4 axes..." |
+| 5 | 3-layer eval pipeline | 4 min | **Offline (replay 90 days) → Shadow (run agent in parallel, don't execute) → Production (10% canary)**. Gate: shadow 必须 agreement >80% with current rule + LLM-judge flags <5% before canary | "Three-layer pipeline. Offline replay gates shadow, shadow gates canary, canary gates rollout. Each layer has explicit go/no-go..." |
+| 6 | Boundary tests (hand-crafted) | 2 min | 30-50 hand-crafted scenarios: **blizzard, port strike, warehouse fire, SAP outage (30-min delay), inventory mismatch, customs hold**. 每个 scenario 有 expected behavior. 这是 **regression test**, agent 改了必跑 | "I lived this in TikTok PayLater. Indonesia refund tier CER jumped 18→25% after a daily-cap incident. After that I built 47 hand-crafted boundary tests..." |
+| 7 | Tail metrics + monitoring | 2 min | **P99 latency, P95 cost, worst-case SLA breach** — 监控 4 维度: (i) decision distribution drift, (ii) override rate by warehouse manager, (iii) downstream cost, (iv) anomaly cluster (>2σ). 500 warehouse manager 每个都不一样 → **per-manager calibration** | "Average is for managers who don't care. P99 is for keeping your job. Four monitoring axes..." |
+| 8 | Resume reframe | 1 min | "我在 TikTok 做 BNPL chatbot, agentic + RAG, intent routing 70→92%. **Multi-tenant** 跟 500 warehouse 一样, 每个 tenant rule 不同. Eval methodology 我复用过 ConvFinQA 的 9-variant ablation, 一个 negative result 让我学会 stratification before aggregation" | "I've done this — BNPL chatbot, multi-tenant, routing 70→92%. The eval methodology is portable..." |
+
+### 🎯 为啥按这个序
+
+**先 metric (CADR), 再 estimator (counterfactual), 再 pipeline (3-layer), 再 boundary (hand-crafted)** — 这是 FDE eval-when-no-labels 标准 stack. 跳序会被打断: 如果直接讲 shadow 但没讲 stratification, 面试官会问 "shadow 怎么判断 agent 比 baseline 好?" 你答不上.
+
+LLM-as-judge (Layer 4) 是这题的 **加分项** — 一般 candidate 不知道 novel decision 不能用 counterfactual, FDE 必须意识到这层 gap.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (counterfactual)**: 面试官会问 "IPS 怎么处理 extreme propensity?" → 答 "clip propensity at [0.05, 0.95] and report sensitivity to clip threshold. If lift is sensitive to clip we don't trust IPS"
+- **Layer 5 (pipeline)**: 面试官会问 "shadow agreement <80% 你怎么办?" → 答 "first slice agreement by decision type — usually 1-2 decision classes drive disagreement. Then root cause: model issue vs label noise vs rule baseline being wrong. We assume rule baseline is right but it's often wrong"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 4 min: clarify + CADR (Layer 1-2)
+- 8 min: counterfactual estimators + LLM-as-judge (Layer 3-4, 重点)
+- 8 min: 3-layer pipeline + boundary tests (Layer 5-6)
+- 3 min: tail metrics (Layer 7)
+- 2 min: resume hook (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 estimator → pivot to **"我先讲 hand-crafted boundary tests, 因为 counterfactual 在 novel decisions 上 break"**
+- 卡 metric → pivot to **ConvFinQA 9-variant ablation 故事**, 讲一个 metric 怎么误导
+- 卡 production → pivot to **Indonesia refund tier CER 18→25%** daily-cap incident, 讲 monitoring 缺失代价
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

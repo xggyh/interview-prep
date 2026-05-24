@@ -6,6 +6,45 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"how do you handle ambiguity / 你遇到 ambiguous requirement 怎么办"**, 我按这 7 层回答, 不跳序. **核心心法: ambiguity-types taxonomy → per-type navigation → reversibility 决定 speed → STAR for each → vulnerability + close**.
+
+### 📐 Handle Ambiguity — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | 拒绝单一答案 (taxonomy first) | 15s | Ambiguity 不是 monolith. Junior 全当 "需要更多信息", Senior 先 classify. 我用 5-type taxonomy | "Ambiguity isn't one thing — different types need different responses. Junior treats them all as 'need more info'. I classify first" |
+| 2 | 5-type taxonomy | 30s | (1) Goal ambiguity (不知道要解决啥), (2) Spec ambiguity (知道目标不知道边界), (3) Technical ambiguity (不知道 feasibility), (4) Priority ambiguity (多个目标冲突), (5) Stakeholder ambiguity (多 owner 不一致) | "Five types — goal (don't know what), spec (don't know boundary), technical (don't know feasibility), priority (conflicting goals), stakeholder (conflicting owners). The type dictates the move" |
+| 3 | Per-type navigation | 45s | Goal → user interview + 1-line problem statement validation. Spec → write strawman doc + edge case 反推. Technical → 1-week POC + ablation. Priority → cost-of-delay matrix + force-rank stakeholder. Stakeholder → DACI / RACI 化解, 找 sponsor | "Per-type — goal ambiguity, user interview and force a one-line problem statement to validate. Spec ambiguity, strawman doc and reverse-engineer edge cases. Technical, time-boxed POC. Priority, cost-of-delay matrix. Stakeholder, DACI or escalate to a single sponsor" |
+| 4 | Reversibility 决定 speed | 25s | One-way door (production deploy / data schema 改) → 慢 + validate. Two-way door (prompt tweak / A/B 实验) → 快 + measure. 80% ambiguity 是 two-way, junior 当 one-way 反而拖延 | "Reversibility decides speed — one-way door like a prod data schema change, I slow down and validate. Two-way like a prompt tweak or an A/B, I move fast and measure. Eighty percent of ambiguity is two-way; treating it as one-way is junior overcaution" |
+| 5 | STAR (goal/priority 混合) | 30s | BNPL agentic + RAG 项目: Situation: customer asked "make chatbot smarter", spec / goal / stakeholder 三层 ambiguity. Task: 化 vague 为 measurable. Action: 1 week user interview (200 conversation), 抽出 intent 类别, 协商 "smarter = intent routing accuracy 70→90%". Result: 70→92% intent acc, 客户 sign-off baseline 给了 follow-on engagement | "Concrete — BNPL chatbot, customer said 'make it smarter'. Three ambiguities at once: goal, spec, stakeholder. I week-one'd 200 conversation interviews, extracted intent categories, negotiated 'smarter = intent routing 70 to 90 percent'. Shipped 70 to 92. The vague brief became a measurable contract" |
+| 6 | STAR (technical) — vulnerability | 25s | ConvFinQA 9-variant ablation: 我设计的 ablation 2 个是 negative result (semantic chunking + ColBERT 在小 corpus 反而 worse). 当时我 ego 受伤想 fudge data — 选择 publish negative + 解释 why. Result: 学到 ablation 价值在 negative 一样大. Vulnerability 让答案真实 | "And a vulnerability moment — ConvFinQA 9-variant ablation. Two variants were negative results, semantic chunking and ColBERT both worse on the small corpus. I was tempted to massage the data because I'd recommended them. I published the negatives. The lesson: ablation's value is in the negatives as much as the positives" |
+| 7 | Close + posture | 15s | I'd ask: are you testing my framework discipline or my STAR depth — 不同的话我会给你不同的 example. Posture confident not anxious | "Quick check — are you testing whether I have a framework for ambiguity, or whether I can tell you a story about navigating one? If it's the latter I have three more concrete ones from Voice agent and Indonesia refund tier" |
+
+### 🎯 为啥按这个序
+
+**先 taxonomy 再 navigation 再 reversibility 再 STAR 再 vulnerability**: 面试官筛的是 "你是不是把所有 ambiguity 当一样". Taxonomy + reversibility 直接证明你是 Senior 思维. **Per-type navigation 是 differentiator**, 大部分人只会说 "I ask clarifying questions". Vulnerability STAR (ConvFinQA negative result) 化解 "你只挑赢的故事讲" 风险.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (BNPL STAR)**: "你怎么 200 conversation 抽 intent? Stakeholder 怎么协商?" → 准备 sub-timeline: week 1 sample log + open-code intent, week 2 cluster + propose 8 类, week 3 stakeholder workshop 选 4 类 must-have + 4 nice-to-have, signed acceptance criteria
+- **Layer 4 (Reversibility)**: "production deploy 你怎么 validate? canary?" → 1% canary 1 hour, slice metric per-region per-language, auto-rollback on 2 SD drift. 不只是 "I A/B test"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Ambiguity is not one thing — 5 types (goal / spec / technical / priority / stakeholder). Reversibility decides speed. BNPL example: 'smarter' became 70→92% intent routing"
+- 1 min: + per-type navigation 一句 + ConvFinQA vulnerability
+- 2 min: + 完整 BNPL STAR + ConvFinQA negative result + close
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问到一个我没经历过的 ambiguity type**: "I haven't faced exactly that — closest was [adjacent story]. The framework I'd apply: classify the type, check reversibility, time-box. If it's an unfamiliar domain I'd over-invest in week-one user interviews because being wrong on the problem statement costs 10x being slow on solution"
+2. **被问到 "你不会 stress 吗?"**: "Honestly yes — Voice agent during the 40-min outage I was stressed. The framework is what kept me from freezing. Process beats panic. And I sleep on it overnight if it's not on-fire"
+3. **被问到 conflicting stakeholders**: "DACI to identify who's the Decider — most stakeholder ambiguity is actually missing accountability, not missing alignment. If no decider, escalate one level. I've had to do this on the Voice agent regulator vs product call"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

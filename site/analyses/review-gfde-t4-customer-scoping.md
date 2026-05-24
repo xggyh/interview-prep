@@ -6,6 +6,49 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"客户说 'we want AI to help our customer service team', 你怎么把这句话变成可 ship 的 project?"** 我按这 8 层回答, 不跳序.
+
+### 📐 Customer Scoping — 8 层 vague-to-ship funnel
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Refuse to code 立刻 | 20s | 显示职业反应: "Before I write any code I need 3 things — who, what KPI, what 'done' looks like" — 这 1 句过滤掉 90% 候选人 | "First reaction — I do not write code yet. I run Discovery week 0…" |
+| 2 | 5 stakeholder map | 2 min | Exec (funding/timeline/why now) + End user (current pain, day-in-life) + IT (stack, SSO, sec review process) + Legal/Compliance (data residency, audit, regulator) + Adjacent team (谁的 upstream/downstream dependency) — 每类 1-3 人, 30-60 min interview each | "I interview at minimum 5 stakeholder buckets…" |
+| 3 | KPI lock (ONE metric + baseline + target + anti-goals) | 2 min | E.g., refund resolution time, baseline 24h (我们 actually measure 1 week first), target 4h, anti-goals = "NOT optimizing agent count / cost / channel mix in phase 1" — anti-goals 跟 goals 一样重要 | "I lock exactly ONE KPI with baseline + target + anti-goals…" |
+| 4 | Workflow decomp + tier | 2 min | 把 vague 拆 8-12 step, per step 用 T4.2 3-question (Det/Rev/Latency) → 5 outcome, 选 MVP slice = 客户 highest-pain × lowest-risk × highest-volume step | "I decompose the manual workflow into 8-12 atomic steps…" |
+| 5 | MVP carve (vertical slice 3 weeks) | 2 min | Week 1 design + 5 interview + KPI lock; Week 2 build vertical slice E2E (hard-coded happy path OK, 2 edge case); Week 3 demo + 5-10 stakeholder feedback + top 3 prioritized; 3-week 红线 不可破 | "MVP is a vertical slice, not a horizontal slice…" |
+| 6 | Pilot rollout 10→50→200 | 1 min | Week 4-8 build production rail (auth/audit/observ/recovery), Week 9-12 measure KPI, daily/weekly review, kill/iterate/scale decision at week 12 | "Pilot is staged 10 → 50 → 200 user…" |
+| 7 | Indonesia resume hook | 1 min | "Real example: Indonesia voice agent expansion. Discovery uncovered 3 things US 没有 — language code-mixing (Bahasa+English), carrier API quirks, local payment rail. KPI = collection success rate. Baseline 18%, target 25%, achieved 25% in pilot, 18→25% CER (collection efficiency rate) improvement" | "Concrete example — Indonesia expansion of our voice agent…" |
+| 8 | Anti-pattern 总结 | 30s | (a) Skip Discovery → wrong thing perfectly; (b) 不 lock KPI → 半年漂移; (c) MVP > 3 week → 客户决策变化前期白做; (d) Vendor narrative not customer KPI → exec 听不进 | "Top failure modes I actively avoid…" |
+
+### 🎯 为啥按这个序
+
+Layer 1 "refuse to code" 是 trust signal — 让面试官知道你不是 demo-driven. Stakeholder map 在 KPI 前面是因为 KPI 必须从 stakeholder 嘴里挖, 不能你猜. Workflow decomp + MVP carve 紧跟 KPI 是 "把抽象目标变可 ship slice" 的关键转换. Indonesia hook 放第 7 层因为前面 6 层已经搭好 framework, 这时候 land 一个真实数字 (18→25%) 最有杀伤力. Anti-pattern 在结尾让面试官记住你的 discipline.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 2 (5 stakeholder)** — 必被追 "What do you actually ASK each stakeholder?" → 准备好 per-bucket script: Exec ("what would make you call this a win in 12 weeks / what kills funding"), End user ("walk me through yesterday's worst case / where do you currently work around the system"), IT ("what's your SSO / where does data sit / what's your sec review SLA"), Legal ("what data CAN'T leave the country / what audit retention do you need"), Adjacent ("what breaks upstream if we automate this step").
+
+**Layer 3 (KPI lock)** — 追 "What if customer can't give you a baseline?" → 答: I spend week 0 measuring it myself (logs / shadowing 3-5 agents / sampling tickets). 不接受 "我感觉是 X hours", 必须有 1 week observable baseline.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (refuse to code + 5 stakeholder)
+- 3-12 min: Layer 3+4 (KPI lock + workflow tier with Indonesia case)
+- 12-22 min: Layer 5+6 (MVP 3-week + pilot staged)
+- 22-27 min: Layer 7 (Indonesia 18→25% concrete numbers)
+- 27-30 min: Layer 8 anti-pattern + Q&A
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 被问 "if exec sponsor disagrees with end-user pain" → 答 "I document the divergence in the stakeholder map and surface it as risk in the design doc — week 0 not week 8"
+- 不知道客户 stack → "I lead with platform-agnostic prototype (FastAPI + Streamlit), bind to their stack in week 4-8"
+- KPI 是 multi-dim (cost + speed + CSAT) → "I pick ONE primary + 2 guardrail metrics (anti-goal violations); if they insist on 3 KPI, week 0 fails and I escalate"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

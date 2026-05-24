@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Pure semantic search recall is 60%. Get it to 90%+"** 或 **"Why does hybrid (BM25 + dense) beat pure dense? When does it NOT help?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 60% → 90% Recall Pipeline — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify + Pure dense failure mode | 0-4 min | 文档类型 (PDF / ticket / contract)? Query 形态 (产品名 / 概念 / 多 hop)? Volume? Latency budget? **然后 demo failure**: query "iPhone 15 Pro Max 256GB dual SIM" → dense embed 把它当"高端手机" → 召回 iPhone 12 / 三星 S23, 漏掉 iPhone 15 真文档. 40% miss 的根因是 SKU / acronym / 罕见 token 没语义 | "Before designing the fix — let me show why pure dense leaks 40%. Embedding compresses SKU / acronym / rare token semantics, so 'iPhone 15 Pro Max' and 'iPhone 13' end up close in vector space." |
+| 2 | 5-layer pipeline 骨架 | 4-10 min | **L1 Query Understanding** (LLM rewrite + multi-query + HyDE + decompose) **L2 Multi-source** (Dense ANN + BM25 同时检 top-100) **L3 Fusion** (RRF k=60) → top-50 **L4 Cross-encoder rerank** (bge-reranker-v2-m3 GPU) → top-10 **L5 Filter & Boost** (perms / freshness / source-type weight) → final top-K | "I split the pipeline into 5 layers — query understanding, multi-source retrieve, fusion, rerank, filter. Each layer is independently observable and ablatable." |
+| 3 | Dense vs BM25 vs Cross-encoder 决策表 | 10-16 min | **Dense bi-encoder** 大 corpus 召回 (10K-1B docs), embed once. **BM25 sparse** exact match / SKU / code / rare term. **Cross-encoder** per-query 重排 top-50, 贵但准. **ColBERT late-interaction** 中间方案. **LLM-as-retriever** 高质量小规模 | "Three retrieval families — dense, sparse, cross-encoder — each has a sweet spot. Here's the decision table." |
+| 4 | RRF fusion 数学 | 16-22 min | RRF formula: `score(d) = sum over sources of 1/(k + rank_s(d))`, k=60 default. Rank-invariant (不需要 normalize scores). 比 weighted score 鲁棒 (不被极端 score 主导). 加权变种: 给 BM25 更高 weight for exact-match query | "Fusion choice is RRF. Critical insight is it's rank-invariant — no need to normalize scores from different retrievers. k=60 is the empirical sweet spot." |
+| 5 | Reranker 深度 | 22-30 min | bi-encoder 召回快, cross-encoder 精排准 (cross-attention 看 query+doc 一起). bge-reranker-v2-m3 / Cohere rerank-3 / Voyage rerank-2 / Jina rerank. **Cache (query, doc) pair** 30-40% hit. LLM-as-rerank (Claude/Gemini 评 1-5 score) 是新 trend, 贵但准. Fine-tune on domain (legal/medical) 再 +3-5% | "Reranker is the precision booster. Cross-encoder reads query+doc jointly via cross-attention. Caching (query, doc) hashes saves 30-40%; LLM-as-rerank is the 2025 trend." |
+| 6 | Ablation methodology | 30-37 min | **关键: 每个 layer 的 recall 增量独立量化**. baseline 60%, +BM25 fusion +12-18% (→ 75%), +query rewrite +3-5% (→ 80%), +HyDE +2-4% (→ 84%), +cross-encoder +3-5% (→ 88%), +domain fine-tune +2-3% (→ 90%). Eval: recall@k, NDCG, MRR, slice eval (per query type) | "Now the methodology — I never deploy a layered system without per-layer ablation. Each layer must prove its recall delta independently. Here's the contribution breakdown." |
+| 7 | When hybrid DOESN'T help | 37-43 min | (1) Query 纯概念无 SKU → dense 已够 (BM25 噪音多反而拉低 precision) (2) 短 query 1-2 token → BM25 不稳 (3) Non-English low-resource → BM25 tokenizer 差 (4) 极小 corpus < 1K docs → 直接全 reranker 更简单. **Edge case**: dense + reranker 没 BM25 也可达 85%+ in pure concept domain | "Anti-pattern alert — hybrid isn't always net positive. Pure concept domains, very short queries, small corpus, low-resource languages all break the assumption." |
+| 8 | Connect + production hardening | 43-50 min | BNPL chatbot 60→90% 实战: pure dense 漏 BNPL-2024-IDR-late-fee-cap policy ID → 加 BM25 + ID prefix index 解决. Multi-tenant filter via Pinecone `tenant_id` namespace. Freshness decay `score *= exp(-age_days/30)`. Per-tenant eval slice (避免 head tenant 撑住 metric) | "Resume hook — BNPL chatbot 60→90% was this exact ablation. Let me share the policy-ID story and the per-tenant slice eval." |
+
+### 🎯 为啥按这个序
+
+**Pure dense failure mode (Layer 1) 必须最先讲** — 这一句把面试官的 mental model 校准到「embedding 不是万能」, 后面所有改造才有动机. 然后 5-layer pipeline (2) 是骨架, 给整体框架. Decision table (3) 是 building block 介绍. RRF 数学 (4) 是技术细节, k=60 是经典加分知识点. Reranker (5) 单列因为它是 precision booster 而非 recall — 这个区分面试官常考. **Ablation methodology (6) 是关键** — 没这一层, 60→90% 就是空话, 有这一层就是 staff-level scientific rigor. When-doesn't-help (7) 体现反思, 不所有 problem 都用同一锤. Resume close (8) 用 60→90% 数字最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (reranker)**: "Cross-encoder 为什么准?" → 准备 cross-attention vs dual-tower 解释. "How to choose model?" → 准备 bge-v2 (open) / Cohere rerank-3 (commercial) / Voyage rerank-2 / fine-tuned domain model 对比.
+- **Layer 6 (ablation)**: "Recall@k 怎么 ground truth?" → 准备 manual annotation (人标 100-500 query) + LLM-as-judge (Claude eval) + click signal (user 点了哪条) 三个来源.
+- **Layer 4 (RRF)**: "为什么 k=60?" → 准备 paper reference (Cormack et al 2009 TREC), k=60 是经验值, 实际可 grid search 在 [10, 100].
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (failure mode) 3 min — 必讲, 这是 anchor
+- Layer 2 (5-layer pipeline) 5 min
+- Layer 3 (decision table) 跳过 / 一句带过
+- Layer 4 (RRF) 3 min
+- Layer 5 (reranker) 5 min — 必讲
+- Layer 6 (ablation) 6 min — 必讲, 这是分水岭
+- Layer 7 (anti-pattern) 跳过 / 1 min
+- Layer 8 (connect) 2 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 RRF 公式 → 退回讲「**核心 idea: 每 source 的 rank 转倒数 1/(k+rank), k=60, 多 source sum. 不 normalize, rank-invariant**」
+- 忘了具体 reranker 模型名 → 退回讲「**几大族: bge-reranker (open), Cohere rerank, Voyage rerank, Jina rerank. 都是 cross-encoder, 都 ~100-200ms latency on top-50**」
+- 被追问 HyDE 是什么 → 退回讲「**Hypothetical Document Embeddings — LLM 先生成 "如果这个 query 的 ideal answer 是什么", 用这个 answer 的 embedding 检索, 不直接 embed query. 因为 doc-to-doc similarity 比 query-to-doc 更准**」
+- 忘了 ablation 怎么测 recall → 退回讲「**recall@k = 检索 top-k 中 ground truth doc 占比. Ground truth 来自人工标注或 LLM judge**」
+- 被追问 hybrid 不 help 的具体场景 → 退回「**纯概念 query 无 SKU, BM25 噪音多反而 hurt precision**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

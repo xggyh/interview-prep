@@ -6,6 +6,46 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"怎么知道 AI / model / agent 实际在 work"**, 我按这 8 层回答, 不跳序. **核心心法: 不能只看 accuracy, 是 multi-layer eval → drift → LLM-judge 校准 → ground-truth-less → Goodhart's Law warning → resume hook**.
+
+### 📐 How Know AI Working — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | 拒绝单一 metric | 15s | 不是 "accuracy 90%" 就 OK; 单 metric 必被 Goodhart, 必有 silent failure. 必须 multi-layer | "I never trust a single metric. Accuracy 90% in aggregate hides a per-slice collapse. Goodhart's Law kicks in the moment you optimize a single number" |
+| 2 | 3-layer eval pyramid | 30s | offline golden set (CI gate 每 PR), online A/B (业务 KPI 才决定), production always-on (per-request quality signal) — 三层缺一不可 | "Three layers: offline golden set as a CI gate that every PR must pass, online A/B for the actual business KPI, and production always-on signal per request. Skip any layer and you ship blind" |
+| 3 | 5 metric class | 30s | technical (latency / error rate) / quality (LLM-judge / NDCG) / user explicit (thumb up-down) / user implicit (regen rate / session length / fallback to human) / business KPI (conversion / containment / CSAT) | "Five metric classes — technical, quality, user explicit feedback, user implicit behavior, business KPI. Implicit is gold — regen rate, fallback-to-human, session abandonment. Explicit thumbs are biased, business KPI is lagging" |
+| 4 | LLM-judge 校准 (Cohen's kappa) | 30s | LLM-judge 不能裸用. Cohen's kappa > 0.6 with human annotator on 200-500 sample; 用不同 family (Gemini 3 Pro judge Claude output 避 self-preference); rubric grounded 不靠 vibes | "LLM-judge needs calibration — I run Cohen's kappa against human on 200 to 500 samples until kappa > 0.6. Different model family to avoid self-preference bias. And the rubric has to be grounded, not vibes" |
+| 5 | Drift detection | 30s | 4 类 drift: data drift (input distribution KS test), concept drift (label meaning changes), model drift (output distribution shift PSI), distribution drift (slice-level). Alert per-slice not aggregate | "Four kinds of drift — data, concept, model, distribution. Detect via KS test on input, PSI on output, and per-slice alerts. Aggregate hides per-language or per-tenant collapse" |
+| 6 | Ground-truth-less methods | 30s | 没 label 时: LLM-judge with rubric, consistency check (paraphrase invariance), self-consistency vote (sample N agree), citation grounding (claim in retrieved doc), uncertainty (logprob entropy), reference-free judge calibrated to human | "Production rarely has ground truth — I use LLM-judge with grounded rubric, paraphrase invariance, self-consistency vote, citation grounding check, and logprob-based uncertainty. Each is weak alone, the composite is strong" |
+| 7 | Goodhart warning + cost | 25s | 优化任何 metric 必被 hack; rotate metric, surprise eval set held-out, red team adversarial. Mature production 5-15% inference cost on eval, critical domain 50%+ | "Goodhart is the rule, not the exception — the metric you optimize gets gamed. I rotate metrics, hold out a surprise eval set, run red-team adversarial probes. Mature production spends 5 to 15 percent of inference cost on eval, critical domains push to 50" |
+| 8 | Resume hook | 15s | BNPL 4-signal composite confidence (retrieval score + generation logprob + citation match + intent match) / ConvFinQA LLM-judge calibration kappa>0.6 / Voice agent CER 18→25% Indonesia tier / production always-on signals | "Lived it on BNPL — 4-signal composite confidence: retrieval score, generation logprob, citation match, intent match. Calibrated against human on 500 conversations until kappa > 0.65. And ConvFinQA where I designed the 9-variant ablation methodology" |
+
+### 🎯 为啥按这个序
+
+**先拒绝单一 metric 再 3-layer 再 LLM-judge 再 drift 再 Goodhart**: 面试官最怕听 "accuracy 95%". 先拒单 metric (signal你成熟), 再 3-layer 框架, 再 LLM-judge 校准 (kappa数), 再 drift, 再 Goodhart 警告 (signal你不天真), 最后 BNPL 4-signal hook 闭环. **Cohen's kappa > 0.6 + 4-signal composite + 5-15% eval cost 是 differentiator**.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (LLM-judge calibration)**: "怎么算 Cohen's kappa? Why 0.6?" → kappa = (Po - Pe) / (1 - Pe), 0.6+ substantial agreement (Landis-Koch). 计算 200-500 sample 两人标注, 不一致再 adjudicate. < 0.6 重 rubric
+- **Layer 6 (Ground-truth-less)**: "self-consistency 怎么实操?" → temperature 0.7 sample N=5 同一 prompt, vote majority answer. 一致度作为 confidence signal. 用在 ConvFinQA 数字 answer; 不适合 open-ended generation
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Not single metric. 3-layer pyramid (offline + online + production). LLM-judge calibrated kappa > 0.6. Drift per-slice. Goodhart's Law"
+- 1 min: + 5 metric class + 4-signal composite
+- 2 min: + BNPL concrete 4-signal + ConvFinQA ablation + 5-15% eval cost benchmark
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **没具体 kappa 数字**: "Kappa target depends on stakes — 0.6 substantial agreement is my floor for general, 0.8 for medical or financial. The number itself isn't the point; the discipline of calibrating against human is"
+2. **被问到 reward hacking 防御**: "Reward hacking is unsolved in general — what I do is hold-out adversarial set, multi-objective optimization (no single reward), and red team probes monthly. Honestly if you optimize hard enough, every metric leaks"
+3. **被问到 specific drift detection 工具**: "Evidently AI, WhyLabs, NannyML are off-shelf. I've rolled my own KS test + PSI in Python because the data was custom. Off-shelf is fine if your data fits their schema, otherwise custom is faster"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

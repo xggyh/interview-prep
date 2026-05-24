@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Indexing 10K technical PDFs for RAG — how do you chunk?"** 或 **"Recall drops 20% when chunk size changes 512→1024 — why?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Chunking Decision Tree — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify + Naive 灾难 | 0-5 min | Doc 类型 (PDF / code / chat log / table-heavy)? Total volume + page distribution? Query 形态 (具体 vs 概念)? Refresh cadence? **然后 demo failure**: 512 fixed chunk 切到表格中间 → "Min: -20°C Max: 60°C" chunk 没有 device 上下文 → LLM 答不出是哪个 device | "5 clarifications first. And let me show the naive failure — fixed-512 chunking on a PDF datasheet splits a temperature table mid-row; the chunk loses device context entirely." |
+| 2 | 7 种 failure mode | 5-10 min | (1) 切表格 (2) 切代码 function (3) 切句中 (4) 丢 heading 路径 (5) chunk 跨多 topic (单 embedding 表示多主题, recall 低) (6) chunk 太小 (答案跨 2 chunk 单 retrieve 漏) (7) chunk 太大 (信息密度低噪声多) | "Before strategy — 7 distinct failure modes. Each strategy targets specific ones. Let me enumerate so we agree on what we're optimizing." |
+| 3 | 8 种 chunking 策略表 | 10-18 min | Fixed-size + overlap (baseline) / Sentence-aware / Paragraph-section / **Heading-aware recursive (production default)** / Semantic (topic-shift) / AST-based (code) / **Late chunking (Jina v3 / Cohere v4)** / Hierarchical parent-doc. 每个标 quality / complexity / 何时用 | "8 strategies on the menu. Production default is heading-aware recursive with table/code atomic fallback. Late chunking is the 2024-25 frontier." |
+| 4 | Decision tree per doc type | 18-25 min | Q1 有 heading 层级? → heading-aware recursive. Q2 对话/log? → speaker-turn / time-window. Q3 代码? → AST. Q4 表格密集? → table-atomic + surrounding text. Q5 极短? → whole-doc. Q6 长 context embed 可用? → late chunking. Default → fixed-500 + overlap-50 + sentence-aware | "Here's my decision tree. 6 questions, deterministic strategy choice. Let me walk through each branch with examples." |
+| 5 | Multi-modal 处理 | 25-31 min | Table → atomic chunk, Markdown serialize, `is_table=true caption=... headers=[...]`. Code → atomic, lang annotation. Figure → caption chunk + image blob (multimodal RAG). Formula → LaTeX + 渲染描述. List → atomic if 短, item-boundary split if 长 | "Multi-modal is non-obvious. Tables must be atomic with Markdown serialize; code never split mid-function; formulas keep LaTeX. Each gets explicit metadata for the retriever." |
+| 6 | Size + overlap 的数学 | 31-37 min | Embedding model max context: 512 (legacy) / 8192 (modern) / 32K (gemini-embed). Chunk size sweet spot: prose 300-500 tok / table-heavy doc 800-1000 / code function-level. Overlap 10-20%: borderline 句子不丢, 但 storage cost +10-20%, dedup retrieve 后处理 | "Size tuning math — embedding model max sets the cap. Sweet spots vary by doc type. Overlap rationale is borderline-sentence recovery, cost is +10-20% storage and dedup overhead." |
+| 7 | Late chunking 深度 | 37-43 min | 经典先 chunk 再 embed → 每 chunk 单独看不到 cross-chunk context. Late chunking: 先 embed 整 doc 拿 token-level embeddings (用 Jina v3 8K context / Cohere v4), pool 成 chunk-level. 保留 long-range context. Recall +5-10% on cross-section query | "Late chunking is the 2024-25 advance. Instead of chunk-then-embed, you embed-then-pool. Long-range context preserved. Recall +5-10% on cross-section queries. Tradeoff is requires long-context embed model." |
+| 8 | Eval methodology + connect | 43-50 min | Sweep grid: chunk_size × overlap × strategy. Per-doc-type slice eval (PDF vs code vs prose). Metric: recall@10 + NDCG. **Bug story**: BNPL chatbot 切到 policy table 中间 → recall 12% → 改 table-atomic 涨到 27%. ConvFinQA 数字表格用 row-aware chunking, multi-hop reasoning recall +18% | "I sweep chunk_size × overlap × strategy as a grid, slice eval by doc type. Resume — BNPL chatbot policy table fix gave 12→27%, ConvFinQA table-row chunking +18% on multi-hop." |
+
+### 🎯 为啥按这个序
+
+**Naive failure (Layer 1) 必须最先讲** — 不画灾难, 面试官不知道为啥 fixed-512 不行. Failure mode 7 类 (Layer 2) 是 building block — 后面策略选择全是 "对治哪些 failure mode". Strategy table (3) 必须在 decision tree (4) 之前 — 不知道 menu 有啥就无法选. Multi-modal (5) 单列因为它是 production 重头戏 (表格 / 代码 / 公式 没人讲就拉胯). Size math (6) 是数字层细节. Late chunking (7) 是 2024-25 frontier, 讲出来面试官知道你 read latest papers. Eval methodology (8) 必须有 — 没 ablation 就是 toy demo.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (decision tree)**: "PDF datasheet 怎么 parse heading?" → 准备 LlamaParse / Unstructured / PyMuPDF 工具链 + 提取 TOC 树. "代码怎么 AST?" → tree-sitter / tree-parser 多语言支持.
+- **Layer 7 (late chunking)**: "Jina v3 怎么实现?" → 准备 long-context bi-encoder + mean-pooling over token range. Paper: Günther et al 2024 "Late Chunking".
+- **Layer 6 (size math)**: "为啥 512 切到 1024 recall drop 20%?" → 准备 "chunk 大 = 单 embedding 多 topic = noise; chunk 小 = 答案被切碎. Sweet spot 数据集相关, 必须 sweep".
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify + 灾难) 4 min — 必讲
+- Layer 2 (failure mode) 2 min, 只列 3 个关键 (切表格 / 丢 heading / 跨 topic)
+- Layer 3 (strategy table) 4 min, 只重点讲 heading-aware + late chunking
+- Layer 4 (decision tree) 4 min
+- Layer 5 (multi-modal) 4 min — 必讲, 区分 production
+- Layer 6 (size math) 3 min
+- Layer 7 (late chunking) 跳过 / 1 min, 一句带过
+- Layer 8 (eval + connect) 4 min — 必讲 ablation
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 late chunking 具体 → 退回讲「**核心 idea: 先 embed 整 doc 拿 token-level, 再按 chunk boundary pool. 保留 long-range context. 需要 long-context embed 模型支持**」
+- 被追问 chunk size 具体值 → 退回讲「**Domain-dependent, 必须 sweep. Empirical: prose 300-500, code function-level, table atomic. 没有 one-size-fits-all**」
+- 忘了 AST tool → 退回讲「**tree-sitter / Pygments / language-specific parser. 核心是按 function/class boundary 切, 不按 token count**」
+- 被追问 hierarchical chunking → 退回讲「**Small chunk for retrieval, large parent chunk for context. Retrieve small, return parent. Trade off recall vs context window**」
+- 忘了 overlap 推荐值 → 退回讲「**10-20% overlap. 太多浪费 storage + retrieve 重复, 太少 borderline 信息丢**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

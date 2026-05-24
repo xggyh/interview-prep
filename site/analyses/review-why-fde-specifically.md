@@ -6,6 +6,45 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Why FDE specifically / 为什么不是 SWE 不是 MLE"**, 我按这 7 层回答, 不跳序. **核心心法: framework anchor (FDE vs SWE vs MLE 三角) → fit-to-me → fit-to-company → why-NOT-just-X → STAR story → vulnerability → close**.
+
+### 📐 Why FDE Specifically — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Framework anchor (FDE 三角) | 20s | FDE = engineering depth + customer-facing + AI 业务落地. 不是 SWE (纯 product 深度), 不是 MLE (纯 research / model), 不是 SE (presale 不写 prod code). 三者交集 | "FDE sits at the intersection of three things — engineering depth, customer-facing, and bringing AI from prototype to production for a real business problem. It's not SWE pure depth, not MLE pure research, not SE presale without prod code" |
+| 2 | Fit-to-me (具体 evidence) | 30s | 我职业一直在 hybrid: TikTok PayLater 7 markets 同时是 engineer + 业务 PM + 区域 stakeholder. Voice agent ASR cascade 40 min outage 同时 debug + 跟客户跟监管沟通. ConvFinQA 同时 research + product feasibility | "Looking at my career — TikTok PayLater across 7 markets I was simultaneously the engineer, the product owner, and the regional stakeholder partner. Voice agent during a 40-min ASR outage I was simultaneously debugging and on the phone with regulators. That hybrid is FDE" |
+| 3 | Fit-to-company (per-company specific) | 25s | OpenAI: research-to-product velocity, GPT-5.5 上线即 enterprise — 需要 FDE 把 model capability 翻译成客户落地. Google: Gemini 3 Pro 2M context 是 platform, 客户需要 architect 帮他用对. (Per-company hook 具体) | "OpenAI specifically — the research-to-product velocity is unique. GPT-5.5 ships and enterprise customers immediately want it deployed. That gap from model release to customer production deployment is exactly what FDE owns" |
+| 4 | Why-NOT-just-SWE | 20s | 我试过纯 SWE — 不够. ByteDance 早期我做 pure backend, 6 个月就 itch. 缺 1) customer 直接反馈 loop 2) AI 落地 ambiguity 3) cross-function (engineer / PM / 区域 business). FDE 三者都给 | "I've done pure SWE — at ByteDance early. Six months in I felt the itch for direct customer feedback and the ambiguity of AI productization. Pure backend is too far from the user; FDE closes that loop" |
+| 5 | Why-NOT-just-MLE | 20s | MLE 我也试过 (ConvFinQA research methodology) — 我喜欢 model 训练但不想 pure research. MLE 离 customer 远, 离 business loop 远. 我 ConvFinQA 设计了 9-variant ablation 但最终 motivating 我的不是 paper 是 production impact | "MLE — I did the ConvFinQA research, designed a 9-variant ablation. I love training models but pure research keeps me too far from the customer and the business loop. The motivating signal for me is production impact, not papers" |
+| 6 | STAR story (1 strong) | 30s | Voice agent ASR cascade 40 min outage — Situation: ASR primary down, 7 markets fall. Task: minimize CER spike + 跟监管沟通 + restore. Action: 5 min triage fallback secondary ASR, parallel call to Indonesia regulator with status, 25 min full restore. Result: CER spike contained 18→25% not 40%, regulator escalation avoided. Reflection: FDE moment — 1 person 同时 eng + customer-facing | "Concrete moment — Voice agent 40-min ASR outage. I was simultaneously triaging the cascade, swapping to secondary ASR, AND on the call with the Indonesia regulator explaining status. CER spike contained 18 to 25 percent instead of 40. One person, both hats — that's the FDE moment, and I want more of it" |
+| 7 | Vulnerability + close | 15s | Acknowledge trade-off: FDE 不是 stepping stone — 我知道 FDE 30% travel / 客户压力大 / less depth than pure MLE. 我 want this fit, not "tolerate" it | "I want to be clear — I know FDE means 30% travel, customer pressure, less depth than pure MLE. I'm not picking FDE as a stepping stone to PM or research. I want this fit specifically, and I'd ask you to evaluate me on whether I'm convincing" |
+
+### 🎯 为啥按这个序
+
+**先 framework 再 fit 再 why-NOT 再 STAR 再 vulnerability**: Recruiter 真在筛 5 个 risk — apply-everywhere / will-jump-to-research / can't-handle-customer / won't-last / can't-code. Framework anchor 化解 "你只是 apply 所有 role", fit-to-me 化解 "won't last", why-NOT-just-X 直接 preempt research/SWE 跳, STAR 证明能 code + 能 customer-facing, vulnerability 化解 "stepping stone" 风险. **Per-company specific hook + acknowledge trade-off 是 differentiator**.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 6 (STAR Voice agent)**: "那个 outage 你具体怎么 triage?" → 准备好 5-min sub-timeline: T+0 alert / T+2 ASR primary 确认 down / T+5 secondary failover script ready / T+8 regulator call initiated / T+25 primary restored. 每分钟具体 action
+- **Layer 3 (Why this company)**: "为什么不是 Anthropic? 不是 Google?" → 准备 per-company differentiator. OpenAI: research velocity + enterprise API + agentic 方向. 不要套用同一稿子
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "FDE = engineering + customer-facing + AI 业务落地, 三角交集. 我职业一直在 hybrid. Voice agent ASR outage 是 FDE moment"
+- 1 min: + why-NOT-SWE + why-NOT-MLE 一句
+- 2 min: + 完整 STAR + vulnerability close
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问到 "你不是更适合 PM?"**: "Fair question. PM I'd be one step further from the code — I write the code, I want to keep doing that. The difference between FDE and PM is FDE owns prod implementation; PM owns the spec. I want to own implementation"
+2. **被问到 "FDE 离开 customer 后悔?"**: "I've thought about it. Indonesia refund tier where I went CER 18 to 25 — that came from being in the room with the ops team, not from a Jira ticket. I don't see customer time as cost, I see it as input"
+3. **没准备好 per-company hook**: "Honestly I'd want to know more about what your FDE team specifically owns — I've read [public hook] but I'd like to hear from you what a typical engagement looks like. Then I can give you a sharper answer on fit"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

@@ -6,6 +6,51 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Walk me through how you'd think about tool calling for an agent system" (开放 T1 全景题)**, 我按这 8 层回答, 不跳序.
+
+### 📐 Tool Calling 全景 — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Reframe: 不是 function call | 0-2 min | 直接打破 "LLM 生成 JSON, runtime parse exec" 这个 2023 demo 视角. 强调 tool call = 跨边界 side-effect 投影, LLM 看不到执行细节, 可 0/1/N 次, 可并发, untrusted | "Before designing — one reframe. Tool calling in 2026 production isn't a function call; it's a side-effect projection across an unreliable boundary. That changes everything." |
+| 2 | Clarify (read/write/mixed) | 2-5 min | Read-heavy / write-heavy / mixed? Volume QPS? Multi-tenant? Reversible vs irreversible 比例? 这决定下面 pattern 怎么组合 | "5 clarifications first — read vs write ratio, QPS scale, multi-tenant, blast radius of destructive tools, downstream SLA." |
+| 3 | 5-risk 心智地图 | 5-9 min | 把 tool call 想成银行转账, 列 5 类风险 → 5 sub-topic: idempotency (防转 2 次) / retry (防 dependency 挂) / parallel-race (防同 entity 并写) / destructive (防转错人) / output validation (防 tool 伪造数据) | "I think about T1 as 5 distinct risk classes. Let me draw the mental map — each maps to one well-defined production pattern." |
+| 4 | 6-stage lifecycle | 9-15 min | Registration (catalog schema) → Discovery (top-K filter) → Planning (ReAct vs Plan-Then-Execute vs Multi-tool parallel) → Invocation (auth, dedup, rate limit, confirm, dispatch, timeout, audit) → Result Handling (validate, truncate, sanitize, wrap, metadata) → Continuation (loop safety) | "Now let me trace the full lifecycle — 6 stages, each surfaces a different FDE failure mode." |
+| 5 | 5-pattern toolkit | 15-25 min | A idempotency (Redis + DB unique 双层) / B layered retry (tool→alternative→human) / C parallel-vs-sequential split (PARALLEL_SAFE vs SEQUENTIAL_ONLY + per-resource lock) / D confirm-required (threshold + compensating) / E output sandboxing (schema + XML wrap + system prompt). 给 decision tree | "Here's my 5-pattern toolkit. Each tool wraps these patterns selectively based on this decision tree." |
+| 6 | MCP vs OpenAI vs Gemini | 25-32 min | MCP vendor-neutral, ecosystem standard ⭐ (你做 internal platform 必选) / OpenAI Function Calling simple but vendor-locked / Gemini Tool Use 2M context + multi-tool parallel. 路由层 cost: Flash $0.50/$3, Pro $2/$12, Opus $5/$25, blended ~$0.85/1M | "Industry options matter for FDE deliverables. Let me compare MCP, OpenAI Function Calling, and Gemini Tool Use across vendor-neutrality, ecosystem depth, and cost." |
+| 7 | Production gotchas | 32-40 min | 主动列 8 个 gotcha: stale result (fetched_at field), N+1 (batch API), cycle (max depth), hot key (per-resource lock), prompt injection (XML wrap), cost runaway (per-session cap), permission escalation (min(platform, user)), schema drift (version field) | "Now the gotchas — the bar between someone who read demos vs someone who shipped this. Let me hit the top 8." |
+| 8 | Resume quote close | 40-45 min | Voice agent 7-market + BNPL multi-tool fanout + Indonesia 3-tier refund + ConvFinQA calculator validation + Internal Agent Platform catalog. 主动 quote 一个 hardest bug (e.g., ASR streaming args_hash boundary bug) | "Closing — I've shipped all 5 patterns across voice agent, BNPL, and the internal Agent Platform. The hardest bug was on the voice agent — let me share one specific story." |
+
+### 🎯 为啥按这个序
+
+T1 全景题最容易死法是「上来就讲 idempotency」— 面试官 zoom 不进任何具体场景, 你也讲不动剩下 4 个 sub-topic. **先 reframe (Layer 1) 是定调**: 「我把 tool call 当分布式系统看, 不当 ML 问题看」, 这一句话直接把候选人 leveling 从 L4 推到 L5. 然后 Clarify (2) + 5-risk map (3) 把面试官的 follow-up 收口到我画的 5 个 sub-topic, **我 control 接下来 30 分钟问什么**. Lifecycle (4) + Pattern (5) 是技术骨架. MCP 对比 (6) 是 FDE 加分必讲. Gotcha (7) 是分水岭. Resume close (8) 把抽象锚到「我真做过」.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (5-risk map)**: 面试官多半 zoom 到其中一个 — 90% 概率是 idempotency 或 destructive. 准备好 5 个 sub-topic 各 10 分钟独立 deep-dive 模板 (见 T1.1-T1.5 单独 review 页).
+- **Layer 5 (pattern decision tree)**: "Reversible vs irreversible 怎么判定?" → 备好 4 个判别 (DB undo 难度 / 副作用是否离开系统 / 法律 obligation / 用户感知). "All-confirm 行不行?" → confirmation fatigue 反 pattern, 选择性 confirm.
+- **Layer 6 (MCP)**: "MCP vs in-process 哪个适合 100ms latency?" → 备好 protocol overhead 数字 (MCP over HTTP +20-50ms, stdio +5-10ms, in-process <1ms).
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (reframe) 压到 1 min, 一句话定调
+- Layer 2 + Layer 3 合并成 4 min, 边 clarify 边画 5-risk map
+- Layer 4 (lifecycle) 跳过 / 压到 3 min, 只讲 invocation stage 内部 7 步骤
+- Layer 5 (5 pattern) + Layer 7 (gotcha) 是必讲核心, 各 8 min
+- Layer 6 (MCP 对比) 压到 3 min, 只说 MCP 是 2026 standard + 你做 internal platform 选 MCP
+- Layer 8 (resume) 压到 2 min, 一句 quote
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 6-stage 完整顺序 → 退回讲「**3 个核心 stage 是 Invocation + Result Handling + Continuation, 这 3 个最容易出 production bug**」, 把焦点收到自己熟的
+- 面试官追问某 sub-topic 你不熟 → 退回讲「**通用 wrap pattern 是: spec metadata + runtime middleware + audit log, 这 3 个套到任何 sub-topic 都成立**」, 然后回到自己熟的角度
+- 忘了 MCP / OpenAI / Gemini 价格 → 退回讲「**Flash/Pro/Opus 三层 routing 通常省 4-6x cost vs 全 Opus**」, 不背具体 $0.50/$3 数字
+- 不熟某个 sub-topic 又被追问 → 主动「**Actually 这正好连着 X (你熟的), 我可以借用一下吗**」, 把控制权拉回
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Agent running 50 turns, 110K/128K context — manage so it doesn't degrade"** 或 **"Coding agent context fills up — keep / summarize / drop?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Long-running Agent Context Management — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify + Token economy 灾难 | 0-5 min | Turn count + tool-call/turn 频率? Single agent vs multi-agent? File reads / test output 多吗? Cost target / latency budget? **然后 demo**: 50-turn coding agent context 110K, each turn cost = current × turn count, 总 cost $6/session, latency 20s/turn → 50 turn 蹲 16 min, agent 还忘了 turn 1 user 说 FastAPI 改成 Flask | "Before designing — 50-turn agent without management is $6/session and 16 min wall clock, and the agent forgets turn 1 decisions. Token economy is non-linear; let me ground in the disaster." |
+| 2 | Lost-in-middle + effective context | 5-10 min | Context window ≠ effective context. Liu et al 2023 U 形 attention — 开头结尾 recall 好, 中间衰减. 2026 Gemini 3 Pro 2M / Claude 200K / GPT-5.5 256K, 但 effective 大概是 head 20K + tail 100K. 这决定哪段必须留 verbatim | "Context window ≠ effective context. Liu's lost-in-middle paper shows U-shaped attention even in 2M-context models. This shapes the strategy." |
+| 3 | 4-strategy 组合骨架 | 10-18 min | (1) **Sliding window** 最近 10 turn verbatim (2) **Hierarchical summary** turn 1-30 heavy summary / 31-40 medium / 41-50 verbatim (3) **External memory** tool output >1K token offload to blob/Postgres/vector DB + ref (4) **Selective pruning + pinning** 关键决策 (user approval / file diff / preference) 永久保留 | "4 strategies in combination — sliding window, hierarchical summary, external memory offload, selective pruning + pinning. They're additive, not alternatives." |
+| 4 | 7 种 memory type | 18-25 min | Working context (current turn) / Episodic (vector DB, "你之前说过 X") / Semantic (Postgres KV, user preferences) / Procedural (system prompt, tool usage) / External docs (user upload) / Scratchpad (local file, agent 自己工作笔记) / Decision log (structured Postgres, 永不丢) | "Production long-running agent uses 4-6 memory types simultaneously. Each serves a different access pattern — let me draw the taxonomy." |
+| 5 | Compaction algorithm | 25-32 min | Pre-call manager: check size > soft cap (80% context) → trigger. Step A externalize big tool outputs. Step B selective prune low-importance reasoning. Step C hierarchical summarize. Step D **reinforce critical info** (re-state user preference / decisions at end of compacted context, 防 lost-in-middle) | "Compaction is a 4-step procedure triggered at 80% soft cap. The non-obvious step is D — restating critical decisions at the end so they don't fall into the lost-in-middle zone." |
+| 6 | Tool output 处理 | 32-38 min | File reads → don't inline raw content, store as `file_ref` with `read_file(path)` tool. Diff 替代 full file (改完只展示 diff). Test output 摘要 (30KB pytest → "5 passed, 2 failed: test_foo line 42, test_bar timeout"). Image/PDF → blob ref + caption | "Big tool outputs are 70% of context bloat. The pattern is offload-and-reference, diff-not-full, summary-not-raw. Let me walk through file reads, test output, and image handling." |
+| 7 | Recall test methodology | 38-44 min | Compaction 不能丢关键信息. Recall test: 给 compacted context, 问 "did we agree on FastAPI?" / "what file did we modify on turn 15?" — LLM 答对率必须 > 95%. Eval set: 50 long-running session × 10 recall question each. Slice by question type (decision / preference / file state) | "Compaction without measurement is hope. I run recall tests — 'did we agree on X?' across 500 evals, slice by question type. Target > 95% answer accuracy." |
+| 8 | Connect + production hardening | 44-50 min | Voice agent multi-turn (5-10 turn 通话) context with user history. ConvFinQA multi-hop reasoning (intermediate calculation steps offload to scratchpad). Internal Agent Platform memory abstraction (4 memory tiers as 1st-class API). Cost target: $0.50/session vs $6 unbounded. Pinned decisions story | "Resume hook — voice agent + Internal Agent Platform built this exact 4-tier memory. Let me share metrics and one pinning bug story." |
+
+### 🎯 为啥按这个序
+
+**Cost economics 灾难 (Layer 1) 必须最先讲** — "$6/session × 1M users = $6M/month" 这个数字让面试官立刻明白 stake. Lost-in-middle (Layer 2) 必须在 strategy 之前讲, 这是设计 strategy 的物理基础. 4-strategy (3) 是骨架. Memory type taxonomy (4) 区分 production vs demo — demo 只有 context, production 有 4-6 tier memory. Compaction algorithm (5) 是具体执行. Tool output (6) 单列因为它占 context 70%, 单独优化 ROI 大. **Recall test (7) 是 staff-level scientific rigor** — compaction without measurement = hope. Resume close (8) 用 $0.50 vs $6 数字最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (compaction)**: "Summary 用什么 model?" → 准备 Gemini 3 Flash / Claude Haiku for summarization (cheap tier, 1/10 cost of generation model). "Summary lossy 怎么办?" → 准备 hierarchical (recent verbatim + old summary), pinning critical, recall test.
+- **Layer 7 (recall test)**: "Specific eval framework?" → 准备 LongBench / Needle-in-a-haystack 类 benchmark + 自定义 session replay test.
+- **Layer 4 (memory type)**: "Episodic vs Semantic 区别?" → episodic 时间序列 (turn N 发生了 X), semantic 抽象事实 (用户喜欢 X). 两种 query pattern.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify + cost 灾难) 4 min — 必讲
+- Layer 2 (lost-in-middle) 2 min
+- Layer 3 (4-strategy) 5 min — 必讲, 骨架
+- Layer 4 (memory type) 跳过 / 3 min, 只讲 working / episodic / decision log 三个
+- Layer 5 (compaction algo) 5 min
+- Layer 6 (tool output) 4 min — 必讲, 70% bloat 来源
+- Layer 7 (recall test) 3 min — 必讲, 区分 staff
+- Layer 8 (connect) 2 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 lost-in-middle paper 名 → 退回讲「**Liu et al 2023 paper, 长 context U 形 attention. 关键 takeaway: 中间衰减, 重要 info 放头/尾**」
+- 被追问 summary 怎么避免 lossy → 退回讲「**Hierarchical (recent verbatim + old summary) + pinning critical decisions + recall test 量化**」
+- 忘了 4 memory tier 完整顺序 → 退回讲「**最核心 3 个: working context (in LLM) / episodic (vector DB) / decision log (structured DB, 永不丢)**」
+- 被追问 compaction trigger → 退回讲「**Soft cap 80% context, hard cap 95%. 触发 hierarchical summarize + externalize big tool outputs**」
+- 被追问 cost calculation → 退回讲「**Per-turn cost = current_context_tokens × input_price + output_tokens × output_price. 50 turn 无管理 = $6, with management = $0.50, 10x 省**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

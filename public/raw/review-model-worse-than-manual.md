@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Your ML model is performing worse than manual process. What do you do?"**, 我按这 8 层回答, 不跳序. 这题考的是 **诊断 discipline + 敢承认 H5 (真错), 不是 retrain ASAP**.
+
+### 📐 Model-Worse-Than-Manual — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Immediate safeguard | 1 min | **不 panic 不 blame**. 立刻 5 个动作: (1) **rollback to manual / shadow mode**, (2) freeze training, (3) preserve current model artifacts, (4) alert stakeholder with neutral language, (5) start incident log. **Safeguard 先, 诊断后** | "Step zero: rollback or shadow mode. No diagnosis runs while model is still affecting outcomes..." |
+| 2 | 5 hypotheses ranked (with priors) | 3 min | **H1 Apple-to-orange (40%)** = baseline 不公平 → **H3 Edge case (25%)** = 模型在 specific slice 烂 → **H4 Integration (15%)** = prod feature 缺 → **H2 Drift (15%)** = distribution 变了 → **H5 真不适用 (5%)**. 这是 prior, 不是直觉 | "Five hypotheses, ranked by industry prior. Most candidates jump to H5 retrain. The data says 40% of the time it's H1 baseline mismatch..." |
+| 3 | Sliced eval methodology | 4 min | **不看 aggregate**, 按 7 axes slice: **time-of-day × user_segment × geography × input_difficulty × confidence_bucket × tenure × case_type**. 90% case 是 1-2 slice 烂, aggregate 平均掉了. **Confusion matrix on the slice that's worst** | "Aggregate is the enemy. Seven slicing axes. I want to find the worst-performing slice and look at the actual errors..." |
+| 4 | Human judgment edge analysis | 3 min | 找 50 个 manual-better-than-model 案例, 让 SME 解释 **what they saw that model didn't**. 5 patterns 出现: (i) **context window beyond features (multi-turn conversation)**, (ii) **rare signal (tribal knowledge)**, (iii) **commonsense (gut)**, (iv) **adversarial input (jailbreak)**, (v) **mixed objective (trade off X for Y)**. **每个 pattern 对应不同 fix** | "Humans see things models don't. I'd interview 5 SMEs on 50 cases. Categorize their reasoning into 5 patterns..." |
+| 5 | Rollback strategy | 2 min | **Three-mode rollback**: (i) instant kill-switch (manual only), (ii) shadow mode (model runs, no execution), (iii) advisory mode (model suggests, human decides). **不是 binary rollback**. Maintain rollback button 6 months minimum after re-deploy | "Rollback is not binary. Three modes. Each gives a different observability/risk tradeoff..." |
+| 6 | Trust rebuild plan | 2 min | **Customer trust 受损了, retrain 不够**. 4 步: (i) **公开 root cause writeup** (no blame), (ii) **per-slice eval dashboard** customer 看得到, (iii) **shadow run 4 weeks before re-deploy**, (iv) **customer-side override SLA** 给 customer 自主权 | "Re-deploy without trust rebuild is malpractice. Four steps for trust rebuild, customer-controlled..." |
+| 7 | Admit H5 honestly | 2 min | **如果 5 hypothesis 跑完 H5 是真的 (model 真不适合 task), 不能死磕**. 退路: (i) re-scope to sub-task model 擅长的, (ii) hybrid (model for easy cases, human for hard), (iii) kill the deployment. **敢承认 H5 是 FDE 区分项** | "If H1-H4 are ruled out and H5 is real, killing the deployment is the right answer. Hard but correct..." |
+| 8 | Resume reframe — ConvFinQA | 1 min | "我做过 ConvFinQA, 9-variant ablation 全输 baseline. 当时我 escalate 给 lead, 写了 negative result writeup, kill 了那个 direction. **从那个项目我学会**: 不敢承认 negative result 比 negative result 本身更贵. **这道题 H5 mindset 我有**" | "I lived this exact scenario. ConvFinQA, 9 variants, all worse than baseline. I had to write a negative result report..." |
+
+### 🎯 为啥按这个序
+
+**先 safeguard, 再 hypothesis prior, 再 sliced eval, 再 rollback** — 因为 90% candidates 立刻说 "我 retrain", 这是错的. **H1 Apple-to-orange 40% prior 意味着大概率是 metric 定义问题, 不是 model 问题**.
+
+H5 honest admission (Layer 7) 是这题的 **FDE 区分项** — ML researcher 会死磕调参, FDE 知道有时候 kill 是正确答案.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (sliced eval)**: 面试官会问 "你怎么挑 slice axes?" → 答 "看 confusion: 先按 confidence bucket slice (model 不 confident 的 slice 最容易烂), 再按 input difficulty (length, edge case flag), 再按 user segment. 7 axes 不是全跑, 是 top 3 跑了再 narrow"
+- **Layer 4 (human edge)**: 面试官会问 "SME 说不出原因怎么办?" → 答 "concrete pair comparison — 拿 model-correct 案例 vs model-wrong 案例, 让 SME 指认 difference. SMEs 比较容易 articulate differential 而不是 absolute reasoning"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 3 min: safeguard + hypothesis ranking (Layer 1-2)
+- 10 min: sliced eval + human edge (Layer 3-4, 重点)
+- 5 min: rollback + trust rebuild (Layer 5-6)
+- 3 min: H5 honest admission (Layer 7)
+- 2 min: resume hook — ConvFinQA (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 hypothesis → pivot to **"我先 slice eval, 不假定 root cause"**
+- 卡 retrain logic → pivot to **ConvFinQA 9-variant 全输** 故事, 讲 retrain 不是 panacea
+- 卡 trust → pivot to **TikTok PayLater Pakistan ASR outage** 故事, 讲 customer-facing comms
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

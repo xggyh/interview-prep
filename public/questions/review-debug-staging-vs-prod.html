@@ -43,6 +43,20 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/debug-staging-vs-prod.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/debug-staging-vs-prod.html"><code>debug-staging-vs-prod.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"Staging 全 pass, prod agent 给客户 bad answer / slower / drift, 你怎么 debug?"</strong> 我按这 8 层回答, 不跳序.</p></blockquote>
+<h4>📐 Staging-vs-Prod Inconsistency Debug — 8 层 funnel</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify "wrong" 三选一</td><td>30s</td><td>反问 "wrong vs different vs slower?" — 这 3 个 root-cause 完全不同. Wrong = bad output. Different = different but ambiguous which is right. Slower = latency regression</td><td>"Before I dig — clarify: wrong, different, or slower? Three root-cause families…"</td></tr><tr><td>2</td><td>Stabilize 先 (impact ≥ 50% → rollback)</td><td>30s</td><td>不是先 RCA — 如果客户 impact ≥ 50% (revenue loss / agent fail rate), 先 rollback 到 last known good, 然后 RCA 在没压力下做. Customer trust &gt; engineer satisfaction</td><td>"Stabilize first — if impact ≥ 50% rollback to last good, RCA after…"</td></tr><tr><td>3</td><td>Reproduce: trace_id + snapshot + replay</td><td>2 min</td><td>要求一个 reproducible failed trace (trace_id 从 LangSmith / Datadog). Capture input snapshot (full prompt + tool outputs + system state). Replay locally with frozen model_hash + temp=0 + seed</td><td>"Need a reproducible — trace_id, full snapshot, replay with frozen hash + temp 0 + seed…"</td></tr><tr><td>4</td><td>7 diff source cheap-first</td><td>2.5 min</td><td>Per source % from postmortems: (1) config 35% (env var / feature flag / yaml diff), (2) model 20% (model version hash, system prompt diff, temp diff), (3) time 15% (date-dependent prompt, "today is X"), (4) data 12% (retrieval index different, embedding model diff), (5) state 10% (cache / session), (6) dep 5% (lib version diff), (7) scale 3% (concurrency, rate-limit timeout). Check cheap-first: config → model → time → data → state → dep → scale</td><td>"Seven diff sources cheap-first — config 35% / model 20% / time 15% / data 12% / state 10% / dep 5% / scale 3%…"</td></tr><tr><td>5</td><td>Diff tool pattern</td><td>1.5 min</td><td>Per source diff tool: config 用 <code>diff &lt;(staging-env-dump) &lt;(prod-env-dump)</code>; model 用 git log on system prompt file + model_hash log; time 用 inject "frozen_date" in replay; data 用 retrieval result hash compare; state 用 Redis dump diff; dep 用 lockfile diff; scale 用 reproduce at load (k6 / locust)</td><td>"For each source — concrete diff tool — config dump diff / git log on prompts / frozen date / retrieval hash diff…"</td></tr><tr><td>6</td><td>Fix + prevent regression</td><td>1.5 min</td><td>Fix 是先 (immediate hotfix or revert), 然后 prevent: (a) golden trace test (the failing input now in CI), (b) canary deploy 5% → 25% → 100% with auto-rollback on KPI degrade, (c) shadow mode (new version observes prod for 1 week without committing). 3 layer 缺一不可</td><td>"After fix — prevent 3 layer — golden trace CI + canary + shadow mode 1 week…"</td></tr><tr><td>7</td><td>Observability stack</td><td>1 min</td><td>LangSmith for LLM trace + token usage + tool call. Datadog APM for latency / dep graph. Sentry for exception. Custom dashboard per agent: KPI / accuracy / cost / fallback rate. Alert on KPI regression not just exception</td><td>"Observability — LangSmith + Datadog APM + Sentry + custom per-agent dashboard with KPI alerts…"</td></tr><tr><td>8</td><td>Resume hook</td><td>1 min</td><td>"Concrete: BNPL chatbot post-deploy regression. Staging pass, prod 30% wrong intent. Traced via LangSmith. Root cause = system prompt file diverged from staging (config 35% bucket). Fixed in 40 min after stabilize-rollback, golden trace added, no recurrence. Internal Agent Platform now does 3-env config parity check at deploy"</td><td>"Real example — BNPL chatbot 30% intent regression, root cause was system prompt config drift, 40min fix after rollback…"</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p>Clarify 第一层 because 90% 候选人冲进去就 debug, 答错 question. Stabilize 第二是 production discipline (customer-first). Reproduce 在 RCA 前是因为没 reproducible bug 不可能 root-cause. 7 diff sources cheap-first 是核心 — 用 frequency-weighted ordering 节省时间. Diff tool pattern 是 "我真的会做" 的 signal. Prevention 3 layer 让面试官知道你 fix 是 systematic. Observability + resume 收尾.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<p><strong>Layer 4 (7 diff source)</strong> — 必被追 "Why config 35%?" → 答: postmortem aggregate — env var (model API key route different env), feature flag (staging has flag on prod off), system prompt yaml drift (someone edits prod without staging PR). 这 3 个是 config 35% 的主体. Model version 20% 是因为 staging pin model_v5 prod 升 v6 是常见漂移. Time 15% 是 "today's date" 类型 prompt 在 staging 老 snapshot 表现不一.</p>
+<p><strong>Layer 6 (canary + shadow)</strong> — 追 "Shadow vs canary trade-off?" → 答: canary 是 real customer at low % (有用户体验风险, 但 production load + behavior 真实). Shadow 是 new version 看同样输入 不 commit (无用户风险, 但 side-effect-free behavior only — 不能验证 tool-call success). 重要 system 两者都跑 — shadow 验 behavior parity, canary 验 user-facing KPI.</p>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>0-3 min: Layer 1+2 (clarify + stabilize-first)</li><li>3-10 min: Layer 3+4 (reproduce + 7-source cheap-first)</li><li>10-17 min: Layer 5+6 (diff tool + prevent 3-layer)</li><li>17-22 min: Layer 7 (LangSmith + Datadog + KPI alert)</li><li>22-27 min: Layer 8 BNPL 30% intent regression case</li><li>27-30 min: Q&amp;A buffer</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>不知道哪个 source first → 默认 config — 35% concrete number 是个安全 default, 然后 model_hash</li><li>被问 "what if not reproducible at all" → "narrow time window via trace_id timestamp, snapshot all infra state for that window, replay with frozen state; if still not reproducible → likely concurrency / race, add structured logging then watch for second instance"</li><li>不熟 LangSmith → "any LLM trace tool — LangSmith / Phoenix / Helicone / homegrown; key fields trace_id / prompt / tool_calls / token_usage / latency"</li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>核心心智模型 (1 sentence)</h4>
@@ -148,6 +162,50 @@ Fix + Prevent:
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/debug-staging-vs-prod.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`debug-staging-vs-prod.html`](questions/debug-staging-vs-prod.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Staging 全 pass, prod agent 给客户 bad answer / slower / drift, 你怎么 debug?"** 我按这 8 层回答, 不跳序.
+
+### 📐 Staging-vs-Prod Inconsistency Debug — 8 层 funnel
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify "wrong" 三选一 | 30s | 反问 "wrong vs different vs slower?" — 这 3 个 root-cause 完全不同. Wrong = bad output. Different = different but ambiguous which is right. Slower = latency regression | "Before I dig — clarify: wrong, different, or slower? Three root-cause families…" |
+| 2 | Stabilize 先 (impact ≥ 50% → rollback) | 30s | 不是先 RCA — 如果客户 impact ≥ 50% (revenue loss / agent fail rate), 先 rollback 到 last known good, 然后 RCA 在没压力下做. Customer trust > engineer satisfaction | "Stabilize first — if impact ≥ 50% rollback to last good, RCA after…" |
+| 3 | Reproduce: trace_id + snapshot + replay | 2 min | 要求一个 reproducible failed trace (trace_id 从 LangSmith / Datadog). Capture input snapshot (full prompt + tool outputs + system state). Replay locally with frozen model_hash + temp=0 + seed | "Need a reproducible — trace_id, full snapshot, replay with frozen hash + temp 0 + seed…" |
+| 4 | 7 diff source cheap-first | 2.5 min | Per source % from postmortems: (1) config 35% (env var / feature flag / yaml diff), (2) model 20% (model version hash, system prompt diff, temp diff), (3) time 15% (date-dependent prompt, "today is X"), (4) data 12% (retrieval index different, embedding model diff), (5) state 10% (cache / session), (6) dep 5% (lib version diff), (7) scale 3% (concurrency, rate-limit timeout). Check cheap-first: config → model → time → data → state → dep → scale | "Seven diff sources cheap-first — config 35% / model 20% / time 15% / data 12% / state 10% / dep 5% / scale 3%…" |
+| 5 | Diff tool pattern | 1.5 min | Per source diff tool: config 用 `diff <(staging-env-dump) <(prod-env-dump)`; model 用 git log on system prompt file + model_hash log; time 用 inject "frozen_date" in replay; data 用 retrieval result hash compare; state 用 Redis dump diff; dep 用 lockfile diff; scale 用 reproduce at load (k6 / locust) | "For each source — concrete diff tool — config dump diff / git log on prompts / frozen date / retrieval hash diff…" |
+| 6 | Fix + prevent regression | 1.5 min | Fix 是先 (immediate hotfix or revert), 然后 prevent: (a) golden trace test (the failing input now in CI), (b) canary deploy 5% → 25% → 100% with auto-rollback on KPI degrade, (c) shadow mode (new version observes prod for 1 week without committing). 3 layer 缺一不可 | "After fix — prevent 3 layer — golden trace CI + canary + shadow mode 1 week…" |
+| 7 | Observability stack | 1 min | LangSmith for LLM trace + token usage + tool call. Datadog APM for latency / dep graph. Sentry for exception. Custom dashboard per agent: KPI / accuracy / cost / fallback rate. Alert on KPI regression not just exception | "Observability — LangSmith + Datadog APM + Sentry + custom per-agent dashboard with KPI alerts…" |
+| 8 | Resume hook | 1 min | "Concrete: BNPL chatbot post-deploy regression. Staging pass, prod 30% wrong intent. Traced via LangSmith. Root cause = system prompt file diverged from staging (config 35% bucket). Fixed in 40 min after stabilize-rollback, golden trace added, no recurrence. Internal Agent Platform now does 3-env config parity check at deploy" | "Real example — BNPL chatbot 30% intent regression, root cause was system prompt config drift, 40min fix after rollback…" |
+
+### 🎯 为啥按这个序
+
+Clarify 第一层 because 90% 候选人冲进去就 debug, 答错 question. Stabilize 第二是 production discipline (customer-first). Reproduce 在 RCA 前是因为没 reproducible bug 不可能 root-cause. 7 diff sources cheap-first 是核心 — 用 frequency-weighted ordering 节省时间. Diff tool pattern 是 "我真的会做" 的 signal. Prevention 3 layer 让面试官知道你 fix 是 systematic. Observability + resume 收尾.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (7 diff source)** — 必被追 "Why config 35%?" → 答: postmortem aggregate — env var (model API key route different env), feature flag (staging has flag on prod off), system prompt yaml drift (someone edits prod without staging PR). 这 3 个是 config 35% 的主体. Model version 20% 是因为 staging pin model_v5 prod 升 v6 是常见漂移. Time 15% 是 "today's date" 类型 prompt 在 staging 老 snapshot 表现不一.
+
+**Layer 6 (canary + shadow)** — 追 "Shadow vs canary trade-off?" → 答: canary 是 real customer at low % (有用户体验风险, 但 production load + behavior 真实). Shadow 是 new version 看同样输入 不 commit (无用户风险, 但 side-effect-free behavior only — 不能验证 tool-call success). 重要 system 两者都跑 — shadow 验 behavior parity, canary 验 user-facing KPI.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (clarify + stabilize-first)
+- 3-10 min: Layer 3+4 (reproduce + 7-source cheap-first)
+- 10-17 min: Layer 5+6 (diff tool + prevent 3-layer)
+- 17-22 min: Layer 7 (LangSmith + Datadog + KPI alert)
+- 22-27 min: Layer 8 BNPL 30% intent regression case
+- 27-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不知道哪个 source first → 默认 config — 35% concrete number 是个安全 default, 然后 model_hash
+- 被问 "what if not reproducible at all" → "narrow time window via trace_id timestamp, snapshot all infra state for that window, replay with frozen state; if still not reproducible → likely concurrency / race, add structured logging then watch for second instance"
+- 不熟 LangSmith → "any LLM trace tool — LangSmith / Phoenix / Helicone / homegrown; key fields trace_id / prompt / tool_calls / token_usage / latency"
 
 ---
 

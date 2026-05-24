@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"CFO refuses to deploy your model because it gives different answers to the same question. How do you respond?"**, 我按这 8 层回答, 不跳序. 这题考的不是 "怎么 reduce temperature", 是 **mental model translation + 2-mode system design**.
+
+### 📐 CFO Model Variability — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Acknowledge before educating | 1 min | **不立刻 "let me explain stochasticity"**. 先 acknowledge: > *"You're right to be concerned — same input giving different output is fundamentally different from what your spreadsheet does. That's not a model bug, it's a category difference. Let me show you how I'd think about when each behavior is appropriate."* | "First sentence: 'You're right to be concerned.' Validate the gut before educating..." |
+| 2 | 6 analogies ranked by effectiveness | 3 min | **(1) Equity analyst's narrative writeup (different wording, same takeaway) — 90% effective for CFOs** > **(2) Weather forecast 70% rain (uncertainty quantified, decision usable)** > **(3) Junior analyst variance vs error** > **(4) Translator (faithful but not word-for-word)** > **(5) Spell checker confidence** > **(6) Survey margin of error**. 我按 CFO type 挑 (1) or (2) | "Six analogies, ranked. For a CFO from finance background, equity analyst writeup works 90% of the time..." |
+| 3 | Variance-vs-error reframe | 2 min | 关键 reframe: **variance ≠ error**. Junior analyst write 2 different summaries of same quarter = both correct, just different wording. **错的是 wrong number**, 不是 different wording. 然后 show: pin the numbers, vary only the prose | "Variance and error are different. Different wording of correct facts is not error. Wrong fact is error. Here's how we engineer for that..." |
+| 4 | 4-layer guardrails | 3 min | (i) **Number pinning** (deterministic retrieval, never LLM-generated numbers), (ii) **Citation requirement** (every number cited to source row), (iii) **LLM-as-judge for factual consistency** (5 runs, flag if numerical drift), (iv) **Human review checklist for material outputs**. **CFO 看到这 4 层后 95% case 满意** | "Four guardrails. Numbers are pinned by deterministic retrieval. LLM only writes prose. Citation required. Judge model checks for drift..." |
+| 5 | 2-mode system | 3 min | Offer CFO **two modes, CFO chooses per use case**: > **Default mode (variance OK)** — exploratory analysis, briefing summary, prose. Temp = 0.3, citations on. > **Audit mode (pinned)** — regulatory filings, board reports, audit responses. Temp = 0, seeded, cached, version-locked output. **Same model, two configurations**, CFO selects | "Two modes, CFO chooses. Default for prose, Audit for filings. Same model, different config. Let me show the toggle..." |
+| 6 | Push-back judgment | 2 min | **当 CFO 说 "I want deterministic always"**, 答: > *"We can do that. The cost is: prose quality drops by ~30%, model can't synthesize across rows. If you accept that for filings but want full quality for briefings, that's the 2-mode setup. If you want deterministic everywhere, here's what we lose."* — **让 CFO 看 trade-off**, 不是 fight him | "If CFO insists deterministic-everywhere, I show the cost. Not fight, illustrate trade-off. CFO decides..." |
+| 7 | 24h follow-up artifact | 2 min | 24h 内 deliver: (i) **1-page memo: 5 examples** showing same-input/different-prose/same-fact, (ii) **demo of 2-mode toggle**, (iii) **calibration report** (LLM judge on 100 finance questions, pass rate by category), (iv) **invitation for CFO to add 10 audit-mode questions**. **CFO owns the test set** | "24-hour deliverable. Five examples, mode toggle demo, calibration report, CFO adds 10 audit questions to my test set..." |
+| 8 | Resume reframe — ConvFinQA + BNPL | 1 min | "我做过 ConvFinQA, multi-hop financial QA — 我们 deliberately pinned numbers with deterministic retrieval, LLM only generated reasoning chain. **9-variant ablation 我跑过 calibration**. Plus TikTok PayLater fraud explanation 给 compliance, 我们用 2-mode system, regulator 喜欢 audit mode (deterministic), ops 用 default mode (prose). **CFO 这场是同 playbook**" | "I've built this — ConvFinQA had deterministic number pinning, BNPL had 2-mode for regulator vs ops..." |
+
+### 🎯 为啥按这个序
+
+**先 acknowledge (Layer 1), 再 analogy (Layer 2), 再 reframe variance≠error (Layer 3), 再 system design (Layer 4-5)** — 因为 90% candidates 直接讲 temperature/seeding, CFO 听不懂. **CFO 的 concern 是 mental model, 不是 hyperparameter**. 用他自己 domain 的 analogy (equity analyst writeup) 是 unlock.
+
+2-mode system (Layer 5) 是这题的 **Client Sim 区分项** — 一般 candidate 给 yes/no on temperature, FDE 给 CFO 决定权 + 2 mode toggle.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 2 (analogy)**: 面试官扮 CFO 说 *"equity analyst is paid to be different, your model isn't paid"* → 答: > *"Fair pushback. Replace equity analyst with internal CFO briefing: same data, two analysts write it up differently, both correct. The wording variance doesn't change the decision. That's the analogy."*
+- **Layer 4 (guardrails)**: 面试官会问 "how do you prove number pinning works?" → 答: 1000-question regression test, deterministic retrieval, assert numerical fields against ground truth, 100% pass rate before deployment. Re-run on every model update.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 3 min: acknowledge + analogy selection (Layer 1-2)
+- 5 min: variance-vs-error reframe (Layer 3)
+- 8 min: 4-layer guardrails + 2-mode (Layer 4-5, 重点)
+- 5 min: push-back + 24h artifact (Layer 6-7)
+- 2 min: resume hook (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 analogy → fall back to **equity analyst writeup** — 永远 work for finance CFO
+- 卡 guardrails → use **ConvFinQA deterministic number pinning** 故事
+- 卡 push-back → use **"let CFO see trade-off, don't fight"** principle
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

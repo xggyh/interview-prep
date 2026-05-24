@@ -5,6 +5,45 @@
 **原页面**: [`gfde-t3-stateless-stateful.html`](questions/gfde-t3-stateless-stateful.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"agent service 应该 stateless 还是 stateful? 对 (a) chatbot (b) coding agent (c) voice agent 分别推荐"**, 我按这 7 层回答, 不跳序.
+
+### 📐 Stateless vs Stateful — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 4-axis 比较框架 | 90s | latency / scale / failover / cost 四维度, 不是 yes/no 选择. Stateless: ∞ scale + simple FO + 30 wire重传 vs Stateful: TTFT 280ms + sticky FO 复杂 | "Stateless vs stateful 不是二选一, 我用 4-axis 框架 — latency, scale, failover, cost..." |
+| 2 | 默认 stance | 30s | **默认 stateless 95% 场景** (OpenAI / Anthropic API 都是这样), voice / sub-500ms 才例外. 这是 industry 默认 | "Default position: stateless. OpenAI / Anthropic 公开 API 都 stateless 是有原因的..." |
+| 3 | 3 use-case 决策 | 3 min | (a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 S3 — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable | "Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..." |
+| 4 | Hybrid pattern 揭示 | 2 min | "Stateless" 是 API 语义, server 内部其实 implicitly stateful — in-process LRU + Redis + DB + GPU KV cache. 4 tier hierarchy | "Now the dirty secret — 'stateless' is API semantics, server is implicitly stateful via 4-tier cache hierarchy..." |
+| 5 | KV cache 复用 mechanics | 3 min | vLLM PagedAttention 自动 prefix 复用. Client 传 conversation_id hint → sticky route → 80-85% prefix cache hit rate. SGLang RadixAttention multi-turn 多 20-30% | "The hidden stateful layer is GPU KV cache — vLLM PagedAttention 自动 share prefix, hit rate 80-85% with sticky..." |
+| 6 | Failover edge cases | 2 min | Stateless: any pod takes over, 0 user impact, but 30K token re-prefill cost. Stateful: pod dies → reconnect to any pod, 200ms re-warm acceptable for voice. 跨 region < 1s FO 要 Redis cross-region replicate | "Failover differs sharply — stateless free but expensive re-prefill, stateful needs warm-up budget..." |
+| 7 | 简历 resume hook | 90s | "Voice agent 7 markets is stateful WebSocket (TTFT 280ms target). BNPL chatbot is stateless REST + Redis blob (任意 pod serve, 2-5s p99). Decision driver: voice < 500ms vs chatbot accepts 2-5s" | "On voice agent (TikTok / ByteDance) we ran stateful WebSocket — on BNPL chatbot we ran stateless REST..." |
+
+### 🎯 为啥按这个序
+
+4-axis 比较先把题从二元拉到光谱, 强制面试官思考维度. 默认 stateless 表态后, per-use-case 决策展示你能 zoom-in 不同场景. Hybrid pattern 是中段 senior 加分 — "你以为是 stateless, 其实server 4 tier stateful". KV cache 是 LLM 独有的隐藏 stateful 层, 多数候选人不知道 — 主动讲是 staff 信号. Failover edge case 把 trade-off 落到操作细节 (200ms re-warm). 简历最后, voice + BNPL 两个项目正好对应 stateful / stateless 双案例.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 5 (KV cache reuse)** — 面试官追问 "vLLM 怎么知道两个 request 是同一 conversation?" 回答: client 传 conversation_id, gateway 把同 conv_id 路由到同 pod (consistent hash via Envoy), vLLM PagedAttention 看到相同 token prefix → 自动 share KV block (16 token per block). 80-85% hit rate. **Layer 6 (failover)** 次之, 问 "WebSocket 断了用户体验如何?" → reconnect + replay last 5s context, 200ms re-warm 用户基本无感.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 4-axis 一句话 (30s) + 默认 stateless (30s)
+2. 3 use-case 推荐 + 各自理由 (4 min)
+3. Hybrid pattern + KV cache reuse (4 min)
+4. Failover edge case (chatbot vs voice 各 1 min, 2 min)
+5. 简历 quote: voice TTFT 280ms + BNPL任意 pod (2 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "WebSocket 一定 stateful 吗"**: 不一定. 可以 WebSocket + 每 message 重传 state (logically stateless), 但失去 KV cache 优势, 通常不值
+2. **被问 "Redis 算 stateful 吗"**: API 表面 stateless (任意 pod 读同 Redis), 但 Redis 自己是 stateful infra. 区分 API 语义 vs infra 语义
+3. **被问 "multi-region active-active 怎么办"**: Redis Cluster cross-region replication 异步 (eventual), 或 CRDT (LWW for conversation history). 强一致要付出 3x cost
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

@@ -6,6 +6,48 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"你怎么让我们的 platform 集成 customer 的 CRM (Salesforce / HubSpot), 处理 OAuth, multi-tenant, token rotation, 故障?"** 我按这 7 层回答, 不跳序.
+
+### 📐 OAuth 2.0 CRM Integration — 7 层 unpack + harden
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 3-term unpack | 30s | 先 unpack 3 confusable term: **access_token** (short-lived 1-24h, every API call), **refresh_token** (long-lived 30d-perpetual, only to /token endpoint, rotate per use), **authorization_code** (one-shot 10 min, exchanged 1x for tokens). 90% bug 是混淆这 3 个 | "Three terms first because they get confused — access vs refresh vs auth_code…" |
+| 2 | Disaster scenario hook | 30s | "想象 user 把 Salesforce 密码贴 chat 给 agent. 1 incident, breach 全公司 CRM. OAuth 2.0 designed for this — never share password, delegate scoped token" | "The reason OAuth exists — never share passwords. Disaster scenario…" |
+| 3 | authorization_code with PKCE end-to-end | 2.5 min | 6-step flow: (1) /authorize redirect with state + PKCE code_challenge S256, (2) user consent screen, (3) callback with code + state verify, (4) /token POST exchange code + code_verifier → access + refresh, (5) call API with Bearer, (6) on 401 → refresh flow with rotation. State CSRF, PKCE 防 code 拦截 | "I default to authorization_code with PKCE — 6 steps, state + PKCE prevent CSRF + code interception…" |
+| 4 | 4 grant types 决策树 | 1.5 min | (a) authorization_code + PKCE → user-facing 3rd party (Salesforce); (b) client_credentials → service-to-service (your platform → vendor backend); (c) refresh_token rotation → keep alive long-lived; (d) device_code → CLI / TV / IoT no browser. Implicit grant deprecated, password grant 死掉 | "Four grants — code+PKCE / client_creds / refresh / device_code — implicit and password grants are dead…" |
+| 5 | Multi-tenant secret + 4 storage 层 | 2 min | Per-tenant DEK wrap by KMS. 4 storage: (a) browser → httpOnly Secure SameSite cookie or window.sessionStorage; (b) mobile → iOS Keychain / Android Keystore; (c) server backend → KMS (AWS/GCP) + Vault for static client_secret; (d) hot cache → Redis encrypted at rest with TTL 5 min. Never localStorage for access tokens | "Storage is tiered — cookie / Keychain / KMS+Vault / Redis encrypted — per-tenant DEK…" |
+| 6 | Refresh storm + clock skew + cache 兜底 | 2 min | Distributed lock (Redis SETNX) on refresh per tenant — 100 workers expire same token, 1 refresh, 99 wait + retry. 30s clock skew buffer (refresh at exp-60s not exp). On vendor 5xx fallback to cached token + retry with backoff. On vendor down 30 min, circuit breaker + customer notification. Bulk rate-limit mitigation: per-tenant token bucket, queue smoothing | "Three production hardening — distributed lock on refresh + 30s clock skew + cache fallback + circuit breaker…" |
+| 7 | Middleware pattern + BNPL resume hook | 1.5 min | 3 pattern: (a) SDK in each service (low overhead, code duplication); (b) sidecar (Envoy / dedicated proxy, 1 hop latency); (c) dedicated Token Service (microservice, single source of truth, +1 hop). 我选 Token Service for multi-tenant SaaS — single audit point, easier rotation. "BNPL chatbot multi-tenant: each merchant 自己的 client_id + DEK + refresh rotation, Token Service centralized, 0 cross-tenant token leak in 18 months" | "Middleware — I pick Token Service for multi-tenant — single audit point…" |
+
+### 🎯 为啥按这个序
+
+3-term unpack 第一 because 面试官 5 秒判断你懂不懂 OAuth. Disaster scenario 提供 motivation (why exist). authorization_code + PKCE 是 most-used flow 必须 nail down. 4 grant decision tree 是 "你知道何时用哪个" 的 signal. Multi-tenant storage 是 enterprise gotcha — 90% startup 死在这. Hardening (refresh storm + clock skew + cache) 是 production-only knowledge. Token Service + BNPL hook 收尾.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 3 (PKCE)** — 必被追 "Why PKCE if I'm a confidential client?" → 答: defense-in-depth. Even confidential clients (server-side with client_secret) benefit from PKCE because (a) it prevents auth code interception via redirect_uri hijack, (b) latest OAuth 2.1 draft recommends PKCE for all client types, (c) zero cost to add. code_challenge = SHA256(code_verifier), code_verifier 43-128 random char.
+
+**Layer 6 (refresh storm)** — 追 "Why distributed lock not just retry?" → 答: 100 worker hit expired token simultaneously → 100 refresh requests → vendor rate-limit blocks ALL → cascade failure. Distributed lock (Redis SETNX with TTL 10s) means 1 worker refreshes, 99 wait 50ms then retry with new token. Single-flight refresh per tenant.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (3-term + disaster scenario)
+- 3-12 min: Layer 3+4 (PKCE 6-step + 4 grant tree)
+- 12-20 min: Layer 5+6 (multi-tenant storage + hardening)
+- 20-26 min: Layer 7 (Token Service + BNPL 18-month no-leak)
+- 26-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘 PKCE 步骤 → "code_verifier = 43-128 random char, code_challenge = base64url(SHA256(verifier)). 发 challenge, 后面用 verifier 验证. 标准 RFC 7636"
+- 被问 token revocation → "RFC 7009 /revoke endpoint, vendor-specific support 不一致, fallback = blocklist token in our cache + wait expiry"
+- 不熟 vendor 具体 (Salesforce / HubSpot 怎么实现) → "I follow RFC, vendor extension I look up in docs first 30 min; main risk is non-standard refresh rotation policy, e.g., Salesforce uses sticky refresh"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

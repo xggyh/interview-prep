@@ -5,6 +5,48 @@
 **原页面**: [`gfde-t3-high-throughput.html`](questions/gfde-t3-high-throughput.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"customer wants 1M QPS LLM serving, p99 < 1s, fine-tuned model. Walk through your serving stack"**, 我按这 9 层回答, 不跳序. 这是我**简历最硬核 hook 区** (vLLM/SGLang/DeepSpeed 简历明示).
+
+### 📐 1M QPS LLM Serving — 9 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Throughput 数学锚点 | 1 min | 1M QPS × avg 700 token output = 700M tokens/sec. 单 H100 FP8 8B model vLLM full stack ~600 QPS → 1700 GPU baseline. 加 prefix cache + spec dec 减半到 ~800-900 GPU | "Let me anchor the math first — 1M QPS × 700 tokens / 600 QPS per H100 = ~1700 GPUs. With prefix cache 减半..." |
+| 2 | Clarify 6 问 | 90s | Model size (8B / 70B / 200B)? Avg input / output token? p99 latency vs throughput priority? TTFT vs TPOT? FP16 / FP8 / INT4 quality budget? Multi-tenant fine-tune? | "Before I commit to a stack, 6 questions — model size, token mix, latency target, quant budget, multi-tenant?" |
+| 3 | 6 levers 排序 + 数学 | 5 min | Baseline HF Trans 5-10 QPS → continuous batch **5x** → PagedAttn **10x** (24x concurrency) → prefix cache **20x** → spec dec **40x** (70% accept) → FP8 quant **60x**. 各 lever 触发条件 | "6 levers multiplicative — 1x baseline to 60x full stack. Let me walk through each with the math..." |
+| 4 | Continuous batching deep-dive | 3 min | Token-level scheduler (vLLM Scheduler class). 不是 batch-level 等满. 1 个 req 完成立刻 swap 新 req in. 无 padding. 8 token block. Iter-level preemption with chunked prefill | "Continuous batching is token-level — vLLM Scheduler swaps in new requests every iteration, no padding waste..." |
+| 5 | PagedAttention 像 OS 页表 | 3 min | KV cache 切 16-token block. Block 按需分配, copy-on-write for shared prefix. 24x more concurrent vs pre-allocate max_seq_len. **生产实测 70B FP8 H100 单节点 8 卡: pre-alloc 4 concurrent → PagedAttn 80-100 concurrent** | "PagedAttention 像 OS 虚拟内存 — 16-token block, CoW for shared prefix, 24x concurrency on 70B FP8..." |
+| 6 | Multi-LoRA serving | 2 min | S-LoRA / Punica: 100 tenant fine-tune adapters 共享 1 个 base model. Adapter swap < 1ms on H100. 比 100 个 base replica 便宜 **33x**. Voice agent 7 market 你正好这个 case | "Multi-LoRA via S-LoRA — 100 tenant adapters share 1 base, 33x cheaper than replicas. Voice agent 7 markets fits this exactly..." |
+| 7 | Parallelism 选型 | 2 min | TP within node (NVLink 900GB/s), DP across node (Ethernet 100Gb/s). **70B FP8 sweet spot = TP=8 single node 8×H100 80GB**. > 200B 用 EP for MoE. PP 几乎不用了 | "Parallelism — TP within node only (NVLink), DP across. 70B FP8 sweet spot 是 TP=8 single 8×H100..." |
+| 8 | Cost-aware routing 数学 | 2 min | 单 model: 全 Opus $5/$25 → $0.0085/call → 1M QPS × 86400s = blended $735M/day. 70/25/5 路由 → blended $0.85/1M = $73M/day, **10x reduction**. 加 self-host vLLM 8B fine-tuned → $0.30/1M | "Cost layer — hosted blended $0.85/1M with 70/25/5 routing vs $5/1M all-Opus = 10x. Self-host vLLM 再降 3x..." |
+| 9 | 简历 resume hook | 90s | "Voice agent self-host LLM 用 **vLLM 0.6** (continuous batch + PagedAttn + prefix cache + FP8), Llama 3.1 8B fine-tuned, **A100 8 卡 → 150 QPS sustained, 18x HF baseline**. BNPL chatbot 用 **SGLang RadixAttention**, multi-turn 多 20-30% extra cache hit." | "On voice agent we ran vLLM TP=8 with FP8 — 18x baseline. BNPL chatbot SGLang RadixAttention for multi-turn..." |
+
+### 🎯 为啥按这个序
+
+数学锚点先开场: 算出来 1700 GPU 让面试官知道你能直接 size capacity. Clarify 5 问是 senior IC 信号 — 没问 model size 就给方案是 junior 反模式. 6 levers 是骨干, 必须给数字 (5x / 10x / 24x 等), 不能停在概念. Continuous batch + PagedAttn 是最容易被追问的两个, 必须能讲 OS-page-table 类比. Multi-LoRA 是 2026 新热点, 你简历 voice agent 7 market 正好对上. Parallelism 选型 (TP within / DP across) 显示你做过 H100 部署. Cost 数学锚点把 throughput 和 economic 串起来. 简历 hook 最后, vLLM + SGLang 双 stack 是 staff 信号.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 5 (PagedAttention)** — 追问 "block size 怎么选?". 回答: 16 token 是 vLLM 默认 sweet spot, 太小 metadata overhead 大, 太大 fragmentation. 70B FP8 实测 block=16 vs 32 差 < 2%. **Layer 4 (continuous batching)** 追问 "chunked prefill 是什么". 回答: 长 prompt prefill 阶段切成 chunk, 每 chunk 和 decode 共享 batch slot, 避免长 prefill 阻塞短 decode (vLLM 0.5+ 默认 enable). **Layer 6 (multi-LoRA)** 追问 "adapter swap 怎么 sub-ms". 回答: adapter 是 low-rank decomposition (rank=8/16/32), GPU mem 几 MB, 预加载到 HBM, swap 是 pointer 切换.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 数学锚点 (1 min) + clarify 3 问 (1 min)
+2. 6 levers 数字 + 各加速比 (5 min)
+3. PagedAttn + continuous batch 深入 (4 min)
+4. Multi-LoRA + parallelism 选型 (3 min)
+5. Cost 数学 + 简历 vLLM/SGLang quote (3 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "1M QPS 真的可行吗"**: 主动承认 "对单个 product 几乎不存在 — Google search 全球 ~100K QPS. 但用 6 levers + 70/25/5 routing 把绝大多数 traffic 引到便宜 model, 可以让 cost / latency 都达标"
+2. **被问 "spec decoding 什么时候不用"**: accept rate < 50% 时 overhead > 收益, 关掉. 通常发生在 draft 和 verifier 模型 distribution 差距大 (e.g., draft 0.5B vs base 70B 不同 tokenizer)
+3. **被问 "INT4 vs FP8 选哪个"**: FP8 < 0.5% quality drop, sweet spot 2026 default. INT4 (AWQ/GPTQ) 2-5% drop, consumer chatbot 可接受, legal/medical 不行. Self-host 选 FP8 (H100/Blackwell 硬件加速), edge / 小 GPU 才用 INT4
+4. **被问 "TensorRT-LLM vs vLLM"**: TRT-LLM 在 NVIDIA stack 上极致优化, +20-30% over vLLM, 但 engine 编译时间长 (1-2h per model), 模型迭代慢. vLLM dev velocity 强, 生产默认 vLLM, TRT-LLM 只在稳定 model + 极致 throughput 需求时用
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

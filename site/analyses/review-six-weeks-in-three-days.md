@@ -6,6 +6,49 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Customer wants a 6-week feature delivered in 3 days. What do you say?"**, 我按这 7 层回答, 不跳序. 这题考的不是 "你能不能加班", 是 **structured scope decomposition + Tier-1 ship strategy**.
+
+### 📐 6-Week Feature in 3 Days — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | "What's driving the timeline?" — first question | 1 min | **不立刻 push back, 不立刻 yes**. 先问 verbatim: > *"Before I say yes or no, help me understand — what's driving the 3-day deadline? Is it a board meeting, a regulatory date, a competitor move, or a customer commitment?"* 80% case timeline 是 self-imposed | "First sentence out of my mouth: 'what's driving the 3-day deadline?'..." |
+| 2 | Decompose monolithic ask | 3 min | "6-week feature" 是 monolithic. 拆成 **3-tier**: > **Tier 1 (must-have for 3-day reason, 20% of scope, 3 days)** > **Tier 2 (nice-to-have, 2-3 weeks)** > **Tier 3 (full feature, 6 weeks)**. 然后讲 verbatim: > *"If we deliver Tier 1 by Friday, does that solve the [board meeting / regulatory / competitor] problem?"* | "I'd structurally decompose the ask. Three tiers, three timelines. Then ask which tier solves their actual problem..." |
+| 3 | 5 hidden need types | 3 min | 真实 need 通常是 5 种之一: **(a) board demo (need screenshot, not feature)**, **(b) regulatory deadline (need partial coverage, not full)**, **(c) competitor parity (need press release, not feature)**, **(d) customer escalation (need acknowledgment + plan)**, **(e) self-imposed (need pushback)**. 每种不同 response | "Five archetypes of 'urgent feature'. Each has a different real answer. Most aren't 'build the feature'..." |
+| 4 | Stakeholder dialog scripts (verbatim) | 4 min | **To customer sponsor**: > *"Let me make sure I understand the real outcome. If we ship X by Friday and deliver full Y in 4 weeks, does that work?"* **To internal eng lead**: > *"I'm not committing 3 days. I'm scoping the slice that's actually 3 days. Can you size Tier 1?"* **To customer if they push back**: > *"I'd rather under-promise and over-deliver than commit a 3-day full feature and ship a 3-day broken feature."* | "Three dialog scripts, verbatim. Customer sponsor, eng lead, and customer-when-pushing-back..." |
+| 5 | Ship Tier 1 + roadmap commit | 2 min | 3 天 ship Tier 1 (minimum viable, prod-quality), 24h 内 deliver **written roadmap** Tier 2 + Tier 3 with dates + owners. **Roadmap 是 trust artifact** — customer 看到你不是说 "no", 是说 "yes for what matters, plan for the rest". Update roadmap weekly | "Tier 1 ships Friday. Tier 2 and 3 land on roadmap with owners and dates. That roadmap is the trust artifact..." |
+| 6 | Anti-pattern: heroics | 1 min | **绝对避免**: (a) commit 3 天全 scope + 加班通宵 → 通常 ship broken thing, customer trust 反而损坏, (b) flat "no" 不给替代方案 → customer 觉得你不 partner, (c) silent extension to 5 days → 比 honest "Tier 1 first" 更损 trust | "Heroics are the worst answer. Three anti-patterns I'd refuse..." |
+| 7 | Resume reframe — Indonesia ops | 1 min | "我在 TikTok PayLater Indonesia, ops team 要 '完整 refund 自动化 3 天上线'. 我问 driver, 真实 driver 是 **regulator quarterly review 周五**. 拆: Tier 1 (auto-refund 5 categories, 80% volume) ship Friday → Tier 2 (其余 categories, 2 weeks) → Tier 3 (full workflow, 6 weeks). Regulator 满意, 没加班通宵, ops 后来 graduate 全功能" | "I lived this — Indonesia ops, full refund automation in 3 days. Real driver was a regulator review. Tier 1 shipped Friday..." |
+
+### 🎯 为啥按这个序
+
+**先 driver, 再 decompose, 再 dialog, 再 roadmap** — 因为 90% candidates 立刻讨论 "我能不能 ship", 不问 "真正要解决什么". **80% case real driver 不是 timeline, 是 audience/event**. 拆完 monolithic ask 后, 20% 是 must-have.
+
+Tier 1 + roadmap (Layer 5) 是这题的 **Client Sim 区分项** — 一般 candidate 给 yes/no, FDE 给 yes-for-X + roadmap-for-Y.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 1 (driver)**: 面试官扮 customer 说 "I just need it, don't ask me why" → 答: > *"Completely fair — and I'll figure out a path. But the more I understand the outcome, the more likely I ship something useful. If I had to guess: is this for [board / regulator / competitor]?"* — 永远 follow up, 不接受 stonewalling
+- **Layer 4 (eng lead pushback)**: 面试官扮 eng lead 说 "3 天什么都做不出来" → 答: > *"I'm not asking for everything. I'm asking you to size the Tier 1 slice — what's the smallest thing that solves problem X. If even Tier 1 is impossible, we have a different conversation with customer."*
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 3 min: driver question + decompose (Layer 1-2)
+- 5 min: hidden need types (Layer 3)
+- 10 min: dialog scripts verbatim (Layer 4, 重点)
+- 5 min: ship Tier 1 + roadmap (Layer 5)
+- 2 min: anti-pattern + resume hook (Layer 6-7)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 dialog → fall back to **"what's driving the deadline?"** 永远是第一句
+- 卡 decomposition → use **TikTok Indonesia refund automation Tier 1 = 5 categories** 故事
+- 卡 push-back → use **"Tier 1 first" framing**, 不是 "no"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

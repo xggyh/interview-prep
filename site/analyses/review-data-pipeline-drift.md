@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"你 ML pipeline 跑 3 个月, accuracy 慢慢掉, 客户没投诉但你看出来了 — 怎么 detect drift 早, 怎么修?"** 我按这 8 层回答, 不跳序.
+
+### 📐 Drift Detection + Remediation — 8 层 framework
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Frame: silent failure 才是真敌人 | 30s | "Silent failure 不是 'model died', 是 'model still returns plausible answer, but wrong distribution'. 客户 6 个月后才发现. 第一原则: detection > anything" | "First — silent failure beats loud failure. Plausible-but-wrong is the enemy…" |
+| 2 | 4 类 drift 区分 | 1.5 min | (a) **Covariate drift** P(X) — feature distribution change, e.g., user demographic shift; (b) **Concept drift** P(Y\|X) — relationship change, e.g., what defines "good loan" changed; (c) **Label drift** P(Y) — outcome distribution change; (d) **Schema drift** — field type / new field / missing field. 4 类 root cause + remediation 完全不同 | "Four drift classes — covariate / concept / label / schema — different root cause + fix per class…" |
+| 3 | 检测方法 per class | 2 min | Covariate: **PSI** (Population Stability Index) > 0.25 alert, KS test p < 0.001. Categorical: chi-square. High-dim: **embedding centroid** distance + MMD. Concept: **accuracy monitor with ADWIN** (Adaptive Windowing) — concept drift only detectable via outcome. Label: chi-square on label dist. Schema: schema registry + Great Expectations / dbt test | "Per class — PSI for covariate, ADWIN for concept, chi-square for label, schema registry for schema…" |
+| 4 | 3 层架构 (input / output / feedback) | 1.5 min | Deploy detection 3 places: (a) **Input layer** — feature dist 监控 (covariate / schema fast detect); (b) **Output layer** — prediction dist 监控 (label drift + early concept signal); (c) **Feedback layer** — ground truth comparison (true concept drift, lags weeks-months). 3 层 缺一不可 | "Three layers — input PSI / output prediction dist / feedback ground truth — covers fast → slow signal…" |
+| 5 | Per-dim routing to owner | 1.5 min | Drift alert routing matrix: schema drift → integration team P0 (block pipeline, fix mapping); covariate drift on key feature → data eng P1 (investigate source); concept drift → ML team P1 (retrain); volume drift → source team P1 (check upstream); label drift on rare class → product team P2. 每个 alert 必须有 owner | "Routing — schema P0 integration, covariate P1 data eng, concept P1 ML team, label P2 product…" |
+| 6 | Remediation playbook 闭环 | 1.5 min | Schema → block pipeline + fix mapping + replay; Covariate → quantify segment, decide subset retrain vs full retrain; Concept → retrain with recent data, validate on holdout, A/B canary; Label → check source upstream + verify labeling team consistency; 每个 playbook 含 success criteria + escalate criteria | "Remediation — schema block+replay / covariate quantify+retrain / concept retrain+A/B / label upstream check…" |
+| 7 | Observability + dashboard | 1 min | Per-feature PSI weekly. Per-prediction-class freq dashboard. Feedback latency tracker (how stale is truth label). Alert on rate of change not absolute (drift accelerating > drift baseline). Tools: Whylogs / Evidently / custom Grafana | "Observability — PSI dashboard / prediction freq / feedback lag / alert on rate-of-change not threshold…" |
+| 8 | Resume hook | 1 min | "Concrete: Indonesia voice agent 3-month run. PSI alert on call-duration feature (covariate drift, +18% mean). Investigation: new carrier acquired, longer ring time. Retrained with last-30-day data + carrier flag feature. CER 25%→26% maintained. Without detection would have silently dropped to ~22%. Internal Agent Platform shared drift framework across 200+ agent" | "Real example — Indonesia voice agent PSI alert on call duration, retrain prevented silent drop…" |
+
+### 🎯 为啥按这个序
+
+Silent failure framing 在第 1 因为面试官想知道你懂 drift 的本质不是 "model crashed". 4 类 区分 是核心 — 大部分人混淆 covariate vs concept. Detection method per class 是 technical depth. 3 层架构 是 "你真的部署过 detection 还是只读过论文" 的 signal. Routing + remediation 是 production-only knowledge. Observability + resume hook 收尾.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 2-3 (drift class + detection)** — 必被追 "Concept drift 怎么 detect without feedback delay?" → 答: 只能间接 — proxy signal (prediction distribution shift in input-stable segment), uncertainty / margin distribution shift, prediction-prediction correlation drift. True concept drift confirmation 永远 lag (need ground truth). ADWIN is for accuracy-tracked online learning, traditional ML pipelines monitor weekly batch feedback.
+
+**Layer 4 (3 layer)** — 追 "Why all 3, not just feedback?" → 答: feedback layer is lagging indicator — 6 week stale labels means 6 weeks of silent damage. Input layer detects in hours (covariate). Output layer detects in days (label / prediction shift). Feedback is ground truth confirmation. Use input → output → feedback as defense-in-depth timeline.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (silent failure framing + 4 drift class)
+- 3-10 min: Layer 3+4 (per-class detection + 3 layer arch)
+- 10-17 min: Layer 5+6 (routing + remediation)
+- 17-22 min: Layer 7 (PSI dashboard + Whylogs / Evidently)
+- 22-27 min: Layer 8 Indonesia voice agent PSI case
+- 27-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘 PSI 公式 → "PSI = Σ (actual% - expected%) × ln(actual%/expected%); thresholds 0.1 minor / 0.25 alert / 0.5 critical; standard industry baseline"
+- 被问 "feedback lag — what if no ground truth ever" → "use weak labels (heuristic / rule-based proxy), or sample 1% for human-label monthly, or use related metric (NPS / retention) as concept-drift proxy"
+- 不熟 ADWIN → "online concept-drift detector for streaming — Adaptive Windowing maintains 2 sub-windows, statistically tests if means differ, drops old window on detection; alternative DDM / EDDM"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

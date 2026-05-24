@@ -5,6 +5,48 @@
 **原页面**: [`gfde-t3-overview.html`](questions/gfde-t3-overview.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"design a production-grade LLM application for a Fortune 500 customer"** (T3 open-ended 总入口题), 我按这 8 层回答, 不跳序.
+
+### 📐 LLM System Design — 8 层结构 (T3 总入口)
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 5 独特属性破题 | 1 min | LLM ≠ traditional web service — 30s/req, $0.01-1/req, non-deterministic, 1 req → N downstream, cost first-class. 直接否定面试官内心默认的 DDIA 套路 | "Before I dive in, LLM systems break 5 assumptions of traditional web service design..." |
+| 2 | Clarify 7 问 | 2 min | QPS / p99 SLA / cost budget per query / single vs multi-region / multi-tenant / self-host vs hosted / compliance (HIPAA / SOC2 / data residency) / PII | "Let me pin down the constraint envelope — what's the QPS, p99 SLA, and cost per query?" |
+| 3 | Arch ASCII + 6 sub-topic 地图 | 4 min | 画 Edge → Gateway → App layer (stateless) → 4 lateral (Cache / Queue / Rate / Tool Reg) → Provider 层. 然后 map 到 6 sub-topic | "Here's the high-level box diagram, and 6 sub-systems each map to a specific design concern..." |
+| 4 | 选 1 个 sub-topic deep-dive | 6 min | 让面试官选 zoom-in, 你 follow up. 默认 fallback = T3.3 high throughput (强项区) | "Which sub-system do you want me to drill into first? — I'd default to throughput since the QPS target is non-trivial" |
+| 5 | 6 throughput levers 数学 | 5 min | HF baseline 5-10 QPS/A100 → vLLM continuous batch 5x → PagedAttn 10x → prefix cache 20x → spec dec 40x → FP8 60x → multi-LoRA 33x | "The throughput story is multiplicative — 6 levers compound from baseline 1x to 50-60x..." |
+| 6 | 4-layer cost defense 数学 | 4 min | All-Opus $5/1M → cache 40% hit → 70/25/5 routing → blended $0.85/1M → 加 cache → $0.50/1M = **10x reduction** | "Cost is the first-class concern — without 4-layer defense, blended cost is $5/1M, with it $0.5/1M, 10x" |
+| 7 | 4-layer observability + eval drift | 3 min | L1 OTel trace + L2 LangSmith prompt log + L3 cost per (user/feature/model) + L4 sampled eval-in-prod LLM-judge | "Observability is 4 layers, not RED — eval-in-prod is the LLM-specific 4th layer most teams forget" |
+| 8 | 简历 hook 7 个 quote | 2 min | Voice agent stateful / BNPL stateless / Internal Agent Platform MCP / vLLM SGLang DeepSpeed / Indonesia refund Temporal / TikTok PayLater 5k QPS / ConvFinQA eval | "These 6 sub-topics each map to a project on my resume — pick the one you want detail on" |
+
+### 🎯 为啥按这个序
+
+5 独特属性破题强制面试官切换思维框架 (避免他用 DDIA 评分). Clarify 早做出来才能让后续 number 有锚 (没 QPS 就没 GPU 数算法). Arch 图是 "lateral pass" — 不深但 cover 全 6 sub-topic, 给面试官选 deep-dive 入口. 6 throughput + 4 cost + 4 obs 是 3 个最高质量 framework, 任选一个进去都能撑 10-15 min. 简历 hook 留最后, 主动 quote 比被动问出来分高.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 5 (throughput levers)** — 面试官最爱问 "why is PagedAttention 24x?" 或 "spec decoding accept rate 怎么调". 必须能讲 KV cache pagination 机制 (像 OS page table, block size 16 token) + speculative draft model 大小关系 (0.5B / 7B base, 70% accept sweet spot). **Layer 7 (eval-in-prod)** 次之, 因为多数人不知道 LLM-as-judge 怎么 calibrate (5% sample + 周度人工 100 条对齐 + MMD drift test).
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 5 独特属性 (30s) + clarify 5 问 (90s)
+2. Arch + 6 sub-topic 一句话 (3 min)
+3. Throughput 6 levers 数学 + cost 4-layer 数学 (8 min)
+4. Observability 4 层 + eval drift (4 min)
+5. 3 个 gotcha (cost runaway / timeout propagate / eval drift, 3 min)
+6. 简历 quote 2 个 (vLLM/SGLang + TikTok PayLater 5k QPS, 2 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "design a chatbot"**: 立刻 reframe → "before I design UI, let me clarify the system scale — is this 10 user demo or 100K MAU?" 把题拉回 T3 distributed system 层
+2. **被问 cost math 数字记不住**: 锚 "Opus 4.7 是 $5/$25, Flash 是 $0.50/$3" 这 2 个最常用, 其他临场算
+3. **被问 specific tool 不熟**: "我没在 prod 用过 X, 但用过 Y (vLLM/SGLang) — 同类问题我会这样解" — 别假装熟
+4. **被问 system 比较时**: 永远先讲 trade-off 维度 (cost / latency / consistency / dev velocity / vendor lock-in), 再 plot 各方案在维度上的位置
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

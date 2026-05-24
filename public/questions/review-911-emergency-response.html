@@ -43,6 +43,20 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/911-emergency-response.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/911-emergency-response.html"><code>911-emergency-response.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"How would you reduce 911 response time using AI?"</strong>, 我按这 8 层回答, 不跳序. 这题是 life-safety domain, 第一动作不是画 ML 架构, 是 <strong>frame the funnel</strong>.</p></blockquote>
+<h4>📐 911 Response Time — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句 (literal)</th></tr></thead><tbody><tr><td>1</td><td>Clarify before solving</td><td>1 min</td><td>"Before I propose anything, 5 questions: PSAP scope? CAD vendor? Current P50/P90? Which 4 funnel segments? Existing ML?" — 拒绝立刻画图</td><td>"Life-safety means I want to make sure I'm not optimizing the wrong segment. Five quick clarifying questions..."</td></tr><tr><td>2</td><td>Time-breakdown anchor</td><td>2 min</td><td>把 total response time 拆成 4 段: <strong>call-taking (45s) → dispatch decision (60s) → turnout (90s) → travel (4-7 min)</strong>. 强调 travel 占 70% 但 dispatch decision 是 ML 最高 leverage</td><td>"911 response time is not one number — it's a 4-stage funnel. Let me draw the timestamps..."</td></tr><tr><td>3</td><td>12 data points to instrument</td><td>3 min</td><td>列 12 个 timestamp event: ring_received, call_picked_up, address_confirmed, priority_assigned, unit_recommended, unit_dispatched, ack_received, turnout_complete, arrival_scene, patient_contact, transport_start, hospital_arrival. <strong>这是 Day-1 dashboard, 不是 ML</strong></td><td>"Before I touch a model, I need 12 timestamps. Day 1 of this engagement is dashboards, not models..."</td></tr><tr><td>4</td><td>Root cause hypothesis (sliced)</td><td>3 min</td><td>按 segment slice: urban vs rural, time-of-day, priority class, dispatcher seniority, call type (cardiac vs fire vs non-emergency). <strong>每段独立 root cause, 不要 average</strong></td><td>"Averages lie in 911. P50 might be fine but P95 cardiac at 2am could be killing people. Let me slice..."</td></tr><tr><td>5</td><td>ML intervention points (ranked)</td><td>4 min</td><td>3 个干预: <strong>(a) Dispatch recommendation (highest leverage, dispatcher-in-loop)</strong> → (b) Pre-positioning (demand prediction + static opt) → (c) ETA estimation (Graph-NN + traffic). 排序按 <strong>lives-saved per $1M</strong></td><td>"I'd rank interventions by lives-saved-per-dollar, not by ML novelty. Top of stack: dispatch recommendation..."</td></tr><tr><td>6</td><td>Eval methodology — NO A/B</td><td>4 min</td><td><strong>不能 A/B 因 ethics</strong>. Use <strong>stepped-wedge by district</strong> + <strong>counterfactual replay</strong> + <strong>shadow→opt-in→default rollout</strong>. Ground truth lags 30-90 days → use leading indicators (override rate, time-to-dispatch)</td><td>"I can't randomize between AI-dispatch and human-dispatch — ethics review will reject. Three alternatives: stepped wedge, counterfactual replay, shadow mode..."</td></tr><tr><td>7</td><td>Failure modes + HITL</td><td>2 min</td><td>5 failure modes: address geocoding error, priority misclassification, ETA underestimate, recommendation bias, network partition. <strong>HITL 三层</strong>: AI suggests + dispatcher confirms + supervisor audit. <strong>Override 是数据不是失败</strong></td><td>"Override rate is my favorite leading metric. If dispatchers override 40% I have a model problem. If 2% I might have a trust problem..."</td></tr><tr><td>8</td><td>Resume reframe</td><td>1 min</td><td>"这跟我 TikTok PayLater Voice Agent 一样 — 7 markets, 6 languages. <strong>2024 Q3 Pakistan ASR provider 40-min outage</strong>, 我们 fallback to recorded TTS + queue, lost 12% transactions but zero compliance breach. <strong>911 应用同思路: graceful degradation matters more than peak accuracy</strong>"</td><td>"I lived this in voice agents. We had a Pakistan ASR provider 40-min outage..."</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p><strong>先 frame the funnel, 再 propose ML</strong> — 因为 90% candidates 跳过 instrumentation 直接讲 LLM dispatch, 这是错的. <strong>Travel time 是 70% bottleneck 但 ML 不能让车开更快</strong>, ML 的 leverage 在 dispatch decision 和 pre-positioning. 先把这个 frame 立住, 后面 6 层都是支撑.</p>
+<p>Eval methodology (Layer 6) 是这题的 <strong>核心区分项</strong> — 一般 candidate 说 "我做个 A/B", FDE 必须立刻 push back "no A/B in life-safety", 然后给出 stepped-wedge + counterfactual replay 替代方案.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 5 (ML intervention)</strong>: 面试官会问 "为啥 dispatch recommendation 比 pre-positioning leverage 高?" → 答 "因为 dispatch 是 per-call decision (10万次/天), pre-positioning 是 shift-level decision (3次/天). Leverage = decision_count × delta_per_decision"</li><li><strong>Layer 6 (eval methodology)</strong>: 面试官会问 "counterfactual replay 怎么算 lift?" → 答 "Pair matching on call type + time + district, compare actual outcome vs replayed AI recommendation. Use propensity score for confounders. Limitation: can't replay traffic dynamics, so we add synthetic traffic noise"</li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>5 min: clarify + funnel breakdown (Layer 1-2 合并)</li><li>10 min: 12 data points + root cause slicing (Layer 3-4)</li><li>10 min: ML intervention + eval methodology (Layer 5-6, 重点)</li><li>3 min: HITL + failure modes (Layer 7)</li><li>2 min: resume hook (Layer 8)</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>卡 ML 部分 → pivot to <strong>"我先讲 instrumentation, ML 是 Phase 2"</strong> — 这是 FDE Diagnose-First 框架</li><li>卡 eval → pivot to <strong>"我做过的 ConvFinQA 9-variant ablation"</strong>, 借 negative result 故事讲 eval 严谨性</li><li>卡 production → pivot to <strong>"Pakistan ASR 40-min outage"</strong> voice agent 故事, 讲 graceful degradation</li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -141,6 +155,50 @@ Q: 决策时 confidence 多少 trigger 什么?
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/911-emergency-response.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`911-emergency-response.html`](questions/911-emergency-response.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"How would you reduce 911 response time using AI?"**, 我按这 8 层回答, 不跳序. 这题是 life-safety domain, 第一动作不是画 ML 架构, 是 **frame the funnel**.
+
+### 📐 911 Response Time — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Clarify before solving | 1 min | "Before I propose anything, 5 questions: PSAP scope? CAD vendor? Current P50/P90? Which 4 funnel segments? Existing ML?" — 拒绝立刻画图 | "Life-safety means I want to make sure I'm not optimizing the wrong segment. Five quick clarifying questions..." |
+| 2 | Time-breakdown anchor | 2 min | 把 total response time 拆成 4 段: **call-taking (45s) → dispatch decision (60s) → turnout (90s) → travel (4-7 min)**. 强调 travel 占 70% 但 dispatch decision 是 ML 最高 leverage | "911 response time is not one number — it's a 4-stage funnel. Let me draw the timestamps..." |
+| 3 | 12 data points to instrument | 3 min | 列 12 个 timestamp event: ring_received, call_picked_up, address_confirmed, priority_assigned, unit_recommended, unit_dispatched, ack_received, turnout_complete, arrival_scene, patient_contact, transport_start, hospital_arrival. **这是 Day-1 dashboard, 不是 ML** | "Before I touch a model, I need 12 timestamps. Day 1 of this engagement is dashboards, not models..." |
+| 4 | Root cause hypothesis (sliced) | 3 min | 按 segment slice: urban vs rural, time-of-day, priority class, dispatcher seniority, call type (cardiac vs fire vs non-emergency). **每段独立 root cause, 不要 average** | "Averages lie in 911. P50 might be fine but P95 cardiac at 2am could be killing people. Let me slice..." |
+| 5 | ML intervention points (ranked) | 4 min | 3 个干预: **(a) Dispatch recommendation (highest leverage, dispatcher-in-loop)** → (b) Pre-positioning (demand prediction + static opt) → (c) ETA estimation (Graph-NN + traffic). 排序按 **lives-saved per $1M** | "I'd rank interventions by lives-saved-per-dollar, not by ML novelty. Top of stack: dispatch recommendation..." |
+| 6 | Eval methodology — NO A/B | 4 min | **不能 A/B 因 ethics**. Use **stepped-wedge by district** + **counterfactual replay** + **shadow→opt-in→default rollout**. Ground truth lags 30-90 days → use leading indicators (override rate, time-to-dispatch) | "I can't randomize between AI-dispatch and human-dispatch — ethics review will reject. Three alternatives: stepped wedge, counterfactual replay, shadow mode..." |
+| 7 | Failure modes + HITL | 2 min | 5 failure modes: address geocoding error, priority misclassification, ETA underestimate, recommendation bias, network partition. **HITL 三层**: AI suggests + dispatcher confirms + supervisor audit. **Override 是数据不是失败** | "Override rate is my favorite leading metric. If dispatchers override 40% I have a model problem. If 2% I might have a trust problem..." |
+| 8 | Resume reframe | 1 min | "这跟我 TikTok PayLater Voice Agent 一样 — 7 markets, 6 languages. **2024 Q3 Pakistan ASR provider 40-min outage**, 我们 fallback to recorded TTS + queue, lost 12% transactions but zero compliance breach. **911 应用同思路: graceful degradation matters more than peak accuracy**" | "I lived this in voice agents. We had a Pakistan ASR provider 40-min outage..." |
+
+### 🎯 为啥按这个序
+
+**先 frame the funnel, 再 propose ML** — 因为 90% candidates 跳过 instrumentation 直接讲 LLM dispatch, 这是错的. **Travel time 是 70% bottleneck 但 ML 不能让车开更快**, ML 的 leverage 在 dispatch decision 和 pre-positioning. 先把这个 frame 立住, 后面 6 层都是支撑.
+
+Eval methodology (Layer 6) 是这题的 **核心区分项** — 一般 candidate 说 "我做个 A/B", FDE 必须立刻 push back "no A/B in life-safety", 然后给出 stepped-wedge + counterfactual replay 替代方案.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (ML intervention)**: 面试官会问 "为啥 dispatch recommendation 比 pre-positioning leverage 高?" → 答 "因为 dispatch 是 per-call decision (10万次/天), pre-positioning 是 shift-level decision (3次/天). Leverage = decision_count × delta_per_decision"
+- **Layer 6 (eval methodology)**: 面试官会问 "counterfactual replay 怎么算 lift?" → 答 "Pair matching on call type + time + district, compare actual outcome vs replayed AI recommendation. Use propensity score for confounders. Limitation: can't replay traffic dynamics, so we add synthetic traffic noise"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 5 min: clarify + funnel breakdown (Layer 1-2 合并)
+- 10 min: 12 data points + root cause slicing (Layer 3-4)
+- 10 min: ML intervention + eval methodology (Layer 5-6, 重点)
+- 3 min: HITL + failure modes (Layer 7)
+- 2 min: resume hook (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 ML 部分 → pivot to **"我先讲 instrumentation, ML 是 Phase 2"** — 这是 FDE Diagnose-First 框架
+- 卡 eval → pivot to **"我做过的 ConvFinQA 9-variant ablation"**, 借 negative result 故事讲 eval 严谨性
+- 卡 production → pivot to **"Pakistan ASR 40-min outage"** voice agent 故事, 讲 graceful degradation
 
 ---
 

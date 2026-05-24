@@ -6,6 +6,48 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"你的 chatbot 什么时候 escalate 给 human? 怎么 escalate 不让用户感觉断裂?"** 我按这 7 层回答, 不跳序.
+
+### 📐 Human-Agent Interaction — 7 层 coexist + calibrate + handoff
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 拒绝 "single rule" 框架 | 30s | 反 single-trigger ("confidence < 0.7 escalate"), 因为 4 种触发条件本质不同 — 必须 coexist | "First — escalation is not a single rule. I run 4 patterns coexisting…" |
+| 2 | 4 pattern coexist (A/B/C/D) | 2 min | A confidence threshold (uncertainty trigger) + B confirm-required (irreversibility trigger) + C scheduled human review (drift detection trigger) + D /handoff user-initiated (frustration / emotion trigger) — 4 个 trigger 解决 4 个 不同问题 | "Pattern A handles uncertainty, B handles irreversibility, C handles drift, D handles emotion…" |
+| 3 | Per-query-type matrix | 2 min | 不是一个 0.7 cutoff 全场, 而是 per-intent × per-action 矩阵: FAQ (threshold 0.5, no confirm), account_query (0.7, no confirm), refund < $50 (0.7, confirm 1-tap), refund > $200 (0.85, confirm 2-step + tier-2 review), dispute (force human) | "Threshold is per intent × per action — not a single global cutoff…" |
+| 4 | Confidence calibration (composite) | 2 min | LLM raw logprob 不可信. Composite = 5+ signal: (a) LLM top-1 logprob, (b) retrieval similarity score, (c) intent classifier softmax margin, (d) tool-call schema validation pass, (e) historical user-feedback for this intent. Platt scaling / isotonic regression 校准成 well-calibrated probability | "Raw LLM confidence is uncalibrated — I compose 5+ signals and fit Platt/isotonic…" |
+| 5 | Smooth handoff mechanics | 1.5 min | 3 必备: (a) Agent prep summary visible to human first responder (transcript + intent + last action + customer profile), (b) human's first line auto-references context ("Hi Sari, I see you were asking about refund #1234, let me help…"), (c) user side gets "transferring you to specialist" not "agent failed" — 0 friction perceived | "Handoff is 3 mechanics — prep summary, context-aware first line, framed transition…" |
+| 6 | False / missed escalation observability | 1.5 min | 2 误差类型监控: false escalate (agent could have handled but bailed → cost) vs missed escalate (agent shouldn't have handled, bad outcome). Calibration plot weekly (expected vs actual error rate per confidence bucket), per-path CSAT, weekly Mon review 50 random by scheduled pattern C | "Two error types to track — false-escalate and missed-escalate — both on weekly review…" |
+| 7 | Indonesia refund tier resume hook | 1 min | "Concrete: Indonesia refund tier — all 4 pattern in prod. Tier 1 (auto < $20) confidence > 0.7. Tier 2 ($20-200) confirm-required + agent suggests, customer 1-tap. Tier 3 (> $200 OR fraud signal) forced human, tier-2 ops review. /handoff anytime. Result: CER 18→25%, fraud ↓40%, NPS ↑8 pts. The 4 patterns are why it works" | "Real example — Indonesia refund tier with all 4 patterns…" |
+
+### 🎯 为啥按这个序
+
+Layer 1 "reject single rule" 立刻区分有 production agent 经验 vs 没有. 4 pattern coexist 是 frame, per-query-type matrix 是 zoom-in — 必须先 frame 再 zoom. Calibration 在第 4 层因为前面 3 层把 "什么时候 escalate" 讲完了, 这层讲 "我怎么知道 confidence 数字可信". Handoff mechanics + observability 是 production-only knowledge. Indonesia hook 用真实数字 land.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (calibration)** — 必被追 "How do you actually calibrate?" → 答: collect 10k labeled outcomes from production over 4 weeks; bucket by composite confidence (0.5/0.6/0.7…); plot expected error rate vs actual; fit isotonic regression (monotonic, doesn't assume shape) on validation set; deploy. Re-calibrate monthly because model + user pattern drift. LangSmith for tracing, custom calibration job in Airflow.
+
+**Layer 5 (handoff)** — 追 "What if human is busy / queue is long?" → 答: pre-handoff 3 path — (a) if SLA < 2 min available human, route normal; (b) if queue 2-10 min, agent says "putting you in queue, ETA X min, want callback?"; (c) if queue > 10 min, offer async ticket with priority flag. Never silent-wait — explicit ETA always.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (single rule reject + 4 pattern frame)
+- 3-10 min: Layer 3+4 (per-query matrix + calibration)
+- 10-18 min: Layer 5+6 (handoff + false/missed observability)
+- 18-25 min: Layer 7 (Indonesia 4-pattern, CER 18→25, fraud ↓40, NPS ↑8)
+- 25-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不会校准 → "calibrate weekly using isotonic regression on labeled production outcomes; LangSmith 抓 trace + custom job"
+- 被问 "how to handle agent over-escalating (lazy)" → "track false-escalate rate per intent; if false rate > 30% for one intent, action item is prompt + threshold rework, not human staffing"
+- 客户 demand 100% automation → "I show false vs missed cost matrix — refund > $200 missed-escalate could cost $X per incident vs false-escalate cost human 30s. Math forces 4-pattern coexist"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

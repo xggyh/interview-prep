@@ -6,6 +6,53 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"External API returns 5xx 30% at peak with 30s timeouts. Design retry/timeout/fallback strategy"** 或 **"Gemini suddenly 429s for 10 min, how do you keep the agent serving?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 3-Layer Retry + Fallback Ladder + Multi-Vendor — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify 5 维 | 0-3 min | Failure pattern (transient vs persistent vs spike)? Latency budget (5s chat / 30s batch)? Failure cost (UX vs compliance)? Alt source available (cache / secondary vendor)? Idempotent? | "Before designing — 5 quick clarifications. Failure pattern, latency budget, blast radius, fallback availability, and whether the underlying call is idempotent." |
+| 2 | 灾难场景 + status code table | 3-8 min | T=0 user 问天气 → 5xx → LLM 把 error 当 result → "Sorry try again" UX 暴跌. 列 8 类 failure source. 然后给 status code retry 决策表: 5xx/408/425/429-with-Retry-After yes, 4xx/SSL no | "Let me ground in the disaster — without retry, here's the funnel hit. And here's the must-memorize status code retry table." |
+| 3 | 3-Layer Retry 骨架 | 8-16 min | **L1 Transport** (HTTP client, 500ms budget, conn err only) **L2 Tool wrapper** (tenacity, 5s budget, 3 retries, 5xx/408/429) **L3 Agent runtime** (tool exhausted → enter fallback). 每层 budget 不同, deadline propagation 通过 CallContext.remaining() | "I split retry into 3 explicit layers. Each layer has its own budget and trigger condition — let me draw the budget hierarchy." |
+| 4 | Backoff 数学 | 16-22 min | `base * 2^n * (1 + uniform(-0.2, 0.2))` exp + jitter. AWS decorrelated jitter alternative `random(base, sleep*3)`. Cap 2-30s per tool. Per-tenant retry budget 20% sliding window 60s | "Backoff is 4 things together: exponential, jitter, budget cap, and max-cap. Skip any one and retry storm bites." |
+| 5 | Circuit Breaker + Bulkhead | 22-30 min | 3-state closed/open/half-open. Threshold 50% failure rate **+ min 20 requests** (避免 5/5 false-open). Per-tool + per-tenant bulkhead. Tier-aware: gold 60%/50req/10s, bronze 30%/10req/60s. Half-open 1 probe | "Circuit breaker is macro protection. The non-obvious part is the min-volume threshold and per-tenant bulkhead so gold customers don't get blocked by bronze noise." |
+| 6 | Fallback Ladder | 30-37 min | Per-tool ladder: primary API → cached (1h stale) → secondary vendor → safe default → human escalate. 每层 result tagged `_degraded=True _fallback_level='cached' _stale_age=N`. 红线: destructive tool **NO fallback** | "Fallback is what separates 99% from 99.99%. Every degraded path must be labeled, never silent. Destructive tools have no fallback — that's a hard line." |
+| 7 | Multi-Vendor LLM Failover | 37-43 min | 2026 reality — Gemini outage 30min 真发生. Cascade Gemini 3 Pro → Flash → Claude Sonnet 4.6 → GPT-5.4 via LLMProvider interface with schema normalize. Hedging for critical path. 价格表 + cost spillover monitor (alert when fallback > 50% spend) | "LLM is just another vendor. Wrap each in a provider interface, normalize schemas, cascade on circuit-open, hedge for the critical path." |
+| 8 | Connect + production hardening | 43-50 min | Voice agent 5-level ASR fallback story (streaming → batch → secondary vendor → text-input → "sorry didn't catch"). Indonesia ASR 40-min outage 0 user-facing 5xx. Gemini 30-min outage failover cost +2.5x. Chaos engineering inject 30% 5xx in staging | "Resume hook — I built this exact pattern on voice agent and BNPL. Two production stories — let me share both." |
+
+### 🎯 为啥按这个序
+
+3-layer retry 必须先讲 (Layer 3) 是因为它是**骨架**, backoff/circuit/fallback 是骨架上的 micro 行为. 不先讲清楚 3 层各自负责什么, 后面 4 层会显得混乱. 然后 backoff (4) → circuit (5) → fallback (6) → multi-vendor (7) 是 inside-out 顺序: 越外层影响范围越大. Multi-vendor 放最后是因为它是 LLM 时代特有 — 传统系统不需要, 但 2026 production 必备. 灾难场景 (Layer 2) + status code table 一定要早讲, 不然面试官无法判断你知不知道 4xx 不该 retry 这种常识.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (circuit breaker)**: "False-positive 怎么办?" → 准备好 min-volume 20 + cross-correlate other tools + 手动 force-close. "Per-tenant breaker 实现?" → 准备 bulkhead pattern 代码 (per-tenant counter + tier config).
+- **Layer 6 (fallback ladder)**: "Destructive tool 真的不能 fallback?" → 准备 "可以 fallback 到 human / 不可以 fallback 到 cache, 因为 cache 没扣钱". "Silent fallback 怎么避免?" → `_degraded` flag + prompt 告诉 LLM "if you see _degraded caveat user".
+- **Layer 7 (multi-vendor)**: "Cascade vs hedge 怎么选?" → 准备 latency vs cost trade-off (hedge 平均贵 2x, 但 p99 latency 砍半).
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify) 压到 2 min, 只问 failure pattern + idempotent + alt source
+- Layer 2 (灾难 + status table) 合 3 min, status table 一句话带过 ("5xx/408/425/429 yes, 4xx no")
+- Layer 3 + 4 (retry + backoff) 合 6 min, 一起讲
+- Layer 5 (circuit) 4 min, 强调 min-volume
+- Layer 6 (fallback) 5 min, 重点 destructive no fallback
+- Layer 7 (multi-vendor) 4 min
+- Layer 8 (connect) 2 min, 一句 quote ASR 5-level 或 Gemini 30-min outage
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 backoff 具体公式 → 退回讲「**exp + jitter, base 100ms 翻倍, 加 ±20% 随机, 整体 budget cap 5s**」, 不背 AWS decorrelated 公式
+- 忘了 circuit breaker 3-state 名字 → 退回讲「**正常 / 熔断 / 探活 3 态**」, 中文也行
+- 忘了 multi-vendor 价格 → 退回讲「**3 tier routing: cheap (Flash) / default (Pro/Sonnet) / hard (Opus), blended cost ~$0.85/1M vs all-Opus $5/1M, 5-6x 省**」, 不背具体
+- 被追问 99.99% SLA 是否可能 → 退回讲「**Possible only with fallback + degradation labels. Destructive tools 99.9% 是上限, 客户不能既要又要**」
+- 被追问 idempotency 关系 → 退回「**Retry 前提是 idempotent. 见 idempotency 题, 我先跟你确认一下这块也要展开吗?**」, 把控制权交回
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

@@ -6,6 +6,49 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Your live demo fails in front of customer execs. What do you do?"**, 我按这 7 层回答, 不跳序. 这题考的不是 "你能不能 fix bug", 是 **trust event 的处理 + dialog literally**.
+
+### 📐 Demo Fails Before Execs — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | 30-second recovery script (verbatim) | 1 min | **不沉默不甩锅不假装**. 立刻说出 verbatim: *"OK, that's not the result we expected — let me pause the demo and acknowledge what just happened. I'd rather walk you through what went wrong than fake my way through the rest."* 然后停 2 秒 让 acknowledge sink in | "First thing out of my mouth, literally, within 30 seconds: 'OK that's not what we expected...'" |
+| 2 | Demo-vs-core distinction | 2 min | 区分 **"demo environment broke"** vs **"core capability broken"**. 90% 是 demo env (数据脏 / VPN / config), 10% 是 core. **在房间里 explicitly classify** 这两种是不同对话. Demo env 失败 → 我们 5 min 修 + show alternative; core 失败 → admit + reschedule | "Here's the critical question I'd answer for the room first: is this a demo environment issue or a core capability issue? Different conversations..." |
+| 3 | Pivot to value conversation | 3 min | 不要硬修 demo. **Pivot to**: (i) what we were trying to show, (ii) why that matters to your business, (iii) **"let me show you data from production not from this demo"**. 把房间从 "demo work?" 转向 "do I trust these people". 开口: > *"Rather than try to brute-force this, let me show you what this looks like in production. I have 3 anonymized customer logs that demonstrate the same capability..."* | "I'd pivot the room within 3 minutes. Not to fix the demo. To re-anchor on value..." |
+| 4 | In-room stakeholder map | 2 min | 房间里通常 4 类: **(a) CEO/sponsor (wants confidence)**, **(b) CIO/builder (wants honesty)**, **(c) CFO (wants risk)**, **(d) skeptic (wants you to fail)**. **每类不同 line**: > to CEO: *"this doesn't change our timeline"* > to CIO: *"happy to do a full RCA with your team"* > to CFO: *"our SLA terms cover this scenario"* > to skeptic: *"good question, what specifically concerned you?"* | "Different execs in the room need different sentences. Four archetypes, four lines..." |
+| 5 | 24h trust repair playbook | 3 min | 24h 内 deliver: (i) **honest RCA email** (1 page, what happened + why + fix), (ii) **followup call with CIO** 30-min, (iii) **revised timeline** if scope changed, (iv) **demo redo offer** 不是 ask. 7 day 内: hardening + rehearsal + new demo. **Honest RCA 比 silent fix 更建 trust** | "24-hour trust repair has a specific playbook. Four deliverables. Each one before the next..." |
+| 6 | Demo hardening for next time | 2 min | 5 hardening rules: (1) **demo env = prod-like data + canned fallback**, (2) **2 rehearsals at exact time-of-day** (network conditions), (3) **2-person tech rehearsal** (1 demo-er + 1 silent debugger), (4) **3 demo paths** (happy, edge, "if everything breaks" canned video), (5) **pre-call 15 min before** | "I'd never demo without 5 hardening checks. Here's my checklist..." |
+| 7 | Resume reframe | 1 min | "我做过 voice agent live demo 给 Indonesia partner, 30 秒内 ASR 卡了. 我说: *'Let me show you what this actually looks like in production'*, 切到 anonymized prod log. **3 个月后 partner 签了**. 他们后来跟我说: 那场 demo 卡是 deal-deciding moment because 我们没装" | "I lived this — Indonesia partner demo. ASR stalled. Switched to production logs. Three months later we signed. The CIO later told me the stall was the deal-decider..." |
+
+### 🎯 为啥按这个序
+
+**先 acknowledge (Layer 1), 再 classify (Layer 2), 再 pivot (Layer 3), 再 stakeholder-tailor (Layer 4)** — 因为 90% candidates 沉默后开始 frantically debug, 这是 trust killer. **房间观察的是你怎么处理失败, 不是你能不能修 bug**.
+
+Stakeholder map (Layer 4) 是这题的 **Client Sim 区分项** — ML researcher 给 room 一句话, FDE 知道房间有 4 类人, 4 句话.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 1 (30-sec script)**: 面试官会问 "如果 CEO 直接 cut you off 说 'just fix it', 你怎么办?" → 答: > *"Of course, Sir/Ma'am. To be transparent: forcing a fix risks giving you a misleading result. I have 5 minutes of value-content I can show in parallel — would you prefer I do that while my colleague investigates, or pause entirely?"*
+- **Layer 5 (trust repair)**: 面试官会问 "RCA 里如果发现是 customer-side 问题 (e.g. VPN), 怎么写?" → 答: never blame the customer in writing. Phrase as *"the demo environment depends on connectivity we don't fully control — we'll add an offline fallback for next session"*
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 5 min: 30-sec script verbatim + classify (Layer 1-2)
+- 10 min: pivot + stakeholder map (Layer 3-4, 重点)
+- 8 min: 24h trust repair (Layer 5)
+- 3 min: hardening playbook (Layer 6)
+- 2 min: resume hook — Indonesia demo (Layer 7)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 verbatim → fall back to **"OK that's not what we expected — let me pause"** 这一句最 universal
+- 卡 stakeholder → pivot to **"4 archetypes in the room, 4 different lines"**
+- 卡 vulnerability → tell **Indonesia ASR stall — partner signed 3 months later** 故事
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

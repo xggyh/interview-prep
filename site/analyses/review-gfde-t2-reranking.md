@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"First-pass top-50, reranker picks top-10 — why, tradeoffs, how to evaluate"** 或 **"Cohere rerank vs cross-encoder vs LLM-as-judge — when each?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Reranking Architecture — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify + Bi-encoder 失败场景 | 0-5 min | Latency budget (chat 200ms / batch 5s)? Volume? Multilingual? Domain (general / legal / medical)? **然后 demo**: query "iPhone 15 Pro Max dual SIM" → bi-encoder top-10 全是 "iPhone 12 dual SIM / Samsung dual SIM / iPad cellular" → top-1 错答. 真正答案排在 top-50 第 4 位 — bi-encoder 召回够但排序烂 | "Before reranking — let me show why pure bi-encoder fails ordering even when recall is fine. The answer is in top-50 at rank 4, but bi-encoder puts iPhone 12 doc at rank 1." |
+| 2 | Bi-encoder vs Cross-encoder 机制 | 5-12 min | Bi-encoder: query + doc 各自独立 embed → cosine. 看不见 query-doc 交互. Pre-indexable, 1M doc 秒级 ANN. **Cross-encoder**: `[CLS] query [SEP] doc [SEP]` 一起进 Transformer, cross-attention 看 token-level alignment. 不能 pre-index, per-query 推理 50-200ms. 这就是为什么 cross-encoder 准但慢 | "Mechanism first. Bi-encoder is dual-tower, query and doc never see each other. Cross-encoder uses cross-attention to align tokens like 'Pro Max'. That's why it's slower but catches fine-grained matches." |
+| 3 | Multi-stage cascade pipeline | 12-19 min | **Stage 0** Query understanding (rewrite / multi-query / HyDE) **Stage 1** BM25 + Dense → top-100 (RRF fusion) **Stage 2a** Cheap rerank (bge-v2-base CPU, ~100ms) → top-25 **Stage 2b** Expensive rerank (bge-v2-large GPU 或 Cohere rerank-3 API, ~200ms) → top-10 **Stage 2c** (optional) LLM-as-judge (Gemini 3 Pro / Opus 4.7, ~3-5s) → top-3 for high-stake | "Production isn't one reranker, it's a cascade. Cheap rerank narrows 100→25, expensive narrows 25→10, optional LLM-as-judge for top-3 high-stake. Each stage cuts cost without losing quality." |
+| 4 | Reranker 模型选择表 | 19-26 min | **bge-reranker-v2-m3** (open, multilingual default, 80-150ms) / **bge-reranker-v2-large** (English better, 200-400ms) / **Cohere rerank-3** (API $1/1K, 150-250ms, excellent) / **mxbai-rerank-large-v1** (open, Cohere-class) / **JaColBERT** (late-interaction, 50-100ms) / **LLM-as-judge Gemini 3 Pro** ($0.10/query) / **LLM-as-judge Claude Opus 4.7** ($0.30/query, legal/medical) / **Domain finetuned bge** (1K-10K labeled pair, +5-10% NDCG) | "8 reranker options on the menu. Default open-source is bge-reranker-v2-m3 for multilingual. API default is Cohere rerank-3. LLM-as-judge for top-3 in high-stake domains." |
+| 5 | Latency engineering | 26-33 min | GPU batch (50 doc 一次 forward 比 50 单次快 5x). FP16 / INT8 quantization (-50% latency, -1% accuracy). Distill smaller model (bge-large 200ms → bge-small 50ms). Cache (query_hash, doc_id) score pair: 30-40% hit. Pre-warm GPU on traffic spike | "Latency engineering is 5 levers — batch, quantize, distill, cache, prewarm. Production reranker p99 should be <250ms; if not, you missed one of these." |
+| 6 | Eval methodology (NDCG > recall) | 33-40 min | Recall@k 不够 — 10 个里都对但顺序烂 NDCG 还是低. **NDCG@10** 是 reranking 主指标 (gain × discount by position). MRR for first-answer-position. Slice eval: per query type (concept / SKU / multi-hop) / per language / per domain. A/B with downstream metric (LLM answer accuracy) 不只 retrieval metric | "Reranker eval is NDCG-driven, not recall. Recall is set by first-stage; reranker job is ordering. Always slice by query type and language, and A/B with downstream answer accuracy." |
+| 7 | Domain fine-tune + hard negative | 40-46 min | 1K-10K (query, positive, hard_negative) triplets. Hard negatives 来自 first-stage top-50 但实际无关 (混淆样本). Margin loss training. Production NDCG +3-8%. Synthetic data: LLM 生成 query for each doc, 再 LLM judge negative. 必 dedup query 防训练泄漏 | "Domain fine-tune is the last 5-8% NDCG. Hard negatives mined from first-stage's confusing top-50. Synthetic data via LLM-generated queries closes the labeled-data gap." |
+| 8 | Connect + production hardening | 46-50 min | BNPL chatbot 7 markets + multilingual: bge-reranker-v2-m3 multilingual → NDCG@5 0.71→0.83, latency +180ms. Cache hit 35%. ConvFinQA reranker for numeric-heavy queries fine-tuned with 2K financial triplets, NDCG +6%. E-commerce learning-to-rank (LightGBM LambdaRank) for multi-objective (relevance + price + stock + delivery) | "Resume hook — BNPL multilingual rerank + ConvFinQA domain fine-tune + e-commerce learning-to-rank. Let me share the BNPL story with metrics." |
+
+### 🎯 为啥按这个序
+
+**Bi-encoder 失败场景 (Layer 1) 必须最先讲** — 不画失败 example 面试官不知道为啥要 reranker. Bi-encoder vs Cross-encoder 机制 (2) 必须在 cascade (3) 之前 — 不懂 cross-attention 不能解释为啥 cascade 有意义. Cascade (3) 是骨架. Model table (4) 是 menu. Latency engineering (5) 单列因为 production 没这个就上不了 chat 200ms SLA. **Eval methodology (6) 必讲 NDCG > recall** — 这个 nuance 是分水岭. Domain fine-tune (7) 单列因为它是最后 5-8% 提升的来源, 体现 staff 思考. Resume close (8) 用 BNPL NDCG 0.71→0.83 数字最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (model choice)**: "Cohere vs bge 怎么选?" → 准备 commercial (Cohere) vs self-host GPU 成本 trade-off + latency / quality 数据.
+- **Layer 6 (NDCG)**: "NDCG 公式?" → 准备 DCG = sum(rel_i / log2(i+1)), NDCG = DCG / IDCG (perfect ranking). 重点是 position-discounted.
+- **Layer 7 (hard negative)**: "怎么 mine hard negative?" → 准备 "first-stage top-50 但人工 / LLM judge 实际无关 = hard. Random 是 easy negative, BM25 confuse 是 hardest negative".
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (failure scenario) 3 min — 必讲
+- Layer 2 (mechanism) 4 min
+- Layer 3 (cascade) 5 min — 必讲, 骨架
+- Layer 4 (model table) 3 min
+- Layer 5 (latency engineering) 4 min
+- Layer 6 (eval) 4 min — 必讲 NDCG insight
+- Layer 7 (domain fine-tune) 跳过 / 2 min
+- Layer 8 (connect) 3 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 NDCG 公式 → 退回讲「**核心 idea: position-discounted gain. rank 1 doc 全计, rank 10 doc 折扣. Normalize by perfect ranking 得 [0,1] score**」
+- 忘了具体 reranker 模型名 → 退回讲「**3 大族: bge-reranker (open) / Cohere rerank (API) / LLM-as-judge. 默认 bge-v2-m3, 升级 Cohere 或 LLM-judge**」
+- 被追问 cross-encoder latency 怎么救 → 退回讲「**5 levers: GPU batch / quantize FP16/INT8 / distill smaller / cache score / prewarm. p99 < 250ms 是 production 标准**」
+- 被追问 LLM-as-judge 怎么用 → 退回讲「**Pointwise score 1-5 / pairwise compare / listwise rank 三种. 贵, 只 top-3 final 用. 法律 / 医疗 / 资金高 stake**」
+- 被追问 reranker 不 work 的场景 → 退回讲「**Recall already 100% top-K (小 corpus / 完美 first-stage) → reranker 无价值. Very short query 1-2 token → cross-encoder 也分不清**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

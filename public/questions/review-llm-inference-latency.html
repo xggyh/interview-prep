@@ -43,6 +43,19 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/llm-inference-latency.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/llm-inference-latency.html"><code>llm-inference-latency.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"LLM inference 慢了 / P99 latency 怎么 debug 怎么优化"</strong>, 我按这 8 层回答, 不跳序. <strong>核心心法: 先 instrument (不猜), 再分 TTFT vs TPOT, 再 7-stage 拆解, 再选对应 optimization, 最后 cost math + Voice agent ASR cascade hook</strong>.</p></blockquote>
+<h4>📐 Inference Latency Debug — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句 (literal)</th></tr></thead><tbody><tr><td>1</td><td>Instrument first (不靠猜)</td><td>15s</td><td>OTel spans per stage, 不靠 println; vLLM metrics endpoint (queue depth / batch size / cache hit), PyTorch Profiler 第二层</td><td>"Before optimizing I instrument — OTel spans per stage end-to-end. Without that we're guessing. vLLM exposes a metrics endpoint, I plug Prometheus and Grafana on it"</td></tr><tr><td>2</td><td>区分 TTFT vs TPOT</td><td>20s</td><td>TTFT = time-to-first-token (UX for streaming, prefill bound), TPOT = time-per-output-token (decode bound, memory bandwidth bound). 不同 metric 不同 optimization</td><td>"Two different metrics — TTFT is prefill, matters for streaming UX. TPOT is decode, memory-bandwidth bound. You optimize them differently"</td></tr><tr><td>3</td><td>7-stage 拆解</td><td>30s</td><td>gateway / RAG retrieve / rerank / tokenize / queue (batch fill) / prefill / decode / post-process. 每 stage P50/P99 一对眼睛</td><td>"Seven stages — gateway, RAG retrieve, rerank, tokenize, queue, prefill, decode, post-process. I look at P50 and P99 per stage. If RAG is 600ms, no inference tuning helps"</td></tr><tr><td>4</td><td>Prefill 优化 (TTFT)</td><td>30s</td><td>prefix cache (system prompt / RAG context 复用), chunked prefill, speculative decoding (draft model 校验), continuous batching (vLLM PagedAttention)</td><td>"Prefill: prefix cache for the system prompt and RAG context — Voice agent we got 60% cache hit rate. Chunked prefill so long context doesn't block decode. Speculative decoding with a small draft model"</td></tr><tr><td>5</td><td>Decode 优化 (TPOT)</td><td>30s</td><td>quantization (AWQ / GPTQ INT8 / INT4, 2-4x throughput), tensor parallel (multi-GPU), continuous batching, flash-attention v3, KV cache eviction</td><td>"Decode: quantization AWQ INT8 is the cheapest win — 2-3x throughput with &lt; 1pt quality drop. Continuous batching via vLLM or SGLang. Flash-attention v3 for memory bandwidth"</td></tr><tr><td>6</td><td>引擎 / model 选择</td><td>25s</td><td>vLLM vs SGLang vs TGI: vLLM 通用强, SGLang RadixAttention 长系统 prompt 优, TGI HF 集成. Smaller model + RAG 通常胜 large model 0-shot</td><td>"vLLM is my default. SGLang's RadixAttention beats it when you have long shared system prompts. For Voice agent we used SGLang because the routing prompt was 4K tokens shared"</td></tr><tr><td>7</td><td>Cost math + routing</td><td>30s</td><td>Gemini 3 Flash $0.50/$3 vs Pro $2/$12 = 4x, Claude Opus 4.7 $5/$25 = 10x. Route by intent complexity (simple→Flash, hard→Pro), 落 cache 命中再 escalate. ASR cascade 同理</td><td>"I route on intent — simple queries to Gemini 3 Flash at $0.50/$3, hard ones to Pro at $2/$12. 4x cost saved on 80% of queries. For self-hosted, INT4 + speculative gets 3-4x throughput per GPU"</td></tr><tr><td>8</td><td>Resume hook</td><td>15s</td><td>Voice agent ASR cascade 40min outage (fallback chain) / BNPL agentic routing / vLLM SGLang inference / SFT DPO RL post-training</td><td>"I lived this — Voice agent ASR cascade had a 40-min outage and the fallback chain saved us. Per-language vLLM pool, dynamic batching, INT8 quant. P99 from 4.2s to 1.8s"</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p><strong>先 instrument 再 stage 再 optimization</strong>: 面试官最怕听 "我直接换 INT8" — 那是猜. 先 OTel 证明 stage 是哪个, 再分 TTFT vs TPOT (面试官常混淆), 再对应 optimization. <strong>Cost math + Gemini Flash routing 让答案 production-grade</strong>, ASR cascade 40min outage 是 vulnerability + resilience 双 hook.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 5 (Quantization)</strong>: "AWQ vs GPTQ vs SmoothQuant 怎么选?" → AWQ activation-aware, GPTQ post-training PPL 低, SmoothQuant 推理友好. INT8 默认安全, INT4 要 calibrate. 实际 ablation per model</li><li><strong>Layer 4 (Speculative decoding)</strong>: "draft model 怎么选? acceptance rate?" → 同 family 小模型 (Llama 70B target + 8B draft), acceptance rate 60-80% 时净收益 1.5-2x; cold start 慢, 不适合 super low latency case</li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>30s: "Instrument first via OTel. Split TTFT vs TPOT. Prefix cache + quantization + continuous batching, route to Flash for cost"</li><li>1 min: + 7-stage 拆解 + ASR cascade 一句</li><li>2 min: + Voice agent concrete P99 numbers + cost routing breakdown</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ol><li><strong>不知道具体引擎细节</strong>: "Honestly I don't have all the SGLang internals memorized — what I know is RadixAttention helps with shared prefix. For the deep internals I'd profile and read the paper. The principle is shared prefix → cache reuse"</li><li><strong>被问到 H100 specific kernel</strong>: "I haven't tuned flash-attn on H100 myself — I rely on the vLLM team's defaults. If P99 is still bad I'd profile with Nsight Systems and look at GPU SM occupancy, but kernel-level tuning isn't my strong suit"</li><li><strong>被问到 cold start</strong>: "Cold start is a separate problem — model load 30-60s for 70B, KV cache warmup. Mitigation is keep-warm pool, pre-load on deploy, or smaller model as fallback. I've used keep-warm at minimum 1 replica"</li></ol>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -227,6 +240,46 @@ Cold start spike?
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/llm-inference-latency.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`llm-inference-latency.html`](questions/llm-inference-latency.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"LLM inference 慢了 / P99 latency 怎么 debug 怎么优化"**, 我按这 8 层回答, 不跳序. **核心心法: 先 instrument (不猜), 再分 TTFT vs TPOT, 再 7-stage 拆解, 再选对应 optimization, 最后 cost math + Voice agent ASR cascade hook**.
+
+### 📐 Inference Latency Debug — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Instrument first (不靠猜) | 15s | OTel spans per stage, 不靠 println; vLLM metrics endpoint (queue depth / batch size / cache hit), PyTorch Profiler 第二层 | "Before optimizing I instrument — OTel spans per stage end-to-end. Without that we're guessing. vLLM exposes a metrics endpoint, I plug Prometheus and Grafana on it" |
+| 2 | 区分 TTFT vs TPOT | 20s | TTFT = time-to-first-token (UX for streaming, prefill bound), TPOT = time-per-output-token (decode bound, memory bandwidth bound). 不同 metric 不同 optimization | "Two different metrics — TTFT is prefill, matters for streaming UX. TPOT is decode, memory-bandwidth bound. You optimize them differently" |
+| 3 | 7-stage 拆解 | 30s | gateway / RAG retrieve / rerank / tokenize / queue (batch fill) / prefill / decode / post-process. 每 stage P50/P99 一对眼睛 | "Seven stages — gateway, RAG retrieve, rerank, tokenize, queue, prefill, decode, post-process. I look at P50 and P99 per stage. If RAG is 600ms, no inference tuning helps" |
+| 4 | Prefill 优化 (TTFT) | 30s | prefix cache (system prompt / RAG context 复用), chunked prefill, speculative decoding (draft model 校验), continuous batching (vLLM PagedAttention) | "Prefill: prefix cache for the system prompt and RAG context — Voice agent we got 60% cache hit rate. Chunked prefill so long context doesn't block decode. Speculative decoding with a small draft model" |
+| 5 | Decode 优化 (TPOT) | 30s | quantization (AWQ / GPTQ INT8 / INT4, 2-4x throughput), tensor parallel (multi-GPU), continuous batching, flash-attention v3, KV cache eviction | "Decode: quantization AWQ INT8 is the cheapest win — 2-3x throughput with < 1pt quality drop. Continuous batching via vLLM or SGLang. Flash-attention v3 for memory bandwidth" |
+| 6 | 引擎 / model 选择 | 25s | vLLM vs SGLang vs TGI: vLLM 通用强, SGLang RadixAttention 长系统 prompt 优, TGI HF 集成. Smaller model + RAG 通常胜 large model 0-shot | "vLLM is my default. SGLang's RadixAttention beats it when you have long shared system prompts. For Voice agent we used SGLang because the routing prompt was 4K tokens shared" |
+| 7 | Cost math + routing | 30s | Gemini 3 Flash $0.50/$3 vs Pro $2/$12 = 4x, Claude Opus 4.7 $5/$25 = 10x. Route by intent complexity (simple→Flash, hard→Pro), 落 cache 命中再 escalate. ASR cascade 同理 | "I route on intent — simple queries to Gemini 3 Flash at $0.50/$3, hard ones to Pro at $2/$12. 4x cost saved on 80% of queries. For self-hosted, INT4 + speculative gets 3-4x throughput per GPU" |
+| 8 | Resume hook | 15s | Voice agent ASR cascade 40min outage (fallback chain) / BNPL agentic routing / vLLM SGLang inference / SFT DPO RL post-training | "I lived this — Voice agent ASR cascade had a 40-min outage and the fallback chain saved us. Per-language vLLM pool, dynamic batching, INT8 quant. P99 from 4.2s to 1.8s" |
+
+### 🎯 为啥按这个序
+
+**先 instrument 再 stage 再 optimization**: 面试官最怕听 "我直接换 INT8" — 那是猜. 先 OTel 证明 stage 是哪个, 再分 TTFT vs TPOT (面试官常混淆), 再对应 optimization. **Cost math + Gemini Flash routing 让答案 production-grade**, ASR cascade 40min outage 是 vulnerability + resilience 双 hook.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (Quantization)**: "AWQ vs GPTQ vs SmoothQuant 怎么选?" → AWQ activation-aware, GPTQ post-training PPL 低, SmoothQuant 推理友好. INT8 默认安全, INT4 要 calibrate. 实际 ablation per model
+- **Layer 4 (Speculative decoding)**: "draft model 怎么选? acceptance rate?" → 同 family 小模型 (Llama 70B target + 8B draft), acceptance rate 60-80% 时净收益 1.5-2x; cold start 慢, 不适合 super low latency case
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Instrument first via OTel. Split TTFT vs TPOT. Prefix cache + quantization + continuous batching, route to Flash for cost"
+- 1 min: + 7-stage 拆解 + ASR cascade 一句
+- 2 min: + Voice agent concrete P99 numbers + cost routing breakdown
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **不知道具体引擎细节**: "Honestly I don't have all the SGLang internals memorized — what I know is RadixAttention helps with shared prefix. For the deep internals I'd profile and read the paper. The principle is shared prefix → cache reuse"
+2. **被问到 H100 specific kernel**: "I haven't tuned flash-attn on H100 myself — I rely on the vLLM team's defaults. If P99 is still bad I'd profile with Nsight Systems and look at GPU SM occupancy, but kernel-level tuning isn't my strong suit"
+3. **被问到 cold start**: "Cold start is a separate problem — model load 30-60s for 70B, KV cache warmup. Mitigation is keep-warm pool, pre-load on deploy, or smaller model as fallback. I've used keep-warm at minimum 1 replica"
 
 ---
 

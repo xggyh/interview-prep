@@ -43,6 +43,20 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/it-blocks-security.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/it-blocks-security.html"><code>it-blocks-security.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"Customer's IT/security team is blocking your deployment. How do you handle it?"</strong>, 我按这 8 层回答, 不跳序. 这题考的不是 "怎么过 audit", 是 <strong>IT 心理 + 4-layer concern model + give them control</strong>.</p></blockquote>
+<h4>📐 IT Blocks Security — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句 (literal)</th></tr></thead><tbody><tr><td>1</td><td>Reframe — IT 不是敌人</td><td>1 min</td><td><strong>第一 mindset</strong>: IT 不是 obstacle, 是 long-term 最稳定 ally — <strong>如果赢得他信任</strong>. 90% block 不是 real security concern, 是 <strong>control 缺失 + 个人 risk 担忧</strong>. 我 job 不是 "证明 we're secure", 是让 IT <strong>feel in control of the process</strong></td><td>"IT is not the enemy. They're the most stable ally if I earn trust. 90% of blocks aren't real security — they're control gaps..."</td></tr><tr><td>2</td><td>1:1 with IT — 50/50 listen/speak</td><td>2 min</td><td><strong>不开 group meeting, 不发 long doc</strong>. 先约 IT lead 1:1, 30 min, <strong>50% listen 50% speak</strong>. Opening verbatim: &gt; <em>"I'm not here to convince you of anything. I want to understand what you've seen go wrong with vendor deployments before, so I can avoid those failure modes. Walk me through your top 3 concerns."</em></td><td>"First action: 1:1 with IT lead. 50% listen 50% speak. Opening sentence verbatim..."</td></tr><tr><td>3</td><td>4-layer concern model</td><td>3 min</td><td>IT 真实 concern 是 4 layer 之一: <strong>(L1) Compliance (regulator audit will fail)</strong> → <strong>(L2) Operational (this will break my on-call)</strong> → <strong>(L3) Control (I wasn't consulted)</strong> → <strong>(L4) Personal (if this fails, I'm fired)</strong>. <strong>不同 layer 不同 response</strong>. 大多数 candidate 只 address L1, 但 70% block 是 L3/L4</td><td>"Four layers of concern. Compliance is the surface. Control and personal risk are usually the real drivers..."</td></tr><tr><td>4</td><td>Detect which layer (questions)</td><td>2 min</td><td>3 个 diagnostic questions: (i) <em>"What's your audit deadline?"</em> (probes L1) (ii) <em>"Who's on-call when this breaks?"</em> (probes L2) (iii) <em>"Were you part of the original procurement?"</em> (probes L3/L4). <strong>Listen for tone, not just answer</strong>. L4 给 vague answers + body language</td><td>"Three questions to detect which layer. You listen to the tone as much as the answer..."</td></tr><tr><td>5</td><td>Give IT veto + quantified checklist</td><td>3 min</td><td>(i) <strong>Veto power</strong> — IT 任何时候可以 disable deployment, 单独的 kill-switch, <strong>not requiring approval from us</strong>, (ii) <strong>Quantified checklist</strong> — 30-item security review with pass/fail per item, IT signs each, (iii) <strong>Joint SOC2/audit prep</strong> — we do 80% paperwork, IT reviews. <strong>Give control, ask for partnership</strong></td><td>"Give IT veto. Literal kill-switch they own. Plus 30-item checklist, they sign each. Control is the currency..."</td></tr><tr><td>6</td><td>Escalation politics — when to go up</td><td>2 min</td><td><strong>不要 over IT 的头 escalate to CIO</strong> unless 2 conditions met: (i) you tried 3 rounds with IT, (ii) IT has explicitly said "this is above my level". <strong>Escalate badly 一次 = permanent enemy</strong>. 如果 escalate: &gt; <em>"With your permission, I'd like to loop in your CIO on the trade-off question. Want to brief you first so we present aligned?"</em> — <strong>let IT control the escalation narrative</strong></td><td>"Escalation has rules. Over IT's head = permanent enemy. Two conditions before going up. Always with permission..."</td></tr><tr><td>7</td><td>90-day trust ramp</td><td>2 min</td><td>Trust build over 90 days: <strong>Week 1-2</strong> (1:1, listen, checklist), <strong>Week 3-4</strong> (deliver paperwork, joint SOC2), <strong>Month 2</strong> (low-stakes pilot, IT picks scope), <strong>Month 3</strong> (production canary with IT veto), <strong>Month 4+</strong> (IT becomes internal champion). <strong>Each milestone IT picks the next</strong>, you don't push</td><td>"Trust ramps over 90 days. Six milestones. At each one IT chooses the next, not us. They control pace..."</td></tr><tr><td>8</td><td>Resume reframe — Indonesia OJK + Bank IT</td><td>1 min</td><td>"我做过 TikTok PayLater Indonesia 上线, OJK regulator + bank IT 双 block. 我跟 bank IT lead 1:1, 真实 concern 是 L3 (procurement bypass). 我们 redo procurement paperwork 给他 control, <strong>2 个月后他变 internal champion</strong>. OJK 那边走 quantified compliance checklist + audit pre-brief. <strong>Same playbook 这题用</strong>"</td><td>"I lived this — Indonesia, OJK + bank IT double-blocked. Bank IT real concern was L3 procurement bypass. Two months later he was our internal champion..."</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p><strong>先 reframe (Layer 1), 再 1:1 listen (Layer 2), 再 detect real layer (Layer 3-4)</strong> — 因为 90% candidates 立刻讲 "我做 SOC2 audit", 这是 L1 surface answer 但 70% 真因是 L3/L4. <strong>听 IT 真实 concern 之前别 propose</strong>.</p>
+<p>Give IT veto + quantified checklist (Layer 5) 是这题的 <strong>Client Sim 区分项</strong> — 一般 candidate sell "trust us", FDE 知道 IT 要 <strong>control</strong>, 不要 trust. Veto = control.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 3 (4-layer model)</strong>: 面试官扮 IT 说 <em>"this is a compliance issue, we have an OJK audit"</em> → 答: &gt; <em>"Of course — let me understand. Is the audit date driving it, or is there a specific control you need to demonstrate? I ask because there's a difference between 'we need a checklist by date X' and 'we have a structural compliance gap.'"</em> — probe whether L1 surface or L3/L4 underneath</li><li><strong>Layer 6 (escalation)</strong>: 面试官会问 "如果 IT 死磕拒绝你怎么办?" → 答: &gt; <em>"After 3 rounds with no progress, I'd ask IT directly: 'I want to be straight with you — is this a no or a not-yet? If it's a not-yet, tell me what would change it. If it's a hard no, I'll respect that and we'll deal with the consequences together, including escalating if you want.' Make it a partnership decision, not a fight."</em></li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>3 min: reframe + 1:1 opening (Layer 1-2)</li><li>8 min: 4-layer model + detect (Layer 3-4, 重点)</li><li>8 min: give veto + checklist + escalation (Layer 5-6)</li><li>5 min: 90-day trust ramp (Layer 7)</li><li>2 min: resume hook — Indonesia OJK (Layer 8)</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>卡 listen → fall back to <strong>"I'm not here to convince you of anything"</strong> opener</li><li>卡 escalation → use <strong>"Indonesia bank IT 2 个月变 internal champion"</strong> 故事</li><li>卡 compliance → say <strong>"L1 surface, but I always probe for L3/L4 underneath"</strong></li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -217,6 +231,50 @@ IT vs Business 冲突?
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/it-blocks-security.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`it-blocks-security.html`](questions/it-blocks-security.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Customer's IT/security team is blocking your deployment. How do you handle it?"**, 我按这 8 层回答, 不跳序. 这题考的不是 "怎么过 audit", 是 **IT 心理 + 4-layer concern model + give them control**.
+
+### 📐 IT Blocks Security — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Reframe — IT 不是敌人 | 1 min | **第一 mindset**: IT 不是 obstacle, 是 long-term 最稳定 ally — **如果赢得他信任**. 90% block 不是 real security concern, 是 **control 缺失 + 个人 risk 担忧**. 我 job 不是 "证明 we're secure", 是让 IT **feel in control of the process** | "IT is not the enemy. They're the most stable ally if I earn trust. 90% of blocks aren't real security — they're control gaps..." |
+| 2 | 1:1 with IT — 50/50 listen/speak | 2 min | **不开 group meeting, 不发 long doc**. 先约 IT lead 1:1, 30 min, **50% listen 50% speak**. Opening verbatim: > *"I'm not here to convince you of anything. I want to understand what you've seen go wrong with vendor deployments before, so I can avoid those failure modes. Walk me through your top 3 concerns."* | "First action: 1:1 with IT lead. 50% listen 50% speak. Opening sentence verbatim..." |
+| 3 | 4-layer concern model | 3 min | IT 真实 concern 是 4 layer 之一: **(L1) Compliance (regulator audit will fail)** → **(L2) Operational (this will break my on-call)** → **(L3) Control (I wasn't consulted)** → **(L4) Personal (if this fails, I'm fired)**. **不同 layer 不同 response**. 大多数 candidate 只 address L1, 但 70% block 是 L3/L4 | "Four layers of concern. Compliance is the surface. Control and personal risk are usually the real drivers..." |
+| 4 | Detect which layer (questions) | 2 min | 3 个 diagnostic questions: (i) *"What's your audit deadline?"* (probes L1) (ii) *"Who's on-call when this breaks?"* (probes L2) (iii) *"Were you part of the original procurement?"* (probes L3/L4). **Listen for tone, not just answer**. L4 给 vague answers + body language | "Three questions to detect which layer. You listen to the tone as much as the answer..." |
+| 5 | Give IT veto + quantified checklist | 3 min | (i) **Veto power** — IT 任何时候可以 disable deployment, 单独的 kill-switch, **not requiring approval from us**, (ii) **Quantified checklist** — 30-item security review with pass/fail per item, IT signs each, (iii) **Joint SOC2/audit prep** — we do 80% paperwork, IT reviews. **Give control, ask for partnership** | "Give IT veto. Literal kill-switch they own. Plus 30-item checklist, they sign each. Control is the currency..." |
+| 6 | Escalation politics — when to go up | 2 min | **不要 over IT 的头 escalate to CIO** unless 2 conditions met: (i) you tried 3 rounds with IT, (ii) IT has explicitly said "this is above my level". **Escalate badly 一次 = permanent enemy**. 如果 escalate: > *"With your permission, I'd like to loop in your CIO on the trade-off question. Want to brief you first so we present aligned?"* — **let IT control the escalation narrative** | "Escalation has rules. Over IT's head = permanent enemy. Two conditions before going up. Always with permission..." |
+| 7 | 90-day trust ramp | 2 min | Trust build over 90 days: **Week 1-2** (1:1, listen, checklist), **Week 3-4** (deliver paperwork, joint SOC2), **Month 2** (low-stakes pilot, IT picks scope), **Month 3** (production canary with IT veto), **Month 4+** (IT becomes internal champion). **Each milestone IT picks the next**, you don't push | "Trust ramps over 90 days. Six milestones. At each one IT chooses the next, not us. They control pace..." |
+| 8 | Resume reframe — Indonesia OJK + Bank IT | 1 min | "我做过 TikTok PayLater Indonesia 上线, OJK regulator + bank IT 双 block. 我跟 bank IT lead 1:1, 真实 concern 是 L3 (procurement bypass). 我们 redo procurement paperwork 给他 control, **2 个月后他变 internal champion**. OJK 那边走 quantified compliance checklist + audit pre-brief. **Same playbook 这题用**" | "I lived this — Indonesia, OJK + bank IT double-blocked. Bank IT real concern was L3 procurement bypass. Two months later he was our internal champion..." |
+
+### 🎯 为啥按这个序
+
+**先 reframe (Layer 1), 再 1:1 listen (Layer 2), 再 detect real layer (Layer 3-4)** — 因为 90% candidates 立刻讲 "我做 SOC2 audit", 这是 L1 surface answer 但 70% 真因是 L3/L4. **听 IT 真实 concern 之前别 propose**.
+
+Give IT veto + quantified checklist (Layer 5) 是这题的 **Client Sim 区分项** — 一般 candidate sell "trust us", FDE 知道 IT 要 **control**, 不要 trust. Veto = control.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (4-layer model)**: 面试官扮 IT 说 *"this is a compliance issue, we have an OJK audit"* → 答: > *"Of course — let me understand. Is the audit date driving it, or is there a specific control you need to demonstrate? I ask because there's a difference between 'we need a checklist by date X' and 'we have a structural compliance gap.'"* — probe whether L1 surface or L3/L4 underneath
+- **Layer 6 (escalation)**: 面试官会问 "如果 IT 死磕拒绝你怎么办?" → 答: > *"After 3 rounds with no progress, I'd ask IT directly: 'I want to be straight with you — is this a no or a not-yet? If it's a not-yet, tell me what would change it. If it's a hard no, I'll respect that and we'll deal with the consequences together, including escalating if you want.' Make it a partnership decision, not a fight."*
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 3 min: reframe + 1:1 opening (Layer 1-2)
+- 8 min: 4-layer model + detect (Layer 3-4, 重点)
+- 8 min: give veto + checklist + escalation (Layer 5-6)
+- 5 min: 90-day trust ramp (Layer 7)
+- 2 min: resume hook — Indonesia OJK (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 listen → fall back to **"I'm not here to convince you of anything"** opener
+- 卡 escalation → use **"Indonesia bank IT 2 个月变 internal champion"** 故事
+- 卡 compliance → say **"L1 surface, but I always probe for L3/L4 underneath"**
 
 ---
 

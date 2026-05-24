@@ -43,6 +43,19 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/rag-vs-ft-vs-pe.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/rag-vs-ft-vs-pe.html"><code>rag-vs-ft-vs-pe.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"RAG vs Fine-tuning vs Prompt Engineering — 怎么选 / 客户应该用哪个"</strong>, 我按这 7 层回答, 不跳序. <strong>核心心法: 不是 either-or, 是 6-dim framework → cost math → hybrid pattern → eval-driven → resume hook</strong>.</p></blockquote>
+<h4>📐 RAG vs FT vs PE Decision — 7 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句 (literal)</th></tr></thead><tbody><tr><td>1</td><td>拆三个根本不同的 lever</td><td>20s</td><td>PE = 改 input format, RAG = inject context (retrieval-time), FT = 改 weights (train-time). 解决不同问题, 不互斥</td><td>"These are three different levers — prompt engineering changes the input, RAG injects context at retrieval time, fine-tuning changes the weights. They solve different problems and most production is hybrid"</td></tr><tr><td>2</td><td>6-dim decision framework</td><td>45s</td><td>(1) 知识新鲜度 (current / static), (2) citation 需求, (3) volume × cost, (4) latency budget, (5) data 数量与质量 (&gt;5K 高质量?), (6) 风格/格式 vs 事实 vs reasoning</td><td>"Six dimensions: knowledge freshness, citation requirement, volume × cost, latency budget, data availability and quality, and whether the gap is style/format/facts/reasoning. Each dimension points to a different lever"</td></tr><tr><td>3</td><td>Pragmatic order</td><td>25s</td><td>PE → RAG → FT. PE 1 day 验证, RAG 1-2 week, FT 1-2 month + GPU + label cost. Plateau on PE 才上 RAG, plateau on RAG + volume justifies 才 FT</td><td>"Pragmatic order: prompt first — one day to validate, free to test. If knowledge gap, add RAG, one to two weeks. Only consider fine-tuning when both plateau AND volume justifies the GPU and label cost"</td></tr><tr><td>4</td><td>Cost math (2026 pricing)</td><td>45s</td><td>Gemini 3 Pro $2/$12 per 1M, Flash $0.50/$3, Claude Opus 4.7 $5/$25, GPT-5.5 $5/$30. RAG: 4K context × 1M req/mo = 4B in token × $2 = $8K/mo on Pro vs $2K on Flash. FT: $5K-50K train + 2-3x cheaper inference (own deploy) — break-even ~5M+ req/mo</td><td>"Math the 2026 prices — Gemini 3 Pro $2 in / $12 out per million. RAG with 4K context, 1M requests/mo = $8K on Pro, $2K on Flash, that's 4x. Fine-tune costs $5-50K upfront, breaks even at roughly 5M+ requests/month against API"</td></tr><tr><td>5</td><td>Hybrid pattern (production 80%)</td><td>30s</td><td>PE (system prompt + few-shot) + RAG (current facts + citation) + Light FT (style 一致 / domain term) 三层叠. 不是 either-or</td><td>"Production is hybrid 80% of the time — PE for reasoning and format, RAG for facts and citation, light fine-tune for style or domain vocabulary. Voice agent runs all three layers"</td></tr><tr><td>6</td><td>Eval-driven justification</td><td>30s</td><td>不靠 vibes 选; 3-layer eval — answer correctness LLM-judge kappa&gt;0.6, citation precision/recall, cost/latency P99. Ablation: PE-only / +RAG / +RAG+FT 比 cost-quality Pareto</td><td>"I prove the choice with eval — not vibes. Three layers: answer correctness via LLM-judge with Cohen's kappa &gt; 0.6, citation precision-recall, and cost-latency. Ablation PE-only vs +RAG vs +RAG+FT on a Pareto front"</td></tr><tr><td>7</td><td>Resume hook</td><td>15s</td><td>BNPL chatbot agentic + RAG (intent 70→92%, 4-signal composite confidence calibration) / ConvFinQA multi-hop 9-variant ablation / Voice agent SFT + DPO + RL post-train</td><td>"Lived it on BNPL — agentic plus RAG plus light SFT. Intent routing 70 to 92 percent. Confidence calibration via 4-signal composite — retrieval score, generation logprob, citation match, intent match. And ConvFinQA where I designed the 9-variant ablation"</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p><strong>先 framework 再 cost 再 eval</strong>: 面试官最怕听 "用 RAG 就够" 或 "FT 更好". 先抛三个不同 lever (避免 false dichotomy), 再 6-dim framework, 再 cost math (Gemini 3 Pro vs Flash 数), 再 hybrid 是 80% production, 最后 eval 证明 + ConvFinQA / BNPL hook. <strong>Cost math + hybrid pattern + eval = differentiator</strong>.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 4 (Cost math)</strong>: "FT break-even 怎么算?" → FT train $10K + own deploy $0.30/1M out token vs API $12/1M out token (Pro). Break-even = $10K / ($12 - $0.30)/1M = 850M out token, ~5M+ req/mo at 200 token/req. Cost real life 还要 +eval +ops, 通常 break-even 推后到 10M+</li><li><strong>Layer 5 (Hybrid)</strong>: "RAG + FT 怎么共存? 不冲突?" → FT 学 style + domain vocab, RAG 提供 fact + current info. FT 不能 freeze facts (易过时), RAG 不能改 output style — 互补</li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>30s: "Not either-or — 6-dim framework (freshness / citation / volume / latency / data / gap type). Order PE→RAG→FT. Hybrid is 80% of production"</li><li>1 min: + cost math (Gemini Pro vs Flash 4x) + hybrid pattern</li><li>2 min: + BNPL 4-signal confidence + ConvFinQA ablation + 9-variant negative result</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ol><li><strong>被问到具体 FT 数量阈值</strong>: "It depends on data quality — for SFT I've seen 5-10K high-quality pairs move the needle, but a fluffy 50K doesn't. DPO needs 1-5K preference pairs and a strong reward signal. Honestly the bottleneck is label quality, not count"</li><li><strong>被问到 RLHF / RLAIF</strong>: "RLHF I've touched on Voice agent post-train, but PPO is finicky. DPO is more stable and what I'd default to. RLAIF — promising but I haven't shipped it production"</li><li><strong>被问到 long-context kill RAG</strong>: "Long-context didn't kill RAG — Gemini 3 Pro 2M context is great but it's still $24 per million in, latency 10s+ for 1M tokens, and recall drops in the middle. RAG narrows first, long-context digests the narrowed set. Hybrid wins"</li></ol>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -223,6 +236,45 @@
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/rag-vs-ft-vs-pe.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`rag-vs-ft-vs-pe.html`](questions/rag-vs-ft-vs-pe.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"RAG vs Fine-tuning vs Prompt Engineering — 怎么选 / 客户应该用哪个"**, 我按这 7 层回答, 不跳序. **核心心法: 不是 either-or, 是 6-dim framework → cost math → hybrid pattern → eval-driven → resume hook**.
+
+### 📐 RAG vs FT vs PE Decision — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | 拆三个根本不同的 lever | 20s | PE = 改 input format, RAG = inject context (retrieval-time), FT = 改 weights (train-time). 解决不同问题, 不互斥 | "These are three different levers — prompt engineering changes the input, RAG injects context at retrieval time, fine-tuning changes the weights. They solve different problems and most production is hybrid" |
+| 2 | 6-dim decision framework | 45s | (1) 知识新鲜度 (current / static), (2) citation 需求, (3) volume × cost, (4) latency budget, (5) data 数量与质量 (>5K 高质量?), (6) 风格/格式 vs 事实 vs reasoning | "Six dimensions: knowledge freshness, citation requirement, volume × cost, latency budget, data availability and quality, and whether the gap is style/format/facts/reasoning. Each dimension points to a different lever" |
+| 3 | Pragmatic order | 25s | PE → RAG → FT. PE 1 day 验证, RAG 1-2 week, FT 1-2 month + GPU + label cost. Plateau on PE 才上 RAG, plateau on RAG + volume justifies 才 FT | "Pragmatic order: prompt first — one day to validate, free to test. If knowledge gap, add RAG, one to two weeks. Only consider fine-tuning when both plateau AND volume justifies the GPU and label cost" |
+| 4 | Cost math (2026 pricing) | 45s | Gemini 3 Pro $2/$12 per 1M, Flash $0.50/$3, Claude Opus 4.7 $5/$25, GPT-5.5 $5/$30. RAG: 4K context × 1M req/mo = 4B in token × $2 = $8K/mo on Pro vs $2K on Flash. FT: $5K-50K train + 2-3x cheaper inference (own deploy) — break-even ~5M+ req/mo | "Math the 2026 prices — Gemini 3 Pro $2 in / $12 out per million. RAG with 4K context, 1M requests/mo = $8K on Pro, $2K on Flash, that's 4x. Fine-tune costs $5-50K upfront, breaks even at roughly 5M+ requests/month against API" |
+| 5 | Hybrid pattern (production 80%) | 30s | PE (system prompt + few-shot) + RAG (current facts + citation) + Light FT (style 一致 / domain term) 三层叠. 不是 either-or | "Production is hybrid 80% of the time — PE for reasoning and format, RAG for facts and citation, light fine-tune for style or domain vocabulary. Voice agent runs all three layers" |
+| 6 | Eval-driven justification | 30s | 不靠 vibes 选; 3-layer eval — answer correctness LLM-judge kappa>0.6, citation precision/recall, cost/latency P99. Ablation: PE-only / +RAG / +RAG+FT 比 cost-quality Pareto | "I prove the choice with eval — not vibes. Three layers: answer correctness via LLM-judge with Cohen's kappa > 0.6, citation precision-recall, and cost-latency. Ablation PE-only vs +RAG vs +RAG+FT on a Pareto front" |
+| 7 | Resume hook | 15s | BNPL chatbot agentic + RAG (intent 70→92%, 4-signal composite confidence calibration) / ConvFinQA multi-hop 9-variant ablation / Voice agent SFT + DPO + RL post-train | "Lived it on BNPL — agentic plus RAG plus light SFT. Intent routing 70 to 92 percent. Confidence calibration via 4-signal composite — retrieval score, generation logprob, citation match, intent match. And ConvFinQA where I designed the 9-variant ablation" |
+
+### 🎯 为啥按这个序
+
+**先 framework 再 cost 再 eval**: 面试官最怕听 "用 RAG 就够" 或 "FT 更好". 先抛三个不同 lever (避免 false dichotomy), 再 6-dim framework, 再 cost math (Gemini 3 Pro vs Flash 数), 再 hybrid 是 80% production, 最后 eval 证明 + ConvFinQA / BNPL hook. **Cost math + hybrid pattern + eval = differentiator**.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (Cost math)**: "FT break-even 怎么算?" → FT train $10K + own deploy $0.30/1M out token vs API $12/1M out token (Pro). Break-even = $10K / ($12 - $0.30)/1M = 850M out token, ~5M+ req/mo at 200 token/req. Cost real life 还要 +eval +ops, 通常 break-even 推后到 10M+
+- **Layer 5 (Hybrid)**: "RAG + FT 怎么共存? 不冲突?" → FT 学 style + domain vocab, RAG 提供 fact + current info. FT 不能 freeze facts (易过时), RAG 不能改 output style — 互补
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Not either-or — 6-dim framework (freshness / citation / volume / latency / data / gap type). Order PE→RAG→FT. Hybrid is 80% of production"
+- 1 min: + cost math (Gemini Pro vs Flash 4x) + hybrid pattern
+- 2 min: + BNPL 4-signal confidence + ConvFinQA ablation + 9-variant negative result
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问到具体 FT 数量阈值**: "It depends on data quality — for SFT I've seen 5-10K high-quality pairs move the needle, but a fluffy 50K doesn't. DPO needs 1-5K preference pairs and a strong reward signal. Honestly the bottleneck is label quality, not count"
+2. **被问到 RLHF / RLAIF**: "RLHF I've touched on Voice agent post-train, but PPO is finicky. DPO is more stable and what I'd default to. RLAIF — promising but I haven't shipped it production"
+3. **被问到 long-context kill RAG**: "Long-context didn't kill RAG — Gemini 3 Pro 2M context is great but it's still $24 per million in, latency 10s+ for 1M tokens, and recall drops in the middle. RAG narrows first, long-context digests the narrowed set. Hybrid wins"
 
 ---
 

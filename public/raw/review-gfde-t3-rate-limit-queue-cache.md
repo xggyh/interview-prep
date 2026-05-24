@@ -5,6 +5,48 @@
 **原页面**: [`gfde-t3-rate-limit-queue-cache.html`](questions/gfde-t3-rate-limit-queue-cache.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"LLM service serves customer chatbot. Provider has 10K TPM, 100 RPM, $5/$25 (Opus). Customer traffic bursty (100x peaks). Design the system"**, 我按这 9 层回答, 不跳序.
+
+### 📐 Cost Defense + Burst Protection — 9 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Burst 数学锚点 | 1 min | Sustained 100 QPS → spike 10K QPS (100x). Provider 100 RPM → 100/60 = 1.67 RPS = **1/600 of peak**. Naive 直打 = 99.83% 429. 这是 burst 的真实 economic | "Let me anchor the burst math — 100 RPM provider vs 10K QPS spike = 1/600 throughput. 99.83% 429 if naive..." |
+| 2 | Clarify 5 问 | 90s | Multi-tenant? Tier (gold/silver/bronze)? p99 vs p50 SLA? Cost budget $/month? Quality regression tolerance? PII/compliance? | "5 clarify — tier model, SLA, budget, quality tolerance, compliance" |
+| 3 | 4-layer cost defense 概览 | 1 min | L1 cache (40% reduction) / L2 priority queue (SLA 保护) / L3 rate limit (defense) / L4 cost-aware routing (5-6x). Combined **8-12x blended cost ↓** | "4 layers stacked — cache, queue, rate, routing. Combined 8-12x blended cost reduction..." |
+| 4 | L1 多 cache 设计 | 4 min | (a) **Exact** hash(model+prompt+temp+seed), 10-20% hit; (b) **Semantic** Pinecone, threshold **0.97 safety / 0.95 normal**, 30-50% FAQ hit; (c) **Tool output** cache for idempotent tool; (d) **vLLM prefix** 自动 share KV. **Per-tenant namespace 防 cross-tenant leak** | "Cache 4 sub-layers — exact, semantic (threshold 0.97), tool output, vLLM prefix. Per-tenant namespace 是红线..." |
+| 5 | L2 priority queue | 2 min | Per-tenant Redis sorted set, score = `tier_priority × 1e10 + timestamp`. Gold tier 5% traffic 优先, Silver 25%, Bronze 70%. Per-tier max concurrency, noisy neighbor 隔离 | "L2 — Redis sorted set per tenant, score = priority×1e10 + ts. Gold 5%, Silver 25%, Bronze 70% concurrency budget..." |
+| 6 | L3 token bucket 多维 | 2 min | 5 dimension: user / tenant / API key / model / global. Redis Lua atomic, < 1ms. **Token-based 不是 request-based** (LLM 1 req 可以 50K token). 429 retry-after header propagate | "L3 token bucket 5-dim — user, tenant, API key, model, global. Critical: token-based not request-based..." |
+| 7 | L4 cost-aware routing | 3 min | 70% Flash ($0.50/$3) + 25% Pro ($2/$12) + 5% Opus ($5/$25). Complexity classify (heuristic + small LLM). Tier override: gold + complex → Opus. Budget exhausted → cheap-only or fallback canned | "L4 routing — 70/25/5 baseline. Complexity classifier (small LLM judge). Budget exhausted → graceful degrade..." |
+| 8 | Graceful degradation ladder | 2 min | 5 step: priority queue → smaller model → aggressive cache → canned response → "服务忙稍后". 每步 cost ↓ quality ↓, 但永远不挂 | "Graceful ladder 5 steps — queue → smaller → cache → canned → busy. 永远不返回 5xx..." |
+| 9 | 简历 resume hook | 90s | "TikTok PayLater chatbot peak 5K QPS. 4-layer: semantic 35% hit (Pinecone 0.97), priority queue gold 5%, token bucket per user/tenant, 70/25/5 routing. Blended $0.85/1M vs $5/1M = **6x savings**, faithfulness ≥ 0.85 unchanged. Eval harness 证明 no quality regression" | "On TikTok PayLater 5K QPS, blended cost $0.85/1M vs $5/1M = 6x, eval harness 证明 no regression..." |
+
+### 🎯 为啥按这个序
+
+Burst 数学锚点 (1/600) 让面试官知道 "naive 直打"为什么必死. Clarify 5 问 是 senior 标记. 4 层 framework 是骨架 — 必须先讲完整再深入. L1 cache 是 cost-saving 最大头, 4 sub-layer (exact / semantic / tool / prefix) 要分清, 多数候选人只想到 exact. **Semantic threshold 0.97 safety / 0.95 normal** 是踩过坑才知道的数字. L2 queue 是 SLA 保护 (不省钱但保 gold). L3 rate limit "token-based 不是 request-based" 是 LLM-specific 细节. L4 routing 数学 (70/25/5) + tier override 显示完整 product thinking. Graceful degradation ladder 是 "永远不挂" 的 mindset. 简历 hook 用 TikTok PayLater 5K QPS 是 concrete win.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (semantic cache)** — 追问 "0.97 vs 0.95 threshold 怎么定?". 回答: per-feature calibrate — 在 1000 历史 query pair 上跑, 找 false-positive rate < 1% 的 threshold. Safety-critical (medical/legal/financial) 0.97+, FAQ 0.93-0.95. Cache poisoning 是 silent kill, 必须 **eval-gated cache write** (写之前先 eval, pass 才写). **Layer 7 (cost-aware routing)** 追问 "complexity classifier 怎么训". 回答: 起步 heuristic (query 长度 / 关键词), 累积 10K labeled sample 后用 small LLM (Haiku) 做 classifier, accuracy 88-92%. 错路到 cheap model 的影响要在 eval harness 监控.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. Burst 数学 (1 min) + 4 layer framework (1 min)
+2. L1 cache 4 sub-layer (3 min)
+3. L2 queue + L3 rate limit (3 min)
+4. L4 routing 70/25/5 + 数学 (3 min)
+5. Graceful ladder + 简历 TikTok PayLater (3 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "semantic cache 答错了怎么办"**: 这是 cache poisoning silent kill. 防御: (a) eval-gated cache write, (b) per-tenant namespace, (c) per-user thumbs-down 直接 invalidate, (d) periodic re-eval on cached entries
+2. **被问 "queue 排太久 user 流失"**: 设 max wait time (e.g., gold 500ms / silver 3s / bronze 10s), 超时 fallback canned / smaller model. Never block forever
+3. **被问 "complexity classifier 跑错 cheap model 用户感受差"**: A/B test — 1% traffic 强制 Opus 做 ground truth, 对比 cheap model 答案 thumbs-up rate, drift > 5% 时 retrain classifier
+4. **被问 "multi-vendor failover 怎么做"**: LiteLLM router. OpenAI 429 → Anthropic → Google → self-host vLLM. 关键: 路由前 normalize schema (function calling / tool / prompt format)
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

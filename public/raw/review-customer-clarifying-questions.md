@@ -6,6 +6,45 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"customer 上来给 vague brief 你问什么 / first meeting clarifying questions"**, 我按这 7 层回答, 不跳序. **核心心法: BSCFS taxonomy → scripted question banks → push-back tactics → STAR examples → vulnerability close. Vendor 上来 design, FDE 上来 ask**.
+
+### 📐 Customer Clarifying Q — 7 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Posture (vendor vs FDE) | 15s | Vendor 听到 brief 就 design demo. FDE 第一反应是问 5-7 question. Skip clarifying = immediate fail. Why-binding 每 question | "First principle — vendor hears a brief and goes to demo. FDE hears a brief and asks 5 to 7 questions. Skipping clarifying is an immediate fail in this role. And every question I ask is bound to a 'why I'm asking'" |
+| 2 | BSCFS taxonomy (5 类) | 30s | Business (KPI / 业务 driver) / Stakeholders (decider / blocker / sponsor) / Constraints (latency / compliance / cost / data) / Failure (acceptable error mode / red lines) / Success (measurable definition + 时间窗) | "Five categories — Business, Stakeholders, Constraints, Failure, Success. BSCFS. Business first because if I don't know the KPI no answer is right. Failure second-last because 'what's the worst that can happen' is the question vendors skip" |
+| 3 | Scripted question banks (per-bucket) | 45s | **Business**: "if this works in 6 months what business metric moves? Whose budget?" **Stakeholders**: "who signs off? Who blocks? Who I never meet but matters?" **Constraints**: "P99 latency / regulator / cost ceiling / data residency / on-prem?" **Failure**: "what's the worst case if AI is wrong — financial / regulatory / brand?" **Success**: "what does 'done' look like at 30/60/90 days?" | "Concrete scripts — Business: 'if this works in six months what metric moved and whose budget did it justify?' Stakeholders: 'who signs off, who blocks, who I never meet but matters?' Constraints: latency, regulator, cost ceiling, data residency. Failure: 'what's the worst case if the AI is wrong?' Success: 30/60/90-day measurable" |
+| 4 | Push-back tactics | 30s | 客户给 vague answer 三招: (1) "what would change if 80% / 90% / 95%?" (push 数字 specificity), (2) "tell me a recent example where this happened" (push concreteness), (3) "if I gave you a demo tomorrow what would make you say no?" (push failure mode) | "When the answer is vague I push three ways. One — 'what would change if accuracy were 80 vs 95?' to force a number. Two — 'walk me through a recent example' to force concreteness. Three — 'if I demo tomorrow what makes you say no' to surface real failure mode" |
+| 5 | KPI-first + 1-page proposal | 20s | 永远 KPI 第一. 1-page proposal within 1 week — restate problem, KPI, 3 options with cost/risk, recommendation, success criteria, 30/60/90 plan. 客户 sign-off baseline | "KPI is always first. And I follow first meeting with a one-page proposal within a week — restated problem, KPI, three options with cost-risk, my recommendation, success criteria, and a 30/60/90 plan. Customer signs that off as the baseline" |
+| 6 | STAR (clarifying win) | 25s | BNPL "make chatbot smarter": 我没接受 brief. Week 1 200 conversation interview + BSCFS 5 question 全跑. Output: "smarter" = intent routing 70→90% on top-5 intents. Sign-off 1-pager. Result: 70→92%, 客户给了 follow-on engagement | "Concrete — BNPL customer asked to 'make the chatbot smarter'. I refused to design until I'd run BSCFS. Five questions surfaced the real KPI: intent routing 70 to 90 percent on top-5 intents. One-page proposal, signed. Shipped 70 to 92" |
+| 7 | Vulnerability + close | 20s | Acknowledge failure mode: 早期我 ConvFinQA 跳过 clarifying 直接做 — 结果 spec 错, 浪费 2 week. 学到 "clarifying time 不是 cost, 是 risk reduction". Close: 我能给你 demo 我的 BSCFS 实操 | "Failure I learned from — early in my career on ConvFinQA I skipped clarifying and dove into design. Spec was wrong, two weeks wasted. The lesson — clarifying time isn't cost, it's risk reduction. Happy to walk through my BSCFS sheet on a real brief if you want" |
+
+### 🎯 为啥按这个序
+
+**先 posture 再 taxonomy 再 scripts 再 push-back 再 STAR 再 vulnerability**: 面试官筛的是 "你会不会 demo-first". Posture 句直接化解, BSCFS taxonomy 证明你有结构, scripted questions 证明你 ready (不是 made-up on spot), push-back tactics 证明你能处理 vague customer (常见现实), STAR 闭环, vulnerability (ConvFinQA spec 错 2 week 浪费) 化解 "你只讲赢的故事". **Why-binding 每个 question 是 differentiator**.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (Scripted questions)**: "客户不知道 KPI 你怎么办?" → 三步: (1) 提供 menu 选项 (containment rate / CSAT / handle time) 让客户挑, (2) 借鉴行业 benchmark (BNPL 25-40% containment), (3) propose 一个先 sign-off 跑 1 week 调
+- **Layer 4 (Push-back)**: "客户 push 回来说 just build the demo? 你怎么 hold line?" → "Happy to demo — but my demo only matters if I demo against your KPI. Give me one number and I'll demo against that, otherwise we're both guessing"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Vendor designs, FDE asks. BSCFS taxonomy — Business / Stakeholders / Constraints / Failure / Success. 5-7 questions first meeting. 1-page proposal within 1 week"
+- 1 min: + scripted question per bucket + BNPL "smarter" example
+- 2 min: + push-back tactics + ConvFinQA vulnerability + close offer
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问到 customer 不配合**: "Customer who won't answer is a signal — usually means they don't know the answer or the sponsor is missing. I'd escalate to ask 'who's the decider' and route the question there. Never just guess and proceed"
+2. **被问到具体 sample question 我没准备**: "Honestly the exact question depends on the domain — for an enterprise SaaS I'd ask differently than for a consumer app. The framework is BSCFS, the wording is per-domain. If you give me the domain I'll show you the per-bucket script"
+3. **被问到 "too many questions 客户烦"**: "Real risk — I cap at 5 to 7 in first meeting, prioritize by decision-blocking. The rest go into a follow-up email or the 1-pager proposal. And I lead each with 'why I'm asking' so it doesn't feel like an interrogation"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

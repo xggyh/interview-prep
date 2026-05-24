@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"6 months in, 12% adoption — what do you do?"**, 我按这 8 层回答, 不跳序. 这题考的是 **funnel diagnosis + product-fit vs deployment-fit 区分**, 不是 "怎么 retrain 模型".
+
+### 📐 Healthcare 12% Adoption — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Clarify before solving | 1 min | 5 questions: **adoption 怎么定义 (login? feature use? daily? weekly?)** \| target was what? \| who are 12% (super-user concentration?) \| EHR integration scope? \| CMIO buy-in? | "12% is meaningless without definition. Five questions before I diagnose..." |
+| 2 | Funnel-first, not feature-first | 2 min | **拒绝接受 "12%" 这个 aggregate**. 拆 7-stage funnel: **awareness → access → trial → first-value → repeat → habit → advocacy**. 每段 conversion rate 单独看. 12% 可能是 access bottleneck (90% 没账号), 也可能是 first-value bottleneck (登了但放弃) | "12% is an aggregate symptom. I need the funnel before I touch the model. Seven stages, conversion rate per stage..." |
+| 3 | 4 hypotheses ranked | 3 min | 排序 4 个: **(A) Product fit (model wrong) — 10%** → **(B) Workflow fit (EHR re-entry, 双录入) — 40%** → **(C) Trust/training (没 onboarding) — 30%** → **(D) Champion politics (CMIO 反对) — 10%** → **(E) Wrong cohort (ICU vs OR) — 10%**. 80% case 是 B+C+D 混合, 不是 A | "Hypotheses are not equal probability. Workflow fit and trust dominate. Here's how I'd rank with priors..." |
+| 4 | On-site shadow (5 + 10) | 3 min | **5 active users + 10 non-users**, 现场 shadow 1 day each. Active 看 **what they actually do, not what they say**. Non-user 看 **where the funnel breaks**. 这是 FDE deployment 的 signature move, 不是 survey | "Surveys lie in healthcare. Doctors say they want AI, then never use it. I need on-site shadow — 5 active, 10 non-user, 1 day each..." |
+| 5 | Telemetry instrumentation | 3 min | 10 events: **page_view, recommendation_shown, recommendation_clicked, recommendation_accepted, recommendation_modified, recommendation_rejected, ehr_synced, manual_override, session_end, return_visit**. **Accept rate / Override rate / Re-entry rate** 是核心三个. Re-entry rate >30% = workflow fit 问题 | "Before I propose anything I need 10 events instrumented. Re-entry rate is the smoking gun for workflow fit..." |
+| 6 | Joint ownership intervention | 3 min | 不是 "我修", 是 **joint action items**: us (model retrain on local data) + customer-IT (EHR write-back integration) + clinical-champion (CMIO co-sign protocol) + ops (mandatory 30-min training). **每个 owner 一个 due date**. 这是 FDE 跟 ML researcher 最大区别 | "Adoption is co-owned. Not us, not them. Four action items, four owners, four due dates..." |
+| 7 | Product-fit vs Deployment-fit | 2 min | 这是关键判断: 如果 **on-site shadow 显示 active users 用得很爽 → deployment fit 问题 (workflow/trust)**. 如果 active users 也抱怨 → product fit 问题 (model). 80% 是 deployment, 但要明确区分 — 不能假定 product 没问题 | "Product fit and deployment fit are different bugs. Different fixes. Different owners. Here's how I'd distinguish..." |
+| 8 | Resume reframe | 1 min | "我在 TikTok BNPL chatbot, intent routing 70→92% — 但 launch 时 adoption 只有 8%. **真因不是 model accuracy, 是 escalation latency >30s**. 修 latency 之后 adoption 跳到 45%. **跟这个 12% 一样: aggregate metric 不告诉你 root cause, funnel 才告诉你**" | "I've debugged this exact failure mode at TikTok. BNPL chatbot launched at 8% adoption — wasn't the model..." |
+
+### 🎯 为啥按这个序
+
+**先 funnel, 再 hypothesis, 再 shadow, 再 telemetry** — 因为 90% candidates 跳过 funnel 直接说 "retrain model". 这是 FDE 最大陷阱: **12% adoption 是 aggregate 症状, 不是诊断**. 你必须先 instrument 才能 diagnose.
+
+Joint ownership (Layer 6) 是这题的 **FDE 区分项** — ML researcher 会说 "我修 model", FDE 会说 "model 只是 4 个 action item 之一, customer IT + clinical champion + ops 都要 owner".
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (hypothesis ranking)**: 面试官会问 "你怎么知道 B 是 40% prior?" → 答 "这是行业 base rate. Epic / Cerner integration 90% AI 工具栽在 double-entry 上. KLAS report 2023 published this"
+- **Layer 6 (joint ownership)**: 面试官会问 "CMIO 不肯 co-sign 怎么办?" → 答 "CMIO 不 co-sign 通常因为 perceived liability — 我会拉 legal + 数据 risk slide, 把责任分摊到 product + clinical protocol. 如果 CMIO 仍拒, 这是 deal-level escalation, 不是 FDE 一个人能解的"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 4 min: clarify + funnel (Layer 1-2)
+- 6 min: hypothesis ranking + shadow (Layer 3-4)
+- 6 min: telemetry + joint ownership (Layer 5-6, 重点)
+- 3 min: product-fit vs deployment-fit (Layer 7)
+- 2 min: resume hook (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 product fit → pivot to **"我先做 on-site shadow, 因为我不假定 product 是 root cause"**
+- 卡 telemetry → pivot to **TikTok BNPL adoption 8%→45% by fixing escalation latency** 故事
+- 卡 politics → pivot to **"FDE 不是单兵, 是 joint action item 设计师"**
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

@@ -6,6 +6,53 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Agent emits 5 parallel tool calls — how do you schedule them?"** 或 **"Two parallel tools both update user_profile, prevent race AND debug 1-in-1000 inconsistency"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Parallel Tool Scheduling + Race — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify 5 维 | 0-3 min | Tools 都是 read 还是混 write? 同 entity 还是多 entity? 是否 idempotent? Failure isolation (1 fail others continue)? Tool 内部本身是否已并发? | "5 quick clarifications before scheduling — read/write mix, entity overlap, idempotency, failure isolation policy, and whether tools internally use thread pools." |
+| 2 | 灾难场景 (WAW + RAW) | 3-7 min | 5 tool naive gather: T2 写 email → T2 写 name 覆盖 email → get_profile 读到 partial state → send_welcome_email 用 old email → log_audit 记错 state. WAW + RAW 同时发生 | "Let me show the naive disaster first — 5 tools fired with asyncio.gather, here's how race silently corrupts state." |
+| 3 | Tool 注解系统 | 7-13 min | 每个 tool 在 spec 里 declare: `safety=read/write/destructive`, `resources_read=['user_profile:{user_id}']`, `resources_write=[...]`, `side_effects=[]`. 这是 static analysis 的输入. Runtime 才能 reason | "Scheduling needs metadata. Each tool declares safety class, resources read/written (templated by arg), and external side-effects." |
+| 4 | DAG + Wave Scheduling | 13-22 min | Static analysis 生成 dependency graph: T2(W user_profile) → T1,T5(R user_profile); T3,T4 independent. Topological sort 分 wave: Wave1 [T2,T3,T4] parallel (write-disjoint), Wave2 [T1,T5] parallel (read after T2 done) | "I build a DAG from the metadata, topological sort it into waves. Wave 1 runs independent writes in parallel; Wave 2 runs reads after dependency-satisfied writes." |
+| 5 | Locking 策略 | 22-30 min | Per-resource distributed lock (Redis SETNX or Redlock). Lock granularity = `(tool_name, resource_id)` not just tool_name. 死锁防御: **deterministic resource ordering** (按 resource_id sort 后再 acquire). Lock timeout 严格短于 tool timeout | "For same-resource writes I serialize via per-resource locks. Two non-obvious things — granularity is per-resource not per-tool, and I sort resource_ids before acquire to prevent deadlock." |
+| 6 | Failure isolation + speedup math | 30-37 min | `asyncio.gather(return_exceptions=True)` 不让 1 fail 拖累 4. Partial result + LLM 看到 mixed success. Amdahl: 4 parallel 100ms + 1 serial 200ms = 300ms (2x speedup not 5x). Bounded concurrency (Semaphore=8) 避免 DB conn pool exhaustion | "Failure isolation via return_exceptions=True. Speedup is bounded by Amdahl — measure don't assume. Cap concurrency to avoid pool exhaustion." |
+| 7 | Debug 1-in-1000 race | 37-43 min | Distributed trace (OpenTelemetry) 每 tool call attach session_id + resource_id. Property-based test (Hypothesis) generate random tool sequences, invariant `final state = sequential equivalent`. Chaos: inject artificial delay 随机化执行顺序 | "Now the hard part — debugging a race that reproduces 1-in-1000. My playbook: distributed trace with resource_id tags, property-based test for sequential equivalence, chaos delay injection." |
+| 8 | Connect + production hardening | 43-50 min | BNPL chatbot multi-tool fanout: user message 触发 5 sub-agent (查 credit + 查 due + 查 dispute + 查 reward + 查 channel). 4 read parallel, 1 write (log) on user_id lock. **Bug story**: gather 默认 fail-fast cancel all → changed to return_exceptions=True, partial result 可用 | "Resume hook — BNPL chatbot had this exact 5-fanout. The cancellation behavior of gather caught us once — let me share." |
+
+### 🎯 为啥按这个序
+
+灾难场景 (Layer 2) 先讲是因为 race condition 抽象, 不画 timeline 面试官 follow 不上「为啥 read-write 顺序会错」. 然后 annotation system (3) 必须放在 DAG (4) 之前 — 没 metadata 就没法 reason. Locking (5) 单列因为是 production 重头戏, 死锁防御 (deterministic ordering) 是经典 staff-level 知识点. Failure isolation (6) 和 speedup math 合并是因为它们都是 "parallel 不是 free lunch" 的 nuance. Debug (7) 单列因为面试官 80% 会追问 "1-in-1000 race 怎么 debug" — 这是分水岭. Resume close (8) 用 BNPL 5-fanout 锚定.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (locking)**: "Redlock 安全吗?" → 准备 Martin Kleppmann clock-drift 质疑 + fencing token 兜底. "Per-row vs per-table lock?" → 准备粒度选择 (per-row 高并发但 lock 多, per-table 简单但 contention).
+- **Layer 7 (debug)**: "1-in-1000 怎么复现?" → 必杀 chaos injection: 在 staging artificially delay 随机 tool 100-2000ms 打乱顺序, 1 小时内大概率复现. 然后 property-based test 把这变成 regression.
+- **Layer 4 (DAG)**: "If LLM emits 100 tools 怎么办?" → 准备 batch + cap N=10 + LLM 重新 plan (告诉 LLM "too many, please re-prioritize").
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify) 压到 2 min
+- Layer 2 (灾难) 压到 3 min, 一句 timeline
+- Layer 3 (annotation) + Layer 4 (DAG) 合 6 min, 一起讲
+- Layer 5 (locking) 5 min, 强调 deterministic ordering 防死锁
+- Layer 6 (failure isolation + Amdahl) 3 min
+- Layer 7 (debug) 5 min — 必讲, 这是分水岭
+- Layer 8 (connect) 2 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 deterministic ordering 防死锁怎么实现 → 退回讲「**关键 insight: 所有 worker acquire resource 时按同一 ordering (e.g., sort resource_id), 就不可能 circular wait, deadlock 数学上不存在**」
+- 被追问 Redlock 算法 → 退回讲「**关键 idea 是多数派 quorum + TTL + ownership token. 我倾向用 ZooKeeper/etcd 替代, CP 比 AP 更适合强一致场景**」
+- 忘了 Amdahl 公式 → 退回讲「**speedup 上限取决于 serial fraction, parallel 不是 N 倍加速**」, 不背公式
+- 被追问 asyncio.gather 行为 → 退回讲「**默认 fail-fast 取消所有, 加 return_exceptions=True 才 partial**」, 一句话定调
+- 被追问 dependency analysis 怎么做 → 退回讲「**最简单 static — 用 tool spec 的 resources_read/write 字段; 进阶 dynamic — 实际运行时 trace 资源 access 反推依赖**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

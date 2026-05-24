@@ -6,6 +6,46 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"dataset / corpus 100x 怎么 scale"**, 我按这 8 层回答, 不跳序. **核心心法: 先 bottleneck 定位 (不是 brute force), 再 ingest pipeline, 再 index/storage 分层, 再 retrieval 优化, 最后 cost math + ConvFinQA / Voice agent hook**.
+
+### 📐 Dataset 100x Scaling — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Bottleneck 定位 (不 brute) | 20s | 100x = 不同 bottleneck: 10k→1M ingest, 1M→100M storage/index, 100M→10B retrieval. 先 profile 现状 P50/P99 ingest_throughput / index_size / retrieve_latency | "I don't 100x everything — I locate the bottleneck. 10k to 1M is ingest, 1M to 100M is index sharding, beyond that retrieval. Profile first" |
+| 2 | Ingest pipeline 并行化 | 30s | 流水线 (parse → chunk → embed → metadata → index), 每 stage 独立扩, batch embed (vLLM 32-64 batch), checkpoint resume, idempotent (doc_id + content_hash), DLQ retry | "Pipeline: parse, chunk, embed, metadata enrich, index — each stage horizontally scaled. Batch embed via vLLM 32-64. Idempotent on doc_id + content_hash so we resume on failure" |
+| 3 | Embedding cost/速度 trade-off | 30s | bge-m3 self-host vs OpenAI 3-large API. 100M chunks × 500t = 50B token. OpenAI $0.13/1M = $6.5K. A100 spot $0.5/hr × 2800 hr ≈ $1.4K self-host. 100x → 必须 self-host | "100M chunks × 500 tokens = 50 billion. OpenAI 3-large API: $6.5K. Self-hosted bge-m3 on A100 spot: ~$1.4K for 2800 GPU-hours. The math forces self-host" |
+| 4 | Index 分层 (hot/warm/cold) | 30s | HNSW in-memory hot (top 10% access, last 30d), pgvector warm, parquet cold; per-tenant shard; embedding distill 768→256 saves 3x memory | "Tiered: HNSW in-memory hot for the 10% accessed in last 30 days, pgvector warm, parquet cold. Distill embedding 768 to 256 — quality drops < 2 points, memory drops 3x" |
+| 5 | Retrieval latency 优化 | 30s | ANN (HNSW M=16 ef=200), pre-filter ACL/tenant 硬 WHERE, rerank latency budget < 200ms 跳 否则 top-50→10, distill rerank model, Redis cache 5-min TTL | "HNSW M=16 ef=200, pre-filter ACL and tenant as hard WHERE, rerank only when budget allows. Cache popular queries 5-min TTL — 30% hit rate cut P50 in half" |
+| 6 | Drift / 维护 | 25s | embedding_model_version metadata (模型升级 = blue-green re-embed), freshness_score decay, content_hash 增量, 月度全量重 index | "Every chunk carries embedding_model_version. Model upgrade is blue-green re-embed, not in-place. Content_hash for delta detection, incremental index daily, full rebuild monthly" |
+| 7 | Cost math + LLM routing | 30s | Storage 100M × 256d × 4B = 100GB ~$100/mo, retrieve $2K/mo, generation route Gemini 3 Flash $0.50/$3 不是 Pro $2/$12, 4x 便宜; escalate to Pro on confidence < 0.7 | "Storage ~$100/mo, retrieve ~$2K/mo. Generation I route to Gemini 3 Flash at $0.50 in / $3 out, escalate to Pro $2/$12 only when retrieve confidence < 0.7 — 4x cost saved on 80% of queries" |
+| 8 | Resume hook | 15s | Voice agent 7 markets 6 languages per-market shard / ConvFinQA 9-variant ablation methodology / Internal Agent Platform shared workflow | "I've shipped per-market sharding on the Voice agent — 7 markets, 6 languages, BGE-M3 multilingual, per-tenant HNSW. And ConvFinQA where I designed the 9-variant ablation that proved which scaling levers matter" |
+
+### 🎯 为啥按这个序
+
+**先 bottleneck 再 pipeline 再 cost**: 100x 是 trap question — 面试官想看你 "不 brute force". 先定位 (10k→1M 不是同一个问题), 再 stage 并行化, 再 storage 分层, 最后 cost math + resume hook 落地. **Embedding cost math + Gemini 3 Flash routing 是 differentiator**.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 3 (Embedding cost)**: "self-host 真的 $1.4K? 怎么算?" → A100 BGE-M3 throughput ~5K tok/s batch 64, 50B / 5K = 10M sec = 2800 GPU-hour, A100 spot $0.5/hr ≈ $1.4K. 不算开销 (parse / I/O), real 可能 2-3x
+- **Layer 4 (Tiered storage)**: "怎么知道 10% hot? 怎么 promote/demote?" → access log Bloom filter, 每 6h 重排 hot set, LRU eviction warm→cold
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 30s: "Bottleneck 不同 stage 不同. Pipeline 并行 + self-host embed + tiered storage + Gemini Flash routing 是核心"
+- 1 min: + 5 decision sub-layers + cost math 一句
+- 2 min: + Voice agent 7 markets concrete numbers + ConvFinQA ablation hook
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **不知道具体 throughput 数**: "It depends on the embedding model — for BGE-M3 on A100 I've seen 3-5K tokens/sec batch 64, but for a different model you'd benchmark first. The point is the throughput is bounded, so you parallelize"
+2. **被问到 1B+ doc**: "Honestly I haven't run 1B production myself — closest was Voice agent in the millions. At 1B I'd think distributed (Vespa, Vald), shard by tenant + hash, ScaNN or DiskANN over HNSW. I'd want to talk to someone who's done it"
+3. **被问到 streaming / real-time ingest**: "Stream via Kafka, embed worker pool, write to staging index with TTL, promote to main in batches. The trade-off is freshness vs index churn — I've done batch hourly, not true real-time"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

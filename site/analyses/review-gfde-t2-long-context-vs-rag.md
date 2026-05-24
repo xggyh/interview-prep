@@ -6,6 +6,54 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Gemini 3 Pro 2M / Claude 200K — does long-context kill RAG?"** 或 **"100K-page legal docs chatbot, long-context vs RAG vs hybrid, defend"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Long-context vs RAG vs Hybrid 决策 — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify + 两个极端灾难 | 0-6 min | Corpus 大小? Update frequency? Multi-hop reasoning 需求? Citation 要求? QPS? **然后 demo**: (A) Pure long-context for 500M token legal corpus = 装不下 (2M cap) + 即使装 $2000/call + 10 分钟 latency. (B) Pure RAG for multi-hop "indemnity cap vs limitation of liability" → top-5 chunk miss section 12 body, LLM 编 "probably $2M based on industry practice". 两端都崩 | "Let me start with two disasters. Pure long-context for 500M tokens = $2000/call. Pure RAG for multi-hop misses cross-section reasoning. Hybrid is the answer; let me show why." |
+| 2 | 2026 context window 现状 | 6-12 min | Gemini 3 Pro 2M / Gemini 3 Flash 1M / Claude Opus 4.7 200K / Claude Sonnet 4.6 200K / GPT-5.5 256K. **名义 ≠ effective**: Liu lost-in-middle research, 2M 模型中间 1.4M 区域 recall 比首尾低 30-40%. 这决定 "塞 2M 不等于 2M 全用" | "2026 context window landscape — but nominal ≠ effective. Even 2M models lose 30-40% recall in the middle band. That shapes the design." |
+| 3 | 长 context vs RAG 对比表 | 12-19 min | Corpus 上限 (LLM ctx vs 任意) / Per-query cost ($1-10 vs $0.005) / Latency (10-60s vs 100ms-2s) / Multi-hop (强 vs 弱) / Update freq (慢 vs 实时) / Citation (靠 prompt 易错 vs 自然) / Vendor lock-in (高 vs 低) / Lost-in-middle (严重 vs 不存在) / Engineering (低 vs 高) | "Now the head-to-head. 9 dimensions. Each has a winner — let me walk the table so we share calibration." |
+| 4 | 决策树 | 19-26 min | Q1: Corpus < 200K? → Pure long-context (装全). Q2: 200K-2M? → 多 hop heavy → pure long-ctx (Pro); else cost-sensitive → RAG narrow + long-ctx within. Q3: > 2M? → real-time update → pure RAG; multi-hop → hybrid RAG narrow + long-ctx; citation strict → hybrid. QPS axis: >10/s = pure RAG must, low <1/min = long-ctx OK | "Decision tree — 3 corpus tiers × update freq × multi-hop × QPS axes. Most production lands in hybrid: RAG narrows to top-K docs, long-context handles cross-section reasoning within those." |
+| 5 | Hybrid 最优解 | 26-33 min | **Stage 1 (RAG narrow)**: retrieve top-10 docs (each ≤ 50K token) → total ~500K. **Stage 2 (long-context handle)**: 500K 进 Gemini 3 Pro 2M (head 区域, recall 好). 多 hop 推理在这 500K 内自由完成. Cost: 500K × $2/1M = $1 vs $2000 pure long-ctx. Latency: ~15s vs 600s | "Hybrid is RAG narrows then long-context reasons. The 500K sweet spot is in Pro's head-band so attention is preserved. 2000x cost reduction, 40x latency improvement." |
+| 6 | Prefix caching 优化 | 33-39 min | Anthropic prompt cache 5min TTL / Gemini 1h TTL. 重复 query 同 prefix doc 后续 9 折. Strategy: long doc 放 prefix, query 放 suffix. 同 user session 全部 cache hit. Cross-session 用 RAG 重新 narrow. **5-min vs 1-hour TTL 决定 session 设计** | "Prefix caching is the 2025-2026 unlock. Anthropic 5min, Gemini 1h. Put long doc in prefix, query in suffix; subsequent queries in same session get 90% discount. Crucial for cost." |
+| 7 | Citation + provenance 处理 | 39-45 min | RAG 天然带 chunk_id, citation 容易. Long-context 靠 prompt instruction "cite section X" 容易 hallucinate. **Hybrid 解法**: RAG 阶段 chunk 带 metadata (doc_id, section, page), 进 long-ctx 时保留 marker, LLM 用 marker 引用. Faithfulness eval: response 是否 ground in 来源 | "Citation is RAG's natural strength. Long-context fakes it via prompt. In hybrid, I preserve chunk metadata into long-context as inline markers — LLM cites by marker, faithfulness eval grounds answer in source." |
+| 8 | Connect + production hardening | 45-50 min | ConvFinQA financial multi-hop: hybrid (RAG retrieve table 上下文 + long-context reasoning on number relations), ablation 证明 +18% on multi-hop questions. BNPL policy: long-doc < 200K, prefix cache 5min, session 内 query 全 hit. Voice agent transcript 4-tier memory (working/episodic/semantic/decision-log) 是同思路 | "Resume hook — ConvFinQA multi-hop hybrid +18%, BNPL policy prefix cache 5min, voice agent 4-tier memory same family. Let me share the ConvFinQA ablation." |
+
+### 🎯 为啥按这个序
+
+**两个极端灾难 (Layer 1) 必须最先讲** — 500M token = $2000 这个数字让面试官立刻看到 stake, 然后 "RAG 编 $2M based on industry practice" 让 multi-hop weakness 具体化. 2026 context window 现状 (2) + lost-in-middle 必须在决策之前讲, 这是物理基础. 对比表 (3) 是 menu, 决策树 (4) 是 selection. **Hybrid 最优解 (5) 是核心 punchline** — 2000x cost reduction 这个数字是 anchor. Prefix caching (6) 单列因为 2024-25 新 feature 必知. Citation (7) 单列因为 long-context 这一项天然弱, hybrid 解决很优雅. Resume close (8) 用 ConvFinQA multi-hop ablation 数字最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 6 (prefix cache)**: "怎么 implement?" → 准备 Anthropic `cache_control: {type: ephemeral}` + Gemini `cached_content_id`. 写法 + TTL 数字.
+- **Layer 5 (hybrid 500K sweet spot)**: "为啥 500K?" → 准备 effective context band: Gemini Pro 2M 中间 1.4M 弱, head 300K + tail 300K 强. 500K 进 head 安全.
+- **Layer 4 (decision tree)**: "Real-time update + multi-hop 怎么办?" → 准备 "RAG real-time index + long-ctx narrow window. Trade off: long-ctx 不能 reload, 所以 RAG 是主, long-ctx 是 stage 2".
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (两个极端灾难) 4 min — 必讲
+- Layer 2 (context window 现状) 跳过 / 2 min, 一句 effective ≠ nominal
+- Layer 3 (对比表) 4 min
+- Layer 4 (decision tree) 4 min
+- Layer 5 (hybrid 最优) 5 min — 必讲, punchline
+- Layer 6 (prefix cache) 4 min — 必讲, 2024-25 feature
+- Layer 7 (citation) 3 min
+- Layer 8 (connect) 3 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了具体 context size 数字 → 退回讲「**Pro 2M, Claude 200K, GPT-5.5 256K. 量级不需要精确**」
+- 被追问 "Long-context 一定贵吗" → 退回讲「**Linear 增长. Gemini Pro >200K tier 是 $4/1M input, 100K query 是 $0.4, 1M 是 $4. Prefix cache 后 9 折. 不一定 prohibitive, 看 QPS**」
+- 忘了 prefix cache TTL → 退回讲「**Anthropic 5 分钟, Gemini 1 小时. 必须同 prefix 内容 + 同 session 才 cache hit**」
+- 被追问 faithfulness 怎么测 → 退回讲「**LLM-as-judge: 给 response + retrieved doc, 问 "is this answer grounded in the docs?" 1-5 score. 大规模用 Claude/Gemini eval**」
+- 被追问 RAG 已死 vs 长 context → 退回「**False dichotomy. Hybrid 是 2026 consensus — RAG narrow + long-ctx within. 各自 sweet spot 不同, complement 不竞争**」
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

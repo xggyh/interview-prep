@@ -43,6 +43,20 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/recurring-fix-failure.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/recurring-fix-failure.html"><code>recurring-fix-failure.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"You've shipped 3 fixes and the bug keeps coming back. Customer is losing patience. What do you do?"</strong>, 我按这 8 层回答, 不跳序. 这题考的不是 "怎么 debug", 是 <strong>stop-the-line judgment + trust repair over months</strong>.</p></blockquote>
+<h4>📐 Recurring Fix Failure — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句 (literal)</th></tr></thead><tbody><tr><td>1</td><td>Stop-the-line decision</td><td>1 min</td><td><strong>3 次 fix 失败 = diagnostic method 错了, 不是 effort 不够</strong>. 第一动作: <strong>stop shipping fixes</strong>. 不是暂停 incident response, 是暂停 new fix attempts. 立 feature flag 把 blast radius 缩到 0, 然后才 diagnose</td><td>"First decision: I stop shipping. Three failed fixes means my diagnostic method is wrong, not that I need a fourth attempt..."</td></tr><tr><td>2</td><td>Customer acknowledgment script (verbatim)</td><td>2 min</td><td>跟 customer 说 verbatim (在 call 里): &gt; <em>"I owe you transparency. We've shipped 3 fixes and the issue is back. That's not a 'we'll try again' situation — that's a sign our diagnostic approach is wrong. I'd like to pause for one week, no new fixes, do a full RCA with fresh eyes, then come back with either a real fix or honest scope change. Will you give me that week?"</em></td><td>"I'd say this to the customer literally, on the call: 'I owe you transparency...'"</td></tr><tr><td>3</td><td>5-Why redo with fresh eyes</td><td>3 min</td><td>重新 5-Why <strong>with someone who hasn't touched it before</strong>. 之前的 3 次 fix 都被 confirmation bias 污染. <strong>Fresh eye 经常发现 layer 2 真因 ≠ layer 1 表面</strong>. 案例: Indonesia voice agent 5% 误识别, 3 次 fix 都在 ASR confidence threshold; fresh eye 发现是 <strong>upstream telephony codec 切换没 alert</strong></td><td>"Fresh eyes is a discipline not a vibe. I'd literally bring in an engineer who hasn't touched this. Here's the Indonesia voice agent 5% misrec story..."</td></tr><tr><td>4</td><td>5 root-cause patterns</td><td>3 min</td><td>3 次 fix 失败通常因为 5 种 root cause 之一: <strong>(a) Wrong layer (修 effect 不是 cause)</strong>, <strong>(b) Coupling missed (fix A 触发 B)</strong>, <strong>(c) Intermittent trigger (没复现 race condition)</strong>, <strong>(d) Environmental drift (fix 时 env 跟 incident env 不同)</strong>, <strong>(e) Wrong reproduction (test 跟 prod 不同)</strong>. 每种不同 diagnostic 工具</td><td>"Five archetypes of 'fix that didn't stick'. Each has a different signature. Most teams don't classify, they just retry..."</td></tr><tr><td>5</td><td>Feature flag + observability upgrade</td><td>2 min</td><td>在 diagnose 期间: (i) <strong>feature flag</strong> 把 affected code path 切到 fallback, (ii) <strong>upgrade observability</strong> — 加 trace, structured log, distributed tracing on the specific call chain, (iii) <strong>synthetic monitoring</strong> that replays the trigger, (iv) <strong>shadow run</strong> new fix candidate 1 week before deploy</td><td>"Before fix #4 goes anywhere near prod, four observability upgrades..."</td></tr><tr><td>6</td><td>Trust repair playbook (months)</td><td>3 min</td><td>Trust 失 1 小时, 重建 3-6 月. <strong>Monthly customer review</strong> with: (i) per-incident timeline, (ii) <strong>time-since-last-incident</strong> counter (the one customer watches), (iii) systematic improvement (test coverage, alerts), (iv) <strong>honest "this is what we'd do differently"</strong> retros. <strong>Consistency over months</strong>, 不是 single grand gesture</td><td>"Trust repair is not one apology. It's monthly cadence for six months. Here's the playbook..."</td></tr><tr><td>7</td><td>Customer "just fix it again" push-back script</td><td>2 min</td><td>当 customer 说 <em>"don't slow down, just fix it"</em>, 回答 verbatim: &gt; <em>"I hear you, and I want this fixed as much as you do. But shipping a 4th attempt without changing approach has a 70% chance of breaking again — I've seen this pattern. One week to do it right gives you a real fix. Two weeks of 'fast fixes' is what got us here. Which trade do you prefer?"</em></td><td>"When the customer pushes 'just ship', here's the exact response..."</td></tr><tr><td>8</td><td>Resume reframe — TikTok voice agent</td><td>1 min</td><td>"我在 TikTok PayLater Indonesia voice agent, <strong>拒绝识别失败 ship 了 3 次 fix 都回归</strong>. 我 stop-the-line 1 周, fresh eyes pair 发现 root cause 是 <strong>upstream telephony provider 切换 codec without notice</strong>. Fix 是 provider-side contract + alerting, 不是 model side. <strong>6 个月没回归</strong>. Trust 重建用了 4 个月 monthly review"</td><td>"I lived this exact pattern — TikTok voice agent, Indonesia, 3 fixes, kept coming back. Stop-the-line, fresh eyes, root cause was upstream telephony..."</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p><strong>先 stop-the-line (Layer 1), 再 acknowledge (Layer 2), 再 fresh-eye RCA (Layer 3)</strong> — 因为 90% candidates 立刻讲 "我做更深 RCA", 这等于 commit fix #4 之前没 reset method. <strong>Stop-the-line 是 FDE judgment</strong>, 不是 process. Customer 看到你停, 反而 trust 增加.</p>
+<p>Customer acknowledgment verbatim (Layer 2) + push-back script (Layer 7) 是这题 <strong>Client Sim 区分项</strong> — 一般 candidate 说 "我会沟通", FDE 给 literal sentences.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 1 (stop-the-line)</strong>: 面试官扮 customer 说 <em>"我们不能停, production 在出问题"</em> → 答: &gt; <em>"I'm not stopping incident response — feature flag keeps users safe right now. I'm stopping new code attempts. Big difference. Will you let me explain the flag setup?"</em></li><li><strong>Layer 6 (trust repair)</strong>: 面试官会问 "monthly review 客户烦怎么办?" → 答: &gt; <em>"Monthly review is at customer's option, not my push. Format is 30-min, written brief + 2 metrics. If customer prefers async, async is fine. Goal is observability into our reliability, not air time."</em></li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>4 min: stop-the-line + customer acknowledgment (Layer 1-2)</li><li>8 min: fresh-eye RCA + 5 root-cause patterns (Layer 3-4, 重点)</li><li>5 min: feature flag + observability (Layer 5)</li><li>8 min: trust repair playbook + push-back script (Layer 6-7)</li><li>2 min: resume hook — TikTok voice agent (Layer 8)</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>卡 verbatim → fall back to <strong>"I owe you transparency"</strong> opener</li><li>卡 RCA → use <strong>TikTok voice agent telephony codec</strong> 故事 — fresh eyes 发现 upstream root cause</li><li>卡 trust politics → say <strong>"trust 失 1 小时, 重建 3-6 月, consistency over grand gesture"</strong></li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -208,6 +222,50 @@ CFO 提 damages?
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/recurring-fix-failure.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`recurring-fix-failure.html`](questions/recurring-fix-failure.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"You've shipped 3 fixes and the bug keeps coming back. Customer is losing patience. What do you do?"**, 我按这 8 层回答, 不跳序. 这题考的不是 "怎么 debug", 是 **stop-the-line judgment + trust repair over months**.
+
+### 📐 Recurring Fix Failure — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Stop-the-line decision | 1 min | **3 次 fix 失败 = diagnostic method 错了, 不是 effort 不够**. 第一动作: **stop shipping fixes**. 不是暂停 incident response, 是暂停 new fix attempts. 立 feature flag 把 blast radius 缩到 0, 然后才 diagnose | "First decision: I stop shipping. Three failed fixes means my diagnostic method is wrong, not that I need a fourth attempt..." |
+| 2 | Customer acknowledgment script (verbatim) | 2 min | 跟 customer 说 verbatim (在 call 里): > *"I owe you transparency. We've shipped 3 fixes and the issue is back. That's not a 'we'll try again' situation — that's a sign our diagnostic approach is wrong. I'd like to pause for one week, no new fixes, do a full RCA with fresh eyes, then come back with either a real fix or honest scope change. Will you give me that week?"* | "I'd say this to the customer literally, on the call: 'I owe you transparency...'" |
+| 3 | 5-Why redo with fresh eyes | 3 min | 重新 5-Why **with someone who hasn't touched it before**. 之前的 3 次 fix 都被 confirmation bias 污染. **Fresh eye 经常发现 layer 2 真因 ≠ layer 1 表面**. 案例: Indonesia voice agent 5% 误识别, 3 次 fix 都在 ASR confidence threshold; fresh eye 发现是 **upstream telephony codec 切换没 alert** | "Fresh eyes is a discipline not a vibe. I'd literally bring in an engineer who hasn't touched this. Here's the Indonesia voice agent 5% misrec story..." |
+| 4 | 5 root-cause patterns | 3 min | 3 次 fix 失败通常因为 5 种 root cause 之一: **(a) Wrong layer (修 effect 不是 cause)**, **(b) Coupling missed (fix A 触发 B)**, **(c) Intermittent trigger (没复现 race condition)**, **(d) Environmental drift (fix 时 env 跟 incident env 不同)**, **(e) Wrong reproduction (test 跟 prod 不同)**. 每种不同 diagnostic 工具 | "Five archetypes of 'fix that didn't stick'. Each has a different signature. Most teams don't classify, they just retry..." |
+| 5 | Feature flag + observability upgrade | 2 min | 在 diagnose 期间: (i) **feature flag** 把 affected code path 切到 fallback, (ii) **upgrade observability** — 加 trace, structured log, distributed tracing on the specific call chain, (iii) **synthetic monitoring** that replays the trigger, (iv) **shadow run** new fix candidate 1 week before deploy | "Before fix #4 goes anywhere near prod, four observability upgrades..." |
+| 6 | Trust repair playbook (months) | 3 min | Trust 失 1 小时, 重建 3-6 月. **Monthly customer review** with: (i) per-incident timeline, (ii) **time-since-last-incident** counter (the one customer watches), (iii) systematic improvement (test coverage, alerts), (iv) **honest "this is what we'd do differently"** retros. **Consistency over months**, 不是 single grand gesture | "Trust repair is not one apology. It's monthly cadence for six months. Here's the playbook..." |
+| 7 | Customer "just fix it again" push-back script | 2 min | 当 customer 说 *"don't slow down, just fix it"*, 回答 verbatim: > *"I hear you, and I want this fixed as much as you do. But shipping a 4th attempt without changing approach has a 70% chance of breaking again — I've seen this pattern. One week to do it right gives you a real fix. Two weeks of 'fast fixes' is what got us here. Which trade do you prefer?"* | "When the customer pushes 'just ship', here's the exact response..." |
+| 8 | Resume reframe — TikTok voice agent | 1 min | "我在 TikTok PayLater Indonesia voice agent, **拒绝识别失败 ship 了 3 次 fix 都回归**. 我 stop-the-line 1 周, fresh eyes pair 发现 root cause 是 **upstream telephony provider 切换 codec without notice**. Fix 是 provider-side contract + alerting, 不是 model side. **6 个月没回归**. Trust 重建用了 4 个月 monthly review" | "I lived this exact pattern — TikTok voice agent, Indonesia, 3 fixes, kept coming back. Stop-the-line, fresh eyes, root cause was upstream telephony..." |
+
+### 🎯 为啥按这个序
+
+**先 stop-the-line (Layer 1), 再 acknowledge (Layer 2), 再 fresh-eye RCA (Layer 3)** — 因为 90% candidates 立刻讲 "我做更深 RCA", 这等于 commit fix #4 之前没 reset method. **Stop-the-line 是 FDE judgment**, 不是 process. Customer 看到你停, 反而 trust 增加.
+
+Customer acknowledgment verbatim (Layer 2) + push-back script (Layer 7) 是这题 **Client Sim 区分项** — 一般 candidate 说 "我会沟通", FDE 给 literal sentences.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 1 (stop-the-line)**: 面试官扮 customer 说 *"我们不能停, production 在出问题"* → 答: > *"I'm not stopping incident response — feature flag keeps users safe right now. I'm stopping new code attempts. Big difference. Will you let me explain the flag setup?"*
+- **Layer 6 (trust repair)**: 面试官会问 "monthly review 客户烦怎么办?" → 答: > *"Monthly review is at customer's option, not my push. Format is 30-min, written brief + 2 metrics. If customer prefers async, async is fine. Goal is observability into our reliability, not air time."*
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 4 min: stop-the-line + customer acknowledgment (Layer 1-2)
+- 8 min: fresh-eye RCA + 5 root-cause patterns (Layer 3-4, 重点)
+- 5 min: feature flag + observability (Layer 5)
+- 8 min: trust repair playbook + push-back script (Layer 6-7)
+- 2 min: resume hook — TikTok voice agent (Layer 8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 verbatim → fall back to **"I owe you transparency"** opener
+- 卡 RCA → use **TikTok voice agent telephony codec** 故事 — fresh eyes 发现 upstream root cause
+- 卡 trust politics → say **"trust 失 1 小时, 重建 3-6 月, consistency over grand gesture"**
 
 ---
 

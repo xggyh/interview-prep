@@ -43,6 +43,20 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/multitenant-monitoring-slas.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/multitenant-monitoring-slas.html"><code>multitenant-monitoring-slas.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"你 SaaS 服务 500 个 tenant, 1 个 Bronze tenant 突然 100x traffic, 怎么不让它拖垮 Gold tenant SLA, 怎么监控, 怎么 bill?"</strong> 我按这 8 层回答, 不跳序.</p></blockquote>
+<h4>📐 Multi-tenant SLA Monitoring — 8 层 isolation + observability + billing</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Frame: noisy neighbor 是 multi-tenant 第一敌人</td><td>30s</td><td>不是 "monitor everything", 是 "isolate first, then observe". 1 个 Bronze 不能拖 Gold — 这是 multi-tenant SaaS 第一原则</td><td>"First — isolation before observation. Noisy neighbor is the primary failure mode…"</td></tr><tr><td>2</td><td>3 层 isolation</td><td>2 min</td><td>(a) <strong>Gateway</strong> token bucket per-tenant (10/s Bronze, 100/s Silver, 1000/s Gold) — fast cheap; (b) <strong>App layer</strong> DB pool partition + Weighted Fair Queue (WFQ) — fair share under contention; (c) <strong>Physical</strong> — Gold gets dedicated infra (cluster / VPC / shard), Bronze shared pool. 3 层 分而治之</td><td>"Three isolation layers — gateway token bucket / app WFQ / physical dedicated for Gold…"</td></tr><tr><td>3</td><td>Tier-based SLA + threshold</td><td>1.5 min</td><td>Gold 99.99% availability + p99 200ms latency, Silver 99.9% + 500ms, Bronze 99% + 1s. Error budget per tier (Gold 4 min/month, Silver 43 min/month, Bronze 7h/month). 客户 contract 显式声明</td><td>"Tier SLA — Gold 99.99/200ms / Silver 99.9/500ms / Bronze 99/1s with error budget per tier…"</td></tr><tr><td>4</td><td>Per-tenant SLI + cardinality control</td><td>2 min</td><td>Cardinality 是 multi-tenant monitoring 第一陷阱. 500 tenant × 50 metric × 10 label = 250k series Prometheus 顶不住. 我用: (a) top-N tenant 全量 SLI (Gold + Silver + top 20 Bronze by spend), (b) 长尾 Bronze aggregated to bucket ('bronze_low'/'bronze_med'), (c) Mimir / Cortex 横扩 storage, (d) per-tenant only on dimensions that matter (availability + latency + error rate, not 50 random labels)</td><td>"Cardinality — top-N tenant full + tail aggregated + Mimir horizontal, never label-explode…"</td></tr><tr><td>5</td><td>Multi-window burn rate alert</td><td>1.5 min</td><td>Google SRE multi-window: 1h@14x burn (2% budget in 1h → page), 6h@7x burn (5% in 6h → page), 1d@3x burn (10% in 1d → ticket), 3d@1x burn (10% in 3d → review). 4 window 避免 alert fatigue + 抓 slow leak</td><td>"Multi-window burn rate — 1h@14x page / 6h@7x page / 1d@3x ticket / 3d@1x review…"</td></tr><tr><td>6</td><td>Customer self-serve dashboard + auto-credit</td><td>1 min</td><td>Per-tenant dashboard (Grafana panel filtered by tenant_id) showing their SLI vs SLA + error budget remaining. SLA breach auto-detect + auto-credit (no manual review for credit &lt; $X) — customer trust signal</td><td>"Customer-facing — Grafana per-tenant dashboard + auto-credit on SLA breach for trust…"</td></tr><tr><td>7</td><td>Billing audit 独立</td><td>1 min</td><td>Billing metering 用独立 DB (从可观测 metric 抽), WORM storage 13 month, HMAC-signed event log, monthly reconciliation. 不要用可观测 metric 直接算 bill (compactor 会 drop / sample). 独立 audit trail is regulatory necessity (finance)</td><td>"Billing — independent DB + WORM 13 month + HMAC + monthly reconcile, separate from observability metric…"</td></tr><tr><td>8</td><td>Resume hook</td><td>1 min</td><td>"Concrete: BNPL platform multi-tenant — 50+ merchant. 3-layer isolation, per-tenant burn rate alert, monthly auto-credit on breach. One Black Friday Bronze merchant 100x traffic, Gold merchant p99 unchanged (gateway tier bucket triggered + WFQ kicked in). Billing audit passed annual financial regulator review"</td><td>"Real example — BNPL 50+ merchant, Black Friday 100x Bronze spike no Gold impact, regulator-passed billing audit…"</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p>Frame "isolation before observation" 第一 because 90% 候选人 jump 到 "Prometheus per-tenant label" → cardinality 死. 3 层 isolation 是核心 mechanism. Tier SLA 给 isolation 量化目标. Cardinality 控制是 production-only deep — 没踩过坑的人不会讲. Multi-window burn rate 是 Google SRE 现代 alerting. Self-serve dashboard + auto-credit 是 customer-facing UX. Billing audit 是 finance / compliance gotcha. Resume hook 用 Black Friday + regulator pass 双 land.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<p><strong>Layer 4 (cardinality)</strong> — 必被追 "How do you bound cardinality at 500 tenants?" → 答: hard cap per metric = top 50 + 5 aggregated bucket. Top 50 by spend (Gold + Silver + top Bronze). Bucket criteria: per-region × per-plan-tier × per-volume-tier (low/med/high) = ~12 buckets covering 450 long-tail. Mimir / Cortex / Thanos 横扩 storage as last resort. Never 500 individual tenant label.</p>
+<p><strong>Layer 5 (multi-window burn rate)</strong> — 追 "Why 14x / 7x / 3x / 1x?" → 答: Google SRE workbook math — error budget = 1 - SLO. Burn rate X means consuming budget X times faster than nominal. 14x in 1h burns 2% of monthly budget (page-worthy). 7x in 6h burns 5% (page). 3x in 1d burns 10% (ticket). 1x in 3d burns 10% (review). Mathematically prevents both fast outage missed + slow leak missed.</p>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>0-3 min: Layer 1+2 (frame + 3 isolation layer)</li><li>3-10 min: Layer 3+4 (tier SLA + cardinality control)</li><li>10-15 min: Layer 5 (multi-window burn rate)</li><li>15-20 min: Layer 6+7 (self-serve dashboard + billing audit)</li><li>20-26 min: Layer 8 BNPL Black Friday case + regulator audit</li><li>26-30 min: Q&amp;A buffer</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>不熟 Mimir/Cortex → "Prometheus 单 instance 死, 用 horizontal-scale TSDB; Mimir / Cortex / Thanos / VictoriaMetrics 都行, 选 cluster vs object-store backend"</li><li>被问 "what if customer demands per-tenant metric on all dimensions" → "explain cardinality + cost; offer top-N + bucket aggregation as default; full per-tenant only for Gold tier as paid feature"</li><li>不熟 WFQ → "Weighted Fair Queue — each tenant has weight (= tier multiplier), queue scheduler picks next request by deficit round-robin so no tenant starves; alternative = stochastic fair queue"</li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>核心心智模型 (1 sentence)</h4>
@@ -146,6 +160,50 @@ Dedup 1h per (tenant × metric)</code></pre>
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/multitenant-monitoring-slas.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`multitenant-monitoring-slas.html`](questions/multitenant-monitoring-slas.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"你 SaaS 服务 500 个 tenant, 1 个 Bronze tenant 突然 100x traffic, 怎么不让它拖垮 Gold tenant SLA, 怎么监控, 怎么 bill?"** 我按这 8 层回答, 不跳序.
+
+### 📐 Multi-tenant SLA Monitoring — 8 层 isolation + observability + billing
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Frame: noisy neighbor 是 multi-tenant 第一敌人 | 30s | 不是 "monitor everything", 是 "isolate first, then observe". 1 个 Bronze 不能拖 Gold — 这是 multi-tenant SaaS 第一原则 | "First — isolation before observation. Noisy neighbor is the primary failure mode…" |
+| 2 | 3 层 isolation | 2 min | (a) **Gateway** token bucket per-tenant (10/s Bronze, 100/s Silver, 1000/s Gold) — fast cheap; (b) **App layer** DB pool partition + Weighted Fair Queue (WFQ) — fair share under contention; (c) **Physical** — Gold gets dedicated infra (cluster / VPC / shard), Bronze shared pool. 3 层 分而治之 | "Three isolation layers — gateway token bucket / app WFQ / physical dedicated for Gold…" |
+| 3 | Tier-based SLA + threshold | 1.5 min | Gold 99.99% availability + p99 200ms latency, Silver 99.9% + 500ms, Bronze 99% + 1s. Error budget per tier (Gold 4 min/month, Silver 43 min/month, Bronze 7h/month). 客户 contract 显式声明 | "Tier SLA — Gold 99.99/200ms / Silver 99.9/500ms / Bronze 99/1s with error budget per tier…" |
+| 4 | Per-tenant SLI + cardinality control | 2 min | Cardinality 是 multi-tenant monitoring 第一陷阱. 500 tenant × 50 metric × 10 label = 250k series Prometheus 顶不住. 我用: (a) top-N tenant 全量 SLI (Gold + Silver + top 20 Bronze by spend), (b) 长尾 Bronze aggregated to bucket ('bronze_low'/'bronze_med'), (c) Mimir / Cortex 横扩 storage, (d) per-tenant only on dimensions that matter (availability + latency + error rate, not 50 random labels) | "Cardinality — top-N tenant full + tail aggregated + Mimir horizontal, never label-explode…" |
+| 5 | Multi-window burn rate alert | 1.5 min | Google SRE multi-window: 1h@14x burn (2% budget in 1h → page), 6h@7x burn (5% in 6h → page), 1d@3x burn (10% in 1d → ticket), 3d@1x burn (10% in 3d → review). 4 window 避免 alert fatigue + 抓 slow leak | "Multi-window burn rate — 1h@14x page / 6h@7x page / 1d@3x ticket / 3d@1x review…" |
+| 6 | Customer self-serve dashboard + auto-credit | 1 min | Per-tenant dashboard (Grafana panel filtered by tenant_id) showing their SLI vs SLA + error budget remaining. SLA breach auto-detect + auto-credit (no manual review for credit < $X) — customer trust signal | "Customer-facing — Grafana per-tenant dashboard + auto-credit on SLA breach for trust…" |
+| 7 | Billing audit 独立 | 1 min | Billing metering 用独立 DB (从可观测 metric 抽), WORM storage 13 month, HMAC-signed event log, monthly reconciliation. 不要用可观测 metric 直接算 bill (compactor 会 drop / sample). 独立 audit trail is regulatory necessity (finance) | "Billing — independent DB + WORM 13 month + HMAC + monthly reconcile, separate from observability metric…" |
+| 8 | Resume hook | 1 min | "Concrete: BNPL platform multi-tenant — 50+ merchant. 3-layer isolation, per-tenant burn rate alert, monthly auto-credit on breach. One Black Friday Bronze merchant 100x traffic, Gold merchant p99 unchanged (gateway tier bucket triggered + WFQ kicked in). Billing audit passed annual financial regulator review" | "Real example — BNPL 50+ merchant, Black Friday 100x Bronze spike no Gold impact, regulator-passed billing audit…" |
+
+### 🎯 为啥按这个序
+
+Frame "isolation before observation" 第一 because 90% 候选人 jump 到 "Prometheus per-tenant label" → cardinality 死. 3 层 isolation 是核心 mechanism. Tier SLA 给 isolation 量化目标. Cardinality 控制是 production-only deep — 没踩过坑的人不会讲. Multi-window burn rate 是 Google SRE 现代 alerting. Self-serve dashboard + auto-credit 是 customer-facing UX. Billing audit 是 finance / compliance gotcha. Resume hook 用 Black Friday + regulator pass 双 land.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (cardinality)** — 必被追 "How do you bound cardinality at 500 tenants?" → 答: hard cap per metric = top 50 + 5 aggregated bucket. Top 50 by spend (Gold + Silver + top Bronze). Bucket criteria: per-region × per-plan-tier × per-volume-tier (low/med/high) = ~12 buckets covering 450 long-tail. Mimir / Cortex / Thanos 横扩 storage as last resort. Never 500 individual tenant label.
+
+**Layer 5 (multi-window burn rate)** — 追 "Why 14x / 7x / 3x / 1x?" → 答: Google SRE workbook math — error budget = 1 - SLO. Burn rate X means consuming budget X times faster than nominal. 14x in 1h burns 2% of monthly budget (page-worthy). 7x in 6h burns 5% (page). 3x in 1d burns 10% (ticket). 1x in 3d burns 10% (review). Mathematically prevents both fast outage missed + slow leak missed.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (frame + 3 isolation layer)
+- 3-10 min: Layer 3+4 (tier SLA + cardinality control)
+- 10-15 min: Layer 5 (multi-window burn rate)
+- 15-20 min: Layer 6+7 (self-serve dashboard + billing audit)
+- 20-26 min: Layer 8 BNPL Black Friday case + regulator audit
+- 26-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不熟 Mimir/Cortex → "Prometheus 单 instance 死, 用 horizontal-scale TSDB; Mimir / Cortex / Thanos / VictoriaMetrics 都行, 选 cluster vs object-store backend"
+- 被问 "what if customer demands per-tenant metric on all dimensions" → "explain cardinality + cost; offer top-N + bucket aggregation as default; full per-tenant only for Gold tier as paid feature"
+- 不熟 WFQ → "Weighted Fair Queue — each tenant has weight (= tier multiplier), queue scheduler picks next request by deficit round-robin so no tenant starves; alternative = stochastic fair queue"
 
 ---
 

@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"你 platform 给客户发 webhook, 客户 endpoint flaky (timeout / 5xx / slow), 你怎么保证 eventual delivery 且不 hammer 客户?"** 我按这 8 层回答, 不跳序.
+
+### 📐 Reliable Webhook — 8 层 delivery + protection
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | At-least-once 哲学声明 | 30s | 不 promise exactly-once (lie). Promise at-least-once + 客户端 idempotent. Provider responsibility = deliver eventually, consumer responsibility = idempotent | "First — exactly-once is fiction at network boundaries. I do at-least-once + idempotent consumer…" |
+| 2 | Idempotency key 双层 | 1.5 min | 每 webhook 带 event_id (UUID v4 or composite tenant_id+resource_id+version). 客户端 dedup 双层: (a) Redis NX SET event_id with TTL 24h (hot path fast O(1)), (b) DB unique index on event_id (cold path durable). Provider also stamp X-Webhook-Id header | "Idempotency key — event_id in body + X-Webhook-Id header, Redis NX + DB unique index dual-layer…" |
+| 3 | Retry policy: exp backoff + jitter | 1.5 min | Exponential backoff base 2s, ±20% jitter (avoid thundering herd), max 7 attempts, 36h window. Attempt schedule: 2s, 4s, 8s, 30s, 5min, 1h, 6h, 24h. After 7 fails → DLQ | "Retry — exponential backoff 2^n with ±20% jitter, 7 attempts, 36h window…" |
+| 4 | Retry budget + per-client backpressure | 2 min | Global retry budget = 20% of new event rate (不让 retry 把 fresh event 挤掉). Per-client backpressure: (a) per-client queue cap 10k events (overflow → DLQ + alert), (b) per-client concurrency cap 10 in-flight, (c) EMA error rate 5xx > 30% over 1 min → circuit breaker half-open, (d) full circuit breaker if 5xx > 70% for 5 min — pause delivery 5 min, notify customer | "Backpressure — retry budget 20% + per-client queue/concurrency/EMA/circuit breaker…" |
+| 5 | DLQ + replay UI | 1.5 min | After 7 fail → DLQ to S3 cold storage 30 day retention. Self-serve replay UI per customer: filter by event_id / date / type, replay single or bulk. Replay re-enters queue, preserves event_id (consumer dedup catches re-replays). Operator audit on bulk replay | "DLQ — S3 cold 30 day, self-serve replay UI per customer, audited bulk replay…" |
+| 6 | Ordering: Kafka per-entity partition | 1.5 min | Within same entity (same user_id / order_id), order matters. Use Kafka partition key = entity_id, single consumer per partition, FIFO within partition. Cross-entity ordering NOT guaranteed — explicit in customer-facing doc | "Ordering — per-entity Kafka partition + single consumer, cross-entity not guaranteed by design…" |
+| 7 | Security: HMAC-SHA256 + replay window | 1 min | X-Signature header = HMAC-SHA256(body, secret). Consumer recompute + constant-time compare. X-Timestamp + reject if > 5 min skew (replay protection). Rotate signing secret quarterly, support 2 active simultaneously during rotation | "Security — HMAC-SHA256 with 5min timestamp window + dual-secret rotation…" |
+| 8 | Resume hook | 1 min | "Concrete: BNPL platform → 50+ merchant webhook for payment events. At-least-once + per-merchant idempotency + Kafka partition by merchant+order. 1 merchant endpoint down 48h, queue 80k event, no loss, automatic replay on recovery. 5 layer 缺一不可 — 之前少 backpressure 一次 cascade 把整个 fleet 拖慢" | "Real example — BNPL 50+ merchant webhook, 48h merchant outage zero loss…" |
+
+### 🎯 为啥按这个序
+
+At-least-once 在第 1 层 set expectation — 不 over-promise. Idempotency key 紧跟是 consumer 责任的合约. Retry policy → backpressure 是 provider 自我保护的 2 层. DLQ + replay 是 "fail visible + customer self-recover" 给客户 dignity. Ordering 单独一层因为 80% 工程师忘了. Security 必须有 (没 HMAC 任何人能 fake). Resume hook 用真实 48h outage 数字 land.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (backpressure)** — 必被追 "Why both retry budget AND per-client backpressure?" → 答: retry budget 防 retry 总量 starve fresh delivery (global health). Per-client backpressure 防 1 个 client 把整个 fleet 拖死 (noisy neighbor). 两者 attack 不同 failure mode — global congestion vs single-tenant noise. EMA decay 0.9 让 transient spike 不立刻 circuit-break.
+
+**Layer 6 (ordering)** — 追 "What if customer needs cross-entity order?" → 答: hard problem. 3 选 1: (a) global single-partition (low throughput, easy order), (b) vector clock + reorder buffer on consumer (complex), (c) document as "best effort" and recommend customer reconcile via periodic snapshot API. 大多数 case (c) is right answer — webhook is event stream, not ordered log.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 0-3 min: Layer 1+2 (at-least-once + idempotency dual-layer)
+- 3-10 min: Layer 3+4 (retry exp+jitter + backpressure)
+- 10-17 min: Layer 5+6 (DLQ replay + Kafka ordering)
+- 17-22 min: Layer 7 (HMAC + replay window)
+- 22-27 min: Layer 8 BNPL 50-merchant 48h outage
+- 27-30 min: Q&A buffer
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 不熟 HMAC code → "constant-time compare via hmac.compare_digest() in Python, never == on bytes (timing attack); SHA256 not MD5"
+- 被问 "what if Redis dies during dedup" → "DB unique constraint is the floor; Redis is fast path. Worst case is duplicate processing if both layers fail, but consumer logic should still be idempotent (final unique key insert)"
+- 客户 endpoint 5 min latency → "we don't block our queue worker, we async fire-and-monitor with 30s connect + 60s read timeout; long-poll endpoint is anti-pattern, reject in customer onboarding doc"
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

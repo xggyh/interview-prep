@@ -6,6 +6,50 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Customer's ERP has no APIs — how do you integrate?"**, 我按这 8 层回答, 不跳序. 这题考的是 **integration pragmatism + velocity-of-value, 不是 "最优技术方案"**.
+
+### 📐 Legacy ERP Integration — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 (literal) |
+|---|---|---|---|---|
+| 1 | Clarify before solving | 1 min | 5 questions: **which ERP (SAP R/3? NetSuite? Mainframe?)** \| read or write? \| latency budget (real-time vs daily)? \| do they have BI team already exporting? \| who owns the system internally? | "ERP integration scope changes 10x depending on read/write and customer-IT readiness. Five questions..." |
+| 2 | "No API" interrogation | 2 min | "No API" 通常是错的. 6 种 hidden integration surface: **BAPI/RFC (SAP), iDOC, JCo/JCA, BI extract, DB replica, COBOL copybook**. 先 audit 这 6 种, 80% case 有至少 1 个可用 | "I push back on 'no API'. Six common hidden integration surfaces. Day 1 is audit, not architecture..." |
+| 3 | Piggyback discovery — Plan A | 3 min | **第一动作: 找 BI/Analytics team**. 80% case 已经有 CSV/Parquet daily export 到 Snowflake/BigQuery. **Plan A = piggyback BI export, ship 70% value in 1 week**. 没人会反对 read-only, 因为 BI team 已经有 audit/permission | "Plan A is always piggyback BI. They've solved compliance, they've solved scheduling. We just consume their export..." |
+| 4 | 6 integration patterns ranked | 4 min | 排序: **(1) BI piggyback (1 week, read-only)** → **(2) File drop SFTP (2 weeks, daily batch)** → **(3) DB read replica (4 weeks, near-real-time read)** → **(4) CDC Debezium (6 weeks, real-time read)** → **(5) ESB/message bus (8 weeks, bi-directional)** → **(6) BAPI/RFC write-back (12 weeks, transactional)**. **Phase ramp, 不要 jump 到 Pattern 6** | "Six patterns, ordered by time-to-first-value. We ramp through them. Each one ships before the next starts..." |
+| 5 | Anti-pattern: screen-scrape / build-new-API | 2 min | **绝对避免**: (a) screen scraping (brittle, compliance nightmare), (b) "let us build a new REST layer for SAP" (12 month project, customer-IT will hate you). **唯一例外**: customer-IT 主动要求并提供资源 | "Two anti-patterns kill FDE engagements. Screen scrape and net-new API layer. Here's why I won't propose either..." |
+| 6 | Resume bridge — TikTok 7 markets | 2 min | "我做 TikTok PayLater 横跨 7 markets. **每个 market 一个本地 partner system**, 没两个一样. 我们的 stack: BI piggyback (Indonesia bank), SFTP (Malaysia merchant), CDC (Singapore core ledger), BAPI (Thailand). **Same playbook 这道题适用**" | "I lived 7 versions of this — TikTok PayLater, 7 markets, every one a different legacy. The patterns are the same..." |
+| 7 | Failure modes + rollback | 2 min | 5 failure modes: **(a) BI export schema drift (no contract)** → **(b) SFTP password rotation broke job** → **(c) DB replica lag spike (3hr)** → **(d) CDC tombstone delete missed** → **(e) BAPI deadlock during month-end close**. 每个对应 mitigation. **Rollback strategy**: always keep file-drop fallback even after CDC | "Every pattern has a failure mode. I'd run the previous pattern as fallback for 60 days after upgrading..." |
+| 8 | Politics reframe | 1 min | "FDE 不是 buy 集成方案, 是 sell **velocity** to customer's CIO. CIO 怕的是: (a) 我们改他的 production ERP, (b) 我们 ownership 不清. Plan A (BI piggyback) 解决两个 fear. **每个 phase ramp 都先解决一个新 fear**" | "ERP integration is 60% politics. The CIO's fear is the constraint, not the technology..." |
+
+### 🎯 为啥按这个序
+
+**先 interrogate "no API", 再 piggyback, 再 phase ramp** — 因为 80% candidates 跳过 interrogation 直接选 Pattern 4-5, 结果 8 周才能 ship 第一个 value. **Velocity-of-value > technical elegance**.
+
+Plan A (piggyback BI) 是这题的 **FDE 区分项** — ML researcher 会 propose 一个新 integration layer, FDE 知道 BI team 已经做过.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (pattern ranking)**: 面试官会问 "为啥不直接上 CDC?" → 答 "CDC 需要 customer-IT 配合 enable Debezium connector on production DB. 这是 4 周的 trust-building 才能拿到. 我先用 BI piggyback ship value, 同时申请 CDC, 4 周后切换"
+- **Layer 5 (anti-pattern)**: 面试官会问 "如果 customer 坚持要 screen-scrape 怎么办?" → 答 "我会写一页 risk slide: (i) UI 改动会破坏, (ii) compliance audit log 不够, (iii) capacity limits. 然后 propose Plan A 作为 alternative. 如果 customer 仍坚持, deal-level escalation"
+
+### ⏱ 时间压缩版 (30 min round)
+
+- 4 min: clarify + interrogate "no API" (Layer 1-2)
+- 5 min: Plan A piggyback (Layer 3)
+- 8 min: 6 patterns ranked (Layer 4, 重点)
+- 5 min: anti-pattern + resume bridge (Layer 5-6)
+- 3 min: failure modes + politics (Layer 7-8)
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 卡 pattern → pivot to **"Phase ramp, 第一周 BI piggyback"** — 永远 fallback 到 Plan A
+- 卡 SAP-specific → pivot to **"我做过 BAPI / iDOC at TikTok PayLater Thailand market"**
+- 卡 politics → pivot to **"60% 政治, CIO fear is the constraint"** 一句话
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

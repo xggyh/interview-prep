@@ -43,6 +43,19 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/gfde-t2-overview.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/gfde-t2-overview.html"><code>gfde-t2-overview.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"Walk me through how you'd design RAG / context management for an agent"</strong> (T2 开放全景题), 我按这 8 层回答, 不跳序.</p></blockquote>
+<h4>📐 RAG / Context Management 全景 — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Reframe: 不是 "embedding + 向量库"</td><td>0-2 min</td><td>2022 RAG = "chunk → embed → cosine top-K". 2026 production RAG = 7-step pipeline. 直接砍掉 baseline view, 拉到 staff level.</td><td>"Before diving — one reframe. The 2022 textbook RAG (chunk-embed-cosine) is now just a baseline. 2026 production RAG is a 7-step pipeline; let me draw it."</td></tr><tr><td>2</td><td>Clarify 5 维</td><td>2-5 min</td><td>客户数据规模 (1k docs / 1M / 10M)? Update frequency (静态 vs 实时)? Latency budget (chat 5s, batch 30s)? 多租户隔离? 文档类型 (prose / tabular / code / mixed)?</td><td>"5 clarifications first — data scale, update frequency, latency budget, tenancy isolation, document types."</td></tr><tr><td>3</td><td>3-layer mental model</td><td>5-9 min</td><td><strong>Knowledge boundary</strong> (LLM cutoff 之后 + private = retrieval) / <strong>Context boundary</strong> (fits in 2M 也要 RAG — cost / latency / quality drop / 隔离) / <strong>Trust boundary</strong> (retrieved 是 untrusted, ground in retrieved + resist injection)</td><td>"RAG operates at 3 mental layers — knowledge, context, trust. Long-context doesn't kill any of them; let me walk through why."</td></tr><tr><td>4</td><td>7-step online pipeline</td><td>9-20 min</td><td>Query understanding (rewrite + intent) → Retrieval routing (skip / SQL / dense / sparse / graph / tool) → Multi-source parallel retrieval → Rerank (RRF + cross-encoder + LLM-as-rerank) → Context assembly (token budget + Lost-in-middle 排序) → Generation with citations → Post-eval (faithfulness, thumbs)</td><td>"Now the online pipeline — 7 steps. Each step is a separate design choice and a separate FDE surface area. Let me trace one query through."</td></tr><tr><td>5</td><td>6 sub-topic map</td><td>20-26 min</td><td>T2.1 Hybrid Search (dense+sparse+RRF+rerank) / T2.2 Chunking (per-doc-type strategy + late chunking) / T2.3 Context Window Mgmt (sliding/summarize/hierarchical/RAG-on-history) / T2.4 Tool Output→Prompt (XML wrap + provenance) / T2.5 Reranking (cross-encoder + cache) / T2.6 Long-context vs RAG (hybrid is winning)</td><td>"RAG splits into 6 sub-topics. Let me give you the 1-paragraph version of each so you can zoom in wherever interests you."</td></tr><tr><td>6</td><td>Offline indexing pipeline</td><td>26-32 min</td><td>Source ingest (crawler/DB/S3/Confluence) → Parse (PDF: LlamaParse, HTML: trafilatura) → Chunk (recursive/semantic/late) → Embed (text-embed-3 / voyage-3 / cohere-v4 / gemini-embed-1) → Index (Pinecone / OpenSearch BM25 / Neo4j graph). Refresh strategy: incremental + version control</td><td>"The online pipeline is half the story. Offline indexing is the other — let me walk through ingest → parse → chunk → embed → index and refresh strategy."</td></tr><tr><td>7</td><td>2026 hot trends</td><td>32-40 min</td><td>(1) Late chunking (Jina v3 / Cohere v4) - embed full doc then chunk, 保 long-range context (2) GraphRAG for relation queries (3) LLM-as-rerank with Claude/Gemini scoring (4) Adaptive retrieval (LLM 决定要不要 retrieve) (5) Long-context + RAG hybrid (5K top-K → 200K window) (6) Multi-modal retrieval (image + text + table)</td><td>"Industry trends FDE 必懂 — let me hit 6: late chunking, GraphRAG, LLM-as-rerank, adaptive retrieval, long-context + RAG hybrid, multi-modal."</td></tr><tr><td>8</td><td>Connect + resume hooks</td><td>40-50 min</td><td>BNPL chatbot (RAG hybrid + intent routing, recall 60%→90%). ConvFinQA (multi-hop reasoning + ablation methodology, why GraphRAG helps). Voice agent RAG-on-history (用户上次问什么 retrieval-able)</td><td>"Resume hooks — BNPL chatbot hybrid search 60→90%, ConvFinQA multi-hop ablation, voice agent RAG-on-history. Let me close with one specific story."</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p>T2 全景题最容易死法是「上来讲 embedding 怎么算余弦」— 2022 demo 视角. <strong>Reframe (Layer 1) 直接定调</strong>: "我把 RAG 当 7-step pipeline 看, 不当 vector DB 看", 这一句把 leveling 从 L4 推到 L5. Mental model (3) 在 clarify 之后讲是因为它定的是问题框架. 7-step pipeline (4) 是骨架, 6 sub-topic (5) 是分支. Offline (6) 必须讲, 80% 候选人只讲 online 部分, 你讲 offline 立刻显得 production. 2026 trends (7) 是 FDE 加分必讲 — late chunking / GraphRAG / LLM-as-rerank 三个词出来面试官就知道你 read 2024-25 papers. Resume close (8) 用 BNPL 60→90% 数字最有说服力.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<ul><li><strong>Layer 4 (pipeline)</strong>: 面试官 80% 会 zoom 到 Step 4 Reranking 或 Step 5 Context Assembly. 准备好 RRF k=60 default 和 Lost-in-middle papers (Liu et al 2023).</li><li><strong>Layer 7 (hot trends)</strong>: "Late chunking 是什么?" → 准备好 Jina v3 paper 一句话总结 (embed full doc → chunk embedding, 保留 cross-chunk context).</li><li><strong>Layer 5 (6 sub-topic)</strong>: 面试官选其中 1 个深问 → 准备每个 sub-topic 10 分钟独立 deep-dive 模板 (见 T2.1-T2.6 单独 review 页).</li></ul>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ul><li>Layer 1 (reframe) 1 min</li><li>Layer 2 (clarify) 2 min</li><li>Layer 3 (mental model) 跳过 / 压到 1 min, 一句 "3 个 boundary"</li><li>Layer 4 (7-step pipeline) 8 min — 必讲, 这是骨架</li><li>Layer 5 (6 sub-topic) 4 min, 每个 30 秒</li><li>Layer 6 (offline) 4 min — 必讲, 区分 production vs demo</li><li>Layer 7 (hot trends) 5 min — 必讲, 选 3 个 (late chunking + LLM-as-rerank + long-context hybrid)</li><li>Layer 8 (connect) 2 min</li></ul>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ul><li>忘了 7-step 完整顺序 → 退回讲「<strong>3 个核心 stage: Retrieval (multi-source parallel) + Rerank (RRF + cross-encoder) + Generation (citation + faithfulness check). 这 3 个能 cover 80%</strong>」</li><li>被追问 embedding 模型选哪个 → 退回讲「<strong>text-embed-3-large / voyage-3 / cohere-v4 / gemini-embed-1 are 2026 mainstream. Benchmark on 自己 domain (MTEB 不一定 reflect)</strong>」</li><li>忘了 RRF 公式 → 退回讲「<strong>核心 idea: 每 source 排名转倒数 1/(k+rank), k=60 default, sum across sources. 不需要 normalize score, rank-invariant</strong>」</li><li>被追问 long-context 替代 RAG → 退回「<strong>Partial — fits + 少用户 + 非敏感 = long-context 简单胜. 但 cost / latency / 多租户 / knowledge update 还需 RAG. Hybrid (RAG top-K → 200K window) is winning pattern</strong>」</li><li>不熟某 sub-topic → 主动「<strong>这正好连着 T2.X, 我可以借用吗</strong>」, 把控制权拉回</li></ul>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -163,6 +176,54 @@ P  Post-eval              (faithfulness / thumbs / slice / regression)</code></p
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t2-overview.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`gfde-t2-overview.html`](questions/gfde-t2-overview.html)
+
+---
+
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Walk me through how you'd design RAG / context management for an agent"** (T2 开放全景题), 我按这 8 层回答, 不跳序.
+
+### 📐 RAG / Context Management 全景 — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Reframe: 不是 "embedding + 向量库" | 0-2 min | 2022 RAG = "chunk → embed → cosine top-K". 2026 production RAG = 7-step pipeline. 直接砍掉 baseline view, 拉到 staff level. | "Before diving — one reframe. The 2022 textbook RAG (chunk-embed-cosine) is now just a baseline. 2026 production RAG is a 7-step pipeline; let me draw it." |
+| 2 | Clarify 5 维 | 2-5 min | 客户数据规模 (1k docs / 1M / 10M)? Update frequency (静态 vs 实时)? Latency budget (chat 5s, batch 30s)? 多租户隔离? 文档类型 (prose / tabular / code / mixed)? | "5 clarifications first — data scale, update frequency, latency budget, tenancy isolation, document types." |
+| 3 | 3-layer mental model | 5-9 min | **Knowledge boundary** (LLM cutoff 之后 + private = retrieval) / **Context boundary** (fits in 2M 也要 RAG — cost / latency / quality drop / 隔离) / **Trust boundary** (retrieved 是 untrusted, ground in retrieved + resist injection) | "RAG operates at 3 mental layers — knowledge, context, trust. Long-context doesn't kill any of them; let me walk through why." |
+| 4 | 7-step online pipeline | 9-20 min | Query understanding (rewrite + intent) → Retrieval routing (skip / SQL / dense / sparse / graph / tool) → Multi-source parallel retrieval → Rerank (RRF + cross-encoder + LLM-as-rerank) → Context assembly (token budget + Lost-in-middle 排序) → Generation with citations → Post-eval (faithfulness, thumbs) | "Now the online pipeline — 7 steps. Each step is a separate design choice and a separate FDE surface area. Let me trace one query through." |
+| 5 | 6 sub-topic map | 20-26 min | T2.1 Hybrid Search (dense+sparse+RRF+rerank) / T2.2 Chunking (per-doc-type strategy + late chunking) / T2.3 Context Window Mgmt (sliding/summarize/hierarchical/RAG-on-history) / T2.4 Tool Output→Prompt (XML wrap + provenance) / T2.5 Reranking (cross-encoder + cache) / T2.6 Long-context vs RAG (hybrid is winning) | "RAG splits into 6 sub-topics. Let me give you the 1-paragraph version of each so you can zoom in wherever interests you." |
+| 6 | Offline indexing pipeline | 26-32 min | Source ingest (crawler/DB/S3/Confluence) → Parse (PDF: LlamaParse, HTML: trafilatura) → Chunk (recursive/semantic/late) → Embed (text-embed-3 / voyage-3 / cohere-v4 / gemini-embed-1) → Index (Pinecone / OpenSearch BM25 / Neo4j graph). Refresh strategy: incremental + version control | "The online pipeline is half the story. Offline indexing is the other — let me walk through ingest → parse → chunk → embed → index and refresh strategy." |
+| 7 | 2026 hot trends | 32-40 min | (1) Late chunking (Jina v3 / Cohere v4) - embed full doc then chunk, 保 long-range context (2) GraphRAG for relation queries (3) LLM-as-rerank with Claude/Gemini scoring (4) Adaptive retrieval (LLM 决定要不要 retrieve) (5) Long-context + RAG hybrid (5K top-K → 200K window) (6) Multi-modal retrieval (image + text + table) | "Industry trends FDE 必懂 — let me hit 6: late chunking, GraphRAG, LLM-as-rerank, adaptive retrieval, long-context + RAG hybrid, multi-modal." |
+| 8 | Connect + resume hooks | 40-50 min | BNPL chatbot (RAG hybrid + intent routing, recall 60%→90%). ConvFinQA (multi-hop reasoning + ablation methodology, why GraphRAG helps). Voice agent RAG-on-history (用户上次问什么 retrieval-able) | "Resume hooks — BNPL chatbot hybrid search 60→90%, ConvFinQA multi-hop ablation, voice agent RAG-on-history. Let me close with one specific story." |
+
+### 🎯 为啥按这个序
+
+T2 全景题最容易死法是「上来讲 embedding 怎么算余弦」— 2022 demo 视角. **Reframe (Layer 1) 直接定调**: "我把 RAG 当 7-step pipeline 看, 不当 vector DB 看", 这一句把 leveling 从 L4 推到 L5. Mental model (3) 在 clarify 之后讲是因为它定的是问题框架. 7-step pipeline (4) 是骨架, 6 sub-topic (5) 是分支. Offline (6) 必须讲, 80% 候选人只讲 online 部分, 你讲 offline 立刻显得 production. 2026 trends (7) 是 FDE 加分必讲 — late chunking / GraphRAG / LLM-as-rerank 三个词出来面试官就知道你 read 2024-25 papers. Resume close (8) 用 BNPL 60→90% 数字最有说服力.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 4 (pipeline)**: 面试官 80% 会 zoom 到 Step 4 Reranking 或 Step 5 Context Assembly. 准备好 RRF k=60 default 和 Lost-in-middle papers (Liu et al 2023).
+- **Layer 7 (hot trends)**: "Late chunking 是什么?" → 准备好 Jina v3 paper 一句话总结 (embed full doc → chunk embedding, 保留 cross-chunk context).
+- **Layer 5 (6 sub-topic)**: 面试官选其中 1 个深问 → 准备每个 sub-topic 10 分钟独立 deep-dive 模板 (见 T2.1-T2.6 单独 review 页).
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (reframe) 1 min
+- Layer 2 (clarify) 2 min
+- Layer 3 (mental model) 跳过 / 压到 1 min, 一句 "3 个 boundary"
+- Layer 4 (7-step pipeline) 8 min — 必讲, 这是骨架
+- Layer 5 (6 sub-topic) 4 min, 每个 30 秒
+- Layer 6 (offline) 4 min — 必讲, 区分 production vs demo
+- Layer 7 (hot trends) 5 min — 必讲, 选 3 个 (late chunking + LLM-as-rerank + long-context hybrid)
+- Layer 8 (connect) 2 min
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 7-step 完整顺序 → 退回讲「**3 个核心 stage: Retrieval (multi-source parallel) + Rerank (RRF + cross-encoder) + Generation (citation + faithfulness check). 这 3 个能 cover 80%**」
+- 被追问 embedding 模型选哪个 → 退回讲「**text-embed-3-large / voyage-3 / cohere-v4 / gemini-embed-1 are 2026 mainstream. Benchmark on 自己 domain (MTEB 不一定 reflect)**」
+- 忘了 RRF 公式 → 退回讲「**核心 idea: 每 source 排名转倒数 1/(k+rank), k=60 default, sum across sources. 不需要 normalize score, rank-invariant**」
+- 被追问 long-context 替代 RAG → 退回「**Partial — fits + 少用户 + 非敏感 = long-context 简单胜. 但 cost / latency / 多租户 / knowledge update 还需 RAG. Hybrid (RAG top-K → 200K window) is winning pattern**」
+- 不熟某 sub-topic → 主动「**这正好连着 T2.X, 我可以借用吗**」, 把控制权拉回
 
 ---
 

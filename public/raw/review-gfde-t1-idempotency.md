@@ -6,6 +6,48 @@
 
 ---
 
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"Design an idempotent tool interface for `transfer_funds` that may be retried"**, 我按这 8 层回答, 不跳序.
+
+### 📐 Idempotent transfer_funds — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | Clarify 5 维 | 0-3 min | 谁生 key (LLM/runtime/server)? Dedup window 多长? Bank API 有没有 idem header? Double charge 是 UX 还是 compliance 事故? Multi-tenant? | "Before designing, 5 quick clarifications — key source, dedup window, downstream idem support, blast radius of double-execute, tenancy model." |
+| 2 | 画灾难场景 | 3-7 min | T=0 transfer, T=5 timeout, T=5 retry, T=6 bank 双 commit → A 扣 200, 客诉 P0. 列 7 个 retry 来源 (network, http client, runtime, LLM re-issue, user refresh, parallel agent, DR replay) | "Let me first show the disaster — without idempotency, here's the timeline that double-charges the customer." |
+| 3 | 定义术语 | 7-10 min | Idempotency = f(f(x))=f(x), side-effect 不是 return. At-most-once vs at-least-once vs exactly-once (Two Generals 不可达, 用 at-least-once + idem consumer = 业务层 exactly-once) | "Quick term grounding so we share vocabulary — idempotency, at-most/least/exactly-once, dedup window." |
+| 4 | Key generation (Layer 1) | 10-18 min | Runtime 生成, 不让 LLM 生 (sampling 不确定性). Composition: `blake2b(tenant + session + tool + canonical(args))`. 强调 canonical: sort_keys + Decimal precision + str normalize. 反面教材: 含 timestamp/nonce = 等于没 dedup | "Layer 1 — key generation. Owned by the agent runtime, not the model and not the server. Let me show why and the canonical hash recipe." |
+| 5 | 3-state machine + race (Layer 2) | 18-28 min | `in_flight / completed / failed` 三态. SETNX atomic 拿锁解决 TOCTOU. In_flight 处理: poll 200ms / Pub/Sub wake / 409 + Retry-After (3 选 1, 我推 Pub/Sub). Worker crash → heartbeat + 重 query downstream | "Layer 2 — state machine. Single-bit 'seen' is broken under concurrency; we need 3 states. The atomic primitive is SETNX." |
+| 6 | TTL + storage tier (Layer 3) | 28-35 min | Redis hot 24h + DB warm 30d + bank ledger permanent. 数值经验: transport retry 60s, LLM re-issue 5min, cross-session 24h, ledger 永久. 长 TTL 风险: 合法新意图被误判 dup → `force_new=true` flag | "Layer 3 — TTL and storage tier. Single Redis isn't enough; we want 3 tiers backed by the bank ledger as ultimate source of truth." |
+| 7 | Failure modes + cross-vendor (Layer 4-5) | 35-42 min | Redis down: destructive=fail closed, write=fall to DB, read=skip dedup. 跨 vendor 4 pattern: A native pass-through (Stripe), B wrapper full ownership, C check-then-execute via query API + lock, D best-effort + reconcile. Decision tree | "Layer 4 — what breaks. Redis down policy varies by tool safety class. Layer 5 — half of downstream APIs don't support idem; here's the 4-pattern decision tree." |
+| 8 | Connect + 加分项 | 42-50 min | Voice agent 7-market 实战: Indonesia GoPay 没 idem → Pattern C; Brazil Mercado Pago 有 idem → Pattern A; SMS dedup 2% hit rate, double-charge 从 3/month 降到 0. Reconciliation job + audit + property test + monitoring | "Resume hook — I built this exact 5-layer on the PayLater voice agent across 7 markets. Let me close with metrics and production hardening." |
+
+### 🎯 为啥按这个序
+
+先画**灾难 timeline** (Layer 2) 而不是直接讲 key generation, 是因为面试官如果不在 production tool team, 听 "idempotency key generation" 会觉得抽象 — 先用 "A 扣了 200, 客诉" 把 stake 拉满. 然后 4-5-6-7 是依赖链: key 不严谨 → state machine 没法工作 → TTL 长短都救不了 → failure mode 没 policy → vendor 没法兜. 最后 Connect 用 7-market 实战把抽象 framework 锚到「我真在 prod 跑过」.
+
+### 🔥 哪一层最容易被追问 deeper
+
+- **Layer 5 (state machine)**: "Two concurrent retries, both see Redis empty — race?" → 必须秒答 SETNX atomic + nx=True + 短 poll/Pub-Sub wait. 准备 redlock 讨论 (Martin Kleppmann clock-drift 质疑) 和 fencing token 兜底.
+- **Layer 7 (cross-vendor)**: "Bank API doesn't accept idempotency-key header, what do you do?" → 决策树秒答 Pattern C: check-then-execute via `bank.search(external_ref=key)` + distributed lock 串行化, 不行就 Pattern D + nightly reconcile.
+
+### ⏱ 时间压缩版 (30 min round)
+
+- Layer 1 (clarify) 压到 2 min, 只问 key source + downstream idem + blast radius
+- Layer 2 (灾难) + Layer 3 (术语) 合并成 5 min, 一句 timeline + 一句 at-least-once vs exactly-once
+- Layer 4-7 是必讲核心, 各 4-5 min
+- Layer 8 (connect) 压到 2 min, 只 quote 一句 "voice agent 7 markets, Indonesia GoPay 用 Pattern C, dropped double-charge from 3/month to 0"
+
+### 🆘 卡壳兜底 (针对这题)
+
+- 忘了 SETNX 具体语法 → 退回讲「**atomic compare-and-set 原语, Redis 叫 SET NX, Postgres 叫 INSERT ON CONFLICT DO NOTHING, ZK 叫 create ephemeral**」, 抽象层面表达正确即可
+- 忘了 Pub/Sub 怎么写 → 退回讲「**3 选 1: 短 poll / async pub-sub / 立返 409 让 client 自己 retry**, 都能解, 各有 trade-off」
+- 忘了 cross-vendor 4 pattern → 退回讲「**核心 insight: 下游不 dedup 时, wrapper 是 source of truth, 兜底是 nightly reconciliation 对账**」, 不一定要把 4 个 pattern 都背出来
+- 面试官追问 exactly-once → 退回 Two Generals + 「**at-least-once + idempotent consumer = 业务层 exactly-once**」一句话定调, 不要陷入分布式理论 rabbit hole
+
+---
+
 ## Extended Cheat Sheet (能背诵·含全量知识)
 
 > 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.

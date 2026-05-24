@@ -5,6 +5,46 @@
 **原页面**: [`gfde-t3-mcp-api-proxy.html`](questions/gfde-t3-mcp-api-proxy.html)
 
 ---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"customer has 50 internal microservices, design the tool abstraction layer. Why is MCP relevant?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 MCP / API Proxy — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 灾难场景对比 | 1 min | 不抽象 → 25K token system prompt + 30% tool 误选 + 月费 $100K. 这是 anti-pattern 起点 | "Without abstraction, the naive approach blows up in 3 ways — token cost, tool selection error, and IAM..." |
+| 2 | MCP 定义 + 3 原语 | 90s | Anthropic 2024 开源, JSON-RPC over stdio/HTTP/SSE. 三原语: **Resources** (read data) / **Tools** (side-effect actions) / **Prompts** (template). 不是 function-calling 的同义词 | "MCP is Anthropic's 2024 standard — vendor-neutral JSON-RPC with 3 primitives: Resources, Tools, Prompts. Function-calling 只覆盖 Tools 一类..." |
+| 3 | Gateway 6 责任 | 3 min | (1) Discovery (RAG over tool catalog) (2) Auth + OBO token exchange (3) Rate limit per tool/tenant (4) Observability trace propagate (5) Result cache (6) Schema versioning | "Gateway 不只是 proxy — 它承担 6 个明确责任, 我逐个讲..." |
+| 4 | 500-tool discovery | 3 min | LLM context 装不下 500 tool. RAG over tool descriptions: embed tool description → top-K=5 tool 进 system prompt → 92% selection accuracy (Internal Agent Platform 实测) | "At 500 tools, 你不能全 dump 到 prompt — 用 RAG over tool catalog, top-5 进 context, 92% accuracy..." |
+| 5 | OBO auth flow | 2 min | OAuth 2.0 Token Exchange (RFC 8693). User → agent → gateway 用 user JWT 换 service-specific token, scope ≤ user. **Agent 永远不能拥有比 user 更高权限** 是 enterprise 红线 | "OBO 是 enterprise 红线 — agent 拿 user JWT 换 service token, scope strictly ≤ user. RFC 8693 Token Exchange..." |
+| 6 | Legacy integration | 90s | 不是所有 service 都 expose REST. SOAP / 数据库直查 / 屏幕爬 (Playwright) / 文件落地 (S3 watcher). MCP server 是 adapter, 把这些封装统一 | "Not all 50 services 是 REST — SOAP / DB direct / screen scrape via Playwright / file drop. MCP server is the adapter layer..." |
+| 7 | Schema versioning | 90s | Customer API 季度升级. MCP server 持 multi-version schema (`tool@v1`, `tool@v2`), gateway 支持 canary route. Eval gate: 新 schema 对 100 个 historical task 跑通才推 | "Schema drift — quarterly upgrade is real. MCP server 持 multi-version, canary 10% traffic, eval gate before full rollout..." |
+| 8 | 简历 resume hook | 90s | "Internal Agent Platform (ByteDance) — 50+ internal tool MCP gateway, OBO + RAG-over-tools 92% selection accuracy, schema versioning canary 10%" | "On ByteDance Internal Agent Platform, we built exactly this — 50+ tool MCP gateway with OBO..." |
+
+### 🎯 为啥按这个序
+
+灾难场景开场把 stakes 拉高 (月费 $100K), 让面试官知道你见过 pain. MCP 3 原语必须先讲清楚 — 多数候选人把 MCP 当 function-calling 同义词, 这是初级失误. Gateway 6 责任是这题的骨架, 6 个全讲完才算覆盖. 500-tool discovery 是 staff-level signal (普通候选人停在 50 tool). OBO 是 enterprise 红线, 主动提说明你做过 SOC2 / 金融客户. Legacy integration 显示你不只懂理想 case. Schema versioning 是 long-term ops mindset. 简历 hook 最后 anchor.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (RAG over tools)** — 追问 "怎么 embed tool description?". 回答: tool name + 1 句话描述 + 5 个 example query 拼接 → text-embedding-3-large → Pinecone 索引. Query 来时 retrieve top-5, 加 LLM-rerank precision boost. **Layer 5 (OBO)** 次之, 问 "token 怎么传?" — gateway 在 request header 验 user JWT → 调 IdP token exchange endpoint (Okta / Auth0) → 拿 service-specific access token (scope claim 限制) → 注入到 downstream call header. Token 不进 LLM prompt, 不进 log.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 灾难 (1 min) + MCP 3 原语 (90s)
+2. Gateway 6 责任 (4 min)
+3. RAG over 500 tools (3 min)
+4. OBO + schema versioning (3 min)
+5. 简历: Internal Agent Platform (2 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "MCP vs OpenAI function calling 实质差异"**: function calling 是单一 LLM vendor 的 schema 格式, MCP 是 protocol — 跨 vendor + 跨 client (Claude Desktop / Cursor / 你自己 SDK 都能连同一 MCP server)
+2. **被问 "MCP 1.0 缺什么"**: rate-limit / quota / multi-tenant 不在 spec, 必须 gateway 层补; streaming tool response 早期版本支持差; binary content 比较弱
+3. **被问 "什么时候 NOT 用 MCP"**: (1) 只有 1-2 个 tool, 直接 function calling 简单; (2) 极低延迟 (< 10ms) tool, MCP JSON-RPC overhead 10-50ms 是 deal-breaker; (3) tool 是 stateful long-running session 而不是 RPC call
+
+---
 
 ## Extended Cheat Sheet (能背诵·含全量知识)
 

@@ -43,6 +43,19 @@
 <blockquote><p>这是 <strong>复习速查页</strong>, 抽自 <a href="questions/gfde-t3-mcp-api-proxy.html">原全量教学页</a>. 10-15 min 通读, 含本主题的全量知识压缩版.</p></blockquote>
 <p><strong>原页面</strong>: <a href="questions/gfde-t3-mcp-api-proxy.html"><code>gfde-t3-mcp-api-proxy.html</code></a></p>
 <hr />
+<h3>🎤 答题逻辑 (Response Architecture)</h3>
+<blockquote><p>被问到 <strong>"customer has 50 internal microservices, design the tool abstraction layer. Why is MCP relevant?"</strong>, 我按这 8 层回答, 不跳序.</p></blockquote>
+<h4>📐 MCP / API Proxy — 8 层结构</h4>
+<table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>灾难场景对比</td><td>1 min</td><td>不抽象 → 25K token system prompt + 30% tool 误选 + 月费 $100K. 这是 anti-pattern 起点</td><td>"Without abstraction, the naive approach blows up in 3 ways — token cost, tool selection error, and IAM..."</td></tr><tr><td>2</td><td>MCP 定义 + 3 原语</td><td>90s</td><td>Anthropic 2024 开源, JSON-RPC over stdio/HTTP/SSE. 三原语: <strong>Resources</strong> (read data) / <strong>Tools</strong> (side-effect actions) / <strong>Prompts</strong> (template). 不是 function-calling 的同义词</td><td>"MCP is Anthropic's 2024 standard — vendor-neutral JSON-RPC with 3 primitives: Resources, Tools, Prompts. Function-calling 只覆盖 Tools 一类..."</td></tr><tr><td>3</td><td>Gateway 6 责任</td><td>3 min</td><td>(1) Discovery (RAG over tool catalog) (2) Auth + OBO token exchange (3) Rate limit per tool/tenant (4) Observability trace propagate (5) Result cache (6) Schema versioning</td><td>"Gateway 不只是 proxy — 它承担 6 个明确责任, 我逐个讲..."</td></tr><tr><td>4</td><td>500-tool discovery</td><td>3 min</td><td>LLM context 装不下 500 tool. RAG over tool descriptions: embed tool description → top-K=5 tool 进 system prompt → 92% selection accuracy (Internal Agent Platform 实测)</td><td>"At 500 tools, 你不能全 dump 到 prompt — 用 RAG over tool catalog, top-5 进 context, 92% accuracy..."</td></tr><tr><td>5</td><td>OBO auth flow</td><td>2 min</td><td>OAuth 2.0 Token Exchange (RFC 8693). User → agent → gateway 用 user JWT 换 service-specific token, scope ≤ user. <strong>Agent 永远不能拥有比 user 更高权限</strong> 是 enterprise 红线</td><td>"OBO 是 enterprise 红线 — agent 拿 user JWT 换 service token, scope strictly ≤ user. RFC 8693 Token Exchange..."</td></tr><tr><td>6</td><td>Legacy integration</td><td>90s</td><td>不是所有 service 都 expose REST. SOAP / 数据库直查 / 屏幕爬 (Playwright) / 文件落地 (S3 watcher). MCP server 是 adapter, 把这些封装统一</td><td>"Not all 50 services 是 REST — SOAP / DB direct / screen scrape via Playwright / file drop. MCP server is the adapter layer..."</td></tr><tr><td>7</td><td>Schema versioning</td><td>90s</td><td>Customer API 季度升级. MCP server 持 multi-version schema (<code>tool@v1</code>, <code>tool@v2</code>), gateway 支持 canary route. Eval gate: 新 schema 对 100 个 historical task 跑通才推</td><td>"Schema drift — quarterly upgrade is real. MCP server 持 multi-version, canary 10% traffic, eval gate before full rollout..."</td></tr><tr><td>8</td><td>简历 resume hook</td><td>90s</td><td>"Internal Agent Platform (ByteDance) — 50+ internal tool MCP gateway, OBO + RAG-over-tools 92% selection accuracy, schema versioning canary 10%"</td><td>"On ByteDance Internal Agent Platform, we built exactly this — 50+ tool MCP gateway with OBO..."</td></tr></tbody></table>
+<h4>🎯 为啥按这个序</h4>
+<p>灾难场景开场把 stakes 拉高 (月费 $100K), 让面试官知道你见过 pain. MCP 3 原语必须先讲清楚 — 多数候选人把 MCP 当 function-calling 同义词, 这是初级失误. Gateway 6 责任是这题的骨架, 6 个全讲完才算覆盖. 500-tool discovery 是 staff-level signal (普通候选人停在 50 tool). OBO 是 enterprise 红线, 主动提说明你做过 SOC2 / 金融客户. Legacy integration 显示你不只懂理想 case. Schema versioning 是 long-term ops mindset. 简历 hook 最后 anchor.</p>
+<h4>🔥 哪一层最容易被追问 deeper</h4>
+<p><strong>Layer 4 (RAG over tools)</strong> — 追问 "怎么 embed tool description?". 回答: tool name + 1 句话描述 + 5 个 example query 拼接 → text-embedding-3-large → Pinecone 索引. Query 来时 retrieve top-5, 加 LLM-rerank precision boost. <strong>Layer 5 (OBO)</strong> 次之, 问 "token 怎么传?" — gateway 在 request header 验 user JWT → 调 IdP token exchange endpoint (Okta / Auth0) → 拿 service-specific access token (scope claim 限制) → 注入到 downstream call header. Token 不进 LLM prompt, 不进 log.</p>
+<h4>⏱ 时间压缩版 (30 min round)</h4>
+<ol><li>灾难 (1 min) + MCP 3 原语 (90s)</li><li>Gateway 6 责任 (4 min)</li><li>RAG over 500 tools (3 min)</li><li>OBO + schema versioning (3 min)</li><li>简历: Internal Agent Platform (2 min)</li></ol>
+<h4>🆘 卡壳兜底 (针对这题)</h4>
+<ol><li><strong>被问 "MCP vs OpenAI function calling 实质差异"</strong>: function calling 是单一 LLM vendor 的 schema 格式, MCP 是 protocol — 跨 vendor + 跨 client (Claude Desktop / Cursor / 你自己 SDK 都能连同一 MCP server)</li><li><strong>被问 "MCP 1.0 缺什么"</strong>: rate-limit / quota / multi-tenant 不在 spec, 必须 gateway 层补; streaming tool response 早期版本支持差; binary content 比较弱</li><li><strong>被问 "什么时候 NOT 用 MCP"</strong>: (1) 只有 1-2 个 tool, 直接 function calling 简单; (2) 极低延迟 (&lt; 10ms) tool, MCP JSON-RPC overhead 10-50ms 是 deal-breaker; (3) tool 是 stateful long-running session 而不是 RPC call</li></ol>
+<hr />
 <h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
 <blockquote><p>10-15 min 通读, 覆盖 MCP 协议 / Gateway 6 责任 / 500-tool discovery / versioning / legacy 集成 全量.</p></blockquote>
 <h4>🧠 核心心智模型 (1 sentence)</h4>
@@ -167,6 +180,46 @@ Customer notification:
 > 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t3-mcp-api-proxy.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
 **原页面**: [`gfde-t3-mcp-api-proxy.html`](questions/gfde-t3-mcp-api-proxy.html)
+
+---
+## 🎤 答题逻辑 (Response Architecture)
+
+> 被问到 **"customer has 50 internal microservices, design the tool abstraction layer. Why is MCP relevant?"**, 我按这 8 层回答, 不跳序.
+
+### 📐 MCP / API Proxy — 8 层结构
+
+| # | 层 | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | 灾难场景对比 | 1 min | 不抽象 → 25K token system prompt + 30% tool 误选 + 月费 $100K. 这是 anti-pattern 起点 | "Without abstraction, the naive approach blows up in 3 ways — token cost, tool selection error, and IAM..." |
+| 2 | MCP 定义 + 3 原语 | 90s | Anthropic 2024 开源, JSON-RPC over stdio/HTTP/SSE. 三原语: **Resources** (read data) / **Tools** (side-effect actions) / **Prompts** (template). 不是 function-calling 的同义词 | "MCP is Anthropic's 2024 standard — vendor-neutral JSON-RPC with 3 primitives: Resources, Tools, Prompts. Function-calling 只覆盖 Tools 一类..." |
+| 3 | Gateway 6 责任 | 3 min | (1) Discovery (RAG over tool catalog) (2) Auth + OBO token exchange (3) Rate limit per tool/tenant (4) Observability trace propagate (5) Result cache (6) Schema versioning | "Gateway 不只是 proxy — 它承担 6 个明确责任, 我逐个讲..." |
+| 4 | 500-tool discovery | 3 min | LLM context 装不下 500 tool. RAG over tool descriptions: embed tool description → top-K=5 tool 进 system prompt → 92% selection accuracy (Internal Agent Platform 实测) | "At 500 tools, 你不能全 dump 到 prompt — 用 RAG over tool catalog, top-5 进 context, 92% accuracy..." |
+| 5 | OBO auth flow | 2 min | OAuth 2.0 Token Exchange (RFC 8693). User → agent → gateway 用 user JWT 换 service-specific token, scope ≤ user. **Agent 永远不能拥有比 user 更高权限** 是 enterprise 红线 | "OBO 是 enterprise 红线 — agent 拿 user JWT 换 service token, scope strictly ≤ user. RFC 8693 Token Exchange..." |
+| 6 | Legacy integration | 90s | 不是所有 service 都 expose REST. SOAP / 数据库直查 / 屏幕爬 (Playwright) / 文件落地 (S3 watcher). MCP server 是 adapter, 把这些封装统一 | "Not all 50 services 是 REST — SOAP / DB direct / screen scrape via Playwright / file drop. MCP server is the adapter layer..." |
+| 7 | Schema versioning | 90s | Customer API 季度升级. MCP server 持 multi-version schema (`tool@v1`, `tool@v2`), gateway 支持 canary route. Eval gate: 新 schema 对 100 个 historical task 跑通才推 | "Schema drift — quarterly upgrade is real. MCP server 持 multi-version, canary 10% traffic, eval gate before full rollout..." |
+| 8 | 简历 resume hook | 90s | "Internal Agent Platform (ByteDance) — 50+ internal tool MCP gateway, OBO + RAG-over-tools 92% selection accuracy, schema versioning canary 10%" | "On ByteDance Internal Agent Platform, we built exactly this — 50+ tool MCP gateway with OBO..." |
+
+### 🎯 为啥按这个序
+
+灾难场景开场把 stakes 拉高 (月费 $100K), 让面试官知道你见过 pain. MCP 3 原语必须先讲清楚 — 多数候选人把 MCP 当 function-calling 同义词, 这是初级失误. Gateway 6 责任是这题的骨架, 6 个全讲完才算覆盖. 500-tool discovery 是 staff-level signal (普通候选人停在 50 tool). OBO 是 enterprise 红线, 主动提说明你做过 SOC2 / 金融客户. Legacy integration 显示你不只懂理想 case. Schema versioning 是 long-term ops mindset. 简历 hook 最后 anchor.
+
+### 🔥 哪一层最容易被追问 deeper
+
+**Layer 4 (RAG over tools)** — 追问 "怎么 embed tool description?". 回答: tool name + 1 句话描述 + 5 个 example query 拼接 → text-embedding-3-large → Pinecone 索引. Query 来时 retrieve top-5, 加 LLM-rerank precision boost. **Layer 5 (OBO)** 次之, 问 "token 怎么传?" — gateway 在 request header 验 user JWT → 调 IdP token exchange endpoint (Okta / Auth0) → 拿 service-specific access token (scope claim 限制) → 注入到 downstream call header. Token 不进 LLM prompt, 不进 log.
+
+### ⏱ 时间压缩版 (30 min round)
+
+1. 灾难 (1 min) + MCP 3 原语 (90s)
+2. Gateway 6 责任 (4 min)
+3. RAG over 500 tools (3 min)
+4. OBO + schema versioning (3 min)
+5. 简历: Internal Agent Platform (2 min)
+
+### 🆘 卡壳兜底 (针对这题)
+
+1. **被问 "MCP vs OpenAI function calling 实质差异"**: function calling 是单一 LLM vendor 的 schema 格式, MCP 是 protocol — 跨 vendor + 跨 client (Claude Desktop / Cursor / 你自己 SDK 都能连同一 MCP server)
+2. **被问 "MCP 1.0 缺什么"**: rate-limit / quota / multi-tenant 不在 spec, 必须 gateway 层补; streaming tool response 早期版本支持差; binary content 比较弱
+3. **被问 "什么时候 NOT 用 MCP"**: (1) 只有 1-2 个 tool, 直接 function calling 简单; (2) 极低延迟 (< 10ms) tool, MCP JSON-RPC overhead 10-50ms 是 deal-breaker; (3) tool 是 stateful long-running session 而不是 RPC call
 
 ---
 
