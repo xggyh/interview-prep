@@ -1,8 +1,8 @@
 ## Client Sim #1 · Demo Fails Before Execs — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/live-demo-fails-execs.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](live-demo-fails-execs.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`live-demo-fails-execs.html`](questions/live-demo-fails-execs.html)
+**原页面**: [`live-demo-fails-execs.html`](live-demo-fails-execs.html)
 
 ---
 

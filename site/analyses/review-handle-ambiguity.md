@@ -1,8 +1,8 @@
 ## Recruiter #2 · Handle Ambiguity — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/handle-ambiguity.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](handle-ambiguity.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`handle-ambiguity.html`](questions/handle-ambiguity.html)
+**原页面**: [`handle-ambiguity.html`](handle-ambiguity.html)
 
 ---
 

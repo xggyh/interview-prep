@@ -1,8 +1,8 @@
 ## AI Deep Dive #5 · How Know AI Working — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/how-know-ai-working.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](how-know-ai-working.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`how-know-ai-working.html`](questions/how-know-ai-working.html)
+**原页面**: [`how-know-ai-working.html`](how-know-ai-working.html)
 
 ---
 

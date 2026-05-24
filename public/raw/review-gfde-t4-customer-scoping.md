@@ -1,8 +1,8 @@
 ## T4.1 · customer scoping — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t4-customer-scoping.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](gfde-t4-customer-scoping.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`gfde-t4-customer-scoping.html`](questions/gfde-t4-customer-scoping.html)
+**原页面**: [`gfde-t4-customer-scoping.html`](gfde-t4-customer-scoping.html)
 
 ---
 

@@ -1,8 +1,8 @@
 ## AI Deep Dive #4 · RAG vs FT vs PE — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/rag-vs-ft-vs-pe.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](rag-vs-ft-vs-pe.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`rag-vs-ft-vs-pe.html`](questions/rag-vs-ft-vs-pe.html)
+**原页面**: [`rag-vs-ft-vs-pe.html`](rag-vs-ft-vs-pe.html)
 
 ---
 

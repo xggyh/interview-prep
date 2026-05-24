@@ -1,8 +1,8 @@
 ## Tech #5 · Multi-tenant SLA Monitoring — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/multitenant-monitoring-slas.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](multitenant-monitoring-slas.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`multitenant-monitoring-slas.html`](questions/multitenant-monitoring-slas.html)
+**原页面**: [`multitenant-monitoring-slas.html`](multitenant-monitoring-slas.html)
 
 ---
 

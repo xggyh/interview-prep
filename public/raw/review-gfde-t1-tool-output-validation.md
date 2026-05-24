@@ -1,8 +1,8 @@
 ## T1.5 · tool output 验证 + 防注入 — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t1-tool-output-validation.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](gfde-t1-tool-output-validation.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`gfde-t1-tool-output-validation.html`](questions/gfde-t1-tool-output-validation.html)
+**原页面**: [`gfde-t1-tool-output-validation.html`](gfde-t1-tool-output-validation.html)
 
 ---
 

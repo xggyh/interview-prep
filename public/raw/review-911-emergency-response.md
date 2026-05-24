@@ -1,8 +1,8 @@
 ## Case #1 · 911 Emergency Response — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/911-emergency-response.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](911-emergency-response.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`911-emergency-response.html`](questions/911-emergency-response.html)
+**原页面**: [`911-emergency-response.html`](911-emergency-response.html)
 
 ---
 

@@ -1,8 +1,8 @@
 ## T2.6 · long context vs RAG — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/gfde-t2-long-context-vs-rag.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](gfde-t2-long-context-vs-rag.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`gfde-t2-long-context-vs-rag.html`](questions/gfde-t2-long-context-vs-rag.html)
+**原页面**: [`gfde-t2-long-context-vs-rag.html`](gfde-t2-long-context-vs-rag.html)
 
 ---
 

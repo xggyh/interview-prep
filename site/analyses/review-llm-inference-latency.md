@@ -1,8 +1,8 @@
 ## AI Deep Dive #3 · LLM Inference Latency — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/llm-inference-latency.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](llm-inference-latency.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`llm-inference-latency.html`](questions/llm-inference-latency.html)
+**原页面**: [`llm-inference-latency.html`](llm-inference-latency.html)
 
 ---
 

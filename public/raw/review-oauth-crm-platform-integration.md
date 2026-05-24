@@ -1,8 +1,8 @@
 ## Tech #1 · OAuth 2.0 CRM Integration — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/oauth-crm-platform-integration.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](oauth-crm-platform-integration.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`oauth-crm-platform-integration.html`](questions/oauth-crm-platform-integration.html)
+**原页面**: [`oauth-crm-platform-integration.html`](oauth-crm-platform-integration.html)
 
 ---
 

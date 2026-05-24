@@ -1,8 +1,8 @@
 ## Tech #4 · Data Pipeline Drift Detection — 复习速查
 
-> 这是 **复习速查页**, 抽自 [原全量教学页](questions/data-pipeline-drift.html). 10-15 min 通读, 含本主题的全量知识压缩版.
+> 这是 **复习速查页**, 抽自 [原全量教学页](data-pipeline-drift.html). 10-15 min 通读, 含本主题的全量知识压缩版.
 
-**原页面**: [`data-pipeline-drift.html`](questions/data-pipeline-drift.html)
+**原页面**: [`data-pipeline-drift.html`](data-pipeline-drift.html)
 
 ---
 
