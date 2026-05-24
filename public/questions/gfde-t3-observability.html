@@ -1817,6 +1817,189 @@ Resume quotes:
   "BNPL chatbot prompt_template_version + model_version tracking"
   "SOC2 audit passed via Presidio redaction at write time"
   "Per-tenant SLA dashboard + synthetic probes 7 markets"</code></pre>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖 4 layer / sampling / PII / eval-in-prod / debug runbook 全量.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<p>LLM observability = <strong>4 layer (trace / LLM-log / metric / eval)</strong> + <strong>tail-based sampling</strong> + <strong>PII redact at write</strong> + <strong>per-tenant SLA</strong>, 没有 eval-in-prod 就是 "prompt-by-vibes", silent quality drop 是 LLM 系统专属灾难.</p>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>OTel</td><td>OpenTelemetry, vendor-neutral trace/log/metric SDK</td><td>全 layer 基础</td></tr><tr><td>Span</td><td>Trace 中一个 operation (start/end/attr/status)</td><td>每 LLM call / tool call</td></tr><tr><td>traceparent header</td><td>W3C standard, agent → gateway → MCP server</td><td>trace propagation</td></tr><tr><td>Tail-based sampling</td><td>决策在 trace 完成后 (基于 error / latency / cost)</td><td>高 QPS 必装</td></tr><tr><td>Head-based sampling</td><td>决策在 trace 开始时 (random %)</td><td>简单, 但漏 error</td></tr><tr><td>LLM-as-judge</td><td>用 LLM (Sonnet) 评估其他 LLM 输出</td><td>eval-in-prod</td></tr><tr><td>Presidio</td><td>Microsoft 开源 PII detection / redaction</td><td>写日志前</td></tr><tr><td>MMD test</td><td>Maximum Mean Discrepancy, distribution shift</td><td>drift detection</td></tr><tr><td>RED method</td><td>Rate / Errors / Duration (传统 web)</td><td>L3 metric 基线</td></tr><tr><td>USE method</td><td>Utilization / Saturation / Errors (GPU)</td><td>LLM serving GPU</td></tr><tr><td>Synthetic probe</td><td>定期 fake request 验证可用性</td><td>per-tenant SLA</td></tr><tr><td>Right to be Forgotten</td><td>GDPR/CCPA 用户要求删数据</td><td>hash-based delete</td></tr><tr><td>Calibration</td><td>LLM judge vs human eval correlation</td><td>weekly</td></tr><tr><td>Cost attribution</td><td>Per-(feature, tenant, model) 维度归因</td><td>dashboard</td></tr><tr><td>Drift detection</td><td>7-day baseline vs recent shift</td><td>daily auto</td></tr></tbody></table>
+<h4>🎯 4-Layer Observability 框架</h4>
+<p><strong>Layer 1: Distributed Tracing (OTel)</strong></p>
+<ul><li>When: 任何 production LLM system</li><li>Algorithm: span-per-operation + W3C traceparent + LLM-specific attributes</li><li>Trade-off: 100% sample $$$$$ vs missing key events</li><li>Tools: OpenTelemetry SDK, Honeycomb, Datadog, Tempo, Jaeger</li></ul>
+<p><strong>Layer 2: LLM-Specific Logging</strong></p>
+<ul><li>When: prompt 是 product code</li><li>Algorithm: structured log {prompt_hash, completion_hash, model, version, tokens, cost, eval_score}</li><li>Trade-off: PII redact overhead vs raw debug visibility</li><li>Tools: LangSmith, Phoenix, Helicone, Langfuse, W&amp;B Weave, Presidio (PII)</li></ul>
+<p><strong>Layer 3: Metrics (RED + LLM-specific)</strong></p>
+<ul><li>When: real-time dashboard + alerting</li><li>Algorithm: Prometheus / Mimir for time-series, LLM-specific (TTFT, TPOT, token cost, cache hit, eval pass)</li><li>Trade-off: cardinality 爆炸 (per-user metric) vs aggregation</li><li>Tools: Prometheus, Mimir, Datadog, NVIDIA DCGM (GPU)</li></ul>
+<p><strong>Layer 4: Quality Monitoring (Eval-in-Prod)</strong></p>
+<ul><li>When: prompt / model 升级 / drift detection</li><li>Algorithm: 5% sample + force-flagged 100%, LLM judge multi-dim (helpfulness / accuracy / tool / safety / refusal / conciseness), calibrate weekly</li><li>Trade-off: judge cost vs quality blind</li><li>Tools: Braintrust, LangSmith eval, custom LLM-judge with Sonnet 4.6</li></ul>
+<h4>🌳 关键决策树 (ASCII)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Sampling strategy at 10K QPS?
+  ├─ All? ── No (TB/day cost prohibit)
+  ├─ Random 1%? ── 漏 errors
+  └─ Tail-based: 1% baseline + 100% errors + 100% slow + 100% expensive + 100% VIP ⭐
+      → ~30x cost reduction vs all
+
+PII in prompt?
+  ├─ Detect via Presidio NER
+  ├─ Redact entities: PERSON / EMAIL / PHONE / CREDIT_CARD / SSN / LOCATION
+  ├─ Hash for correlation (sha256 + per-type salt)
+  └─ Right-to-be-Forgotten: hash deletion via user_id
+
+Eval-in-prod method?
+  ├─ Manual sample review weekly ── 不够 scale
+  ├─ User signal (thumbs-up) ── biased
+  ├─ Pure LLM judge ── calibrate vs human
+  └─ Hybrid: 5% LLM judge + 0.1% human + force-flag ⭐</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: 4-Layer Instrumentation — Trace + Log + Metric + Eval</strong></p>
+<pre class="language-python"><code class="language-python"># OTel span with LLM attrs
+with tracer.start_as_current_span("llm_call") as span:
+    span.set_attribute("llm.model", "claude-sonnet-4.6")
+    span.set_attribute("llm.prompt_template_version", "v2.3")
+    span.set_attribute("llm.prompt_hash", sha256(prompt)[:16])
+    span.set_attribute("llm.input_tokens", resp.usage.input_tokens)
+    span.set_attribute("llm.cached_input_tokens", resp.usage.cache_read_tokens)
+    span.set_attribute("llm.output_tokens", resp.usage.output_tokens)
+    span.set_attribute("llm.cost_usd", calc_cost(resp))
+    span.set_attribute("llm.ttft_ms", ttft)
+    span.set_attribute("llm.finish_reason", resp.stop_reason)
+    span.set_attribute("tenant.id", req.tenant_id)
+    span.set_attribute("feature.id", req.feature_id)</code></pre>
+<ul><li>Top 3 gotchas: (1) 漏 prompt_template_version → 改了 prompt 不知 (2) raw prompt 入 log (PII) (3) cost_usd 用 estimate 不用 response.usage (provider 算的)</li><li>Tools: OpenTelemetry SDK Python/TS, LangSmith integration, semantic conventions</li></ul>
+<p><strong>Problem 2: Sampling Strategy at Scale — Tail-based</strong></p>
+<pre class="language-yaml"><code class="language-yaml"># OTel Collector tail sampling config
+processors:
+  tail_sampling:
+    decision_wait: 30s
+    policies:
+      - name: errors
+        type: status_code
+        status_code: { status_codes: [ERROR] }
+      - name: slow
+        type: latency
+        latency: { threshold_ms: 5000 }
+      - name: expensive
+        type: numeric_attribute
+        numeric_attribute: { key: llm.cost_usd, min_value: 0.5 }
+      - name: vip_tenant
+        type: string_attribute
+        string_attribute: { key: tenant.tier, values: [gold] }
+      - name: jailbreak
+        type: boolean_attribute
+        boolean_attribute: { key: security.jailbreak_flag, value: true }
+      - name: random_1pct
+        type: probabilistic
+        probabilistic: { sampling_percentage: 1.0 }</code></pre>
+<ul><li>Cost: ~30x reduction vs 100% sampling</li><li>Top 3 gotchas: (1) decision_wait 太短 → 完整 trace 没到决策时丢 (2) VIP tenant 100% 漏定义 (3) head sampling alone 漏 errors</li><li>Tools: OpenTelemetry Collector, Honeycomb tail sampler, Datadog APM</li></ul>
+<p><strong>Problem 3: PII Redaction Pipeline — Presidio, Hash for Correlation</strong></p>
+<pre class="language-python"><code class="language-python"># Presidio integration
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
+def redact_for_log(text, user_id):
+    analyzer_results = analyzer.analyze(
+        text=text,
+        entities=["PERSON", "EMAIL", "PHONE_NUMBER", "CREDIT_CARD", "SSN", "LOCATION"],
+        language="en"
+    )
+    # Replace with hash for correlation
+    anonymized = anonymizer.anonymize(
+        text=text,
+        analyzer_results=analyzer_results,
+        operators={"DEFAULT": OperatorConfig("hash", {"hash_type": "sha256"})}
+    )
+    return anonymized.text
+
+# Right-to-be-Forgotten: hash by user_id + type
+def gdpr_delete(user_id):
+    user_hashes = compute_user_hashes(user_id, salt=PER_TYPE_SALT)
+    log_db.delete(where=user_hashes)</code></pre>
+<ul><li>Top 3 gotchas: (1) redact at log-write time, not at read (太晚) (2) hash 无 salt → rainbow table risk (3) GDPR delete 不 cover backup</li><li>Tools: Microsoft Presidio (spaCy NER + custom), AWS Macie, AWS Comprehend PII</li></ul>
+<p><strong>Problem 4: Eval-in-Prod — LLM-as-Judge, Drift Detection</strong></p>
+<pre class="language-python"><code class="language-python">def sampled_eval(req, response):
+    # 5% random + 100% flagged
+    if random.random() &gt; 0.05 and not req.force_eval:
+        return
+    
+    judge_prompt = f"""
+    Query: {req.query}
+    Response: {response.text}
+    Rate 1-5 on: helpfulness, accuracy, tool_use, safety, refusal_appropriateness, conciseness
+    """
+    scores = llm_judge_sonnet.complete(judge_prompt)  # cheaper than Opus for judge
+    
+    eval_db.insert({
+        "ts": now(),
+        "req": redact(req),
+        "resp_hash": sha256(response.text)[:16],
+        "model": response.model,
+        "scores": scores,
+        "prompt_template_version": PROMPT_VERSION,
+    })
+    
+    # Drift detection daily job
+    baseline = avg(eval_db.last_7d_excluding_today())
+    today = avg(eval_db.today())
+    if today &lt; baseline - 0.05:
+        alert("eval_drift", baseline, today)
+
+# MMD test on prompt embeddings
+def mmd_drift(today_embeddings, baseline_embeddings):
+    return maximum_mean_discrepancy(today_embeddings, baseline_embeddings, kernel="rbf")</code></pre>
+<ul><li>Top 3 gotchas: (1) judge model 用 Opus too expensive ($25/M out) → 用 Sonnet 4.6 ($15/M) (2) judge not calibrated vs human → drift in judge (3) drift alert 阈值死板 (用 percentile not absolute)</li><li>Tools: Braintrust, LangSmith, Phoenix evals, Sonnet 4.6 as judge, custom MMD</li></ul>
+<p><strong>Problem 5: Debug Workflow — Trace_ID → Slice → Re-run</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Standard runbook:
+1. User reports: "agent gave wrong answer for X"
+2. Find trace_id from user session or audit log
+3. Read trace top-down in Honeycomb / Datadog
+4. Identify failed span (error / high latency / bad eval)
+5. Compare to good case (same template, similar query)
+6. Re-run with replay tool (deterministic mocks)
+7. Slice analysis: by tenant / model / template / time
+8. Root cause: prompt / tool / model / RAG / input / cache stale
+9. Hot fix: rollback prompt OR patch tool OR retrain
+10. Post-mortem: add eval case to prevent regression</code></pre>
+<ul><li>Replay tool: store {prompt, model, version} → re-call with same input + mocked tool outputs</li><li>Slice dashboards: per-tenant eval score, per-template error rate, per-model latency</li><li>Top 3 gotchas: (1) trace 没 PII redact → 看 log 时再 redact 太晚 (2) replay 不 deterministic (tool 随机) (3) slice 维度太多 cardinality 爆</li><li>Tools: Honeycomb (slice excellent), LangSmith replay, custom replay harness</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li><strong>Raw PII in logs</strong>: SOC2 / GDPR 违规, 必须 Presidio redact at write</li><li><strong>100% sample everything</strong>: TB/day cost, 必须 tail-based</li><li><strong>No LLM eval-in-prod</strong>: quality silent drop, "prompt-by-vibes"</li><li><strong>No tool spans</strong>: agent debug 卡哪步不能</li><li><strong>Single pillar (only metric)</strong>: log + trace + eval 都没 → 盲眼</li><li><strong>No alerting on eval drop</strong>: 3 周后客户告才知</li><li><strong>Trace context not propagated</strong>: agent → gateway → MCP 各自 trace</li><li><strong>No prompt_template_version tracking</strong>: 改 prompt 不知道 perf delta</li><li><strong>No cost attribution per feature</strong>: 1 bad prompt 100x token spike 不知</li><li><strong>No PII deletion workflow (GDPR)</strong>: 用户要求删 → 找不到记录</li><li><strong>LLM judge 用 Opus</strong>: cost $25/M out, 选 Sonnet $15</li><li><strong>Judge not calibrated vs human</strong>: judge drift 自己</li><li><strong>High cardinality metric (per-user)</strong>: Prometheus 爆</li><li><strong>Synthetic probe 不 per-tenant</strong>: tenant-specific 漏 detect</li><li><strong>Eval drift detect 阈值死板</strong>: 用 percentile (P25 baseline) 不 absolute</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Slice analysis</td><td>Voice agent ID market</td><td>"Eval drop 92→84%, 4h identify+fix via per-market slice + replay"</td></tr><tr><td>Prompt version track</td><td>BNPL chatbot</td><td>"prompt_template_version + model_version in span, A/B easy"</td></tr><tr><td>PII redact + SOC2</td><td>Voice agent + payment</td><td>"Presidio redact at write, SOC2 audit pass, GDPR delete by hash"</td></tr><tr><td>Per-tenant SLA</td><td>Voice agent 7 markets</td><td>"Synthetic probe 1/min per market, SLO dashboard, monthly auto report"</td></tr><tr><td>Cost attribution</td><td>TikTok PayLater</td><td>"Per-(feature, tenant) cost dashboard caught 1 bad prompt 100x token spike"</td></tr><tr><td>Drift MMD</td><td>Internal Agent Platform</td><td>"Daily MMD on prompt embeddings, catch shift before user complains"</td></tr><tr><td>LLM-as-judge</td><td>BNPL eval pipeline</td><td>"Sonnet 4.6 judge 5% sample, calibrate weekly vs human 0.85 corr"</td></tr><tr><td>Debug runbook</td><td>Indonesia refund incident</td><td>"Trace_id → replay → slice 1 tenant → root cause 4h"</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"LLM obs needs 4 layers, not 3 — eval-in-prod is the LLM-specific one"</li><li>"Tail-based sampling: 1% baseline + 100% (errors / slow / expensive / VIP / jailbreak), 30x cost reduction"</li><li>"PII redact at write, not at read — at-read is already 数据泄"</li><li>"Cost from response.usage (provider authoritative), not your estimate"</li><li>"Prompt_template_version + model_version in every span, A/B 立刻能切"</li><li>"LLM judge calibrate vs human weekly, otherwise judge drift"</li><li>"Drift detection: 7-day baseline + MMD test on prompt embeddings, daily auto"</li><li>"Per-tenant synthetic probe 1/min + SLO dashboard, monthly auto credit policy"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>Raw PII in logs (SOC2 / GDPR 违规)</li><li>100% sample everything (TB/day)</li><li>No LLM eval-in-prod (prompt-by-vibes)</li><li>No tool spans (debug stuck)</li><li>Single pillar (盲)</li><li>No alerting on eval drop</li><li>Trace context not propagated</li><li>No version tracking</li><li>No cost attribution per feature</li><li>No PII deletion workflow</li></ol>
+<h4>📊 Span attributes 全表 (LLM-specific, 背)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">llm.model                        claude-sonnet-4.6
+llm.prompt_template_version      v2.3
+llm.prompt_hash                  sha256[:16]
+llm.input_tokens                 1234
+llm.cached_input_tokens          800   (Anthropic 90% off)
+llm.output_tokens                567
+llm.cost_usd                     0.012
+llm.ttft_ms                      820
+llm.total_ms                     3500
+llm.finish_reason                stop / length / refusal
+llm.refused                      bool
+tools.used                       ["get_balance", "send_sms"]
+cache.semantic_hit               bool
+cache.prefix_hit_ratio           0.85
+quality.eval_score               4.2 (async populated)
+security.jailbreak_flag          false
+tenant.id                        "tk_payL_001"
+feature.id                       "refund_tier3"
+user.tier                        gold</code></pre>
+<h4>🧰 2026 工具栈 quick lookup</h4>
+<table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你用过</th></tr></thead><tbody><tr><td>Trace SDK</td><td>OpenTelemetry</td><td>—</td><td>OTel ✅</td></tr><tr><td>Trace backend</td><td>Honeycomb (slice excellent)</td><td>Datadog APM, Tempo</td><td>Honeycomb</td></tr><tr><td>LLM-specific obs</td><td>LangSmith</td><td>Phoenix, Helicone, Langfuse, W&amp;B Weave</td><td>LangSmith ✅</td></tr><tr><td>Metric</td><td>Prometheus + Mimir</td><td>Datadog, Grafana Cloud</td><td>Prometheus</td></tr><tr><td>Eval suite</td><td>Braintrust</td><td>OpenAI Evals, Anthropic Evals</td><td>Braintrust</td></tr><tr><td>LLM judge</td><td>Claude Sonnet 4.6</td><td>Gemini 3 Pro</td><td>Sonnet</td></tr><tr><td>PII</td><td>Presidio</td><td>AWS Macie, AWS Comprehend</td><td>Presidio ✅</td></tr><tr><td>GPU monitor</td><td>NVIDIA DCGM</td><td>Datadog GPU</td><td>DCGM</td></tr><tr><td>Sampling</td><td>OTel Collector tail</td><td>Honeycomb Refinery</td><td>OTel</td></tr><tr><td>Drift</td><td>MMD / KS test custom</td><td>Evidently AI, Arize</td><td>MMD custom</td></tr></tbody></table>
+<h4>🎬 45-min 节奏 (T3.4 专属)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">0-5    Clarify    "QPS? Multi-tenant? SLA? Compliance (SOC2 / GDPR)? Stack?"
+5-10   Mental     "4 layer + tail sample + PII redact + per-tenant SLA"; 画 ASCII
+10-25  4 layer    Trace / LLM-log / metric / eval-in-prod 逐层
+25-35  Sampling+PII Tail-based + Presidio + GDPR delete
+35-42  Eval+Debug LLM judge + drift + replay + slice runbook
+42-45  Resume     "Voice agent ID 4h fix; SOC2 audit pass"</code></pre>
+<h4>🔢 关键 production 数字</h4>
+<ul><li>Voice agent ID market: eval drop 92% → 84%, 4h identify + fix via slice + replay</li><li>BNPL chatbot: prompt_template_version + model_version per span</li><li>SOC2 audit: pass via Presidio redact at write</li><li>Per-tenant SLA dashboard: 7 markets, synthetic probe 1/min, monthly auto report</li><li>Tail-based sampling cost reduction: ~30x vs 100%</li><li>LLM judge calibration corr: 0.85 (Sonnet 4.6 vs human, weekly recalibrate)</li><li>Drift detection: 7-day MMD baseline, daily run, alert &gt; 5pp drop</li><li>Eval-in-prod sample rate: 5% random + 100% flagged</li><li>Cost from response.usage: 100% accurate (vs estimate 80%)</li></ul>
   </section>
 
   
@@ -4011,6 +4194,340 @@ Resume quotes:
   "SOC2 audit passed via Presidio redaction at write time"
   "Per-tenant SLA dashboard + synthetic probes 7 markets"
 ```
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖 4 layer / sampling / PII / eval-in-prod / debug runbook 全量.
+
+### 🧠 核心心智模型 (1 sentence)
+
+LLM observability = **4 layer (trace / LLM-log / metric / eval)** + **tail-based sampling** + **PII redact at write** + **per-tenant SLA**, 没有 eval-in-prod 就是 "prompt-by-vibes", silent quality drop 是 LLM 系统专属灾难.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| OTel | OpenTelemetry, vendor-neutral trace/log/metric SDK | 全 layer 基础 |
+| Span | Trace 中一个 operation (start/end/attr/status) | 每 LLM call / tool call |
+| traceparent header | W3C standard, agent → gateway → MCP server | trace propagation |
+| Tail-based sampling | 决策在 trace 完成后 (基于 error / latency / cost) | 高 QPS 必装 |
+| Head-based sampling | 决策在 trace 开始时 (random %) | 简单, 但漏 error |
+| LLM-as-judge | 用 LLM (Sonnet) 评估其他 LLM 输出 | eval-in-prod |
+| Presidio | Microsoft 开源 PII detection / redaction | 写日志前 |
+| MMD test | Maximum Mean Discrepancy, distribution shift | drift detection |
+| RED method | Rate / Errors / Duration (传统 web) | L3 metric 基线 |
+| USE method | Utilization / Saturation / Errors (GPU) | LLM serving GPU |
+| Synthetic probe | 定期 fake request 验证可用性 | per-tenant SLA |
+| Right to be Forgotten | GDPR/CCPA 用户要求删数据 | hash-based delete |
+| Calibration | LLM judge vs human eval correlation | weekly |
+| Cost attribution | Per-(feature, tenant, model) 维度归因 | dashboard |
+| Drift detection | 7-day baseline vs recent shift | daily auto |
+
+### 🎯 4-Layer Observability 框架
+
+**Layer 1: Distributed Tracing (OTel)**
+- When: 任何 production LLM system
+- Algorithm: span-per-operation + W3C traceparent + LLM-specific attributes
+- Trade-off: 100% sample $$$$$ vs missing key events
+- Tools: OpenTelemetry SDK, Honeycomb, Datadog, Tempo, Jaeger
+
+**Layer 2: LLM-Specific Logging**
+- When: prompt 是 product code
+- Algorithm: structured log {prompt_hash, completion_hash, model, version, tokens, cost, eval_score}
+- Trade-off: PII redact overhead vs raw debug visibility
+- Tools: LangSmith, Phoenix, Helicone, Langfuse, W&B Weave, Presidio (PII)
+
+**Layer 3: Metrics (RED + LLM-specific)**
+- When: real-time dashboard + alerting
+- Algorithm: Prometheus / Mimir for time-series, LLM-specific (TTFT, TPOT, token cost, cache hit, eval pass)
+- Trade-off: cardinality 爆炸 (per-user metric) vs aggregation
+- Tools: Prometheus, Mimir, Datadog, NVIDIA DCGM (GPU)
+
+**Layer 4: Quality Monitoring (Eval-in-Prod)**
+- When: prompt / model 升级 / drift detection
+- Algorithm: 5% sample + force-flagged 100%, LLM judge multi-dim (helpfulness / accuracy / tool / safety / refusal / conciseness), calibrate weekly
+- Trade-off: judge cost vs quality blind
+- Tools: Braintrust, LangSmith eval, custom LLM-judge with Sonnet 4.6
+
+### 🌳 关键决策树 (ASCII)
+
+```
+Sampling strategy at 10K QPS?
+  ├─ All? ── No (TB/day cost prohibit)
+  ├─ Random 1%? ── 漏 errors
+  └─ Tail-based: 1% baseline + 100% errors + 100% slow + 100% expensive + 100% VIP ⭐
+      → ~30x cost reduction vs all
+
+PII in prompt?
+  ├─ Detect via Presidio NER
+  ├─ Redact entities: PERSON / EMAIL / PHONE / CREDIT_CARD / SSN / LOCATION
+  ├─ Hash for correlation (sha256 + per-type salt)
+  └─ Right-to-be-Forgotten: hash deletion via user_id
+
+Eval-in-prod method?
+  ├─ Manual sample review weekly ── 不够 scale
+  ├─ User signal (thumbs-up) ── biased
+  ├─ Pure LLM judge ── calibrate vs human
+  └─ Hybrid: 5% LLM judge + 0.1% human + force-flag ⭐
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: 4-Layer Instrumentation — Trace + Log + Metric + Eval**
+
+```python
+# OTel span with LLM attrs
+with tracer.start_as_current_span("llm_call") as span:
+    span.set_attribute("llm.model", "claude-sonnet-4.6")
+    span.set_attribute("llm.prompt_template_version", "v2.3")
+    span.set_attribute("llm.prompt_hash", sha256(prompt)[:16])
+    span.set_attribute("llm.input_tokens", resp.usage.input_tokens)
+    span.set_attribute("llm.cached_input_tokens", resp.usage.cache_read_tokens)
+    span.set_attribute("llm.output_tokens", resp.usage.output_tokens)
+    span.set_attribute("llm.cost_usd", calc_cost(resp))
+    span.set_attribute("llm.ttft_ms", ttft)
+    span.set_attribute("llm.finish_reason", resp.stop_reason)
+    span.set_attribute("tenant.id", req.tenant_id)
+    span.set_attribute("feature.id", req.feature_id)
+```
+- Top 3 gotchas: (1) 漏 prompt_template_version → 改了 prompt 不知 (2) raw prompt 入 log (PII) (3) cost_usd 用 estimate 不用 response.usage (provider 算的)
+- Tools: OpenTelemetry SDK Python/TS, LangSmith integration, semantic conventions
+
+**Problem 2: Sampling Strategy at Scale — Tail-based**
+
+```yaml
+# OTel Collector tail sampling config
+processors:
+  tail_sampling:
+    decision_wait: 30s
+    policies:
+      - name: errors
+        type: status_code
+        status_code: { status_codes: [ERROR] }
+      - name: slow
+        type: latency
+        latency: { threshold_ms: 5000 }
+      - name: expensive
+        type: numeric_attribute
+        numeric_attribute: { key: llm.cost_usd, min_value: 0.5 }
+      - name: vip_tenant
+        type: string_attribute
+        string_attribute: { key: tenant.tier, values: [gold] }
+      - name: jailbreak
+        type: boolean_attribute
+        boolean_attribute: { key: security.jailbreak_flag, value: true }
+      - name: random_1pct
+        type: probabilistic
+        probabilistic: { sampling_percentage: 1.0 }
+```
+- Cost: ~30x reduction vs 100% sampling
+- Top 3 gotchas: (1) decision_wait 太短 → 完整 trace 没到决策时丢 (2) VIP tenant 100% 漏定义 (3) head sampling alone 漏 errors
+- Tools: OpenTelemetry Collector, Honeycomb tail sampler, Datadog APM
+
+**Problem 3: PII Redaction Pipeline — Presidio, Hash for Correlation**
+
+```python
+# Presidio integration
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
+def redact_for_log(text, user_id):
+    analyzer_results = analyzer.analyze(
+        text=text,
+        entities=["PERSON", "EMAIL", "PHONE_NUMBER", "CREDIT_CARD", "SSN", "LOCATION"],
+        language="en"
+    )
+    # Replace with hash for correlation
+    anonymized = anonymizer.anonymize(
+        text=text,
+        analyzer_results=analyzer_results,
+        operators={"DEFAULT": OperatorConfig("hash", {"hash_type": "sha256"})}
+    )
+    return anonymized.text
+
+# Right-to-be-Forgotten: hash by user_id + type
+def gdpr_delete(user_id):
+    user_hashes = compute_user_hashes(user_id, salt=PER_TYPE_SALT)
+    log_db.delete(where=user_hashes)
+```
+- Top 3 gotchas: (1) redact at log-write time, not at read (太晚) (2) hash 无 salt → rainbow table risk (3) GDPR delete 不 cover backup
+- Tools: Microsoft Presidio (spaCy NER + custom), AWS Macie, AWS Comprehend PII
+
+**Problem 4: Eval-in-Prod — LLM-as-Judge, Drift Detection**
+
+```python
+def sampled_eval(req, response):
+    # 5% random + 100% flagged
+    if random.random() > 0.05 and not req.force_eval:
+        return
+    
+    judge_prompt = f"""
+    Query: {req.query}
+    Response: {response.text}
+    Rate 1-5 on: helpfulness, accuracy, tool_use, safety, refusal_appropriateness, conciseness
+    """
+    scores = llm_judge_sonnet.complete(judge_prompt)  # cheaper than Opus for judge
+    
+    eval_db.insert({
+        "ts": now(),
+        "req": redact(req),
+        "resp_hash": sha256(response.text)[:16],
+        "model": response.model,
+        "scores": scores,
+        "prompt_template_version": PROMPT_VERSION,
+    })
+    
+    # Drift detection daily job
+    baseline = avg(eval_db.last_7d_excluding_today())
+    today = avg(eval_db.today())
+    if today < baseline - 0.05:
+        alert("eval_drift", baseline, today)
+
+# MMD test on prompt embeddings
+def mmd_drift(today_embeddings, baseline_embeddings):
+    return maximum_mean_discrepancy(today_embeddings, baseline_embeddings, kernel="rbf")
+```
+- Top 3 gotchas: (1) judge model 用 Opus too expensive ($25/M out) → 用 Sonnet 4.6 ($15/M) (2) judge not calibrated vs human → drift in judge (3) drift alert 阈值死板 (用 percentile not absolute)
+- Tools: Braintrust, LangSmith, Phoenix evals, Sonnet 4.6 as judge, custom MMD
+
+**Problem 5: Debug Workflow — Trace_ID → Slice → Re-run**
+
+```
+Standard runbook:
+1. User reports: "agent gave wrong answer for X"
+2. Find trace_id from user session or audit log
+3. Read trace top-down in Honeycomb / Datadog
+4. Identify failed span (error / high latency / bad eval)
+5. Compare to good case (same template, similar query)
+6. Re-run with replay tool (deterministic mocks)
+7. Slice analysis: by tenant / model / template / time
+8. Root cause: prompt / tool / model / RAG / input / cache stale
+9. Hot fix: rollback prompt OR patch tool OR retrain
+10. Post-mortem: add eval case to prevent regression
+```
+- Replay tool: store {prompt, model, version} → re-call with same input + mocked tool outputs
+- Slice dashboards: per-tenant eval score, per-template error rate, per-model latency
+- Top 3 gotchas: (1) trace 没 PII redact → 看 log 时再 redact 太晚 (2) replay 不 deterministic (tool 随机) (3) slice 维度太多 cardinality 爆
+- Tools: Honeycomb (slice excellent), LangSmith replay, custom replay harness
+
+### 🔥 Production gotchas (top 15)
+
+1. **Raw PII in logs**: SOC2 / GDPR 违规, 必须 Presidio redact at write
+2. **100% sample everything**: TB/day cost, 必须 tail-based
+3. **No LLM eval-in-prod**: quality silent drop, "prompt-by-vibes"
+4. **No tool spans**: agent debug 卡哪步不能
+5. **Single pillar (only metric)**: log + trace + eval 都没 → 盲眼
+6. **No alerting on eval drop**: 3 周后客户告才知
+7. **Trace context not propagated**: agent → gateway → MCP 各自 trace
+8. **No prompt_template_version tracking**: 改 prompt 不知道 perf delta
+9. **No cost attribution per feature**: 1 bad prompt 100x token spike 不知
+10. **No PII deletion workflow (GDPR)**: 用户要求删 → 找不到记录
+11. **LLM judge 用 Opus**: cost $25/M out, 选 Sonnet $15
+12. **Judge not calibrated vs human**: judge drift 自己
+13. **High cardinality metric (per-user)**: Prometheus 爆
+14. **Synthetic probe 不 per-tenant**: tenant-specific 漏 detect
+15. **Eval drift detect 阈值死板**: 用 percentile (P25 baseline) 不 absolute
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Slice analysis | Voice agent ID market | "Eval drop 92→84%, 4h identify+fix via per-market slice + replay" |
+| Prompt version track | BNPL chatbot | "prompt_template_version + model_version in span, A/B easy" |
+| PII redact + SOC2 | Voice agent + payment | "Presidio redact at write, SOC2 audit pass, GDPR delete by hash" |
+| Per-tenant SLA | Voice agent 7 markets | "Synthetic probe 1/min per market, SLO dashboard, monthly auto report" |
+| Cost attribution | TikTok PayLater | "Per-(feature, tenant) cost dashboard caught 1 bad prompt 100x token spike" |
+| Drift MMD | Internal Agent Platform | "Daily MMD on prompt embeddings, catch shift before user complains" |
+| LLM-as-judge | BNPL eval pipeline | "Sonnet 4.6 judge 5% sample, calibrate weekly vs human 0.85 corr" |
+| Debug runbook | Indonesia refund incident | "Trace_id → replay → slice 1 tenant → root cause 4h" |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "LLM obs needs 4 layers, not 3 — eval-in-prod is the LLM-specific one"
+2. "Tail-based sampling: 1% baseline + 100% (errors / slow / expensive / VIP / jailbreak), 30x cost reduction"
+3. "PII redact at write, not at read — at-read is already 数据泄"
+4. "Cost from response.usage (provider authoritative), not your estimate"
+5. "Prompt_template_version + model_version in every span, A/B 立刻能切"
+6. "LLM judge calibrate vs human weekly, otherwise judge drift"
+7. "Drift detection: 7-day baseline + MMD test on prompt embeddings, daily auto"
+8. "Per-tenant synthetic probe 1/min + SLO dashboard, monthly auto credit policy"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. Raw PII in logs (SOC2 / GDPR 违规)
+2. 100% sample everything (TB/day)
+3. No LLM eval-in-prod (prompt-by-vibes)
+4. No tool spans (debug stuck)
+5. Single pillar (盲)
+6. No alerting on eval drop
+7. Trace context not propagated
+8. No version tracking
+9. No cost attribution per feature
+10. No PII deletion workflow
+
+### 📊 Span attributes 全表 (LLM-specific, 背)
+
+```
+llm.model                        claude-sonnet-4.6
+llm.prompt_template_version      v2.3
+llm.prompt_hash                  sha256[:16]
+llm.input_tokens                 1234
+llm.cached_input_tokens          800   (Anthropic 90% off)
+llm.output_tokens                567
+llm.cost_usd                     0.012
+llm.ttft_ms                      820
+llm.total_ms                     3500
+llm.finish_reason                stop / length / refusal
+llm.refused                      bool
+tools.used                       ["get_balance", "send_sms"]
+cache.semantic_hit               bool
+cache.prefix_hit_ratio           0.85
+quality.eval_score               4.2 (async populated)
+security.jailbreak_flag          false
+tenant.id                        "tk_payL_001"
+feature.id                       "refund_tier3"
+user.tier                        gold
+```
+
+### 🧰 2026 工具栈 quick lookup
+
+| 类别 | 默认 | Alt | 你用过 |
+|---|---|---|---|
+| Trace SDK | OpenTelemetry | — | OTel ✅ |
+| Trace backend | Honeycomb (slice excellent) | Datadog APM, Tempo | Honeycomb |
+| LLM-specific obs | LangSmith | Phoenix, Helicone, Langfuse, W&B Weave | LangSmith ✅ |
+| Metric | Prometheus + Mimir | Datadog, Grafana Cloud | Prometheus |
+| Eval suite | Braintrust | OpenAI Evals, Anthropic Evals | Braintrust |
+| LLM judge | Claude Sonnet 4.6 | Gemini 3 Pro | Sonnet |
+| PII | Presidio | AWS Macie, AWS Comprehend | Presidio ✅ |
+| GPU monitor | NVIDIA DCGM | Datadog GPU | DCGM |
+| Sampling | OTel Collector tail | Honeycomb Refinery | OTel |
+| Drift | MMD / KS test custom | Evidently AI, Arize | MMD custom |
+
+### 🎬 45-min 节奏 (T3.4 专属)
+
+```
+0-5    Clarify    "QPS? Multi-tenant? SLA? Compliance (SOC2 / GDPR)? Stack?"
+5-10   Mental     "4 layer + tail sample + PII redact + per-tenant SLA"; 画 ASCII
+10-25  4 layer    Trace / LLM-log / metric / eval-in-prod 逐层
+25-35  Sampling+PII Tail-based + Presidio + GDPR delete
+35-42  Eval+Debug LLM judge + drift + replay + slice runbook
+42-45  Resume     "Voice agent ID 4h fix; SOC2 audit pass"
+```
+
+### 🔢 关键 production 数字
+
+- Voice agent ID market: eval drop 92% → 84%, 4h identify + fix via slice + replay
+- BNPL chatbot: prompt_template_version + model_version per span
+- SOC2 audit: pass via Presidio redact at write
+- Per-tenant SLA dashboard: 7 markets, synthetic probe 1/min, monthly auto report
+- Tail-based sampling cost reduction: ~30x vs 100%
+- LLM judge calibration corr: 0.85 (Sonnet 4.6 vs human, weekly recalibrate)
+- Drift detection: 7-day MMD baseline, daily run, alert > 5pp drop
+- Eval-in-prod sample rate: 5% random + 100% flagged
+- Cost from response.usage: 100% accurate (vs estimate 80%)
 </script>
 <script>
 (function(){

@@ -2311,3 +2311,350 @@ Resume quotes:
   "TikTok payment Redis Lua atomic check, < 1ms"
   "Self-host Llama 70B 90%, cost $0.30/1M"
 ```
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖 5 layer / 4-tier cache / priority queue / cost routing / budget / degradation 全量.
+
+### 🧠 核心心智模型 (1 sentence)
+
+LLM API 慢 + 贵 + rate-limited, 防御靠 **5 layer 叠加** (cache → queue → rate → routing → budget) 实现 **8-12x blended cost ↓**, 单 layer 都不够; 加 **7-step graceful degradation** 保 peak SLA.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| Exact cache | hash(model + prompt + temp + seed), 10-20% hit | 重复 query |
+| Semantic cache | embedding similarity > threshold 命中 | FAQ-style 30-50% hit |
+| Tool output cache | per-tool TTL (get_balance 5s, static 24h) | idempotent reads |
+| LLM prefix cache | vLLM 内 KV block share | self-host serving |
+| Priority queue | per-tier (gold/silver/bronze/free) sorted | 多租户 SLA |
+| Concurrency semaphore | per-tenant in-flight cap (Redis SETNX) | 防 noisy neighbor |
+| Token bucket | rate limit with burst tolerance | per-(user,tenant,model) |
+| Cost-aware routing | complexity → Flash/Pro/Opus | 5-10x cost ↓ |
+| Budget cap | per-tenant monthly USD cap | 防 runaway |
+| Atomic Redis Lua | race-free check-and-decrement | budget enforcement |
+| Graceful degradation | 多 tier 降级 (model / cache / canned) | peak / vendor down |
+| Spillover | vendor 429 → 备用 vendor | multi-vendor router |
+| Pre-flight cost estimate | call 前估 cost, 拒超 budget | budget enforcement |
+| Cost spike detector | 5x hourly baseline → alert | catch bad prompt |
+| Wrong-hit | semantic cache 误命中 (similar query 不同 answer) | 必须 eval gate |
+
+### 🎯 5 个 Layer Framework
+
+**Layer 1: Cache (4 tier)**
+- When: 50% 流量是 cache-able (FAQ-heavy)
+- Algorithm: exact (hash) → semantic (embedding 0.95) → tool output (per-TTL) → LLM prefix (vLLM)
+- Trade-off: stale data vs cost; wrong-hit on semantic
+- Tools: Redis (exact + tool), Pinecone / Qdrant (semantic, threshold 0.95-0.97), vLLM (prefix), per-tool config
+
+**Layer 2: Priority Queue + Concurrency**
+- When: multi-tenant, SLA differential
+- Algorithm: Redis sorted set, score = priority×1e10 + ts; per-tenant Redis SETNX concurrency
+- Trade-off: queue depth vs starvation low-tier
+- Tools: Redis sorted set, Redis Lua atomic, Envoy filters
+
+**Layer 3: Rate Limit (Token Bucket Multi-dim)**
+- When: 防滥用 + per-tenant fair
+- Algorithm: token bucket per (user, tenant, tool, model); 429 with Retry-After
+- Trade-off: dim 越多越精细, 也越复杂
+- Tools: Envoy rate limit filter, Redis Lua INCRBY, LiteLLM router
+
+**Layer 4: Cost-Aware Model Routing**
+- When: cost-driven
+- Algorithm: complexity classifier (small LM or rules) → 90% Flash / 9% Pro / 1% Opus
+- Trade-off: routing complexity vs quality A/B
+- Tools: small LM classifier (Haiku $1/$5), LiteLLM router, per-tenant default
+
+**Layer 5: Budget Enforcement (Per-Tenant Monthly Cap)**
+- When: enterprise multi-tenant
+- Algorithm: Postgres atomic counter + Redis Lua check, alert 80%/95%/100% hard stop
+- Trade-off: pre-flight estimate accuracy vs over-spend
+- Tools: Postgres + Redis Lua + alert (Slack / PagerDuty)
+
+### 🌳 关键决策树 (ASCII)
+
+```
+Cache strategy?
+  ├─ Exact only ── 10-20% hit, 不够
+  ├─ + Semantic 0.95 ── 30-50% hit (FAQ), wrong-hit risk
+  ├─ + Tool output cache (read-only) ── per-tool TTL
+  └─ + LLM prefix (vLLM server) ── 60-90% shared prefix ⭐ (combined)
+
+Routing strategy?
+  ├─ Complexity < 0.3 ── Self-host 70B OR Gemini Flash ($0.50/$3)
+  ├─ Complexity < 0.7 ── Gemini Pro ($2/$12)
+  └─ Complexity ≥ 0.7 ── Opus 4.7 ($5/$25)
+  → 90/9/1 mix → blended $0.85/1M (vs $5 all-Opus = 6x ↓)
+
+Degradation tier?
+  L1 Queue 80% ── smaller model
+  L2 Cost trend ── aggressive cache 0.90 threshold
+  L3 Vendor 429 ── spillover alt vendor
+  L4 Latency >3s ── drop parallel tool
+  L5 Ctx >30K ── drop multi-turn history
+  L6 Severe ── canned response from cache
+  L7 Total ── "try later" static
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: 4-Layer Cache — Exact, Semantic, Tool Output, LLM Prefix**
+
+```python
+async def cached_llm_call(req):
+    # L1 Exact
+    exact_key = sha256(f"{req.model}|{req.prompt}|{req.temp}|{req.seed}")[:16]
+    if cached := await redis.get(f"exact:{exact_key}"):
+        return cached
+    # L2 Semantic
+    emb = await embed(req.prompt)
+    matches = await pinecone.query(emb, top_k=1, namespace=req.tenant_id)
+    if matches and matches[0].score >= 0.95:
+        return matches[0].metadata.cached_response
+    # L3 Tool output (skip for non-tool)
+    # L4 LLM prefix via vLLM extra_body conv_id
+    resp = await vllm.complete(req.prompt, extra_body={"conversation_id": req.conv_id})
+    # Write back (eval-gated for semantic)
+    await redis.setex(f"exact:{exact_key}", 3600, resp)
+    if random.random() < 0.05:  # 5% eval gate before semantic cache
+        if eval_pass(req.prompt, resp):
+            await pinecone.upsert(emb, {"cached_response": resp}, namespace=req.tenant_id)
+    return resp
+```
+- Top 3 gotchas: (1) semantic threshold 0.90 wrong-hit silent (用 0.95+) (2) cache 不 per-tenant → cross-tenant leak (3) write 不 eval-gated → poisoning
+- Tools: Redis (exact), Pinecone (semantic, threshold 0.95), vLLM prefix cache (auto)
+
+**Problem 2: Priority Queue + Per-Tenant Concurrency**
+
+```lua
+-- Redis Lua atomic priority enqueue + concurrency check
+local tenant_id = KEYS[1]
+local priority = tonumber(ARGV[1])  -- 1=gold, 2=silver, 3=bronze
+local req_id = ARGV[2]
+local max_concurrent = tonumber(ARGV[3])
+
+local in_flight = tonumber(redis.call('GET', 'inflight:'..tenant_id) or 0)
+if in_flight >= max_concurrent then
+    -- Queue with score (priority×1e10 + timestamp)
+    local score = priority * 1e10 + tonumber(ARGV[4])
+    redis.call('ZADD', 'wait:'..tenant_id, score, req_id)
+    return {-1, 'queued'}
+end
+
+redis.call('INCR', 'inflight:'..tenant_id)
+return {1, 'dispatch'}
+```
+
+| Tier | Queue depth | p99 SLA | Concurrency | Model |
+|---|---|---|---|---|
+| Gold | 100 | < 2s | 50 | Sonnet / Pro |
+| Silver | 500 | < 5s | 20 | Haiku / Flash |
+| Bronze | 2000 | < 30s | 5 | Flash |
+| Free | 10K | best effort | 1 | Flash + canned |
+
+- Top 3 gotchas: (1) concurrency check 不 atomic → race over-dispatch (2) starvation low-tier (Bronze 永远 wait) → 加 max-wait fairness (3) queue depth 没 metric → silent overflow
+- Tools: Redis Lua, Envoy filter, custom dispatcher
+
+**Problem 3: Cost-Aware Model Routing — Gemini Flash 90% / Pro 9% / Opus 1%**
+
+```python
+async def route(query, history, user_tier, budget_remaining):
+    # Complexity classifier (cheap LM or rules)
+    complexity = await classify(query, history)  # Haiku $1/$5 or rules
+    
+    if budget_remaining < 0.01:
+        if user_tier == "gold":
+            return "gemini-3-flash"  # degraded but cheap
+        raise BudgetExhausted
+    
+    if complexity < 0.3:
+        return "self-host-llama70b"  # $0.30/1M
+    elif complexity < 0.7:
+        return "gemini-3-pro"        # $2/$12
+    else:
+        return "claude-opus-4.7"     # $5/$25
+
+# Quality A/B per route
+# 5% sample → Sonnet judge → log eval score by route
+# Alert if any route quality < baseline 5pp
+```
+- Top 3 gotchas: (1) complexity classifier 不 calibrate (2) routing 没 A/B test 比 single model (3) Opus route 占比 > 5% 时 cost / 6 lost
+- Tools: LiteLLM router, Haiku classifier, Braintrust A/B
+
+**Problem 4: Budget Enforcement — Per-Tenant Monthly Cap**
+
+```lua
+-- Redis Lua atomic budget check & decrement (race-free)
+local tenant_id = KEYS[1]
+local month = KEYS[2]
+local estimated_cost = tonumber(ARGV[1])  -- in micro-USD
+local hard_cap = tonumber(ARGV[2])
+
+local current = tonumber(redis.call('GET', 'budget:'..tenant_id..':'..month) or 0)
+if current + estimated_cost > hard_cap then
+    return {-1, 'budget_exhausted', current, hard_cap}
+end
+redis.call('INCRBY', 'budget:'..tenant_id..':'..month, estimated_cost)
+
+-- Alert thresholds
+if current >= hard_cap * 0.95 then
+    redis.call('PUBLISH', 'budget_alert', 'urgent:'..tenant_id)
+elseif current >= hard_cap * 0.8 then
+    redis.call('PUBLISH', 'budget_alert', 'warn:'..tenant_id)
+end
+return {1, 'ok', current + estimated_cost}
+```
+- Top 3 gotchas: (1) pre-flight estimate too low → overshoot (2) Redis 单 source, no Postgres backup → 数据丢 (3) cost spike detector 没 → 1 bad prompt 整月用完
+- Tools: Redis Lua (fast), Postgres (durable), Slack alert, custom Grafana dashboard
+
+**Problem 5: Graceful Degradation Ladder — 7 step**
+
+```python
+class DegradationController:
+    def __init__(self):
+        self.queue_pressure = 0.0  # 0-1
+        self.cost_trend = 0.0
+        self.vendor_429_rate = 0.0
+        self.latency_p99 = 0.0
+    
+    async def check_and_apply(self, req):
+        # L1 Queue 80% full
+        if self.queue_pressure > 0.8:
+            req.model = downgrade_model(req.model)
+        # L2 Cost trend up
+        if self.cost_trend > 1.5:
+            req.cache_threshold = 0.90  # aggressive
+        # L3 Vendor 429 rate up
+        if self.vendor_429_rate > 0.1:
+            req.vendor = alt_vendor(req.vendor)
+        # L4 Latency >3s
+        if self.latency_p99 > 3.0:
+            req.parallel_tools = False
+        # L5 Ctx >30K
+        if req.context_size > 30000:
+            req.history = req.history[-5:]  # only last 5
+        # L6 Severe: serve canned
+        if self.severity > 0.9:
+            return await canned_response(req.intent)
+        # L7 Total: static
+        if self.total_fail:
+            return "Service temporarily unavailable. Try again later."
+```
+- Top 3 gotchas: (1) degradation 没 user comm (突然变笨用户骂) (2) recovery 没 hysteresis (反复抖动) (3) canned response 不 per-intent (单 "try later" 体验糟)
+- Tools: custom Grafana threshold dashboard, Slack ops, canned response cache
+
+### 🔥 Production gotchas (top 15)
+
+1. **No cache (50% waste)**: 重复 query 全走 LLM
+2. **One queue for all tenants**: noisy neighbor 拖死全局
+3. **Sync to LLM (no queue)**: burst 时全 fail
+4. **Single model only**: cost 5-10x vs routing
+5. **No budget cap**: 1 bad prompt 月费爆
+6. **Cache threshold 0.85**: wrong-hit silent kill
+7. **No degradation plan**: peak time 全挂
+8. **Single vendor**: 该 vendor down = down
+9. **No pre-flight cost estimate**: 才 call 才知 overshoot
+10. **Eval gate 缺**: cache poisoning 服万人
+11. **Per-tenant 不 isolate**: tenant A 用完 tenant B 同 quota 也死
+12. **No cost spike detector**: 1 prompt 100x token 不知
+13. **Atomic check 不 Lua**: race 时 over-dispatch
+14. **Recovery 不 hysteresis**: 反复 degrade-recover 抖动
+15. **Canned response 1 句通用**: 没 per-intent 体验差
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Semantic cache | BNPL chatbot | "Pinecone 0.95 threshold, FAQ 38% hit, cost ↓ 42%" |
+| Priority queue | Voice agent 7 markets | "Gold 50 concurrent, Silver 20, Bronze 5, Free 1; SLA differential" |
+| Cost-aware routing | TikTok PayLater 5k QPS | "70/25/5 Flash/Pro/Opus, blended $0.85/1M (vs $5)" |
+| Budget cap | Voice agent | "Per-tenant monthly $5K cap, Redis Lua atomic, 80/95/100 alert" |
+| Self-host fallback | BNPL Llama 70B | "Self-host 90% traffic $0.30/1M, vendor 10% spillover" |
+| Atomic Redis Lua | TikTok payment | "< 1ms atomic check, 0 race condition over 6M txn" |
+| Graceful degrade | TikTok peak | "7-step ladder, peak hour faithfulness 95%→89% acceptable" |
+| Cost spike detect | BNPL incident | "5x hourly baseline alert caught 1 bad prompt 100x token spike in 15min" |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "Cost defense 5 layer 叠 8-12x blended; 单 layer 都打不到目标"
+2. "Semantic cache 0.95 threshold + eval-gated write; 0.90 太激进, wrong-hit silent kill"
+3. "Priority queue per-tier; Gold concurrency 50 vs Free 1 — SLA differential"
+4. "Routing 90/9/1 Flash/Pro/Opus → blended $0.85/1M, 6x cheaper than all-Opus"
+5. "Budget cap atomic Redis Lua; pre-flight estimate + 80/95/100 alert tiered"
+6. "Self-host Llama 70B $0.30/1M, 16-80x cheaper than hosted Opus at scale"
+7. "Graceful degradation 7-step ladder, peak hour 95% → 89% faithfulness acceptable"
+8. "Cost spike detector 5x baseline catches bad prompt within 15min"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. No cache (50% waste)
+2. One queue all tenants (noisy neighbor)
+3. Sync to LLM no queue (burst kill)
+4. Single model (cost 5-10x)
+5. No budget cap (runaway)
+6. Cache threshold loose (wrong-hits)
+7. No degradation plan (peak fail)
+8. Single vendor (down = down)
+9. No pre-flight cost estimate
+10. No eval gate on cache write (poisoning)
+
+### 📊 2026 pricing + 数学全表
+
+| Model | Input $/1M | Output $/1M | Cache In $/1M | When |
+|---|---|---|---|---|
+| Self-host Llama 70B FP8 (vLLM TP=8) | ~0.30 | ~0.30 | n/a | 90% complexity < 0.3 |
+| Gemini 3 Flash | 0.50 | 3 | 0.10 | 70% complexity < 0.5 |
+| Gemini 3 Pro | 2 | 12 | 0.40 | 9% complexity 0.5-0.7 |
+| Claude Haiku 4.5 | 1 | 5 | 0.10 | classifier / cheap A/B |
+| Claude Sonnet 4.6 | 3 | 15 | 0.30 | mid-end |
+| Claude Opus 4.7 | 5 | 25 | 0.50 | 1% complexity > 0.7 |
+| GPT-5.5 | 5 | 30 | 1 | alt high-end |
+
+**Cost math (100K QPS LLM workload)**:
+- All Opus baseline: $73M/day
+- 90/9/1 routing only: $12M/day (84% ↓)
+- + 38% semantic cache: $7.4M/day (90% ↓)
+- + Anthropic prefix cache 90% off: $5M/day (93% ↓)
+- → blended $0.50-0.85/1M, 10x ↓
+
+### 🧰 2026 工具栈 quick lookup
+
+| 类别 | 默认 | Alt | 你用过 |
+|---|---|---|---|
+| Cache (exact + tool) | Redis Cluster | DragonFly, KeyDB | Redis ✅ |
+| Vector cache (semantic) | Pinecone | Qdrant, Milvus, Weaviate | Pinecone ✅ |
+| LLM prefix cache | vLLM auto | SGLang RadixAttn | vLLM ✅ |
+| Atomic check | Redis Lua | Postgres advisory lock | Redis Lua ✅ |
+| Priority queue | Redis sorted set | Kafka tiered topic | Redis |
+| Concurrency sema | Redis SETNX | semaphore service | Redis Lua |
+| Router | LiteLLM | OpenRouter, Portkey | LiteLLM |
+| Rate limit | Envoy filter | Kong, NGINX | Envoy |
+| Budget tracker | Postgres + Redis | DynamoDB atomic | Postgres + Redis |
+| Alert | PagerDuty + Slack | Opsgenie | PagerDuty |
+| Self-host | vLLM TP=8 H100 | TensorRT-LLM | vLLM ✅ |
+
+### 🎬 45-min 节奏 (T3.5 专属)
+
+```
+0-5    Clarify    "QPS? Multi-tenant tier? Cost budget? Vendor? FAQ-heavy?"
+5-10   Mental     "5 layer cost defense + 7 degrade"; 画 ASCII
+10-25  Cache+Queue 4-tier cache + priority queue + concurrency
+25-35  Routing+Budget complexity classifier + 90/9/1 + atomic Redis Lua
+35-42  Degrade    7-step ladder + canned response per-intent
+42-45  Resume     "BNPL 38% cache hit; PayLater 5k QPS cost ↓ 84%"
+```
+
+### 🔢 关键 production 数字
+
+- BNPL semantic cache: Pinecone 0.95, 38% hit, cost ↓ 42%
+- TikTok PayLater: 5k QPS peak, 70/25/5 routing, blended $0.85/1M
+- Voice agent 7 markets: per-tenant $5K monthly cap, 80/95/100 alert
+- Self-host Llama 70B: $0.30/1M output (vLLM TP=8 H100)
+- Atomic Redis Lua: < 1ms p99 check, 0 race in 6M transactions
+- Cache hit rate target: exact 10-20% + semantic 30-50% + prefix 60-90%
+- Combined cost reduction (all 5 layer): 8-12x
+- Cost spike detector: 5x hourly baseline → alert in 15 min
+- Graceful degradation peak hour: faithfulness 95% → 89% acceptable

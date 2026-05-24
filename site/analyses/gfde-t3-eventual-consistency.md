@@ -2369,3 +2369,386 @@ Resume quotes:
   "Voice agent SMS idempotency key per message"
   "Tried 2PC cross-vendor, abandoned in a week, moved to Saga"
 ```
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖 2PC fail / Saga / Outbox / Workflow / Verify-on-timeout 全量. 你的 **Indonesia refund** 是核心 hook.
+
+### 🧠 核心心智模型 (1 sentence)
+
+跨 vendor agent workflow **2PC 不可行** (network partition + coordinator failure + cross-vendor lock 不存在), 必须靠 **Saga (短) / Outbox (跨服务) / Workflow Engine (长 + 5+ step)** + **3 层 idempotency** + **verify-on-timeout** 保证最终一致.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| 2PC | Two-phase commit, coordinator prepare + commit | 单 DB 内 OK, 跨 vendor 不行 |
+| Saga | Forward + compensating action per step | < 5 步 + all reversible |
+| Outbox | Intent table in same TX as biz state | 跨 service 可靠 publish |
+| Workflow Engine | Temporal / DBOS, durable state as code | 5+ 步 / long-running |
+| Compensating action | 反向 undo (refund, cancel, release) | Saga 必备 |
+| Idempotency key | 同 key 多次 call 同 effect | retry safety |
+| Vendor Idempotency-Key | Stripe / PayPal header honor | 防 double-charge |
+| FOR UPDATE SKIP LOCKED | Postgres multi-worker outbox poll | 不冲突 dispatch |
+| Verify-on-timeout | call → timeout → get_status(idem_key) → reconstruct or retry | uncertain state |
+| Activity (Temporal) | retryable, durable step | LLM / tool call |
+| Workflow state | Temporal 持久化 history, replay-able | crash recovery |
+| Agent-as-workflow | LLM agent step = activity | 复杂 agent |
+| Compensation 不可逆 | refund 退一半 / email 发了不能撤 | order matters |
+| DLQ | dead-letter queue for failed compensations | manual recovery |
+| Uncertain state | downstream status 未知, escalate ops | verify-on-timeout 出口 |
+
+### 🎯 4 个核心 framework
+
+**Framework 1: 2PC vs Eventual (When 2PC Fails)**
+- When: 任何 cross-vendor agent
+- Algorithm: 2PC 需要 coordinator + locking + atomic commit; 跨 vendor 这三都没
+- Trade-off: strong consistency 不可能 → 接受 eventual
+- Tools: SAGA / Outbox / Temporal, NOT 2PC
+
+**Framework 2: Saga Pattern**
+- When: < 5 步 + 每步 reversible + 简单
+- Algorithm: try forward; on fail → reverse compensate completed steps
+- Trade-off: compensation 也可能 fail → DLQ + manual escalation
+- Tools: Temporal SAGA orchestrator, custom state machine
+
+**Framework 3: Outbox Pattern**
+- When: 跨 service, 不 framework lock-in
+- Algorithm: tx { biz_action + outbox.insert(intent) }; worker poll FOR UPDATE SKIP LOCKED → publish to Kafka → mark published
+- Trade-off: at-least-once 保证, consumer dedup 必须
+- Tools: Postgres outbox table, Kafka publish, idempotency key
+
+**Framework 4: Workflow Engine (Temporal / DBOS)**
+- When: 5+ 步 / long-running (天/周) / multi-vendor / audit
+- Algorithm: @workflow.defn + execute_activity with retry_policy + workflow state persistent
+- Trade-off: framework lock-in vs handroll bug-prone
+- Tools: **Temporal**, **DBOS**, Inngest
+
+### 🌳 关键决策树 (ASCII)
+
+```
+Consistency pattern选哪个?
+  ├─ < 3 步 + 全 reversible ── Saga DIY 简单
+  ├─ 跨 service + no framework ── Outbox + Kafka
+  ├─ 5+ 步 / 长时 / audit ── Workflow Engine (Temporal) ⭐
+  └─ 单 DB ACID 内 ── direct transaction (2PC fine)
+
+Idempotency 怎么做?
+  L1 Redis SETNX (fast, in-flight protect)
+  L2 DB unique constraint (durable safety net)
+  L3 Vendor Idempotency-Key (Stripe, PayPal honor)
+  → 3 层叠 safe-by-design
+
+Timeout 怎么处理?
+  call with idem_key + timeout 10s
+  → timeout: sleep 5s, call get_status(idem_key)
+     - completed → reconstruct from response
+     - not_found → safe retry
+     - failed → compensate
+     - in_progress → wait + recheck
+     - uncertain → escalate ops UI
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: Why 2PC Fails for Agents — Cross-Vendor**
+
+```
+2PC 步骤:
+  1. Coordinator → 各 participant: PREPARE
+  2. Participant: vote YES (lock resource) / NO
+  3. Coordinator: 全 YES → COMMIT, 否则 ABORT
+  4. Participant: ack
+
+跨 vendor failure:
+  - Vendor 不接受 external coordinator (Stripe 不会 PREPARE then 等你 COMMIT)
+  - Network partition: coordinator down → participants 一直 lock
+  - Latency: cross-vendor 2PC 多 round-trip = 10s+
+  - Stripe / Salesforce / SMTP 各自 commit semantic 不同
+  → 工程师都明白 2PC 跨 vendor impossible
+```
+- When 2PC still works: 单 DB / 单 cluster 内部 (Postgres + XA), 不出 vendor 界
+- Top 3 gotchas: (1) 候选人不能直接说 "用 2PC" (面试官 confirm 你不懂) (2) 知道 saga / outbox 名称 (3) Indonesia refund 你说试过 2PC 不行
+- Tools: PostgreSQL prepared transactions (within), Temporal SAGA cross-vendor
+
+**Problem 2: Saga Pattern + Compensating Actions**
+
+```python
+class SagaOrchestrator:
+    async def run(self, steps):
+        completed = []
+        try:
+            for step in steps:
+                result = await step.forward(idempotency_key=step.idem_key)
+                completed.append((step, result))
+            return [r for _, r in completed]
+        except Exception as e:
+            # Compensate in reverse
+            for step, result in reversed(completed):
+                try:
+                    await step.compensate(result, idempotency_key=step.idem_key + ":undo")
+                except Exception as ce:
+                    # Compensation failed → DLQ
+                    dlq.send(step, result, ce)
+                    page_ops(step, ce)
+            raise
+
+# Example: Indonesia refund 5-step
+steps = [
+    Step("lookup_customer", forward=lookup, compensate=noop),
+    Step("risk_score", forward=score, compensate=noop),
+    Step("write_ledger", forward=ledger_insert, compensate=ledger_reverse),
+    Step("fund_return", forward=trigger_return, compensate=cancel_return),
+    Step("send_confirmation", forward=send_sms, compensate=send_correction_sms),
+]
+```
+- Top 3 gotchas: (1) compensation 自己也可能 fail → DLQ + manual (2) compensation 不 idempotent (3) order matters: email LAST (after all confirmed)
+- Tools: Temporal SAGA, custom state machine, DLQ via Kafka topic
+
+**Problem 3: Outbox Pattern + Idempotency 3-tier**
+
+```python
+# Outbox write in same transaction as business state
+async def step_with_outbox(workflow_id, step_name, biz_action, event_payload):
+    async with db.transaction():
+        await biz_action()  # e.g., update order status
+        await db.execute("""
+            INSERT INTO outbox (id, workflow_id, step_name, event_type, payload,
+                                 idempotency_key, status, created_at)
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'pending', now())
+        """, workflow_id, step_name, "send_confirmation",
+            event_payload, f"{workflow_id}:{step_name}")
+
+# Worker (multi-instance safe)
+async def outbox_worker():
+    while True:
+        rows = await db.fetch("""
+            SELECT * FROM outbox WHERE status = 'pending'
+            ORDER BY created_at LIMIT 100
+            FOR UPDATE SKIP LOCKED
+        """)
+        for row in rows:
+            try:
+                await kafka.produce("events", row.payload,
+                                     headers={"Idempotency-Key": row.idempotency_key})
+                await db.execute("UPDATE outbox SET status='published' WHERE id=$1", row.id)
+            except Exception:
+                await db.execute("UPDATE outbox SET attempts=attempts+1 WHERE id=$1", row.id)
+
+# Idempotency 3-tier:
+# L1 Redis SETNX (fast in-flight lock)
+async def check_in_flight(idem_key):
+    return await redis.set(f"in_flight:{idem_key}", "1", nx=True, ex=300)
+
+# L2 DB unique constraint backup
+# CREATE UNIQUE INDEX idx_idem ON outbox(idempotency_key);
+
+# L3 Vendor side (Stripe)
+# headers: {"Idempotency-Key": "wf123:charge_card"}
+```
+- Idem key 结构: `{workflow_id}:{step_name}` deterministic, 同 workflow 重试同 key
+- Top 3 gotchas: (1) outbox 没 FOR UPDATE SKIP LOCKED → 多 worker 重发 (2) idem key 用 timestamp (retry 不 same) (3) cleanup 不删 published row → outbox 表无限大
+- Tools: Postgres outbox, Kafka publish, Redis SETNX, Stripe Idempotency-Key header
+
+**Problem 4: Workflow Engine (Temporal / DBOS) — When + Agent-as-Workflow**
+
+```python
+# Temporal workflow as code
+@workflow.defn
+class RefundWorkflow:
+    @workflow.run
+    async def run(self, refund_request):
+        # Each activity: retryable, durable, replay-safe
+        customer = await workflow.execute_activity(
+            lookup_customer, refund_request.customer_id,
+            retry_policy=RetryPolicy(maximum_attempts=3, backoff_coefficient=2.0)
+        )
+        score = await workflow.execute_activity(risk_score, customer)
+        
+        if score > 0.8:
+            # Long-running pause: wait for human approval
+            approval = await workflow.wait_condition(
+                lambda: self.approval_received, timeout=timedelta(hours=24)
+            )
+            if not approval:
+                raise ApprovalTimeout
+        
+        ledger_id = await workflow.execute_activity(write_ledger, refund_request)
+        try:
+            await workflow.execute_activity(trigger_fund_return, ledger_id)
+        except ActivityError:
+            # Auto compensate
+            await workflow.execute_activity(reverse_ledger, ledger_id)
+            raise
+        await workflow.execute_activity(send_sms, customer.phone)
+
+# Agent-as-workflow pattern for LLM agents:
+# - LLM call = activity (retryable)
+# - Tool call = activity (idempotent)
+# - Conversation state = workflow state (durable)
+# - Loop = workflow.execute_activity in for loop
+# - Long pause = workflow.wait_condition (human-in-loop)
+```
+- When NOT to use Temporal: simple < 3 step, all reversible, no audit need
+- Top 3 gotchas: (1) activity 不 idempotent (Temporal retry double-execute) (2) workflow body call non-deterministic code (random / time / network) → replay broken (3) workflow_id 重复 → Temporal reject
+- Tools: **Temporal Cloud / SDK**, **DBOS** (Postgres-centric), Inngest
+
+**Problem 5: Verify-on-Timeout Pattern**
+
+```python
+async def call_with_verify(idem_key, action, timeout=10.0):
+    try:
+        return await asyncio.wait_for(action(idem_key), timeout=timeout)
+    except asyncio.TimeoutError:
+        # Settle delay, then probe
+        await asyncio.sleep(5)
+        status = await vendor.get_status(idem_key)
+        
+        if status == "completed":
+            return await vendor.reconstruct(idem_key)  # fetch result by idem
+        elif status == "not_found":
+            # Safe to retry (vendor never saw it)
+            return await action(idem_key)
+        elif status == "failed":
+            raise OperationFailed(status.reason)
+        elif status == "in_progress":
+            # Wait + recheck up to 60s
+            await asyncio.sleep(10)
+            return await call_with_verify(idem_key, action, timeout=30)
+        else:
+            # Uncertain → escalate to ops UI for manual reconciliation
+            await ops_queue.escalate(idem_key, "uncertain_state")
+            raise UncertainState(idem_key)
+
+# Vendor-side get_status requirements:
+# - Honor idempotency key indexing (5-day window minimum)
+# - Return canonical status + idempotent fetch of result
+# - SLA < 200ms for get_status
+```
+- Production data (Indonesia refund 6 months): 156K refunds, 1.9% verify-on-timeout triggered, of those 93% auto-recover via get_status, 0.4% escalate to ops
+- Top 3 gotchas: (1) timeout 太短 + sleep 太短 → 边缘 case 仍 retry (2) vendor get_status latency 高 → block (3) uncertain 不 escalate → silent corrupt
+- Tools: vendor get_status (Stripe / PayPal honor), Temporal as orchestrator, custom ops UI dashboard
+
+### 🔥 Production gotchas (top 15)
+
+1. **2PC for cross-vendor**: impossible, 候选人不能说
+2. **In-memory state**: crash 时 lost
+3. **Retry without idempotency**: double-execute
+4. **No verify on timeout**: uncertain state silent
+5. **No compensating action**: forward-only, partial commit 不能 undo
+6. **Compensation 也 fail**: 没 DLQ + manual escalation path
+7. **Email before payment confirmed**: order matters, email LAST
+8. **Workflow_id 重复**: Temporal reject 或 state corrupt
+9. **Compensation 不 idempotent**: retry compensation 双 undo
+10. **No timeout per step**: 一步 hang forever
+11. **Outbox 没 FOR UPDATE SKIP LOCKED**: 多 worker 重发
+12. **Idem key 用 timestamp**: retry 不 same → 不 dedup
+13. **Workflow body non-deterministic**: replay broken
+14. **Cleanup 不删 published outbox**: 表无限大
+15. **Uncertain state 不 escalate**: silent corrupt
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| Saga + compensation | Indonesia refund tier | "5-step Temporal Saga, 156K refunds, 0 double-refund" |
+| Verify-on-timeout | Indonesia refund | "1.9% trigger verify-on-timeout, 93% auto-recover, 0.4% ops escalate" |
+| Outbox pattern | TikTok payment | "Postgres outbox + Kafka publish, 0 event lost in 12 months" |
+| Idempotency 3-tier | Voice agent SMS | "Redis SETNX + DB unique + vendor Idempotency-Key, 0 double SMS" |
+| Workflow engine | Indonesia refund | "Temporal workflow as code, 5+ step durable, dev velocity 3-4x vs handroll" |
+| Agent-as-workflow | Internal Agent Platform | "LLM call = activity, conversation = workflow state, crash auto-replay" |
+| 2PC tried + abandoned | Cross-vendor refund | "Tried 2PC week 1, network partition + Stripe no PREPARE, moved Saga week 2" |
+| DLQ + ops UI | Indonesia refund ops | "Failed compensations → DLQ, ops dashboard manual reconcile" |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "Cross-vendor 2PC is impossible — coordinator failure + no PREPARE + network partition; eventually consistent only"
+2. "Saga short / Outbox cross-service / Workflow Engine (Temporal) for 5+ step long-running — pick by complexity"
+3. "Idempotency 3-tier: Redis SETNX (fast) + DB unique (durable) + vendor Idempotency-Key (Stripe)"
+4. "Indonesia refund 5-step Temporal Saga: 156K processed, 0 double-refund, 1.9% verify-on-timeout"
+5. "Order matters: email LAST after all confirmed, irreversible last or use delayed queue"
+6. "Verify-on-timeout: timeout → sleep 5s → get_status by idem_key → completed / not_found / failed / in_progress / uncertain"
+7. "Outbox: tx { biz + outbox.insert }, worker FOR UPDATE SKIP LOCKED, Kafka publish, dedup downstream"
+8. "Agent-as-workflow with Temporal — LLM call = activity, conversation = workflow state, crash auto-replay"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. 2PC for cross-vendor (impossible)
+2. In-memory state (lost on crash)
+3. Retry no idempotency (double-execute)
+4. No verify on timeout (uncertain silent)
+5. No compensating action
+6. No DLQ for compensation failures
+7. Email before payment confirmed (order)
+8. Workflow_id duplicate
+9. Compensation not idempotent
+10. No timeout per step
+
+### 📊 Indonesia refund production stats (你的 hook)
+
+```
+6-month data:
+  156K refunds processed
+  0 double-refund
+  1.9% trigger verify-on-timeout (network blip / vendor slow)
+    of those: 93% auto-recover via get_status
+    of those: 0.4% escalate ops manual reconcile
+  100% audit trail
+  P99 refund completion: 8.5s (multi-step)
+  Compensation triggered: 0.3% (most catch in step 4 = trigger_fund_return)
+
+Stack:
+  Temporal Cloud + Postgres outbox + Kafka events
+  Stripe Idempotency-Key + Redis SETNX in-flight
+  Ops dashboard React + Postgres + custom replay tool
+```
+
+### 🧰 2026 工具栈 quick lookup
+
+| 类别 | 默认 | Alt | 你用过 |
+|---|---|---|---|
+| Workflow engine | Temporal Cloud / SDK | DBOS, Inngest | Temporal ✅ |
+| Outbox store | Postgres | MySQL | Postgres |
+| Event bus | Kafka | NATS, RabbitMQ | Kafka |
+| Idempotency cache | Redis SETNX | Memcached | Redis |
+| Vendor idem | Stripe / PayPal honor header | — | Stripe |
+| DLQ | Kafka DLQ topic | SQS DLQ | Kafka |
+| Audit log | Postgres append-only + S3 | DynamoDB | Postgres + S3 |
+| Ops UI | Custom React + Temporal Web | Retool | Custom |
+| Replay | Temporal replay debugger | custom | Temporal |
+| Saga orchestrator | Temporal SAGA | custom state machine | Temporal |
+
+### 🎬 45-min 节奏 (T3.6 专属)
+
+```
+0-5    Clarify    "Step count? Cross-vendor? SLA? Audit? Tenant?"
+5-10   Mental     "2PC impossible cross-vendor; eventual via Saga/Outbox/Temporal"
+10-25  Pattern    Saga + compensation, Outbox + worker, Workflow engine
+25-35  Idempotency 3-tier + verify-on-timeout + vendor Idempotency-Key
+35-42  Production  Indonesia refund 156K + DLQ + ops escalate
+42-45  Resume      "Indonesia refund 0 double, TikTok outbox 0 event lost"
+```
+
+### 🔢 关键 production 数字
+
+- Indonesia refund: 156K processed, 0 double-refund, 1.9% verify-on-timeout
+- Of verify-on-timeout: 93% auto-recover via get_status, 0.4% ops escalate
+- TikTok payment outbox: 0 event lost in 12 months
+- Voice agent SMS: 0 double-SMS via 3-tier idempotency
+- Temporal vs handroll: 3-4x dev velocity, significantly less bug
+- 2PC tried: week 1 → abandoned → Saga week 2 (cross-vendor case)
+- P99 multi-step refund: 8.5s
+- Compensation trigger rate: 0.3% (most in fund_return step)
+- Idempotency key TTL (vendor side): 5 days minimum (Stripe spec)
+
+### 🧠 mental model anchors
+
+- "2PC is impossible cross-vendor"
+- "Saga short / Outbox cross-service / Temporal long"
+- "Idempotency 3-tier: Redis + DB unique + vendor"
+- "Order matters: email LAST"
+- "Verify-on-timeout: get_status → 5 outcomes"
+- "Agent-as-workflow: LLM = activity, conversation = state"
+- "DLQ + ops UI for stuck workflow"

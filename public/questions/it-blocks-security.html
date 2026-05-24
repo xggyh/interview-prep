@@ -736,6 +736,165 @@ Phrases:
   - Ship before IT signoff
   - Generic SOC 2 dump
   - Argue with IT in group call</code></pre>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<blockquote><p><strong>IT 不是你的敌人, 是你最稳定的盟友 — 如果你赢得他的信任</strong>. 90% IT block 不是真 security concern, 是 control 缺失 + 流程被跳过 + 个人 risk 担忧. 你的 job 不是 "证明 we're secure", 是让 IT 感受到他在控制 process + 给他 quantified checklist + 给他 veto 权.</p></blockquote>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>SOC 2 Type II</td><td>AICPA 6-12 个月运营审计, 5 trust principles</td><td>enterprise 99% 必问</td></tr><tr><td>ISO 27001</td><td>国际 ISMS standard, 欧洲 push</td><td>+ SOC 2 完整 baseline</td></tr><tr><td>HIPAA</td><td>美国医疗数据法, PHI 必须 BAA</td><td>healthcare</td></tr><tr><td>PCI DSS</td><td>信用卡数据安全 (Level 1-4)</td><td>支付场景</td></tr><tr><td>BAA</td><td>Business Associate Agreement (HIPAA)</td><td>不签不能碰 PHI</td></tr><tr><td>DPA</td><td>Data Processing Agreement (GDPR)</td><td>欧洲 mandatory</td></tr><tr><td>DEK</td><td>Data Encryption Key, 加密 data</td><td>per-tenant DEK</td></tr><tr><td>KEK</td><td>Key Encryption Key, 加密 DEK</td><td>wrapping pattern</td></tr><tr><td>BYOK</td><td>Bring Your Own Key, 客户提供 KEK</td><td>customer-controlled</td></tr><tr><td>HYOK</td><td>Hold Your Own Key, 客户 hold KEK 每次问</td><td>最严, latency 大</td></tr><tr><td>HSM</td><td>Hardware Security Module, FIPS 140-2 L3+</td><td>物理硬件 key</td></tr><tr><td>Data residency</td><td>数据物理 region</td><td>EU / 越南 / 印尼 in-country</td></tr><tr><td>Zero Trust</td><td>不假设 network 默认可信</td><td>现代 enterprise 范式</td></tr><tr><td>STRIDE</td><td>Spoofing/Tamper/Repudiation/Info/DoS/Elevation</td><td>threat model framework</td></tr><tr><td>FedRAMP</td><td>US federal authorization, 1-2 年</td><td>federal customer</td></tr><tr><td>CAIQ</td><td>Cloud security questionnaire 标准答</td><td>24h 内 return 填好</td></tr><tr><td>SIEM</td><td>Security Information &amp; Event Management</td><td>客户 audit log 接入</td></tr></tbody></table>
+<h4>🎯 5 个核心 framework</h4>
+<p><strong>Framework 1</strong>: 6-Layer Real Concern (L1-L6) 识别</p>
+<ul><li>When: 收到 IT block 信号第一刻</li><li>Algorithm:</li><li>L1 Surface: data leaving network → checklist (SOC 2 / ISO / DPA)</li><li>L2 Control: oversight 缺失 → governance access + audit log</li><li>L3 NIH: internal alternative → make ally + joint platform</li><li>L4 Career: vendor failure = my fault → legal SLA + insurance</li><li>L5 Geopolitical: don't trust [country] → data residency</li><li>L6 Past trauma: previously burned → trust building over time</li><li>Trade-off: 误判 layer = 按错药, listen-only 50% before propose</li><li>Tools: 1:1 with IT lead (not group call), open-ended questions, sponsor align</li></ul>
+<p><strong>Framework 2</strong>: Security Control Inventory (10-Doc Package)</p>
+<ul><li>When: 知道 layer 后 customize</li><li>Algorithm:</li></ul>
+<ol><li>1-pager security overview</li><li>SOC 2 Type II + ISO 27001 + relevant cert</li><li>Architecture + threat model (STRIDE)</li><li>Encryption + BYOK detail</li><li>Access control model (Zero Trust)</li><li>Audit log schema + SIEM integration</li><li>Data handling + residency</li><li>IR runbook + insurance</li><li>Pen-test summary (NDA-gated)</li><li>Contract templates (MSA / DPA / BAA)</li></ol>
+<ul><li>Trade-off: 给所有 = 信息淹没, 给 0 = 不信任</li><li>Tools: per-role tailoring (CISO exec brief / architect threat model / compliance audit / analyst SIEM / IT director governance)</li></ul>
+<p><strong>Framework 3</strong>: 3-Tier Phased Rollout</p>
+<ul><li>When: IT 不让全量上线</li><li>Algorithm:</li><li>T1 (2w): sandbox non-prod, FREE, full audit access, IT veto</li><li>T2 (4w): prod single team, BYOK, daily review, discounted</li><li>T3 (12w+): broader scope, IT signoff each expansion, standard pricing</li><li>每 stage IT veto authority (single kill-switch feature flag, customer holds credential, 24h on-call, no questions asked)</li><li>Trade-off: 慢, 但 IT 感觉 in control</li><li>Tools: feature flag (LaunchDarkly), audit log streaming, customer-controlled credential</li></ul>
+<p><strong>Framework 4</strong>: 3-Way Working Session (IT vs Business 平衡)</p>
+<ul><li>When: 内部冲突需要中立 facilitate</li><li>Algorithm:</li><li>Restate goals (Business + IT 都 legitimate)</li><li>Identify constraints (both 角度)</li><li>Propose phased approach</li><li>Define exit criteria</li><li>Agree on cadence (weekly / biweekly)</li><li>Action items</li><li>Trade-off: 站任何一边都错, 必须 facilitator</li><li>Tools: meeting facilitator hat, structured agenda, exit criteria writeup</li></ul>
+<p><strong>Framework 5</strong>: When to Commit vs Refuse (Push Back)</p>
+<ul><li>When: 客户 ask 超出工程能力</li><li>Algorithm:</li><li><strong>Don't lightly commit</strong>:</li><li>On-prem deployment (6-12 month custom)</li><li>Air-gapped (radically reduce function)</li><li>FedRAMP (1-2 year process, 可能拿不到)</li><li>Unlimited liability (never)</li><li>Continuous pen-test (annual is industry)</li><li>Sub-hour breach notification (impossible)</li><li><strong>Can commit</strong>:</li><li>SOC 2 + ISO 27001 + DPA + BAA + custom amendment</li><li>BYOK + per-tenant DEK</li><li>Data residency per-region (US / EU / SEA)</li><li>Audit log streaming to SIEM</li><li>Customer-paid pen-test annual</li><li>24h breach notification</li><li>Cyber insurance certificate</li><li>Trade-off: yes 失底线, no 失关系, 平衡 craft</li><li>Tools: 内部 CISO pre-align ceiling, contract template library, escalation hierarchy</li></ul>
+<h4>🌳 关键决策树</h4>
+<pre class="language-plaintext"><code class="language-plaintext">IT block 来源?
+├── CISO (顶层) → Executive briefing + risk + insurance
+├── Security architect → Architecture + threat model + control mapping
+├── Compliance officer → SOC 2 + ISO + recent audit
+├── Security analyst (执行层) → Log streaming + monitoring integration
+└── IT director (中层) → Governance + minimal team overhead
+
+Hard-block vs Soft-block?
+├── Hard (政策 e.g., FedRAMP required, 你没) → 接受 reality, deal 可能死
+├── Soft (流程慢) → 3-tier phased + IT veto + compliance package
+└── Mixed → 识别 hard 部分先 escalate to leadership, soft 部分走流程
+
+客户 ask 评估?
+├── On-prem 必要? → 内部 EM align engineering cost
+├── BYOK 必要? → ✓ commit (standard offering)
+├── In-country residency? → 看 region 能力
+├── Air-gap 必要? → 慎重 commit (function 受限)
+└── FedRAMP? → 接受可能 deal 死
+
+IT vs Business 冲突?
+├── 站任何一边都错
+├── 3-way working session facilitator
+├── Restate both as legitimate
+└── Propose phased with IT veto</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: 4-Layer Concern Model (识别真因)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Listen-only call 30-min:
+    Open: "What's your normal process for vendor review — let's go through it"
+    Open: "I want to understand directly, not filtered"
+    No deck, listen 50% time
+  
+  Layer identification:
+    L1 surface: 给 SOC 2 checklist
+    L2 control: governance access + audit log
+    L3 NIH: ally + joint platform language
+    L4 career: legal SLA + insurance + named escalation
+    L5 geopolitical (China/Russia 等): data residency in-country
+    L6 past trauma: 时间 + 透明</code></pre>
+<ul><li>Top 3 gotchas: 一上来 list mitigations (没识别 layer) / argue with IT in group / NIH 当 obstinacy 误判</li><li>Tools/tactics: open-ended questions, 1:1 not group, no deck listen-only first</li></ul>
+<p><strong>Problem 2: Security Control Inventory (10-Doc + Per-Role)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Per-role 1-pager (不要 dump 50-page SOC 2):
+    CISO: Executive briefing + risk + cyber insurance certificate
+    Architect: Architecture diagram + STRIDE threat model + control mapping
+    Compliance: SOC 2 Type II + ISO 27001 + recent audit summary
+    Analyst: Audit log schema + SIEM integration (Splunk / Datadog / Sumo)
+    IT director: Governance model + IT veto authority + minimal team overhead
+  
+  Standard checklist tick:
+    ✓ AES-256 at rest, TLS 1.3 in transit
+    ✓ Per-tenant DEK + customer KEK (BYOK)
+    ✓ SOC 2 Type II + ISO 27001
+    ✓ DPA + BAA + custom amendments
+    ✓ Audit log streaming to customer SIEM
+    ✓ Customer-paid pen-test annual
+    ✓ Data residency per region
+    ✓ Just-in-time engineer access
+    ✓ 24/7 on-call + 24h breach notification
+    ✓ Cyber insurance certificate</code></pre>
+<ul><li>Top 3 gotchas: generic 50-page dump / 没 per-role tailor / 没 SIEM integration story</li><li>Tools/tactics: CAIQ / CCM pre-filled library, quarterly update, 24h SLA return</li></ul>
+<p><strong>Problem 3: Compliance / Certifications Proof Package</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Industry mapping:
+    Healthcare: SOC 2 + HIPAA + BAA
+    Financial: SOC 2 + PCI DSS + SOX
+    EU enterprise: SOC 2 + ISO 27001 + GDPR DPA
+    US federal: FedRAMP (1-2yr, accept reality if don't have)
+    Indonesia BNPL: OJK 认证 + 本地 KYC compliance
+  
+  Audit-ready:
+    Recent SOC 2 audit &lt; 12 months old
+    Customer audit access portal (Vanta / Drata)
+    Quarterly attestation update
+    Pen-test annual + remediation tracking
+  
+  Contract templates:
+    MSA (Master Service Agreement)
+    DPA (GDPR)
+    BAA (HIPAA)
+    Custom amendments per customer</code></pre>
+<ul><li>Top 3 gotchas: SOC 2 outdated (&gt; 12 月) / 没 industry-specific cert / 没 audit access portal</li><li>Tools/tactics: Vanta / Drata compliance automation, audit report library, contract template versioning</li></ul>
+<p><strong>Problem 4: Pilot / Sandbox / POC (Build Trust Incrementally)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  T1 Sandbox (2 weeks):
+    Non-prod data, synthetic + masked
+    FREE (no cost)
+    Full audit access to customer IT
+    IT has veto + kill switch single command
+    Goal: prove integration works, build trust
+  
+  T2 Restricted Prod (4 weeks):
+    Real prod data 1 team only
+    BYOK customer-controlled encryption
+    Daily review with customer IT
+    Discounted pricing
+    Goal: prove production-grade
+  
+  T3 Broader (12+ weeks):
+    Expanded scope, more teams
+    IT signoff at each expansion
+    Standard pricing
+    Goal: gradual scale
+  
+  IT-veto principle:
+    Single kill-switch command (feature flag)
+    Customer holds credential
+    24h on-call escalation
+    No question asked when invoked</code></pre>
+<ul><li>Top 3 gotchas: 全量上线没 phasing / 没 customer-controlled kill switch / IT 不在 veto authority</li><li>Tools/tactics: LaunchDarkly feature flag, customer credential vault, 24h on-call rota</li></ul>
+<p><strong>Problem 5: IT vs Business Conflict (3-Way Working Session)</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">  Facilitator hat:
+    Don't side with either
+    Restate both as legitimate
+    "Business needs X, IT needs Y, both legitimate"
+  
+  3-Way agenda:
+    1. Restate goals (Business + IT)
+    2. Identify constraints (both legitimate)
+    3. Propose phased with IT veto
+    4. Define exit criteria
+    5. Cadence (weekly / biweekly)
+    6. Action items
+  
+  Sales pressure to escalate over IT:
+    Public: 不当面反驳
+    Private: "Escalating burns IT permanently. Phased + IT veto faster long-term"
+    AE 坚持: escalate manager. Don't put your name on bypass</code></pre>
+<ul><li>Top 3 gotchas: 站 sales 边 (IT 永敌) / 站 IT 边 (business sponsor 失) / escalate over IT to CIO</li><li>Tools/tactics: facilitator hat, 3-way working session, 不 cut-throat sales escalation</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>Escalate over IT to CIO → IT 永久敌对, 续约 block</li><li>Skip IT review process → burning bridge</li><li>Argue with IT in group call → 公开 loss, IT 面子受损</li><li>Promise "我们 secure" without checklist → hand-wave dismiss</li><li>Blame sales VP to IT → internal disloyalty</li><li>NIH 当 obstinacy 误判 → 错失 ally 机会</li><li>没 phased option → all-or-nothing 死</li><li>Over-promise on-prem / air-gap → 工程做不到, explode</li><li>没 read who blocked (CISO vs analyst) → 按错药</li><li>50-page SOC 2 generic dump → IT 看 5 分钟跳走</li><li>没 internal CISO align before commit → 后续否决</li><li>客户 sponsor 落单不联络 → 失内部 champion</li><li>Skip 1:1 直接 group → 公开冲突</li><li>没 SIEM 集成 → analyst 信号缺失</li><li>Audit log 不 streaming → 客户事后无法 review</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>OJK 监管 navigation</td><td>TikTok PayLater Indonesia</td><td>监管 + bank IT 双 block, in-country residency</td></tr><tr><td>BYOK + per-tenant DEK</td><td>Voice agent multi-tenant</td><td>per-tenant encryption 你做过</td></tr><tr><td>Audit log SIEM streaming</td><td>Voice agent + BNPL</td><td>structured audit log 设计</td></tr><tr><td>GDPR DPA + 数据 residency</td><td>7 markets cross-region</td><td>EU / SEA 不同 residency 处理</td></tr><tr><td>Phased rollout + IT veto</td><td>Voice agent 跨 7 markets</td><td>shadow → opt-in → default</td></tr><tr><td>3-way working session</td><td>跨 ByteDance product/ops/legal</td><td>多 stakeholder facilitator</td></tr><tr><td>China geopolitical</td><td>TikTok 美国 / 印尼</td><td>地缘政治压力 navigation</td></tr><tr><td>Push back on impossible</td><td>EM align on engineering ceiling</td><td>air-gap 拒绝</td></tr><tr><td>3rd-party pen-test</td><td>Internal Agent Platform</td><td>annual review</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"I want to understand directly, not filtered. What's your normal vendor review process — let's go through it"</li><li>"Joint platform: you own the data, we own the AI. You can pull the plug any time"</li><li>"IT veto at every stage transition. No questions asked when invoked"</li><li>"Business needs faster delivery, IT needs control. Both legitimate. Phased approach with IT veto unblocks both"</li><li>"I won't escalate over IT to CIO — burning that bridge means we lose the next 3 years. Phased + listening is faster long-term"</li><li>"Indonesia OJK + bank IT double block — we got there with in-country residency + customer-controlled KMS + 12-week phased + quarterly review"</li><li>"If you need FedRAMP and we don't have it, I'd rather tell you upfront than waste your 6 months. Reality check"</li><li>"Veto authority is a single feature flag command. Customer holds the credential. We don't ask questions when invoked"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>Escalate over IT to CIO</li><li>Skip review process / bypass</li><li>Public group argument with IT</li><li>Promise without checklist</li><li>Over-commit on-prem / air-gap</li><li>Ship before IT signoff</li><li>Generic 50-page SOC 2 dump</li><li>NIH 当 obstinacy 误判</li><li>AE force escalation 你 silent</li><li>没 internal CISO align before commit</li></ol>
   </section>
 
   
@@ -2144,6 +2303,324 @@ Phrases:
   - Generic SOC 2 dump
   - Argue with IT in group call
 ```
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **IT 不是你的敌人, 是你最稳定的盟友 — 如果你赢得他的信任**. 90% IT block 不是真 security concern, 是 control 缺失 + 流程被跳过 + 个人 risk 担忧. 你的 job 不是 "证明 we're secure", 是让 IT 感受到他在控制 process + 给他 quantified checklist + 给他 veto 权.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| SOC 2 Type II | AICPA 6-12 个月运营审计, 5 trust principles | enterprise 99% 必问 |
+| ISO 27001 | 国际 ISMS standard, 欧洲 push | + SOC 2 完整 baseline |
+| HIPAA | 美国医疗数据法, PHI 必须 BAA | healthcare |
+| PCI DSS | 信用卡数据安全 (Level 1-4) | 支付场景 |
+| BAA | Business Associate Agreement (HIPAA) | 不签不能碰 PHI |
+| DPA | Data Processing Agreement (GDPR) | 欧洲 mandatory |
+| DEK | Data Encryption Key, 加密 data | per-tenant DEK |
+| KEK | Key Encryption Key, 加密 DEK | wrapping pattern |
+| BYOK | Bring Your Own Key, 客户提供 KEK | customer-controlled |
+| HYOK | Hold Your Own Key, 客户 hold KEK 每次问 | 最严, latency 大 |
+| HSM | Hardware Security Module, FIPS 140-2 L3+ | 物理硬件 key |
+| Data residency | 数据物理 region | EU / 越南 / 印尼 in-country |
+| Zero Trust | 不假设 network 默认可信 | 现代 enterprise 范式 |
+| STRIDE | Spoofing/Tamper/Repudiation/Info/DoS/Elevation | threat model framework |
+| FedRAMP | US federal authorization, 1-2 年 | federal customer |
+| CAIQ | Cloud security questionnaire 标准答 | 24h 内 return 填好 |
+| SIEM | Security Information & Event Management | 客户 audit log 接入 |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: 6-Layer Real Concern (L1-L6) 识别
+- When: 收到 IT block 信号第一刻
+- Algorithm:
+  - L1 Surface: data leaving network → checklist (SOC 2 / ISO / DPA)
+  - L2 Control: oversight 缺失 → governance access + audit log
+  - L3 NIH: internal alternative → make ally + joint platform
+  - L4 Career: vendor failure = my fault → legal SLA + insurance
+  - L5 Geopolitical: don't trust [country] → data residency
+  - L6 Past trauma: previously burned → trust building over time
+- Trade-off: 误判 layer = 按错药, listen-only 50% before propose
+- Tools: 1:1 with IT lead (not group call), open-ended questions, sponsor align
+
+**Framework 2**: Security Control Inventory (10-Doc Package)
+- When: 知道 layer 后 customize
+- Algorithm:
+  1. 1-pager security overview
+  2. SOC 2 Type II + ISO 27001 + relevant cert
+  3. Architecture + threat model (STRIDE)
+  4. Encryption + BYOK detail
+  5. Access control model (Zero Trust)
+  6. Audit log schema + SIEM integration
+  7. Data handling + residency
+  8. IR runbook + insurance
+  9. Pen-test summary (NDA-gated)
+  10. Contract templates (MSA / DPA / BAA)
+- Trade-off: 给所有 = 信息淹没, 给 0 = 不信任
+- Tools: per-role tailoring (CISO exec brief / architect threat model / compliance audit / analyst SIEM / IT director governance)
+
+**Framework 3**: 3-Tier Phased Rollout
+- When: IT 不让全量上线
+- Algorithm:
+  - T1 (2w): sandbox non-prod, FREE, full audit access, IT veto
+  - T2 (4w): prod single team, BYOK, daily review, discounted
+  - T3 (12w+): broader scope, IT signoff each expansion, standard pricing
+  - 每 stage IT veto authority (single kill-switch feature flag, customer holds credential, 24h on-call, no questions asked)
+- Trade-off: 慢, 但 IT 感觉 in control
+- Tools: feature flag (LaunchDarkly), audit log streaming, customer-controlled credential
+
+**Framework 4**: 3-Way Working Session (IT vs Business 平衡)
+- When: 内部冲突需要中立 facilitate
+- Algorithm:
+  - Restate goals (Business + IT 都 legitimate)
+  - Identify constraints (both 角度)
+  - Propose phased approach
+  - Define exit criteria
+  - Agree on cadence (weekly / biweekly)
+  - Action items
+- Trade-off: 站任何一边都错, 必须 facilitator
+- Tools: meeting facilitator hat, structured agenda, exit criteria writeup
+
+**Framework 5**: When to Commit vs Refuse (Push Back)
+- When: 客户 ask 超出工程能力
+- Algorithm:
+  - **Don't lightly commit**:
+    - On-prem deployment (6-12 month custom)
+    - Air-gapped (radically reduce function)
+    - FedRAMP (1-2 year process, 可能拿不到)
+    - Unlimited liability (never)
+    - Continuous pen-test (annual is industry)
+    - Sub-hour breach notification (impossible)
+  - **Can commit**:
+    - SOC 2 + ISO 27001 + DPA + BAA + custom amendment
+    - BYOK + per-tenant DEK
+    - Data residency per-region (US / EU / SEA)
+    - Audit log streaming to SIEM
+    - Customer-paid pen-test annual
+    - 24h breach notification
+    - Cyber insurance certificate
+- Trade-off: yes 失底线, no 失关系, 平衡 craft
+- Tools: 内部 CISO pre-align ceiling, contract template library, escalation hierarchy
+
+### 🌳 关键决策树
+
+```
+IT block 来源?
+├── CISO (顶层) → Executive briefing + risk + insurance
+├── Security architect → Architecture + threat model + control mapping
+├── Compliance officer → SOC 2 + ISO + recent audit
+├── Security analyst (执行层) → Log streaming + monitoring integration
+└── IT director (中层) → Governance + minimal team overhead
+
+Hard-block vs Soft-block?
+├── Hard (政策 e.g., FedRAMP required, 你没) → 接受 reality, deal 可能死
+├── Soft (流程慢) → 3-tier phased + IT veto + compliance package
+└── Mixed → 识别 hard 部分先 escalate to leadership, soft 部分走流程
+
+客户 ask 评估?
+├── On-prem 必要? → 内部 EM align engineering cost
+├── BYOK 必要? → ✓ commit (standard offering)
+├── In-country residency? → 看 region 能力
+├── Air-gap 必要? → 慎重 commit (function 受限)
+└── FedRAMP? → 接受可能 deal 死
+
+IT vs Business 冲突?
+├── 站任何一边都错
+├── 3-way working session facilitator
+├── Restate both as legitimate
+└── Propose phased with IT veto
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: 4-Layer Concern Model (识别真因)**
+- 核心解法:
+  ```
+  Listen-only call 30-min:
+    Open: "What's your normal process for vendor review — let's go through it"
+    Open: "I want to understand directly, not filtered"
+    No deck, listen 50% time
+  
+  Layer identification:
+    L1 surface: 给 SOC 2 checklist
+    L2 control: governance access + audit log
+    L3 NIH: ally + joint platform language
+    L4 career: legal SLA + insurance + named escalation
+    L5 geopolitical (China/Russia 等): data residency in-country
+    L6 past trauma: 时间 + 透明
+  ```
+- Top 3 gotchas: 一上来 list mitigations (没识别 layer) / argue with IT in group / NIH 当 obstinacy 误判
+- Tools/tactics: open-ended questions, 1:1 not group, no deck listen-only first
+
+**Problem 2: Security Control Inventory (10-Doc + Per-Role)**
+- 核心解法:
+  ```
+  Per-role 1-pager (不要 dump 50-page SOC 2):
+    CISO: Executive briefing + risk + cyber insurance certificate
+    Architect: Architecture diagram + STRIDE threat model + control mapping
+    Compliance: SOC 2 Type II + ISO 27001 + recent audit summary
+    Analyst: Audit log schema + SIEM integration (Splunk / Datadog / Sumo)
+    IT director: Governance model + IT veto authority + minimal team overhead
+  
+  Standard checklist tick:
+    ✓ AES-256 at rest, TLS 1.3 in transit
+    ✓ Per-tenant DEK + customer KEK (BYOK)
+    ✓ SOC 2 Type II + ISO 27001
+    ✓ DPA + BAA + custom amendments
+    ✓ Audit log streaming to customer SIEM
+    ✓ Customer-paid pen-test annual
+    ✓ Data residency per region
+    ✓ Just-in-time engineer access
+    ✓ 24/7 on-call + 24h breach notification
+    ✓ Cyber insurance certificate
+  ```
+- Top 3 gotchas: generic 50-page dump / 没 per-role tailor / 没 SIEM integration story
+- Tools/tactics: CAIQ / CCM pre-filled library, quarterly update, 24h SLA return
+
+**Problem 3: Compliance / Certifications Proof Package**
+- 核心解法:
+  ```
+  Industry mapping:
+    Healthcare: SOC 2 + HIPAA + BAA
+    Financial: SOC 2 + PCI DSS + SOX
+    EU enterprise: SOC 2 + ISO 27001 + GDPR DPA
+    US federal: FedRAMP (1-2yr, accept reality if don't have)
+    Indonesia BNPL: OJK 认证 + 本地 KYC compliance
+  
+  Audit-ready:
+    Recent SOC 2 audit < 12 months old
+    Customer audit access portal (Vanta / Drata)
+    Quarterly attestation update
+    Pen-test annual + remediation tracking
+  
+  Contract templates:
+    MSA (Master Service Agreement)
+    DPA (GDPR)
+    BAA (HIPAA)
+    Custom amendments per customer
+  ```
+- Top 3 gotchas: SOC 2 outdated (> 12 月) / 没 industry-specific cert / 没 audit access portal
+- Tools/tactics: Vanta / Drata compliance automation, audit report library, contract template versioning
+
+**Problem 4: Pilot / Sandbox / POC (Build Trust Incrementally)**
+- 核心解法:
+  ```
+  T1 Sandbox (2 weeks):
+    Non-prod data, synthetic + masked
+    FREE (no cost)
+    Full audit access to customer IT
+    IT has veto + kill switch single command
+    Goal: prove integration works, build trust
+  
+  T2 Restricted Prod (4 weeks):
+    Real prod data 1 team only
+    BYOK customer-controlled encryption
+    Daily review with customer IT
+    Discounted pricing
+    Goal: prove production-grade
+  
+  T3 Broader (12+ weeks):
+    Expanded scope, more teams
+    IT signoff at each expansion
+    Standard pricing
+    Goal: gradual scale
+  
+  IT-veto principle:
+    Single kill-switch command (feature flag)
+    Customer holds credential
+    24h on-call escalation
+    No question asked when invoked
+  ```
+- Top 3 gotchas: 全量上线没 phasing / 没 customer-controlled kill switch / IT 不在 veto authority
+- Tools/tactics: LaunchDarkly feature flag, customer credential vault, 24h on-call rota
+
+**Problem 5: IT vs Business Conflict (3-Way Working Session)**
+- 核心解法:
+  ```
+  Facilitator hat:
+    Don't side with either
+    Restate both as legitimate
+    "Business needs X, IT needs Y, both legitimate"
+  
+  3-Way agenda:
+    1. Restate goals (Business + IT)
+    2. Identify constraints (both legitimate)
+    3. Propose phased with IT veto
+    4. Define exit criteria
+    5. Cadence (weekly / biweekly)
+    6. Action items
+  
+  Sales pressure to escalate over IT:
+    Public: 不当面反驳
+    Private: "Escalating burns IT permanently. Phased + IT veto faster long-term"
+    AE 坚持: escalate manager. Don't put your name on bypass
+  ```
+- Top 3 gotchas: 站 sales 边 (IT 永敌) / 站 IT 边 (business sponsor 失) / escalate over IT to CIO
+- Tools/tactics: facilitator hat, 3-way working session, 不 cut-throat sales escalation
+
+### 🔥 Production gotchas (top 15)
+
+1. Escalate over IT to CIO → IT 永久敌对, 续约 block
+2. Skip IT review process → burning bridge
+3. Argue with IT in group call → 公开 loss, IT 面子受损
+4. Promise "我们 secure" without checklist → hand-wave dismiss
+5. Blame sales VP to IT → internal disloyalty
+6. NIH 当 obstinacy 误判 → 错失 ally 机会
+7. 没 phased option → all-or-nothing 死
+8. Over-promise on-prem / air-gap → 工程做不到, explode
+9. 没 read who blocked (CISO vs analyst) → 按错药
+10. 50-page SOC 2 generic dump → IT 看 5 分钟跳走
+11. 没 internal CISO align before commit → 后续否决
+12. 客户 sponsor 落单不联络 → 失内部 champion
+13. Skip 1:1 直接 group → 公开冲突
+14. 没 SIEM 集成 → analyst 信号缺失
+15. Audit log 不 streaming → 客户事后无法 review
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| OJK 监管 navigation | TikTok PayLater Indonesia | 监管 + bank IT 双 block, in-country residency |
+| BYOK + per-tenant DEK | Voice agent multi-tenant | per-tenant encryption 你做过 |
+| Audit log SIEM streaming | Voice agent + BNPL | structured audit log 设计 |
+| GDPR DPA + 数据 residency | 7 markets cross-region | EU / SEA 不同 residency 处理 |
+| Phased rollout + IT veto | Voice agent 跨 7 markets | shadow → opt-in → default |
+| 3-way working session | 跨 ByteDance product/ops/legal | 多 stakeholder facilitator |
+| China geopolitical | TikTok 美国 / 印尼 | 地缘政治压力 navigation |
+| Push back on impossible | EM align on engineering ceiling | air-gap 拒绝 |
+| 3rd-party pen-test | Internal Agent Platform | annual review |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "I want to understand directly, not filtered. What's your normal vendor review process — let's go through it"
+2. "Joint platform: you own the data, we own the AI. You can pull the plug any time"
+3. "IT veto at every stage transition. No questions asked when invoked"
+4. "Business needs faster delivery, IT needs control. Both legitimate. Phased approach with IT veto unblocks both"
+5. "I won't escalate over IT to CIO — burning that bridge means we lose the next 3 years. Phased + listening is faster long-term"
+6. "Indonesia OJK + bank IT double block — we got there with in-country residency + customer-controlled KMS + 12-week phased + quarterly review"
+7. "If you need FedRAMP and we don't have it, I'd rather tell you upfront than waste your 6 months. Reality check"
+8. "Veto authority is a single feature flag command. Customer holds the credential. We don't ask questions when invoked"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. Escalate over IT to CIO
+2. Skip review process / bypass
+3. Public group argument with IT
+4. Promise without checklist
+5. Over-commit on-prem / air-gap
+6. Ship before IT signoff
+7. Generic 50-page SOC 2 dump
+8. NIH 当 obstinacy 误判
+9. AE force escalation 你 silent
+10. 没 internal CISO align before commit
+
 </script>
 <script>
 (function(){

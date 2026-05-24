@@ -906,6 +906,104 @@ Phasing 90 days:
 
 Quote opportunity:
   "I just shipped a 9-variant ablation on agent eval for ConvFinQA on a 300-conv stratified set..."</code></pre>
+<hr />
+<h3>Extended Cheat Sheet (能背诵·含全量知识)</h3>
+<blockquote><p>10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.</p></blockquote>
+<h4>🧠 核心心智模型 (1 sentence)</h4>
+<blockquote><p><strong>Logistics AI eval = "offline replay (CADR + 9-axis strata + counterfactual + boundary) + shadow (recommend not execute) + production 14-metric monitor + 4 类 drift 自动 retrain + 5 类 failure mode mitigation"</strong>. Question 在考 eval, 不在考 agent. <strong>Eval &gt; Model</strong>.</p></blockquote>
+<h4>📚 术语全表</h4>
+<table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>CADR</td><td>Cost-Adjusted Delivery Rate = delivery_rate - λ × cost_over_baseline</td><td>单一可优化 scalar (RL reward)</td></tr><tr><td>λ (lambda)</td><td>trade-off coefficient, 0.3-0.8 per stakeholder</td><td>跟 customer 谈调</td></tr><tr><td>Counterfactual</td><td>"agent 不选这条路 outcome 会怎样" 估计</td><td>novel decision grading</td></tr><tr><td>IPW</td><td>Inverse Propensity Weighting, 罕见 decision 加权</td><td>反事实 estimator #2</td></tr><tr><td>Pessimistic bound</td><td>假设最差情形, 只有 outcome 远超才给 credit</td><td>反事实 estimator #3</td></tr><tr><td>LLM-as-judge</td><td>用另一个 LLM 评 agent novel 决策</td><td>NN 找不到匹配时</td></tr><tr><td>Self-preference bias</td><td>同 model 既当 agent 又当 judge → 偏好自己</td><td>必须不同 model family</td></tr><tr><td>Boundary tests</td><td>50-200 domain expert 手工标 critical case</td><td>hazmat / 高值 compliance</td></tr><tr><td>Data drift</td><td>输入分布变 (KS test)</td><td>新地区上线 / 季节变化</td></tr><tr><td>Concept drift</td><td>feature→label 关系变 (recent vs baseline perf)</td><td>燃油涨价后 cost 决策不再最优</td></tr><tr><td>Behavior drift</td><td>agent 输出分布变 (KL divergence)</td><td>突然 5x 选 air freight</td></tr><tr><td>Outcome drift</td><td>业务结果趋势 (Mann-Kendall)</td><td>CADR 缓慢下跌</td></tr><tr><td>DLQ</td><td>Dead Letter Queue, 失败决策落库</td><td>growth &gt; 100/min alert</td></tr><tr><td>Manager gaming</td><td>假装 accept 后台手动改</td><td>accept rate metric 危险</td></tr><tr><td>Stratified eval</td><td>多轴分桶 (carrier × region × tier × value × class × weather × season)</td><td>防 aggregate 掩盖</td></tr><tr><td>Time-based split</td><td>train/dev/test 按时间切, 不 random</td><td>避免 temporal leakage</td></tr></tbody></table>
+<h4>🎯 5 个核心 framework</h4>
+<p><strong>Framework 1</strong>: 单一 scalar metric (CADR + tunable λ)</p>
+<ul><li>When: 多 trade-off (delivery vs cost) 需要 single optimization signal</li><li>Algorithm: <code>CADR = delivery_rate - λ × max(0, cost - baseline) / baseline</code></li><li>Trade-off: 单 scalar 易 RL 训练, 但丢失 stratification 洞察, 必须配 multi-axis dashboard</li><li>Tools: Numpy percentile, Pandas groupby, Looker dashboard</li></ul>
+<p><strong>Framework 2</strong>: 3-Estimator counterfactual + LLM judge</p>
+<ul><li>When: novel decision human 没做过, 无 ground truth</li><li>Algorithm: NN (历史最像) / IPW (倒概率加权) / Pessimistic (最差假设) → 3 个 agreement → &gt; 20% 分歧 = low confidence flag for human</li><li>Trade-off: 都是估计不是真值; LLM judge 自偏好风险</li><li>Tools: scikit FAISS NN, Gemini 3 Pro $2/$12 + Claude Opus 4.7 $5/$25 dual-judge, kappa &gt; 0.85 校准</li></ul>
+<p><strong>Framework 3</strong>: 3-Layer eval pipeline (offline → shadow → production)</p>
+<ul><li>When: 任何 production AI agent</li><li>Algorithm: Offline (CI replay 2yr, block if CADR worse / strata regression / boundary critical fail) → Shadow (4w, recommend not execute, weekly retro accept rate + outcome) → Production (canary + 14 metric daily alert + kill switch)</li><li>Trade-off: 慢, 但跳一层 = 早期 bug 打到客户</li><li>Tools: GitHub Actions CI, LaunchDarkly feature flag, Datadog APM, Mimir 长期, dbt + Airflow</li></ul>
+<p><strong>Framework 4</strong>: 4-Drift detection + retraining pipeline</p>
+<ul><li>When: 上线后自动监测环境变化</li><li>Algorithm:</li><li>Data drift: KS test per feature, pval &lt; 0.01 → flag</li><li>Concept drift: train quick model on recent 30d, if &gt; +3% baseline → retrain</li><li>Behavior drift: KL(today || last_7d) &gt; 0.5 → investigate (could be prompt injection)</li><li>Outcome drift: Mann-Kendall tau &lt; -0.3 + pval &lt; 0.01 → urgent retrain</li><li>Trade-off: 检测灵敏度 vs 假警报频率</li><li>Tools: scipy.stats.ks_2samp / kendalltau, Evidently, Whylogs, Great Expectations</li></ul>
+<p><strong>Framework 5</strong>: 5-Class production failure mitigation</p>
+<ul><li>When: 永远生效, 5 个独立 detector</li><li>Algorithm:</li><li>Upstream stale: SAP 60min lag → disable inventory decisions; weather 30min stale → no_weather_signal</li><li>Edge case: &gt; $5K value / hazmat / VIP / single trigger &gt; 100 / cost &gt; $1000 / novel pattern → escalate</li><li>Prompt injection: sanitize (truncate, structured input) / system prompt 强化 / output validate (cost &gt; 1.5x baseline → escalate)</li><li>Correlated failure: 60min 窗口任何 decision type &gt; 5x baseline OR single trigger &gt; 100 affected → pause + oncall</li><li>Manager gaming: 对比 accept vs actual action, &gt; 20% mismatch → alert; outcome metric 主导, 不是 accept rate</li><li>Trade-off: 5 个 guard 会增加 manual escalation 量</li><li>Tools: feature_flag.set('agent_enabled', False) kill switch, DLQ growth alert</li></ul>
+<h4>🌳 关键决策树</h4>
+<pre class="language-plaintext"><code class="language-plaintext">新 PR 提交 → CI offline eval
+├── CADR &lt; human - 0.005? → FAIL block
+├── Strata regression (any &gt; -0.02)? → FAIL block
+├── Boundary critical fail rate &gt; 0? → FAIL block
+└── Else → Stage to shadow
+
+Shadow 4w
+├── Agreement &lt; 85%? → review, possibly block
+├── Manager accept rate per manager &gt; 70%? → continue
+└── Else → Pilot 3 warehouse
+
+Pilot 4w
+├── Outcome worse than control? → kill, debug
+└── Else → Production canary
+
+Production daily
+├── Delivery rate &lt; 99% / 24h? → page + kill switch eval
+├── Cost &gt; 110% baseline / 6h? → page
+├── KL(today || baseline) &gt; 0.5? → page (injection?)
+├── DLQ growth &gt; 100/h? → page
+├── Novel decision &gt; 20% / 1h? → warn
+└── Latency p99 &gt; 2s? → warn</code></pre>
+<h4>⚙️ Part 2 五个深度问题速查</h4>
+<p><strong>Problem 1: CADR + Stratification</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  cadr = delivery_rate - 0.5 * max(0, cost - baseline)/baseline
+  strata = carrier × region × tier × class × value × weather × season  # 7 axes
+  alert if any stratum drops &gt; 0.02 vs last_week
+  also: P50/P99/P999 tail metrics, spike_analysis above_p99</code></pre>
+<ul><li>Top 3 gotchas: 多 metric 选不出 Pareto / aggregate 改善某 strata 退步 / 忽略 P99 tail</li><li>Tools: numpy.percentile, scipy, Pandas groupby</li></ul>
+<p><strong>Problem 2: Counterfactual Eval</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # 3 estimator agreement
+  nn = nearest_neighbor_outcome(decision, context, k=20)
+  ipw = ipw_outcome(decision, context)  # 1/propensity weight
+  pess = max_historical_outcome(context)
+  if max-min &gt; 0.2 * mean: confidence=low, flag_human
+  # LLM judge for truly novel
+  judge: gemini_pro_complete(prompt), inter-judge with Claude Opus 4.7</code></pre>
+<ul><li>Top 3 gotchas: self-preference bias (same model) / IPW propensity &lt; 0.05 不可靠 / novel decision 当当然给 credit</li><li>Tools: scikit FAISS, Gemini 3 Pro $2/$12 + Claude Opus 4.7 $5/$25 dual-judge</li></ul>
+<p><strong>Problem 3: 3-Layer Pipeline</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  offline_eval(agent) → PASS gate
+    └── time_split / CADR / strata / boundary / novel rate
+  ShadowAgent.on_shipment_delay → log decision, human still decides
+  ProductionMonitor: 14 alerts (4 维度) + kill switch</code></pre>
+<ul><li>Top 3 gotchas: random split temporal leakage / 跳 shadow 直 pilot / production 没 kill switch</li><li>Tools: GitHub Actions, LaunchDarkly, Datadog, OpenTelemetry, Mimir, dbt + Airflow</li></ul>
+<p><strong>Problem 4: Drift + Retraining</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  # 4 类 drift detection daily
+  data_drift: scipy.stats.ks_2samp(today, baseline) pval &lt; 0.01
+  concept_drift: quick_model_perf - baseline_perf &gt; 0.03
+  behavior_drift: kl_divergence(today_dec, last_7d_dec) &gt; 0.5
+  outcome_drift: scipy.stats.kendalltau(days, cadr) tau &lt; -0.3 pval &lt; 0.01
+  # retraining pipeline auto:
+  pull 6mo → time_split → fine_tune → offline_eval gate → boundary gate → shadow 14d → pilot 14d → canary</code></pre>
+<ul><li>Top 3 gotchas: 检测到 drift 但没 trigger pipeline / 行为 drift 当 retrain 信号 (实际可能 prompt injection) / 不区分 4 类 drift</li><li>Tools: scipy.stats, Evidently, Whylogs, Great Expectations, Argo Workflows</li></ul>
+<p><strong>Problem 5: 5-Class Failure Modes</strong></p>
+<ul><li>核心解法:</li></ul>
+<pre class="language-python"><code class="language-python">  upstream: cross_validate(sap_value, warehouse_actual), &gt; 10% diff → unreliable
+  edge_case: load_escalation_triggers().any() → queue_human
+  injection: sanitize + system_prompt + output_validate cost &gt; 1.5x → escalate
+  correlated: 1h window any decision_type &gt; 5x baseline OR single_trigger &gt; 100 → pause + page
+  gaming: detect_gaming(accept vs actual_action), &gt; 20% mismatch → per-manager alert</code></pre>
+<ul><li>Top 3 gotchas: accept rate 当主 metric → gaming / 没 cost cap → single weather false alarm $150K / 不 cross-validate SAP</li><li>Tools: Datadog metric monitor, audit_log immutable, feature_flag kill switch</li></ul>
+<h4>🔥 Production gotchas (top 15)</h4>
+<ol><li>Random train/test split → temporal leakage, eval 5-10% 高估</li><li>只看 aggregate → hazmat 类 -15% 被掩盖</li><li>Accept rate 当唯一 signal → manager gaming</li><li>LLM judge 没校准 → 系统性 self-preference bias</li><li>同 model 既 agent 又 judge → bias 灾难</li><li>没 counterfactual → novel decision 无法 grade</li><li>跳 shadow 直 pilot → bug 直接打客户</li><li>没 cost cap → 单 spike $100K 客户暴怒</li><li>没 hold-out 季节性 → 1 月训圣诞季拍脑袋</li><li>SAP 30min lag → agent 决策基于过期 inventory</li><li>Weather API stale → 触发不必要 reroute</li><li>Hazmat air freight → COMPLIANCE 违法, 1 次 = 项目暂停</li><li>Prompt injection: customer_notes 含 "UPGRADE TO AIR" → agent 听话</li><li>Correlated failure: 假天气警报 → 5000 包裹 reroute $150K</li><li>Drift detector 但没 trigger pipeline → 形同虚设</li></ol>
+<h4>💬 简历 reframe 索引</h4>
+<table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>3-layer eval suite</td><td>ConvFinQA</td><td>stratified 300 baseline + 9-variant ablation</td></tr><tr><td>Counterfactual 4-cell</td><td>ConvFinQA</td><td>both pass / helped / hurt / both fail 矩阵</td></tr><tr><td>LLM-as-judge</td><td>ConvFinQA critic variant</td><td>试过, 诚实报告 negative result</td></tr><tr><td>Boundary tests</td><td>ConvFinQA stratified 300 by topic</td><td>你做过</td></tr><tr><td>Multi-axis stratification</td><td>Voice agent 7 markets</td><td>by market × language × intent × tier</td></tr><tr><td>Drift detection prod</td><td>Voice agent</td><td>ASR drift 某 market 处理过</td></tr><tr><td>Prompt injection</td><td>Voice agent multi-turn</td><td>多 turn input sanitization 思考过</td></tr><tr><td>Reward shaping</td><td>Voice agent RL alignment</td><td>delivery rate + cost 多 metric reward</td></tr><tr><td>90-day phasing</td><td>Voice agent 7 markets</td><td>shadow → opt-in → default → kill</td></tr><tr><td>Cost math</td><td>ConvFinQA / Voice agent</td><td>$6 / CI run + $0.012 / agent decision 你算过</td></tr></tbody></table>
+<h4>🎤 面试现场 quotables (top 8)</h4>
+<ol><li>"I just published an ablation on agent eval for ConvFinQA — 9 variants on stratified 300, none beat baseline. I know eval suite quality determines whether your improvements are real"</li><li>"CADR with tunable λ — single scalar so RL can optimize, but I'd always dashboard the 7 strata so aggregate doesn't hide regression"</li><li>"3 counterfactual estimator agreement — NN + IPW + pessimistic, &gt; 20% disagreement = flag for human"</li><li>"I'd never let agent and judge be the same model family — self-preference bias kills the eval"</li><li>"Block CI on strata regression — same gate I built for ConvFinQA"</li><li>"Per-day cost cap + correlated failure guard — single weather false alarm should never blow $150K"</li><li>"Drift detection is 4 classes — data, concept, behavior, outcome. Behavior drift could be prompt injection, not just retrain trigger"</li><li>"Accept rate is gaming risk. Outcome metric is the real North Star"</li></ol>
+<h4>🚨 红线 (top 10 anti-patterns)</h4>
+<ol><li>直接画 agent architecture (题考 eval, 不考 agent)</li><li>只说 offline eval (STAFF 必须 online + production)</li><li>没 counterfactual (novel 怎么 grade?)</li><li>忽略 prompt injection (agentic #1 attack)</li><li>没 cost cap / kill switch (跑飞了怎么停)</li><li>Accept-rate 当唯一 metric (manager gaming)</li><li>跳 phasing (零部署经验)</li><li>Random split (temporal leakage)</li><li>不 stratify (aggregate 掩盖)</li><li>Drift 检测但没 retraining pipeline</li></ol>
+<h4>📊 数字 anchors (面试必记)</h4>
+<table class="md-table"><thead><tr><th>Metric</th><th>Value</th><th>Source</th></tr></thead><tbody><tr><td>CADR λ</td><td>0.3-0.8 per stakeholder</td><td>跟 customer 谈</td></tr><tr><td>9-axis stratification</td><td>carrier × region × tier × value × class × weather × season + 自定义</td><td>防 aggregate 掩盖</td></tr><tr><td>Strata regression threshold</td><td>-0.02 vs last week → alert</td><td>2% drop monitor</td></tr><tr><td>Sample size</td><td>minimum 100 per strata for reliability</td><td>噪声防</td></tr><tr><td>Counterfactual estimator</td><td>3 (NN / IPW / Pessimistic), 分歧 &gt; 20% mean = low conf</td><td>flag human</td></tr><tr><td>IPW propensity floor</td><td>&lt; 0.05 不可靠</td><td>罕见 decision</td></tr><tr><td>Boundary tests</td><td>50-200 hand-crafted by domain expert</td><td>critical class 100% pass</td></tr><tr><td>LLM-judge kappa</td><td>&gt; 0.85 必须 (logistics 强 stake)</td><td>inter-judge calibrate</td></tr><tr><td>Daily monitor cost</td><td>$25-50 LLM-as-judge</td><td>100-1000 sample/day</td></tr><tr><td>Agent decision cost</td><td>$0.012 each (500 in + 200 out, Gemini 3 Pro $2/$12)</td><td>per-query cost</td></tr><tr><td>CI run judge cost</td><td>$5 (500 cases × 800 tokens, Pro)</td><td>block on regression</td></tr><tr><td>Shadow duration</td><td>4 weeks</td><td>recommend not execute</td></tr><tr><td>Pilot scope</td><td>3 warehouses opt-in × 4 weeks</td><td>limited rollout</td></tr><tr><td>Phasing</td><td>D0-30 offline / D30-60 shadow / D60-90 opt-in / D90+ gradual</td><td>90-day rollout</td></tr><tr><td>Drift retraining trigger</td><td>data &gt; 5 features OR concept &gt; 0.03 OR behavior KL &gt; 0.5 OR outcome tau &lt; -0.3</td><td>auto-mark</td></tr><tr><td>Cost cap</td><td>per-day Σ reroute cost ≤ $X / customer approval</td><td>correlated failure guard</td></tr><tr><td>Single trigger</td><td>&gt; 100 affected → pause + page</td><td>mass weather event</td></tr><tr><td>Gaming detection</td><td>accept vs actual_action &gt; 20% mismatch</td><td>manager flag</td></tr><tr><td>Cost spike threshold</td><td>&gt; 110% baseline / 6h sustained → page</td><td>financial gate</td></tr><tr><td>Delivery rate floor</td><td>&lt; 99% / 24h sustained → page</td><td>SLA breach</td></tr></tbody></table>
+<h4>💡 Counterfactual Estimator cheat (背诵)</h4>
+<table class="md-table"><thead><tr><th>Estimator</th><th>公式 / 思路</th><th>限制</th></tr></thead><tbody><tr><td>Nearest-neighbor</td><td>k_nearest_historical (k=20), filter same decision, mean outcome</td><td>k 太小或匹配少 → None novel flag</td></tr><tr><td>Inverse Propensity Weighting</td><td>propensity = historical_count(decision) / total; if &lt; 0.05 None; else weighted outcome / propensity</td><td>罕见 decision 不可靠</td></tr><tr><td>Pessimistic bound</td><td>max historical outcome for similar context, conservative</td><td>过保守, 只 good case 给 credit</td></tr><tr><td>Agreement check</td><td>range(estimates) &gt; 0.2 × mean → low confidence, flag human</td><td>3 estimator 必跑</td></tr><tr><td>LLM-as-judge</td><td>Gemini 3 Pro $2/$12 evaluate plausibility/cost/delivery/compliance</td><td>novel decision 用, kappa &gt; 0.85 必须</td></tr><tr><td>Dual-judge</td><td>Gemini 3 Pro + Claude Opus 4.7, inter-judge agreement alert</td><td>self-preference bias 防</td></tr></tbody></table>
+<h4>💡 Production Alert cheat (背诵)</h4>
+<table class="md-table"><thead><tr><th>Alert</th><th>Condition</th><th>Severity</th></tr></thead><tbody><tr><td>delivery_rate_drop</td><td>&lt; 0.99 sustained 24h</td><td>page, kill-switch eval</td></tr><tr><td>cost_spike</td><td>&gt; 1.10 baseline sustained 6h</td><td>page</td></tr><tr><td>decision_distribution_shift</td><td>KL(today, last_7d) &gt; 0.5</td><td>page, prompt injection?</td></tr><tr><td>dlq_growth</td><td>&gt; 100 entries/hour</td><td>page</td></tr><tr><td>novel_decision_burst</td><td>&gt; 20% in 1h window</td><td>warn, state shift?</td></tr><tr><td>latency_p99</td><td>&gt; 2000ms</td><td>warn</td></tr></tbody></table>
   </section>
 
   
@@ -2155,6 +2253,274 @@ Phasing 90 days:
 Quote opportunity:
   "I just shipped a 9-variant ablation on agent eval for ConvFinQA on a 300-conv stratified set..."
 ```
+
+---
+
+## Extended Cheat Sheet (能背诵·含全量知识)
+
+> 10-15 min 通读, 覆盖本页所有 framework / decision / production gotcha.
+
+### 🧠 核心心智模型 (1 sentence)
+
+> **Logistics AI eval = "offline replay (CADR + 9-axis strata + counterfactual + boundary) + shadow (recommend not execute) + production 14-metric monitor + 4 类 drift 自动 retrain + 5 类 failure mode mitigation"**. Question 在考 eval, 不在考 agent. **Eval > Model**.
+
+### 📚 术语全表
+
+| 术语 | 一句话定义 | 何时用 |
+|---|---|---|
+| CADR | Cost-Adjusted Delivery Rate = delivery_rate - λ × cost_over_baseline | 单一可优化 scalar (RL reward) |
+| λ (lambda) | trade-off coefficient, 0.3-0.8 per stakeholder | 跟 customer 谈调 |
+| Counterfactual | "agent 不选这条路 outcome 会怎样" 估计 | novel decision grading |
+| IPW | Inverse Propensity Weighting, 罕见 decision 加权 | 反事实 estimator #2 |
+| Pessimistic bound | 假设最差情形, 只有 outcome 远超才给 credit | 反事实 estimator #3 |
+| LLM-as-judge | 用另一个 LLM 评 agent novel 决策 | NN 找不到匹配时 |
+| Self-preference bias | 同 model 既当 agent 又当 judge → 偏好自己 | 必须不同 model family |
+| Boundary tests | 50-200 domain expert 手工标 critical case | hazmat / 高值 compliance |
+| Data drift | 输入分布变 (KS test) | 新地区上线 / 季节变化 |
+| Concept drift | feature→label 关系变 (recent vs baseline perf) | 燃油涨价后 cost 决策不再最优 |
+| Behavior drift | agent 输出分布变 (KL divergence) | 突然 5x 选 air freight |
+| Outcome drift | 业务结果趋势 (Mann-Kendall) | CADR 缓慢下跌 |
+| DLQ | Dead Letter Queue, 失败决策落库 | growth > 100/min alert |
+| Manager gaming | 假装 accept 后台手动改 | accept rate metric 危险 |
+| Stratified eval | 多轴分桶 (carrier × region × tier × value × class × weather × season) | 防 aggregate 掩盖 |
+| Time-based split | train/dev/test 按时间切, 不 random | 避免 temporal leakage |
+
+### 🎯 5 个核心 framework
+
+**Framework 1**: 单一 scalar metric (CADR + tunable λ)
+- When: 多 trade-off (delivery vs cost) 需要 single optimization signal
+- Algorithm: `CADR = delivery_rate - λ × max(0, cost - baseline) / baseline`
+- Trade-off: 单 scalar 易 RL 训练, 但丢失 stratification 洞察, 必须配 multi-axis dashboard
+- Tools: Numpy percentile, Pandas groupby, Looker dashboard
+
+**Framework 2**: 3-Estimator counterfactual + LLM judge
+- When: novel decision human 没做过, 无 ground truth
+- Algorithm: NN (历史最像) / IPW (倒概率加权) / Pessimistic (最差假设) → 3 个 agreement → > 20% 分歧 = low confidence flag for human
+- Trade-off: 都是估计不是真值; LLM judge 自偏好风险
+- Tools: scikit FAISS NN, Gemini 3 Pro $2/$12 + Claude Opus 4.7 $5/$25 dual-judge, kappa > 0.85 校准
+
+**Framework 3**: 3-Layer eval pipeline (offline → shadow → production)
+- When: 任何 production AI agent
+- Algorithm: Offline (CI replay 2yr, block if CADR worse / strata regression / boundary critical fail) → Shadow (4w, recommend not execute, weekly retro accept rate + outcome) → Production (canary + 14 metric daily alert + kill switch)
+- Trade-off: 慢, 但跳一层 = 早期 bug 打到客户
+- Tools: GitHub Actions CI, LaunchDarkly feature flag, Datadog APM, Mimir 长期, dbt + Airflow
+
+**Framework 4**: 4-Drift detection + retraining pipeline
+- When: 上线后自动监测环境变化
+- Algorithm:
+  - Data drift: KS test per feature, pval < 0.01 → flag
+  - Concept drift: train quick model on recent 30d, if > +3% baseline → retrain
+  - Behavior drift: KL(today || last_7d) > 0.5 → investigate (could be prompt injection)
+  - Outcome drift: Mann-Kendall tau < -0.3 + pval < 0.01 → urgent retrain
+- Trade-off: 检测灵敏度 vs 假警报频率
+- Tools: scipy.stats.ks_2samp / kendalltau, Evidently, Whylogs, Great Expectations
+
+**Framework 5**: 5-Class production failure mitigation
+- When: 永远生效, 5 个独立 detector
+- Algorithm:
+  - Upstream stale: SAP 60min lag → disable inventory decisions; weather 30min stale → no_weather_signal
+  - Edge case: > $5K value / hazmat / VIP / single trigger > 100 / cost > $1000 / novel pattern → escalate
+  - Prompt injection: sanitize (truncate, structured input) / system prompt 强化 / output validate (cost > 1.5x baseline → escalate)
+  - Correlated failure: 60min 窗口任何 decision type > 5x baseline OR single trigger > 100 affected → pause + oncall
+  - Manager gaming: 对比 accept vs actual action, > 20% mismatch → alert; outcome metric 主导, 不是 accept rate
+- Trade-off: 5 个 guard 会增加 manual escalation 量
+- Tools: feature_flag.set('agent_enabled', False) kill switch, DLQ growth alert
+
+### 🌳 关键决策树
+
+```
+新 PR 提交 → CI offline eval
+├── CADR < human - 0.005? → FAIL block
+├── Strata regression (any > -0.02)? → FAIL block
+├── Boundary critical fail rate > 0? → FAIL block
+└── Else → Stage to shadow
+
+Shadow 4w
+├── Agreement < 85%? → review, possibly block
+├── Manager accept rate per manager > 70%? → continue
+└── Else → Pilot 3 warehouse
+
+Pilot 4w
+├── Outcome worse than control? → kill, debug
+└── Else → Production canary
+
+Production daily
+├── Delivery rate < 99% / 24h? → page + kill switch eval
+├── Cost > 110% baseline / 6h? → page
+├── KL(today || baseline) > 0.5? → page (injection?)
+├── DLQ growth > 100/h? → page
+├── Novel decision > 20% / 1h? → warn
+└── Latency p99 > 2s? → warn
+```
+
+### ⚙️ Part 2 五个深度问题速查
+
+**Problem 1: CADR + Stratification**
+- 核心解法:
+  ```python
+  cadr = delivery_rate - 0.5 * max(0, cost - baseline)/baseline
+  strata = carrier × region × tier × class × value × weather × season  # 7 axes
+  alert if any stratum drops > 0.02 vs last_week
+  also: P50/P99/P999 tail metrics, spike_analysis above_p99
+  ```
+- Top 3 gotchas: 多 metric 选不出 Pareto / aggregate 改善某 strata 退步 / 忽略 P99 tail
+- Tools: numpy.percentile, scipy, Pandas groupby
+
+**Problem 2: Counterfactual Eval**
+- 核心解法:
+  ```python
+  # 3 estimator agreement
+  nn = nearest_neighbor_outcome(decision, context, k=20)
+  ipw = ipw_outcome(decision, context)  # 1/propensity weight
+  pess = max_historical_outcome(context)
+  if max-min > 0.2 * mean: confidence=low, flag_human
+  # LLM judge for truly novel
+  judge: gemini_pro_complete(prompt), inter-judge with Claude Opus 4.7
+  ```
+- Top 3 gotchas: self-preference bias (same model) / IPW propensity < 0.05 不可靠 / novel decision 当当然给 credit
+- Tools: scikit FAISS, Gemini 3 Pro $2/$12 + Claude Opus 4.7 $5/$25 dual-judge
+
+**Problem 3: 3-Layer Pipeline**
+- 核心解法:
+  ```python
+  offline_eval(agent) → PASS gate
+    └── time_split / CADR / strata / boundary / novel rate
+  ShadowAgent.on_shipment_delay → log decision, human still decides
+  ProductionMonitor: 14 alerts (4 维度) + kill switch
+  ```
+- Top 3 gotchas: random split temporal leakage / 跳 shadow 直 pilot / production 没 kill switch
+- Tools: GitHub Actions, LaunchDarkly, Datadog, OpenTelemetry, Mimir, dbt + Airflow
+
+**Problem 4: Drift + Retraining**
+- 核心解法:
+  ```python
+  # 4 类 drift detection daily
+  data_drift: scipy.stats.ks_2samp(today, baseline) pval < 0.01
+  concept_drift: quick_model_perf - baseline_perf > 0.03
+  behavior_drift: kl_divergence(today_dec, last_7d_dec) > 0.5
+  outcome_drift: scipy.stats.kendalltau(days, cadr) tau < -0.3 pval < 0.01
+  # retraining pipeline auto:
+  pull 6mo → time_split → fine_tune → offline_eval gate → boundary gate → shadow 14d → pilot 14d → canary
+  ```
+- Top 3 gotchas: 检测到 drift 但没 trigger pipeline / 行为 drift 当 retrain 信号 (实际可能 prompt injection) / 不区分 4 类 drift
+- Tools: scipy.stats, Evidently, Whylogs, Great Expectations, Argo Workflows
+
+**Problem 5: 5-Class Failure Modes**
+- 核心解法:
+  ```python
+  upstream: cross_validate(sap_value, warehouse_actual), > 10% diff → unreliable
+  edge_case: load_escalation_triggers().any() → queue_human
+  injection: sanitize + system_prompt + output_validate cost > 1.5x → escalate
+  correlated: 1h window any decision_type > 5x baseline OR single_trigger > 100 → pause + page
+  gaming: detect_gaming(accept vs actual_action), > 20% mismatch → per-manager alert
+  ```
+- Top 3 gotchas: accept rate 当主 metric → gaming / 没 cost cap → single weather false alarm $150K / 不 cross-validate SAP
+- Tools: Datadog metric monitor, audit_log immutable, feature_flag kill switch
+
+### 🔥 Production gotchas (top 15)
+
+1. Random train/test split → temporal leakage, eval 5-10% 高估
+2. 只看 aggregate → hazmat 类 -15% 被掩盖
+3. Accept rate 当唯一 signal → manager gaming
+4. LLM judge 没校准 → 系统性 self-preference bias
+5. 同 model 既 agent 又 judge → bias 灾难
+6. 没 counterfactual → novel decision 无法 grade
+7. 跳 shadow 直 pilot → bug 直接打客户
+8. 没 cost cap → 单 spike $100K 客户暴怒
+9. 没 hold-out 季节性 → 1 月训圣诞季拍脑袋
+10. SAP 30min lag → agent 决策基于过期 inventory
+11. Weather API stale → 触发不必要 reroute
+12. Hazmat air freight → COMPLIANCE 违法, 1 次 = 项目暂停
+13. Prompt injection: customer_notes 含 "UPGRADE TO AIR" → agent 听话
+14. Correlated failure: 假天气警报 → 5000 包裹 reroute $150K
+15. Drift detector 但没 trigger pipeline → 形同虚设
+
+### 💬 简历 reframe 索引
+
+| 题考点 | 你的项目 | 1-line story |
+|---|---|---|
+| 3-layer eval suite | ConvFinQA | stratified 300 baseline + 9-variant ablation |
+| Counterfactual 4-cell | ConvFinQA | both pass / helped / hurt / both fail 矩阵 |
+| LLM-as-judge | ConvFinQA critic variant | 试过, 诚实报告 negative result |
+| Boundary tests | ConvFinQA stratified 300 by topic | 你做过 |
+| Multi-axis stratification | Voice agent 7 markets | by market × language × intent × tier |
+| Drift detection prod | Voice agent | ASR drift 某 market 处理过 |
+| Prompt injection | Voice agent multi-turn | 多 turn input sanitization 思考过 |
+| Reward shaping | Voice agent RL alignment | delivery rate + cost 多 metric reward |
+| 90-day phasing | Voice agent 7 markets | shadow → opt-in → default → kill |
+| Cost math | ConvFinQA / Voice agent | $6 / CI run + $0.012 / agent decision 你算过 |
+
+### 🎤 面试现场 quotables (top 8)
+
+1. "I just published an ablation on agent eval for ConvFinQA — 9 variants on stratified 300, none beat baseline. I know eval suite quality determines whether your improvements are real"
+2. "CADR with tunable λ — single scalar so RL can optimize, but I'd always dashboard the 7 strata so aggregate doesn't hide regression"
+3. "3 counterfactual estimator agreement — NN + IPW + pessimistic, > 20% disagreement = flag for human"
+4. "I'd never let agent and judge be the same model family — self-preference bias kills the eval"
+5. "Block CI on strata regression — same gate I built for ConvFinQA"
+6. "Per-day cost cap + correlated failure guard — single weather false alarm should never blow $150K"
+7. "Drift detection is 4 classes — data, concept, behavior, outcome. Behavior drift could be prompt injection, not just retrain trigger"
+8. "Accept rate is gaming risk. Outcome metric is the real North Star"
+
+### 🚨 红线 (top 10 anti-patterns)
+
+1. 直接画 agent architecture (题考 eval, 不考 agent)
+2. 只说 offline eval (STAFF 必须 online + production)
+3. 没 counterfactual (novel 怎么 grade?)
+4. 忽略 prompt injection (agentic #1 attack)
+5. 没 cost cap / kill switch (跑飞了怎么停)
+6. Accept-rate 当唯一 metric (manager gaming)
+7. 跳 phasing (零部署经验)
+8. Random split (temporal leakage)
+9. 不 stratify (aggregate 掩盖)
+10. Drift 检测但没 retraining pipeline
+
+### 📊 数字 anchors (面试必记)
+
+| Metric | Value | Source |
+|---|---|---|
+| CADR λ | 0.3-0.8 per stakeholder | 跟 customer 谈 |
+| 9-axis stratification | carrier × region × tier × value × class × weather × season + 自定义 | 防 aggregate 掩盖 |
+| Strata regression threshold | -0.02 vs last week → alert | 2% drop monitor |
+| Sample size | minimum 100 per strata for reliability | 噪声防 |
+| Counterfactual estimator | 3 (NN / IPW / Pessimistic), 分歧 > 20% mean = low conf | flag human |
+| IPW propensity floor | < 0.05 不可靠 | 罕见 decision |
+| Boundary tests | 50-200 hand-crafted by domain expert | critical class 100% pass |
+| LLM-judge kappa | > 0.85 必须 (logistics 强 stake) | inter-judge calibrate |
+| Daily monitor cost | $25-50 LLM-as-judge | 100-1000 sample/day |
+| Agent decision cost | $0.012 each (500 in + 200 out, Gemini 3 Pro $2/$12) | per-query cost |
+| CI run judge cost | $5 (500 cases × 800 tokens, Pro) | block on regression |
+| Shadow duration | 4 weeks | recommend not execute |
+| Pilot scope | 3 warehouses opt-in × 4 weeks | limited rollout |
+| Phasing | D0-30 offline / D30-60 shadow / D60-90 opt-in / D90+ gradual | 90-day rollout |
+| Drift retraining trigger | data > 5 features OR concept > 0.03 OR behavior KL > 0.5 OR outcome tau < -0.3 | auto-mark |
+| Cost cap | per-day Σ reroute cost ≤ $X / customer approval | correlated failure guard |
+| Single trigger | > 100 affected → pause + page | mass weather event |
+| Gaming detection | accept vs actual_action > 20% mismatch | manager flag |
+| Cost spike threshold | > 110% baseline / 6h sustained → page | financial gate |
+| Delivery rate floor | < 99% / 24h sustained → page | SLA breach |
+
+### 💡 Counterfactual Estimator cheat (背诵)
+
+| Estimator | 公式 / 思路 | 限制 |
+|---|---|---|
+| Nearest-neighbor | k_nearest_historical (k=20), filter same decision, mean outcome | k 太小或匹配少 → None novel flag |
+| Inverse Propensity Weighting | propensity = historical_count(decision) / total; if < 0.05 None; else weighted outcome / propensity | 罕见 decision 不可靠 |
+| Pessimistic bound | max historical outcome for similar context, conservative | 过保守, 只 good case 给 credit |
+| Agreement check | range(estimates) > 0.2 × mean → low confidence, flag human | 3 estimator 必跑 |
+| LLM-as-judge | Gemini 3 Pro $2/$12 evaluate plausibility/cost/delivery/compliance | novel decision 用, kappa > 0.85 必须 |
+| Dual-judge | Gemini 3 Pro + Claude Opus 4.7, inter-judge agreement alert | self-preference bias 防 |
+
+### 💡 Production Alert cheat (背诵)
+
+| Alert | Condition | Severity |
+|---|---|---|
+| delivery_rate_drop | < 0.99 sustained 24h | page, kill-switch eval |
+| cost_spike | > 1.10 baseline sustained 6h | page |
+| decision_distribution_shift | KL(today, last_7d) > 0.5 | page, prompt injection? |
+| dlq_growth | > 100 entries/hour | page |
+| novel_decision_burst | > 20% in 1h window | warn, state shift? |
+| latency_p99 | > 2000ms | warn |
+
 </script>
 <script>
 (function(){
