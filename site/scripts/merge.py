@@ -76,6 +76,9 @@ def main():
                 "reportedUsers": q.get("reportedUsers"),
                 "lastAsked": q.get("lastAsked"),
             }
+            # Carry top-level algorithm/data-structure tag if any source provides it
+            if q.get("algoTag"):
+                entry["algoTag"] = q["algoTag"]
         print(f"  merged {company}: {len(items)} questions")
 
     items = list(merged.values())

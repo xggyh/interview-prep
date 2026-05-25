@@ -411,17 +411,23 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         is_deep = slug_id in DEEP_DIVE_SLUGS
         deep_badge = '<span class="deep-badge" title="教学版深度讲解：概念铺垫 + 架构推演 + 45min 面试节奏 + Follow-up 演练">📚 教学版</span>' if is_deep else ''
 
+        # Algorithm / data structure tag (Coding questions only)
+        algo_tag = q.get("algoTag")
+        algo_chip = f'<span class="tag tag-algo" title="算法/数据结构: {esc(algo_tag)}">{esc(algo_tag)}</span>' if algo_tag else ''
+
         data_companies = "|".join(company_list)
         data_deep = "1" if is_deep else "0"
+        data_algo = esc(algo_tag) if algo_tag else ""
         # Encode recency as a single comparable integer: year*1000 + month*10 + phase.
         # `most_recent` is the max-across-companies, already chosen above.
         rec_key = _recency_key(most_recent or "")
         data_recency = rec_key[0] * 1000 + rec_key[1] * 10 + rec_key[2]
         card = f"""
-<div class="q-card{' is-deep' if is_deep else ''}" data-type="{esc(qtype)}" data-companies="{esc(data_companies)}" data-deep="{data_deep}" data-reports="{total_reports}" data-recency="{data_recency}" data-title="{esc(q['title']).lower()}">
+<div class="q-card{' is-deep' if is_deep else ''}" data-type="{esc(qtype)}" data-companies="{esc(data_companies)}" data-deep="{data_deep}" data-algo="{data_algo}" data-reports="{total_reports}" data-recency="{data_recency}" data-title="{esc(q['title']).lower()}">
   <a class="q-title" href="{href}">{esc(q['title'])}</a>
   <div class="q-tags">
     <span class="{tag_class(qtype)}">{esc(qtype)}</span>
+    {algo_chip}
     <span class="tag tag-level">{esc(level_tag)}</span>
     {deep_badge}
     {''.join(company_badges)}
@@ -452,6 +458,18 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         '<button class="active" data-dfilter="all">全部</button>',
         f'<button data-dfilter="deep">📚 教学版深度讲解 ({deep_count})</button>',
     ]
+
+    # Algorithm / data-structure filter buttons (Coding questions)
+    from collections import Counter
+    algo_counts = Counter()
+    for q in questions:
+        tag = q.get("algoTag")
+        if tag:
+            algo_counts[tag] += 1
+    algo_tabs = [f'<button class="active" data-afilter="all">全部 ({sum(algo_counts.values())})</button>']
+    # Order tags by count descending (most-asked categories first)
+    for tag, count in algo_counts.most_common():
+        algo_tabs.append(f'<button data-afilter="{esc(tag)}">{esc(tag)} ({count})</button>')
 
     # Sort buttons
     sort_tabs = [
@@ -514,6 +532,10 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
     {''.join(deep_tabs)}
   </div>
   <div class="filter-bar">
+    <span class="filter-label">算法：</span>
+    {''.join(algo_tabs)}
+  </div>
+  <div class="filter-bar">
     <span class="filter-label">排序：</span>
     {''.join(sort_tabs)}
   </div>
@@ -522,14 +544,15 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
 </main>
 
 <script>
-const state = {{ cfilter: 'all', tfilter: 'all', dfilter: 'all', sort: 'recency' }};
+const state = {{ cfilter: 'all', tfilter: 'all', dfilter: 'all', afilter: 'all', sort: 'recency' }};
 function applyFilters() {{
   document.querySelectorAll('.q-card').forEach(card => {{
     const companies = (card.dataset.companies || '').split('|');
     const matchC = state.cfilter === 'all' || companies.includes(state.cfilter);
     const matchT = state.tfilter === 'all' || card.dataset.type === state.tfilter;
     const matchD = state.dfilter === 'all' || (state.dfilter === 'deep' && card.dataset.deep === '1');
-    card.style.display = (matchC && matchT && matchD) ? '' : 'none';
+    const matchA = state.afilter === 'all' || card.dataset.algo === state.afilter;
+    card.style.display = (matchC && matchT && matchD && matchA) ? '' : 'none';
   }});
 }}
 function applySort() {{
@@ -573,6 +596,14 @@ document.querySelectorAll('button[data-dfilter]').forEach(btn => {{
     document.querySelectorAll('button[data-dfilter]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.dfilter = btn.dataset.dfilter;
+    applyFilters();
+  }});
+}});
+document.querySelectorAll('button[data-afilter]').forEach(btn => {{
+  btn.addEventListener('click', () => {{
+    document.querySelectorAll('button[data-afilter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.afilter = btn.dataset.afilter;
     applyFilters();
   }});
 }});
