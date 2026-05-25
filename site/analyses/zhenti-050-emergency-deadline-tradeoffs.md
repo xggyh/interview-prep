@@ -7,6 +7,95 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Deadline 题. 涉及 scope / 工程方法论 / 通讯 / tech debt 术语.
+
+### Scope / Phasing ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **MVP (Minimum Viable Product)** ⭐ | **最小可行版**. 70% 用例 + zero polish. 不是 cut corner 是 cut scope. |
+| **Walking skeleton** ⭐ | **每组件 stub / mock 但端到端跑通**. 跑稳后再换真组件. 不同于 MVP. |
+| **Slice / Vertical slice** | 一个功能完整的薄片. 比 horizontal feature 更可 ship. |
+| **Happy path** | 最常见的成功路径. Emergency 时只保 happy path. |
+| **Edge case** | 不常见但合法的情况. Emergency 时 defer. |
+| **Phased rollout** | 分阶段交付 — Tier 1 周五, Tier 2 下周. |
+| **Tier 1/2/3** | 按风险 / 复杂度分层 — 简单先 ship, 复杂的延后. |
+| **Reverse scope** | 客户 ask X, 你说 "X 太大, 给你 X' 小版本". |
+| **Scope creep** | 项目过程中不断加需求. Deadline 下死敌. |
+| **Anchored ask** | 客户随便说的 deadline 没想清楚 — push back 通常有 flex. |
+
+### 工程妥协 / Trade-off ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Tech debt / 技术债** ⭐ | **赶工时省的 quality work**. 不是 bad code, 是 "我们没时间做 right". 必须 track + 还. |
+| **Debt log / Debt register** | 列出所有 shortcut 的清单, 含 owner + payback date. |
+| **Manual override** | 自动化没跑通时, 人工干预 workflow. 短期 OK. |
+| **Hardcode** | 写死值不参数化. 短期 OK 长期问题. |
+| **Hack / Quick fix** | 不优雅但能跑的方案. |
+| **Workaround** | 绕过问题不修根因. |
+| **Polish** | UI / UX / 边缘 case 抛光. Emergency 时第一个 cut. |
+| **Code freeze** | 暂停 feature ship, 只修 bug. |
+
+### 永不妥协 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Reversibility** ⭐ | **必须能 rollback**. Migration 必须 reversible, 否则 ship 错没法救. |
+| **Data integrity** ⭐ | 不能丢 / 损坏数据. Emergency 也不能省. |
+| **Idempotency** | 同 request 多次执行结果一致. Retry 安全必备. |
+| **Observability** ⭐ | **能 debug**. 没 log 没 metric 出问题瞎. |
+| **Security / Auth** | 认证授权. Emergency 时也不能跳. |
+| **Compliance** | HIPAA / SOX / GDPR. 监管要求 hard requirement. |
+| **Backward compatibility** | 旧 client 还能跑. API breaking 时小心. |
+| **Migration safety** | DB schema 改要 backfill + dual write + cutover, 不能直接砍. |
+
+### Deploy / Rollout ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Canary rollout** ⭐ | 1% → 5% → 25% → 100%. 出 SLO breach 自动 rollback. |
+| **Shadow mode** | 新代码跟旧并跑, 新只记录不生效. 零风险收数据. |
+| **Feature flag** ⭐ | **不重新部署就能开关功能**. LaunchDarkly / Statsig 用. Emergency 时尤关键. |
+| **Blue-green deployment** | 两套环境切换 — blue 跑, green 待命; ship 时切到 green. 0 downtime. |
+| **A/B test** | 两 version 同跑比 metric. Statistical test. |
+| **Kill switch** | 一键关功能. Production 必备. |
+
+### 通讯 / 客户管理 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Push back** ⭐ | **温和拒绝客户 ask**. 不是 "no", 是 "let's clarify why". |
+| **Under-promise, over-deliver** ⭐ | 承诺保守, 超额完成. 比反过来 trust 多 10x. |
+| **Status update** | 项目进度通报. Frequency 越高 trust 越高. |
+| **Stakeholder alignment** | 跟所有相关方 sync. Emergency 时尤其重要. |
+| **Customer Success Manager (CSM)** | 客户关系负责人. FDE 跟 CSM 配合. |
+| **Executive sponsor** | 客户那边出钱拍板的人. |
+| **Steering committee** | 项目治理委员会 — 出问题升级到这里. |
+| **Escalation path** | 升级链. Customer 不满意时. |
+
+### Eval / 验证
+
+| 术语 | 解释 |
+|---|---|
+| **Smoke test** | 最低限度 "能跑就行" 测试. Emergency 时只跑这个. |
+| **Regression test** | 检查老功能没坏. |
+| **Golden path test** | 覆盖 happy path. |
+| **0% wrong-call** | Indonesia refund tier 1 的 metric — 没 false positive. |
+| **Coverage** | 自动化覆盖比例. Tier 1 70% coverage = 7 成 case 自动处理. |
+
+### Postmortem / 学习
+
+| 术语 | 解释 |
+|---|---|
+| **Tech debt sprint** | Ship 完 emergency 后专门还债的迭代. |
+| **Postmortem (no-incident)** | 项目复盘 — 没事故也复盘 "what hurts". |
+| **Wedding cake metaphor** | 90% 完成的蛋糕能 ship, 50% 是另一种产品. |
+
+---
+
 ## 这道题在考什么
 
 表面是 timeline 题, 底下藏着 **8 个 FDE evaluation signal**:

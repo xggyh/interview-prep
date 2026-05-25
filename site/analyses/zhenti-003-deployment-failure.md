@@ -7,6 +7,79 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 incident response 故事 + 大量 production AI 工程术语. 这张表过完, 故事里的 jargon 就不慌.
+
+### Incident response 流程 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Stop bleeding (止血)** ⭐ | 故障发生时第一件事 — rollback / pause sessions, 先停止伤害扩大, 不 debug live. Stop bleeding 是 minutes, root cause 是 hours/days. |
+| **Triage** | 故障分诊 — 评估影响范围 + 决定第一步 action (pause? rollback? kill?). |
+| **Rollback** | 回滚到上一个 stable 版本. Stop bleeding 标准做法. |
+| **Rollback runbook** ⭐ | 回滚操作手册 — 谁 pause / 谁 revert / 谁通知 ops / ETA. Written 不是 ad-hoc, junior 也能 execute. |
+| **Root cause** | 根本原因. 跟 superficial cause 区分 — "embedding model 升级" 是 trigger, "routing prompt 跟 embedding distribution coupled" 是 root cause. |
+| **Post-mortem (事后复盘)** | 故障复盘文档. 必须有 timeline / impact / root cause / permanent fix / lesson. |
+| **Permanent fix + safety nets** | 永久修复 + 安全网. 不只 fix 这个 bug, 是建机制防同类 bug. |
+| **Pause new sessions** | 暂停接受新会话 (但现有 session 不 kill). Reversibility 判断 — pause 是 two-way, kill 是 one-way. |
+
+### 监控 / 检测 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **L1 / L2 / L3 monitoring** ⭐ | 三层监控. L1 = real-time system metric (5-min alert). L2 = daily human sample review (output relevance). L3 = weekly ops 反馈 (anecdotal). |
+| **Alert / alert threshold** | 告警阈值. 设太松 = 漏; 太紧 = 噪音. 印尼 alert 3 min fire 是 tight. |
+| **Silent regression** | 沉默退化 — metric 看上去 OK 但客户体验下降. L1 catch 不到, L2/L3 catch. |
+| **Distribution shift** | 分布漂移. Embedding 升级后 similarity score 分布变, 但单点看不出. 必须有 distribution-level 检测. |
+| **Eval suite / eval gate** | 评测集 + 上线门控. Eval suite green 不等于 production safe (印尼 incident 就是这个教训). |
+| **Confidence score** | 模型对自己预测的置信度. 低 confidence query auto-escalate human 是常见 pattern. |
+
+### 技术 stack
+
+| 术语 | 解释 |
+|---|---|
+| **Embedding model (BGE base / large)** | 嵌入模型. 把文本转向量, 后续算 similarity. BGE 是开源的, base/large 是参数量大小. |
+| **Routing prompt** | 路由 prompt — 决定用户 query 分到哪个 tool / tier. 跟 embedding distribution 隐式 coupled. |
+| **ASR cascade** | ASR 级联 — primary → fallback → last-resort 三层 vendor. |
+| **Shadow mode** ⭐ | 影子模式 — 新 model 跟旧 model 并跑, 新 model 决策**只记录不生效**. 上线 risky change 必经. |
+| **Cascade health check** | 级联健康检查. Naive 版只看 "vendor responding", 真正要 multi-signal (confidence + duration + relative-to-baseline). |
+| **Sampling** | 采样 — shadow mode 跑 10% traffic 不是 100%, cost 加 10% 但 catch 90% 问题. |
+
+### 业务 / 合规
+
+| 术语 | 解释 |
+|---|---|
+| **Routing accuracy** | 路由准确率. 用户 query 是否被分到正确 tool / tier. 印尼 incident 是从 92% 掉到 78%. |
+| **Customer satisfaction dashboard** | 客户满意度看板. ops 看到的实时图表. |
+| **Tier 1 / 2 fraud** | 风险分层. Tier 1 = 通用 FAQ (低风险), tier 2 = 账户特定问题 (中风险). |
+| **Regulator-reportable incident** | 监管必须上报的事故. 没 surface 具体金额 = 不 reportable. |
+| **OJK / BACEN** | 印尼 / 巴西金融监管. |
+| **Compliance team** | 合规团队. 审查 chatbot 输出是否触碰红线. |
+| **Chargeback** | 卡支付里, 客户投诉某交易是 fraud → 发卡行扣回钱. |
+| **PCI / GLBA** | 美国金融数据合规 — PCI (卡数据), GLBA (Gramm-Leach-Bliley, 银行客户隐私). |
+
+### 客户沟通
+
+| 术语 | 解释 |
+|---|---|
+| **Status update** | 故障状态更新. 标准格式: detected / suspected cause / mitigation status / impact / ETA full post-mortem. |
+| **Ownership language** | 用 "I" 不用 "we". "I shipped, it broke, I caused it" vs "we had an issue". |
+| **Blame shifting** | 推锅. "Vendor 不靠谱" 是 anti-pattern. |
+| **Sit with ops / Zoom with ops** | 跟 ops 现场 / 远程坐在一起 review case. 关系修复关键动作. |
+
+### 工程方法论
+
+| 术语 | 解释 |
+|---|---|
+| **Hidden dependency** | 隐式依赖. Embedding 跟 routing prompt 通过 similarity 分布 coupled, 不写在 code 里, 容易忽视. |
+| **Isolated change (illusion)** | 孤立修改是错觉. AI 系统组件之间通过 distribution / threshold / prompt-data coupling 隐式连接. |
+| **Dependency map** | 依赖地图. Explicit 写 explicit + implicit dependency, peer review. |
+| **Proxy metric** | 代理指标. "hallucination 经 classifier 检测" 是 proxy, 真实 ground truth 是 human review. |
+| **ROI argument** | 投资回报论证. "Shadow mode 加 10% compute cost vs avoid 1 incident every 6 months" 这种数学. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 题里 vulnerability signal density 最高的一道**. 表面问失败, 实际筛 6 件事:

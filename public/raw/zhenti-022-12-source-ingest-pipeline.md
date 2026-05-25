@@ -8,6 +8,112 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题里的数据工程词汇密度极高, 不懂就跟不上架构图. 这张表 5 min 看完.
+
+### 数据架构 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Medallion architecture (Bronze/Silver/Gold)** ⭐ | 三层数据分层: Bronze = 原始数据落地不动 schema; Silver = 清洗 + 标准化业务键; Gold = 给下游业务消费的聚合表. Databricks 提出现已成工业标准. |
+| **Data lake** | 廉价存储原始数据 (S3 + 文件格式). |
+| **Lakehouse** | 数据湖 + 数据仓库混合 — 廉价存储 + ACID 事务. Iceberg / Delta 实现. |
+| **Data warehouse** | 结构化 SQL 仓库 (Snowflake / BigQuery / Redshift). |
+| **ETL vs ELT** ⭐ | ETL = 在管道里 transform 再 load (Spark 模式); ELT = 先 load 原始数据再用 SQL transform (现代 modern stack). |
+| **Iceberg / Delta / Hudi** | 三种开放表格式 — 给 S3 上的 Parquet 文件加 ACID + schema 演化 + time travel. Iceberg 最 vendor-neutral. |
+| **Parquet** | 列式压缩文件格式, 数据湖标准. |
+| **SCD2 (Slowly Changing Dimension Type 2)** | 维表保留历史变更, 每次变更新增一行而不是覆盖. |
+
+### 摄取 / 同步模式
+
+| 术语 | 解释 |
+|---|---|
+| **CDC (Change Data Capture)** ⭐ | 增量数据捕获 — 读数据库 transaction log, 只传变更, 不查表 (不影响线上). |
+| **GoldenGate / Qlik Replicate / Fivetran / Debezium** | 4 个主流 CDC 工具. GoldenGate Oracle 强; Debezium 开源 (基于 Kafka). |
+| **Webhook** | 源系统主动 POST 事件到你的 endpoint. Shopify / Stripe 标配. |
+| **Backfill** | 历史数据回填 — 系统上线后导入过去几年数据. |
+| **Watermark** | 时间水位线 — 标记 "这个时间点之前的数据已到齐". 用于晚到数据处理. |
+| **Late-arriving data** | 晚到数据 — supplier EDI 856 可能 3 天后才到. 必须设计 reprocess window. |
+| **Idempotency** ⭐ | 幂等 — 同一条数据多次写入结果一样. 防止 source 重发. |
+| **Dedup / Merge key** | 用 source-side ID 作为唯一键去重. |
+| **Schema drift** | schema 不通知就变了 (Shopify 加新字段). |
+| **Schema registry** ⭐ | 集中管理所有 source 的 schema 版本, producer 注册 / consumer 验证. Confluent Schema Registry / AWS Glue Registry. |
+| **Contract test** | source 团队和消费团队对 schema 的契约测试, PR 阶段跑. |
+| **DLQ (Dead Letter Queue)** ⭐ | 处理失败的消息进的队列, 待人工 review. 不能让 bad row block 整 batch. |
+
+### 编排 / 调度
+
+| 术语 | 解释 |
+|---|---|
+| **Airflow** | 老牌任务调度器, task-based DAG. |
+| **Dagster** ⭐ | 新一代编排器, asset-based (描述 "数据 asset" 而不是 "task"). 异构 source 适合. |
+| **Prefect** | 介于 Airflow / Dagster 之间. |
+| **dbt (data build tool)** ⭐ | SQL 模型编排框架, 在 warehouse 里跑 transform. 自带 test / lineage / docs. |
+| **Asset-based vs Task-based** | Dagster 描述 "数据成品 (asset)"; Airflow 描述 "要跑的任务 (task)". Asset-based 自动 lineage. |
+| **OpenLineage / Marquez** | 数据血缘开放标准 + 可视化工具. |
+
+### 数据质量
+
+| 术语 | 解释 |
+|---|---|
+| **Great Expectations (GE)** ⭐ | 数据质量框架 — 声明 expectations (not_null, unique, range), 跑 checkpoint 验证. |
+| **Soda** | GE 的竞品, 类似. |
+| **dbt tests** | dbt 内置的数据测试 (unique, not_null, accepted_values, relationships). |
+| **Reconciliation test** | 对账测试 — POS 营收 ≈ SAP 营收, 容忍度内 pass. |
+| **Anomaly detection** | 行数 / 分布 / freshness 异常告警. |
+| **Freshness** | 数据新鲜度 — 离最新 source event 多久. |
+
+### 零售 / 行业 source
+
+| 术语 | 解释 |
+|---|---|
+| **POS** | Point of Sale — 收银台系统. Oracle Retail / NCR / Toast 等. |
+| **EDI 850/856/810** ⭐ | Electronic Data Interchange — 零售 B2B 标准: 850 = 采购订单; 856 = 发货通知 (ASN); 810 = invoice. 已用 30 年, 文本格式. |
+| **AS2** | EDI 传输协议 — HTTPS + S/MIME 签名. |
+| **EDI 997** | functional acknowledgement — 收到 EDI 后必须 60 秒内回的 ack. |
+| **ERP / SAP S/4HANA** | Enterprise Resource Planning — 企业核心系统; SAP 是头部. |
+| **WMS (Warehouse Management System)** | 仓库管理系统 — Manhattan / Blue Yonder. |
+| **Shopify / Magento** | 两大电商平台. Shopify SaaS; Magento 自托管. |
+| **Placer.ai** | 实体店客流量数据供应商. |
+| **Brandwatch** | 社交媒体监听 SaaS. |
+| **Smartsheet** | 类 Excel 的 SaaS 表格工具. |
+| **CDS Views** | SAP S/4HANA 提供的语义视图层. |
+| **ABAP** | SAP 自家编程语言. |
+| **CCD / SKU** | Stock Keeping Unit — 库存单位. 零售核心业务键. |
+
+### 模型 / 特征服务
+
+| 术语 | 解释 |
+|---|---|
+| **Feature Store** | 特征存储 — Tecton / Feast. 训练和线上推理用同一份 feature. |
+| **Forecast horizon** | 预测 horizon — 这题 90 天 demand forecast. |
+| **Drift dashboard** | 漂移监控 — 预测值 vs 实际值跟踪. |
+
+### 基础设施
+
+| 术语 | 解释 |
+|---|---|
+| **S3 Glacier** | AWS 冷存储 — 检索慢 (分钟-小时) 但便宜 10×. 用于 audit / compliance. |
+| **Kinesis / Kafka** | 流式消息队列. Kinesis 是 AWS 托管, Kafka 是开源标准. |
+| **Lambda** | AWS Serverless function. 适合 webhook 接收等突发负载. |
+| **SQS** | AWS 简单队列服务. |
+| **Vault (HashiCorp)** | 密钥管理服务. |
+| **JDBC / ODBC** | Java / 通用数据库连接协议. |
+| **HMAC** | Hash-based Message Authentication Code — webhook 签名验证. |
+| **TPS** | Transactions Per Second. |
+
+### 监控 / 告警
+
+| 术语 | 解释 |
+|---|---|
+| **PagerDuty** | 告警 + on-call 调度工具. |
+| **Sensor** | Dagster 的 watchdog — 定时检查外部状态 (e.g. data freshness). |
+| **Slack alert** | 告警发到 Slack 频道. |
+| **MAR (Monthly Active Rows)** | Fivetran 计价单位 — 月活跃同步行数. |
+
+---
+
 ## 这道题在考什么
 
 不是考你会不会写 Airflow DAG, 是考你**在 12 个 schema 完全不同的来源面前怎么不崩**:

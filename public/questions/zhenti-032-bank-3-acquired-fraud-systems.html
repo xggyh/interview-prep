@@ -43,6 +43,19 @@
 <blockquote><p>"A regional bank has <strong>grown via acquisitions</strong>. They now have <strong>3 fraud detection systems</strong> — one from each acquired entity — with <strong>inconsistent labels, conflicting thresholds, and 3 different vendor stacks</strong>. They want a <strong>unified fraud platform in 90 days</strong>. Walk me through your approach."</p></blockquote>
 <p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir / Databricks 高频 <strong>行业</strong>: Fintech / banking / fraud / risk</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题里的专业词如果不懂, 听都听不下去. 这张表 5 min 看完, 后面就跟得上.</p></blockquote>
+<h4>业务 / 行业</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Acquired entity</strong></td><td>被收购的子公司. 这题 = 银行通过收购拼起来的, 3 个 entity 各自跑各自的系统.</td></tr><tr><td><strong>Fraud (欺诈)</strong></td><td>银行里<strong>有多种含义</strong>: Card fraud / ACH fraud / Account Takeover / Synthetic ID / Money Laundering. 3 个 system 大概率各自定义不同.</td></tr><tr><td><strong>CNP (Card Not Present)</strong></td><td>卡不在场交易 — 网上 / 电话 / 邮购支付. 没 chip+PIN, 欺诈率高.</td></tr><tr><td><strong>ATO (Account Takeover)</strong></td><td>账户被盗 — 攻击者用真凭证登入合法账户操作. 比 CNP 更隐蔽 (表面用户行为正常).</td></tr><tr><td><strong>Synthetic ID fraud</strong></td><td>合成身份 — 用真 SSN + 假姓名 + 假地址组合开账户, 慢慢建信用再爆雷. 长尾难抓.</td></tr><tr><td><strong>ACH (Automated Clearing House)</strong></td><td>美国银行间电子转账网络. 工资/房租/B2B 转账走 ACH. 跟卡支付 (Visa/Master) 平行的另一条 rail.</td></tr><tr><td><strong>AML (Anti-Money Laundering)</strong></td><td>反洗钱. 跟 fraud <strong>不同</strong> — fraud 抓骗子 (银行损失), AML 是合规 (政府监管要求 detect + report 可疑交易).</td></tr><tr><td><strong>Chargeback</strong></td><td>持卡人投诉某交易是欺诈 → 发卡行扣回钱 + 罚款. Fraud team 的核心 label (真实 ground truth) 来源, 但有几周滞后.</td></tr><tr><td><strong>OCC</strong></td><td>Office of the Comptroller of the Currency — 美国国家级银行监管. 这题 90 天 deadline 是 driven by OCC 审计.</td></tr><tr><td><strong>Fed / FDIC</strong></td><td>Federal Reserve (联储) / Federal Deposit Insurance Corp. 另两个相关监管.</td></tr><tr><td><strong>Bank holding company</strong></td><td>银行控股公司 — 上层法人. 跟旗下 entity 分开监管.</td></tr></tbody></table></div>
+<h4>数据 / 建模概念 ⭐ 这题的关键</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Ontology (本体)</strong> ⭐</td><td><strong>数据/概念的统一定义体系</strong> — 不是数据库 schema, 是上层业务概念词典. 比如 "fraud" 在 3 个 system 里到底各自指什么? "customer" 是 SSN-unique 还是 account-unique? Ontology 定义 fraud type / customer / transaction / account 等核心实体的标准含义 + 它们的关系. <strong>Palantir 的核心方法论, FDE 面试必考</strong>.</td></tr><tr><td><strong>Label unification</strong> ⭐</td><td><strong>标签统一</strong>. 3 个 system 各自标 "fraud" 方式不同 (A: CNP/ATO/synthetic; B: P0/P1/P2; C: Confirmed/Suspected/Disputed). 必须有 mapping 表对到<strong>统一标签集</strong>, 否则跨系统训练或评估直接失败 (拿 A 的 label 训, B 的 label 验, 数字毫无意义).</td></tr><tr><td><strong>Baseline-per-system</strong> ⭐</td><td><strong>每个 system 单独的基准性能数字</strong>. 在做任何 unify 之前, 必须先记录 "现在 3 个 system 各自 precision/recall/FPR 多少". 之后改完才能说 "好了还是更差了" — 没 baseline = 没法证明 unification 有效.</td></tr><tr><td><strong>Label</strong></td><td>这条数据 (e.g. 某笔交易) 的真实分类 — fraud 还是合法. 来源: manual review / customer chargeback (有滞后) / investigator confirmed — 每种数据质量差很多.</td></tr><tr><td><strong>Threshold (阈值)</strong></td><td>模型决策阈值. score &gt; 0.78 = block. 调高 → recall ↓; 调低 → FPR ↑. 每个 system 的 threshold 都是踩坑调出来的, <strong>直接抛弃 = 重复踩坑</strong>.</td></tr></tbody></table></div>
+<h4>模型 / ML 性能指标</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Precision</strong></td><td>抓对率. 80% = 抓 100 个, 80 个真欺诈, 20 个误伤.</td></tr><tr><td><strong>Recall</strong></td><td>召回率. 60% = 100 笔实际欺诈, 抓到 60 笔, 漏 40 笔.</td></tr><tr><td><strong>False Positive Rate (FPR)</strong></td><td>误抓率. 5% = 100 笔合法, 5 笔被误抓 → 用户被卡 → 投诉.</td></tr><tr><td><strong>Customer friction</strong></td><td>误抓合法交易导致用户摩擦. KPI: 投诉 / 卡 reset / churn. FPR 涨 1% 用户可能不忍.</td></tr><tr><td><strong>XGBoost</strong></td><td>梯度提升决策树 — fraud 检测最常用传统 ML 模型, tabular 数据上比 deep learning 更稳更可解释.</td></tr><tr><td><strong>Ensemble</strong></td><td>多模型集成 — 综合 3 个 model 输出 (vote / weighted / stacking).</td></tr><tr><td><strong>Black box model</strong></td><td>黑盒模型 — 内部不可解释. Fraud 领域 problematic, 监管 / 客户问 "为啥 block 我" 你说不出.</td></tr></tbody></table></div>
+<h4>工程 / 部署</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vendor stack</strong></td><td>厂商技术栈. 这家 FICO, 那家 SAS, 第三家自研 Python — Unification 必须决定每个 stack "拆/换/保留".</td></tr><tr><td><strong>FICO Falcon</strong></td><td>业界最大 SaaS 反欺诈平台, 很多大行用. SaaS, 不开源, model 是 black box.</td></tr><tr><td><strong>SAS</strong></td><td>老牌统计 / ML 平台, 金融机构常用. 通常 on-prem, 跟 cloud-native 不兼容.</td></tr><tr><td><strong>ThreatMetrix</strong></td><td>设备指纹 + 行为反欺诈 SaaS, RELX 旗下.</td></tr><tr><td><strong>Shadow mode (影子模式)</strong></td><td>新 model 跟旧 model 并跑, 新 model 决策<strong>只记录不生效</strong>, 收集真实数据<strong>不影响线上</strong>. Fraud 上线必经.</td></tr><tr><td><strong>Canary (灰度)</strong></td><td>新决策只生效 1-10% 流量, 观察影响, 渐进 ramp 到 100%. Shadow → canary → full = 标准 rollout.</td></tr><tr><td><strong>Walking skeleton</strong></td><td>走骨头 — 最薄端到端版本, 每组件 mock 但流程全跑通. 跑稳后再换真组件. <strong>Decomposition 题标准 MVP 方法论</strong>.</td></tr><tr><td><strong>Proxy metric</strong></td><td>代理指标 — 真目标 (fraud loss $) 数据慢, 用快的代理 (model precision/recall) 快速迭代.</td></tr></tbody></table></div>
+<h4>人 / 政治</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SME (Subject Matter Expert)</strong></td><td>领域专家. Fraud SME = 在 fraud 业务干多年的人, 知道 "为啥 threshold 调 0.78" 背后的血泪.</td></tr><tr><td><strong>CRO (Chief Risk Officer)</strong></td><td>首席风险官. 通常是 fraud unification 项目的 <strong>buyer</strong> (出钱+拍板).</td></tr><tr><td><strong>CISO</strong></td><td>Chief Information Security Officer. 管 cyber security, 跟 CRO <strong>不同</strong>.</td></tr><tr><td><strong>CCO</strong></td><td>Chief Compliance Officer. 必 sign-off, 否则 OCC 审计过不了.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p><strong>不是</strong>: 考你能不能 design 一个反欺诈模型.</p>
 <p><strong>是</strong>: 考你能不能在<strong>遗留系统、政治、合规、3 个 owner、90 天 deadline</strong> 的真实约束下做出<strong>冷静的拆解 + 反时间压力的 push back</strong>.</p>
@@ -325,6 +338,72 @@ Key phrases:
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir / Databricks 高频
 **行业**: Fintech / banking / fraud / risk
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题里的专业词如果不懂, 听都听不下去. 这张表 5 min 看完, 后面就跟得上.
+
+### 业务 / 行业
+
+| 术语 | 解释 |
+|---|---|
+| **Acquired entity** | 被收购的子公司. 这题 = 银行通过收购拼起来的, 3 个 entity 各自跑各自的系统. |
+| **Fraud (欺诈)** | 银行里**有多种含义**: Card fraud / ACH fraud / Account Takeover / Synthetic ID / Money Laundering. 3 个 system 大概率各自定义不同. |
+| **CNP (Card Not Present)** | 卡不在场交易 — 网上 / 电话 / 邮购支付. 没 chip+PIN, 欺诈率高. |
+| **ATO (Account Takeover)** | 账户被盗 — 攻击者用真凭证登入合法账户操作. 比 CNP 更隐蔽 (表面用户行为正常). |
+| **Synthetic ID fraud** | 合成身份 — 用真 SSN + 假姓名 + 假地址组合开账户, 慢慢建信用再爆雷. 长尾难抓. |
+| **ACH (Automated Clearing House)** | 美国银行间电子转账网络. 工资/房租/B2B 转账走 ACH. 跟卡支付 (Visa/Master) 平行的另一条 rail. |
+| **AML (Anti-Money Laundering)** | 反洗钱. 跟 fraud **不同** — fraud 抓骗子 (银行损失), AML 是合规 (政府监管要求 detect + report 可疑交易). |
+| **Chargeback** | 持卡人投诉某交易是欺诈 → 发卡行扣回钱 + 罚款. Fraud team 的核心 label (真实 ground truth) 来源, 但有几周滞后. |
+| **OCC** | Office of the Comptroller of the Currency — 美国国家级银行监管. 这题 90 天 deadline 是 driven by OCC 审计. |
+| **Fed / FDIC** | Federal Reserve (联储) / Federal Deposit Insurance Corp. 另两个相关监管. |
+| **Bank holding company** | 银行控股公司 — 上层法人. 跟旗下 entity 分开监管. |
+
+### 数据 / 建模概念 ⭐ 这题的关键
+
+| 术语 | 解释 |
+|---|---|
+| **Ontology (本体)** ⭐ | **数据/概念的统一定义体系** — 不是数据库 schema, 是上层业务概念词典. 比如 "fraud" 在 3 个 system 里到底各自指什么? "customer" 是 SSN-unique 还是 account-unique? Ontology 定义 fraud type / customer / transaction / account 等核心实体的标准含义 + 它们的关系. **Palantir 的核心方法论, FDE 面试必考**. |
+| **Label unification** ⭐ | **标签统一**. 3 个 system 各自标 "fraud" 方式不同 (A: CNP/ATO/synthetic; B: P0/P1/P2; C: Confirmed/Suspected/Disputed). 必须有 mapping 表对到**统一标签集**, 否则跨系统训练或评估直接失败 (拿 A 的 label 训, B 的 label 验, 数字毫无意义). |
+| **Baseline-per-system** ⭐ | **每个 system 单独的基准性能数字**. 在做任何 unify 之前, 必须先记录 "现在 3 个 system 各自 precision/recall/FPR 多少". 之后改完才能说 "好了还是更差了" — 没 baseline = 没法证明 unification 有效. |
+| **Label** | 这条数据 (e.g. 某笔交易) 的真实分类 — fraud 还是合法. 来源: manual review / customer chargeback (有滞后) / investigator confirmed — 每种数据质量差很多. |
+| **Threshold (阈值)** | 模型决策阈值. score > 0.78 = block. 调高 → recall ↓; 调低 → FPR ↑. 每个 system 的 threshold 都是踩坑调出来的, **直接抛弃 = 重复踩坑**. |
+
+### 模型 / ML 性能指标
+
+| 术语 | 解释 |
+|---|---|
+| **Precision** | 抓对率. 80% = 抓 100 个, 80 个真欺诈, 20 个误伤. |
+| **Recall** | 召回率. 60% = 100 笔实际欺诈, 抓到 60 笔, 漏 40 笔. |
+| **False Positive Rate (FPR)** | 误抓率. 5% = 100 笔合法, 5 笔被误抓 → 用户被卡 → 投诉. |
+| **Customer friction** | 误抓合法交易导致用户摩擦. KPI: 投诉 / 卡 reset / churn. FPR 涨 1% 用户可能不忍. |
+| **XGBoost** | 梯度提升决策树 — fraud 检测最常用传统 ML 模型, tabular 数据上比 deep learning 更稳更可解释. |
+| **Ensemble** | 多模型集成 — 综合 3 个 model 输出 (vote / weighted / stacking). |
+| **Black box model** | 黑盒模型 — 内部不可解释. Fraud 领域 problematic, 监管 / 客户问 "为啥 block 我" 你说不出. |
+
+### 工程 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **Vendor stack** | 厂商技术栈. 这家 FICO, 那家 SAS, 第三家自研 Python — Unification 必须决定每个 stack "拆/换/保留". |
+| **FICO Falcon** | 业界最大 SaaS 反欺诈平台, 很多大行用. SaaS, 不开源, model 是 black box. |
+| **SAS** | 老牌统计 / ML 平台, 金融机构常用. 通常 on-prem, 跟 cloud-native 不兼容. |
+| **ThreatMetrix** | 设备指纹 + 行为反欺诈 SaaS, RELX 旗下. |
+| **Shadow mode (影子模式)** | 新 model 跟旧 model 并跑, 新 model 决策**只记录不生效**, 收集真实数据**不影响线上**. Fraud 上线必经. |
+| **Canary (灰度)** | 新决策只生效 1-10% 流量, 观察影响, 渐进 ramp 到 100%. Shadow → canary → full = 标准 rollout. |
+| **Walking skeleton** | 走骨头 — 最薄端到端版本, 每组件 mock 但流程全跑通. 跑稳后再换真组件. **Decomposition 题标准 MVP 方法论**. |
+| **Proxy metric** | 代理指标 — 真目标 (fraud loss $) 数据慢, 用快的代理 (model precision/recall) 快速迭代. |
+
+### 人 / 政治
+
+| 术语 | 解释 |
+|---|---|
+| **SME (Subject Matter Expert)** | 领域专家. Fraud SME = 在 fraud 业务干多年的人, 知道 "为啥 threshold 调 0.78" 背后的血泪. |
+| **CRO (Chief Risk Officer)** | 首席风险官. 通常是 fraud unification 项目的 **buyer** (出钱+拍板). |
+| **CISO** | Chief Information Security Officer. 管 cyber security, 跟 CRO **不同**. |
+| **CCO** | Chief Compliance Officer. 必 sign-off, 否则 OCC 审计过不了. |
 
 ---
 

@@ -8,6 +8,126 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 agent + enterprise data integration 题. 名词不懂直接误入 ETL 死路. 5 min 看完.
+
+### Agent / Tool 调用
+
+| 术语 | 解释 |
+|---|---|
+| **MCP (Model Context Protocol)** ⭐ | Anthropic 2024 开源的 agent tool 调用标准, JSON-RPC over HTTP. 2026 业界 default. |
+| **MCP server** | 实现 MCP 协议的服务 — 每个 source 一个 server. |
+| **MCP gateway** | 中心化的 MCP 路由层 — 做 auth / cache / 日志. |
+| **Tool / Function calling** ⭐ | LLM 调用外部 function 的能力. OpenAI 命名 "function calling", Anthropic 叫 "tool use". |
+| **Tool catalog** | 工具目录 — 所有可用 tool 的 metadata 集合. |
+| **Domain tool vs Raw tool** ⭐ | Domain = `get_overdue_invoices` (业务语义); Raw = `POST /sap/odata/...` (技术细节). 用 domain. |
+| **Composite tool** | 组合工具 — 一个 tool 内部调多个 API, 减少 LLM compose 错误. |
+| **Tool description** | 工具描述 — 给 LLM 看的 docstring, 决定 LLM 选不选这个 tool. |
+| **LangGraph** | LangChain 的 stateful agent 框架, 支持 parallel tool call. |
+| **Claude Sonnet 4.6** | Anthropic 旗舰中端 model. |
+
+### Auth / 权限 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **OBO (On-Behalf-Of)** ⭐ | 代理身份调用 — agent 以 user 身份调用 source, 不是 service account. |
+| **Token exchange (RFC 8693)** | OAuth 2.0 token 互换标准 — user JWT 换 SAP/SFDC 的 access token. |
+| **JWT Bearer flow** | SFDC 的 JWT 认证流 — 签发的 JWT 直接换 access token. |
+| **Subject token** | 被代理的 user 的 token. |
+| **Service account** | 服务账号 — 不依赖具体 user 的身份. 这题尽量不用. |
+| **Permission flattening** | 权限拍平 — ETL 后 source 端 RLS 丢失, 风险. |
+| **RLS (Row-Level Security)** | 行级安全 — Postgres / Snowflake 按 user 过滤行. |
+| **IdP (Identity Provider)** | 身份提供商 — Okta / Azure AD. |
+| **Okta** | 头部 SSO SaaS. |
+| **SAML / OIDC** | 两种企业身份联合协议. |
+
+### 数据源
+
+| 术语 | 解释 |
+|---|---|
+| **SAP S/4HANA** ⭐ | SAP 现代 ERP 平台. Cloud 版有 OData API. |
+| **SAP ECC** | SAP 老一代 ERP, 主要 BAPI / RFC API. |
+| **OData v4** | SAP S/4 Cloud 的 RESTful API 标准. |
+| **BAPI / RFC** | SAP ECC 的远程函数调用. |
+| **SAP Cloud Connector** | 连接 on-prem SAP 和 cloud 的网关. |
+| **SAP JCo / pyrfc** | Java / Python SAP RFC 客户端库. |
+| **Salesforce (SFDC)** ⭐ | 头部 CRM SaaS. REST + Bulk API. |
+| **SFDC governor limits** ⭐ | Salesforce 强制的 API 上限 (100K/24h free, 1M premium). |
+| **SFDC org** | Salesforce 客户实例. |
+| **Postgres** | 开源关系数据库. |
+| **read replica** | 只读副本 — 减轻主库压力. |
+| **Customer 360** | 客户全景视图 — 销售 + 服务 + 营销整合. |
+
+### ETL / 数据架构 (这题反例)
+
+| 术语 | 解释 |
+|---|---|
+| **ETL / ELT** | Extract-Transform-Load — 数据仓库经典. 这题不能用. |
+| **Data warehouse / Snowflake** | 列式分析仓. |
+| **Staleness** | 数据陈旧度 — ETL 通常 30min-6h 滞后. |
+| **Federated query** | 联邦查询 — Trino / Presto 跨 source 直查. 慢但 real-time. |
+| **Trino / Presto** | 联邦 SQL 引擎. |
+
+### Caching / 性能
+
+| 术语 | 解释 |
+|---|---|
+| **Per-user cache key** ⭐ | 缓存 key 包含 user_id — 不同 user 看不同数据时正确. |
+| **Per-tool TTL** | 每个 tool 不同的 cache 时长. |
+| **Semantic cache** | 语义缓存 — 相似 query 命中同 cache. |
+| **Negative cache** | 负缓存 — 错误结果也短暂缓存, 防止 flood retry. |
+| **Cache invalidation** | 缓存失效 — 数据变了如何清 cache. |
+| **Cache hit rate** | 缓存命中率 — 这题目标 > 60%. |
+| **Bulk API** | SFDC 的批量 API — 1 个 call 拿 10K 行. |
+| **Governor limit** | SFDC API 24h 上限. |
+
+### Schema / Discovery
+
+| 术语 | 解释 |
+|---|---|
+| **Schema registry / Tool catalog** | 工具元数据中心. |
+| **RAG over tool catalog** ⭐ | 用 vector search 从 1500 tool 里找 top-20 给 LLM. |
+| **Vector DB (PGvector / Pinecone / Qdrant)** | 向量数据库. |
+| **Embedding** | 把 query / tool description 转成向量. |
+| **Tool eval suite** | 工具评估套件 — golden Q × expected tool sequence. |
+| **Identifier mapping** | ID 映射 — SAP customer_id ↔ SFDC account_id. |
+
+### 安全 / 沙箱
+
+| 术语 | 解释 |
+|---|---|
+| **Safe SQL / Sandboxed SQL** | 受限 SQL 执行 — read-only + 表黑名单 + 行数上限 + 5s timeout. |
+| **statement_timeout** | Postgres 单 query 超时. |
+| **EXPLAIN cost** | Postgres 查询计划成本估算. |
+| **SQL injection** | SQL 注入 — LLM 写 raw SQL 时风险. |
+| **Audit log** | 审计日志 — 谁在何时调了什么 tool. |
+| **Immutable store** | 不可变存储 — 审计日志写 WORM. |
+
+### 部署 / 运维
+
+| 术语 | 解释 |
+|---|---|
+| **VPC** | AWS 私有网络. |
+| **Bedrock** | AWS 托管 LLM 服务. |
+| **OTel span chain** | 跨 service 的 trace 链. |
+| **Dual-confirm UX** | 双重确认界面 — 写操作前 user 显式 confirm. |
+| **Eval suite daily run** | 每日跑评估 — 检测 regression. |
+
+### 业务术语
+
+| 术语 | 解释 |
+|---|---|
+| **Overdue invoices** | 逾期未付发票. |
+| **Accounts receivable aging** | 应收账款账龄. |
+| **Collections** | 催收. |
+| **Customer master** | 客户主数据 — SAP 概念. |
+| **Lead / Opportunity / Account** | SFDC 销售概念: 潜客 / 商机 / 客户. |
+| **Activity (SFDC)** | 互动记录 (电话 / 邮件 / 会议). |
+| **SKU** | Stock Keeping Unit — 库存单位. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 RAG, 是考你**异构数据源 agent 接入的 modern pattern**:

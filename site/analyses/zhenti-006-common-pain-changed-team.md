@@ -7,6 +7,97 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 pattern recognition + influence without authority + change management 的故事. 涉及大量方法论术语 + agent platform 术语.
+
+### 影响力 / 改变方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Pattern + Pilot + Data + Champion** ⭐ | 4-element framework. Pattern (量化跨客户证据) + Pilot (低风险验证) + Data (验证后数字) + Champion (转化关键 blocker). 缺一不行. |
+| **Influence without authority** ⭐ | 没有 manager 头衔但要 drive change. 是 FDE 跟 implementation engineer 的核心区别. |
+| **Pattern recognition (across customers)** ⭐ | 跨客户识别共性. 1 customer = noise, 3 customer same specific complaint = pattern. |
+| **Champion** | 把 influential blocker 转化成支持者. Tech lead 一旦 convert, 他 push 比你 push 有效 10×. |
+| **Escape hatch design** | 逃生口设计. Pattern 是 default with parameters, 不是 one-size-fits-all. |
+| **Default with parameters** | 默认值 + 可调参数. 每个客户调比例 / 深度. |
+| **Customer pain ≠ my pain** | 客户痛点不是我的痛点. 你 see 的 pattern 不一定是 customer pain. |
+| **Loop closure (closing the loop)** | 闭环. 从 customer insight 反哺 product / process change. |
+
+### 模式判别标准
+
+| 术语 | 解释 |
+|---|---|
+| **N ≥ 3 customers same specific complaint** | 至少 3 个客户 same 具体抱怨. Vague complaint ("AI 不准") 不算. |
+| **Quantify cross-customer** | 跨客户量化. "57% timeline on doc" 是 cross-customer 可比的, "feels slow" 不是. |
+| **Survives steel-man** | 经得起 steel-man 反驳. 你试着用 alternative explanation 推翻自己, 推不翻才是 real pattern. |
+| **Noise vs signal** | 噪音 vs 信号. 1 customer 的 environment-specific 问题是 noise. |
+
+### Spec doc / 工程流程术语
+
+| 术语 | 解释 |
+|---|---|
+| **Spec doc** ⭐ | 规格说明文档. 传统软件流程 — PM 写 → eng review → 反复 round trip 4-6 周. AI 系统的 wrong abstraction. |
+| **Round trip latency** | 来回耗时. Spec doc 一个 round 4 天 (Mon send → Tue incorporate → Wed review → Thu next comment). |
+| **Workshop + Skeleton** ⭐ | 替代 spec doc 的方法. Workshop 3 天 stakeholder in room + Skeleton day 5 working code. 1 周 vs 8 周. |
+| **Skeleton (working skeleton)** | 最薄端到端 working code. 不是 finished product, 是 first iteration. |
+| **Iterate on skeleton** | 基于 skeleton 修改. Ops review 真东西 > 读 doc. |
+| **Onboarding time** | 客户上线时长. 14 周 → 6 周 是这题主要 KPI. |
+
+### Tool / Agent 术语
+
+| 术语 | 解释 |
+|---|---|
+| **Tool description** | Agent 工具描述. LLM 看 description 决定用哪个 tool. 描述模糊 = 路由不准. |
+| **RAG-based tool discovery** ⭐ | 用 RAG (semantic embedding) 动态选 tool, 不 hard-code if-else. 路由 70% → 92% 用的方法. |
+| **Intent classifier** | 意图分类器. 用户 query → intent 标签. |
+| **Confusion matrix** | 混淆矩阵. 真实 vs 预测的二维表, 看 mis-classification 落在哪里. |
+| **Semantic embedding** | 语义嵌入. 把 text 转向量, 算 similarity. |
+| **Dynamic prompt** | 动态 prompt. 根据 query 选 top-K tool description 拼到 prompt. |
+| **Tool description template** | 工具描述模板. Standardize 写法防止 5 个 team 各自模糊. |
+
+### Internal Agent Platform 术语
+
+| 术语 | 解释 |
+|---|---|
+| **3-layer abstraction** | 3 层抽象. Workflow / Tool / Memory, 每层留 escape hatch. |
+| **Workflow layer** | 编排层 — 多 step 流程组合. |
+| **Tool layer** | 工具层 — 单独 callable function (API / DB / LLM). |
+| **Memory layer** | 记忆层 — short / long / shared. |
+| **Seed teams** | 种子团队. Platform 第一批客户. |
+| **Onboarding** | 让新团队接入 platform. |
+| **Pair programming** | 结对编程. Onboarding 第一周陪客户写. |
+| **De facto standard** | 事实标准. 没正式 mandate, 但大家都用. |
+
+### 多市场 / 文化术语
+
+| 术语 | 解释 |
+|---|---|
+| **Localization (vs translation)** ⭐ | 本地化 > 翻译. 包含 translation + cultural framing + persona + TTS voice + escalation rules. |
+| **Persona** | 人设. Agent 在不同市场的语气 / 礼貌度 / 文化贴合. |
+| **Cultural workshop** | 文化研讨. 1 周 with local ops, 进 scoping default. |
+| **TTS voice A/B** | 男声 / 女声 + 音调 / 节奏 A/B test. 巴西女声听起来像 telemarketing 这种文化信号. |
+| **Escalation rules per-market** | 各市场升级规则不同. |
+
+### 公司 / 监控术语
+
+| 术语 | 解释 |
+|---|---|
+| **NPS (Net Promoter Score)** | 净推荐值. -100 到 +100. 这题里 ops NPS +35 是衡量满意度. |
+| **Grafana** | 开源监控看板工具. |
+| **Prometheus** | 开源时序数据库, 跟 Grafana 配套. |
+| **Looker / Tableau** | 商业 BI 看板工具. |
+| **Central observability dashboard** | 中央可观测性看板. 这题里我 propose 没被 adopt 的反 pattern. |
+
+### 反 pattern
+
+| 术语 | 解释 |
+|---|---|
+| **Wrong-attribute (failure)** | 错误归因. 把 catch rate drop 归因为 "泰国 ops less mature" 而不是我的 scope. |
+| **Sugar-coat (no pushback)** | 故事没 pushback = 显得 proposal 没 friction = 不重要 OR 你 sugar-coat. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 跟 SE / Implementation 区分度最高的题之一**. 表面问 pattern recognition, 实际筛 6 件事:

@@ -43,6 +43,25 @@
 <blockquote><p>"Design a <strong>distributed task queue</strong> that supports: <strong>priority</strong> (paid &gt; free), <strong>retry</strong> with exponential backoff, <strong>dead-letter</strong> after N failures, <strong>per-tenant fair scheduling</strong> (one big customer can't starve others), and <strong>idempotency</strong>. Throughput <strong>10K tasks/sec</strong>, task duration ranges 100ms - 10min. Talk through Kafka vs Redis Streams vs Postgres SKIP LOCKED vs Temporal."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / Stripe / Cloudflare / Temporal · 行业: infra / fintech <strong>约束</strong>: 10K TPS / multi-tenant fairness / wide duration variance (100ms - 10min) / per-tenant priority / exactly-once semantics where possible / observability for debugging stuck jobs</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题是分布式系统经典题. 名词不懂直接挂. 5 min 看完.</p></blockquote>
+<h4>队列概念 (核心)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Task queue</strong> ⭐</td><td>任务队列 — producer 把任务塞队列, worker 拿任务执行.</td></tr><tr><td><strong>Producer / Consumer / Worker</strong></td><td>生产者 (塞任务) / 消费者 (拿任务) / 执行者.</td></tr><tr><td><strong>Dispatcher</strong></td><td>调度器 — 决定 next task 给哪个 worker.</td></tr><tr><td><strong>Topic / Partition</strong></td><td>Kafka 概念 — topic 是逻辑队列, partition 是物理分片.</td></tr><tr><td><strong>DLQ (Dead Letter Queue)</strong> ⭐</td><td>死信队列 — N 次重试失败后进的终态队列.</td></tr><tr><td><strong>HOL blocking (Head-of-Line)</strong></td><td>队头阻塞 — 队头慢任务卡住后续. Kafka 长任务的痛.</td></tr><tr><td><strong>Backpressure</strong></td><td>反压 — 下游处理不过来时向上游 push back (e.g. 返回 429).</td></tr></tbody></table></div>
+<h4>语义 / 可靠性</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>At-least-once</strong> ⭐</td><td>至少一次 — 可能重复发, 必须配 idempotency. 业界默认.</td></tr><tr><td><strong>Exactly-once</strong></td><td>恰好一次 — 分布式系统严格意义不可能, 只能 effectively-once.</td></tr><tr><td><strong>At-most-once</strong></td><td>最多一次 — 可能丢, 不重复.</td></tr><tr><td><strong>Idempotency / Idempotency key</strong> ⭐</td><td>幂等 / 幂等键 — 同 key 多次提交结果一样. Stripe 标配.</td></tr><tr><td><strong>Dedup window</strong></td><td>去重窗口 — 24h 内同 idem key 视为同一 task.</td></tr><tr><td><strong>Effectively-once</strong></td><td>实际一次 — at-least-once + idempotent processor.</td></tr><tr><td><strong>FIFO</strong></td><td>First-In-First-Out 顺序.</td></tr></tbody></table></div>
+<h4>重试 / 失败处理</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Retry with backoff</strong> ⭐</td><td>带退避的重试 — 失败后等一段时间再试.</td></tr><tr><td><strong>Exponential backoff</strong></td><td>指数退避 — 1s / 2s / 4s / 8s ...</td></tr><tr><td><strong>Jitter</strong></td><td>抖动 — 在退避时间上加随机扰动, 避免 thundering herd.</td></tr><tr><td><strong>Stripe-style 阶梯 backoff</strong> ⭐</td><td>Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式.</td></tr><tr><td><strong>Thundering herd</strong></td><td>雷暴 — 多 worker 同时重试导致瞬间洪峰.</td></tr><tr><td><strong>Circuit breaker</strong></td><td>熔断器 — 错误率高时直接拒绝, 给下游恢复时间.</td></tr><tr><td><strong>Visibility timeout</strong> ⭐</td><td>不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念.</td></tr><tr><td><strong>Lease / Leased</strong></td><td>租约 — task 被 worker 持有的状态.</td></tr><tr><td><strong>Heartbeat</strong> ⭐</td><td>心跳 — long-running worker 定期续 lease, 防 spurious retry.</td></tr><tr><td><strong>ack / nack</strong></td><td>acknowledge / negative ack — 任务完成 / 失败的通知.</td></tr></tbody></table></div>
+<h4>公平性 / 优先级</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Priority queue</strong></td><td>优先级队列 — paid &gt; free.</td></tr><tr><td><strong>Per-tenant fair scheduling</strong> ⭐</td><td>多租户公平调度 — 一个大客户不能 starve 别人.</td></tr><tr><td><strong>Starvation</strong></td><td>饥饿 — 低优先 task 永远拿不到 worker.</td></tr><tr><td><strong>WFQ (Weighted Fair Queueing)</strong> ⭐</td><td>加权公平队列 — 按 weight 分配份额.</td></tr><tr><td><strong>DRR (Deficit Round Robin)</strong></td><td>亏空轮询 — WFQ 的具体实现.</td></tr><tr><td><strong>Token bucket</strong></td><td>令牌桶 — 经典 rate limiting 算法.</td></tr><tr><td><strong>Min-share guarantee</strong></td><td>最低份额保证 — 任何 tenant 至少分到 5%.</td></tr><tr><td><strong>Burst</strong></td><td>突发 — 短时间内大量请求.</td></tr><tr><td><strong>Quota / In-flight quota</strong></td><td>配额 — 同时 leased 上限.</td></tr></tbody></table></div>
+<h4>Backing Store 选型</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Kafka</strong> ⭐</td><td>高吞吐流式日志, 1M+ TPS 但 long task HOL block.</td></tr><tr><td><strong>Redis Streams</strong></td><td>Redis 5+ 的 stream 数据结构, 100K TPS 量级.</td></tr><tr><td><strong>RabbitMQ</strong></td><td>经典 AMQP 队列, Erlang 实现.</td></tr><tr><td><strong>Postgres SKIP LOCKED</strong> ⭐</td><td>Postgres 9.5+ 的特性 — <code>FOR UPDATE SKIP LOCKED</code> 让多 worker 跳过已锁行.</td></tr><tr><td><strong>SQS (Simple Queue Service)</strong></td><td>AWS 托管队列.</td></tr><tr><td><strong>Temporal</strong> ⭐</td><td>工作流编排引擎 (不仅是队列). 长 workflow + state 适合.</td></tr><tr><td><strong>Celery</strong></td><td>Python 经典任务队列库.</td></tr><tr><td><strong>Outbox pattern</strong></td><td>任务和业务 state 在同一 DB transaction, 后异步 publish.</td></tr><tr><td><strong>Saga</strong></td><td>长流程补偿模式.</td></tr></tbody></table></div>
+<h4>数据结构 / 操作</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Sorted set (ZADD)</strong></td><td>Redis 有序集合 — 按 score 排序, 快速 peek top.</td></tr><tr><td><strong>SET NX / EX</strong></td><td>Redis 命令 — NX = if Not eXists; EX = expiry seconds.</td></tr><tr><td><strong>JSONB</strong></td><td>Postgres 二进制 JSON 列.</td></tr><tr><td><strong>Partial index</strong></td><td>Postgres 部分索引 — WHERE 条件下才建索引.</td></tr><tr><td><strong>FOR UPDATE SKIP LOCKED</strong></td><td>Postgres 行锁 + 跳过已锁.</td></tr><tr><td><strong>Materialized view</strong></td><td>物化视图 — 预聚合结果, 定时刷新.</td></tr><tr><td><strong>PARTITION BY RANGE</strong></td><td>Postgres 表分区.</td></tr></tbody></table></div>
+<h4>部署 / Scale</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>HA (High Availability)</strong></td><td>高可用 — 主从 + 自动 failover.</td></tr><tr><td><strong>DR (Disaster Recovery)</strong></td><td>灾难恢复 — 跨 region 备份.</td></tr><tr><td><strong>RPO / RTO</strong></td><td>Recovery Point Objective / Time Objective — 能丢多少数据 / 多久恢复.</td></tr><tr><td><strong>HPA (Horizontal Pod Autoscaler)</strong></td><td>K8s 水平自动伸缩.</td></tr><tr><td><strong>Long polling</strong></td><td>长轮询 — client 等 server 有数据再返回.</td></tr><tr><td><strong>Sharding</strong></td><td>分片 — 按 hash 拆 DB.</td></tr><tr><td><strong>Aurora multi-AZ</strong></td><td>Aurora 跨可用区高可用.</td></tr></tbody></table></div>
+<h4>监控</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Queue depth</strong></td><td>队列深度 — 待处理任务数.</td></tr><tr><td><strong>Dispatch lag</strong></td><td>派发延迟 — 入队到开始执行的时间.</td></tr><tr><td><strong>PagerDuty / Slack alert</strong></td><td>告警工具.</td></tr><tr><td><strong>Iceberg (audit)</strong></td><td>数据湖表格式 — 用于审计日志归档.</td></tr><tr><td><strong>Stuck task</strong></td><td>卡住的 task — leased &gt; 预期时长.</td></tr><tr><td><strong>parent_task_id</strong></td><td>父任务 ID — 用于链式 task lineage.</td></tr><tr><td><strong>OTel span chain</strong></td><td>OpenTelemetry span 链 — 跨 service trace 任务生命周期.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 Celery + Redis, 是考你<strong>真正在 production 用过分布式 queue, 知道这些 trade-off</strong>:</p>
 <ol><li><strong>Queue backend 选型</strong> — Kafka / Redis Streams / Postgres SKIP LOCKED / RabbitMQ / Temporal, 每个有真实 sweet spot</li><li><strong>优先级实现</strong> — multi-topic vs sorted set vs priority queue (Kafka 不原生支持)</li><li><strong>Retry strategy</strong> — Stripe-style 阶梯 (30s/2m/10m/1h/6h/24h) + jitter, 不是 simple exponential</li><li><strong>Idempotency</strong> — 同一 task 不能跑两次, idempotency key + dedup window</li><li><strong>Per-tenant fair scheduling</strong> — token bucket / weighted fair queueing / per-tenant topic</li><li><strong>Visibility timeout</strong> — worker pick task 后多久没 ack 就 re-deliver, 是 SQS / DLQ 关键</li><li><strong>Worker heartbeat</strong> — long-running task 怎么续期 visibility, 不被 spurious retry</li><li><strong>Observability</strong> — 卡 task 怎么 debug, lineage 怎么 trace</li><li><strong>菜鸟答案失败点</strong>: "Celery + Redis + retry decorator" — 完全没回答 fairness / priority / DLQ / visibility timeout 这些 真正 production 痛点.</li></ol>
@@ -596,6 +615,115 @@ SLO:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / Stripe / Cloudflare / Temporal · 行业: infra / fintech
 **约束**: 10K TPS / multi-tenant fairness / wide duration variance (100ms - 10min) / per-tenant priority / exactly-once semantics where possible / observability for debugging stuck jobs
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题是分布式系统经典题. 名词不懂直接挂. 5 min 看完.
+
+### 队列概念 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Task queue** ⭐ | 任务队列 — producer 把任务塞队列, worker 拿任务执行. |
+| **Producer / Consumer / Worker** | 生产者 (塞任务) / 消费者 (拿任务) / 执行者. |
+| **Dispatcher** | 调度器 — 决定 next task 给哪个 worker. |
+| **Topic / Partition** | Kafka 概念 — topic 是逻辑队列, partition 是物理分片. |
+| **DLQ (Dead Letter Queue)** ⭐ | 死信队列 — N 次重试失败后进的终态队列. |
+| **HOL blocking (Head-of-Line)** | 队头阻塞 — 队头慢任务卡住后续. Kafka 长任务的痛. |
+| **Backpressure** | 反压 — 下游处理不过来时向上游 push back (e.g. 返回 429). |
+
+### 语义 / 可靠性
+
+| 术语 | 解释 |
+|---|---|
+| **At-least-once** ⭐ | 至少一次 — 可能重复发, 必须配 idempotency. 业界默认. |
+| **Exactly-once** | 恰好一次 — 分布式系统严格意义不可能, 只能 effectively-once. |
+| **At-most-once** | 最多一次 — 可能丢, 不重复. |
+| **Idempotency / Idempotency key** ⭐ | 幂等 / 幂等键 — 同 key 多次提交结果一样. Stripe 标配. |
+| **Dedup window** | 去重窗口 — 24h 内同 idem key 视为同一 task. |
+| **Effectively-once** | 实际一次 — at-least-once + idempotent processor. |
+| **FIFO** | First-In-First-Out 顺序. |
+
+### 重试 / 失败处理
+
+| 术语 | 解释 |
+|---|---|
+| **Retry with backoff** ⭐ | 带退避的重试 — 失败后等一段时间再试. |
+| **Exponential backoff** | 指数退避 — 1s / 2s / 4s / 8s ... |
+| **Jitter** | 抖动 — 在退避时间上加随机扰动, 避免 thundering herd. |
+| **Stripe-style 阶梯 backoff** ⭐ | Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式. |
+| **Thundering herd** | 雷暴 — 多 worker 同时重试导致瞬间洪峰. |
+| **Circuit breaker** | 熔断器 — 错误率高时直接拒绝, 给下游恢复时间. |
+| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念. |
+| **Lease / Leased** | 租约 — task 被 worker 持有的状态. |
+| **Heartbeat** ⭐ | 心跳 — long-running worker 定期续 lease, 防 spurious retry. |
+| **ack / nack** | acknowledge / negative ack — 任务完成 / 失败的通知. |
+
+### 公平性 / 优先级
+
+| 术语 | 解释 |
+|---|---|
+| **Priority queue** | 优先级队列 — paid > free. |
+| **Per-tenant fair scheduling** ⭐ | 多租户公平调度 — 一个大客户不能 starve 别人. |
+| **Starvation** | 饥饿 — 低优先 task 永远拿不到 worker. |
+| **WFQ (Weighted Fair Queueing)** ⭐ | 加权公平队列 — 按 weight 分配份额. |
+| **DRR (Deficit Round Robin)** | 亏空轮询 — WFQ 的具体实现. |
+| **Token bucket** | 令牌桶 — 经典 rate limiting 算法. |
+| **Min-share guarantee** | 最低份额保证 — 任何 tenant 至少分到 5%. |
+| **Burst** | 突发 — 短时间内大量请求. |
+| **Quota / In-flight quota** | 配额 — 同时 leased 上限. |
+
+### Backing Store 选型
+
+| 术语 | 解释 |
+|---|---|
+| **Kafka** ⭐ | 高吞吐流式日志, 1M+ TPS 但 long task HOL block. |
+| **Redis Streams** | Redis 5+ 的 stream 数据结构, 100K TPS 量级. |
+| **RabbitMQ** | 经典 AMQP 队列, Erlang 实现. |
+| **Postgres SKIP LOCKED** ⭐ | Postgres 9.5+ 的特性 — `FOR UPDATE SKIP LOCKED` 让多 worker 跳过已锁行. |
+| **SQS (Simple Queue Service)** | AWS 托管队列. |
+| **Temporal** ⭐ | 工作流编排引擎 (不仅是队列). 长 workflow + state 适合. |
+| **Celery** | Python 经典任务队列库. |
+| **Outbox pattern** | 任务和业务 state 在同一 DB transaction, 后异步 publish. |
+| **Saga** | 长流程补偿模式. |
+
+### 数据结构 / 操作
+
+| 术语 | 解释 |
+|---|---|
+| **Sorted set (ZADD)** | Redis 有序集合 — 按 score 排序, 快速 peek top. |
+| **SET NX / EX** | Redis 命令 — NX = if Not eXists; EX = expiry seconds. |
+| **JSONB** | Postgres 二进制 JSON 列. |
+| **Partial index** | Postgres 部分索引 — WHERE 条件下才建索引. |
+| **FOR UPDATE SKIP LOCKED** | Postgres 行锁 + 跳过已锁. |
+| **Materialized view** | 物化视图 — 预聚合结果, 定时刷新. |
+| **PARTITION BY RANGE** | Postgres 表分区. |
+
+### 部署 / Scale
+
+| 术语 | 解释 |
+|---|---|
+| **HA (High Availability)** | 高可用 — 主从 + 自动 failover. |
+| **DR (Disaster Recovery)** | 灾难恢复 — 跨 region 备份. |
+| **RPO / RTO** | Recovery Point Objective / Time Objective — 能丢多少数据 / 多久恢复. |
+| **HPA (Horizontal Pod Autoscaler)** | K8s 水平自动伸缩. |
+| **Long polling** | 长轮询 — client 等 server 有数据再返回. |
+| **Sharding** | 分片 — 按 hash 拆 DB. |
+| **Aurora multi-AZ** | Aurora 跨可用区高可用. |
+
+### 监控
+
+| 术语 | 解释 |
+|---|---|
+| **Queue depth** | 队列深度 — 待处理任务数. |
+| **Dispatch lag** | 派发延迟 — 入队到开始执行的时间. |
+| **PagerDuty / Slack alert** | 告警工具. |
+| **Iceberg (audit)** | 数据湖表格式 — 用于审计日志归档. |
+| **Stuck task** | 卡住的 task — leased > 预期时长. |
+| **parent_task_id** | 父任务 ID — 用于链式 task lineage. |
+| **OTel span chain** | OpenTelemetry span 链 — 跨 service trace 任务生命周期. |
 
 ---
 

@@ -9,6 +9,109 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> RAG 是 AI Engineer 必懂. 这堆术语不熟 = 听不懂 chunking / reranker / MMR 在说啥.
+
+### RAG 核心概念
+
+| 术语 | 解释 |
+|---|---|
+| **RAG (Retrieval-Augmented Generation)** ⭐ | "先检索后生成" 范式. 把外部知识 embed → 检索 → 塞给 LLM 当 context. 解决 LLM 知识截止 + hallucination. |
+| **Ingest (摄取)** | 把文档解析 + chunk + embed + 入 index 的离线过程. |
+| **Retrieval (检索)** | 用 query 找 top-k 相似 chunk. 在线过程. |
+| **Grounded** | LLM 回答**只用** retrieved context, 不靠自己 parametric knowledge. |
+| **"I don't know" fallback** ⭐ | 检索分数低时让 LLM 说 "我不知道" 而不是瞎编. 法律 / 医疗必备. |
+| **Citation / inline `[n]`** | 答案里 `[1] [2]` 引用 retrieved chunk. UI 可点回原文. |
+| **Faithfulness** | 答案是否忠于 retrieved context (没编). 跟 relevance 不同. |
+| **Provenance** | 每个 entity / 答案附 `{doc, page, char_range}`. |
+
+### Chunking 策略
+
+| 术语 | 解释 |
+|---|---|
+| **Chunking** ⭐ | 把长文档切小块 (LLM context 装得下 + embedder 质量稳). 这题考核心. |
+| **Fixed-size chunking** | 每 N tokens 一刀. 简单但切句子中间. |
+| **Heading-aware chunking** ⭐ | 按 markdown `#` / HTML `<h1>` 切. 语义边界. |
+| **Recursive chunking** | 先按 section, section 太大再按 paragraph, 再按 sentence. langchain `RecursiveCharacterTextSplitter`. |
+| **Overlap** | 相邻 chunk 重叠 tokens. 100/12% 常用, 防答案跨边界丢. |
+| **Propositional chunking** | LLM 把段落改写成独立 "命题" (e.g., "A 是 B" 一句话), 再 embed. recall 高但 ingest 慢. |
+| **Late chunking** | Jina AI 2024 新方法. 先 embed 全文 (long-context embedder), 再切 embedding. 每 chunk embed 见全文 context. |
+| **Sliding window** | 同 overlap 概念. |
+
+### Embedding
+
+| 术语 | 解释 |
+|---|---|
+| **Embedding (嵌入)** ⭐ | 把 text 映射成固定维度 dense 向量 (e.g., 768/1536d). 语义近 → 向量距离近. |
+| **`text-embedding-3-small`** | OpenAI 经典 embedder, 1536d, $0.02/1M tokens, fast. |
+| **`text-embedding-3-large`** | OpenAI 大模型, 3072d, 更准更贵. |
+| **`bge-base-en-v1.5` (BGE)** | BAAI 开源 embedder, 768d, 自托管 GPU 跑. 跟 OpenAI 同档质量, 数据合规 + 0 边际成本. |
+| **`e5-large` / `mxbai-embed-large`** | 其他开源选项. |
+| **MRL / Matryoshka embedding** | 一个 model 输出可截断: 1024d truncate 到 256d 还能用. cost / quality 灵活权衡. |
+| **L2 normalize** ⭐ | embedding 除以模长. 让 inner product = cosine similarity. |
+| **Cosine similarity vs Inner product (dot product)** | 同向量在 normalize 后等价. Cosine ∈ [-1, 1], inner product 无 bound. |
+| **Dimension (维度)** | embedding 长度. 768 / 1024 / 1536 / 3072 常见. 高 → 准 + 内存大. |
+
+### Vector DB / Index
+
+| 术语 | 解释 |
+|---|---|
+| **FAISS** ⭐ | Facebook 开源 ANN 库. `IndexFlatIP` (brute), `IndexHNSWFlat`, `IndexIVFPQ` 等. |
+| **`IndexFlatIP`** | Brute-force inner product. < 100k vectors 适用. 100% recall. |
+| **HNSW** | 图算法 ANN, 详见 Q18. |
+| **Chroma** | 开源 vector DB, 持久化 + metadata filter 友好. Demo 阶段标配. |
+| **pgvector** | PostgreSQL 向量扩展. 跟业务表共库, 减依赖. |
+| **Pinecone / Weaviate / Qdrant / Milvus** | 托管 / 开源 vector DB. 本题题面禁 Pinecone. |
+| **HyDE (Hypothetical Document Embedding)** | LLM 先回答 (hypothetically), embed 答案, 用它去 retrieve. 对 vague query 有奇效. |
+
+### Retrieval 算法
+
+| 术语 | 解释 |
+|---|---|
+| **top-k retrieval** | 取最相似 k 个 chunk. |
+| **MMR (Maximal Marginal Relevance)** ⭐ | 在 relevance 和 diversity 之间平衡: `λ × rel - (1-λ) × max_sim_to_selected`. 防 top-5 全是 near-duplicate. |
+| **BM25** | 经典 sparse retrieval, 基于 term frequency. 对 exact keyword (产品代码, 名字) 强. |
+| **Hybrid retrieval** ⭐ | BM25 + vector 结合. Vector 抓语义, BM25 抓 exact match. |
+| **RRF (Reciprocal Rank Fusion)** | Hybrid 融合算法: `score = Σ 1/(k+rank_i)`. 不需要分数 normalize. |
+| **Reranker (cross-encoder)** ⭐ | 二段式: vector retrieve top-100 → cross-encoder rerank → top-5. 准但慢. `bge-reranker-large` 是常用. |
+| **Cross-encoder vs Bi-encoder** | Bi-encoder = query / doc 独立 embed (快); cross-encoder = query+doc 一起过 model (准 + 慢). |
+| **Query rewriting / Query expansion** | LLM 改写 query 成 3 个变体 → 各 retrieve → union. 对模糊 query 有奇效. |
+
+### Eval / Metrics
+
+| 术语 | 解释 |
+|---|---|
+| **Golden set** ⭐ | 人工标注的 Q&A 测试集 (50-200 examples). Defend chunking 全靠它. |
+| **Recall@k** ⭐ | top-k 里有没有正确 doc. |
+| **MRR (Mean Reciprocal Rank)** | 正确 doc 的平均排名倒数. 1.0 = 永远 top-1. |
+| **nDCG** | 排序质量指标, 考虑相关性分级. |
+| **Judge LLM** | 用 GPT-4 评分 (faithfulness / completeness / citation). LLM-as-judge. |
+| **RAGAS / DeepEval** | RAG eval 库, 含 faithfulness / context-precision / answer-relevance 等指标. |
+| **Ablation study** | 一次改一个变量看效果. 这题 chunking 4 strategy × N 参数 = N 次 ablation. |
+
+### LLM API
+
+| 术语 | 解释 |
+|---|---|
+| **`gpt-4o-mini`** | OpenAI 小模型, 便宜 + 快. RAG 默认 LLM. |
+| **`gpt-4o` (Omni)** | OpenAI 旗舰. 更准更贵, 用于 judge / 高 stakes. |
+| **Context window** | LLM 单次能装多少 token. GPT-4o = 128k, Claude 3.5 = 200k. |
+| **System / User / Assistant message** | LLM API 标准消息类型. |
+| **`temperature=0`** | LLM 输出随机性最低. RAG 用 0 求确定. |
+| **Streaming response** | LLM token-by-token 返回, 用户体感快. |
+
+### 上下文工程
+
+| 术语 | 解释 |
+|---|---|
+| **Context stuffing** | 把 N 个 chunk 全塞进 prompt. 主流策略. |
+| **"Lost in the middle"** | 长 context 中部信息被 LLM 忽略的现象 (paper). 重要内容放头尾. |
+| **Prompt template** | 固定结构 + 变量替换的 prompt. f-string 或 jinja2. |
+| **Score threshold** | top-1 score < N → 返 "I don't know" 不调 LLM, 省钱 + 防幻觉. |
+
+---
+
 ## 这道题在考什么
 
 RAG 看起来 "load + split + embed + retrieve + LLM" 五行代码搞定 (`langchain.RAG`). 但题目说**defend your chunking strategy + eval methodology** — 这是真功夫:

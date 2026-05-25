@@ -9,6 +9,99 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> ANN 是向量检索硬骨头. 这堆术语必须张口就来, 否则面试官问哪个算法你蒙圈.
+
+### ANN (Approximate Nearest Neighbor) 算法
+
+| 术语 | 解释 |
+|---|---|
+| **ANN (Approximate Nearest Neighbor)** ⭐ | 近似最近邻搜索. 牺牲一点 recall 换巨大 speedup. 大规模向量检索必走. |
+| **k-NN (exact)** | 精确 k 最近邻. Brute force O(N×d) per query. 10M × 768d → 770ms, 慢. |
+| **HNSW (Hierarchical Navigable Small World)** ⭐ | 分层小世界图. 从顶层稀疏图 navigate 到底层密集图. SOTA recall × latency 在内存够时. |
+| **IVF (Inverted File Index)** | k-means 把 N 向量聚成 K cluster, query 只搜 nprobe 个最近 cluster. |
+| **IVF-PQ (IVF + Product Quantization)** ⭐ | IVF + 每向量切 M 段, 每段 8-bit 量化. 10M × 96 bytes = 1GB 总, 但 recall 损 5-10%. |
+| **LSH (Locality Sensitive Hashing)** | 哈希让相似向量落同 bucket. 高维 recall 烂, 过时. |
+| **ScaNN (Google)** | 学习的 quantization + asymmetric distance. SOTA 但 ops 复杂. |
+| **DiskANN (Microsoft)** | SSD 上的 HNSW. 1B 向量单机, 96% recall, 1ms p99. 1B+ 场景关键. |
+| **Annoy (Spotify)** | 老式随机树 ANN. Build 后 immutable. 简单但不 SOTA. |
+
+### HNSW 参数
+
+| 术语 | 解释 |
+|---|---|
+| **`M` (max edges per node)** ⭐ | 图节点度数上限. 高 M → 高 recall + 高内存. 32 是 sweet spot. |
+| **`ef_construction`** | Build 时探索的候选数. 高 → 图质量好 + build 慢. 200 默认. |
+| **`ef_search` (or `ef`)** ⭐ | Query 时探索的候选数. **可在线调!** 100 → recall 0.95 1ms; 500 → recall 0.995 5ms. |
+| **`max_elements`** | 索引容量上限. 加 20% 余量给增长. |
+
+### 量化 / 压缩
+
+| 术语 | 解释 |
+|---|---|
+| **Product Quantization (PQ)** ⭐ | 把 d 维向量切 M 段, 每段独立 k-means 量化成 8-bit 码本 index. 768d × float32 = 3KB → 96 bytes. |
+| **Scalar Quantization (SQ)** | 每维独立量化 (float32 → int8). 4x 压缩, recall 损小. |
+| **Binary embedding** | 1-bit per dim. 4096 dim = 512 bytes/vec. recall ~80%. |
+| **fp16 / bf16** | 半精度浮点. 2x 压缩, 几乎无损. |
+| **Quantization-aware training** | 训练时就考虑量化, 比 post-hoc 准. |
+
+### 距离 / Similarity
+
+| 术语 | 解释 |
+|---|---|
+| **Cosine similarity** | `dot(a, b) / (|a| × |b|)`. L2 normalize 后等价 dot product. |
+| **Inner product (IP / dot product)** | `Σ aᵢ × bᵢ`. 无 bound. |
+| **L2 distance (Euclidean)** | `√Σ(aᵢ - bᵢ)²`. 跟 cosine 不等价但相关. |
+| **Asymmetric distance (ScaNN)** | query 不量化, doc 量化 → 算 distance 时用 query 原始精度. 比 symmetric 准. |
+
+### 性能 / 复杂度
+
+| 术语 | 解释 |
+|---|---|
+| **Recall@k** ⭐ | top-k 里有多少正确. 0.98 = 100 query 中 98 个 top-10 含真 top-1. |
+| **Latency p50 / p99** | 中位 / 99 分位延迟. p99 是 SLA 标准. |
+| **Throughput / QPS** | Queries Per Second. 单机 HNSW 16-core ~1000 QPS. |
+| **SIMD / AVX2 / AVX-512** | CPU 向量化指令. faiss 内部用. 决定 brute force 速度 (10 GFLOPS). |
+| **GFLOPS / TFLOPS** | 每秒 10⁹ / 10¹² 浮点运算. CPU AVX2 ~10 GFLOPS, A100 ~30 TFLOPS. |
+| **`hnswlib`** ⭐ | C++ HNSW 库 + Python binding. 不依赖 FAISS, 更轻. |
+| **`faiss-cpu` / `faiss-gpu`** | Facebook FAISS, 包 HNSW/IVF/PQ 全家桶. |
+| **`cuVS` (RAPIDS)** | NVIDIA 的 GPU vector search 库. |
+
+### 工程 / Production
+
+| 术语 | 解释 |
+|---|---|
+| **mmap (memory-mapped file)** ⭐ | OS 把文件映射到进程内存. 多 process 共享, OS page cache 友好. 大 index 必备. |
+| **Tombstone** | 删除标记 (不真删, 留位). HNSW `mark_deleted` 是 tombstone. 累积过多触发 rebuild. |
+| **Active/passive index swap** | 新 index 后台 build, 完成后原子切换 (atomic pointer swap). 旧 index drain 后回收. |
+| **Incremental insert** | 不重 build 整 index, 增量加点. HNSW 支持, IVF / Annoy 不支持. |
+| **Sharding** | N 个机器各 N 分之 1 向量, fan-out + top-k merge. 50M+ 必走. |
+| **Filter (metadata filter)** | "similar to query AND created_at > 2024-01". HNSW 原生不支持, Qdrant 集成. |
+| **Post-filter vs Pre-filter** | Post = 先 retrieve 后 filter (top-100 → top-10); Pre = 按 filter 分 index. |
+| **Cold start / Pre-warm** | 进程启动后 OS page cache 没数据, 首查询慢. Pre-run 几个 query 把 page 拉进 RAM. |
+| **`/healthz`** | K8s health endpoint. Known-answer query 验 index 装载正确. |
+
+### 数据 / 实验
+
+| 术语 | 解释 |
+|---|---|
+| **`.npz` (NumPy zip)** | NumPy 多 array 序列化格式. `np.load(allow_pickle=True)`. |
+| **`np.linalg.norm(x, axis=1, keepdims=True)`** | 沿行算 L2 范数, 保 dim. Normalize 必备. |
+| **Ground truth (brute force)** | 用 O(N) brute force 算真 top-k, 跟 ANN 结果比测 recall. |
+| **A/B test (online recall)** | 两 ef 各 50% 流量, 看用户 KPI (点击 / 转化) 差别. |
+
+### 比较 / 替代
+
+| 术语 | 解释 |
+|---|---|
+| **`sklearn.NearestNeighbors`** | sklearn 实现. KD-tree / Ball-tree, 高维 (>~20d) 不工作. 这题不用. |
+| **ColBERT / Multi-vector** | 每 token 一个向量, 检索时 query token × doc token max-pool. 准 + 慢. |
+| **Vespa** | Yahoo 开源搜索引擎, 含向量 + 文本混合. |
+| **Recsys 100M+ scale** | 推荐系统千万到亿向量. IVF-PQ 主流, 因 memory 受限. |
+
+---
+
 ## 这道题在考什么
 
 10M × 768d brute force =  10M × 768 × 4 bytes = **30 GB** floats + 10M × 768 multiplications per query = ~7.6B FLOPs ≈ 5-50s on CPU. 不能 brute force. 必上 ANN (Approximate Nearest Neighbor). 考的是:

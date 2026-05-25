@@ -7,7 +7,154 @@
 
 ---
 
-## 这道题在考什么
+## 📖 术语速查 (本题用到的)
+
+> **这题术语密度全 53 题最高** — 6 个公司每家都有 specific 产品 / paper / 客户 / 缩写要 cite. 这是查表必备. 面试前认对应公司的 6-10 个 specific 名词 = pass.
+
+### 通用方法论
+
+| 术语 | 解释 |
+|---|---|
+| **Specificity** ⭐ | 具体性. Cite real product / paper / customer 名字, 不是 generic ("OpenAI is leading AI lab"). |
+| **Resume hook alignment** ⭐ | 简历钩子对齐. 你具体经历对应该公司具体业务. |
+| **Differentiator (vs competitor)** | 区别于竞品. Contrast 不 bash. |
+| **Trade-off acknowledgment** | 显式承认你 give up 什么. |
+| **Long-term commit (5-10 年)** | 长期承诺信号. 不是 stepping stone, 不是 fishing offer. |
+| **Fishing offer** | 钓 offer. Apply 多家不在意去哪. Red flag. |
+| **Stepping stone** | 跳板. FDE → PM / 创业, 老板怕这种. |
+| **Reverse anchor (comp)** | 反向锚定. 让 recruiter 先 give number 你 negotiate up. |
+
+### OpenAI ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Operator** ⭐ | OpenAI 浏览器 + computer use agent. 能在网页上点 + 填表 + 自动化跨应用任务. Industry-defining agent work. |
+| **GPT-5** | OpenAI frontier model. |
+| **Codex** | OpenAI code agent. |
+| **ChatGPT Enterprise** | 企业版 ChatGPT. |
+| **Custom GPTs / GPT Store** | 自定义 GPT + 共享市场. |
+| **Realtime API** | OpenAI 实时 voice + multimodal API. |
+| **Whisper** | OpenAI 开源 ASR. 简历 voice agent 直接相关. |
+| **Sora** | OpenAI 视频生成模型. |
+| **Stargate** | OpenAI + Microsoft 等的 $100B+ 数据中心 / 算力 投资. |
+| **GPT-5 system card** | 模型公开发布报告 — capability / safety eval / known limitations. |
+| **Tomoro acquisition** | OpenAI 2025 收购 Tomoro (Singapore agent company), 扩张 SEA. |
+| **Stripe / Klarna / Morgan Stanley** | 3 个公开 OpenAI 企业客户案例. Klarna AI 替代 700 FTE 是 BNPL adjacent. |
+| **Mercado Libre / PwC** | 拉美电商 / 咨询客户. |
+
+### Anthropic ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Claude (3.7 Sonnet / Opus / Haiku)** | Anthropic 模型系列. |
+| **Claude Code** ⭐ | Anthropic code agent / CLI. |
+| **Constitutional AI** ⭐ | Anthropic 用 AI 反馈替代部分人类反馈做 alignment (RLAIF). Foundational paper. |
+| **RLAIF (Reinforcement Learning from AI Feedback)** | AI 反馈强化学习. 跟 RLHF (human feedback) 区分. |
+| **Tool Use API** | Anthropic 工具调用 API. |
+| **Computer Use API** | Anthropic 版的 Operator. |
+| **Core Views (on AI Safety)** | Anthropic 公开 mission 文档. |
+| **RSP (Responsible Scaling Policy)** ⭐ | 模型能力到 threshold 才解锁部署. |
+| **Applied Solutions** | Anthropic FDE-equivalent 团队名. |
+| **Sleeper Agents (paper)** | Anthropic alignment risk 论文. |
+| **Towards Monosemanticity** | Anthropic 可解释性 (interpretability) 论文. |
+| **Many-shot jailbreaking** | Anthropic 越狱攻击论文. |
+| **Lex / Mintlify / Notion / Quora Poe / Zoom** | Anthropic 公开企业客户. |
+| **Bedrock (AWS + Anthropic)** | AWS 上的 Claude 托管. |
+
+### Palantir ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Foundry** ⭐ | Palantir 数据 + ontology 平台. |
+| **AIP (Palantir AI Platform)** ⭐ | Palantir 把 LLM 接到 Foundry 上的 layer. |
+| **Apollo** | Palantir deployment 管理工具. |
+| **Workshop** | Palantir low-code app builder. |
+| **Ontology** ⭐ | Palantir 核心方法论 — 业务概念统一定义. |
+| **Karp letters** | Palantir CEO Alex Karp 每年 shareholder letter. |
+| **Long-tenure FDE** | 5+ 年任期文化. Palantir 公开 reputation. |
+| **Embedded on-site** | 派驻客户现场. Palantir FDE 工作形态. |
+| **FDSE** | Palantir 正式叫法 — Forward Deployed Software Engineer. |
+| **Deployment Strategist** | Palantir 另一个 FDE-adjacent 角色, 偏 strategy. |
+| **Airbus / Anduril / JPMorgan / United Health / Merck / BP** | 公开 Palantir 客户. Anduril 是 Palantir alumni 创立. |
+| **U.S. Army / DoD / HHS / UK NHS** | 国防 / 政府客户. |
+
+### Databricks ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Lakehouse** ⭐ | Databricks 核心概念 — data lake + warehouse 合一. |
+| **Mosaic AI** ⭐ | Databricks 收购 Mosaic ML ($1.3B) 后的 LLM stack. |
+| **DBRX** | Databricks 开源 MoE 模型. |
+| **MoE (Mixture of Experts)** | 混合专家模型. 推理时只激活部分参数. |
+| **MLflow** | Databricks ML lifecycle 工具. |
+| **Unity Catalog** | Databricks 数据治理. |
+| **Genie** | Databricks text-to-SQL AI. |
+| **Lakehouse AI** | Databricks 的 AI 平台总称. |
+| **Spark / PySpark** | Apache Spark 大数据处理. Databricks 创始团队核心技术. |
+| **DSPy (Stanford collab)** | Databricks 跟 Stanford 合作的 prompt 编程框架. |
+| **Block (Square / Cash App) / Mastercard / Comcast / AT&T / Shell / Walgreens / HSBC / Toyota** | Databricks 公开客户. |
+
+### Scale AI ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Scale Data Engine** ⭐ | 数据标注核心平台. |
+| **Scale GenAI Platform** | LLM lifecycle. |
+| **RLHF Studio** ⭐ | 人类反馈 alignment 工具. |
+| **RLHF (Reinforcement Learning from Human Feedback)** | 人类反馈强化学习. GPT-3.5 / 4 alignment 的基础方法. |
+| **Donovan** | Scale 的 defense / federal platform. |
+| **Spellbook** | Scale 的 legal AI. |
+| **Scale Evaluation** | 评测即服务 (eval as a service). |
+| **Scale Studio** | 标注工具. |
+| **Alexandr Wang** | Scale AI 创始 CEO. |
+| **OpenAI / Anthropic / Meta (as Scale customers)** | Scale 服务这些 frontier lab 的数据标注. |
+| **GM / Toyota / BMW** | 自动驾驶数据标注客户. |
+
+### ElevenLabs ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **ElevenLabs Conversational AI** ⭐ | ElevenLabs 的对话 AI 产品. |
+| **TTS Multilingual v2** | 多语言 TTS 第 2 代. |
+| **Voice Cloning (Professional / Instant)** | 声音克隆. Professional 用 30 min 训练, Instant 几秒. |
+| **Voice Library** | 共享声音库. |
+| **Studio (long-form audio)** | 长篇音频生成 (audiobook). |
+| **Dubbing** | 多语言配音. |
+| **Storyteller / Audible-style** | Audiobook 客户类型. |
+| **NPC voicing** | 游戏 NPC 配音. |
+
+### 通用业务 / 监管 / 工程术语
+
+| 术语 | 解释 |
+|---|---|
+| **Frontier model proximity** | 离前沿模型近. OpenAI FDE 物理在 research 旁. |
+| **Enterprise FDE** | 企业 FDE. Customer 是 Fortune 500. |
+| **Customer-tuning** | 客户定制化训练. Mosaic AI / RLHF Studio 都属于. |
+| **Serving stack** | 推理服务栈. vLLM / SGLang 都属于. |
+| **Frontier benchmark / SOTA leader** | 前沿基准 / 业界最强. DBRX 不是 SOTA, GPT-5 / Claude / Gemini 是. |
+| **Open MoE** | 开源 Mixture of Experts. DBRX 是. |
+| **OJK / BACEN** | 印尼 / 巴西金融监管. |
+| **Constitutional confirm** | 受 Constitutional AI 启发的 tier-based 确认 pattern. |
+| **Human-in-the-loop (HITL)** | 人在回路. 高风险决策必须人审. |
+| **Tier-based design** | 分层设计. 印尼 voice agent tier 1/2/3 是 high-stakes safety thinking 的 production 实现. |
+| **Multi-vendor cascade** | 多 vendor 级联. Azure → Google → Whisper. |
+
+### Resume hook (Gao Xin specific)
+
+| 术语 | 解释 |
+|---|---|
+| **TikTok PayLater** | 字节内 BNPL 产品, 7 markets. |
+| **Voice agent debt collection** | 语音 agent 自动催收, 7 markets / 6 languages. |
+| **BNPL chatbot 70 → 92%** | 6 周 routing accuracy 提升. |
+| **Internal Agent Platform 5 → 14 teams** | 字节内部 agent platform, -65% build time. |
+| **ConvFinQA 9-variant ablation** | 学术项目, 含 2 个 negative result. |
+| **OJK + BACEN compliance** | 跨监管部署经验. |
+| **vLLM / SGLang + SFT / DPO / RL** | 推理 + 后训练 stack. |
+| **ASR cascade (Azure → Google → Whisper)** | Pakistan launch 实战的多 vendor 兜底设计. |
+
+---
+
+## 这道题在考什么 (Summary)
 
 这是 **FDE 面试的 closer**. 表面问 motivation, 实际筛 5 件事:
 

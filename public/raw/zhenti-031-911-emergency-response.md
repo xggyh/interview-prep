@@ -8,6 +8,74 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题里的专业词如果不懂, 听都听不下去. 这张表 5 min 看完, 后面就跟得上.
+
+### 911 / 公共安全行业
+
+| 术语 | 解释 |
+|---|---|
+| **PSAP (Public Safety Answering Point)** ⭐ | 911 接警中心 — 接电话 + 派遣的物理设施 + 团队. 美国大城市通常 1-3 个 PSAP. **PSAP 接警员是工会**, 引入 AI 会触动饭碗, 是这题最高政治风险. |
+| **CAD (Computer-Aided Dispatch)** ⭐ | 计算机辅助调度系统 — PSAP 用的核心软件, 记录 call → dispatch → arrival 全流程. 主流厂商: **Motorola, Tyler, Hexagon**. |
+| **Dispatcher (调度员)** | 在 PSAP 工作的人, 接电话 + 决定派哪辆车 + 跟车上沟通. 跟 call-taker 有时分开 (call-taker 接电话, dispatcher 派车). |
+| **Call-to-dispatch / Dispatch-to-arrival** | 911 response time 拆成 3 段: call processing (90s P90 标准) + turnout (60s) + travel (240s). 不同段 bottleneck 完全不同. |
+| **NFPA 1710** | 美国消防协会标准 — 城市 EMS 必须在 6.5 min P90 内 call-to-arrival. 这题的 industry baseline. |
+| **EMS (Emergency Medical Services)** | 急救服务 — 救护车 + paramedic. **EMS director** 是这题关键 stakeholder. |
+| **Cardiac arrest "golden 4 minutes"** | 心脏骤停 4 分钟内 CPR / AED 生存率最高, 超过 10 min 几乎无法救活. 这题 P90 cardiac response 是 north-star metric. |
+| **Mental health crisis call** | 911 接的精神危机电话 — 优化策略跟 cardiac 完全不同, 很多城市改派 civilian responder 而非警察. |
+| **CJIS (Criminal Justice Information Services)** | FBI 的执法数据合规标准 — 911 数据涉及 CJIS, 类似 HIPAA 但更严. 数据加密 + access control 必做. |
+| **HIPAA** | 美国医疗隐私法 — 911 涉及医疗数据 (cardiac arrest 是医疗) 必合规. |
+| **Equity gap (公平性差距)** | 低收入 / 少数族裔街区的 911 response time 平均比富人区慢 50%+. 是这题 explicit 的 counter-metric, 不能 widen. |
+
+### 数据 / 系统厂商
+
+| 术语 | 解释 |
+|---|---|
+| **Motorola CAD / Tyler / Hexagon** | 3 大 CAD 厂商. 这题 likely Motorola. 集成必经 vendor. |
+| **Zoll / ImageTrend** | EMS 行业的车载系统 + GPS 数据厂商. Zoll 是市占第一. |
+| **INRIX** | 实时交通数据 SaaS, 美国城市常买. Google Maps API 是替代品. |
+| **NMEA stream** | 标准 GPS 数据格式. Ambulance GPS feed 走 NMEA. |
+| **HL7** | 美国医疗信息交换标准 — 医院 ED status 走 HL7. |
+| **12 timestamps per incident** | 标准 CAD 一个 incident 记录 12 个时间戳 (call_received → connected → classified → cad_submit → dispatcher_received → unit_selected → notified → ack → enroute → arrived ...). 是 funnel diagnose 的核心数据. |
+
+### 方法论 / 部署模式
+
+| 术语 | 解释 |
+|---|---|
+| **Walking skeleton (走骨头)** ⭐ | 最薄端到端版本, 每个组件可以 mock 但流程全跑通. 跑稳后再换真组件. **Decomposition 题标准 MVP 方法论**. |
+| **Shadow mode (影子模式)** | AI 跟人并跑, AI 决策**只记录不生效**, 收集真实数据但不影响线上. Safety-critical 必经. |
+| **Opt-in / Default-on** | 渐进 rollout: shadow → 几个志愿者 opt-in → 全员 default-on (但可 override). |
+| **Stepped wedge rollout** | 分批 rollout — 不是 A/B 切一半, 而是按时间窗 / 区域分批上, 每批观察后才上下一批. 适合 ethics 不能 A/B 的场景. |
+| **Counterfactual replay** | 反事实回放 — 把 AI 跑在历史 incident 上, 比较 AI 预测的 ETA vs 实际 ETA. 不是真 ground truth, 但能给早期信号. |
+| **Override rate (覆盖率)** | dispatcher 推翻 AI 推荐的比例. 是这题的 north-star process metric — 太低 (<10%) = rubber-stamp, 太高 (>50%) = 模型烂. **20-30% 是 sweet spot**. |
+| **Recommendation, not decision** | AI 给推荐, 人做最终决定. Safety-critical 的红线, 否则 legal liability + 工会反对. |
+| **Dead reckoning** | 当 GPS 信号断 (隧道 / 大楼里), 用 "last known position + heading × elapsed time" 估算当前位置. 5-15% 的 ambulance ping 要 fallback 这个. |
+| **Kill switch** | 一键禁用 AI 回到 manual mode. < 60s 触发. Safety-critical 必备. |
+
+### 数据 / ML 性能
+
+| 术语 | 解释 |
+|---|---|
+| **P50 / P90 / P99** | Latency / response time 的百分位 — P90 = 90% 的 case 在这数以下. Mayor 关心平均, EMS director 关心 P99 (最坏情况救人). |
+| **MAE (Mean Absolute Error)** | 平均绝对误差 — ETA 预测的标准指标. 这题 target MAE < 60s. |
+| **GBDT (Gradient Boosted Decision Tree)** | 梯度提升决策树 — tabular 数据上的 baseline 选择, 比 deep learning 稳. ETA 预测首选. |
+| **ASR (Automatic Speech Recognition)** | 自动语音识别 — 911 call audio → text. LLM 处理前的入口. |
+| **LLM-assisted call processing** | 用 LLM (e.g. Gemini Flash) 边听 call 边提取 symptom, 自动填 CAD 字段, call-taker 只 confirm. 这题省 30-60s/call. |
+
+### 角色 / 政治
+
+| 术语 | 解释 |
+|---|---|
+| **PSAP union (接警员工会)** ⭐ | 911 dispatcher 工会 — **这题最高政治风险**, 能 kill 项目. 第一周必须 PSAP president 在 launch readme 上 co-sign. |
+| **Mayor's office** | 市长办公室 — buyer, 要 PR / 选举 quick win. 在意 average response time (面向公众). |
+| **EMS director** | 急救主任 — 在意 patient outcome + paramedic safety. |
+| **City CTO** | 市政府首席技术官 — 管系统集成 + 安全. |
+| **CJIS officer** | 城市的 CJIS 合规官 — 必 sign-off. |
+| **Citizen advocacy group** | 公民倡导团体 — 关注 equity, 会公开盯着 dashboard. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能 design 一个 911 系统的方案.

@@ -43,6 +43,25 @@
 <blockquote><p>"Given a folder of documents (mixed PDF / markdown / HTML), build a <strong>small RAG pipeline</strong> end-to-end: chunk → embed → index → retrieve → format → LLM. <strong>Code it.</strong> Then <strong>defend your chunking strategy</strong> — why this chunk size? Why this overlap? How would you evaluate it?"</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Anthropic</strong>, OpenAI, Scale AI, Cohere <strong>难度</strong>: Hard <strong>主要技能</strong>: end-to-end RAG, chunking decisions, eval methodology, vector DB</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>RAG 是 AI Engineer 必懂. 这堆术语不熟 = 听不懂 chunking / reranker / MMR 在说啥.</p></blockquote>
+<h4>RAG 核心概念</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RAG (Retrieval-Augmented Generation)</strong> ⭐</td><td>"先检索后生成" 范式. 把外部知识 embed → 检索 → 塞给 LLM 当 context. 解决 LLM 知识截止 + hallucination.</td></tr><tr><td><strong>Ingest (摄取)</strong></td><td>把文档解析 + chunk + embed + 入 index 的离线过程.</td></tr><tr><td><strong>Retrieval (检索)</strong></td><td>用 query 找 top-k 相似 chunk. 在线过程.</td></tr><tr><td><strong>Grounded</strong></td><td>LLM 回答<strong>只用</strong> retrieved context, 不靠自己 parametric knowledge.</td></tr><tr><td><strong>"I don't know" fallback</strong> ⭐</td><td>检索分数低时让 LLM 说 "我不知道" 而不是瞎编. 法律 / 医疗必备.</td></tr><tr><td><strong>Citation / inline <code>[n]</code></strong></td><td>答案里 <code>[1] [2]</code> 引用 retrieved chunk. UI 可点回原文.</td></tr><tr><td><strong>Faithfulness</strong></td><td>答案是否忠于 retrieved context (没编). 跟 relevance 不同.</td></tr><tr><td><strong>Provenance</strong></td><td>每个 entity / 答案附 <code>{doc, page, char_range}</code>.</td></tr></tbody></table></div>
+<h4>Chunking 策略</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Chunking</strong> ⭐</td><td>把长文档切小块 (LLM context 装得下 + embedder 质量稳). 这题考核心.</td></tr><tr><td><strong>Fixed-size chunking</strong></td><td>每 N tokens 一刀. 简单但切句子中间.</td></tr><tr><td><strong>Heading-aware chunking</strong> ⭐</td><td>按 markdown <code>#</code> / HTML <code>&lt;h1&gt;</code> 切. 语义边界.</td></tr><tr><td><strong>Recursive chunking</strong></td><td>先按 section, section 太大再按 paragraph, 再按 sentence. langchain <code>RecursiveCharacterTextSplitter</code>.</td></tr><tr><td><strong>Overlap</strong></td><td>相邻 chunk 重叠 tokens. 100/12% 常用, 防答案跨边界丢.</td></tr><tr><td><strong>Propositional chunking</strong></td><td>LLM 把段落改写成独立 "命题" (e.g., "A 是 B" 一句话), 再 embed. recall 高但 ingest 慢.</td></tr><tr><td><strong>Late chunking</strong></td><td>Jina AI 2024 新方法. 先 embed 全文 (long-context embedder), 再切 embedding. 每 chunk embed 见全文 context.</td></tr><tr><td><strong>Sliding window</strong></td><td>同 overlap 概念.</td></tr></tbody></table></div>
+<h4>Embedding</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Embedding (嵌入)</strong> ⭐</td><td>把 text 映射成固定维度 dense 向量 (e.g., 768/1536d). 语义近 → 向量距离近.</td></tr><tr><td><strong><code>text-embedding-3-small</code></strong></td><td>OpenAI 经典 embedder, 1536d, $0.02/1M tokens, fast.</td></tr><tr><td><strong><code>text-embedding-3-large</code></strong></td><td>OpenAI 大模型, 3072d, 更准更贵.</td></tr><tr><td><strong><code>bge-base-en-v1.5</code> (BGE)</strong></td><td>BAAI 开源 embedder, 768d, 自托管 GPU 跑. 跟 OpenAI 同档质量, 数据合规 + 0 边际成本.</td></tr><tr><td><strong><code>e5-large</code> / <code>mxbai-embed-large</code></strong></td><td>其他开源选项.</td></tr><tr><td><strong>MRL / Matryoshka embedding</strong></td><td>一个 model 输出可截断: 1024d truncate 到 256d 还能用. cost / quality 灵活权衡.</td></tr><tr><td><strong>L2 normalize</strong> ⭐</td><td>embedding 除以模长. 让 inner product = cosine similarity.</td></tr><tr><td><strong>Cosine similarity vs Inner product (dot product)</strong></td><td>同向量在 normalize 后等价. Cosine ∈ [-1, 1], inner product 无 bound.</td></tr><tr><td><strong>Dimension (维度)</strong></td><td>embedding 长度. 768 / 1024 / 1536 / 3072 常见. 高 → 准 + 内存大.</td></tr></tbody></table></div>
+<h4>Vector DB / Index</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>FAISS</strong> ⭐</td><td>Facebook 开源 ANN 库. <code>IndexFlatIP</code> (brute), <code>IndexHNSWFlat</code>, <code>IndexIVFPQ</code> 等.</td></tr><tr><td><strong><code>IndexFlatIP</code></strong></td><td>Brute-force inner product. &lt; 100k vectors 适用. 100% recall.</td></tr><tr><td><strong>HNSW</strong></td><td>图算法 ANN, 详见 Q18.</td></tr><tr><td><strong>Chroma</strong></td><td>开源 vector DB, 持久化 + metadata filter 友好. Demo 阶段标配.</td></tr><tr><td><strong>pgvector</strong></td><td>PostgreSQL 向量扩展. 跟业务表共库, 减依赖.</td></tr><tr><td><strong>Pinecone / Weaviate / Qdrant / Milvus</strong></td><td>托管 / 开源 vector DB. 本题题面禁 Pinecone.</td></tr><tr><td><strong>HyDE (Hypothetical Document Embedding)</strong></td><td>LLM 先回答 (hypothetically), embed 答案, 用它去 retrieve. 对 vague query 有奇效.</td></tr></tbody></table></div>
+<h4>Retrieval 算法</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>top-k retrieval</strong></td><td>取最相似 k 个 chunk.</td></tr><tr><td><strong>MMR (Maximal Marginal Relevance)</strong> ⭐</td><td>在 relevance 和 diversity 之间平衡: <code>λ × rel - (1-λ) × max_sim_to_selected</code>. 防 top-5 全是 near-duplicate.</td></tr><tr><td><strong>BM25</strong></td><td>经典 sparse retrieval, 基于 term frequency. 对 exact keyword (产品代码, 名字) 强.</td></tr><tr><td><strong>Hybrid retrieval</strong> ⭐</td><td>BM25 + vector 结合. Vector 抓语义, BM25 抓 exact match.</td></tr><tr><td><strong>RRF (Reciprocal Rank Fusion)</strong></td><td>Hybrid 融合算法: <code>score = Σ 1/(k+rank_i)</code>. 不需要分数 normalize.</td></tr><tr><td><strong>Reranker (cross-encoder)</strong> ⭐</td><td>二段式: vector retrieve top-100 → cross-encoder rerank → top-5. 准但慢. <code>bge-reranker-large</code> 是常用.</td></tr><tr><td><strong>Cross-encoder vs Bi-encoder</strong></td><td>Bi-encoder = query / doc 独立 embed (快); cross-encoder = query+doc 一起过 model (准 + 慢).</td></tr><tr><td><strong>Query rewriting / Query expansion</strong></td><td>LLM 改写 query 成 3 个变体 → 各 retrieve → union. 对模糊 query 有奇效.</td></tr></tbody></table></div>
+<h4>Eval / Metrics</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Golden set</strong> ⭐</td><td>人工标注的 Q&amp;A 测试集 (50-200 examples). Defend chunking 全靠它.</td></tr><tr><td><strong>Recall@k</strong> ⭐</td><td>top-k 里有没有正确 doc.</td></tr><tr><td><strong>MRR (Mean Reciprocal Rank)</strong></td><td>正确 doc 的平均排名倒数. 1.0 = 永远 top-1.</td></tr><tr><td><strong>nDCG</strong></td><td>排序质量指标, 考虑相关性分级.</td></tr><tr><td><strong>Judge LLM</strong></td><td>用 GPT-4 评分 (faithfulness / completeness / citation). LLM-as-judge.</td></tr><tr><td><strong>RAGAS / DeepEval</strong></td><td>RAG eval 库, 含 faithfulness / context-precision / answer-relevance 等指标.</td></tr><tr><td><strong>Ablation study</strong></td><td>一次改一个变量看效果. 这题 chunking 4 strategy × N 参数 = N 次 ablation.</td></tr></tbody></table></div>
+<h4>LLM API</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>gpt-4o-mini</code></strong></td><td>OpenAI 小模型, 便宜 + 快. RAG 默认 LLM.</td></tr><tr><td><strong><code>gpt-4o</code> (Omni)</strong></td><td>OpenAI 旗舰. 更准更贵, 用于 judge / 高 stakes.</td></tr><tr><td><strong>Context window</strong></td><td>LLM 单次能装多少 token. GPT-4o = 128k, Claude 3.5 = 200k.</td></tr><tr><td><strong>System / User / Assistant message</strong></td><td>LLM API 标准消息类型.</td></tr><tr><td><strong><code>temperature=0</code></strong></td><td>LLM 输出随机性最低. RAG 用 0 求确定.</td></tr><tr><td><strong>Streaming response</strong></td><td>LLM token-by-token 返回, 用户体感快.</td></tr></tbody></table></div>
+<h4>上下文工程</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Context stuffing</strong></td><td>把 N 个 chunk 全塞进 prompt. 主流策略.</td></tr><tr><td><strong>"Lost in the middle"</strong></td><td>长 context 中部信息被 LLM 忽略的现象 (paper). 重要内容放头尾.</td></tr><tr><td><strong>Prompt template</strong></td><td>固定结构 + 变量替换的 prompt. f-string 或 jinja2.</td></tr><tr><td><strong>Score threshold</strong></td><td>top-1 score &lt; N → 返 "I don't know" 不调 LLM, 省钱 + 防幻觉.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>RAG 看起来 "load + split + embed + retrieve + LLM" 五行代码搞定 (<code>langchain.RAG</code>). 但题目说<strong>defend your chunking strategy + eval methodology</strong> — 这是真功夫:</p>
 <ol><li><strong>End-to-end build 能力</strong> — 5 个 component 都要能写, 不是只熟悉一段</li><li><strong>Chunking 策略选择 + 论证</strong> — fixed size vs heading-aware vs late chunking vs propositional chunking, 不同 doc 类型选不同</li><li><strong>Embedding 模型选型</strong> — <code>text-embedding-3-small</code> vs <code>bge-base</code> vs <code>e5-large</code> — 维度 / latency / 成本 trade-off</li><li><strong>Vector DB 选型</strong> — FAISS (本地, 快) vs Chroma (持久, 元数据 filter 友好) vs pgvector (跟 Postgres 一起) — 这道题用 FAISS 或 Chroma 都行</li><li><strong>Retrieval 策略</strong> — top-k, MMR, hybrid (BM25 + vector), reranker — 你能不能讲明白何时上哪个</li><li><strong>Eval 方法</strong> — golden Q&amp;A set, retrieval recall@k, end-to-end faithfulness/relevance metrics — 没 eval 没法 defend</li><li><strong>真做 prompt 设计</strong> — context 怎么塞, citation 怎么带, "I don't know" 兜底</li><li><strong>Cost / latency awareness</strong> — 多大 chunk 多少 token, embed 多少钱, retrieve p99 多少, LLM call 多少</li></ol>
@@ -807,6 +826,109 @@ llm.chat(prompt) -&gt; answer
 **出处**: Exponent 2026 FDE · 公司: **Anthropic**, OpenAI, Scale AI, Cohere
 **难度**: Hard
 **主要技能**: end-to-end RAG, chunking decisions, eval methodology, vector DB
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> RAG 是 AI Engineer 必懂. 这堆术语不熟 = 听不懂 chunking / reranker / MMR 在说啥.
+
+### RAG 核心概念
+
+| 术语 | 解释 |
+|---|---|
+| **RAG (Retrieval-Augmented Generation)** ⭐ | "先检索后生成" 范式. 把外部知识 embed → 检索 → 塞给 LLM 当 context. 解决 LLM 知识截止 + hallucination. |
+| **Ingest (摄取)** | 把文档解析 + chunk + embed + 入 index 的离线过程. |
+| **Retrieval (检索)** | 用 query 找 top-k 相似 chunk. 在线过程. |
+| **Grounded** | LLM 回答**只用** retrieved context, 不靠自己 parametric knowledge. |
+| **"I don't know" fallback** ⭐ | 检索分数低时让 LLM 说 "我不知道" 而不是瞎编. 法律 / 医疗必备. |
+| **Citation / inline `[n]`** | 答案里 `[1] [2]` 引用 retrieved chunk. UI 可点回原文. |
+| **Faithfulness** | 答案是否忠于 retrieved context (没编). 跟 relevance 不同. |
+| **Provenance** | 每个 entity / 答案附 `{doc, page, char_range}`. |
+
+### Chunking 策略
+
+| 术语 | 解释 |
+|---|---|
+| **Chunking** ⭐ | 把长文档切小块 (LLM context 装得下 + embedder 质量稳). 这题考核心. |
+| **Fixed-size chunking** | 每 N tokens 一刀. 简单但切句子中间. |
+| **Heading-aware chunking** ⭐ | 按 markdown `#` / HTML `<h1>` 切. 语义边界. |
+| **Recursive chunking** | 先按 section, section 太大再按 paragraph, 再按 sentence. langchain `RecursiveCharacterTextSplitter`. |
+| **Overlap** | 相邻 chunk 重叠 tokens. 100/12% 常用, 防答案跨边界丢. |
+| **Propositional chunking** | LLM 把段落改写成独立 "命题" (e.g., "A 是 B" 一句话), 再 embed. recall 高但 ingest 慢. |
+| **Late chunking** | Jina AI 2024 新方法. 先 embed 全文 (long-context embedder), 再切 embedding. 每 chunk embed 见全文 context. |
+| **Sliding window** | 同 overlap 概念. |
+
+### Embedding
+
+| 术语 | 解释 |
+|---|---|
+| **Embedding (嵌入)** ⭐ | 把 text 映射成固定维度 dense 向量 (e.g., 768/1536d). 语义近 → 向量距离近. |
+| **`text-embedding-3-small`** | OpenAI 经典 embedder, 1536d, $0.02/1M tokens, fast. |
+| **`text-embedding-3-large`** | OpenAI 大模型, 3072d, 更准更贵. |
+| **`bge-base-en-v1.5` (BGE)** | BAAI 开源 embedder, 768d, 自托管 GPU 跑. 跟 OpenAI 同档质量, 数据合规 + 0 边际成本. |
+| **`e5-large` / `mxbai-embed-large`** | 其他开源选项. |
+| **MRL / Matryoshka embedding** | 一个 model 输出可截断: 1024d truncate 到 256d 还能用. cost / quality 灵活权衡. |
+| **L2 normalize** ⭐ | embedding 除以模长. 让 inner product = cosine similarity. |
+| **Cosine similarity vs Inner product (dot product)** | 同向量在 normalize 后等价. Cosine ∈ [-1, 1], inner product 无 bound. |
+| **Dimension (维度)** | embedding 长度. 768 / 1024 / 1536 / 3072 常见. 高 → 准 + 内存大. |
+
+### Vector DB / Index
+
+| 术语 | 解释 |
+|---|---|
+| **FAISS** ⭐ | Facebook 开源 ANN 库. `IndexFlatIP` (brute), `IndexHNSWFlat`, `IndexIVFPQ` 等. |
+| **`IndexFlatIP`** | Brute-force inner product. < 100k vectors 适用. 100% recall. |
+| **HNSW** | 图算法 ANN, 详见 Q18. |
+| **Chroma** | 开源 vector DB, 持久化 + metadata filter 友好. Demo 阶段标配. |
+| **pgvector** | PostgreSQL 向量扩展. 跟业务表共库, 减依赖. |
+| **Pinecone / Weaviate / Qdrant / Milvus** | 托管 / 开源 vector DB. 本题题面禁 Pinecone. |
+| **HyDE (Hypothetical Document Embedding)** | LLM 先回答 (hypothetically), embed 答案, 用它去 retrieve. 对 vague query 有奇效. |
+
+### Retrieval 算法
+
+| 术语 | 解释 |
+|---|---|
+| **top-k retrieval** | 取最相似 k 个 chunk. |
+| **MMR (Maximal Marginal Relevance)** ⭐ | 在 relevance 和 diversity 之间平衡: `λ × rel - (1-λ) × max_sim_to_selected`. 防 top-5 全是 near-duplicate. |
+| **BM25** | 经典 sparse retrieval, 基于 term frequency. 对 exact keyword (产品代码, 名字) 强. |
+| **Hybrid retrieval** ⭐ | BM25 + vector 结合. Vector 抓语义, BM25 抓 exact match. |
+| **RRF (Reciprocal Rank Fusion)** | Hybrid 融合算法: `score = Σ 1/(k+rank_i)`. 不需要分数 normalize. |
+| **Reranker (cross-encoder)** ⭐ | 二段式: vector retrieve top-100 → cross-encoder rerank → top-5. 准但慢. `bge-reranker-large` 是常用. |
+| **Cross-encoder vs Bi-encoder** | Bi-encoder = query / doc 独立 embed (快); cross-encoder = query+doc 一起过 model (准 + 慢). |
+| **Query rewriting / Query expansion** | LLM 改写 query 成 3 个变体 → 各 retrieve → union. 对模糊 query 有奇效. |
+
+### Eval / Metrics
+
+| 术语 | 解释 |
+|---|---|
+| **Golden set** ⭐ | 人工标注的 Q&A 测试集 (50-200 examples). Defend chunking 全靠它. |
+| **Recall@k** ⭐ | top-k 里有没有正确 doc. |
+| **MRR (Mean Reciprocal Rank)** | 正确 doc 的平均排名倒数. 1.0 = 永远 top-1. |
+| **nDCG** | 排序质量指标, 考虑相关性分级. |
+| **Judge LLM** | 用 GPT-4 评分 (faithfulness / completeness / citation). LLM-as-judge. |
+| **RAGAS / DeepEval** | RAG eval 库, 含 faithfulness / context-precision / answer-relevance 等指标. |
+| **Ablation study** | 一次改一个变量看效果. 这题 chunking 4 strategy × N 参数 = N 次 ablation. |
+
+### LLM API
+
+| 术语 | 解释 |
+|---|---|
+| **`gpt-4o-mini`** | OpenAI 小模型, 便宜 + 快. RAG 默认 LLM. |
+| **`gpt-4o` (Omni)** | OpenAI 旗舰. 更准更贵, 用于 judge / 高 stakes. |
+| **Context window** | LLM 单次能装多少 token. GPT-4o = 128k, Claude 3.5 = 200k. |
+| **System / User / Assistant message** | LLM API 标准消息类型. |
+| **`temperature=0`** | LLM 输出随机性最低. RAG 用 0 求确定. |
+| **Streaming response** | LLM token-by-token 返回, 用户体感快. |
+
+### 上下文工程
+
+| 术语 | 解释 |
+|---|---|
+| **Context stuffing** | 把 N 个 chunk 全塞进 prompt. 主流策略. |
+| **"Lost in the middle"** | 长 context 中部信息被 LLM 忽略的现象 (paper). 重要内容放头尾. |
+| **Prompt template** | 固定结构 + 变量替换的 prompt. f-string 或 jinja2. |
+| **Score threshold** | top-1 score < N → 返 "I don't know" 不调 LLM, 省钱 + 防幻觉. |
 
 ---
 

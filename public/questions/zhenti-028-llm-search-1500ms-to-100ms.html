@@ -43,6 +43,27 @@
 <blockquote><p>"Your LLM-powered semantic search (over 10M documents) is hitting <strong>p50 1500ms</strong>. PM wants <strong>p50 100ms</strong>. Current path: embed query (100ms) → vector search (200ms) → LLM rerank (500ms) → LLM summarize (300ms) → post-process (400ms). <strong>How do you get 15× speed-up?</strong> What can you cut without killing quality?"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search <strong>约束</strong>: 10M docs / quality bar (nDCG@10 ≥ baseline, factuality ≥ 95%) / cost can grow modestly (≤ 2×) / no quality regression &gt; 2% / streaming UI allowed</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题是 search + LLM latency 优化. 不懂术语跟不上每个 ms 的攻略. 5 min 看完.</p></blockquote>
+<h4>Latency / UX 概念</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>p50 / p95 / p99</strong> ⭐</td><td>50% / 95% / 99% 分位的延迟. p50 = 中位数.</td></tr><tr><td><strong>TTFT (Time-To-First-Token)</strong> ⭐</td><td>首字延迟 — streaming 时关键.</td></tr><tr><td><strong>TTFB (Time-To-First-Byte)</strong></td><td>首字节延迟.</td></tr><tr><td><strong>Perceived latency</strong> ⭐</td><td>用户感知延迟 — 100ms TTFT 即使总 300ms 也感觉 instant.</td></tr><tr><td><strong>Streaming (SSE)</strong></td><td>Server-Sent Events — 边算边返回.</td></tr><tr><td><strong>Debouncing</strong></td><td>防抖 — user 还在 type 时不触发 search.</td></tr></tbody></table></div>
+<h4>Search 架构</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Semantic search</strong> ⭐</td><td>语义搜索 — 用 embedding 找语义相近文档.</td></tr><tr><td><strong>Vector search / K-NN</strong></td><td>向量最近邻搜索.</td></tr><tr><td><strong>HNSW (Hierarchical Navigable Small World)</strong> ⭐</td><td>主流近似最近邻算法.</td></tr><tr><td><strong>ef_search</strong> ⭐</td><td>HNSW 搜索宽度 — 调大 recall ↑ 速度 ↓. 调小反之.</td></tr><tr><td><strong>ef_construction</strong></td><td>HNSW 建图宽度.</td></tr><tr><td><strong>M (graph degree)</strong></td><td>HNSW 每节点连接数.</td></tr><tr><td><strong>BM25</strong></td><td>经典 keyword 检索算法.</td></tr><tr><td><strong>Hybrid retrieval</strong></td><td>向量 + BM25 双路融合.</td></tr><tr><td><strong>RRF (Reciprocal Rank Fusion)</strong></td><td>排名倒数融合算法.</td></tr><tr><td><strong>ColBERT / Late interaction</strong></td><td>token-level 后期交互检索, 比 single-vector 准.</td></tr><tr><td><strong>Prefilter vs Postfilter</strong> ⭐</td><td>搜索前 / 后过滤. ACL 用 prefilter.</td></tr><tr><td><strong>Filter-aware HNSW</strong></td><td>内置 filter 跳过不符合节点的 HNSW.</td></tr><tr><td><strong>Navigational query</strong></td><td>导航式查询 ("facebook login") — 直接跳到已知页面.</td></tr><tr><td><strong>Lookup query</strong></td><td>查找式 — 给我一堆链接.</td></tr><tr><td><strong>Analytical query</strong></td><td>分析式 — 需要 LLM 综合回答.</td></tr></tbody></table></div>
+<h4>Cascade / 路由</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Cascade architecture</strong> ⭐</td><td>级联架构 — 简单 query 走便宜路径, 难 query 走全套.</td></tr><tr><td><strong>Query router / classifier</strong></td><td>查询路由 / 分类器.</td></tr><tr><td><strong>Fast path vs Full path</strong> ⭐</td><td>快路径 (80% 流量, 80ms) vs 全路径 (20%, 300ms).</td></tr><tr><td><strong>Skip ladder</strong></td><td>跳过阶梯 — 高置信度时跳过 reranker / LLM.</td></tr><tr><td><strong>Tail query</strong></td><td>长尾查询 — rare entity, 难 query.</td></tr></tbody></table></div>
+<h4>Reranker</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Reranker</strong> ⭐</td><td>重排 — top-100 retrieve 后用更准但更慢模型重排到 top-10.</td></tr><tr><td><strong>Cross-encoder</strong></td><td>双输入交叉模型 — query 和 doc 一起算 score, 比 bi-encoder 准.</td></tr><tr><td><strong>Bi-encoder</strong></td><td>双塔模型 — query 和 doc 分别 encode, 余弦相似度. 快.</td></tr><tr><td><strong>MS MARCO</strong></td><td>微软 search 数据集, 训 reranker 标配.</td></tr><tr><td><strong>MiniLM</strong></td><td>小型 BERT 系列, distill 用.</td></tr><tr><td><strong>Cohere Rerank</strong></td><td>Cohere 的 reranker API.</td></tr><tr><td><strong>Score gap / Score separation</strong></td><td>top-k 分数差距 — 大 = confident, 小 = ambiguous.</td></tr></tbody></table></div>
+<h4>量化 / 蒸馏</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Distillation</strong> ⭐</td><td>蒸馏 — 用大模型当 teacher 训小模型 student.</td></tr><tr><td><strong>Distilled embedder</strong></td><td>蒸馏小 embedder (BGE-small 384d).</td></tr><tr><td><strong>BGE-large vs BGE-small</strong></td><td>1024 / 384 维 embedder.</td></tr><tr><td><strong>text-embedding-3-large</strong></td><td>OpenAI 3072 维 embedder. 慢但准.</td></tr><tr><td><strong>FP16 / FP8 / INT8</strong></td><td>不同精度量化.</td></tr><tr><td><strong>Speculative decoding</strong></td><td>推测解码 — 小模型预测大模型 verify.</td></tr></tbody></table></div>
+<h4>LLM / 生成</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Claude Haiku vs Opus</strong> ⭐</td><td>Anthropic 小型 / 旗舰. Haiku 3× 快 5× 便宜.</td></tr><tr><td><strong>GPT-4 / GPT-4 Turbo</strong></td><td>OpenAI 大模型.</td></tr><tr><td><strong>Prompt caching</strong> ⭐</td><td>Anthropic 的 prompt cache — system prompt 命中 cache 时 90% 便宜 + 快.</td></tr><tr><td><strong>KV cache prefix sharing</strong></td><td>KV 缓存前缀共享.</td></tr><tr><td><strong>Prefill</strong></td><td>LLM 输入 forward 阶段.</td></tr><tr><td><strong>Decode</strong></td><td>LLM 输出阶段, 一次一个 token.</td></tr><tr><td><strong>Max output tokens</strong></td><td>输出长度上限.</td></tr><tr><td><strong>Citation parsing</strong></td><td>引用解析.</td></tr></tbody></table></div>
+<h4>Caching</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Result cache</strong> ⭐</td><td>完整结果缓存 (Redis), 同 query 同 user 命中.</td></tr><tr><td><strong>Embed cache</strong></td><td>查询 embedding 缓存.</td></tr><tr><td><strong>Semantic cache</strong></td><td>相似 query 的语义级缓存.</td></tr><tr><td><strong>Negative cache</strong></td><td>失败结果短暂缓存防 retry flood.</td></tr><tr><td><strong>Cache invalidation</strong></td><td>缓存失效.</td></tr><tr><td><strong>TTL (Time-To-Live)</strong></td><td>缓存过期时间.</td></tr><tr><td><strong>Zipf distribution</strong></td><td>查询频次 Zipf 分布 — top 20% query 占 80% 流量.</td></tr><tr><td><strong>Cache pre-warm</strong></td><td>预热 — 启动时填好 cache.</td></tr><tr><td><strong>Doc-id-aware invalidation</strong></td><td>doc 更新时反向找含它的 cache 失效.</td></tr></tbody></table></div>
+<h4>质量评估</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>nDCG@10</strong> ⭐</td><td>Normalized Discounted Cumulative Gain top-10 — 检索质量金标准.</td></tr><tr><td><strong>MRR (Mean Reciprocal Rank)</strong></td><td>平均倒数排名.</td></tr><tr><td><strong>Recall@K</strong></td><td>top-K 中相关文档比例.</td></tr><tr><td><strong>Precision@K</strong></td><td>top-K 中精确率.</td></tr><tr><td><strong>Factuality</strong></td><td>事实准确性 — LLM 输出有依据 vs 编造.</td></tr><tr><td><strong>Hallucination</strong></td><td>幻觉 — 编造内容.</td></tr><tr><td><strong>Human eval / Golden set</strong></td><td>人工评估 / 黄金集.</td></tr><tr><td><strong>Active learning</strong></td><td>主动学习 — 低 confidence 样本人工标后重训.</td></tr><tr><td><strong>A/B test</strong></td><td>上线前的对比实验.</td></tr></tbody></table></div>
+<h4>部署 / 后处理</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>PII redaction</strong></td><td>PII 脱敏.</td></tr><tr><td><strong>Audit log</strong></td><td>审计日志.</td></tr><tr><td><strong>Async fire-and-forget</strong></td><td>异步不阻塞主流程.</td></tr><tr><td><strong>CDN / Edge caching</strong></td><td>边缘缓存 — Cloudflare / CloudFront.</td></tr><tr><td><strong>OTel (OpenTelemetry)</strong></td><td>observability 标准.</td></tr><tr><td><strong>Bedrock</strong></td><td>AWS LLM 托管服务.</td></tr><tr><td><strong>T4 / H100 GPU</strong></td><td>NVIDIA GPU 型号.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 "更快", 是考你<strong>理解每一个 ms 在哪 + 知道哪些可以 cut</strong>:</p>
 <ol><li><strong>Cascade architecture</strong> — small model first, escalate only when needed</li><li><strong>Caching layers</strong> — embed cache, retrieval cache, reranker cache, generation cache</li><li><strong>Pre-computation</strong> — index time vs query time work split</li><li><strong>Parallelism</strong> — sequential 200+500+300 = 1000, parallel = 500</li><li><strong>Quantization + distillation</strong> — smaller faster model with eval-validated quality</li><li><strong>HNSW tuning</strong> — ef_search, prefilter strategies</li><li><strong>Skip ladders</strong> — high-confidence skip reranker, skip summarize</li><li><strong>Streaming partial</strong> — perceived latency vs actual</li><li><strong>菜鸟答案失败点</strong>: "上更快 GPU" — 没 attack architecture. "缓存" — 没说 invalidation. "去掉 reranker" — 没 quality guard.</li></ol>
@@ -389,6 +410,129 @@ Streaming:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search
 **约束**: 10M docs / quality bar (nDCG@10 ≥ baseline, factuality ≥ 95%) / cost can grow modestly (≤ 2×) / no quality regression > 2% / streaming UI allowed
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题是 search + LLM latency 优化. 不懂术语跟不上每个 ms 的攻略. 5 min 看完.
+
+### Latency / UX 概念
+
+| 术语 | 解释 |
+|---|---|
+| **p50 / p95 / p99** ⭐ | 50% / 95% / 99% 分位的延迟. p50 = 中位数. |
+| **TTFT (Time-To-First-Token)** ⭐ | 首字延迟 — streaming 时关键. |
+| **TTFB (Time-To-First-Byte)** | 首字节延迟. |
+| **Perceived latency** ⭐ | 用户感知延迟 — 100ms TTFT 即使总 300ms 也感觉 instant. |
+| **Streaming (SSE)** | Server-Sent Events — 边算边返回. |
+| **Debouncing** | 防抖 — user 还在 type 时不触发 search. |
+
+### Search 架构
+
+| 术语 | 解释 |
+|---|---|
+| **Semantic search** ⭐ | 语义搜索 — 用 embedding 找语义相近文档. |
+| **Vector search / K-NN** | 向量最近邻搜索. |
+| **HNSW (Hierarchical Navigable Small World)** ⭐ | 主流近似最近邻算法. |
+| **ef_search** ⭐ | HNSW 搜索宽度 — 调大 recall ↑ 速度 ↓. 调小反之. |
+| **ef_construction** | HNSW 建图宽度. |
+| **M (graph degree)** | HNSW 每节点连接数. |
+| **BM25** | 经典 keyword 检索算法. |
+| **Hybrid retrieval** | 向量 + BM25 双路融合. |
+| **RRF (Reciprocal Rank Fusion)** | 排名倒数融合算法. |
+| **ColBERT / Late interaction** | token-level 后期交互检索, 比 single-vector 准. |
+| **Prefilter vs Postfilter** ⭐ | 搜索前 / 后过滤. ACL 用 prefilter. |
+| **Filter-aware HNSW** | 内置 filter 跳过不符合节点的 HNSW. |
+| **Navigational query** | 导航式查询 ("facebook login") — 直接跳到已知页面. |
+| **Lookup query** | 查找式 — 给我一堆链接. |
+| **Analytical query** | 分析式 — 需要 LLM 综合回答. |
+
+### Cascade / 路由
+
+| 术语 | 解释 |
+|---|---|
+| **Cascade architecture** ⭐ | 级联架构 — 简单 query 走便宜路径, 难 query 走全套. |
+| **Query router / classifier** | 查询路由 / 分类器. |
+| **Fast path vs Full path** ⭐ | 快路径 (80% 流量, 80ms) vs 全路径 (20%, 300ms). |
+| **Skip ladder** | 跳过阶梯 — 高置信度时跳过 reranker / LLM. |
+| **Tail query** | 长尾查询 — rare entity, 难 query. |
+
+### Reranker
+
+| 术语 | 解释 |
+|---|---|
+| **Reranker** ⭐ | 重排 — top-100 retrieve 后用更准但更慢模型重排到 top-10. |
+| **Cross-encoder** | 双输入交叉模型 — query 和 doc 一起算 score, 比 bi-encoder 准. |
+| **Bi-encoder** | 双塔模型 — query 和 doc 分别 encode, 余弦相似度. 快. |
+| **MS MARCO** | 微软 search 数据集, 训 reranker 标配. |
+| **MiniLM** | 小型 BERT 系列, distill 用. |
+| **Cohere Rerank** | Cohere 的 reranker API. |
+| **Score gap / Score separation** | top-k 分数差距 — 大 = confident, 小 = ambiguous. |
+
+### 量化 / 蒸馏
+
+| 术语 | 解释 |
+|---|---|
+| **Distillation** ⭐ | 蒸馏 — 用大模型当 teacher 训小模型 student. |
+| **Distilled embedder** | 蒸馏小 embedder (BGE-small 384d). |
+| **BGE-large vs BGE-small** | 1024 / 384 维 embedder. |
+| **text-embedding-3-large** | OpenAI 3072 维 embedder. 慢但准. |
+| **FP16 / FP8 / INT8** | 不同精度量化. |
+| **Speculative decoding** | 推测解码 — 小模型预测大模型 verify. |
+
+### LLM / 生成
+
+| 术语 | 解释 |
+|---|---|
+| **Claude Haiku vs Opus** ⭐ | Anthropic 小型 / 旗舰. Haiku 3× 快 5× 便宜. |
+| **GPT-4 / GPT-4 Turbo** | OpenAI 大模型. |
+| **Prompt caching** ⭐ | Anthropic 的 prompt cache — system prompt 命中 cache 时 90% 便宜 + 快. |
+| **KV cache prefix sharing** | KV 缓存前缀共享. |
+| **Prefill** | LLM 输入 forward 阶段. |
+| **Decode** | LLM 输出阶段, 一次一个 token. |
+| **Max output tokens** | 输出长度上限. |
+| **Citation parsing** | 引用解析. |
+
+### Caching
+
+| 术语 | 解释 |
+|---|---|
+| **Result cache** ⭐ | 完整结果缓存 (Redis), 同 query 同 user 命中. |
+| **Embed cache** | 查询 embedding 缓存. |
+| **Semantic cache** | 相似 query 的语义级缓存. |
+| **Negative cache** | 失败结果短暂缓存防 retry flood. |
+| **Cache invalidation** | 缓存失效. |
+| **TTL (Time-To-Live)** | 缓存过期时间. |
+| **Zipf distribution** | 查询频次 Zipf 分布 — top 20% query 占 80% 流量. |
+| **Cache pre-warm** | 预热 — 启动时填好 cache. |
+| **Doc-id-aware invalidation** | doc 更新时反向找含它的 cache 失效. |
+
+### 质量评估
+
+| 术语 | 解释 |
+|---|---|
+| **nDCG@10** ⭐ | Normalized Discounted Cumulative Gain top-10 — 检索质量金标准. |
+| **MRR (Mean Reciprocal Rank)** | 平均倒数排名. |
+| **Recall@K** | top-K 中相关文档比例. |
+| **Precision@K** | top-K 中精确率. |
+| **Factuality** | 事实准确性 — LLM 输出有依据 vs 编造. |
+| **Hallucination** | 幻觉 — 编造内容. |
+| **Human eval / Golden set** | 人工评估 / 黄金集. |
+| **Active learning** | 主动学习 — 低 confidence 样本人工标后重训. |
+| **A/B test** | 上线前的对比实验. |
+
+### 部署 / 后处理
+
+| 术语 | 解释 |
+|---|---|
+| **PII redaction** | PII 脱敏. |
+| **Audit log** | 审计日志. |
+| **Async fire-and-forget** | 异步不阻塞主流程. |
+| **CDN / Edge caching** | 边缘缓存 — Cloudflare / CloudFront. |
+| **OTel (OpenTelemetry)** | observability 标准. |
+| **Bedrock** | AWS LLM 托管服务. |
+| **T4 / H100 GPU** | NVIDIA GPU 型号. |
 
 ---
 

@@ -8,6 +8,129 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 search + LLM latency 优化. 不懂术语跟不上每个 ms 的攻略. 5 min 看完.
+
+### Latency / UX 概念
+
+| 术语 | 解释 |
+|---|---|
+| **p50 / p95 / p99** ⭐ | 50% / 95% / 99% 分位的延迟. p50 = 中位数. |
+| **TTFT (Time-To-First-Token)** ⭐ | 首字延迟 — streaming 时关键. |
+| **TTFB (Time-To-First-Byte)** | 首字节延迟. |
+| **Perceived latency** ⭐ | 用户感知延迟 — 100ms TTFT 即使总 300ms 也感觉 instant. |
+| **Streaming (SSE)** | Server-Sent Events — 边算边返回. |
+| **Debouncing** | 防抖 — user 还在 type 时不触发 search. |
+
+### Search 架构
+
+| 术语 | 解释 |
+|---|---|
+| **Semantic search** ⭐ | 语义搜索 — 用 embedding 找语义相近文档. |
+| **Vector search / K-NN** | 向量最近邻搜索. |
+| **HNSW (Hierarchical Navigable Small World)** ⭐ | 主流近似最近邻算法. |
+| **ef_search** ⭐ | HNSW 搜索宽度 — 调大 recall ↑ 速度 ↓. 调小反之. |
+| **ef_construction** | HNSW 建图宽度. |
+| **M (graph degree)** | HNSW 每节点连接数. |
+| **BM25** | 经典 keyword 检索算法. |
+| **Hybrid retrieval** | 向量 + BM25 双路融合. |
+| **RRF (Reciprocal Rank Fusion)** | 排名倒数融合算法. |
+| **ColBERT / Late interaction** | token-level 后期交互检索, 比 single-vector 准. |
+| **Prefilter vs Postfilter** ⭐ | 搜索前 / 后过滤. ACL 用 prefilter. |
+| **Filter-aware HNSW** | 内置 filter 跳过不符合节点的 HNSW. |
+| **Navigational query** | 导航式查询 ("facebook login") — 直接跳到已知页面. |
+| **Lookup query** | 查找式 — 给我一堆链接. |
+| **Analytical query** | 分析式 — 需要 LLM 综合回答. |
+
+### Cascade / 路由
+
+| 术语 | 解释 |
+|---|---|
+| **Cascade architecture** ⭐ | 级联架构 — 简单 query 走便宜路径, 难 query 走全套. |
+| **Query router / classifier** | 查询路由 / 分类器. |
+| **Fast path vs Full path** ⭐ | 快路径 (80% 流量, 80ms) vs 全路径 (20%, 300ms). |
+| **Skip ladder** | 跳过阶梯 — 高置信度时跳过 reranker / LLM. |
+| **Tail query** | 长尾查询 — rare entity, 难 query. |
+
+### Reranker
+
+| 术语 | 解释 |
+|---|---|
+| **Reranker** ⭐ | 重排 — top-100 retrieve 后用更准但更慢模型重排到 top-10. |
+| **Cross-encoder** | 双输入交叉模型 — query 和 doc 一起算 score, 比 bi-encoder 准. |
+| **Bi-encoder** | 双塔模型 — query 和 doc 分别 encode, 余弦相似度. 快. |
+| **MS MARCO** | 微软 search 数据集, 训 reranker 标配. |
+| **MiniLM** | 小型 BERT 系列, distill 用. |
+| **Cohere Rerank** | Cohere 的 reranker API. |
+| **Score gap / Score separation** | top-k 分数差距 — 大 = confident, 小 = ambiguous. |
+
+### 量化 / 蒸馏
+
+| 术语 | 解释 |
+|---|---|
+| **Distillation** ⭐ | 蒸馏 — 用大模型当 teacher 训小模型 student. |
+| **Distilled embedder** | 蒸馏小 embedder (BGE-small 384d). |
+| **BGE-large vs BGE-small** | 1024 / 384 维 embedder. |
+| **text-embedding-3-large** | OpenAI 3072 维 embedder. 慢但准. |
+| **FP16 / FP8 / INT8** | 不同精度量化. |
+| **Speculative decoding** | 推测解码 — 小模型预测大模型 verify. |
+
+### LLM / 生成
+
+| 术语 | 解释 |
+|---|---|
+| **Claude Haiku vs Opus** ⭐ | Anthropic 小型 / 旗舰. Haiku 3× 快 5× 便宜. |
+| **GPT-4 / GPT-4 Turbo** | OpenAI 大模型. |
+| **Prompt caching** ⭐ | Anthropic 的 prompt cache — system prompt 命中 cache 时 90% 便宜 + 快. |
+| **KV cache prefix sharing** | KV 缓存前缀共享. |
+| **Prefill** | LLM 输入 forward 阶段. |
+| **Decode** | LLM 输出阶段, 一次一个 token. |
+| **Max output tokens** | 输出长度上限. |
+| **Citation parsing** | 引用解析. |
+
+### Caching
+
+| 术语 | 解释 |
+|---|---|
+| **Result cache** ⭐ | 完整结果缓存 (Redis), 同 query 同 user 命中. |
+| **Embed cache** | 查询 embedding 缓存. |
+| **Semantic cache** | 相似 query 的语义级缓存. |
+| **Negative cache** | 失败结果短暂缓存防 retry flood. |
+| **Cache invalidation** | 缓存失效. |
+| **TTL (Time-To-Live)** | 缓存过期时间. |
+| **Zipf distribution** | 查询频次 Zipf 分布 — top 20% query 占 80% 流量. |
+| **Cache pre-warm** | 预热 — 启动时填好 cache. |
+| **Doc-id-aware invalidation** | doc 更新时反向找含它的 cache 失效. |
+
+### 质量评估
+
+| 术语 | 解释 |
+|---|---|
+| **nDCG@10** ⭐ | Normalized Discounted Cumulative Gain top-10 — 检索质量金标准. |
+| **MRR (Mean Reciprocal Rank)** | 平均倒数排名. |
+| **Recall@K** | top-K 中相关文档比例. |
+| **Precision@K** | top-K 中精确率. |
+| **Factuality** | 事实准确性 — LLM 输出有依据 vs 编造. |
+| **Hallucination** | 幻觉 — 编造内容. |
+| **Human eval / Golden set** | 人工评估 / 黄金集. |
+| **Active learning** | 主动学习 — 低 confidence 样本人工标后重训. |
+| **A/B test** | 上线前的对比实验. |
+
+### 部署 / 后处理
+
+| 术语 | 解释 |
+|---|---|
+| **PII redaction** | PII 脱敏. |
+| **Audit log** | 审计日志. |
+| **Async fire-and-forget** | 异步不阻塞主流程. |
+| **CDN / Edge caching** | 边缘缓存 — Cloudflare / CloudFront. |
+| **OTel (OpenTelemetry)** | observability 标准. |
+| **Bedrock** | AWS LLM 托管服务. |
+| **T4 / H100 GPU** | NVIDIA GPU 型号. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 "更快", 是考你**理解每一个 ms 在哪 + 知道哪些可以 cut**:

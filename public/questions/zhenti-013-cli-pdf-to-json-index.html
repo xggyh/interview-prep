@@ -43,6 +43,19 @@
 <blockquote><p>"Build a <strong>CLI tool</strong> that takes a directory of PDFs and produces a <strong>searchable JSON index</strong> with <strong>extracted entities</strong> (people, organizations, dates, monetary values). Code it. Then we'll discuss productionization."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min, shared screen + IDE) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Scale AI</strong>, OpenAI, Anthropic <strong>难度</strong>: Medium-Hard <strong>主要技能</strong>: 真实 production tooling, LLM 集成成本控制, CLI UX, error handling</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题最杂 — CLI + PDF + NER + LLM 全混. 30+ 个术语先扫一遍.</p></blockquote>
+<h4>CLI / 工程</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>argparse</code></strong> ⭐</td><td>Python stdlib 命令行参数解析. <code>add_argument</code>, <code>subparsers</code>, <code>--flag</code> 标准 CLI UX.</td></tr><tr><td><strong><code>--dry-run</code></strong></td><td>"假装跑一遍" — 只打印会做什么, 不真做. 文件操作工具的标配安全 flag.</td></tr><tr><td><strong>Subcommand (子命令)</strong></td><td><code>git commit</code> / <code>git push</code> 这种结构. <code>argparse.add_subparsers()</code> 实现.</td></tr><tr><td><strong>Exit code</strong></td><td>进程返回值: <code>0</code> = OK, <code>1</code> = 一般错误, <code>2</code> = 用法错误. shell 用 <code>$?</code> 读.</td></tr><tr><td><strong><code>rglob</code> (recursive glob)</strong></td><td><code>Path.rglob('*.pdf')</code> 递归找所有 .pdf 文件. 替代 <code>os.listdir + walk</code>.</td></tr><tr><td><strong><code>logging</code> (而非 print)</strong></td><td>Python 标准日志库, 带 timestamp / level / handler. <code>print</code> 在 production 是 anti-pattern.</td></tr><tr><td><strong>Atomic rename</strong> ⭐</td><td>写文件先写 <code>.tmp</code>, 然后 <code>os.replace(tmp, final)</code> 原子改名. 防 crash 时 master index 损坏.</td></tr></tbody></table></div>
+<h4>PDF / OCR</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>pdfplumber</code></strong> ⭐</td><td>纯 Python PDF text + table 抽取库. mature, 不需要 native binding.</td></tr><tr><td><strong><code>PyMuPDF</code> (fitz)</strong></td><td>C 库 binding, 比 pdfplumber 快 10x, 但安装复杂.</td></tr><tr><td><strong><code>pdfminer.six</code></strong></td><td>老牌 PDF parser, pdfplumber 底层就是它.</td></tr><tr><td><strong>OCR (Optical Character Recognition)</strong></td><td>图像识别成文字. 扫描 PDF 必走.</td></tr><tr><td><strong><code>tesseract</code> / <code>pytesseract</code></strong></td><td>Google 开源 OCR. CPU 跑, 1-3s/page.</td></tr><tr><td><strong><code>paddleocr</code> / <code>easyocr</code></strong></td><td>中国 / 中文 OCR, GPU 可加速, 比 tesseract 快 5x.</td></tr><tr><td><strong><code>pdf2image</code></strong></td><td>把 PDF 页面渲染成图像, OCR 前的中间步骤. Mac 需 <code>brew install poppler</code>.</td></tr><tr><td><strong>Native PDF vs scanned PDF</strong></td><td>Native = 文字层可 extract; scanned = 图片需 OCR. 混合是常态 (封面扫描+正文 text).</td></tr><tr><td><strong>DPI</strong></td><td>dots per inch. OCR 输入图像质量, 200 是 sweet spot, 300 更准但慢.</td></tr></tbody></table></div>
+<h4>NER (Named Entity Recognition) / LLM</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>NER (Named Entity Recognition)</strong> ⭐</td><td>命名实体识别 — 从文本抽 person / org / date / money / location. spaCy / BERT / LLM 都做.</td></tr><tr><td><strong>spaCy</strong></td><td>经典 Python NLP 库, mature. <code>en_core_web_sm</code> 50MB 模型, ~100k tokens/sec on CPU.</td></tr><tr><td><strong><code>en_core_web_sm/md/lg</code></strong></td><td>spaCy 英文模型大小 sm/md/lg, 大的准但慢. <code>xx_ent_wiki_sm</code> = 多语言.</td></tr><tr><td><strong>Entity label</strong> (PERSON, ORG, DATE, MONEY, GPE)</td><td>spaCy NER 标签集. GPE = Geo-Political Entity (国家/城市).</td></tr><tr><td><strong>Chunking (LLM 语境)</strong> ⭐</td><td>把长文档切成 LLM context 能装的小块. 这题里 8000 chars per chunk, 200 chars overlap.</td></tr><tr><td><strong>Overlap</strong></td><td>相邻 chunk 重叠的 chars. 0 overlap 会切断跨边界的实体; 大 overlap 浪费 token.</td></tr><tr><td><strong><code>gpt-4o</code> / <code>gpt-4o-mini</code></strong></td><td>OpenAI 模型. mini 比 4o 便宜 10x, 多数 NER 任务够用.</td></tr><tr><td><strong><code>response_format={'type': 'json_object'}</code></strong></td><td>OpenAI API 强制返 valid JSON 的参数. 比让 LLM "自觉" 返 JSON 稳定.</td></tr><tr><td><strong><code>temperature=0.0</code></strong></td><td>LLM 输出随机性, 0 = 最确定. 抽 entity 这类任务用 0.</td></tr><tr><td><strong><code>tool_use</code> / Structured output</strong></td><td>Anthropic / OpenAI 用 schema 约束 LLM 返结构化数据, 比纯 prompt 更稳.</td></tr><tr><td><strong>Hallucination (幻觉)</strong></td><td>LLM 编造未出现的 entity. 防御: post-hoc verify (在原文里 string-match).</td></tr></tbody></table></div>
+<h4>成本 / 限流</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Cost budget per doc</strong> ⭐</td><td>单文档 LLM 调用上限 ($). 超了 stop. 防 cost runaway 关键.</td></tr><tr><td><strong><code>prompt_tokens / completion_tokens</code></strong></td><td>LLM API usage 字段, 计费基础. Input 比 output 便宜 ~4x.</td></tr><tr><td><strong>Pricing pluggability</strong></td><td>价格写 yaml/config 不 hardcode, 因为 OpenAI/Anthropic 每月可能降价.</td></tr><tr><td><strong><code>logprobs</code></strong></td><td>LLM 返回每个 token 的对数概率. 用来算 confidence score.</td></tr></tbody></table></div>
+<h4>Production 工程</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>file_hash</code> (SHA-1)</strong> ⭐</td><td>文件内容的指纹. 用来 dedupe (同样 bytes) + change-detect (重新跑没必要).</td></tr><tr><td><strong>Resume / checkpoint</strong></td><td>跑 8 小时挂了不重跑 — 用 hash 记录已处理, 跳过.</td></tr><tr><td><strong><code>ProcessPoolExecutor</code></strong></td><td>Python 多进程并行. CPU-bound 任务 (spaCy / OCR) 用这个, 不是 thread (有 GIL).</td></tr><tr><td><strong>I/O-bound vs CPU-bound</strong></td><td>LLM API call = I/O-bound (用 thread / async); spaCy NER = CPU-bound (用 process).</td></tr><tr><td><strong><code>asdict()</code></strong></td><td>dataclass 转 dict, 用于 JSON serialize.</td></tr><tr><td><strong>PCI / GLBA / PII</strong></td><td>监管: PCI = 信用卡, GLBA = 美国金融客户数据, PII = 可识别个人信息. ingestion 时要 redact.</td></tr><tr><td><strong>Provenance</strong></td><td>数据来源溯源 — 每个 entity 附 <code>{page, char_start, char_end}</code> 可点回原文. 法律 doc 必备.</td></tr><tr><td><strong>Telemetry / Prometheus metrics</strong></td><td>Production 监控指标 (counter, gauge, histogram). <code>pdfindex.cost.usd</code>, <code>pdfindex.errors</code>.</td></tr><tr><td><strong>Idempotent</strong></td><td>同 input 同 output, 多次跑不出问题. 这题: 同 file_hash 不重复处理.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>这道题不是 algo, 是 <strong>真 FDE 工程问题</strong> — 客户给一堆 PDF (审计报告 / 法律合同 / 研究 paper), 让你 "搜得到 + 找得到关键人/公司/金额". 考察:</p>
 <ol><li><strong>CLI 设计</strong> — <code>argparse</code> 用对, <code>--dry-run</code>, <code>--output</code>, progress bar, exit code</li><li><strong>PDF 怎么读</strong> — <code>pdfplumber</code> vs <code>PyMuPDF</code> (fitz) vs <code>pdfminer.six</code> — 各有 trade-off, 你能不能开口选</li><li><strong>Entity extraction 路径选择</strong> — spaCy NER (offline, 快, 限于训练域) vs LLM (灵活, 慢且贵) — 你能不能 quantify 成本</li><li><strong>Chunking + cost control</strong> — LLM 不能整个 100-page PDF 灌进去, 要 chunk + budget</li><li><strong>Robustness</strong> — PDF 是图片扫描怎么办 (OCR fallback)? 加密 PDF? 损坏文件? 中文/多语言?</li><li><strong>Output format</strong> — JSON schema 要适合 grep / 给 downstream search index 用</li><li><strong>Test 怎么写</strong> — 不能真 call OpenAI, 要 mock; 也要有真 PDF fixture</li></ol>
@@ -833,6 +846,77 @@ python pdfindex.py search ./out --query "Anthropic"</code></pre>
 **出处**: Exponent 2026 FDE · 公司: **Scale AI**, OpenAI, Anthropic
 **难度**: Medium-Hard
 **主要技能**: 真实 production tooling, LLM 集成成本控制, CLI UX, error handling
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题最杂 — CLI + PDF + NER + LLM 全混. 30+ 个术语先扫一遍.
+
+### CLI / 工程
+
+| 术语 | 解释 |
+|---|---|
+| **`argparse`** ⭐ | Python stdlib 命令行参数解析. `add_argument`, `subparsers`, `--flag` 标准 CLI UX. |
+| **`--dry-run`** | "假装跑一遍" — 只打印会做什么, 不真做. 文件操作工具的标配安全 flag. |
+| **Subcommand (子命令)** | `git commit` / `git push` 这种结构. `argparse.add_subparsers()` 实现. |
+| **Exit code** | 进程返回值: `0` = OK, `1` = 一般错误, `2` = 用法错误. shell 用 `$?` 读. |
+| **`rglob` (recursive glob)** | `Path.rglob('*.pdf')` 递归找所有 .pdf 文件. 替代 `os.listdir + walk`. |
+| **`logging` (而非 print)** | Python 标准日志库, 带 timestamp / level / handler. `print` 在 production 是 anti-pattern. |
+| **Atomic rename** ⭐ | 写文件先写 `.tmp`, 然后 `os.replace(tmp, final)` 原子改名. 防 crash 时 master index 损坏. |
+
+### PDF / OCR
+
+| 术语 | 解释 |
+|---|---|
+| **`pdfplumber`** ⭐ | 纯 Python PDF text + table 抽取库. mature, 不需要 native binding. |
+| **`PyMuPDF` (fitz)** | C 库 binding, 比 pdfplumber 快 10x, 但安装复杂. |
+| **`pdfminer.six`** | 老牌 PDF parser, pdfplumber 底层就是它. |
+| **OCR (Optical Character Recognition)** | 图像识别成文字. 扫描 PDF 必走. |
+| **`tesseract` / `pytesseract`** | Google 开源 OCR. CPU 跑, 1-3s/page. |
+| **`paddleocr` / `easyocr`** | 中国 / 中文 OCR, GPU 可加速, 比 tesseract 快 5x. |
+| **`pdf2image`** | 把 PDF 页面渲染成图像, OCR 前的中间步骤. Mac 需 `brew install poppler`. |
+| **Native PDF vs scanned PDF** | Native = 文字层可 extract; scanned = 图片需 OCR. 混合是常态 (封面扫描+正文 text). |
+| **DPI** | dots per inch. OCR 输入图像质量, 200 是 sweet spot, 300 更准但慢. |
+
+### NER (Named Entity Recognition) / LLM
+
+| 术语 | 解释 |
+|---|---|
+| **NER (Named Entity Recognition)** ⭐ | 命名实体识别 — 从文本抽 person / org / date / money / location. spaCy / BERT / LLM 都做. |
+| **spaCy** | 经典 Python NLP 库, mature. `en_core_web_sm` 50MB 模型, ~100k tokens/sec on CPU. |
+| **`en_core_web_sm/md/lg`** | spaCy 英文模型大小 sm/md/lg, 大的准但慢. `xx_ent_wiki_sm` = 多语言. |
+| **Entity label** (PERSON, ORG, DATE, MONEY, GPE) | spaCy NER 标签集. GPE = Geo-Political Entity (国家/城市). |
+| **Chunking (LLM 语境)** ⭐ | 把长文档切成 LLM context 能装的小块. 这题里 8000 chars per chunk, 200 chars overlap. |
+| **Overlap** | 相邻 chunk 重叠的 chars. 0 overlap 会切断跨边界的实体; 大 overlap 浪费 token. |
+| **`gpt-4o` / `gpt-4o-mini`** | OpenAI 模型. mini 比 4o 便宜 10x, 多数 NER 任务够用. |
+| **`response_format={'type': 'json_object'}`** | OpenAI API 强制返 valid JSON 的参数. 比让 LLM "自觉" 返 JSON 稳定. |
+| **`temperature=0.0`** | LLM 输出随机性, 0 = 最确定. 抽 entity 这类任务用 0. |
+| **`tool_use` / Structured output** | Anthropic / OpenAI 用 schema 约束 LLM 返结构化数据, 比纯 prompt 更稳. |
+| **Hallucination (幻觉)** | LLM 编造未出现的 entity. 防御: post-hoc verify (在原文里 string-match). |
+
+### 成本 / 限流
+
+| 术语 | 解释 |
+|---|---|
+| **Cost budget per doc** ⭐ | 单文档 LLM 调用上限 ($). 超了 stop. 防 cost runaway 关键. |
+| **`prompt_tokens / completion_tokens`** | LLM API usage 字段, 计费基础. Input 比 output 便宜 ~4x. |
+| **Pricing pluggability** | 价格写 yaml/config 不 hardcode, 因为 OpenAI/Anthropic 每月可能降价. |
+| **`logprobs`** | LLM 返回每个 token 的对数概率. 用来算 confidence score. |
+
+### Production 工程
+
+| 术语 | 解释 |
+|---|---|
+| **`file_hash` (SHA-1)** ⭐ | 文件内容的指纹. 用来 dedupe (同样 bytes) + change-detect (重新跑没必要). |
+| **Resume / checkpoint** | 跑 8 小时挂了不重跑 — 用 hash 记录已处理, 跳过. |
+| **`ProcessPoolExecutor`** | Python 多进程并行. CPU-bound 任务 (spaCy / OCR) 用这个, 不是 thread (有 GIL). |
+| **I/O-bound vs CPU-bound** | LLM API call = I/O-bound (用 thread / async); spaCy NER = CPU-bound (用 process). |
+| **`asdict()`** | dataclass 转 dict, 用于 JSON serialize. |
+| **PCI / GLBA / PII** | 监管: PCI = 信用卡, GLBA = 美国金融客户数据, PII = 可识别个人信息. ingestion 时要 redact. |
+| **Provenance** | 数据来源溯源 — 每个 entity 附 `{page, char_start, char_end}` 可点回原文. 法律 doc 必备. |
+| **Telemetry / Prometheus metrics** | Production 监控指标 (counter, gauge, histogram). `pdfindex.cost.usd`, `pdfindex.errors`. |
+| **Idempotent** | 同 input 同 output, 多次跑不出问题. 这题: 同 file_hash 不重复处理. |
 
 ---
 

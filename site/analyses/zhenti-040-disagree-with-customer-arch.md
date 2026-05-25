@@ -8,6 +8,91 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题混合: **disagree 沟通技巧 + 架构具体术语**. 5 min 速查.
+
+### 沟通 / Disagree 技巧
+
+| 术语 | 解释 |
+|---|---|
+| **Disagree without being a jerk** ⭐ | 反对但不伤人 — Amazon "disagree-and-commit" 的核心. 这题主题. |
+| **"Walk me through how you arrived at this"** ⭐ | 开场万能句 — 先问对方推理过程, 听完再说自己看法. 不上来就反对. |
+| **Lead with what they got right** ⭐ | 先肯定对方对的部分 — "3 things you got right: X, Y, Z". 然后才提质疑. |
+| **Concerns as questions, not statements** ⭐ | 用问句不用陈述句 — "Have you considered the ops burden?" 而不是 "Microservices will slow you down". |
+| **Pre-mortem framing** | 事前预演 — "if 6 months in this doesn't work, here's the path". 不指责现在, 担忧未来. |
+| **Acknowledge what you don't know** | 承认无知 — "you have context I don't (regulatory, org chart, past projects)". 谦虚是 disagree 的入场券. |
+| **Defer to their authority** ⭐ | 让回决策权 — "your call — you know your org". 反复强调他们是 decider 你只 surface. |
+| **Reversibility plan** ⭐ | 可逆方案 — "if monolith now and need microservices later, here's the migration sequence". 降低对方对 "万一选错" 的恐惧. |
+| **Quantify costs** | 量化成本 — "40% of platform team time = 1.6 engineers" / "24 engineer-months of features". 抽象 vs 具体. |
+| **Alternative as option, not imposition** | 替代是选项不是强加 — "an alternative I'd consider" 而非 "you should do this". |
+| **Update your view in public** | 公开改观点 — 如果对方说服你, 立刻承认 "I think you're right and I was wrong". 是 FDE 强者标志. |
+| **Help them save face** | 帮对方留面子 — "incorporating new information" 替代 "reversing decision". 政治智慧. |
+| **Close with appreciation for engagement** | 收尾感谢对方愿意 engage. 即使没改观点也加分. |
+
+### 架构 / 系统设计
+
+| 术语 | 解释 |
+|---|---|
+| **Microservices (微服务)** ⭐ | 把单体拆成 N 个独立服务 — 各自部署 + 数据库. 适合 high-scale, 但 ops burden 大. 这题客户选的. |
+| **Monolith (单体)** ⭐ | 单个应用 + 单个数据库. Ops 简单, 开发快. 适合 < 1000s TPS. 这题 FDE 推荐的. |
+| **TPS (Transactions Per Second)** | 每秒交易数 — 衡量 scale 的标准. 50 TPS 是小, 500 TPS 中, 5000+ 大. |
+| **Kafka** | LinkedIn 开源的分布式消息队列 — 高吞吐 + 持久. 适合 5000+ TPS. 自托管 ops 重. |
+| **Apache Pulsar** | Yahoo 开源 — Kafka 的竞争对手, multi-tenancy 更好. Gao Xin Brazil 项目用过. |
+| **RabbitMQ** | 经典消息队列 — 比 Kafka 轻量, 适合中等 scale. |
+| **SQS (Simple Queue Service)** | AWS 托管消息队列 — 0 ops, pay-per-use. 替代 Kafka 的轻方案. |
+| **MSK (Managed Streaming for Kafka)** | AWS 托管 Kafka — 不自己运维 cluster. |
+| **K8s (Kubernetes)** ⭐ | 容器编排系统 — 部署微服务必备. 自运维 K8s 集群 = 高 ops 成本. |
+| **On-prem (On-premises)** ⭐ | 本地部署 — 自己机房 / 自己机器. 跟 cloud-managed 相反. |
+| **Bare-metal** | 裸金属 — 不虚拟化的物理机器. On-prem K8s 经常 bare-metal. |
+| **Postgres (PostgreSQL)** | 开源关系数据库 — monolith 的标配. 单机能跑 1000s TPS. |
+| **RDS (Relational Database Service)** | AWS 托管 Postgres / MySQL — 自动 backup + patch + DR. |
+| **Read replicas** | 读副本 — Postgres scale 的标准方法, 不需要拆 microservices. |
+| **Partitioning / Sharding** | 分区 / 分片 — Postgres scale 的另一标准方法. |
+| **Worker queue / Job queue** | 异步任务队列 — 不一定要 Kafka, SQS / RabbitMQ 都行. |
+
+### 架构决策维度
+
+| 术语 | 解释 |
+|---|---|
+| **Reuse existing infra** | 复用现有基础设施 — 客户的 Kafka 已在用 → 加 workload 比新搭便宜. 这题客户的合理论据. |
+| **Team expertise / Team familiarity** | 团队熟悉度 — 选已会的技术比选 "最好的" 重要. 客户的合理论据. |
+| **Future-proofing / Pre-mature optimization** ⭐ | 提前优化 — 为还没发生的 scale 现在付出复杂度成本. 这题客户的最大坑. |
+| **Operational burden / Ops cost** ⭐ | 运维负担 — 6 个 microservices = 6 个 pipeline + 6 个 alert + 6 个 upgrade. 隐性成本巨大. |
+| **Platform team bandwidth** | 平台团队带宽 — 多少 engineer-month 花在运维 vs feature. |
+| **Lock-in (锁定)** | 选了某架构后难离开. 这题 microservices 不容易回到 monolith. |
+| **Migration cost** | 迁移成本 — monolith → microservices = 3-4 个月. 不是 0 但可预测. |
+
+### 合规 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **InfoSec (信息安全部)** | 客户的 InfoSec 部门 — 通常更保守, 偏好 on-prem (但常基于过时认知). |
+| **AWS managed services** | AWS 托管服务 — RDS, MSK, SQS, etc. 比 self-host 合规更强 (SOC2, FedRAMP, HIPAA). |
+| **SOC2 / FedRAMP / HIPAA** | 三种主流合规标准. AWS managed services 通常都过. |
+| **DR (Disaster Recovery)** | 灾备恢复 — managed services 自动处理. |
+| **Patching** | 打补丁 — managed services 自动. Self-host 自己来. |
+| **Regulated data** | 受监管数据 — InfoSec 通常用这个理由偏好 on-prem. 现代 AWS managed 也合规, 值得重评. |
+
+### 角色 / 政治
+
+| 术语 | 解释 |
+|---|---|
+| **Lead Architect** ⭐ | 主架构师 — 这题对方 (Priya). 团队架构决策权人. |
+| **Platform team** | 平台团队 — 跑 K8s + 基础设施的人. 这题的 ops 负担承担者. |
+| **InfoSec team** | 信息安全团队 — 客户内审批方. |
+| **CTO** | 首席技术官 — 如果架构是 CTO 钦定的, Lead Architect 没权改. 这题 follow-up Q3. |
+| **Save face (留面子)** | 政治术语 — 让对方反悔不丢人. 中国 / 印度 / 日本组织尤其重要. |
+
+### Gao Xin 简历相关
+
+| 术语 | 解释 |
+|---|---|
+| **TikTok PayLater Brazil Pulsar disagreement** | Gao Xin 反对过 Pulsar + bare-metal 选择 — 用同样的 5 步, 最后达成 hybrid. |
+| **Multi-tenancy** | 多租户 — Pulsar 比 Kafka 强的一点. Gao Xin Brazil 经验里学到的. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能否解释你的架构 superior.

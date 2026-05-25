@@ -8,6 +8,86 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题术语**药企特定 + IP / 监管词最多**, 5 min 看完后面跟得上.
+
+### 药企 / 制药行业核心
+
+| 术语 | 解释 |
+|---|---|
+| **Compound library (化合物库)** ⭐ | 药企内部所有候选化合物的数据库 — 结构 + 性质 + 测试结果. **核心知识产权**, 一旦泄露 = 几亿美金研发白做. |
+| **Assay data** | 实验数据 — 在 lab 里测某化合物对靶点的活性 / 毒性 / 选择性. 跟 compound library 配对. |
+| **Lead optimization (lead opt)** | 先导化合物优化 — 找到 hit 后, 改结构提高活性 + 降低副作用的迭代过程. **Pre-filing 最敏感阶段**. |
+| **SMILES (Simplified Molecular-Input Line-Entry System)** | 化合物结构的文本表示, 比如 "CC(=O)OC1=CC=CC=C1C(=O)O" 是阿司匹林. RAG 检索化学语料必处理. |
+| **Therapeutic area** | 治疗领域 — Oncology (肿瘤) / Immunology / Cardiovascular / Neurology 等. 这题 pilot scope 是 Oncology, 不是全公司. |
+| **Medicinal chemist** | 药物化学家 — 设计 + 合成 candidate compound 的人. 这题 30 人 pilot 用户. |
+| **Pharmacovigilance** | 药物警戒 — 上市后跟踪副作用. Adverse event database 在这里. |
+| **LIMS (Laboratory Information Management System)** | 实验室管理系统 — 存 assay 数据 + sample tracking. 数据源之一. |
+
+### FDA / 监管 / 合规
+
+| 术语 | 解释 |
+|---|---|
+| **FDA (Food and Drug Administration)** | 美国食药监 — 药企最大监管. |
+| **EMA** | European Medicines Agency, 欧盟同等机构. |
+| **Phase I / II / III trials** | 临床试验 3 阶段: Phase I (安全, 几十人) → Phase II (有效, 几百人) → Phase III (确认, 几千人). Phase III 数据极敏感. |
+| **BLA / NDA** | Biologics License Application / New Drug Application — 向 FDA 申请药上市的申报. 文件极敏感. |
+| **21 CFR Part 11** ⭐ | FDA 法规第 21 卷第 11 部分 — 规定电子记录 + 电子签名的合规要求. AI 系统如果输出进入 FDA submission, 必须 21 CFR Part 11 validated. |
+| **GxP** | Good x Practice 总称 (GMP 生产, GLP 实验室, GCP 临床). FDA 监管的所有 quality framework. |
+| **Validated use vs non-validated use** ⭐ | "Validated" = 用于 FDA 申报 / 患者安全决策, 必须正式 validation (耗时 1-2 年). "Non-validated" = 仅 R&D / exploration, 不进 submission, 流程轻得多. 这题 v1 是 non-validated. |
+| **FDA AI guidance** | FDA 2023+ 发布的 AI/ML 在药品研发中的应用指引. |
+| **Freedom-to-operate (FTO)** | 自由实施权 — 我做这个化合物会不会侵犯他人专利? IP attorney 的核心工作. |
+| **Pre-filing data** | 还没向专利局 / FDA 申报的数据. **最敏感**, 一泄露竞品就抄. |
+| **Adverse event report (AE)** | 副作用报告 — HIPAA + 21 CFR Part 11 双重监管. 不在这题 pilot scope. |
+
+### 跨国合规
+
+| 术语 | 解释 |
+|---|---|
+| **GDPR / SCC** | 欧盟数据保护法 / Standard Contractual Clauses (跨境传输条款). 欧盟数据出境必合规. |
+| **PIPL (China)** | 中国个人信息保护法 — 中国患者数据跨境受严控. |
+| **CCPA / NYSHIELD** | 加州 / 纽约州的数据保护法. |
+| **Data residency** | 数据必须留在某国境内的要求. EU 项目数据必须 EU 内, US 项目 US 内. 跨境是 veto. |
+
+### IP / 法务
+
+| 术语 | 解释 |
+|---|---|
+| **Chief IP Officer (CIPO)** ⭐ | 首席知识产权官 — 这题**最大 veto holder + 创伤来源** (18 个月前 ChatGPT 化合物结构泄露事件). |
+| **Trade secret** | 商业秘密 — 比专利保护更敏感, 因为一公开就没了. Pre-filing 化合物属于这类. |
+| **Patent claims** | 专利权利要求 — 专利说明书里定义保护范围的条款. |
+| **Patent prep notes** | 专利申报前的草稿 + 律师笔记 — 在律师笔记本电脑里, 不在系统. **永久 defer**. |
+| **CLO (Chief Legal Officer)** | 首席法务官. |
+| **CCO (Chief Compliance Officer)** | 首席合规官 — 管 FDA / GxP 合规. |
+| **CMO (Chief Medical Officer)** | 首席医学官 — 管 patient safety + 临床决策. |
+
+### AI / 系统 / 架构
+
+| 术语 | 解释 |
+|---|---|
+| **RAG (Retrieval-Augmented Generation)** | 检索增强生成 — LLM 先检索内部文档, 再基于文档生成答案 + 引用. 比 fine-tuning 适合企业内部知识. |
+| **Self-hosted vs API** ⭐ | 模型部署模式选择 — 自托管 (数据不离开公司) vs commercial API (数据走 OpenAI/Anthropic). **药企几乎必选 self-hosted**, 是 IP / 法务决策不是技术决策. |
+| **Llama 3.1 70B / Mistral** | 主流 self-host LLM. 这题 likely 选择. |
+| **AWS Bedrock + PrivateLink** | AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择. |
+| **Qdrant / Weaviate (self-hosted)** | 自托管向量数据库. 用 self-hosted 而不是 Pinecone (SaaS) 因为 IP team 不批多租户云服务. |
+| **Hallucination (幻觉)** | LLM 编造不存在的事实 — 在化学领域 = 编造化合物结构 / 假活性数据. 极危险. |
+| **Citation / provenance** | 每个答案必须引用来源文档. Audit + 合规必需. |
+| **Walking skeleton** | 最薄端到端版本, 每组件可 mock 但流程跑通. **Decomposition 题 MVP 方法论**. |
+| **Red team** | 红队测试 — 主动 probe 模型, 找漏洞. 化学领域 = 问竞品化合物看会不会泄露训练数据. |
+
+### 角色 / 用户
+
+| 术语 | 解释 |
+|---|---|
+| **Head of Research** | 研究负责人 — 这题 oncology pilot 的 sponsor. |
+| **Regulatory affairs** | 法规事务 — 跟 FDA 沟通的内部团队. |
+| **Patent attorney** | 专利律师 — 内部 IP 团队成员. |
+| **InfoSec / CISO** | 信息安全 — 管 network + encryption. |
+| **Internal Audit** | 内审 — SOX-adjacent controls 审查. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能 build 一个 RAG.

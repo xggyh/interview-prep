@@ -9,6 +9,87 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 流式系统满地术语. 这张表 5 min 扫完, 后面 backpressure / DLQ / circuit breaker 全跟得上.
+
+### 流式系统核心概念
+
+| 术语 | 解释 |
+|---|---|
+| **Backpressure (背压)** ⭐ | 下游慢时, **上游主动停 pull**, 不要继续 buffer. 防 OOM. 这题核心. 来自 reactive streams / Akka / Flink. |
+| **Producer / Consumer (生产/消费)** | 生产者从 source 取消息, 消费者处理. 中间用 queue 解耦. |
+| **Bounded queue (有界队列)** ⭐ | 容量上限的 queue. 满了 `put()` block — backpressure 自然 propagate. |
+| **Little's Law** ⭐ | `throughput × latency = in-flight`. 100 msg/s × 200ms = 20 并发. **决定 workers 数**. |
+| **In-flight count** | 当前正在处理 (从 queue 取出但未完成) 的 message 数. |
+| **Lag (消费滞后)** | Kafka 中 `high_water_mark - committed_offset`. Lag 涨 = consumer 跟不上. |
+| **Partition (分区)** | Kafka topic 的物理分片单位. 一个 partition 串行, 多个 partition 并行. |
+
+### 投递语义 (delivery semantics)
+
+| 术语 | 解释 |
+|---|---|
+| **At-least-once** ⭐ | 至少投一次, 可能重复. **Default** + 要求 downstream idempotent. |
+| **Exactly-once** | 严格一次. Kafka 有 EOS (transactional), 但 downstream 不是 Kafka 时很难. |
+| **At-most-once** | 至多一次, 可能丢. fire-and-forget 场景 (e.g., metrics). |
+| **Idempotent downstream** | 同 message 多次处理结果相同. 用 SETNX(msg_id) 实现 dedupe. |
+| **Outbox pattern** | 处理结果先写 outbox 表 (with msg_id), 单独 worker poll outbox → side effect. Transactional 保证. |
+
+### asyncio / 并发原语
+
+| 术语 | 解释 |
+|---|---|
+| **`asyncio`** ⭐ | Python 异步 IO 框架. 单线程 + event loop + coroutine. |
+| **`asyncio.Queue(maxsize=K)`** ⭐ | 异步队列. 满时 `await q.put()` block — backpressure 入口. |
+| **`asyncio.Semaphore(N)`** | 限并发 N 个. 跟 queue 不同: queue 限 buffer 容量, semaphore 限并发. |
+| **`asyncio.Event`** | 多 task 协调用 flag. `event.set()` 通知所有等的 task. shutdown 信号常用. |
+| **`asyncio.create_task`** | 启动一个并发 task (不 block 当前). |
+| **`asyncio.wait_for(coro, timeout)`** | 给 coroutine 加 timeout. 防 worker 卡在 `q.get()` 不响应 shutdown. |
+| **`asyncio.gather`** | 等多个 task 全部完成. 但**unbounded gather 就是 OOM 元凶**. |
+| **`asyncio.CancelledError`** | task 被 cancel 时抛的异常. 必须 propagate, 不能吞. |
+| **`task_done()` + `queue.join()`** ⭐ | task_done() 标记一条消息完成; queue.join() 等所有 in-flight 完成. 漏 task_done() 会让 join 永远 hang. |
+| **`asyncio.iscoroutinefunction`** | 检查 fn 是不是 `async def` 定义的. 用来写既支持 sync 又支持 async 的 decorator. |
+| **Event loop** | asyncio 的核心 — 单线程跑所有 coroutine. `time.sleep()` 会**阻塞它**, 必须用 `asyncio.sleep()`. |
+| **Coroutine** | `async def` 函数返回的对象. 必须 `await` 才执行. |
+
+### 错误处理 / 健壮性
+
+| 术语 | 解释 |
+|---|---|
+| **Retry with backoff** | 失败后重试, 间隔指数增长. 详见 Q16. |
+| **Exponential backoff + jitter** | 间隔 = `base * 2^n + random`. 防 thundering herd. |
+| **Full jitter** | `random.uniform(0, base * 2^n)`. AWS 推荐. |
+| **Circuit breaker (熔断器)** ⭐ | N 错误 in 窗口 → open → 一段时间内直接 reject 不试 → cooldown 后 half-open 探测. 防 cascading failure. |
+| **DLQ (Dead Letter Queue)** ⭐ | 死信队列. 重试穷尽的消息丢这里, 离线分析 + 手动 replay. |
+| **Poison message** | 总是 fail 的消息 (e.g., schema 不合规). 卡 partition 不 ack 就死循环 — 必须 DLQ + ack. |
+| **Cascading failure** | 一个慢/挂的下游让上游堆积, 上游又拖更上游, 雪崩. backpressure + breaker 防这个. |
+| **Thundering herd** | 大量 client 同时 fail 同时 retry → 第二波 spike 又挂. |
+
+### Production / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **Graceful shutdown** ⭐ | 收 SIGTERM 后: 停止 pull → drain in-flight → ack → exit. 不丢消息. |
+| **SIGTERM / SIGINT** | Unix 信号. SIGTERM = 优雅停 (K8s 默认), SIGINT = Ctrl+C. SIGKILL 无法捕获. |
+| **K8s `preStop` hook** | Pod 被终止前的最后机会. 30s grace 期发 SIGTERM. |
+| **K8s `readinessProbe`** | 健康检查 - 不 ready 时 LB 不送流量. 满 queue 时返回 not ready 是常用手段. |
+| **HPA (Horizontal Pod Autoscaler)** | K8s 按指标 (CPU / queue depth) 自动扩容. |
+| **Hedged request** | "Tail at Scale" paper — p95 时同时发备份请求, 取先返的. 牺牲 cost 换 tail latency. |
+| **Replay tool** | 从 DLQ 重投失败的消息. Production 必备. |
+
+### Kafka / 上下游具体
+
+| 术语 | 解释 |
+|---|---|
+| **Kafka offset** | 每条消息在 partition 的位置. consumer 提交 offset 表示已处理. |
+| **Consumer group** | 一组 consumer 共享 topic. Kafka 把 partition 均匀分到 group 内. |
+| **Kafka EOS (Exactly-Once Semantics)** | Transactional producer + transactional offset commit. Hard 但可能. |
+| **Redis Streams** | Redis 5.0+ 的流式 data structure, 比 Kafka 轻. `XADD` 写, `XREAD` 读. |
+| **AIOKafka / aiokafka** | Python asyncio 版 Kafka client. 替代 sync `kafka-python`. |
+| **`httpx.AsyncClient`** | asyncio HTTP client. 替代 sync `requests`. |
+
+---
+
 ## 这道题在考什么
 
 这道题考你**懂不懂流式系统**, 不是"会不会 async":

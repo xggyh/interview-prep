@@ -7,6 +7,99 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 2 AM IR 题. On-call workflow + 监控工具 + 通讯术语密集.
+
+### 事故等级 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Incident** | 影响 user 的故障. Customer-facing 才算 incident, internal bug 不算. |
+| **P0 / SEV-1** ⭐ | **服务全挂 / 数据丢失 / 安全 breach / 监管 breach**. 立刻 page 全员. |
+| **P1 / SEV-2** | 主要功能挂 / 一个 region 全挂 / major customer 不可用. 1 小时内 ack. |
+| **P2 / SEV-3** | 局部 degradation / minor customer 不可用. 4 小时内. |
+| **P3 / SEV-4** | 小问题. 当天 work-hour. |
+| **Severity score** | 3 轴打分 — user impact / 类型 (hard fail vs degraded) / business impact. |
+
+### On-Call 工具 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **PagerDuty / Opsgenie** ⭐ | **On-call alert routing 平台**. 自动打电话 + escalate. 2 AM 响的就是它. |
+| **Page / Ack** | 被 page = alert 叫醒. Ack 后停止 escalate, 必须 5 min 内. |
+| **Escalation policy** | Primary 不 ack → secondary → tertiary 的升级链. |
+| **Slack #incidents / War room** | 事故协调 channel + 多人聚一起 (物理 / 虚拟). |
+| **Bridge** | 电话会议 — Zoom / Meet 实时协调. |
+
+### 监控 / Dashboard ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Grafana / Datadog dashboard** ⭐ | **Primary metric 可视化**. 错误率 / latency / throughput 一眼看. |
+| **Golden signals** ⭐ | Google SRE 经典 4 metric — Latency / Traffic / Errors / Saturation. |
+| **p50 / p95 / p99** ⭐ | Latency 百分位. p99 = 1% 最慢的, 真实用户体验. |
+| **Error rate** | 失败 request 比例. baseline + 上 1% 通常 alert. |
+| **Throughput / QPS** | 每秒请求数. |
+| **Saturation** | 接近上限 (CPU / memory / queue). 预警信号. |
+| **Self-healing** | 不干预自动恢复. Transient 故障常见. |
+| **Drift detection** | Input / output 分布变了 — AI-specific 监控. |
+
+### 诊断 / 调查 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Triage** ⭐ | **初步分诊** — 5 min 内确定 severity + scope + 是否在 mitigation. |
+| **Scope / Blast radius** | 影响范围. 全 user / 1 region / 1 tenant / 某 user 区间. |
+| **Self-healing check** | 看是否 transient. 5 min 后再 alert 是 anti-pattern. |
+| **Recent changes** | 故障前 24h 的 deploy / config change. 95% 故障跟 recent change 有关. |
+| **Coincidence check** | 跟 vendor deploy / 我们 deploy / 流量 spike 时间 align? |
+| **Symptom vs cause** | 看到的 error 是症状, 不是根因. |
+
+### Mitigation 工具 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Rollback** ⭐ | **回滚到上一版**. 最快 mitigate. 必须 deploy 流水线支持. |
+| **Feature flag / Kill switch** ⭐ | **不重新部署就能关功能的开关**. LaunchDarkly / Statsig. |
+| **Circuit breaker** | 连续失败 → 停 calling. |
+| **Traffic shaping / Drain** | 限速 / 把流量从坏 node 移走. |
+| **Scale up / out** | 加 capacity. Saturation 用. |
+| **Mitigation before root cause** ⭐ | **先止血再找根因**. 用户痛优先于优雅. |
+
+### 通讯 / Comm ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Status page** ⭐ | **公开 incident 通知页** — status.openai.com 类. P0 5 min 内必更. |
+| **24h brief / 5-day RCA** | 事故 24h 简版 + 5 天完整 RCA. |
+| **Internal Slack** | 同事 / leadership 沟通 channel. |
+| **Stakeholder updates** | CTO / VP / Customer Success 同步. |
+
+### Postmortem 文化 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Postmortem** ⭐ | **事后复盘文档**. Timeline + RCA + action items. |
+| **Blameless postmortem** ⭐ | **不甩锅个人** — 系统 / process 失败. Google SRE 文化. |
+| **5 whys / RCA** | 连续问 5 次 why 找根因 (Root Cause Analysis). |
+| **Contributing factor** | 不是根因但 made things worse 的因素. |
+| **Action item** | 具体改进项 — owner + ETA. |
+| **Runbook update** | Postmortem 后更新 / 新建 runbook. |
+
+### Metrics / Targets ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **MTTA (Mean Time To Acknowledge)** | Page 到 ack. Target < 5 min. |
+| **MTTD (Mean Time To Detect)** | 故障发生到发现. |
+| **MTTR (Mean Time To Resolve)** ⭐ | **故障发生到修复**. Reliability 核心指标. |
+| **SLO** | 可靠性目标 — 99.9% availability. |
+| **Error budget burn rate** ⭐ | **Error budget 消耗速度**. 烧太快 = freeze feature ship. |
+| **SLO breach** | SLA / SLO 违反 — 客户 SLA breach = 罚款. |
+
+---
+
 ## 这道题在考什么
 
 表面是 IR 题, 底下藏着 **8 个 FDE evaluation signal**:

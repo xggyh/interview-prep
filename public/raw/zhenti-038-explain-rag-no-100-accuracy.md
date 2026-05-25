@@ -8,6 +8,88 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题最大坑: **non-技术 VP** 听不懂术语. 表里**前 4 节是你可以说的, 第 5 节是你绝不能说的**.
+
+### 沟通 / 解释技巧
+
+| 术语 | 解释 |
+|---|---|
+| **Reframe (重新定义问题)** ⭐ | 不直接回答 "100% 能不能", 重塑问题为 "right standard for your use case is what?". 这题核心动作. |
+| **Business analogy** ⭐ | 业务类比 — 用 VP 已经懂的概念解释技术. "Citation = agent 说 'per policy 4.2'", "Confidence = junior agent 不确定时 escalate". |
+| **Anchor to current baseline** | 锚定当前基线 — "你的人工 team 现在多准? 88-92%". 让 VP 意识到她对比的不是 100% 而是当前. |
+| **Variance vs human baseline** | LLM 变异 vs 人变异 — 关键 framing. 人也不是 100%. |
+| **Help them sell upward** ⭐ | 帮对方向上推销 — 给 VP 一个**给 CEO 的 3 句话 script** + 1-pager. 不只是说服 VP, 是 arm her. |
+| **CEO-script (3 sentences)** | 给 CEO 的 3 句话: (1) 比现在好 4-10x, (2) 每个答案有 citation + audit + escalation, (3) 1 小时可 rollback. |
+| **Phased rollout proposal** | 阶段性上线提议 — 200 agents 先, 30 天 eval, 再全量. 给对方控制感. |
+| **Name worst case honestly** | 诚实说最差情况 — "前 30 天预期 3-5 个 incident". 比 hand-wave reassurance 更可信. |
+| **Don't patronize** | 不要 condescending — VP 是聪明人, 只是不懂技术. 用类比, 不用 baby talk. |
+| **"Right question to ask"** | 开场认可对方问题 — "you're asking the right question before rollout". 验证 VP 的关切. |
+
+### AI / 系统术语 (你可以解释, 但不直接用)
+
+| 术语 | 解释 |
+|---|---|
+| **RAG (Retrieval-Augmented Generation)** ⭐ | 检索增强生成 — LLM 先检索文档再答, 是这题的系统类型. **不要直接说 "RAG"**, 说 "the system reasons rather than retrieves" 或 "it cites the source". |
+| **Citation** ⭐ | 引用 — 每个答案附带源文档. 类比: "agent says 'per policy 4.2'". 4 guards 之一. |
+| **Confidence score / Calibration** ⭐ | 置信度 / 校准 — AI 报告自己多确定. 类比: "junior agent 不确定时 escalate". |
+| **Eval / Evaluation set** | 评估集 — 5000 题已知答案的测试. 每周跑, 监控 drift. 类比: "每周客户满意度调查, 但是给 AI". |
+| **Audit log** | 审计日志 — 每个 AI 答案 + 引用 + confidence 记录. 类比: "call recording for legal review". |
+| **Escalation** | 升级 — confidence 低就转人工. 类比: junior agent 转 senior. |
+| **Hallucination** | 幻觉 — AI 编造源文档没的事实. **不直接说**, 说 "wrong answer". |
+| **Drift** | 漂移 — 准确率随时间下滑 (新问题 / 新文档). |
+| **Retroactive correction** | 事后纠正 — 找到错答后联系客户 + credit + 喂回系统. |
+| **Rollback (回滚)** | 1 小时内禁用 AI 回到人工. Reversibility 关键卖点. |
+
+### 业务 / 客服行业
+
+| 术语 | 解释 |
+|---|---|
+| **VP of Customer Operations** ⭐ | 客户运营副总 — 这题对方. 非技术 (ex-MBA), 有 budget authority. |
+| **First-response accuracy** | 首次响应准确率 — 客服行业标准指标. 行业 baseline 85-92%. |
+| **Support team / Support agent** | 客服团队 — 这题 2000 人. |
+| **Ticket** | 客服工单 — 这题 2000 tickets / day. |
+| **Escalation rate** | 升级率 — 多少 case 转人工. |
+| **NPS (Net Promoter Score)** | 净推荐值 — 客户满意度核心指标. |
+| **LTV (Lifetime Value)** | 客户终生价值 — 算 wrong answer cost 时用. |
+| **Churn** | 客户流失. |
+| **QA (Quality Assurance)** | 质量审核 — 客户中心通常已经 QA 5% calls. 类比 AI eval. |
+| **Incident response / Incident playbook** | 事件响应流程 — 客户投诉怎么处理. AI 套用同一 playbook + 多一步 audit log review. |
+| **Override rate** | 覆盖率 — agent 推翻 AI 推荐的比例. 早期高, 后期降. 是 trust 指标. |
+
+### 数据 / ML 概念 (非术语表达)
+
+| 术语 | 解释 |
+|---|---|
+| **Fine-tuning** | 微调 — 用客户数据再训练 model. **不直接说**, 说 "tailored to your data". |
+| **Re-ranker** | 重排序 — 提升 retrieval 质量的二阶段. **不直接说**. |
+| **2-model consensus** | 两模型共识 — 高精度要求时用. **可以用**, 类比 second opinion. |
+| **SLA (Service Level Agreement)** | 服务等级协议 — uptime 99.9%, 不是 accuracy 100%. |
+| **Doc freshness** | 文档新鲜度 — 检测过期文档. 类比 "policy doc updated when". |
+
+### 禁词清单 ❌ (不要在 VP 前说)
+
+| 术语 | 为啥不能说 |
+|---|---|
+| **Embedding** | VP 听不懂, 听到就 tune out. |
+| **Vector** | 同上. |
+| **Chunking** | 同上. |
+| **Temperature / Top-p** | 同上. |
+| **Stochastic / Deterministic** | 听起来像炫技. |
+| **Token** | 太底层. |
+| **Context window** | 太底层. |
+| **"Model"** (单用) | 太抽象, 说 "the system" 或 "the AI". |
+
+### Gao Xin 简历相关
+
+| 术语 | 解释 |
+|---|---|
+| **OJK** | 印尼金融监管 — Gao Xin 给 OJK 做过类似 "reframe + analogy + 帮 GM 上推" 的 methodology doc, 6 周 pre-approved. |
+| **ConvFinQA negative-result ablation** | 用消融实验测准确率, 不 hand-wave. 这题精神. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能否 explain RAG technically.

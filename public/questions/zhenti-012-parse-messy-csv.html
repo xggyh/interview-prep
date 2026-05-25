@@ -43,6 +43,19 @@
 <blockquote><p>"Parse a messy CSV with <strong>inconsistent quoting</strong>. Some fields are quoted, some aren't. Some have embedded commas, some have embedded newlines, some have escaped quotes. <strong>Don't use the <code>csv</code> module</strong> — implement it yourself with a state machine. Walk us through edge cases."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Palantir</strong> (经典), Scale AI, OpenAI <strong>难度</strong>: Medium <strong>主要技能</strong>: State machine, edge case 思维, RFC 4180 understanding, robust parsing</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题里很多 "听过没真做过" 的词. 扫一遍再读, 流畅很多.</p></blockquote>
+<h4>算法 / 形式语言</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>State machine (状态机)</strong> ⭐</td><td>一组状态 + 状态间的 transition 规则. 这题 5 状态: START / UNQUOTED / QUOTED / QUOTE_IN_QUOTED / END_OF_ROW. <strong>CSV 解析的唯一正确方案</strong>.</td></tr><tr><td><strong>Regular language</strong></td><td>能被有限状态自动机识别的语言 (regex 能匹配的). CSV <strong>不是</strong> regular — 嵌套引号 + 转义让它至少 context-free.</td></tr><tr><td><strong>Context-free grammar (CFG)</strong></td><td>比 regular 更强的形式语言层级. CSV 属于这层, 所以 regex 写不出正确 parser.</td></tr><tr><td><strong>Pumping lemma</strong></td><td>证明某语言<strong>不是</strong> regular 的工具. 用它能证 "嵌套 quote 的 CSV" 没有有限 regex.</td></tr><tr><td><strong>Single-pass parser</strong></td><td>输入只过一遍, O(N) time. 这题就是 char-by-char 单遍走完.</td></tr><tr><td><strong>Lookahead / peek-ahead</strong></td><td>看下一个 char 决定当前. 这题处理 CRLF 时 peek <code>text[i+1]</code> 是不是 <code>\n</code>.</td></tr></tbody></table></div>
+<h4>文件格式 / 编码</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RFC 4180</strong> ⭐</td><td>CSV 的官方标准. 定义: 逗号分隔, 引号包字段, <code>""</code> 转义内嵌引号. 现实数据 80% 不符合.</td></tr><tr><td><strong>Dialect (方言)</strong></td><td>CSV 变体配置. Excel-style (<code>""</code> 转义) vs Unix-style (<code>\"</code> 转义). <code>csv.Sniffer().sniff()</code> 自动识别.</td></tr><tr><td><strong>Delimiter (分隔符)</strong></td><td>默认 <code>,</code>. TSV 用 <code>\t</code>. 欧洲常用 <code>;</code> (因为千位用逗号).</td></tr><tr><td><strong>CRLF / LF / CR</strong> ⭐</td><td>行尾符. Windows = <code>\r\n</code> (CRLF), Unix/Mac = <code>\n</code> (LF), 老 Mac = <code>\r</code> (CR). 1970s 主机 export 还能看见 CR.</td></tr><tr><td><strong>BOM (Byte Order Mark)</strong></td><td>文件头特殊 bytes 标识编码: UTF-8 BOM = <code>EF BB BF</code>, UTF-16 LE = <code>FF FE</code>. 不 strip 第一格会变 <code>﻿header1</code>.</td></tr><tr><td><strong>UTF-8 / UTF-16 / Latin-1 / Windows-1252</strong></td><td>字符编码. UTF-8 默认; Latin-1 老欧洲; Windows-1252 微软变种. 解错 = mojibake (乱码).</td></tr><tr><td><strong>Mojibake</strong></td><td>编码识别错误导致的乱码 (e.g., <code>é</code> → <code>Ã©</code>). 必须用对的 encoding 才能 decode.</td></tr><tr><td><strong>Surrogate pair</strong></td><td>UTF-16 表示 BMP 以外字符 (e.g., 大部分 emoji) 用的两个 16-bit 单元. Python str 自动处理.</td></tr></tbody></table></div>
+<h4>Python / 库</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Generator / <code>yield</code></strong> ⭐</td><td>Python 惰性求值 — 不一次性 build list. 流式 yield 一行省内存, 30GB 文件也能跑.</td></tr><tr><td><strong><code>io.StringIO</code></strong></td><td>内存中的 file-like object. 用 string 当文件处理.</td></tr><tr><td><strong><code>csv</code> module</strong></td><td>Python stdlib CSV parser. C 实现 ~30MB/s. <strong>本题禁用</strong>, 但是面试官想看你了解它.</td></tr><tr><td><strong><code>pyarrow.csv</code></strong></td><td>Apache Arrow 的 C++ CSV parser, ~300MB/s, multi-threaded. 大文件首选.</td></tr><tr><td><strong><code>pandas.read_csv</code></strong></td><td>最常用 high-level CSV reader, 自动 type infer. 但 dirty data 上 <code>error_bad_lines</code> 不够细.</td></tr><tr><td><strong><code>chardet</code> / <code>charset-normalizer</code></strong></td><td>自动 sniff 文件 encoding 的库. 客户 CSV 来源乱时必备.</td></tr><tr><td><strong><code>@dataclass</code></strong></td><td>Python 3.7+ 自动生成数据类的装饰器. 配 <code>Optional[str]</code> 表达 nullable.</td></tr></tbody></table></div>
+<h4>性能 / 复杂度</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>O(N) vs O(N²)</strong></td><td>这题: char loop + list accumulator + <code>.join()</code> 是 O(N); 每次 <code>s += c</code> 是 O(N²) (Python str immutable, 每次 copy).</td></tr><tr><td><strong>Streaming / chunked</strong></td><td>分块读 (不一次 load 全文件). 30GB CSV 必走流式.</td></tr><tr><td><strong>State across chunks</strong></td><td>流式时 quoted field 跨 chunk 边界, parser 必须<strong>跨 chunk 持有状态</strong> (<code>state</code>, <code>buf</code>, <code>row</code>).</td></tr><tr><td><strong>Memory cap</strong></td><td>防止 pathological input (一个无闭合 quote 的巨大 field) OOM. 单 field 长度上限.</td></tr></tbody></table></div>
+<h4>错误处理 / 健壮性</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Strict vs lenient</strong> ⭐</td><td>Strict = 不合法就 throw; lenient = 尽力 recover + log. Production 默认 lenient + 每行 error 单独报.</td></tr><tr><td><strong>Ragged rows</strong></td><td>行的列数跟 header 不一致. 处理: pad with <code>''</code> / truncate / log + skip.</td></tr><tr><td><strong>Type coercion / inference</strong></td><td>parse 出 str 后猜成 int/float/bool/None. 这题不做, Q19 才考.</td></tr><tr><td><strong>Schema validation</strong></td><td>列名/类型/约束 (e.g., <code>age IS NOT NULL</code>) 验证. dbt / Great Expectations 是 production 标准.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>CSV 看起来 trivial — <code>line.split(',')</code> 五秒钟. 然而:</p>
 <ol><li><strong>能不能识别 state machine 模式</strong> — split 思路一开始就死, 必须 char-by-char 状态机</li><li><strong>边界情况枚举能力</strong> — <code>"hello, world"</code>, <code>"she said ""hi"""</code>, <code>"line1\nline2"</code>, 行尾 CR/LF, BOM, trailing comma, ragged rows — 每一个都要在脑里列出来</li><li><strong>RFC 4180 + reality gap</strong> — 标准说一套, 客户数据另一套. 你能不能 graceful degrade</li><li><strong>错误处理姿势</strong> — 遇到不合法行: throw? skip + log? best-effort recover? 客户视角说话</li><li><strong>测试覆盖</strong> — 写 10 个 testcase 覆盖每个 state transition</li><li><strong>不偷懒</strong> — 题目说 "don't use csv module", 你不能 <code>import csv</code> 直接调; 但可以用 <code>io.StringIO</code> 之类的辅助</li></ol>
@@ -625,6 +638,66 @@ Don't:
 **出处**: Exponent 2026 FDE · 公司: **Palantir** (经典), Scale AI, OpenAI
 **难度**: Medium
 **主要技能**: State machine, edge case 思维, RFC 4180 understanding, robust parsing
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题里很多 "听过没真做过" 的词. 扫一遍再读, 流畅很多.
+
+### 算法 / 形式语言
+
+| 术语 | 解释 |
+|---|---|
+| **State machine (状态机)** ⭐ | 一组状态 + 状态间的 transition 规则. 这题 5 状态: START / UNQUOTED / QUOTED / QUOTE_IN_QUOTED / END_OF_ROW. **CSV 解析的唯一正确方案**. |
+| **Regular language** | 能被有限状态自动机识别的语言 (regex 能匹配的). CSV **不是** regular — 嵌套引号 + 转义让它至少 context-free. |
+| **Context-free grammar (CFG)** | 比 regular 更强的形式语言层级. CSV 属于这层, 所以 regex 写不出正确 parser. |
+| **Pumping lemma** | 证明某语言**不是** regular 的工具. 用它能证 "嵌套 quote 的 CSV" 没有有限 regex. |
+| **Single-pass parser** | 输入只过一遍, O(N) time. 这题就是 char-by-char 单遍走完. |
+| **Lookahead / peek-ahead** | 看下一个 char 决定当前. 这题处理 CRLF 时 peek `text[i+1]` 是不是 `\n`. |
+
+### 文件格式 / 编码
+
+| 术语 | 解释 |
+|---|---|
+| **RFC 4180** ⭐ | CSV 的官方标准. 定义: 逗号分隔, 引号包字段, `""` 转义内嵌引号. 现实数据 80% 不符合. |
+| **Dialect (方言)** | CSV 变体配置. Excel-style (`""` 转义) vs Unix-style (`\"` 转义). `csv.Sniffer().sniff()` 自动识别. |
+| **Delimiter (分隔符)** | 默认 `,`. TSV 用 `\t`. 欧洲常用 `;` (因为千位用逗号). |
+| **CRLF / LF / CR** ⭐ | 行尾符. Windows = `\r\n` (CRLF), Unix/Mac = `\n` (LF), 老 Mac = `\r` (CR). 1970s 主机 export 还能看见 CR. |
+| **BOM (Byte Order Mark)** | 文件头特殊 bytes 标识编码: UTF-8 BOM = `EF BB BF`, UTF-16 LE = `FF FE`. 不 strip 第一格会变 `﻿header1`. |
+| **UTF-8 / UTF-16 / Latin-1 / Windows-1252** | 字符编码. UTF-8 默认; Latin-1 老欧洲; Windows-1252 微软变种. 解错 = mojibake (乱码). |
+| **Mojibake** | 编码识别错误导致的乱码 (e.g., `é` → `Ã©`). 必须用对的 encoding 才能 decode. |
+| **Surrogate pair** | UTF-16 表示 BMP 以外字符 (e.g., 大部分 emoji) 用的两个 16-bit 单元. Python str 自动处理. |
+
+### Python / 库
+
+| 术语 | 解释 |
+|---|---|
+| **Generator / `yield`** ⭐ | Python 惰性求值 — 不一次性 build list. 流式 yield 一行省内存, 30GB 文件也能跑. |
+| **`io.StringIO`** | 内存中的 file-like object. 用 string 当文件处理. |
+| **`csv` module** | Python stdlib CSV parser. C 实现 ~30MB/s. **本题禁用**, 但是面试官想看你了解它. |
+| **`pyarrow.csv`** | Apache Arrow 的 C++ CSV parser, ~300MB/s, multi-threaded. 大文件首选. |
+| **`pandas.read_csv`** | 最常用 high-level CSV reader, 自动 type infer. 但 dirty data 上 `error_bad_lines` 不够细. |
+| **`chardet` / `charset-normalizer`** | 自动 sniff 文件 encoding 的库. 客户 CSV 来源乱时必备. |
+| **`@dataclass`** | Python 3.7+ 自动生成数据类的装饰器. 配 `Optional[str]` 表达 nullable. |
+
+### 性能 / 复杂度
+
+| 术语 | 解释 |
+|---|---|
+| **O(N) vs O(N²)** | 这题: char loop + list accumulator + `.join()` 是 O(N); 每次 `s += c` 是 O(N²) (Python str immutable, 每次 copy). |
+| **Streaming / chunked** | 分块读 (不一次 load 全文件). 30GB CSV 必走流式. |
+| **State across chunks** | 流式时 quoted field 跨 chunk 边界, parser 必须**跨 chunk 持有状态** (`state`, `buf`, `row`). |
+| **Memory cap** | 防止 pathological input (一个无闭合 quote 的巨大 field) OOM. 单 field 长度上限. |
+
+### 错误处理 / 健壮性
+
+| 术语 | 解释 |
+|---|---|
+| **Strict vs lenient** ⭐ | Strict = 不合法就 throw; lenient = 尽力 recover + log. Production 默认 lenient + 每行 error 单独报. |
+| **Ragged rows** | 行的列数跟 header 不一致. 处理: pad with `''` / truncate / log + skip. |
+| **Type coercion / inference** | parse 出 str 后猜成 int/float/bool/None. 这题不做, Q19 才考. |
+| **Schema validation** | 列名/类型/约束 (e.g., `age IS NOT NULL`) 验证. dbt / Great Expectations 是 production 标准. |
 
 ---
 

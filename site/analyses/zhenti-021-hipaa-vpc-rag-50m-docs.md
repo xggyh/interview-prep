@@ -8,6 +8,120 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题里的合规 + 架构词如果不懂, 后面架构图听不下去. 这张表 5 min 看完.
+
+### 合规 / 行业 (HIPAA 体系)
+
+| 术语 | 解释 |
+|---|---|
+| **HIPAA** ⭐ | Health Insurance Portability and Accountability Act — 美国医疗数据隐私法. 违反 = OCR (Office for Civil Rights) 罚款 + 客户走人. |
+| **PHI (Protected Health Information)** ⭐ | 受保护医疗信息 — 任何能识别到病人 + 涉及健康的数据. 18 类直接标识符 (name, MRN, SSN, DOB...) + 准标识符组合. |
+| **PII** | Personally Identifiable Information — 通用个人信息. PHI ⊂ 医疗领域的 PII. |
+| **BAA (Business Associate Agreement)** ⭐ | 业务伙伴协议 — HIPAA 要求所有接触 PHI 的供应商 (你 / Anthropic / AWS) 必须签的法律合同. 没 BAA = 直接违规. |
+| **OCR / HHS** | OCR = Office for Civil Rights, 隶属 HHS (卫生部) — 真的来查 HIPAA 违规的执法机构. |
+| **HITRUST CSF** | 医疗行业的安全合规框架 — 比 SOC 2 更医疗-specific 的认证. |
+| **PCI / GLBA** | PCI = 信用卡数据合规; GLBA = 金融数据隐私法. 医疗系统也常涉及. |
+| **Joint Commission** | 美国医院认证组织 — 它的 audit retention 要求 10 年, 比 HIPAA 6 年更严. |
+| **k-anonymity** | 数据去识别度量 — 准标识符组合 (rare diagnosis + zip + DOB) 在数据集中至少有 k 个一样的人. k < 5 = 仍可识别个体. |
+| **Right to Erasure** | 病人有权要求删除自己的记录. HIPAA / GDPR / 州法都有不同版本. 删 metadata 不够, **embedding vector 也得删**. |
+| **MRN** | Medical Record Number — 病历号. 每家医院给 patient 的内部 ID. PHI 第一类. |
+| **SOAP note** | 临床笔记标准格式: Subjective (主诉) / Objective (体征) / Assessment (诊断) / Plan (治疗计划). |
+| **ICD code** | International Classification of Diseases — 国际疾病分类码 (e.g. E11.9 = type 2 diabetes). 索引重要 keyword. |
+
+### EHR / 医疗集成
+
+| 术语 | 解释 |
+|---|---|
+| **EHR / EMR** | Electronic Health Record / Medical Record — 电子病历系统. Epic / Cerner 是两大头部供应商. |
+| **Epic** | 美国市占率最高的 EHR 系统 (~40% 大医院). 私有协议 + SMART-on-FHIR + Hyperspace UI. |
+| **Cerner** | 另一头部 EHR, 现属 Oracle. 主走 HL7v2 协议. |
+| **Meditech / Allscripts / Athena** | 其他 EHR 供应商, 小医院常用. |
+| **FHIR (Fast Healthcare Interoperability Resources)** ⭐ | 现代医疗数据标准, JSON-based, RESTful API. R4 / R5 是版本. |
+| **HL7v2** | 老一代医疗消息标准, pipe-delimited 文本格式. 还在大量用. |
+| **CCD / CCDA** | Continuity of Care Document — XML 格式的病人摘要交换标准. |
+| **SMART-on-FHIR** | 在 FHIR 上的 OAuth + app 嵌入框架. 医生在 Epic 里直接打开第三方 app. |
+| **DICOM** | 影像数据标准 (X 光 / CT / MRI). |
+| **PACS** | Picture Archiving and Communication System — 医院影像存储系统. |
+| **Mirth Connect** | 开源 HL7 集成引擎, 经常用于 Cerner 集成. |
+| **ADT / ORU / MDM** | HL7 消息类型: ADT = 病人入院出院; ORU = 检验结果; MDM = 临床文档. |
+| **CDC (Change Data Capture)** | 增量数据同步模式 — 只传变更, 不重传全量. |
+
+### LLM / RAG 架构
+
+| 术语 | 解释 |
+|---|---|
+| **RAG (Retrieval-Augmented Generation)** ⭐ | 检索增强生成 — 先从文档库里 retrieve 相关片段, 再让 LLM 基于片段生成答案. |
+| **Embedding** | 把文本变成 1024 维向量, 语义近的向量距离近. |
+| **BGE-M3** | 开源中英多语 embedding 模型, 自部署友好. M3 = multi-functionality + multi-linguality + multi-granularity. |
+| **HNSW (Hierarchical Navigable Small World)** | 向量近似最近邻算法. M=32 是连接数, ef=128 是搜索宽度. |
+| **K-NN search** | K 个最近邻搜索 — 向量库的核心 API. |
+| **BM25** | 经典 keyword 检索算法 (TF-IDF 变种). 关键词精确匹配强. |
+| **Hybrid retrieval** ⭐ | 向量 + BM25 双路并行召回, 用 RRF 融合. 医疗这种 keyword-heavy 场景必备. |
+| **RRF (Reciprocal Rank Fusion)** | 排名倒数融合 — 不需要 score normalize, 按 rank 倒数求和. |
+| **Cross-encoder rerank** | 用更贵的双向交叉模型对 top-100 重排出 top-10. 比 bi-encoder 准但慢. |
+| **Bi-encoder** | query 和 doc 分别 encode 再求相似度. 快但不如 cross-encoder 准. |
+| **nDCG@10** | normalized Discounted Cumulative Gain — top-10 检索质量指标, 越高越好. |
+| **Citation faithfulness** | 引用忠实度 — LLM 答案里每个 claim 必须真的来自引用的 source span. |
+| **NLI (Natural Language Inference)** | 蕴含判断模型 — 判断 premise 是否蕴含 hypothesis. 用于 citation 验证. |
+| **Hallucination** | LLM 编造没有依据的内容. 在医疗 = patient harm. |
+| **vLLM / TensorRT-LLM** | 高吞吐 LLM 推理引擎. PagedAttention + continuous batching. |
+| **Med-PaLM 2 / Hippocratic 1.5** | 医疗领域专门 fine-tune 的 LLM. |
+| **Bedrock** | AWS 托管的 LLM 服务. 支持 in-VPC + BAA 部署 Claude. |
+
+### 基础设施 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **VPC (Virtual Private Cloud)** ⭐ | AWS 私有网络. "Deploy in customer VPC" = 装在客户自己的 AWS 账户里, 完全不出他们网络. |
+| **VPC endpoint** | VPC 内调 AWS 服务的私网入口, 不走公网 IGW. |
+| **IGW / NAT** | Internet Gateway / NAT — VPC 出公网的两种方式. HIPAA 部署里都禁用. |
+| **KMS-CMK** | AWS Key Management Service - Customer Managed Key. 用户自管的加密主密钥. |
+| **CloudHSM** | AWS 硬件安全模块 (FIPS 140-2 L3). 比 KMS 更高合规要求时用. |
+| **Envelope encryption** | 信封加密 — data key 加密数据, master key 加密 data key. 应用层不持有 master key. |
+| **S3 Object Lock / WORM** | Write Once Read Many — 写入后不可改不可删. HIPAA audit 必备. |
+| **OpenSearch** | AWS 托管的 ElasticSearch fork. 原生支持 K-NN + BM25 hybrid. |
+| **Aurora Postgres + RLS** | Aurora = AWS 托管 Postgres; RLS = Row-Level Security 行级安全策略. |
+| **DynamoDB** | AWS 托管 NoSQL kv 存储. |
+| **MSK** | Managed Streaming for Kafka — AWS 托管 Kafka. |
+| **Kinesis** | AWS 流处理服务, 类似 Kafka. |
+| **Dagster** | 数据 pipeline 编排工具 (类似 Airflow). |
+| **CloudTrail** | AWS 自带的 API 调用 audit 日志. 只 cover AWS API, 不 cover 应用层. |
+| **ACM Private CA** | AWS 私有证书颁发机构, 用于内部 mTLS. |
+| **Linkerd / Istio** | Service mesh — 服务间 mTLS + observability. |
+| **Teleport** | 带审计录像的远程接入跳板机, 客户支持隧道用. |
+
+### Auth / 访问控制
+
+| 术语 | 解释 |
+|---|---|
+| **ACL (Access Control List)** ⭐ | 访问控制列表 — 哪个用户可访问哪些 doc. 这题 5K doctor × 1M patient. |
+| **RBAC (Role-Based Access Control)** | 基于角色的访问控制 (department, specialty). Cardinality 低时用. |
+| **ABAC (Attribute-Based)** | 基于属性的访问控制. 比 RBAC 更细. |
+| **Pre-filter vs Post-filter** ⭐ | 检索前过滤 vs 检索后过滤. HIPAA "minimum necessary" 要求 pre-filter — 不该看见的连见都不能见到. |
+| **Care team** | 病人的主治团队列表. ACL 主键来源. |
+| **Break-glass access** | 紧急情况 (ED / ICU) 越权访问 + 强制事后审计. |
+| **SAML / OIDC** | 企业级身份联合协议. SAML 老但广泛, OIDC 现代基于 OAuth. |
+| **IdP (Identity Provider)** | 身份提供者 — 客户的 Active Directory / Okta. |
+| **MFA / Step-up MFA** | 多因子认证 / 敏感操作时再要一次 MFA. |
+| **JWT (JSON Web Token)** | 自包含的认证 token, 服务间常用. |
+
+### 观测 / 运维
+
+| 术语 | 解释 |
+|---|---|
+| **SLA / SLO** | Service Level Agreement (对外承诺) / Objective (内部目标). |
+| **p50 / p99** | 50% / 99% 分位的延迟. p99 = 1% 慢请求的延迟. |
+| **RPO / RTO** | Recovery Point Objective (能丢多少数据) / Recovery Time Objective (多久能恢复). |
+| **Blue/green deploy** | 蓝绿部署 — v1 / v2 双跑, 切流量过去, 老版本兜底. |
+| **Snyk / ECR scan** | 容器镜像漏洞扫描. |
+| **CVE** | Common Vulnerabilities and Exposures — 公开的安全漏洞编号. |
+| **Pen test** | 渗透测试 — 雇白帽子尝试攻破系统. |
+| **DLQ (Dead Letter Queue)** | 处理失败的消息进的队列, 待人工处理. |
+
+---
+
 ## 这道题在考什么
 
 不是考你会不会做 RAG, 是考你**在合规约束 + 50M scale 下做 RAG**, 哪些地方会爆炸:

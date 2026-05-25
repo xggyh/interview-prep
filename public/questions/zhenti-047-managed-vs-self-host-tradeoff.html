@@ -43,6 +43,23 @@
 <blockquote><p>"Your customer is debating between using a managed AI provider (OpenAI / Anthropic / Cohere API) versus self-hosting open-weight models (Llama / Mistral / Qwen on their own GPUs). <strong>Walk me through the tradeoff</strong> — cost, data residency, vendor lock-in, latency, ops burden, quality lag. When do you recommend hybrid? Show me the math."</p></blockquote>
 <p><strong>Round</strong>: AI Specialty (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — enterprise sales / FDE 必问</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>Build vs buy 涉及 infra / 成本 / 监管多领域术语. 5 min 速查.</p></blockquote>
+<h4>部署方式 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Managed (API)</strong> ⭐</td><td><strong>用 vendor 的 API</strong> — OpenAI / Anthropic / Cohere 跑模型, 你只 call. 启动 0 成本, vendor 处理 infra, 但 per-query 贵 + 数据出你网络.</td></tr><tr><td><strong>Self-host</strong> ⭐</td><td><strong>自己买 GPU 跑 open-weight 模型</strong> — Llama / Mistral / Qwen. 设 $50k-500k+, ops 重, 但 per-query 便宜 + 数据不出.</td></tr><tr><td><strong>Hybrid</strong></td><td>一部分 self-host, 一部分 API. Embedding 自己跑 + LLM API 是最常见.</td></tr><tr><td><strong>BYOC (Bring Your Own Cloud)</strong></td><td>Vendor 把 model 跑你 VPC 内的 GPU. 数据不出 cloud, 但 vendor 仍 manage.</td></tr><tr><td><strong>On-prem</strong></td><td>在客户自己数据中心跑. 高合规需求 (banking, defense).</td></tr><tr><td><strong>Air-gapped</strong></td><td>完全离网部署. 国防 / 国家安全场景. 必 self-host.</td></tr><tr><td><strong>Sovereign cloud</strong></td><td>中国 / EU / 印度 等要求数据 + compute 在境内.</td></tr></tbody></table></div>
+<h4>Open Weights 模型 (2026)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Open weights</strong></td><td>Model 权重开源 — 可下载, 可 self-host, 可商用 (看 license). 跟 "open source" 区别: 训练数据 / 流程未必开.</td></tr><tr><td><strong>Llama 4</strong></td><td>Meta 2026 开源旗舰. 估计 ~ GPT-4o Mini quality.</td></tr><tr><td><strong>Qwen 3</strong></td><td>Alibaba 开源 — 强多语言 (中文 / 阿拉伯).</td></tr><tr><td><strong>Mistral Large 3</strong></td><td>Mistral 开源 — 高效推理.</td></tr><tr><td><strong>DeepSeek</strong></td><td>中国 model, 多种 size 都开.</td></tr><tr><td><strong>Phi-4</strong></td><td>Microsoft 小型高效 — 适合 edge / 单 GPU.</td></tr><tr><td><strong>Frontier model</strong></td><td>当前最强 — Opus 4.7 / Gemini 3 Pro / GPT-5.5. 通常 managed-only.</td></tr><tr><td><strong>Quality lag</strong></td><td>Open weights 比 frontier 落后 6-12 月. 2026 缩小但还在.</td></tr></tbody></table></div>
+<h4>推理 / Serving 工具 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>vLLM</strong> ⭐</td><td><strong>开源 LLM serving engine</strong>. PagedAttention + continuous batching, throughput 大. Self-host 最流行.</td></tr><tr><td><strong>SGLang</strong></td><td>vLLM 竞品 — structured output / agent 流场景更优.</td></tr><tr><td><strong>TensorRT-LLM</strong></td><td>NVIDIA 自家 inference engine. 最快但 H100 / H200 限定.</td></tr><tr><td><strong>TGI (Text Generation Inference)</strong></td><td>Hugging Face 的 serving.</td></tr><tr><td><strong>KV cache</strong> ⭐</td><td><strong>注意力 K/V 缓存</strong>. 长输入重复用, 不重算. Memory 主要消耗源.</td></tr><tr><td><strong>PagedAttention</strong></td><td>vLLM 创新 — KV cache 分页存, 像 OS 虚拟内存. 利用率 +24x.</td></tr><tr><td><strong>Continuous batching</strong></td><td>不等 batch 凑齐, 来一条跑一条, 完成的腾位置. Throughput 大.</td></tr><tr><td><strong>Speculative decoding</strong></td><td>小 model 先生成 draft, 大 model 验证 — 加速 2-3x.</td></tr><tr><td><strong>Quantization</strong> ⭐</td><td>把模型权重从 FP16 压成 INT8 / INT4 / FP8, 减 memory + 加速, 一点点 quality loss.</td></tr><tr><td><strong>GPTQ / AWQ</strong></td><td>主流 weight-only quantization 算法.</td></tr><tr><td><strong>FP8 / INT4 / INT8</strong></td><td>不同精度. H100 原生 FP8; INT4 最压但 quality 掉.</td></tr><tr><td><strong>Distillation</strong></td><td>大 model 教小 model — Opus 输出训 Haiku, deploy 小的便宜.</td></tr></tbody></table></div>
+<h4>GPU 经济</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>H100 / H200 / B100 / B200</strong></td><td>NVIDIA 数据中心 GPU. H100 = 2023, H200 = 2024, B200 = 2025.</td></tr><tr><td><strong>A100</strong></td><td>上代主力. 二手 / 旧云便宜.</td></tr><tr><td><strong>GPU-hour</strong></td><td>一块 GPU 跑一小时. H100 ~ $2-4/hr on-demand.</td></tr><tr><td><strong>Reserved instance</strong></td><td>长租折扣 — 1-3 年合约 50-70% off on-demand.</td></tr><tr><td><strong>Spot instance</strong></td><td>可被回收的便宜 GPU. Training 用, serving 不能用 (会断).</td></tr><tr><td><strong>GPU utilization</strong></td><td>GPU 跑时利用率. &lt; 50% 是钱浪费.</td></tr><tr><td><strong>TCO (Total Cost of Ownership)</strong> ⭐</td><td><strong>总拥有成本</strong> — GPU + 电 + 网 + ops 人 + observability + on-call. 通常 = 2-3x compute.</td></tr></tbody></table></div>
+<h4>路由 / Abstraction</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>LiteLLM</strong></td><td>100+ provider 统一 API. 切 vendor 改一行 config. Vendor lock-in 抗手段.</td></tr><tr><td><strong>Portkey / OpenRouter</strong></td><td>类似 LiteLLM, 加 caching / fallback.</td></tr><tr><td><strong>Multi-vendor fallback</strong></td><td>Primary vendor 挂时 auto fallback secondary. 可靠性必备.</td></tr><tr><td><strong>Cascade routing</strong></td><td>简单 query → Haiku, 难的 → Opus. 10x cost reduction.</td></tr><tr><td><strong>Egress</strong></td><td>数据流出 cloud 的网费 + 监管. Managed 时数据 egress 到 vendor.</td></tr></tbody></table></div>
+<h4>合规 / 监管</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Data residency</strong></td><td>数据存哪 — EU / 中国 / 印度 都有法规要求境内.</td></tr><tr><td><strong>HIPAA + BAA</strong></td><td>美国医疗 + Business Associate Agreement. Anthropic / OpenAI 都签.</td></tr><tr><td><strong>SOC2 Type II</strong></td><td>Ongoing 安全审计. SaaS / vendor 标配.</td></tr><tr><td><strong>GDPR + DPA</strong></td><td>欧盟隐私 + Data Processing Agreement.</td></tr><tr><td><strong>SOX</strong></td><td>美国财报合规 — 金融机构必.</td></tr><tr><td><strong>Zero-retention</strong></td><td>Vendor 承诺不留你数据训 model.</td></tr><tr><td><strong>KYC / Fair lending</strong></td><td>金融行业 — Know Your Customer + 反歧视借贷.</td></tr><tr><td><strong>Sovereign requirement</strong></td><td>国家级数据 + compute 留境内.</td></tr></tbody></table></div>
+<h4>部署 patterns</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Cold start</strong></td><td>Serverless / new GPU pod 首次响应慢 (几秒到几十秒). API 启动友好, self-host 痛.</td></tr><tr><td><strong>Auto-scaling</strong></td><td>按 QPS 自动加 / 减 GPU pod. Production 必备但实现复杂.</td></tr><tr><td><strong>Bin packing</strong></td><td>把多 model / 多 tenant 塞同 GPU 提利用率.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>表面是 build vs buy 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
 <ol><li><strong>Real cost math</strong> — 不只是 "self-host cheaper at scale", 是 actual break-even calculation</li><li><strong>Total Cost of Ownership</strong> — GPU + ops + observability + drift + on-call, not just compute</li><li><strong>Data residency / governance</strong> — knowing why finance / health / gov sometimes can't use managed</li><li><strong>Vendor lock-in awareness</strong> — API change, deprecation, pricing volatility</li><li><strong>Latency profile</strong> — egress + cold start + queue depth</li><li><strong>Model quality lag</strong> — open weights typically 6-12 months behind frontier</li><li><strong>Hybrid patterns</strong> — embedding self-host + LLM API, or open for stable + API for cutting-edge</li><li><strong>2026 reality</strong> — Llama 4, Qwen 3, Mistral Large 3 closing quality gap</li></ol>
@@ -836,6 +853,97 @@ Quotes for interview:
 
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — enterprise sales / FDE 必问
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> Build vs buy 涉及 infra / 成本 / 监管多领域术语. 5 min 速查.
+
+### 部署方式 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Managed (API)** ⭐ | **用 vendor 的 API** — OpenAI / Anthropic / Cohere 跑模型, 你只 call. 启动 0 成本, vendor 处理 infra, 但 per-query 贵 + 数据出你网络. |
+| **Self-host** ⭐ | **自己买 GPU 跑 open-weight 模型** — Llama / Mistral / Qwen. 设 $50k-500k+, ops 重, 但 per-query 便宜 + 数据不出. |
+| **Hybrid** | 一部分 self-host, 一部分 API. Embedding 自己跑 + LLM API 是最常见. |
+| **BYOC (Bring Your Own Cloud)** | Vendor 把 model 跑你 VPC 内的 GPU. 数据不出 cloud, 但 vendor 仍 manage. |
+| **On-prem** | 在客户自己数据中心跑. 高合规需求 (banking, defense). |
+| **Air-gapped** | 完全离网部署. 国防 / 国家安全场景. 必 self-host. |
+| **Sovereign cloud** | 中国 / EU / 印度 等要求数据 + compute 在境内. |
+
+### Open Weights 模型 (2026)
+
+| 术语 | 解释 |
+|---|---|
+| **Open weights** | Model 权重开源 — 可下载, 可 self-host, 可商用 (看 license). 跟 "open source" 区别: 训练数据 / 流程未必开. |
+| **Llama 4** | Meta 2026 开源旗舰. 估计 ~ GPT-4o Mini quality. |
+| **Qwen 3** | Alibaba 开源 — 强多语言 (中文 / 阿拉伯). |
+| **Mistral Large 3** | Mistral 开源 — 高效推理. |
+| **DeepSeek** | 中国 model, 多种 size 都开. |
+| **Phi-4** | Microsoft 小型高效 — 适合 edge / 单 GPU. |
+| **Frontier model** | 当前最强 — Opus 4.7 / Gemini 3 Pro / GPT-5.5. 通常 managed-only. |
+| **Quality lag** | Open weights 比 frontier 落后 6-12 月. 2026 缩小但还在. |
+
+### 推理 / Serving 工具 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **vLLM** ⭐ | **开源 LLM serving engine**. PagedAttention + continuous batching, throughput 大. Self-host 最流行. |
+| **SGLang** | vLLM 竞品 — structured output / agent 流场景更优. |
+| **TensorRT-LLM** | NVIDIA 自家 inference engine. 最快但 H100 / H200 限定. |
+| **TGI (Text Generation Inference)** | Hugging Face 的 serving. |
+| **KV cache** ⭐ | **注意力 K/V 缓存**. 长输入重复用, 不重算. Memory 主要消耗源. |
+| **PagedAttention** | vLLM 创新 — KV cache 分页存, 像 OS 虚拟内存. 利用率 +24x. |
+| **Continuous batching** | 不等 batch 凑齐, 来一条跑一条, 完成的腾位置. Throughput 大. |
+| **Speculative decoding** | 小 model 先生成 draft, 大 model 验证 — 加速 2-3x. |
+| **Quantization** ⭐ | 把模型权重从 FP16 压成 INT8 / INT4 / FP8, 减 memory + 加速, 一点点 quality loss. |
+| **GPTQ / AWQ** | 主流 weight-only quantization 算法. |
+| **FP8 / INT4 / INT8** | 不同精度. H100 原生 FP8; INT4 最压但 quality 掉. |
+| **Distillation** | 大 model 教小 model — Opus 输出训 Haiku, deploy 小的便宜. |
+
+### GPU 经济
+
+| 术语 | 解释 |
+|---|---|
+| **H100 / H200 / B100 / B200** | NVIDIA 数据中心 GPU. H100 = 2023, H200 = 2024, B200 = 2025. |
+| **A100** | 上代主力. 二手 / 旧云便宜. |
+| **GPU-hour** | 一块 GPU 跑一小时. H100 ~ $2-4/hr on-demand. |
+| **Reserved instance** | 长租折扣 — 1-3 年合约 50-70% off on-demand. |
+| **Spot instance** | 可被回收的便宜 GPU. Training 用, serving 不能用 (会断). |
+| **GPU utilization** | GPU 跑时利用率. < 50% 是钱浪费. |
+| **TCO (Total Cost of Ownership)** ⭐ | **总拥有成本** — GPU + 电 + 网 + ops 人 + observability + on-call. 通常 = 2-3x compute. |
+
+### 路由 / Abstraction
+
+| 术语 | 解释 |
+|---|---|
+| **LiteLLM** | 100+ provider 统一 API. 切 vendor 改一行 config. Vendor lock-in 抗手段. |
+| **Portkey / OpenRouter** | 类似 LiteLLM, 加 caching / fallback. |
+| **Multi-vendor fallback** | Primary vendor 挂时 auto fallback secondary. 可靠性必备. |
+| **Cascade routing** | 简单 query → Haiku, 难的 → Opus. 10x cost reduction. |
+| **Egress** | 数据流出 cloud 的网费 + 监管. Managed 时数据 egress 到 vendor. |
+
+### 合规 / 监管
+
+| 术语 | 解释 |
+|---|---|
+| **Data residency** | 数据存哪 — EU / 中国 / 印度 都有法规要求境内. |
+| **HIPAA + BAA** | 美国医疗 + Business Associate Agreement. Anthropic / OpenAI 都签. |
+| **SOC2 Type II** | Ongoing 安全审计. SaaS / vendor 标配. |
+| **GDPR + DPA** | 欧盟隐私 + Data Processing Agreement. |
+| **SOX** | 美国财报合规 — 金融机构必. |
+| **Zero-retention** | Vendor 承诺不留你数据训 model. |
+| **KYC / Fair lending** | 金融行业 — Know Your Customer + 反歧视借贷. |
+| **Sovereign requirement** | 国家级数据 + compute 留境内. |
+
+### 部署 patterns
+
+| 术语 | 解释 |
+|---|---|
+| **Cold start** | Serverless / new GPU pod 首次响应慢 (几秒到几十秒). API 启动友好, self-host 痛. |
+| **Auto-scaling** | 按 QPS 自动加 / 减 GPU pod. Production 必备但实现复杂. |
+| **Bin packing** | 把多 model / 多 tenant 塞同 GPU 提利用率. |
 
 ---
 

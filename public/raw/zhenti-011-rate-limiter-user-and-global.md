@@ -9,6 +9,70 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 限流题里的术语如果不懂, 算法解释都听不懂. 5 min 扫完, 后面跟得上.
+
+### 算法 / 数据结构
+
+| 术语 | 解释 |
+|---|---|
+| **Token bucket (令牌桶)** ⭐ | 限流主流算法. 桶里有 N 个 token, 每次请求消耗 1 个, 按固定 rate 回填; 桶空 → reject. 允许短时 burst (桶里囤的 token). |
+| **Leaky bucket (漏桶)** | 请求进队列, 按固定速率漏出. 严格 shaping, 不允许 burst. 跟 token bucket 互斥语义. |
+| **Fixed window counter** | 每个固定时窗 (e.g., 每分钟) 计数. 简单粗暴, 缺点是窗口边界可双倍 burst (59 秒 + 0 秒). |
+| **Sliding window log** | 存所有 request timestamp, 查最近 N 秒数量. 精确但 O(N) memory per user. |
+| **Sliding window counter** | Fixed window + 当前窗口线性插值, 平滑近似 sliding log. O(1) memory ±5% 精度. |
+| **Burst (突发)** | 短时间内的流量峰值. Token bucket 允许 burst 等于桶 capacity. |
+| **Refill rate** | Token 回填速率 (tokens/sec). 决定稳态吞吐. |
+| **Atomic invariant** | 多个状态变更必须**全成功或全不变**. 这题里: 两个 bucket 都有 token 才扣, 否则**一个都不扣**. |
+
+### Python / 并发 / 数据类型
+
+| 术语 | 解释 |
+|---|---|
+| **`time.monotonic()`** ⭐ | 单调时钟 — 永远只增, NTP 不会回拨. 限流必用; `time.time()` 会被 NTP 调回. |
+| **`@dataclass`** | Python 3.7+ 自动生成 `__init__/__eq__/__repr__` 的装饰器. 替代手写 boilerplate. |
+| **`field(default_factory=...)`** | dataclass 默认值用工厂函数生成 (避免 mutable default 共享 bug). |
+| **`threading.Lock`** | 单进程线程互斥锁. `with lock:` 保证临界区串行. |
+| **GIL (Global Interpreter Lock)** | Python 全局解释器锁, 单进程内 CPython bytecode 互斥. 救一部分 race 但不全救 (e.g., 复合操作). |
+
+### Redis / 分布式
+
+| 术语 | 解释 |
+|---|---|
+| **Redis Lua script** ⭐ | Redis 执行 Lua 脚本是**原子的** (单线程执行, 不会被其他命令插进来). 用于 read-decide-write 不可分割的限流逻辑. |
+| **`EVALSHA`** | 用 SHA-1 引用已加载的 Lua 脚本, 比每次 EVAL 全文重传快. |
+| **`SETNX`** | "Set if Not Exists" — 不存在才设. Idempotency / lock 用. |
+| **`HMSET / HMGET`** | Hash multi set/get — 一次设/取多个 hash field. (Redis 4+ 推荐 HSET 多参数). |
+| **`EXPIRE`** | 给 key 设 TTL, 到点自动删. 限流里给 idle user 自动 GC. |
+| **Redis Sentinel / Cluster** | Sentinel = master-replica 自动 failover; Cluster = sharded 多 master. |
+| **CAS (Compare-And-Swap)** | 原子比较交换. Redis 用 WATCH/MULTI/EXEC 实现, 但 Lua 更简单. |
+| **Consistent hashing (一致性哈希)** | 把 key 映射到节点的算法, 节点增减时只迁移少量 key. 限流里用于 sticky routing. |
+| **Sticky routing** | 同一 user 永远落同一 instance (基于 hash). 让 in-memory 限流不在分布式下失准. |
+
+### HTTP / API 语义
+
+| 术语 | 解释 |
+|---|---|
+| **`429 Too Many Requests`** ⭐ | HTTP 状态码, 限流标准返回. |
+| **`Retry-After` header** | 服务端告诉客户端 "X 秒后再试". 单位秒或 HTTP-date. Client SDK 看到 429 应尊重这个. |
+| **`X-RateLimit-Limit/Remaining/Reset`** | 三件套 header — 限额 / 剩余 / 重置时刻. OpenAI/Anthropic 都返这套. |
+| **Fail-open vs fail-close** ⭐ | Redis 挂时: fail-open = 放行所有请求 (好 UX 但失限流); fail-close = 拒绝所有 (安全但伤客户). 大厂多 fail-open + 告警. |
+| **Clock skew** | 不同机器时钟不同步. NTP 一般在 ms 级, 但偶尔几秒. 分布式限流不能依赖各节点本地时钟. |
+
+### 业务 / Production
+
+| 术语 | 解释 |
+|---|---|
+| **RPM / TPM / RPS / QPS** | Requests Per Minute / Tokens Per Minute / Requests Per Second / Queries Per Second. Anthropic 同时跑 RPM + TPM + daily cap 三层. |
+| **Hot key (热 key)** | 单个 key (e.g., 超大客户 api_key) 流量占 single Redis shard 大头, 打满该 shard. |
+| **Hierarchical buckets** | 多层限流: per-key + per-org + per-tier + global capacity. 一次 atomic 检查全部. |
+| **Pre-flight estimate** | 请求来了先**估**这次会用多少 token (e.g., LLM input+output), 预扣; 完成后真实 reconcile (refund or claw-back). |
+| **Token (LLM 语境)** | LLM 计费单位, 不是限流的 token. 1 个英文 token ≈ 4 chars ≈ 0.75 词. 容易跟 "token bucket 的 token" 混. |
+| **Tail latency (p99)** | 99 分位延迟. 限流自身延迟必须 << 用户 latency budget. Redis Lua call ~0.5-1ms. |
+
+---
+
 ## 这道题在考什么
 
 考的不是会不会写 token bucket — 满地都是教程. 考的是:

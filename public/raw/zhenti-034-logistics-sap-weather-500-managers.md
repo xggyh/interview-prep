@@ -8,6 +8,75 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 物流 / SAP / agent / 工会词都在这. 5 min 看完后面跟得上.
+
+### 物流 / 供应链行业
+
+| 术语 | 解释 |
+|---|---|
+| **Re-route (重路由)** | 临时改变 shipment 的路径 / 时间 / 车辆 — 因为 weather / 设备坏 / 仓库爆仓 / 客户改单. 这题的核心动作. |
+| **Carrier** | 承运商 — FedEx, UPS, 自营车队等. 一个 shipment 走哪个 carrier 是 routing 决策之一. |
+| **Hub / hub overflow** | 中转仓库 + 爆仓 — hub 同时来太多 shipments 处理不过来. 触发 re-route 之一. |
+| **Lane** | 物流术语 — 一对 origin-destination 之间的路线. "LA → Chicago lane" 是一条 lane. |
+| **SLA (Service Level Agreement)** ⭐ | 合同里承诺的服务水平 — 比如 "next-day delivery". 违 SLA = 罚款 + customer churn. **Hard constraint**. |
+| **Hazmat (Hazardous Materials)** | 危险品运输 — 有严格法规 (DOT, FMCSA), 哪种车能装哪种 hazmat 是 hard constraint. 路由错 = $50K+ + 监管处罚. |
+| **HOS (Hours of Service)** ⭐ | 驾驶员服务时长法规 — FMCSA 规定司机每天 / 每周最多开多久, 必须休息多久. 违规 = 公司被审计. **Hard constraint**. |
+| **FMCSA (Federal Motor Carrier Safety Administration)** | 美国交通部下属 — 监管商业卡车. HOS 是它管的. |
+| **Teamsters (国际卡车司机工会)** ⭐ | 美国最大物流工会 — 在 30% 美国物流公司有合同, **限制 algorithmic dispatch 必须 driver opt-in**. 这题最大政治风险. |
+| **Dispatcher / Central Dispatch** | 调度员 / 中央调度 — 这题 5 人小团队负责 regional 重路由决策. **不是替换对象, 是 co-designer**. |
+| **Warehouse manager** | 仓库经理 — 本地决策 + 提供 local context (dock 坏了 / 当地天气等). 这题 500 人, 个体 tenure 差异大. |
+
+### SAP / 系统集成
+
+| 术语 | 解释 |
+|---|---|
+| **SAP** | 德国 ERP 巨头 — 大企业必备. 物流公司用 SAP 各种模块. |
+| **SAP TM (Transportation Management)** ⭐ | SAP 的运输管理模块 — 这题主集成对象, schema 复杂 100+ 字段, 每个客户的 customization 不同, **80% 集成成本在 mapping 客户特定字段**. |
+| **SAP EWM (Extended Warehouse Management)** | SAP 仓库管理模块 — dock 状态 + 库容数据来源. |
+| **IDoc** | SAP 的标准数据交换格式 — 跟 SAP 系统 write/read 走 IDoc. 这题 SAP 写回路由必走 IDoc. |
+| **BAPI** | SAP 业务接口 — 类似 API, 比 IDoc 更结构化. |
+| **Telematics** | 车联网数据 — 车的实时位置 / 速度 / 状态. 厂商: **Lytx, Samsara**, 各区域不同. |
+| **DVR (Driver Vehicle Recorder)** | 车载记录仪 — 司机分配 + HOS 数据来源. |
+
+### 数据 / 信号源
+
+| 术语 | 解释 |
+|---|---|
+| **NOAA** | 美国国家海洋大气管理局 — 免费 + 权威天气 API. |
+| **INRIX / Google Maps API** | 商业实时交通数据 SaaS. |
+| **CRM (Customer Relationship Management)** | 客户管理系统 — Salesforce 之类. 这题客户偏好数据在 CRM. |
+| **Manager-input local context** | 仓库经理输入的本地信息 ("dock 4 broken until Tuesday") — **目前没有任何系统记录这个**, 在 email + Slack + 经理脑子里. 这题需要新建结构化输入 app. |
+
+### Agent / AI 部署模式
+
+| 术语 | 解释 |
+|---|---|
+| **Autonomous agent** | 全自动 agent — 自己决策 + 执行, 不需要人. **这题第一坑就是冲去 build 这个**. |
+| **Trust ladder (信任阶梯)** ⭐ | 渐进部署模式: shadow → recommend → opt-in autonomy → full autonomous. **这题核心方法论**. |
+| **Shadow mode** | AI 跟人并跑, AI 决策不生效只记录. 12 周最少. |
+| **Recommend mode** | AI 推荐, 人审批 + 执行. Override rate 是关键指标. |
+| **Opt-in autonomy** | 仅 low-risk 场景 (e.g. 区域内天气) AI 自动决策, 但 5 min 内可被 override. |
+| **Per-manager calibration** | 不同 manager 不同信任阈值 — veteran (10+ yr) 可给更高 autonomy, junior 必须保守. |
+| **Hard constraint vs soft preference** ⭐ | Hard = 法规 / 合同 (HOS / hazmat / SLA), 必须**确定性规则引擎**. Soft = 客户偏好 / 成本, 可 ML. **混在一起 = 灾难**. |
+| **LangGraph / Multi-agent** | LLM 编排框架 — 候选人冲这个第一坑. |
+| **Tool use** | LLM 调用外部工具 (查 SAP / 写 IDoc 等). |
+| **Kill switch** | 一键禁用 AI 回 manual mode. < 60s 触发. Safety-critical 必备. |
+
+### 角色 / 政治
+
+| 术语 | 解释 |
+|---|---|
+| **COO** | Chief Operating Officer — 这题 sponsor. |
+| **VP Ops** | 运营副总 — owns daily risk. |
+| **CIO** | Chief Information Officer — 管 SAP 集成成本. |
+| **CISO** | Chief Information Security Officer — 管数据安全. |
+| **Driver union rep** ⭐ | 工会代表 — unionized 区域 veto holder, 必 week 1 engage. |
+| **Champion / Skeptic / Fence-sitter** | 用户态度三分: 10% 拥护者, 70% 观望, 20% 怀疑. 先攻 champion. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能 design 一个 multi-agent system.

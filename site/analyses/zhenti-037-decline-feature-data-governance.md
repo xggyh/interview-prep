@@ -8,6 +8,74 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Decline + 数据治理 + 政治 + reframe 术语. 5 min 速查.
+
+### 沟通 / 谈判术语
+
+| 术语 | 解释 |
+|---|---|
+| **Reframe (重新 framing)** ⭐ | 重新定义对话框架 — 不是 "policy says no", 是 "我在保护你 12 个月后的位置". 把 "decline a feature" 转成 "protect their future". |
+| **Active listening** | 主动倾听 — 4 min 听对方讲, 重述 ("OK so the goal is..."), 让对方知道你听懂了. |
+| **Reflect back** | 复述确认 — "OK so the goal is X, the friction is Y". 在给方案前先确认你理解了问题. |
+| **Decline + alternatives** ⭐ | 拒绝 + 给替代方案. 单纯 "no" = 关系坏. "no + 3 alternative paths" = 关系反而更牢. |
+| **Bear political weight** ⭐ | 承担政治压力 — "Let me email your CCO this afternoon" 替对方扛压力. 不让对方一个人面对内部冲突. |
+| **Underlying pain (根本痛点)** | 真实问题, 不是 surface ask. VP 说 "turn off audit log" 但 underlying pain 可能是 "analysts feel watched". |
+| **Surface ask vs Real goal** | 表面诉求 vs 真实目标. FDE 必做 diagnose. |
+| **Power asymmetry** | 权力不对等 — VP 有 budget authority, FDE 没有. 但 FDE 有 leverage = 不愿 ship 违规东西. |
+| **"I want to be direct"** | 标准开场词. 礼貌但坚定. |
+| **Disagree-and-commit** | 反对但执行 — 但这题相反: **不能 commit** 违规东西. |
+| **Make it about them personally** | 让风险关乎对方个人前途 — "in 12 months YOUR audit asks YOU". |
+| **Close with appreciation** | 收尾感谢对方 — "thanks for raising this with us rather than building a workaround". 巩固关系. |
+
+### 角色 / 头衔
+
+| 术语 | 解释 |
+|---|---|
+| **VP of Analytics** ⭐ | 分析副总 — 这题对方. 有 budget authority + 团队压力. |
+| **CCO (Chief Compliance Officer)** ⭐ | 首席合规官 — 客户公司的合规守门人. **必须 loop 进 conversation**, 不能 sneak around. |
+| **Internal audit / Internal auditor** | 内审 — 12 个月后会来问 VP "决策记录在哪". |
+| **Legal team** | 法务 — VP 的另一个 stakeholder. |
+| **CEO** | 客户 CEO — 如果 VP escalate, 你的 AE 必须 push back. |
+| **AE (Account Executive) / EM (Engagement Manager)** | 大客户经理 / 项目经理 — 你公司里的人, 内部 align 对象. |
+
+### 数据治理 / 合规术语
+
+| 术语 | 解释 |
+|---|---|
+| **Data governance** ⭐ | 数据治理 — 谁能访问什么数据, 怎么记录, 怎么审计. 这题的核心红线. |
+| **Audit log** ⭐ | 审计日志 — 记录每个 access / change / message. 监管 + 内审必查. VP 想关掉它. |
+| **PII (Personally Identifiable Information)** | 个人可识别信息 — SSN, 地址, email. 不能暴露在没权限的人能看的地方 (e.g. Slack 公开 channel). |
+| **Access control** | 访问控制 — RBAC (Role-Based Access Control) 框架, 谁能看什么. |
+| **RBAC (Role-Based Access Control)** | 基于角色的访问控制 — 替代 "audit log removed" 的更好方案. |
+| **Least privilege** | 最小权限原则 — 给最少必需的权限. 安全基本原则. |
+| **Compliance violation** | 合规违规. |
+| **Discovery request / E-discovery** | 法律取证请求 — 诉讼 / 监管查时调取的数据. 没 audit log = "我们关了 logging" = 比 "我们记录了, 你来查" 更糟. |
+| **SOC2** | 数据安全合规标准 — 这题里 FDE 自己平台必符合. 即使客户同意, 平台层 logging 不能关. |
+| **Multi-tenant security** | 多租户安全 — SaaS 平台多客户隔离 + 安全. |
+
+### 替代方案 / 路径
+
+| 术语 | 解释 |
+|---|---|
+| **Option A/B/C framework** | 提供 3 个具体可选方案 — A: 改 UX, B: 改 access, C: 改文化. 让 VP 不空手回去. |
+| **Filtering from default search** | 过滤掉默认搜索 — 数据还在 (logged), 但 UI 看不到. Option A 的技术实现. |
+| **Cultural fix vs Technical fix** | 文化解决 vs 技术解决 — 有时 VP 说话比加 feature 更有效. Option C. |
+| **Norms documentation** | 规范文档 — "this is for exploration, criticism encouraged" 等. Cultural fix 之一. |
+| **3-way meeting** | 三方会议 — FDE + VP + CCO, 一起谈. |
+| **In writing** | 书面 — 关键合规决定必须有 written approval. "I want CCO approval in writing". |
+
+### Gao Xin 简历相关
+
+| 术语 | 解释 |
+|---|---|
+| **OJK disclosure preamble** | 印尼监管要求语音 agent 通话前必须念的法定免责声明 — Gao Xin 项目里, GM 想砍, 类比这题. |
+| **A/B test** | 对照实验 — VP 用来推动 "remove safeguard" 的常见 framing. |
+| **Conversion rate** | 转化率 — 业务指标, 跟 compliance 经常打架. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能说 "no" politely.

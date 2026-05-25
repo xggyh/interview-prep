@@ -8,6 +8,151 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 LLM inference 内核知识. 不懂术语直接挂 OpenAI/Anthropic 面试. 5 min 看完.
+
+### Latency 指标 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **TTFT (Time-To-First-Token)** ⭐ | 第一个 token 出来的时间 — streaming UX 关键指标. |
+| **ITL (Inter-Token Latency)** ⭐ | token 之间的间隔 — decode 阶段每步耗时. |
+| **E2E latency** ⭐ | end-to-end 全部 token 出完的总时间. |
+| **p50 / p95 / p99** | 50% / 95% / 99% 分位的延迟. p99 = 1% 慢请求的延迟. |
+| **RPS / QPS** | Requests / Queries Per Second. |
+| **Throughput** | 吞吐量 — 单位时间处理的 token / request 数. |
+| **Streaming SSE** | Server-Sent Events — token 流式返回, 用户感知比 non-streaming 快很多. |
+
+### Inference 阶段 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Prefill** ⭐ | 输入阶段 — 一次性 forward 所有 input token, 填充 KV cache. compute-bound. |
+| **Decode** ⭐ | 输出阶段 — 自回归一次生成一个 token. memory-bandwidth-bound. |
+| **Autoregressive** | 自回归 — 每个 token 依赖前面所有 token. |
+| **Chunked prefill** | 把长 input 分成多个 chunk, 跟 decode 交错执行. |
+| **Compute-bound vs Memory-bound** | 计算瓶颈 vs 内存带宽瓶颈. Prefill 是前者, Decode 是后者. |
+
+### Batching
+
+| 术语 | 解释 |
+|---|---|
+| **Continuous batching** ⭐ | 持续批处理 — 完成的 sequence 释放 slot, 新 request 即时加入. vLLM/SGLang 核心. |
+| **Static batching** | 静态批处理 — 一批一起开始一起结束 (旧). |
+| **Dynamic batching** | 动态等待凑批 — 中间态, 不如 continuous. |
+| **max_num_seqs** | vLLM 参数 — 同时 in-flight 最大 sequence 数. 调大 throughput ↑ ITL ↑. |
+| **max_num_batched_tokens** | 每 step token 上限. |
+| **Batch size** | 单次 forward pass 内的 sequence 数. |
+| **Slot** | 一个 in-flight sequence 占的位置. |
+
+### KV Cache (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **KV cache** ⭐ | Key/Value 缓存 — decode 时复用之前 token 的 attention K/V, 避免重算. |
+| **PagedAttention** ⭐ | vLLM 发明 — 把 KV cache 像虚拟内存一样分页, 解决碎片化. |
+| **RadixAttention** ⭐ | SGLang 的 prefix tree-based KV 共享, 比 vLLM prefix caching 更激进. |
+| **Prefix caching** | 共享 system prompt 等公共前缀的 KV cache. |
+| **KV eviction** | KV 满了把老 sequence 的 KV 踢出去 (LRU). |
+| **KV swap to CPU** | KV 满 fallback 到 CPU 内存 (慢 50×). |
+| **H2O / FastGen / KIVI** | KV cache 压缩 / 量化方法. |
+| **GQA (Grouped Query Attention)** | 共享 KV 头的 attention 变体 — Llama-70B 用 8 KV 头不是 64. KV size 小 8×. |
+| **MHA / MQA** | Multi-Head / Multi-Query Attention — 传统 vs 极端共享. |
+
+### 量化 / 加速
+
+| 术语 | 解释 |
+|---|---|
+| **FP16 / BF16** | 16-bit 浮点 — baseline. |
+| **FP8 (E4M3)** ⭐ | 8-bit 浮点 — Hopper H100 native, 1.5× 加速 / < 1% quality drop. |
+| **INT8 / INT4** | 8-bit / 4-bit 整数量化. 更狠. |
+| **AWQ (Activation-aware Weight Quantization)** | 按 activation 重要性量化权重的 INT4 方法. |
+| **GPTQ** | 另一种 INT4 量化方法. |
+| **SmoothQuant** | INT8 量化, 把 outlier 平滑到 activation. |
+| **QAT (Quantization Aware Training)** | 训练时就考虑量化, 修正 quant loss. |
+| **Speculative decoding** ⭐ | 推测解码 — 小 draft model 一次生成 n 个 token, 大 model 一次 verify. 2× 加速. |
+| **Medusa / EAGLE** | 在 model 头上加多个 spec head 的 spec decoding 变体. |
+| **Lookahead decoding** | 并行 n-gram 生成. |
+| **Draft model** | spec decoding 里的小模型. |
+| **Accept rate** | spec decoding 接受率 — 60-80% 算好. |
+
+### Inference Stack
+
+| 术语 | 解释 |
+|---|---|
+| **vLLM** ⭐ | UC Berkeley 开源, 业界最常用. PagedAttention 发源地. |
+| **SGLang** | LMSYS 开源, RadixAttention 强 + structured output. |
+| **TensorRT-LLM** ⭐ | NVIDIA 自家 inference 引擎, 性能最强但 lock-in. |
+| **TGI (Text Generation Inference)** | HuggingFace 的 inference server. |
+| **Triton Inference Server** | NVIDIA 通用推理框架 (不止 LLM). |
+| **OpenRouter** | LLM API 聚合层. |
+
+### 并行 / 拓扑
+
+| 术语 | 解释 |
+|---|---|
+| **Tensor Parallel (TP)** ⭐ | 张量并行 — 把每层切到多个 GPU. 70B TP=8 标配. |
+| **Pipeline Parallel (PP)** | 流水线并行 — 不同层在不同 GPU. |
+| **Data Parallel (DP)** | 数据并行 — 多 replica. |
+| **TP=8** | 8 个 GPU 张量并行. |
+| **GPU replica** | 完整模型的一个副本. |
+| **NVLink** | NVIDIA GPU 间高速互联. |
+| **InfiniBand** | 节点间高速网络. |
+
+### GPU 硬件
+
+| 术语 | 解释 |
+|---|---|
+| **H100** ⭐ | NVIDIA Hopper 80GB GPU, LLM 推理主流. |
+| **H200** | H100 升级版, 141GB 内存. |
+| **A100** | 上一代, 40/80GB. |
+| **Blackwell B100/B200** | H100 下一代. |
+| **TFLOPS** | Tera Floating Point Operations Per Second. |
+| **nvidia-smi dmon** | GPU 监控命令. |
+
+### 网络 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **TLS handshake** | HTTPS 首次连接的握手 — 50ms 量级. |
+| **HTTP/2 multiplex** | HTTP/2 的多路复用. |
+| **Keepalive / Connection pool** | 持久连接 — 避免每次 TLS 重握手. |
+| **gRPC** | Google RPC 框架, HTTP/2 上的二进制协议. |
+| **Region affinity** | 路由到最近 region. |
+| **AZ (Availability Zone)** | 可用区. |
+| **CDN (Cloudflare / CloudFront)** | 内容分发网络 / 边缘 TLS 终止. |
+| **WAF** | Web Application Firewall. |
+
+### 观测
+
+| 术语 | 解释 |
+|---|---|
+| **OpenTelemetry (OTel)** ⭐ | 跨厂商 observability 标准. |
+| **APM (Datadog / Grafana Tempo)** | 应用性能监控. |
+| **USE method** | Utilization / Saturation / Errors — 系统瓶颈方法论. |
+| **RED method** | Rate / Errors / Duration — 服务级方法论. |
+| **GPU utilization** | GPU 使用率 — < 90% 通常说明 batching 没饱和. |
+
+### 路由 / 模型策略
+
+| 术语 | 解释 |
+|---|---|
+| **Dual-model routing** ⭐ | 双模型路由 — 简单查询走小模型, 复杂走大模型. |
+| **Cascade** | 级联 — 小模型先尝试, 失败 escalate 到大模型. |
+| **Priority queue** | 优先级队列 — paid > free user. |
+| **Preemption** | 抢占 — 高优先 request 把低优先 KV evict. |
+
+### 工具
+
+| 术语 | 解释 |
+|---|---|
+| **HF tokenizers (Rust)** | HuggingFace Rust tokenizer, 比 Python 快 10×. |
+| **SentencePiece / tiktoken** | 两种 tokenization 算法. |
+| **FastAPI / Envoy** | Web 框架 / 服务代理. |
+
+---
+
 ## 这道题在考什么
 
 OpenAI / Anthropic FDE 最爱这道题, 因为它**测你是否真懂 inference stack**, 不是 black-box "API 调一下":

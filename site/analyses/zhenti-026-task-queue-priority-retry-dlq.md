@@ -8,6 +8,115 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是分布式系统经典题. 名词不懂直接挂. 5 min 看完.
+
+### 队列概念 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Task queue** ⭐ | 任务队列 — producer 把任务塞队列, worker 拿任务执行. |
+| **Producer / Consumer / Worker** | 生产者 (塞任务) / 消费者 (拿任务) / 执行者. |
+| **Dispatcher** | 调度器 — 决定 next task 给哪个 worker. |
+| **Topic / Partition** | Kafka 概念 — topic 是逻辑队列, partition 是物理分片. |
+| **DLQ (Dead Letter Queue)** ⭐ | 死信队列 — N 次重试失败后进的终态队列. |
+| **HOL blocking (Head-of-Line)** | 队头阻塞 — 队头慢任务卡住后续. Kafka 长任务的痛. |
+| **Backpressure** | 反压 — 下游处理不过来时向上游 push back (e.g. 返回 429). |
+
+### 语义 / 可靠性
+
+| 术语 | 解释 |
+|---|---|
+| **At-least-once** ⭐ | 至少一次 — 可能重复发, 必须配 idempotency. 业界默认. |
+| **Exactly-once** | 恰好一次 — 分布式系统严格意义不可能, 只能 effectively-once. |
+| **At-most-once** | 最多一次 — 可能丢, 不重复. |
+| **Idempotency / Idempotency key** ⭐ | 幂等 / 幂等键 — 同 key 多次提交结果一样. Stripe 标配. |
+| **Dedup window** | 去重窗口 — 24h 内同 idem key 视为同一 task. |
+| **Effectively-once** | 实际一次 — at-least-once + idempotent processor. |
+| **FIFO** | First-In-First-Out 顺序. |
+
+### 重试 / 失败处理
+
+| 术语 | 解释 |
+|---|---|
+| **Retry with backoff** ⭐ | 带退避的重试 — 失败后等一段时间再试. |
+| **Exponential backoff** | 指数退避 — 1s / 2s / 4s / 8s ... |
+| **Jitter** | 抖动 — 在退避时间上加随机扰动, 避免 thundering herd. |
+| **Stripe-style 阶梯 backoff** ⭐ | Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式. |
+| **Thundering herd** | 雷暴 — 多 worker 同时重试导致瞬间洪峰. |
+| **Circuit breaker** | 熔断器 — 错误率高时直接拒绝, 给下游恢复时间. |
+| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念. |
+| **Lease / Leased** | 租约 — task 被 worker 持有的状态. |
+| **Heartbeat** ⭐ | 心跳 — long-running worker 定期续 lease, 防 spurious retry. |
+| **ack / nack** | acknowledge / negative ack — 任务完成 / 失败的通知. |
+
+### 公平性 / 优先级
+
+| 术语 | 解释 |
+|---|---|
+| **Priority queue** | 优先级队列 — paid > free. |
+| **Per-tenant fair scheduling** ⭐ | 多租户公平调度 — 一个大客户不能 starve 别人. |
+| **Starvation** | 饥饿 — 低优先 task 永远拿不到 worker. |
+| **WFQ (Weighted Fair Queueing)** ⭐ | 加权公平队列 — 按 weight 分配份额. |
+| **DRR (Deficit Round Robin)** | 亏空轮询 — WFQ 的具体实现. |
+| **Token bucket** | 令牌桶 — 经典 rate limiting 算法. |
+| **Min-share guarantee** | 最低份额保证 — 任何 tenant 至少分到 5%. |
+| **Burst** | 突发 — 短时间内大量请求. |
+| **Quota / In-flight quota** | 配额 — 同时 leased 上限. |
+
+### Backing Store 选型
+
+| 术语 | 解释 |
+|---|---|
+| **Kafka** ⭐ | 高吞吐流式日志, 1M+ TPS 但 long task HOL block. |
+| **Redis Streams** | Redis 5+ 的 stream 数据结构, 100K TPS 量级. |
+| **RabbitMQ** | 经典 AMQP 队列, Erlang 实现. |
+| **Postgres SKIP LOCKED** ⭐ | Postgres 9.5+ 的特性 — `FOR UPDATE SKIP LOCKED` 让多 worker 跳过已锁行. |
+| **SQS (Simple Queue Service)** | AWS 托管队列. |
+| **Temporal** ⭐ | 工作流编排引擎 (不仅是队列). 长 workflow + state 适合. |
+| **Celery** | Python 经典任务队列库. |
+| **Outbox pattern** | 任务和业务 state 在同一 DB transaction, 后异步 publish. |
+| **Saga** | 长流程补偿模式. |
+
+### 数据结构 / 操作
+
+| 术语 | 解释 |
+|---|---|
+| **Sorted set (ZADD)** | Redis 有序集合 — 按 score 排序, 快速 peek top. |
+| **SET NX / EX** | Redis 命令 — NX = if Not eXists; EX = expiry seconds. |
+| **JSONB** | Postgres 二进制 JSON 列. |
+| **Partial index** | Postgres 部分索引 — WHERE 条件下才建索引. |
+| **FOR UPDATE SKIP LOCKED** | Postgres 行锁 + 跳过已锁. |
+| **Materialized view** | 物化视图 — 预聚合结果, 定时刷新. |
+| **PARTITION BY RANGE** | Postgres 表分区. |
+
+### 部署 / Scale
+
+| 术语 | 解释 |
+|---|---|
+| **HA (High Availability)** | 高可用 — 主从 + 自动 failover. |
+| **DR (Disaster Recovery)** | 灾难恢复 — 跨 region 备份. |
+| **RPO / RTO** | Recovery Point Objective / Time Objective — 能丢多少数据 / 多久恢复. |
+| **HPA (Horizontal Pod Autoscaler)** | K8s 水平自动伸缩. |
+| **Long polling** | 长轮询 — client 等 server 有数据再返回. |
+| **Sharding** | 分片 — 按 hash 拆 DB. |
+| **Aurora multi-AZ** | Aurora 跨可用区高可用. |
+
+### 监控
+
+| 术语 | 解释 |
+|---|---|
+| **Queue depth** | 队列深度 — 待处理任务数. |
+| **Dispatch lag** | 派发延迟 — 入队到开始执行的时间. |
+| **PagerDuty / Slack alert** | 告警工具. |
+| **Iceberg (audit)** | 数据湖表格式 — 用于审计日志归档. |
+| **Stuck task** | 卡住的 task — leased > 预期时长. |
+| **parent_task_id** | 父任务 ID — 用于链式 task lineage. |
+| **OTel span chain** | OpenTelemetry span 链 — 跨 service trace 任务生命周期. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 Celery + Redis, 是考你**真正在 production 用过分布式 queue, 知道这些 trade-off**:

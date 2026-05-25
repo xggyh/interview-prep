@@ -8,6 +8,103 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题**安全 + 凭证管理术语最多**. 5 min 速查.
+
+### 沟通 / 谈判核心
+
+| 术语 | 解释 |
+|---|---|
+| **Respect their role** ⭐ | 尊重对方职责 — "Your team is doing what you're paid to do". Security 头一听就放下武器. 这题开场关键. |
+| **Diagnose the fear, not the policy** ⭐ | 诊断恐惧, 不是政策 — 问 "what specific concern?" 不是 "why your policy is strict?". 政策是 surface, 恐惧是 root. |
+| **Re-scope narrowly** ⭐ | 缩小范围 — 不要 full prod credentials, 要 read-only + 3 tables + 15 min + 特定 IP. Re-scope = unlock. |
+| **Bring their tools** ⭐ | 用对方的工具 — Vault / Okta / Splunk 都他们已用. 不引入新工具 = 降低 adoption 阻力. |
+| **Hand them defensible artifact** | 给可上推的文档 — "1-pager for your CISO". Security 头要拿去说服上级. |
+| **Help them sell upward** | 帮对方向上推销 — 跟 Q38 同模式, 但这题对象是 CISO 不是 CEO. |
+| **Pre-mortem the failure** | 预演失败 — "if breach happens, here's the 5 steps". 主动 walk through 减少对方焦虑. |
+| **Kill switch** ⭐ | 一键禁用 — "revoke role in Vault, access dies in seconds". 给对方控制感. |
+| **"Genuine appreciation, not grovel"** | 真诚感谢, 不卑微 — "you're the reason this is clean in 12 months". |
+| **Don't lead with frustration** | 不以挫败开场 — "we've been blocked 2 weeks" = win the wrong battle. |
+| **Escalation war** | 升级战 — 跳过对方找他 CEO = 永远树敌. 这题反面. |
+
+### 安全 / 凭证管理 (core security 术语)
+
+| 术语 | 解释 |
+|---|---|
+| **Production credentials (生产凭证)** ⭐ | 接到生产环境的密钥 / token / DB password. **vendor 拿到生产 = security 头最大恐惧**. |
+| **Vault (HashiCorp Vault)** ⭐ | 业界最常用的 secrets management 工具 — 存 + 动态分发凭证, 支持 JIT, TTL, auto-rotate. 这题必用. |
+| **JIT (Just-In-Time) credentials** ⭐ | 即时凭证 — 不预发, 用时才发, 15 min 后自动失效. **替代 static credentials 的金标准**. |
+| **Static credentials** | 静态凭证 — 一次发, 永久有效. **安全反面教材**, 一泄露 = 永久泄露. |
+| **TTL (Time-To-Live)** | 凭证存活时间 — Vault 配的 15-min TTL 是合理 default. |
+| **Auto-rotate / Secret rotation** | 自动轮换 — 凭证定期换. |
+| **Okta** ⭐ | 主流身份认证 SaaS — SSO + MFA + SCIM. 这题用来挂 vendor 团队的身份. |
+| **SSO (Single Sign-On)** | 单点登录 — 一个 Okta 账号登所有系统. |
+| **MFA (Multi-Factor Authentication)** | 多因素认证 — 密码 + 手机 token. |
+| **SCIM (System for Cross-domain Identity Management)** | 跨系统身份同步标准 — vendor 员工离职, 自动 deprovision. |
+| **RBAC (Role-Based Access Control)** | 角色访问控制 — "read-only on 3 tables" 是 role 定义. |
+| **Least privilege** ⭐ | 最小权限原则 — 只给最少必需的访问. 安全基本盘. |
+| **Allowlist (vs Blocklist)** | 允许列表 — 默认拒绝, 显式允许. 比 blocklist 安全. |
+| **Column-level allowlist** | 列级允许列表 — 不是 `SELECT *`, 显式列出可访问列. 排除 PII. |
+| **IP allowlist** | IP 允许列表 — 只允许特定网段连接. |
+| **Dedicated subnet** | 专属网段 — vendor 走自己的 IP 范围, 不混在公网. |
+| **Blast radius** ⭐ | 爆炸半径 — 一次 breach 的影响范围. Security 关键思考维度. |
+| **Data exfiltration** | 数据外泄 — 攻击者把数据偷出去. Security 头第一恐惧. |
+| **Breach surface** | 攻击面 — 系统暴露给攻击者的总范围. Vault + JIT + allowlist 都在缩 surface. |
+| **Forensics** | 取证 — breach 后查证攻击者做了什么. SIEM log 是关键. |
+
+### 审计 / 监控
+
+| 术语 | 解释 |
+|---|---|
+| **SIEM (Security Information and Event Management)** ⭐ | 安全信息事件管理系统 — 聚合所有 log + 实时检测异常. **Splunk** 是最常见. |
+| **Splunk** | 行业最大 SIEM 厂商. 客户已用 = vendor 用同一个. |
+| **Audit log** | 审计日志 — 每个 query / access 记录. 这题 vendor 必 stream 到客户 SIEM. |
+| **Anomaly detection** | 异常检测 — SIEM 上的规则, 比如 "full table scan in 非业务小时". |
+| **Query logging** | 查询日志 — 每条 SQL / API call 留痕. |
+| **Real-time stream** | 实时流 — log 实时进 SIEM, 不是 batch. |
+
+### 合规 / 标准
+
+| 术语 | 解释 |
+|---|---|
+| **NIST 800-53** ⭐ | 美国国家标准 — 联邦机构 + 大企业的安全控制标准. Access Control (AC) 系列是这题映射. |
+| **ISO 27001** | 国际信息安全管理标准. |
+| **SOC2 (Service Organization Control 2)** | 美国大企业用的 vendor 安全审计标准. |
+| **CISO (Chief Information Security Officer)** ⭐ | 首席安全官 — 这题 James 的上级, 1-pager 给他看的人. |
+| **Policy exception** | 政策例外 — CISO 给特定 vendor 一次性豁免, 通常需 documented controls + 季度 review. |
+| **Compliance posture** | 合规姿态 — 客户当前满足哪些标准, vendor access 不能破坏这个. |
+
+### 替代方案
+
+| 术语 | 解释 |
+|---|---|
+| **Sanitized prod replica** | 脱敏的生产副本 — QA 用, 没 real PII. Vendor 开发可用. |
+| **Synthetic data** | 合成数据 — 假数据匹配真 schema, 0 PII 风险. |
+| **POC (Proof of Concept)** | 概念验证 — 用脱敏数据先证明价值, security 审查并行. |
+| **Self-host vs Vendor-host** | 客户自托管 vs vendor 托管 — 如果 security 死活不给 vendor access, vendor code + model 部署到客户侧是终极选项. |
+| **MLOps capacity** | 机器学习运维能力 — 客户自托管的前提条件, 不是所有客户都有. |
+
+### 角色
+
+| 术语 | 解释 |
+|---|---|
+| **Head of Security & IT** ⭐ | 这题对方 (James) — 既管 security 又管 IT, 中型企业常见组合. |
+| **CISO** | James 上级 — 1-pager 给他看的人. |
+| **24/7 security contact (on-call)** | vendor 侧的安全 on-call 名单 — breach 时客户 24h 内能找到人. |
+| **AE / Director / EM** | 你公司的内部 align 对象 — 升级前必 align. |
+
+### Gao Xin 简历相关
+
+| 术语 | 解释 |
+|---|---|
+| **Indonesia InfoSec team** | Gao Xin 项目里 6-周 hold 的对方 — 类比 James. |
+| **ByteDance global data sovereignty** | 字节全球数据主权 — Indonesia 数据不能出印尼是当时具体恐惧. |
+| **OJK audit** | 印尼监管对 vendor access 的审计 — Indonesia InfoSec 的 upstream worry. |
+| **NDA on prompts** | 提示词 NDA — Gao Xin 用过的具体 mitigation. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能否 push security to give credentials.

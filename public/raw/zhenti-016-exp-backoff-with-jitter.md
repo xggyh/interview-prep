@@ -9,6 +9,99 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 退避重试是 distributed reliability 的灵魂. 这堆术语 5 min 扫完, AWS paper + HTTP 状态码全 get.
+
+### Retry / Jitter 算法
+
+| 术语 | 解释 |
+|---|---|
+| **Exponential backoff (指数退避)** ⭐ | 每次失败后等 `base × 2^n` 秒. n=0,1,2,3... 间隔 1s, 2s, 4s, 8s... |
+| **Jitter (抖动)** ⭐ | 在 backoff 加随机, 防 thundering herd. AWS 推荐 full jitter. |
+| **Full jitter** ⭐ | `delay = random.uniform(0, base * 2^n)`. AWS 经典 paper "Exponential Backoff And Jitter" 的推荐. |
+| **Equal jitter** | `delay = exp/2 + random(0, exp/2)`. 保证至少一半的 backoff. |
+| **No jitter** | `delay = base * 2^n`. 千 client 同时 retry → thundering herd, BAD. |
+| **Decorrelated jitter** | `delay = min(cap, random(base, last_delay * 3))`. AWS 推大 fleet (>1k clients) 用这个, 收敛比 full jitter 平稳. |
+| **`max_delay_s` / cap** | backoff 单次上限. 不能让 retry 1024 秒. |
+| **`max_attempts`** | 总尝试次数. 3-5 合理. |
+| **Thundering herd** ⭐ | 大量 client 同时 fail + 同时 retry → 第二波 spike. Jitter 防这个. |
+| **Tail at Scale (Google paper)** | "tail latency at scale" — 提出 hedged request 等技巧. |
+| **Hedged request** | p95 时 fire 备份请求, 取先返的. cost ↑ tail latency ↓. |
+
+### Retry budget / 全局保护
+
+| 术语 | 解释 |
+|---|---|
+| **Retry budget** ⭐ | 全局 retry 速率上限 (e.g., 总 retry ≤ 10% 请求). 防 cascading retry storm. 用 token bucket 实现 (Q11). |
+| **Retry storm** | 多 client × 多 retry × cascading = 雪崩. budget cap 防这个. |
+| **Deadline propagation** | request 总 deadline 跨 retry 不变. 超 deadline 直接 raise, 不再 sleep. |
+| **Context cancellation** | caller cancel (`asyncio.CancelledError`) 时 retry 必须立即 propagate, 不能继续 retry. |
+
+### HTTP / API 错误分类
+
+| 术语 | 解释 |
+|---|---|
+| **4xx vs 5xx** ⭐ | 4xx = client 错 (不 retry); 5xx = server 错 (retry). |
+| **`429 Too Many Requests`** | 限流. **必须 honor `Retry-After`**, 不要自己算. |
+| **`Retry-After` header** | 服务端告诉 "X 秒后再试". 单位秒, 或 HTTP-date (`Wed, 21 Oct 2026 07:28:00 GMT`). |
+| **`500 Internal Server Error`** | 服务端通用错. 可 retry. |
+| **`502 Bad Gateway`** | LB / proxy 拿不到后端. 可 retry. |
+| **`503 Service Unavailable`** | 服务端过载. 可 retry, 看 Retry-After. |
+| **`504 Gateway Timeout`** | LB 等后端超时. **仅 idempotent 时 retry** (不知道 server 跑没跑). |
+| **`408 Request Timeout`** | 服务端嫌客户端发太慢. 可 retry. |
+| **`400 Bad Request`** | 请求格式错. **不 retry** (bug, 重试无意义). |
+| **`401 Unauthorized`** | 没认证. refresh token 后 retry 一次, 不无限. |
+| **`403 Forbidden`** | 没权限. 不 retry. |
+| **`409 Conflict`** | 冲突 (乐观锁). 默认不 retry. |
+| **`422 Unprocessable Entity`** | 语义错 (e.g., schema 校验 fail). 不 retry. |
+
+### 幂等性 (Idempotency)
+
+| 术语 | 解释 |
+|---|---|
+| **Idempotent (幂等)** ⭐ | 同操作多次执行结果相同. GET / PUT 是; POST / DELETE 默认不是. |
+| **Idempotency-Key header** | client 给每个 POST 带 key, 服务端 cache 24h. 重复 key → 返 cached response. Stripe/OpenAI 都用. |
+| **`Idempotency-Key` 生成** | `hash(user_id, operation, payload)`. 同 op 永远同 key. |
+| **At-least-once + idempotent = de facto exactly-once** | 实际 exactly-once 的工程实现. |
+
+### Circuit breaker / 配合
+
+| 术语 | 解释 |
+|---|---|
+| **Circuit breaker (熔断器)** ⭐ | 三态: CLOSED (正常 retry) → N 错误 → OPEN (拒绝调用, 等冷却) → HALF-OPEN (试探一次) → 成 → CLOSED. |
+| **Half-open** | 熔断器冷却后的探测态. 一次成功就回 CLOSED, 失败回 OPEN. |
+| **Cooldown** | 熔断 open 后等待时间. 一般 30s-5min. |
+
+### Python / 异步
+
+| 术语 | 解释 |
+|---|---|
+| **`asyncio.sleep` vs `time.sleep`** ⭐ | asyncio 用前者 (yield 给 loop), 后者会**阻塞 event loop**, 整个 process 卡住. |
+| **`@functools.wraps`** | 写 decorator 时保留原函数名 / docstring. |
+| **`asyncio.iscoroutinefunction`** | 检查 fn 是不是 async, 决定 decorator 走 sync 还是 async 路径. |
+| **`time.monotonic`** | 单调时钟. deadline 计算必用, 不被 NTP 回拨影响. |
+| **`patch('time.sleep')`** | test 时把 `time.sleep` mock 掉, 不真睡几秒. |
+| **`freezegun`** | test 时冻结时间的库. mock clock 干净方案. |
+
+### 库 / 工具
+
+| 术语 | 解释 |
+|---|---|
+| **`tenacity`** | Python retry 库, 行业标准. `@retry(stop=stop_after_attempt(3), wait=wait_exponential_jitter())`. |
+| **`backoff`** | 另一个 retry 库, 早期流行. |
+| **AWS Architecture Blog "Exponential Backoff And Jitter"** | jitter 算法的经典 paper, 2015. 必读. |
+
+### 监控
+
+| 术语 | 解释 |
+|---|---|
+| **`retry_total / retry_success / retry_exhausted`** | Prometheus counter 三件套. retry rate 看 grafana 必备. |
+| **`retry_seconds_total`** | 总 sleep 累积时间 (sum). 跟 retry_count 一起看 backoff 行为. |
+| **SLA / SLO / SLI** | Service Level Agreement / Objective / Indicator. 决定 deadline budget. |
+
+---
+
 ## 这道题在考什么
 
 很多候选人写完 `time.sleep(2 ** attempt)` 就交 — 0 分. 真考的是:

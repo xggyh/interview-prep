@@ -43,6 +43,23 @@
 <blockquote><p>"Customer reports their AI feature 'feels worse' than 2 months ago. <strong>Same model, same prompts, but quality has degraded.</strong> Walk me through your diagnosis methodology — hypotheses with priors, stratified eval, common causes, and how you isolate variables."</p></blockquote>
 <p><strong>Round</strong>: Production / Reliability (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production AI drift 必问</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>Model drift 题. 涉及 ML 监控 + 统计 + Bayesian 思维.</p></blockquote>
+<h4>Drift 类型 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Model drift</strong> ⭐</td><td><strong>Vendor 偷偷更新了 underlying model</strong>. GPT-5.3 → 5.4 没说. 同 API call 行为变了. <strong>2026 最常见的"突然变差"原因</strong>.</td></tr><tr><td><strong>Data drift</strong> ⭐</td><td><strong>输入分布变了</strong> — 用户问题类型变了. 新 product line / 季节 / 营销活动.</td></tr><tr><td><strong>Concept drift</strong> ⭐</td><td><strong>输入 → 输出的 mapping 变了</strong>. 同 query 现在该有不同答案 (法规更新). 比 data drift 难抓.</td></tr><tr><td><strong>Distribution shift</strong></td><td>总称 — 包 data + concept drift.</td></tr><tr><td><strong>Covariate shift</strong></td><td>输入分布变, 但 conditional p(y</td><td>x) 不变. = pure data drift.</td></tr><tr><td><strong>Label shift / Prior shift</strong></td><td>类别比例变了 (e.g. fraud rate 涨了).</td></tr><tr><td><strong>Prompt drift</strong> ⭐</td><td><strong>有人改了 prompt</strong> 没走 review. Git log 能查.</td></tr><tr><td><strong>Eval drift</strong></td><td>Rubric / judge model 升级 → 同输出新分不同.</td></tr><tr><td><strong>Baseline shift</strong></td><td>用户期望变高了 — model 没变差, 但 "feels worse" 是 expectation up.</td></tr><tr><td><strong>Silent drift</strong></td><td>没 alert 触发的 drift — 渐进式. 最危险.</td></tr></tbody></table></div>
+<h4>Drift 检测指标 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>KL divergence</strong> ⭐</td><td><strong>两分布的"距离"</strong>. Drift 量化常用. 0 = 一样, 大 = 偏离多.</td></tr><tr><td><strong>Wasserstein / KS test / Chi-square</strong></td><td>类似 KL 不同场景 — 连续 / sparse / categorical 分布.</td></tr><tr><td><strong>Embedding mean cosine</strong></td><td>输入 embedding 平均的 cosine drift. Semantic shift 抓手.</td></tr><tr><td><strong>Population Stability Index (PSI)</strong></td><td>金融常用. &gt; 0.25 = 严重 drift.</td></tr><tr><td><strong>Refusal rate drift</strong></td><td>Model 越来越保守? Refusal % 涨 = 信号.</td></tr></tbody></table></div>
+<h4>Bayesian / Prior 思维 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Prior probability</strong> ⭐</td><td><strong>某假设的先验概率</strong> — "model drift 是因, 40% prior". 没数据前的 belief.</td></tr><tr><td><strong>Posterior probability</strong></td><td>收了 evidence 后的概率. Posterior = prior × likelihood / normalize.</td></tr><tr><td><strong>Bayesian thinking</strong></td><td>用 prior + evidence 更新 belief. 不是 binary.</td></tr><tr><td><strong>Likelihood</strong></td><td>假设 H 为真时, 看到这个 evidence 的概率.</td></tr><tr><td><strong>Hypothesis-driven debug</strong></td><td>列假设 + 测每个 — 比 trial-and-error 高效.</td></tr><tr><td><strong>Ablation</strong></td><td>单变量改, 看影响.</td></tr><tr><td><strong>Variable isolation</strong></td><td>一次只动一个 variable, 其他固定.</td></tr><tr><td><strong>Confounding variable</strong></td><td>跟原因混淆的变量. e.g. deploy 跟 query growth 同时发生 → 哪个是因?</td></tr></tbody></table></div>
+<h4>Eval / 测量 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vintage golden set</strong> ⭐</td><td><strong>2 月前的 eval set, 现在重跑</strong>. 如果分掉了 → model 真变差.</td></tr><tr><td><strong>Regression eval</strong></td><td>改动后跑老 eval, 看 metric 退化没.</td></tr><tr><td><strong>Stratified eval</strong> ⭐</td><td>按 slice (language / intent / tenant) 拆开看. 整体 OK 但某 slice 挂.</td></tr><tr><td><strong>Per-segment metric</strong></td><td>跟 stratified eval 同义.</td></tr><tr><td><strong>A/A test</strong></td><td>同 version 分两组 — 应该无差异. 校准 A/B 系统.</td></tr><tr><td><strong>Vintage queries vs new queries</strong></td><td>老 query 重跑 vs 新 query 测 — 隔离 data drift vs model drift.</td></tr><tr><td><strong>Time-of-day pattern</strong></td><td>Drift 跟时段相关? Peak hour traffic 不同?</td></tr></tbody></table></div>
+<h4>监控 / Observability ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Continuous monitoring</strong></td><td>一直 monitoring, 不是点状测.</td></tr><tr><td><strong>Drift detection</strong></td><td>自动检测 drift 的 alert system.</td></tr><tr><td><strong>Golden set refresh</strong></td><td>Eval set 持续更新. 不 refresh 3 月就 stale.</td></tr><tr><td><strong>Per-slice dashboard</strong> ⭐</td><td><strong>按 language / region / tenant 拆的 dashboard</strong>. Worst slice catch issue.</td></tr><tr><td><strong>Canary monitoring</strong></td><td>1-5% 流量先 ship, 看 metric.</td></tr><tr><td><strong>A/B against old version</strong></td><td>跟之前 stable version 实时比.</td></tr><tr><td><strong>Shadow mode</strong></td><td>新 version 跟旧并跑, 新只记录.</td></tr></tbody></table></div>
+<h4>Vendor 升级 / API ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>API model version pinning</strong> ⭐</td><td><strong>指定 model version (gpt-5.5-2025-12)</strong> 而不是 alias (gpt-5.5). Vendor 升级不影响你.</td></tr><tr><td><strong>Model alias / Latest tag</strong></td><td>"gpt-4o" 这种, 跟着 vendor 自动升. 危险.</td></tr><tr><td><strong>Deprecation notice</strong></td><td>Vendor 通知某 model 要废. 通常 30-90 天 notice.</td></tr><tr><td><strong>Silent model update</strong></td><td>Vendor 没说就改了. Anthropic / OpenAI 一般会说, 但 minor patch 可能没说.</td></tr><tr><td><strong>Vendor changelog</strong></td><td>Vendor 的 model 更新记录. Production 必 subscribe.</td></tr></tbody></table></div>
+<h4>质量 metric + Prevention ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Hallucination rate / Faithfulness</strong></td><td>编造比例 / 输出是否 grounded. RAG 重点 track.</td></tr><tr><td><strong>Refusal rate</strong></td><td>拒答比例. 涨 = 太保守了 — vendor 升级常见症状.</td></tr><tr><td><strong>Verbosity / Tone drift</strong></td><td>输出长度 / 风格变了 — model 升级最 visible.</td></tr><tr><td><strong>Regression eval on every change</strong></td><td>CI 跑 golden set.</td></tr><tr><td><strong>Pin model version</strong> ⭐</td><td>不用 latest alias. 防 silent upgrade.</td></tr><tr><td><strong>Drift alert</strong></td><td>KL &gt; 0.1 时 page.</td></tr><tr><td><strong>Customer perception survey</strong></td><td>季度问客户 "feels worse?" — baseline shift 唯一抓手.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>表面是 model drift 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
 <ol><li><strong>Hypothesis-driven debug</strong> — 不是改一堆 things, 是 isolating 一个 variable</li><li><strong>5 hypothesis categories</strong> — data / prompt / model / eval / baseline drift</li><li><strong>Bayesian prior thinking</strong> — 知道哪个原因最常见 (prior)</li><li><strong>Stratified eval methodology</strong> — 不只是 overall, 是 by-segment</li><li><strong>Variable isolation</strong> — A/B with vintage queries vs new queries, etc.</li><li><strong>2026 reality</strong> — vendor silently updates underlying model</li><li><strong>Customer perception vs reality</strong> — "feels worse" may be users got better</li><li><strong>Specific shipped diagnoses</strong> — voice agent Indonesia, BNPL Anthropic model upgrade</li></ol>
@@ -908,6 +925,96 @@ Quotes for interview:
 
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production AI drift 必问
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> Model drift 题. 涉及 ML 监控 + 统计 + Bayesian 思维.
+
+### Drift 类型 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Model drift** ⭐ | **Vendor 偷偷更新了 underlying model**. GPT-5.3 → 5.4 没说. 同 API call 行为变了. **2026 最常见的"突然变差"原因**. |
+| **Data drift** ⭐ | **输入分布变了** — 用户问题类型变了. 新 product line / 季节 / 营销活动. |
+| **Concept drift** ⭐ | **输入 → 输出的 mapping 变了**. 同 query 现在该有不同答案 (法规更新). 比 data drift 难抓. |
+| **Distribution shift** | 总称 — 包 data + concept drift. |
+| **Covariate shift** | 输入分布变, 但 conditional p(y|x) 不变. = pure data drift. |
+| **Label shift / Prior shift** | 类别比例变了 (e.g. fraud rate 涨了). |
+| **Prompt drift** ⭐ | **有人改了 prompt** 没走 review. Git log 能查. |
+| **Eval drift** | Rubric / judge model 升级 → 同输出新分不同. |
+| **Baseline shift** | 用户期望变高了 — model 没变差, 但 "feels worse" 是 expectation up. |
+| **Silent drift** | 没 alert 触发的 drift — 渐进式. 最危险. |
+
+### Drift 检测指标 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **KL divergence** ⭐ | **两分布的"距离"**. Drift 量化常用. 0 = 一样, 大 = 偏离多. |
+| **Wasserstein / KS test / Chi-square** | 类似 KL 不同场景 — 连续 / sparse / categorical 分布. |
+| **Embedding mean cosine** | 输入 embedding 平均的 cosine drift. Semantic shift 抓手. |
+| **Population Stability Index (PSI)** | 金融常用. > 0.25 = 严重 drift. |
+| **Refusal rate drift** | Model 越来越保守? Refusal % 涨 = 信号. |
+
+### Bayesian / Prior 思维 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Prior probability** ⭐ | **某假设的先验概率** — "model drift 是因, 40% prior". 没数据前的 belief. |
+| **Posterior probability** | 收了 evidence 后的概率. Posterior = prior × likelihood / normalize. |
+| **Bayesian thinking** | 用 prior + evidence 更新 belief. 不是 binary. |
+| **Likelihood** | 假设 H 为真时, 看到这个 evidence 的概率. |
+| **Hypothesis-driven debug** | 列假设 + 测每个 — 比 trial-and-error 高效. |
+| **Ablation** | 单变量改, 看影响. |
+| **Variable isolation** | 一次只动一个 variable, 其他固定. |
+| **Confounding variable** | 跟原因混淆的变量. e.g. deploy 跟 query growth 同时发生 → 哪个是因? |
+
+### Eval / 测量 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Vintage golden set** ⭐ | **2 月前的 eval set, 现在重跑**. 如果分掉了 → model 真变差. |
+| **Regression eval** | 改动后跑老 eval, 看 metric 退化没. |
+| **Stratified eval** ⭐ | 按 slice (language / intent / tenant) 拆开看. 整体 OK 但某 slice 挂. |
+| **Per-segment metric** | 跟 stratified eval 同义. |
+| **A/A test** | 同 version 分两组 — 应该无差异. 校准 A/B 系统. |
+| **Vintage queries vs new queries** | 老 query 重跑 vs 新 query 测 — 隔离 data drift vs model drift. |
+| **Time-of-day pattern** | Drift 跟时段相关? Peak hour traffic 不同? |
+
+### 监控 / Observability ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Continuous monitoring** | 一直 monitoring, 不是点状测. |
+| **Drift detection** | 自动检测 drift 的 alert system. |
+| **Golden set refresh** | Eval set 持续更新. 不 refresh 3 月就 stale. |
+| **Per-slice dashboard** ⭐ | **按 language / region / tenant 拆的 dashboard**. Worst slice catch issue. |
+| **Canary monitoring** | 1-5% 流量先 ship, 看 metric. |
+| **A/B against old version** | 跟之前 stable version 实时比. |
+| **Shadow mode** | 新 version 跟旧并跑, 新只记录. |
+
+### Vendor 升级 / API ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **API model version pinning** ⭐ | **指定 model version (gpt-5.5-2025-12)** 而不是 alias (gpt-5.5). Vendor 升级不影响你. |
+| **Model alias / Latest tag** | "gpt-4o" 这种, 跟着 vendor 自动升. 危险. |
+| **Deprecation notice** | Vendor 通知某 model 要废. 通常 30-90 天 notice. |
+| **Silent model update** | Vendor 没说就改了. Anthropic / OpenAI 一般会说, 但 minor patch 可能没说. |
+| **Vendor changelog** | Vendor 的 model 更新记录. Production 必 subscribe. |
+
+### 质量 metric + Prevention ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Hallucination rate / Faithfulness** | 编造比例 / 输出是否 grounded. RAG 重点 track. |
+| **Refusal rate** | 拒答比例. 涨 = 太保守了 — vendor 升级常见症状. |
+| **Verbosity / Tone drift** | 输出长度 / 风格变了 — model 升级最 visible. |
+| **Regression eval on every change** | CI 跑 golden set. |
+| **Pin model version** ⭐ | 不用 latest alias. 防 silent upgrade. |
+| **Drift alert** | KL > 0.1 时 page. |
+| **Customer perception survey** | 季度问客户 "feels worse?" — baseline shift 唯一抓手. |
 
 ---
 

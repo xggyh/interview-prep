@@ -7,6 +7,86 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 customer communication + 风控合规 + 数据论证的综合故事. 涉及一堆 BNPL / 监管 / negotiation 术语.
+
+### 沟通方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Bad news + 3 options + recommendation** ⭐ | Deliver bad news 标准 pattern. 不是单纯 say no, 是 give 3 options + 推荐其中 1 个. 让 customer 仍然觉得 in control. |
+| **Acknowledge before reframe** ⭐ | 5 秒承认对方 stake → 2-3 秒 pause → reframe to shared goal. Sequence matters, 跳过 acknowledge 直接 reframe = customer 觉得没被听到. |
+| **Reframe** | 重新框定. "Delay" → "right answer faster vs wrong answer on time". 不是 push back, 是换角度. |
+| **Reverse anchor** | 反向锚定. Comp 谈判时让对方先 give number, 你 negotiate up. |
+| **Steel man** | 用对方最强 argument 自己复述一遍, 确认你 understand 不是 strawman. |
+| **1v1 not group** | 单独谈不是群面. Group setting bad news 让对方 defensive 公开 push back. |
+| **Friday afternoon not Monday** | 时机选择. Friday 给对方周末 process, Monday 当面 deliver = ambush. |
+| **Push back** | 反推. Customer 提的方案有问题, 你 not capitulate. |
+| **Escalation ladder** | 升级阶梯. Step 1 peer ops manager → Step 2 joint manager 1:1 → Step 3 written objection. |
+| **Written objection** | 书面反对意见记录. "My recommendation was B, decision was A, I'll execute A but flag risks". Ass-covering + 学习记录. |
+
+### BNPL / 风控 / 监管
+
+| 术语 | 解释 |
+|---|---|
+| **BNPL (Buy Now Pay Later)** | 先买后付. 这题的业务背景. |
+| **Tier 1 / 2 / 3** ⭐ | 风险分层. Tier 1 = info lookup (低风险), tier 2 = structured calc (中风险), tier 3 = final approve (regulator-impacting, 一次性). |
+| **Refund automation** | 退款自动化. 这题里 ops 想推全自动, 我 push back tier 3 不能上. |
+| **Wrong-call rate** | 错决策率. Tier 3 8% wrong-call = 100 笔有 8 笔判错. |
+| **95% CI (Confidence Interval)** | 95% 置信区间. "8% wrong-call (CI 6.5-9.8%)" = 95% 概率真实值在 6.5-9.8 之间. |
+| **OJK** ⭐ | 印尼金融服务管理局 (Otoritas Jasa Keuangan). 单笔 wrong refund 触发 audit threshold $50k 累积. |
+| **BACEN** | 巴西央行. |
+| **Compliance team** | 合规团队. 必 sign-off, 否则监管过不了. |
+| **Compliance red line** | 合规红线. Specific 数字 promise (e.g., "你 eligible to increase by 5000") = 红线, 触碰会被监管罚. |
+| **Output schema constraint** | 输出格式限制. Boolean only / no number, 防止 LLM 自由扩展 surface. |
+| **Pilot data** | 试点数据. 2 周跑 tier 1+2 拿到的真实统计. |
+| **Hold-out test set** | 留出测试集. 训练时不让模型见, 用来 unbiased 评估. |
+
+### 业务 KPI
+
+| 术语 | 解释 |
+|---|---|
+| **Q-end (Quarter End)** | 季末. KPI 考核的关键时点. |
+| **Quarterly target** | 季度目标. Ops director / VP commit 给上级的承诺. |
+| **OKR** | Objectives and Key Results. Google 流行的目标管理体系. 这题里 VP 把 tool 写进 Q3 OKR. |
+| **OKR amendment** | OKR 修订. 季中改 OKR, VP 不丢面子的途径. |
+| **KPI lift** | KPI 提升. |
+| **Cost reduction** | 成本节省. |
+| **Coverage** | 覆盖率. "Tier 1+2 70% volume coverage" = 这两层覆盖 70% 业务量. |
+| **Catch rate** | Voice agent 接通 + 完成对话比例. |
+
+### 项目 / 工程
+
+| 术语 | 解释 |
+|---|---|
+| **Soft launch** | 软启动. 小流量先上, 不大张旗鼓宣传. |
+| **Accent adapter** | 口音适配器. Lightweight fine-tune 针对特定方言. |
+| **Dry-run** | 演练 / 干跑. Launch 前 simulate 真实场景. |
+| **Cross-team Zoom** | 跨团队远程会议. |
+| **Q3 / Q4** | 第三 / 第四季度. |
+
+### 公司 / 人
+
+| 术语 | 解释 |
+|---|---|
+| **Product VP** | 产品副总裁. |
+| **Ops director / ops lead** | 运营总监 / 运营负责人. |
+| **Skip-level** | 越级 — manager 的 manager. Ops director 跟 my manager 的 manager 反馈, 是 skip-level feedback. |
+| **CS team** | 客服团队. |
+| **Marketing director** | 营销总监. |
+
+### 反 pattern
+
+| 术语 | 解释 |
+|---|---|
+| **Ambush** | 突袭. 不给对方 mental prep 时间. Bad news 的 anti-pattern. |
+| **Sugar-coat** | 糖衣. 把 bad news 包装太软, 对方听不出严重性. |
+| **Procrastination** | 拖延. "我 wait 3 days build stronger case" 是 fear 包装. |
+| **Confrontational** | 对抗性的. Push back too hard 没有 acknowledge. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 跟 SWE / Sales 区分度最高的一道题之一**. 表面问沟通, 实际筛 6 件事:

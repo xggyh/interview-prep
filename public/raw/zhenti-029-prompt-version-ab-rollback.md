@@ -8,6 +8,133 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 LLM ops + 产品 ops + ML ops 三层混合. 名词不懂答不清 lifecycle. 5 min 看完.
+
+### 概念框架
+
+| 术语 | 解释 |
+|---|---|
+| **Prompt** ⭐ | LLM 的系统输入文本, 决定 LLM 行为. 这题 200+ 个 prompt 在跑. |
+| **Prompt as data, not code** ⭐ | 本题核心思维 — prompt 是产品 config (DB 管), 不是源码 (git 管). |
+| **Prompt lifecycle** | 创建 → eval → canary → A/B → prod → 回滚 / deprecate. |
+| **System prompt** | 定义 LLM 角色的指令文本. |
+| **Variables / Jinja templating** | 模板变量 — `{{ user_name }}` 这种占位符. |
+| **Jinja2** | Python 模板引擎, 业界 prompt 标准. |
+| **Tier-1 / Tier-2 / Tier-3** | 重要度分级 — tier-1 关键 (支付 / 合规), tier-3 实验. |
+
+### 版本 / 注册中心
+
+| 术语 | 解释 |
+|---|---|
+| **Prompt registry** ⭐ | 集中存 prompt 的服务 — 这题主架构. |
+| **Version tag (semver)** | 语义化版本 1.2.3 — MAJOR.MINOR.PATCH. |
+| **Parent version** | 派生自哪个版本 (forking). |
+| **State machine (draft/eval-passed/canary/prod/deprecated/rolled-back)** | prompt 版本的状态. |
+| **Variables schema** | 模板变量的 JSON Schema. |
+| **PromptLayer / LangSmith / Helicone** | 3 个商业 prompt 管理工具. |
+
+### Eval (评估)
+
+| 术语 | 解释 |
+|---|---|
+| **Eval gate** ⭐ | 评估卡口 — 必须过才能 promote. |
+| **Golden set** ⭐ | 黄金集 — 50-200 (input, expected) 对, 回归测试用. |
+| **LLM-as-judge** ⭐ | 用 LLM 当 judge 比较两个回复. |
+| **Pairwise comparison** | 配对比较 A vs B. |
+| **Rubric-based scoring** | 评分细则 — helpfulness/accuracy/tone 各打分. |
+| **Human review** | 人工审核 — tier-1 必须. |
+| **Active learning queue** | 低 confidence 样本进入人工标注队列. |
+| **Lint** | 语法检查 — Jinja syntax / PII / 长度 / model 兼容. |
+| **Regression budget** | 允许 quality 下降的预算 (e.g., 3%). |
+| **BLEU / Exact match / nDCG** | 不同任务的 scoring 指标. |
+
+### A/B 测试 / Rollout
+
+| 术语 | 解释 |
+|---|---|
+| **A/B test** ⭐ | A 和 B 两组随机比较, 测效应大小. |
+| **Canary rollout** ⭐ | 灰度发布 — 1% → 10% → 50% → 100% 分阶段. |
+| **Feature flag** ⭐ | 功能开关 — runtime 控制 traffic 走哪个版本. |
+| **LaunchDarkly / Statsig / Optimizely** | 3 个商业 feature flag 平台. |
+| **Sticky assignment** ⭐ | 粘性分配 — 同 user 总走同 version, hash(user_id) % 100. |
+| **Traffic split / Traffic percentage** | 流量切分百分比. |
+| **Multi-armed bandit (MAB)** | 多臂老虎机 — 边 explore 边 exploit 找最优 arm. |
+| **Thompson sampling** | MAB 的一种贝叶斯算法. |
+| **Power calculation** | A/B 需要多少 sample 才能检测出 X% 效应. |
+| **Holdout / Control group** | 对照组. |
+| **Cohort** | 同质用户群. |
+
+### Rollback / 自动回滚
+
+| 术语 | 解释 |
+|---|---|
+| **Auto-rollback** ⭐ | 自动回滚 — metric 超阈值时无需人工. |
+| **Rollback trigger** | 触发回滚的 metric 阈值. |
+| **Baseline metric** | 过去 7 天的基准. |
+| **Sliding window** | 滑动窗口比较. |
+| **Flap loop** | 反复回滚 + 重发的循环, 必须防. |
+| **Freeze window** | 回滚后冻结时间 (24h), 防 flap. |
+| **Cache invalidation** ⭐ | 缓存失效 — Redis cache 必须 < 30s 失效让 rollback 生效. |
+| **TTL (Time To Live)** | 缓存过期时间. |
+| **Fix forward** | 不回滚, 直接发布修复版. |
+
+### 多租户 / 变体
+
+| 术语 | 解释 |
+|---|---|
+| **Per-tenant variant** ⭐ | 每客户的定制版本. |
+| **Inheritance / extends** | Jinja extends 让 variant 继承 base 并覆盖部分块. |
+| **Variant pool** | 命名变体池 (formal / casual / multilingual). |
+| **Tenant override** | 租户级覆盖. |
+
+### 监控 / 业务指标
+
+| 术语 | 解释 |
+|---|---|
+| **CSAT** | Customer Satisfaction Score — 客户满意度. |
+| **NPS (Net Promoter Score)** | 净推荐值. |
+| **Refund rate** | 退款率. |
+| **Conversion rate** | 转化率. |
+| **Acceptance rate** | 用户对 LLM 答案的接受率 (thumbs up). |
+| **Quality score** | LLM-judge 跑 1% 样本评的分. |
+| **Token usage** | LLM 调用的 token 量, 直接关系 cost. |
+| **Runaway cost** ⭐ | 失控成本 — 新 prompt 长 50% → 月成本翻倍. |
+
+### 合规 / 审计
+
+| 术语 | 解释 |
+|---|---|
+| **Audit log** ⭐ | 审计日志 — 每次 prompt 变更的 who/what/when/why. |
+| **Immutable log** | 不可变日志 — WORM 写入. |
+| **SOX (Sarbanes-Oxley)** | 美国上市公司财务合规, 要求审计保留 7 年. |
+| **SOC 2** | 企业服务安全审计标准. |
+| **Retention period** | 保留期 (这题 7 年). |
+| **Reason / change reason** | 变更原因 — audit 必填. |
+
+### Auth / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **SDK fetch** | 应用通过 SDK runtime 拿当前 prompt 版本. |
+| **Retool** | 内部工具 UI 平台 — 适合搭 PM 友好编辑器. |
+| **PagerDuty** | on-call + 告警. |
+| **Slack notify** | Slack 通知. |
+| **Anthropic prompt cache** | Anthropic 自己的 server-side prompt cache. |
+
+### 模型 / Provider
+
+| 术语 | 解释 |
+|---|---|
+| **Claude Sonnet 4.6 / Opus 4.7** | Anthropic 模型 — Sonnet 主用, Opus judge. |
+| **GPT-5.5** | OpenAI 旗舰. |
+| **Gemini 3 Pro** | Google 旗舰. |
+| **Model-agnostic prompt** | 不绑死特定 model 的 prompt 设计. |
+| **Cross-model eval** | 同 prompt 跑多 model 对比. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 git, 是考你 **prompt 不是普通 code, 需要 ML ops 加 web ops 加产品 ops 三层混合的 lifecycle 系统**:

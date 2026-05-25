@@ -7,6 +7,94 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 judgment vs stubbornness 的故事 — 涉及大量决策方法论术语 + LLM / 量化 / 监管术语.
+
+### 决策方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Hill worth dying on** ⭐ | 值得死磕的山头. Principle-grounded + one-way door + 高 blast radius. Senior FDE 一年只 stand firm 2-3 次. |
+| **Principle-grounded vs ego-grounded** ⭐ | 立场基于原则 (数据 / 监管 / 安全 / 用户) 还是基于自我. Principle 是 strength, ego 是 red flag. |
+| **Steel-man** ⭐ | 把对方最强 argument 复述一遍, 确认 understand. 跟 strawman (扎稻草人) 相反. |
+| **Reversibility (one-way vs two-way door)** ⭐ | 决策可逆性. One-way = 错了高代价 (e.g., 改 base model 要全部 retrain). Two-way = 错了易撤. |
+| **Blast radius** | 错误影响范围. 单 team vs 多用户 / 美元 / 监管. |
+| **A/B pilot + abide by data** | 对照试验 + 双方承诺听数据. "Pilot data resolve, not who's right". |
+| **Conditional commitment** | 条件承诺. "If pilot shows X < threshold, I'll back down". 让 stand firm 不变 stubborn. |
+| **Confirmation bias** | 确认偏误. 见 contradictory data 先找 alternative explanation 而不是 update. |
+| **Admit partial loss** | 承认部分失败. Stand firm 赢了之后 admit 哪部分对方对的, 维持关系. |
+| **Trust bank** | 信任银行. Stand firm 在 trust bank 高时 spend 一次, 然后立刻 deposit 回去. |
+
+### 5 种 ego variants (要警惕的)
+
+| 术语 | 解释 |
+|---|---|
+| **Sunk cost** | "spent 4 weeks on this, can't change now". |
+| **Public commitment** | "Told VP this, can't reverse now". |
+| **Identity-grounded** | "I'm the ML expert, you're ops, my call". |
+| **Stubborn loop** | "They keep pushing back so I keep digging in". |
+| **Ego-as-principle** | "Standardize" when really "I want to build". |
+
+### LLM / 量化技术
+
+| 术语 | 解释 |
+|---|---|
+| **Llama 2 7B / 13B** ⭐ | Meta 开源 LLM. 7B 跟 13B 参数量差近 2×, inference 成本差更大 (~3×). 13B 更聪明但贵. |
+| **INT8 quantization** ⭐ | 把模型从 FP16 量化到 INT8, 显存减一半. 13B INT8 cost 只比 7B FP16 高 1.4× (不是 3×). |
+| **FP16** | Half-precision floating point. LLM 训练 / 部署常用. |
+| **Hallucination rate** | 模型编造事实的比例. 7B 在金融数字上 4.2%, 13B 1.5%, 差距显著. |
+| **SFT (Supervised Fine-Tuning)** | 监督微调. Base model 升级 = SFT 全部 retrain. |
+| **DPO (Direct Preference Optimization)** | 直接偏好优化. 同样 base model 改了要 retrain. |
+| **Retrain cost** | 重训成本. Base model swap 后 SFT 50k dialog + DPO 20k pair 全 redo, $200k + 8 weeks. |
+| **vLLM** | 高吞吐 LLM inference engine. INT8 latency 280ms vs FP16 320ms. |
+| **Latency (推理延迟)** | 单次推理耗时. Voice agent 实时性关键. |
+| **Throughput** | 单位时间处理量. INT8 throughput 高于 FP16. |
+
+### 业务 / 监管
+
+| 术语 | 解释 |
+|---|---|
+| **OJK** | 印尼监管. 2023 罚款过 fintech RMB 8M = 类似 case 的 precedent. |
+| **OJK precedent** | 监管前例. 数据论证里强力的引用. |
+| **Regulator exposure** | 监管暴露. 4% hallucination × 数百万 monthly call = 数万 wrong info → 监管行动. |
+| **Hidden cost** | 隐藏成本. 7B 便宜的 inference 是 visible, regulator fine + retrain 是 hidden. |
+| **Industry precedent** | 行业先例. "同类 fintech voice agent 大多 7B" 是 weak argument 之一. |
+| **Internal benchmark** | 内部基准测试. 1k labeled financial dialog 自己 eval. |
+| **Statistical significance** | 统计显著性. CI 不重叠 = 显著差异. |
+
+### 沟通 / 升级
+
+| 术语 | 解释 |
+|---|---|
+| **Stand firm** | 坚持立场. 跟 stubborn 区分 — selective + principle-grounded. |
+| **Back down** | 让步. 不是 weakness, 是知道 hill not worth dying on. |
+| **Push back** | 反推. 跟 reframe / acknowledge 配合用. |
+| **Escalation ladder** | 升级阶梯. Peer → joint manager 1:1 → written objection. |
+| **Joint manager 1:1** | 双方 manager 一起开会. "Not over their head, this exceeds peer authority". |
+| **Counter (counter-argument)** | 反驳论证. |
+| **Skip-level** | 越级反馈. Ops director 跟 my manager 的 manager 说. |
+
+### 工程 stack
+
+| 术语 | 解释 |
+|---|---|
+| **LangGraph** | LangChain 出的 agent orchestration framework. 生态广. |
+| **Agent orchestration framework** | Agent 编排框架 — 多 tool + memory + planning 组合. |
+| **Memory layer (agent)** | Agent 记忆层. Short / long / shared memory. |
+| **Pluggable backend** | 可插拔后端. Memory layer 给 SQL or vector 选择, 不强制. |
+| **Vector DB** | 向量数据库. Semantic search 适用. |
+| **Pinecone / Qdrant / pgvector** | 三个主流 vector DB. pgvector 是 Postgres 插件. |
+
+### 反 pattern
+
+| 术语 | 解释 |
+|---|---|
+| **Tattling** | 打小报告. Escalation too early 给人这种感觉. |
+| **Ass-covering** | 自保. Written objection 既是 self-protection 也是 learning record. |
+
+---
+
 ## 这道题在考什么
 
 这是 FDE 题里 **judgment 跟 stubbornness 区分度最高的一道**. 表面问坚持, 实际筛 6 件事:

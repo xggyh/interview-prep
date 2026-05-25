@@ -8,6 +8,79 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Client Sim 题 = **communication + ownership + 政治术语**. 5 min 速查.
+
+### 沟通 / 谈判核心
+
+| 术语 | 解释 |
+|---|---|
+| **Ownership language** ⭐ | 主动归责的语言 — "I" / "we" / "I should have flagged earlier" 替代 "the team" / "engineering said". 把延期归到自己, 不是别人. |
+| **Blame language** | 推卸语言 — "Engineering said X" / "The team didn't tell me" / "The customer's slow". CTO 一听就 lose trust. |
+| **Frame the call** | 开场定调 — "I'll be direct" / "I called specifically to deliver bad news". 让对方知道接下来是 hard news. |
+| **Headline first / Bury the lead** ⭐ | 先讲核心结论, 再讲 context. "We're slipping 3 weeks. New target [date]." 然后才讲原因. 反过来 = bury the lead = 失分. |
+| **Hard news delivery** | 坏消息传递技巧 — 直接 + 结构化 + own it. CTO/VP 这级别人**讨厌委婉**, 喜欢 specific. |
+| **Push back / Disagree-and-commit** | 推回 / 反对但执行 — 你可以反对 CTO 的某个 framing, 但用 evidence 不情绪. |
+| **Emotional regulation** | 情绪管理 — 对方激动你不能跟着激动. 沉默 + 听 > 反驳. |
+| **Don't over-promise** ⭐ | 不要超额承诺 — "I'll fix it this weekend" / "We'll add 5 extra features to make up" = dig your own hole. **超额承诺 = 下次再 miss**. |
+| **Promise the process, not the outcome** ⭐ | 承诺流程不承诺结果 — "I'll have written answer by Wednesday" 而非 "you'll get credit". 你不能控制结果, 但能控制流程. |
+| **Specific vs vague** | 具体 vs 模糊 — "June 15th" 不是 "soon". "80% confident" 不是 "pretty confident". |
+| **Confidence level (置信度)** | 给具体百分比 — "80% confident in June 15. Remaining risk is X". 量化你的不确定性. |
+| **Behavioral commitment / Behavioral change** | 行为承诺 — 不是道歉, 是 "我以后这样做": "anything that risks >5 business day slip, I call you within 24 hours". |
+| **Escalation path** ⭐ | 升级路径 — 客户要找你 director 或更高级别. **不要 fight escalation**, 主动配合: "I'll text her in 30 seconds". |
+| **Hand mic to them** | 把话筒给对方 — 讲完你的 3 min headline 后**闭嘴**, 听对方反应. 大多数候选人继续讲 = 输. |
+
+### 角色 / 头衔
+
+| 术语 | 解释 |
+|---|---|
+| **CTO (Chief Technology Officer)** ⭐ | 首席技术官 — 客户技术决策最高人. 这题对方. 技术人, 直接 + 结构化沟通最有效. |
+| **Director / VP** | 你公司里的中层 / 高层 — escalation 可能涉及. |
+| **AE (Account Executive)** | 客户大客户经理 — 这题里负责商业 + 合同的人 (credit 谈判 owner). |
+| **CEO** | 客户 CEO — 如果 CTO 要升级到他这级别, 你要 prep 不同的话术. |
+| **GM (General Manager)** | 业务负责人 — Gao Xin 简历里 Indonesia GM 是这种角色. |
+
+### 项目 / 部署术语
+
+| 术语 | 解释 |
+|---|---|
+| **Soft-launch vs Hard-launch** ⭐ | 软发布 vs 硬发布 — Soft = 内部 / 受限用户先用 (ramp-up); Hard = 全量 / 对外发布 (board commit 通常对此). **这题里 soft-launch 滑了 3 周, hard-launch 不动**. |
+| **Slip (滑期)** | 项目延期. "3-week slip". |
+| **ETA (Estimated Time of Arrival)** | 预计完成时间. |
+| **Board commit** | 向董事会承诺 — CTO 的 board commit 是这题敏感点. |
+| **Phased rollout / Phased launch** | 分批上线 — 不全量发, 先 20% 用户, 再 ramp 到 100%. 这题 fallback 选项. |
+| **Scope reduction** | 减小范围 — 不要全功能上, 砍掉 [feature B] 先上 [feature A]. |
+| **Internal milestone vs External commit** | 内部里程碑 vs 对外承诺 — 这题关键 framing: 把 soft-launch 表述为 internal 不让 board 看到. |
+
+### 流程 / 工具
+
+| 术语 | 解释 |
+|---|---|
+| **Daily standup** | 每日站会 — "I'm the new daily owner of [bottleneck]" 是 mitigation. |
+| **Daily 5-line status update** | 每日 5 行状态更新 — 这题具体的 behavioral commitment. |
+| **Hard internal checkpoint** | 硬性内部检查点 — "if not on-track by June 1st, I'll call you that afternoon". 自我设的 trigger. |
+| **Post-mortem** | 事后复盘 — 出问题后系统性总结. 这题没明说但隐含. |
+| **Cc list** | 抄送列表 — 你的 daily status 抄给谁是 CTO 决定. |
+
+### 客户具体场景
+
+| 术语 | 解释 |
+|---|---|
+| **Snowflake cluster** | Snowflake 云数仓 — 这题集成对象, 出权限问题. |
+| **Data governance committee** | 数据治理委员会 — 客户内部审批组织, biweekly meeting 是 bottleneck. |
+| **Inference latency** | 推理延迟 — LLM 部署的关键性能指标. 这题超 spec 3x. |
+| **Prompt strategy / Routing model** | 提示策略 / 路由模型 — mitigation 提到的技术手段, 用小模型先 route 减少大模型调用. |
+
+### Gao Xin 简历相关
+
+| 术语 | 解释 |
+|---|---|
+| **OJK (Otoritas Jasa Keuangan)** | 印尼金融监管局 — Gao Xin 的 Indonesia 项目监管. 类比这题的 governance committee. |
+| **BNPL (Buy Now Pay Later)** | 先买后付 — TikTok PayLater 产品类别. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能找借口.

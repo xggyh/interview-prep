@@ -7,6 +7,77 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题术语密度极高 — PE / RAG / FT 三大派全考. 5 min 扫完再往下读.
+
+### 三大技术核心 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **PE (Prompt Engineering)** ⭐ | **改 input format, 不动模型**. System prompt, few-shot examples, chain-of-thought 都是 PE. 启动成本 $0, 但 prompt 太长 = 每 query 贵. |
+| **RAG (Retrieval-Augmented Generation)** ⭐ | **检索后生成**. Query → embed → vector DB 找相似 chunk → 拼进 prompt → LLM 回答. 知识可热更新 + 有 citation, 但加 30-200ms latency. |
+| **Fine-tune (FT)** ⭐ | **改模型权重**. 用 (input, expected_output) 训, 让 model 学新行为. 一次性 $25k+, 更新慢 (要 re-train), 但跑起来便宜. 2026 三种主流: SFT / DPO / RLHF. |
+
+### Fine-tune 子流派
+
+| 术语 | 解释 |
+|---|---|
+| **SFT (Supervised Fine-Tuning)** | 标准的监督训练 — 给 (输入, 期望输出) 对, model 学 next-token prediction. FT 最基础形式. |
+| **DPO (Direct Preference Optimization)** | 用 (chosen, rejected) 对学偏好. 不需要 reward model, 比 RLHF 简单稳定. 2024+ 主流. |
+| **RLHF (Reinforcement Learning from Human Feedback)** | 训 reward model + PPO. 复杂但 quality 上限最高 — Claude / GPT 后训用这个. |
+| **LoRA (Low-Rank Adaptation)** | 只训 1-3% 参数, 不动 base model. 比 full FT 便宜 10x + 减少 catastrophic forgetting. |
+| **QLoRA** | 4-bit 量化 + LoRA. 单 GPU 也能 FT 70B model. |
+| **PEFT (Parameter-Efficient Fine-Tuning)** | 总称 — LoRA / QLoRA / adapter 都属 PEFT. 跟 full FT 对立. |
+| **Catastrophic forgetting** | FT 后 model 把通用能力忘了 — 学新任务太狠, 老任务变笨. 修法: 混 20% general 数据. |
+| **Continued pre-training** | 在 base model 上继续 pre-train (无监督), 给 domain 知识. 比 SFT 更"基础", 但贵 + 不稳. |
+
+### RAG / 检索 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Chunking** | 把长文档切成小块. 大小 (256 / 512 / 1024 token) + overlap (overlap 50-100 token 防 cut off) 影响 retrieval 质量. |
+| **Embedding** | 把 text → 1024 维向量. 用 cosine similarity 比较相似度. 模型如 text-embedding-3-large / Voyage-3 / BGE-M3. |
+| **Vector DB / 向量数据库** | 存 embedding 的数据库 — Qdrant / Pinecone / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速. |
+| **Dense retrieval** | 用 embedding 找相似 — 适合 semantic match (paraphrase). 但抓不到 exact ID / SKU. |
+| **Sparse retrieval / BM25** | 关键词匹配 — BM25 算法. 适合 exact match (产品号, 人名). 跟 dense 互补. |
+| **Hybrid retrieval** | Dense + BM25 同时跑, 合并结果. Production-grade RAG 标配, 比单一方法 +10pp recall. |
+| **Reranker / cross-encoder** | 第二阶段精排. Dense 召回 top-50, cross-encoder 重新打分留 top-10. 模型如 bge-reranker / Cohere Rerank. |
+| **HyDE (Hypothetical Document Embeddings)** | 让 LLM 先生成"假想答案", 再用这个答案的 embedding 去检索. 对短查询 / 模糊查询有效. |
+| **Citation** | RAG 输出附"来源是 chunk X". 合规 (medical / legal) 必须有, 也方便 hallucination 排查. |
+| **Long-context** | 模型支持的最大 input token. 2026: Gemini 3 Pro 2M / Claude Opus 4.7 1M. 改变了一些 RAG 边界. |
+
+### 评估 / Eval
+
+| 术语 | 解释 |
+|---|---|
+| **Golden set / Eval set** | 200-2000 个手标的 (query, expected answer) 对, 用来 measure model 改动. |
+| **LLM-as-judge** | 用另一个 LLM 给输出打分. 必须**不同 model**自评 (否则 bias), 必须**校准过** (Cohen's kappa > 0.6). |
+| **Pass@k** | 采样 k 次, 至少一次对就算对. Coding eval 常用. |
+| **Brier score** | 概率预测校准指标 — predicted 0.9 confidence 时, 实际是不是 90% 对? |
+
+### 推理 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **Cascade routing** ⭐ | 按难度路由 — 简单 query → Haiku, 复杂 → Sonnet, 最复杂 → Opus. 通常省 10x cost. |
+| **Prompt caching** | Anthropic / OpenAI 5-min 缓存重复的 system prompt. 90% input cost 立刻减. |
+| **Distillation** | 大 model 教小 model — 用 Opus 输出训 Haiku, 然后只跑 Haiku. FT cost reduction 的常用 path. |
+| **Time to first token (TTFT)** | 用户按 enter 到看到第一个字的时间. Streaming UX 关键指标. |
+| **qps / qpd** | Queries per second / per day. FT 经济性常用 50k qpd 当门槛. |
+
+### Model 名 (2026)
+
+| 术语 | 解释 |
+|---|---|
+| **Claude Opus 4.7** | Anthropic 2026 旗舰. 1M context, $5/$25 per M token. 最强 reasoning. |
+| **Claude Sonnet 4.6** | Anthropic 中端. $3/$15 per M. 多数 production 默认. |
+| **Claude Haiku 4.5** | Anthropic 小型. $1/$5 per M. Cascade 的便宜端. |
+| **Gemini 3 Pro** | Google 2026. 2M context, $2/$12. 超长文档优势. |
+| **GPT-5.5** | OpenAI 2026 旗舰. $5/$30. |
+
+---
+
 ## 这道题在考什么
 
 表面是 "选哪个 technique", 底下藏着 **8 个 FDE evaluation signal**:

@@ -7,6 +7,74 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是个完整 5 分钟技术故事, 涉及 voice agent / 后训练 / 监管 / ablation 等一堆 jargon. 这张表过完, 回答里的术语就不慌.
+
+### 技术 stack ⭐ 这题密度最高
+
+| 术语 | 解释 |
+|---|---|
+| **ASR (Automatic Speech Recognition)** ⭐ | 语音转文本. Voice agent 的第一步. 这题里 Azure / Google / Whisper 都是 ASR provider. |
+| **TTS (Text-to-Speech)** | 文本转语音. Voice agent 的最后一步, 把 LLM 生成的回复念出来. |
+| **vLLM** | 高吞吐 LLM inference engine, 用 PagedAttention 管理 KV cache. 部署 LLM 标配. |
+| **SGLang** | 另一个 LLM serving framework, 比 vLLM 在结构化 prompt 场景更快. |
+| **SFT (Supervised Fine-Tuning)** ⭐ | 监督微调. 50k 人工标注 dialog, 教模型 "正确回答应该长什么样". |
+| **DPO (Direct Preference Optimization)** ⭐ | 直接偏好优化. 20k preference pair (A 好于 B), 教模型偏好. 比 RLHF 简单. |
+| **RL (Reinforcement Learning)** | 强化学习. 比 DPO 更复杂, 用 reward model + policy gradient. |
+| **INT8 quantization** | 把模型参数从 FP16/FP32 量化到 INT8, 显存 / 计算成本降, 精度小损失. |
+| **RAG (Retrieval-Augmented Generation)** | 检索增强生成. 先 retrieve 相关 doc 再让 LLM 生成. |
+| **KV cache** | LLM 推理时 attention 的 key-value 缓存, vLLM 优化的核心. |
+
+### 模型 / 架构
+
+| 术语 | 解释 |
+|---|---|
+| **Llama 7B / 13B** | Meta 开源的 LLM 系列, 7B/13B 是参数量 (70 亿 / 130 亿). 13B 比 7B 强但 inference 贵 3×. |
+| **Base model** | 基础模型. 后续做 SFT/DPO/RL 都在 base model 之上. 选错难撤. |
+| **Cascade (级联兜底)** ⭐ | Primary → fallback → last-resort 三层. Azure → Google → 本地 Whisper. Vendor 挂时关键. |
+| **Whisper** | OpenAI 开源的 ASR 模型, 可本地部署. 比云 ASR 慢但不挂. |
+| **Hallucination (幻觉)** | LLM 编造不存在的事实. 金融数字 hallucination 是监管红线. |
+| **9-variant ablation** | 9 种组合实验 — 逐个 disable / replace pipeline 组件看哪个真正提供 lift. ConvFinQA 用的方法. |
+| **Negative result** | 实验显示某组件没用 (或负 lift). 学术圈通常藏起来, publish 是 honesty 信号. |
+
+### 业务 / 行业
+
+| 术语 | 解释 |
+|---|---|
+| **Voice agent debt collection** | 语音 agent 自动催收. TikTok PayLater 用例. 替代人工催收的 outbound call. |
+| **BNPL (Buy Now Pay Later)** | 先买后付. Klarna / Affirm / TikTok PayLater 这类. |
+| **CER (Catch Rate / 接通率)** | Voice agent 成功 catch 客户对话 + 完成 tier 1/2 协商的比例. |
+| **Outbound call** | 系统主动拨出电话. 反过来是 inbound (客户打进来). |
+| **Tier 1 / 2 / 3** | 风险分层. Tier 1 (低风险自动) / Tier 2 (中风险有保护) / Tier 3 (高风险人审). |
+| **OJK** | 印尼金融监管. 任何 wrong refund 都可能触发 audit. |
+| **BACEN** | 巴西央行监管. |
+| **Reportable incident** | 监管要求必须上报的事故 (e.g., 错告知客户金额, 系统给错 refund). |
+
+### 工程 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **Phased rollout** | 分阶段上线 — 100 客户 → 1k → 10k → full. 跟 canary deployment 同义. |
+| **On-call** | 值班. 出事第一时间响应. 印尼上线我自己 24/7 on-call 1 周. |
+| **Shadow mode (影子模式)** | 新 model 跟旧 model 并跑, 新 model 只记录不生效. Production 上 risky model 必经. |
+| **A/B test** | 把流量分成 A/B 两组比效果. 数据驱动决策标准做法. |
+| **L1 / L2 / L3 monitoring** | 三层监控 — L1 (real-time system metric), L2 (daily human sample review), L3 (weekly ops 反馈). L3 通常 catch L1 看不到的 silent regression. |
+| **Silent regression** | 沉默退化 — metric 看上去 OK 但客户体验下降. 比 outright failure 更危险. |
+| **Reversibility / one-way / two-way door** | 决策可逆性. Two-way = 易撤 (改 prompt), One-way = 难撤 (改 monitored prompt). |
+| **Walking skeleton** | 最薄端到端版本, 所有组件 mock 但流程跑通. |
+| **Sim-to-real** | 仿真训练 → 真实部署的迁移. Synthetic data + small human eval set 的常见 pattern. |
+
+### 人 / 政治
+
+| 术语 | 解释 |
+|---|---|
+| **Ops (operations team)** | 客户运营团队. FDE 的主要 customer-facing 对接方. |
+| **Stakeholder** | 利益相关方. 印尼 voice agent 有 ops / product / compliance / risk / fraud / legal / OJK liaison / vendor / 内部 ML platform 9 类. |
+| **Senior ML / tech lead** | 资深 ML 工程师 / 技术负责人. 通常是你 disagreement 的对方 + 决策 gate. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 招聘的 highest signal density** 题之一. 表面问技术, 实际在筛:

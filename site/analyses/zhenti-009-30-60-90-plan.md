@@ -7,6 +7,108 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 onboarding plan + 公司 specific 研究 + ramp-up 方法论 综合. 涉及大量公司专属产品 / paper / 框架术语.
+
+### Plan 方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Escalating ambition** ⭐ | 递增式野心. 30 天 = learn (low output), 60 天 = contribute (small ship), 90 天 = own + propose. 不是均匀切分. |
+| **Calibration with hiring manager** ⭐ | 跟招聘经理对齐. Day 1 1-hour 问 "what does success look like for YOU?". Plan 是 hypothesis, manager 答案 updates plan. |
+| **Under-promise day 1, over-deliver day 90** | 起步少承诺, 收尾多交付. FDE rookie 反 pattern 是 over-promise. |
+| **Exit criteria per milestone** | 每个 milestone 的退出标准. Measurable, not aspirational. |
+| **30/60/90 ratio shift** | 时间分配比例随阶段变. Day 1-30 = 70% customer 30% internal. Day 31-60 = 50/30/20. Day 61-90 = 40/30/30. |
+| **Low-hanging fruit (LHF)** | 容易摘的果子. Pod 已经想要但没时间做的小项目. |
+| **Mid-size deliverable** | 中等规模交付. 不是 greenfield, 不是 high-stakes-renewal. 1 month scope. |
+| **Contained 2-week first project** | 受限 2 周首个项目. Bounded, customer-facing, two-way door. |
+
+### 公司专属 — OpenAI
+
+| 术语 | 解释 |
+|---|---|
+| **Operator** ⭐ | OpenAI 的浏览器 + computer use agent. 能在网页上点按钮 / 填表. |
+| **GPT-5** | OpenAI 的下一代 frontier model. |
+| **Codex** | OpenAI 的 code agent / code 生成. |
+| **ChatGPT Enterprise** | OpenAI 的企业版 ChatGPT. |
+| **Custom GPTs / GPT Store** | 用户自定义 GPT + 共享市场. |
+| **Realtime API** | OpenAI 的实时 voice + multimodal API. |
+| **Stargate** | OpenAI + Microsoft 等的 $100B+ 数据中心 / 算力 投资项目. |
+| **Eval & Deployment team** | OpenAI 内部专注 eval + 部署的团队. |
+| **Tomoro acquisition** | OpenAI 2025 收购 Tomoro (Singapore agent company). |
+
+### 公司专属 — Anthropic
+
+| 术语 | 解释 |
+|---|---|
+| **Claude (3.7 / Opus / Sonnet / Haiku)** | Anthropic 的模型系列. |
+| **Claude Code** | Anthropic 的 code agent / CLI. |
+| **Constitutional AI** ⭐ | Anthropic 用 AI 反馈替代部分人类反馈做 alignment (RLAIF). |
+| **Tool Use API** | Anthropic 的工具调用 API. |
+| **Computer Use API** | Anthropic 的版本的 Operator (computer use). |
+| **Core Views (on AI Safety)** | Anthropic 公开的 mission alignment 文档. |
+| **RSP (Responsible Scaling Policy)** | 模型能力到某 threshold 才解锁部署的政策. |
+| **Applied Solutions** | Anthropic 的 FDE-equivalent 团队名. |
+
+### 公司专属 — Palantir
+
+| 术语 | 解释 |
+|---|---|
+| **Foundry** ⭐ | Palantir 的数据 + ontology 平台. |
+| **AIP (Palantir AI Platform)** | Palantir 把 LLM 接到 Foundry 上. |
+| **Apollo** | Palantir 的 deployment 管理工具. |
+| **Workshop** | Palantir 的 low-code app builder. |
+| **Ontology** | Palantir 核心方法论 — 上层业务概念词典. |
+| **Karp's letters** | Palantir CEO 每年的 shareholder letter, 哲学 + 战略. |
+
+### 公司专属 — Databricks
+
+| 术语 | 解释 |
+|---|---|
+| **Lakehouse** | Databricks 核心概念 — data lake + data warehouse 合一. |
+| **MLflow** | Databricks 的 ML lifecycle 工具 (track / version / deploy). |
+| **Mosaic AI** | Databricks 收购 Mosaic ML 后的 LLM stack. |
+| **DBRX** | Databricks 开源的 MoE (Mixture of Experts) 模型. |
+| **Unity Catalog** | Databricks 的数据治理工具. |
+| **Genie** | Databricks 的 text-to-SQL AI. |
+| **Spark / PySpark** | Apache Spark 大数据处理框架, Databricks 创始团队的核心技术. |
+| **Notebook** | Databricks Notebook — Jupyter-like 协作环境. |
+
+### Source of truth / Ramp 术语
+
+| 术语 | 解释 |
+|---|---|
+| **Shadow (existing FDE on customer calls)** | 旁听老 FDE 客户会议. 不 contribute, only listen. |
+| **Pod meetings** | 小组会议. Pod = FDE 团队的 sub-unit, 通常服务 1-2 个 customer. |
+| **Cross-functional coffee** | 跨职能咖啡聊天. Sales / customer success / product 各人 30 min. |
+| **Deployment retrospective** | 部署复盘. 老项目的 post-mortem 文档. |
+| **Customer pod** | 客户小组. 服务特定客户的 FDE 团队. |
+| **Internal tooling docs** | 内部工具文档. |
+| **Stakeholder map** | 利益相关方地图. 谁决定 / 谁阻拦 / 谁付钱 / 谁用. |
+| **Pattern recognition** | 模式识别. 60-day pattern notes 是 90-day proposal 的原材料. |
+
+### 业务 / 评估术语
+
+| 术语 | 解释 |
+|---|---|
+| **Customer renewal** | 客户续约. FDE 的 ultimate metric. |
+| **Standard performance review trajectory** | 标准绩效评估轨迹. Hit plan = 标准 promotion track. |
+| **Pilot scope (low-risk validation)** | 试点范围 — 低风险验证. |
+| **Customer demonstrably better off** | 客户可证明地变好. "Ship 了" 不够, 客户实际有改善才算 outcome. |
+| **'Go-to person' for 1 small dimension** | 某小方向的 go-to 人. RAG-based tool discovery / multi-market cultural review. |
+
+### 反 pattern / 红线
+
+| 术语 | 解释 |
+|---|---|
+| **Greenfield project** | 从 0 启动的项目. 90 天不该接, 风险高. |
+| **High-stakes-renewal project** | 高风险续约项目. 90 天不该接. |
+| **Tattling** | 打小报告. 升级太早给的感觉. |
+| **Anti-rookie pattern** | 反新人 pattern. Don't ship code day 1, don't disagree publicly, don't propose major changes, don't over-promise. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 题里 most calibrated-thinking-required 的题**. 表面问 plan, 实际筛 6 件事:

@@ -9,6 +9,86 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 重构题的术语都是 "工程素养" 词. 知道这些, 跟面试官同频. 不知道 = 听不懂面试官在 reference 哪个 pattern.
+
+### 设计原则 / SOLID
+
+| 术语 | 解释 |
+|---|---|
+| **Single Responsibility Principle (SRP)** ⭐ | "一个 class/function 只有一个变更理由". 这题 before 有 6 个 (validate, query, fee, fraud, persist, notify) → 必须拆. |
+| **Dependency Injection (DI)** ⭐ | 依赖通过构造函数/参数传入, 而不是全局 import. 让 test 可注入 fake. |
+| **Dependency Inversion** | 高层模块不依赖低层模块, 都依赖抽象 (Protocol / Interface). 这题: handler 不依赖 `psycopg`, 只依赖 `UserRepo` Protocol. |
+| **SOLID** | S (SRP), O (Open-Closed), L (Liskov), I (Interface Segregation), D (Dependency Inversion). OO 设计经典 5 原则. |
+| **Functional core, imperative shell** ⭐ | 内核 pure function, 外壳负责 I/O. 这题: validators / fees / tier 是 pure; adapters / handler 是 imperative. |
+| **Pure function** | 同 input 同 output, 无 side effect, 无 mutation. 测试 trivial. |
+| **Side effect** | DB 写, 文件写, 网络调用, 全局变量改. 必须 inject 才好测. |
+
+### Python 语言特性
+
+| 术语 | 解释 |
+|---|---|
+| **`@dataclass`** | 自动生成 `__init__/__eq__/__repr__`. 替代手写 boilerplate class. |
+| **`Protocol` (PEP 544)** ⭐ | Python 的 structural subtyping. "duck typing 加类型注解" — 不需 inherit, 只要符合接口就行. 这题用来定义 `UserRepo / TxRepo` 等 ports. |
+| **`@dataclass(frozen=True)`** | immutable dataclass. 防意外 mutation. |
+| **Walrus operator `:=`** | Python 3.8+ 赋值表达式. `if err := validate(...)` 一行赋值 + 判断. |
+| **Type hint `User \| None`** | Python 3.10+ union 类型. 等价 `Optional[User]`. |
+| **`mypy --strict`** | 静态类型 checker. CI 强制就抓 90% 类型 bug. |
+
+### 重构 patterns
+
+| 术语 | 解释 |
+|---|---|
+| **Characterization test** ⭐ | "锁住现行行为" 的 test. 在改之前写, 改之后必须仍 pass. **Refactor 必备**. |
+| **Extract function** | 把一段 inline 代码抽成函数. Refactor 最基本动作. |
+| **Adapter pattern** | 包外部 lib (e.g. `psycopg`, `requests`) 进自己的接口. 让 lib 可替换. |
+| **Repository pattern** | 数据访问抽象 (`UserRepo.get_user`). 隐藏 SQL / DB 细节. |
+| **Strangler pattern** ⭐ | 老系统不删, 新系统逐步替换调用方, 最终老系统空了再删. 大 refactor 安全姿势. |
+| **Strategy pattern** | 把行为 plug-in 化 (e.g., 多 region 各自 rule 实现). |
+| **Branch by abstraction** | 不开 feature branch, 而是在 trunk 加抽象层, 灰度切流量. |
+| **Shadow traffic** | 旧/新 handler 同时跑, 比较输出, 0 diff 后切流. |
+| **Feature flag** | `if FEATURE_X: new_path else: old_path`. 灰度上线, 出错回滚. |
+
+### Code smells (代码坏味道)
+
+| 术语 | 解释 |
+|---|---|
+| **Magic number** | 没名字的常量 (`100000`, `0.78`). 改一处要全局搜. |
+| **Tuple positional access** | `user[1]` 看不出意思. 改 dataclass: `user.status`. |
+| **Nested if 3+ levels** | 嵌套太深, 难读. 用 early return / 提 helper. |
+| **Long parameter list** | 7+ 参数. 改 dataclass / config object. |
+| **God function** | 一个函数干所有事 (这题 before). 必拆. |
+| **Global state** | 模块级 `db_conn = ...`. 不能 mock, 测试痛苦. |
+| **Implicit error** | `except: pass` 静默吞错. 看不到失败原因. |
+
+### 测试 / CI
+
+| 术语 | 解释 |
+|---|---|
+| **Unit test vs integration test** | Unit = 单组件 with fakes; integration = 真 DB / 真 HTTP. Unit 快 (ms); integration 慢 (s). |
+| **Fake vs Mock vs Stub** ⭐ | Fake = in-memory 真实现 (`FakeUserRepo`); Mock = 验证 call 的对象; Stub = 返预设值. 这题用 fake 比 mock 干净. |
+| **`unittest.mock.patch`** | Python mock 用 monkey-patch 替换模块属性. characterization test 用. |
+| **Frozen clock** | test 时 inject 固定时间, 避免 flaky. `FrozenClock` 是 fake. |
+| **Cyclomatic complexity** | 函数分支数衡量. 这题 before 25 (高), refactor 后每个 ≤ 10. |
+| **Coverage %** | 测试覆盖的代码行比例. 0% → 95% 是重构成功标志. |
+| **CODEOWNERS** | GitHub 文件: 谁要 review 改某文件. |
+| **`git mv`** | Git 重命名 + move, 保留 blame history. |
+| **CI / Pre-commit hook** | 提交前自动跑 lint / test. `ruff`, `mypy`, `pytest`. |
+| **`ruff`** | Rust 写的 Python linter, 比 `flake8` 快 100x. |
+
+### 业务术语 (BNPL refund 上下文)
+
+| 术语 | 解释 |
+|---|---|
+| **BNPL (Buy Now Pay Later)** | 先享后付 — Klarna / Afterpay / TikTok PayLater. 用户分期付款. |
+| **Refund** | 退款. 这题 handler 处理 refund 决策 (auto vs manual). |
+| **Tier (AUTO / MANUAL)** | 自动放行 vs 走人工 review. 业务规则决定. |
+| **VIP user / Pro tier** | 高价值用户. 通常 fee 减免 + 阈值放宽. |
+| **Chargeback vs Refund** | Chargeback 是持卡人投诉发卡行 + 银行强扣 (有罚款); Refund 是商户主动退. |
+
+---
+
 ## 这道题在考什么
 
 这道题最容易低估. 大多数候选人觉得"重构就是切几个函数嘛", 然后 30 分钟切完, 面试官说"你的过程比结果重要" → 跪. 真正考的是:

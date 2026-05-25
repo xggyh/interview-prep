@@ -7,6 +7,93 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题主线是 ConvFinQA (金融 QA 学术项目) 的 ramp-up. 涉及大量金融 / NLP / 工程术语. 这张表过完, 故事里的 jargon 就跟得上.
+
+### Ramp-up 方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Three-track parallel ramp** ⭐ | 3 个 track 并行 — Domain learning / Technical implementation / Validation. 不 sequential. |
+| **Ramp ≠ master** ⭐ | Ramp = 够 ship first piece + 知道剩余 gap. 不等于 master domain. |
+| **Source of truth = specific human** ⭐ | 不 Google. 找 specific 领域专家 1 小时 lunch chat, 比 1 周 doc 强 10×. |
+| **Calibrated confidence** ⭐ | 校准自信. 我 know 我 know 什么, partial 什么, 不 know 什么. Ship 前 explicit flag low-confidence. |
+| **First small delivery (week 2)** | 第 2 周就 ship 个小东西. Ramp + ship 并行, 不是 ramp 完才 ship. |
+| **Cold email / cold-DM** | 冷邮 / 主动私信. 找 grad student / industry expert 时用. |
+| **Lunch chat / coffee chat** | 1 小时非正式聊天. 比 formal interview 高效. |
+| **Office hour** | 答疑时间. Mentor / senior 开放预约. |
+| **Hypothesis logging** | 假设记录. 结构化试错 — 每个 hypothesis 1 天实验 + success metric + writeup. |
+| **Skim vs deep** | 跳读 vs 深读. Depth proportional to "depth-of-impact-on-decisions-I'll-make". |
+
+### Financial / SEC 术语 (ConvFinQA 用)
+
+| 术语 | 解释 |
+|---|---|
+| **ConvFinQA** ⭐ | Multi-hop financial QA 公开数据集 + paper. 用户简历里的学术项目. |
+| **Multi-hop QA** | 多跳问答. 一个问题需要从多 doc / 多段抽信息再组合. |
+| **SEC 10-K filing** ⭐ | 美国上市公司年报. 200-400 页, 包含 MD&A / financial statements / footnotes. |
+| **MD&A (Management Discussion & Analysis)** | 10-K 里管理层的讨论分析章节. |
+| **EBITDA** | Earnings Before Interest, Taxes, Depreciation, Amortization. 衡量 operating cash flow. |
+| **Operating income** | 营业利润. 跟 EBITDA 区别在是否扣折旧摊销. |
+| **Working capital** | 营运资金 = 流动资产 - 流动负债. |
+| **Deferred revenue** | 递延收入. 客户已付钱但服务未交付的负债. |
+| **Accrual accounting** | 权责发生制. 跟 cash basis 相反. |
+| **Earnings transcripts** | 财报电话会议 transcript. |
+| **NYU Stern** | 纽约大学 Stern 商学院. 金融 grad student source. |
+| **Honoraria** | 小额答谢费 / 顾问费. Pay grad student review. |
+
+### NLP / 检索术语
+
+| 术语 | 解释 |
+|---|---|
+| **Retrieval module** | 检索模块. 把 query → top-k 相关 doc. |
+| **Dense embedding** | 稠密向量嵌入. BERT / OpenAI embedding 都是 dense. |
+| **Sparse retrieval (BM25)** | 稀疏检索. 基于词频 (TF-IDF / BM25), 跟 dense 互补. |
+| **Hybrid retrieval** | Dense + Sparse 结合. 金融 entity 在 dense 上 confused, 需要 hybrid. |
+| **Numeric reasoning** | 数值推理. 处理金额 / 百分比 / 增长率等. |
+| **Aggregation** | 聚合. 多段数字合并算总和 / 平均. |
+| **Sub-question decomposition** | 子问题分解. 复杂 question 拆成多个简单 sub-question. |
+| **Verification (numeric)** | 数值校验. 算完 cross-check 是否一致. |
+| **9-variant ablation** ⭐ | 9 种组合实验, 逐个 disable / replace 组件看 lift. |
+| **Negative result** | 负结果. 实验显示某组件没用. Publish 是 honesty 信号. |
+| **End-to-end accuracy** | 端到端准确率. 跟 per-stage metric 区分. |
+
+### Voice / Production 术语 (alternate STAR)
+
+| 术语 | 解释 |
+|---|---|
+| **ASR / TTS** | 语音识别 / 语音合成. |
+| **Twilio** | 提供 SMS / voice / video API 的云通信平台. |
+| **Telephony provider** | 电信提供商. Twilio / Plivo / Vonage. |
+| **Streaming audio** | 流式音频. 边收边处理, 不等完整 audio. |
+| **WebSocket** | 浏览器 / server 之间持久连接, 双向. Voice streaming 用. |
+| **Jitter buffer** | 抖动缓冲区. 缓冲音频 frame 应对网络延迟波动. |
+| **Audio frame ordering** | 音频帧顺序. 包乱序到达, 需排序重组. |
+| **ElevenLabs (as TTS provider)** | 第 3 方 TTS, 简历也提过. |
+
+### BNPL / 风控术语 (alternate STAR)
+
+| 术语 | 解释 |
+|---|---|
+| **BNPL funnel** | 先买后付漏斗. Apply → credit decision → disburse → repay. |
+| **PD / LGD / EAD** | Probability of Default / Loss Given Default / Exposure At Default. 风控核心三件套. |
+| **Credit decision** | 信用决策. 是否给客户授信. |
+| **Fraud signal taxonomy** | 欺诈信号分类体系. |
+| **Affirm / Klarna** | 美国 / 欧洲两大 BNPL 上市公司. |
+
+### Cross-function 术语
+
+| 术语 | 解释 |
+|---|---|
+| **Stakeholder mapping** | 利益相关方梳理. 谁决定 / 谁阻拦 / 谁付钱 / 谁用. |
+| **Customer mental model** | 客户心智模型. 他们怎么想问题. FDE 独有 ramp 维度. |
+| **Organizational politics** | 组织政治. VP vs compliance vs ops 之间 tension. |
+| **Round-robin (ramp)** | 第 1 周问每个 function "what should I be careful of from your perspective?". |
+| **Failure mode** | 失败模式. Ship 之前 list 5-10 个 potential failure mode = ready signal. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 工作 80% 时间的真实写照**. 表面问 ramp-up, 实际筛 6 件事:

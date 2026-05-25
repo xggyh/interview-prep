@@ -7,6 +7,97 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 wrong decision + reversal 故事. 重点是 self-awareness 方法论 + 多市场 localization + agent platform 一些技术术语.
+
+### 自我审查 / 反转方法论 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **Wrong-process vs wrong-outcome** ⭐ | Wrong-outcome = 信息当时合理但运气差 (可 OK). Wrong-process = 决策过程有 avoidable gap (真正 growth opportunity). |
+| **Assumption list** ⭐ | 显式假设清单. Major decision 前列 explicit + implicit assumption + verification plan. Peer review 5 min 比 review final design 30 min 更有效. |
+| **Confirmation bias** ⭐ | 确认偏误. 见 contradictory data 先找 alternative explanation. |
+| **Signal convergence (3-signal threshold)** | 信号收敛. 1 customer = noise, 3 customers same pattern = real, 3 + direct observation = reverse decision. |
+| **Direct observation > metric** ⭐ | 直接观察 (现场看 47 通话) 比抽象 metric 更能 shift conviction. |
+| **24-hour pause** | 24 小时暂停. First contradictory signal 不立刻 dismiss, 暂停一天 confront data. |
+| **Refuse diffusion of ownership** | 拒绝分摊 ownership. Tech lead 说 "I also approved" 你说 "I was scope owner". |
+| **Hypothesis order** | 假设顺序. Cheapest hypothesis 先验证, 不 jump to most expensive (e.g., fine-tune). |
+| **Generalization assumption** | 泛化假设. "印尼 working pattern 能推广" 是 invisible 假设 — 没 verbalize 没人能 catch. |
+| **Damage control** | 损害控制. Wrong decision 已 ship 后怎么 unwind + customer comm + path forward. |
+
+### 反转 sequence
+
+| 术语 | 解释 |
+|---|---|
+| **Conviction shift** | 信念转变. Direct observation 比 abstract metric 更易 trigger. |
+| **Reversal owner statement** | 反转主动认领声明. 不 hedge "我们 should have", direct "I was wrong". |
+| **Path forward** | 前进路径. 不让 conversation 停在 problem 上, 立刻提 next step. |
+| **Reversed default** | 反转默认. "Every parameter is hyperparameter until proven constant". |
+
+### 多市场 / Localization
+
+| 术语 | 解释 |
+|---|---|
+| **Multi-region localization** ⭐ | 多市场本地化. 翻译只是其中一层. |
+| **Cultural workshop** | 文化研讨. 1 周 with local ops, 进 scoping default. |
+| **Persona design** | 人设设计. Agent 在不同市场的语气. |
+| **Escalation logic per-market** | 各市场升级逻辑不同. |
+| **TTS A/B with local audience** | TTS 声音跟当地受众 A/B test. |
+| **Catch rate variance** | 各市场 catch rate 方差. 8pp → 2pp 是显著收敛. |
+| **Persona/voice culturally mismatched** | 人设 / 声音 跟文化不匹配. 巴西女声听起来像 telemarketing. |
+| **Cultural cue mismatch** | 文化信号错位. 客户 ask "are you human?". |
+| **Cultural advisor** | 文化顾问. Per-market persona 设计 with local 顾问. |
+
+### Agent Platform 术语 (alternate STAR)
+
+| 术语 | 解释 |
+|---|---|
+| **Memory layer (vector vs SQL)** | Agent 记忆层后端选择. Vector DB (semantic search) vs SQL (exact match). |
+| **Pluggable backend** | 可插拔后端. 让客户选 storage. |
+| **Forced standardization** | 强制标准化. Anti-pattern, 用 escape hatch 替代. |
+| **Semantic recall** | 语义召回. Vector DB 能力, SQL 不能. |
+| **Voluntary migrate** | 自愿迁移. 客户用 SQL 跑了 6 个月, 主动换 vector. |
+
+### Routing / Fine-tune 术语 (alternate STAR)
+
+| 术语 | 解释 |
+|---|---|
+| **Fine-tuning** | 微调. Routing 70% 不够先 jump to fine-tune 是 wrong hypothesis order. |
+| **Confusion matrix** | 混淆矩阵. 看 mis-classification 落在哪. 这题的 "look at data first" 工具. |
+| **Tool description ambiguity** | 工具描述歧义. Routing 错的真正 root cause, fine-tune 修不了. |
+| **RAG-based tool discovery** | 基于 RAG 的工具发现. 修复 routing 的方法. |
+| **'Data before model' principle** | 先看数据再训模型. MLE 第一反应 train, FDE 第一反应 look at data. |
+
+### 业务 / 监管
+
+| 术语 | 解释 |
+|---|---|
+| **OJK / OJK audit** | 印尼监管 + 审计. |
+| **Compliance team** | 合规团队. BNPL VP case catch 你 over-confidence. |
+| **Eligibility surface** | 资格暴露. Chatbot 自由 surface 具体额度 = 监管红线. |
+| **Monetary promise** | 金钱承诺. 自由 surface 数字 = 触发 monetary promise regulation. |
+
+### ASR / Cascade 术语 (alternate)
+
+| 术语 | 解释 |
+|---|---|
+| **ASR cascade** | ASR 级联. Azure → Google → Whisper. |
+| **Per-language fallback order** | 各语言的兜底顺序不同. "Fallback order is hyperparameter not constant". |
+| **Whisper** | OpenAI 开源 ASR. 各语言性能不一. |
+| **Hyperparameter** | 超参数. 跟 constant 区分 — hyperparameter 要 per-language tune. |
+
+### 反 pattern / 红线
+
+| 术语 | 解释 |
+|---|---|
+| **Humblebrag** | 谦虚式炫耀. 用 "wrong decision" 故事其实在炫耀自己最终对.. |
+| **Luck-credit, not learning** | "Wrong decision but everything turned out fine" — 把运气当 learning. |
+| **Over-claim** | 夸大. "I'm now expert in X" 4 months 后是 over-claim. |
+| **Blame shifting** | 推锅. "Vendor 不靠谱" 是 anti-pattern. |
+
+---
+
 ## 这道题在考什么
 
 这是 **FDE 题里 self-awareness signal density 最高的一道**. 表面问技术决策, 实际筛 6 件事:

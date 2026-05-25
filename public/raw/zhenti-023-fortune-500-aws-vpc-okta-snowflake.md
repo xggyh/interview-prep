@@ -8,6 +8,143 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 enterprise SaaS / on-prem 部署密集型, 名词不懂跟不上. 5 min 看完.
+
+### 业务 / 行业
+
+| 术语 | 解释 |
+|---|---|
+| **F500 (Fortune 500)** ⭐ | 美国营收前 500 的大企业. 安全要求 + 采购流程是 startup 的 100×. |
+| **SaaS vs Self-hosted vs BYOC** ⭐ | SaaS = 跑在我们网络; Self-hosted / BYOC (Bring Your Own Cloud) = 跑在客户自己 AWS 账户里. F500 几乎都要后者. |
+| **Air-gap** | 物理或逻辑断网部署 — 完全不连公网. Defense / 银行最严级别. |
+| **ARR (Annual Recurring Revenue)** | 年度经常性收入. SaaS 估值指标. |
+| **SecRev (Security Review)** ⭐ | 客户安全团队对供应商的审查. F500 通常 4-8 周. 这题 6 周. |
+| **Customer ops team** | 客户自己的运维团队 — F500 不让供应商直接进生产, customer ops 负责 apply. |
+
+### 部署架构
+
+| 术语 | 解释 |
+|---|---|
+| **VPC (Virtual Private Cloud)** ⭐ | AWS 私有网络. F500 部署 = 在客户自己 VPC 里跑. |
+| **Cross-account role** ⭐ | 客户 AWS 账户给我们 SRE 临时 access 的 IAM 角色. break-glass 用. |
+| **VPC peering** | 两个 VPC 互联. F500 不喜欢, 因为数据可能跨 VPC. |
+| **VPC endpoint (Interface / Gateway)** | VPC 内访问 AWS 服务的私网入口 (e.g. S3 / KMS / Bedrock 不出公网). |
+| **AWS PrivateLink** ⭐ | AWS 跨账户私网链路 — 不通过公网就能调外部 SaaS (e.g. Snowflake / Datadog). |
+| **IGW / NAT GW** | Internet Gateway / NAT — 公网出口. F500 部署都禁用. |
+| **EKS / ECS / Lambda** | AWS K8s / 容器服务 / serverless. F500 99% 已有 EKS. |
+| **ALB internal** | Application Load Balancer 内网模式, 不对公网开放. |
+| **AWS organization** | 多账户管理体系, 大企业用. |
+
+### IaC / 部署工具
+
+| 术语 | 解释 |
+|---|---|
+| **Terraform** ⭐ | HashiCorp 的基础设施即代码工具 — 描述 VPC / EKS / RDS 等用代码. |
+| **Helm** ⭐ | K8s 应用包管理器 — chart 是部署模板. |
+| **CDK** | AWS Cloud Development Kit — 用代码 (TS/Python) 描述基础设施. |
+| **GitOps** ⭐ | 用 git 作为部署 source of truth, controller 持续 sync 状态. Argo CD / Flux 实现. |
+| **Argo CD / Flux** | 两大 K8s GitOps controller. |
+| **IaC (Infrastructure as Code)** | 基础设施即代码总称. |
+| **Kyverno** | K8s 策略引擎 — 用 YAML 写策略 (e.g. 强制 image 签名). |
+
+### Image / Supply Chain
+
+| 术语 | 解释 |
+|---|---|
+| **ECR (Elastic Container Registry)** | AWS 容器镜像仓库. |
+| **Cosign** ⭐ | Sigstore 项目的 OSS 镜像签名工具. |
+| **Notary v2** | OCI 镜像签名标准. |
+| **SBOM (Software Bill of Materials)** ⭐ | 软件物料清单 — 镜像里所有依赖 + 版本. 用于安全扫描. |
+| **Syft** | SBOM 生成工具. |
+| **Snyk / Trivy** | 镜像漏洞扫描工具. |
+| **Fulcio / Rekor** | Sigstore 的 keyless 签名 CA + 透明日志. |
+| **Admission controller** | K8s pod 创建前的拦截器 — 验签不通过就拒绝 pod 起. |
+| **Supply chain attack** | 通过污染依赖 / image 攻击下游用户. SolarWinds 事件. |
+
+### Auth / SSO
+
+| 术语 | 解释 |
+|---|---|
+| **Okta** ⭐ | 头部 SSO / IdP SaaS. F500 标配. |
+| **SSO (Single Sign-On)** | 单点登录. |
+| **IdP (Identity Provider)** | 身份提供者 — Okta / Azure AD / Auth0. |
+| **RP (Relying Party)** | 信赖方 — 接受 IdP token 的应用 (我们的 app). |
+| **OIDC (OpenID Connect)** ⭐ | 基于 OAuth 2 的身份认证协议, 现代主流. |
+| **SAML** | 老一代企业 SSO 协议, XML-based. 仍广泛用. |
+| **PKCE** | OAuth 防 code interception 扩展. SPA / mobile 必备. |
+| **JWT (JSON Web Token)** | 自包含的认证 token, JSON 格式. |
+| **JWKS** | JSON Web Key Set — 验签用的公钥列表. |
+| **JIT (Just-In-Time) provisioning** | 用户首次 SSO 时自动建账户. |
+| **SCIM** | System for Cross-domain Identity Management — IdP push user state 到下游应用. |
+| **Group claim** | JWT 里的 user 所属 group 信息, 用于 role 映射. |
+| **acr_values / Step-up MFA** | 强制高敏感操作走更强认证. |
+
+### Snowflake
+
+| 术语 | 解释 |
+|---|---|
+| **Snowflake** ⭐ | 头部云数据仓库. F500 大量在用. |
+| **Key-pair auth** | Snowflake 推荐的服务账号认证 — RSA 私钥签名, 不存密码. |
+| **External OAuth** | Snowflake 信任外部 IdP (Okta) JWT, 实现 user-attributed query. |
+| **Network Policy** | Snowflake 的 IP 白名单. |
+| **Snowflake role** | RBAC 角色. 通过 grant 控制访问哪些 db/schema/table. |
+| **Snowflake PrivateLink** | Snowflake 提供的 AWS PrivateLink 连接, 数据完全私网. |
+
+### 加密 / Key 管理
+
+| 术语 | 解释 |
+|---|---|
+| **BYOK (Bring Your Own Key)** ⭐ | 客户自带加密密钥 — 我们看不到 plaintext. 安全 sales 必谈. |
+| **KMS-CMK** | AWS KMS Customer Managed Key — 客户自管的加密主密钥. |
+| **CloudHSM** | AWS 硬件安全模块 (FIPS 140-2 L3). |
+| **Envelope encryption** | 信封加密 — data key 加密数据, master key 加密 data key. |
+| **Secrets Manager** | AWS 托管密钥存储. |
+
+### 观测 / Telemetry
+
+| 术语 | 解释 |
+|---|---|
+| **OTel / OTLP** ⭐ | OpenTelemetry — 跨厂商 observability 标准. OTLP 是它的传输协议. |
+| **Datadog / Splunk / Dynatrace** | 3 大企业 monitoring SaaS. F500 必有其一. |
+| **Prometheus Remote Write** | Prometheus 把 metrics push 给远端的协议. |
+| **Metrics-only egress** | 只让聚合 metrics 出 customer 网络, raw data 永不出. |
+| **Anonymized traces** | 脱敏的分布式 trace. |
+
+### 合规
+
+| 术语 | 解释 |
+|---|---|
+| **SOC 2 Type II** | 企业服务最常见的安全审计. Type II = 持续监控 12 个月. |
+| **FedRAMP** | 美国联邦政府云服务认证, 比 SOC 2 严. |
+| **PCI** | 信用卡数据合规. |
+| **HITRUST** | 医疗合规框架. |
+| **CVE / CVSS** | 公开漏洞编号 / 评分 (0-10). CVSS ≥ 9 = critical. |
+
+### Mesh / Network 安全
+
+| 术语 | 解释 |
+|---|---|
+| **Service mesh (Istio / Linkerd)** | 服务间通信层 — mTLS + traffic policy + observability. |
+| **mTLS** | 双向 TLS — 客户端服务器都要证书. |
+| **CIDR** | 网段表示法 (e.g. 10.50.0.0/16). |
+| **MCP (Model Context Protocol)** | Anthropic 的 agent tool 调用标准. |
+| **LangGraph** | LangChain 的 stateful agent 框架. |
+
+### 工具 / 流程
+
+| 术语 | 解释 |
+|---|---|
+| **Teleport** | 带审计录像的远程访问跳板机. |
+| **PagerDuty** | 告警 + on-call 调度. |
+| **Buildkite** | CI/CD 工具. |
+| **Release channel** | dev / beta / stable / LTS 通道概念. |
+| **LTS (Long-Term Support)** | 长期维护版本, 18 个月 backport security fix. |
+| **RCA (Root Cause Analysis)** | 故障根因分析. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 K8s, 是考你**真正在客户 VPC 里跑过软件**, 知道这些坑:

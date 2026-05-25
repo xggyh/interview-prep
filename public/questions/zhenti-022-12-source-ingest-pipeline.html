@@ -43,6 +43,25 @@
 <blockquote><p>"Retail customer has <strong>12 data sources</strong> — POS systems (Oracle Retail + NCR), e-commerce (Shopify + Magento), inventory (SAP S/4HANA), warehouse (Manhattan WMS), supplier feeds (EDI 850/856/810), weather API, promo calendar (Smartsheet), foot traffic (Placer.ai), social signals (Brandwatch). They want to feed a demand forecasting model. <strong>Design the ingest + transform pipeline.</strong>"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Palantir / Databricks / o9 Solutions · 行业: retail / CPG <strong>约束</strong>: 12 heterogeneous sources / multiple SLAs (real-time POS vs daily EDI) / schema drift / data quality / late-arriving data / forecasting freshness (daily forecast horizon 90 days)</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题里的数据工程词汇密度极高, 不懂就跟不上架构图. 这张表 5 min 看完.</p></blockquote>
+<h4>数据架构 (核心)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Medallion architecture (Bronze/Silver/Gold)</strong> ⭐</td><td>三层数据分层: Bronze = 原始数据落地不动 schema; Silver = 清洗 + 标准化业务键; Gold = 给下游业务消费的聚合表. Databricks 提出现已成工业标准.</td></tr><tr><td><strong>Data lake</strong></td><td>廉价存储原始数据 (S3 + 文件格式).</td></tr><tr><td><strong>Lakehouse</strong></td><td>数据湖 + 数据仓库混合 — 廉价存储 + ACID 事务. Iceberg / Delta 实现.</td></tr><tr><td><strong>Data warehouse</strong></td><td>结构化 SQL 仓库 (Snowflake / BigQuery / Redshift).</td></tr><tr><td><strong>ETL vs ELT</strong> ⭐</td><td>ETL = 在管道里 transform 再 load (Spark 模式); ELT = 先 load 原始数据再用 SQL transform (现代 modern stack).</td></tr><tr><td><strong>Iceberg / Delta / Hudi</strong></td><td>三种开放表格式 — 给 S3 上的 Parquet 文件加 ACID + schema 演化 + time travel. Iceberg 最 vendor-neutral.</td></tr><tr><td><strong>Parquet</strong></td><td>列式压缩文件格式, 数据湖标准.</td></tr><tr><td><strong>SCD2 (Slowly Changing Dimension Type 2)</strong></td><td>维表保留历史变更, 每次变更新增一行而不是覆盖.</td></tr></tbody></table></div>
+<h4>摄取 / 同步模式</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>CDC (Change Data Capture)</strong> ⭐</td><td>增量数据捕获 — 读数据库 transaction log, 只传变更, 不查表 (不影响线上).</td></tr><tr><td><strong>GoldenGate / Qlik Replicate / Fivetran / Debezium</strong></td><td>4 个主流 CDC 工具. GoldenGate Oracle 强; Debezium 开源 (基于 Kafka).</td></tr><tr><td><strong>Webhook</strong></td><td>源系统主动 POST 事件到你的 endpoint. Shopify / Stripe 标配.</td></tr><tr><td><strong>Backfill</strong></td><td>历史数据回填 — 系统上线后导入过去几年数据.</td></tr><tr><td><strong>Watermark</strong></td><td>时间水位线 — 标记 "这个时间点之前的数据已到齐". 用于晚到数据处理.</td></tr><tr><td><strong>Late-arriving data</strong></td><td>晚到数据 — supplier EDI 856 可能 3 天后才到. 必须设计 reprocess window.</td></tr><tr><td><strong>Idempotency</strong> ⭐</td><td>幂等 — 同一条数据多次写入结果一样. 防止 source 重发.</td></tr><tr><td><strong>Dedup / Merge key</strong></td><td>用 source-side ID 作为唯一键去重.</td></tr><tr><td><strong>Schema drift</strong></td><td>schema 不通知就变了 (Shopify 加新字段).</td></tr><tr><td><strong>Schema registry</strong> ⭐</td><td>集中管理所有 source 的 schema 版本, producer 注册 / consumer 验证. Confluent Schema Registry / AWS Glue Registry.</td></tr><tr><td><strong>Contract test</strong></td><td>source 团队和消费团队对 schema 的契约测试, PR 阶段跑.</td></tr><tr><td><strong>DLQ (Dead Letter Queue)</strong> ⭐</td><td>处理失败的消息进的队列, 待人工 review. 不能让 bad row block 整 batch.</td></tr></tbody></table></div>
+<h4>编排 / 调度</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Airflow</strong></td><td>老牌任务调度器, task-based DAG.</td></tr><tr><td><strong>Dagster</strong> ⭐</td><td>新一代编排器, asset-based (描述 "数据 asset" 而不是 "task"). 异构 source 适合.</td></tr><tr><td><strong>Prefect</strong></td><td>介于 Airflow / Dagster 之间.</td></tr><tr><td><strong>dbt (data build tool)</strong> ⭐</td><td>SQL 模型编排框架, 在 warehouse 里跑 transform. 自带 test / lineage / docs.</td></tr><tr><td><strong>Asset-based vs Task-based</strong></td><td>Dagster 描述 "数据成品 (asset)"; Airflow 描述 "要跑的任务 (task)". Asset-based 自动 lineage.</td></tr><tr><td><strong>OpenLineage / Marquez</strong></td><td>数据血缘开放标准 + 可视化工具.</td></tr></tbody></table></div>
+<h4>数据质量</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Great Expectations (GE)</strong> ⭐</td><td>数据质量框架 — 声明 expectations (not_null, unique, range), 跑 checkpoint 验证.</td></tr><tr><td><strong>Soda</strong></td><td>GE 的竞品, 类似.</td></tr><tr><td><strong>dbt tests</strong></td><td>dbt 内置的数据测试 (unique, not_null, accepted_values, relationships).</td></tr><tr><td><strong>Reconciliation test</strong></td><td>对账测试 — POS 营收 ≈ SAP 营收, 容忍度内 pass.</td></tr><tr><td><strong>Anomaly detection</strong></td><td>行数 / 分布 / freshness 异常告警.</td></tr><tr><td><strong>Freshness</strong></td><td>数据新鲜度 — 离最新 source event 多久.</td></tr></tbody></table></div>
+<h4>零售 / 行业 source</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>POS</strong></td><td>Point of Sale — 收银台系统. Oracle Retail / NCR / Toast 等.</td></tr><tr><td><strong>EDI 850/856/810</strong> ⭐</td><td>Electronic Data Interchange — 零售 B2B 标准: 850 = 采购订单; 856 = 发货通知 (ASN); 810 = invoice. 已用 30 年, 文本格式.</td></tr><tr><td><strong>AS2</strong></td><td>EDI 传输协议 — HTTPS + S/MIME 签名.</td></tr><tr><td><strong>EDI 997</strong></td><td>functional acknowledgement — 收到 EDI 后必须 60 秒内回的 ack.</td></tr><tr><td><strong>ERP / SAP S/4HANA</strong></td><td>Enterprise Resource Planning — 企业核心系统; SAP 是头部.</td></tr><tr><td><strong>WMS (Warehouse Management System)</strong></td><td>仓库管理系统 — Manhattan / Blue Yonder.</td></tr><tr><td><strong>Shopify / Magento</strong></td><td>两大电商平台. Shopify SaaS; Magento 自托管.</td></tr><tr><td><strong>Placer.ai</strong></td><td>实体店客流量数据供应商.</td></tr><tr><td><strong>Brandwatch</strong></td><td>社交媒体监听 SaaS.</td></tr><tr><td><strong>Smartsheet</strong></td><td>类 Excel 的 SaaS 表格工具.</td></tr><tr><td><strong>CDS Views</strong></td><td>SAP S/4HANA 提供的语义视图层.</td></tr><tr><td><strong>ABAP</strong></td><td>SAP 自家编程语言.</td></tr><tr><td><strong>CCD / SKU</strong></td><td>Stock Keeping Unit — 库存单位. 零售核心业务键.</td></tr></tbody></table></div>
+<h4>模型 / 特征服务</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Feature Store</strong></td><td>特征存储 — Tecton / Feast. 训练和线上推理用同一份 feature.</td></tr><tr><td><strong>Forecast horizon</strong></td><td>预测 horizon — 这题 90 天 demand forecast.</td></tr><tr><td><strong>Drift dashboard</strong></td><td>漂移监控 — 预测值 vs 实际值跟踪.</td></tr></tbody></table></div>
+<h4>基础设施</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>S3 Glacier</strong></td><td>AWS 冷存储 — 检索慢 (分钟-小时) 但便宜 10×. 用于 audit / compliance.</td></tr><tr><td><strong>Kinesis / Kafka</strong></td><td>流式消息队列. Kinesis 是 AWS 托管, Kafka 是开源标准.</td></tr><tr><td><strong>Lambda</strong></td><td>AWS Serverless function. 适合 webhook 接收等突发负载.</td></tr><tr><td><strong>SQS</strong></td><td>AWS 简单队列服务.</td></tr><tr><td><strong>Vault (HashiCorp)</strong></td><td>密钥管理服务.</td></tr><tr><td><strong>JDBC / ODBC</strong></td><td>Java / 通用数据库连接协议.</td></tr><tr><td><strong>HMAC</strong></td><td>Hash-based Message Authentication Code — webhook 签名验证.</td></tr><tr><td><strong>TPS</strong></td><td>Transactions Per Second.</td></tr></tbody></table></div>
+<h4>监控 / 告警</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>PagerDuty</strong></td><td>告警 + on-call 调度工具.</td></tr><tr><td><strong>Sensor</strong></td><td>Dagster 的 watchdog — 定时检查外部状态 (e.g. data freshness).</td></tr><tr><td><strong>Slack alert</strong></td><td>告警发到 Slack 频道.</td></tr><tr><td><strong>MAR (Monthly Active Rows)</strong></td><td>Fivetran 计价单位 — 月活跃同步行数.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你会不会写 Airflow DAG, 是考你<strong>在 12 个 schema 完全不同的来源面前怎么不崩</strong>:</p>
 <ol><li><strong>Per-source connector pattern</strong> — 不能写一个 generic ingester, 每个 source 都需要专属的 connector + auth + error handling</li><li><strong>Schema registry 是命门</strong> — 12 个 source 各自演化, 没有 registry + contract test 一周就乱</li><li><strong>DLQ 在 ingestion 必须有</strong> — bad row 不能 block 整 batch, 要 isolation</li><li><strong>Idempotency + dedupe</strong> — POS 偶尔会重复发送一笔交易, 要做 exactly-once 语义</li><li><strong>Late-arriving data</strong> — supplier EDI 856 可能 3 天后到, watermark + reprocessing 必须支持</li><li><strong>Transform 在哪做</strong> — ELT (dbt in warehouse) vs ETL (Spark) — 这道题考你的 modern-stack 直觉</li><li><strong>数据质量验证</strong> — Great Expectations / Soda / dbt tests 必备, 否则 garbage in → forecasting model 崩</li><li><strong>菜鸟答案失败点</strong>: "我会用 Airflow + Spark, 写 12 个 DAG, 跑出来塞 Snowflake" — 太浅. 没回答 schema drift / DLQ / late arrival / 端到端可观察性 / forecasting model 关心 freshness 这些问题.</li></ol>
@@ -368,6 +387,112 @@ Numbers:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir / Databricks / o9 Solutions · 行业: retail / CPG
 **约束**: 12 heterogeneous sources / multiple SLAs (real-time POS vs daily EDI) / schema drift / data quality / late-arriving data / forecasting freshness (daily forecast horizon 90 days)
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题里的数据工程词汇密度极高, 不懂就跟不上架构图. 这张表 5 min 看完.
+
+### 数据架构 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Medallion architecture (Bronze/Silver/Gold)** ⭐ | 三层数据分层: Bronze = 原始数据落地不动 schema; Silver = 清洗 + 标准化业务键; Gold = 给下游业务消费的聚合表. Databricks 提出现已成工业标准. |
+| **Data lake** | 廉价存储原始数据 (S3 + 文件格式). |
+| **Lakehouse** | 数据湖 + 数据仓库混合 — 廉价存储 + ACID 事务. Iceberg / Delta 实现. |
+| **Data warehouse** | 结构化 SQL 仓库 (Snowflake / BigQuery / Redshift). |
+| **ETL vs ELT** ⭐ | ETL = 在管道里 transform 再 load (Spark 模式); ELT = 先 load 原始数据再用 SQL transform (现代 modern stack). |
+| **Iceberg / Delta / Hudi** | 三种开放表格式 — 给 S3 上的 Parquet 文件加 ACID + schema 演化 + time travel. Iceberg 最 vendor-neutral. |
+| **Parquet** | 列式压缩文件格式, 数据湖标准. |
+| **SCD2 (Slowly Changing Dimension Type 2)** | 维表保留历史变更, 每次变更新增一行而不是覆盖. |
+
+### 摄取 / 同步模式
+
+| 术语 | 解释 |
+|---|---|
+| **CDC (Change Data Capture)** ⭐ | 增量数据捕获 — 读数据库 transaction log, 只传变更, 不查表 (不影响线上). |
+| **GoldenGate / Qlik Replicate / Fivetran / Debezium** | 4 个主流 CDC 工具. GoldenGate Oracle 强; Debezium 开源 (基于 Kafka). |
+| **Webhook** | 源系统主动 POST 事件到你的 endpoint. Shopify / Stripe 标配. |
+| **Backfill** | 历史数据回填 — 系统上线后导入过去几年数据. |
+| **Watermark** | 时间水位线 — 标记 "这个时间点之前的数据已到齐". 用于晚到数据处理. |
+| **Late-arriving data** | 晚到数据 — supplier EDI 856 可能 3 天后才到. 必须设计 reprocess window. |
+| **Idempotency** ⭐ | 幂等 — 同一条数据多次写入结果一样. 防止 source 重发. |
+| **Dedup / Merge key** | 用 source-side ID 作为唯一键去重. |
+| **Schema drift** | schema 不通知就变了 (Shopify 加新字段). |
+| **Schema registry** ⭐ | 集中管理所有 source 的 schema 版本, producer 注册 / consumer 验证. Confluent Schema Registry / AWS Glue Registry. |
+| **Contract test** | source 团队和消费团队对 schema 的契约测试, PR 阶段跑. |
+| **DLQ (Dead Letter Queue)** ⭐ | 处理失败的消息进的队列, 待人工 review. 不能让 bad row block 整 batch. |
+
+### 编排 / 调度
+
+| 术语 | 解释 |
+|---|---|
+| **Airflow** | 老牌任务调度器, task-based DAG. |
+| **Dagster** ⭐ | 新一代编排器, asset-based (描述 "数据 asset" 而不是 "task"). 异构 source 适合. |
+| **Prefect** | 介于 Airflow / Dagster 之间. |
+| **dbt (data build tool)** ⭐ | SQL 模型编排框架, 在 warehouse 里跑 transform. 自带 test / lineage / docs. |
+| **Asset-based vs Task-based** | Dagster 描述 "数据成品 (asset)"; Airflow 描述 "要跑的任务 (task)". Asset-based 自动 lineage. |
+| **OpenLineage / Marquez** | 数据血缘开放标准 + 可视化工具. |
+
+### 数据质量
+
+| 术语 | 解释 |
+|---|---|
+| **Great Expectations (GE)** ⭐ | 数据质量框架 — 声明 expectations (not_null, unique, range), 跑 checkpoint 验证. |
+| **Soda** | GE 的竞品, 类似. |
+| **dbt tests** | dbt 内置的数据测试 (unique, not_null, accepted_values, relationships). |
+| **Reconciliation test** | 对账测试 — POS 营收 ≈ SAP 营收, 容忍度内 pass. |
+| **Anomaly detection** | 行数 / 分布 / freshness 异常告警. |
+| **Freshness** | 数据新鲜度 — 离最新 source event 多久. |
+
+### 零售 / 行业 source
+
+| 术语 | 解释 |
+|---|---|
+| **POS** | Point of Sale — 收银台系统. Oracle Retail / NCR / Toast 等. |
+| **EDI 850/856/810** ⭐ | Electronic Data Interchange — 零售 B2B 标准: 850 = 采购订单; 856 = 发货通知 (ASN); 810 = invoice. 已用 30 年, 文本格式. |
+| **AS2** | EDI 传输协议 — HTTPS + S/MIME 签名. |
+| **EDI 997** | functional acknowledgement — 收到 EDI 后必须 60 秒内回的 ack. |
+| **ERP / SAP S/4HANA** | Enterprise Resource Planning — 企业核心系统; SAP 是头部. |
+| **WMS (Warehouse Management System)** | 仓库管理系统 — Manhattan / Blue Yonder. |
+| **Shopify / Magento** | 两大电商平台. Shopify SaaS; Magento 自托管. |
+| **Placer.ai** | 实体店客流量数据供应商. |
+| **Brandwatch** | 社交媒体监听 SaaS. |
+| **Smartsheet** | 类 Excel 的 SaaS 表格工具. |
+| **CDS Views** | SAP S/4HANA 提供的语义视图层. |
+| **ABAP** | SAP 自家编程语言. |
+| **CCD / SKU** | Stock Keeping Unit — 库存单位. 零售核心业务键. |
+
+### 模型 / 特征服务
+
+| 术语 | 解释 |
+|---|---|
+| **Feature Store** | 特征存储 — Tecton / Feast. 训练和线上推理用同一份 feature. |
+| **Forecast horizon** | 预测 horizon — 这题 90 天 demand forecast. |
+| **Drift dashboard** | 漂移监控 — 预测值 vs 实际值跟踪. |
+
+### 基础设施
+
+| 术语 | 解释 |
+|---|---|
+| **S3 Glacier** | AWS 冷存储 — 检索慢 (分钟-小时) 但便宜 10×. 用于 audit / compliance. |
+| **Kinesis / Kafka** | 流式消息队列. Kinesis 是 AWS 托管, Kafka 是开源标准. |
+| **Lambda** | AWS Serverless function. 适合 webhook 接收等突发负载. |
+| **SQS** | AWS 简单队列服务. |
+| **Vault (HashiCorp)** | 密钥管理服务. |
+| **JDBC / ODBC** | Java / 通用数据库连接协议. |
+| **HMAC** | Hash-based Message Authentication Code — webhook 签名验证. |
+| **TPS** | Transactions Per Second. |
+
+### 监控 / 告警
+
+| 术语 | 解释 |
+|---|---|
+| **PagerDuty** | 告警 + on-call 调度工具. |
+| **Sensor** | Dagster 的 watchdog — 定时检查外部状态 (e.g. data freshness). |
+| **Slack alert** | 告警发到 Slack 频道. |
+| **MAR (Monthly Active Rows)** | Fivetran 计价单位 — 月活跃同步行数. |
 
 ---
 

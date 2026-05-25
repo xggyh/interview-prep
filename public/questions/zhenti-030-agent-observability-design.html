@@ -43,6 +43,31 @@
 <blockquote><p>"You're running a production multi-step <strong>AI agent</strong> (LLM + tools + RAG + multi-turn). Customer reports 'sometimes the agent gives wrong answer or hangs'. <strong>Design the observability</strong>: what to log, what to alert on, what dashboards to build. Cover <strong>traces, metrics, logs, evals, costs</strong>."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Sierra / Glean / LangChain · 行业: AI infra / agent platform <strong>约束</strong>: multi-step agent with tool calls / multi-tenant / PII redaction / cost tracking / debugging stuck or wrong runs / SLO tracking / per-customer view</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题是 agent 生产可观测性集大成. 名词不懂 dashboard / alert / eval 都搭不起来. 5 min 看完.</p></blockquote>
+<h4>5 Pillars / 整体框架</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Observability</strong> ⭐</td><td>可观测性 — 通过外部输出推测系统内部状态.</td></tr><tr><td><strong>Traces / Metrics / Logs</strong></td><td>传统 3 pillars.</td></tr><tr><td><strong>Evals / Costs</strong> ⭐</td><td>Agent 时代新增 2 pillar — 质量 + 成本.</td></tr><tr><td><strong>Telemetry</strong></td><td>遥测数据 — traces / metrics / logs 统称.</td></tr><tr><td><strong>OpenTelemetry (OTel)</strong> ⭐</td><td>跨厂商可观测性标准, CNCF 项目.</td></tr><tr><td><strong>OTLP</strong></td><td>OTel 的传输协议.</td></tr><tr><td><strong>OTel Collector</strong></td><td>中间转发层 — 接收 + 处理 + 路由 telemetry.</td></tr><tr><td><strong>GenAI semantic conventions</strong> ⭐</td><td>2026 OTel 给 LLM 的标准属性 (gen_ai.request.model 等).</td></tr></tbody></table></div>
+<h4>Traces / Spans (核心)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Trace</strong> ⭐</td><td>一次请求的完整轨迹 — 由多个 span 组成.</td></tr><tr><td><strong>Span</strong> ⭐</td><td>一个操作单元 (一次 LLM call / 一次 tool call).</td></tr><tr><td><strong>Root span</strong></td><td>trace 的最外层 span (agent.run).</td></tr><tr><td><strong>Span hierarchy</strong></td><td>span 的父子关系树.</td></tr><tr><td><strong>Span attributes</strong></td><td>span 上挂的 key/value (model name / cost / latency).</td></tr><tr><td><strong>Trace context (W3C TraceContext)</strong></td><td>跨 service 传 trace_id 的标准 — <code>traceparent</code> header.</td></tr><tr><td><strong>trace_id / span_id</strong></td><td>链路 / 操作的唯一 ID.</td></tr><tr><td><strong>Trace waterfall</strong></td><td>trace 可视化 — span 按时间排列的瀑布图.</td></tr><tr><td><strong>Tempo / Datadog APM / Jaeger</strong></td><td>3 大 trace backend.</td></tr><tr><td><strong>LangSmith</strong> ⭐</td><td>LangChain 出的 LLM-native trace + eval 平台.</td></tr><tr><td><strong>Helicone</strong></td><td>OpenAI proxy 加可观测性.</td></tr></tbody></table></div>
+<h4>Sampling (采样)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Sampling rate</strong></td><td>采样率 — 1% 表示 1/100 trace 留下.</td></tr><tr><td><strong>Head sampling</strong></td><td>头部采样 — trace 开始时决定保留. 随机 1%.</td></tr><tr><td><strong>Tail sampling</strong> ⭐</td><td>尾部采样 — 看完整 trace 后决定 (错误 / 慢 / 贵 100% 保留, 其余 1%).</td></tr><tr><td><strong>Tier-1 / tier-2 / tier-3</strong></td><td>重要级 — tier-1 100% 采样, tier-3 1%.</td></tr></tbody></table></div>
+<h4>Metrics 方法论</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RED method</strong> ⭐</td><td>Rate / Errors / Duration — 服务级三件套.</td></tr><tr><td><strong>USE method</strong> ⭐</td><td>Utilization / Saturation / Errors — 基础设施级.</td></tr><tr><td><strong>Cardinality</strong></td><td>维度基数 — per-tenant × per-flow × per-model 组合. 太高 metric 系统爆.</td></tr><tr><td><strong>Pre-aggregation</strong></td><td>预聚合 — 1min 桶降低 cardinality.</td></tr><tr><td><strong>Prometheus / Grafana</strong></td><td>开源 metrics + 可视化.</td></tr><tr><td><strong>Datadog metrics</strong></td><td>Datadog 的 metrics SaaS.</td></tr></tbody></table></div>
+<h4>SLO / 告警</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SLO (Service Level Objective)</strong> ⭐</td><td>服务水平目标 — 99.5% availability.</td></tr><tr><td><strong>SLI (Service Level Indicator)</strong></td><td>衡量 SLO 的具体指标 (成功率).</td></tr><tr><td><strong>SLA (Service Level Agreement)</strong></td><td>对客户的合同承诺, 通常宽于 SLO.</td></tr><tr><td><strong>Error budget</strong> ⭐</td><td>错误预算 — 99.5% = 月内允许 36h downtime.</td></tr><tr><td><strong>MTTD (Mean Time To Detect)</strong> ⭐</td><td>故障平均发现时间.</td></tr><tr><td><strong>MTTR (Mean Time To Recover)</strong></td><td>平均恢复时间.</td></tr><tr><td><strong>PagerDuty / Slack alert</strong></td><td>告警通道.</td></tr><tr><td><strong>Alert fatigue</strong></td><td>告警疲劳 — 假阳过多 on-call 麻木.</td></tr><tr><td><strong>Compound conditions</strong></td><td>复合条件 — 多个 metric 同时超阈才告警, 减少误报.</td></tr><tr><td><strong>Anomaly detection (EWMA / z-score)</strong></td><td>异常检测 — 不用固定阈值.</td></tr></tbody></table></div>
+<h4>Agent 特有指标</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Stuck detection</strong> ⭐</td><td>卡住检测 — agent 长时间无 span emit 视为 hang.</td></tr><tr><td><strong>Tool selection drift</strong> ⭐</td><td>工具选择漂移 — agent 用工具的分布随时间变化. PSI &gt; 0.2 告警.</td></tr><tr><td><strong>Hallucination rate</strong> ⭐</td><td>幻觉率 — agent 答案无 source 依据的比例.</td></tr><tr><td><strong>NLI (Natural Language Inference)</strong></td><td>蕴含判断 — 证据是否蕴含 claim.</td></tr><tr><td><strong>Tool error rate</strong></td><td>每个 tool 失败率, 识别 flaky integration.</td></tr><tr><td><strong>LLM refusal rate</strong></td><td>LLM 拒绝回答率 — safety filter trigger.</td></tr><tr><td><strong>Tokens per run</strong></td><td>每 run 用的 token 数, runaway 信号.</td></tr><tr><td><strong>Loop bug</strong></td><td>agent 死循环 bug — tool_calls 无界增长.</td></tr></tbody></table></div>
+<h4>Eval (生产环境)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>In-loop eval</strong> ⭐</td><td>在生产中持续 eval, 不只 offline.</td></tr><tr><td><strong>LLM-as-judge</strong> ⭐</td><td>用 LLM 当 judge 评 quality.</td></tr><tr><td><strong>Synthetic eval / Golden replay</strong></td><td>定期跑 golden set 跟踪 quality.</td></tr><tr><td><strong>Active learning queue</strong></td><td>低 confidence 样本进人工标注.</td></tr><tr><td><strong>Citation check</strong></td><td>引用检查 — 答案声明能否定位到 source span.</td></tr><tr><td><strong>NLI threshold</strong></td><td>NLI 阈值 (0.7 / 0.85).</td></tr><tr><td><strong>Hourly batch eval</strong></td><td>每小时批量 eval 已 log 的 run.</td></tr></tbody></table></div>
+<h4>Logs / PII</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Structured JSON logging</strong> ⭐</td><td>结构化日志 — key/value JSON, 可 query.</td></tr><tr><td><strong>Loki / ELK / Splunk</strong></td><td>3 大 log backend.</td></tr><tr><td><strong>PII redact</strong> ⭐</td><td>PII 脱敏 — 在 OTel collector 阶段处理.</td></tr><tr><td><strong>Presidio</strong></td><td>Microsoft 开源的 PII 检测库.</td></tr><tr><td><strong>Log levels</strong></td><td>DEBUG / INFO / WARN / ERROR.</td></tr><tr><td><strong>Hot / Cold / Archive retention</strong></td><td>3 层保留: 14-30d hot / 90d cold / 7yr archive.</td></tr><tr><td><strong>Debug vault</strong></td><td>受限的原始数据存储, 仅 break-glass 访问.</td></tr><tr><td><strong>Break-glass access</strong></td><td>紧急访问 — manager 审批 + 时间窗 + audit.</td></tr></tbody></table></div>
+<h4>Cost Tracking</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Per-request cost breakdown</strong> ⭐</td><td>每次请求成本拆分 — LLM in/out + embedding + tool + storage.</td></tr><tr><td><strong>Per-tenant budget</strong></td><td>每客户月预算.</td></tr><tr><td><strong>Runaway cost</strong> ⭐</td><td>失控成本 — agent 死循环 / prompt 长 50% 时月底破产.</td></tr><tr><td><strong>Cost burn rate</strong></td><td>成本烧速 ($/hour).</td></tr><tr><td><strong>Hard stop vs Soft throttle</strong></td><td>超预算硬停 vs 软限速.</td></tr><tr><td><strong>Cost anomaly</strong></td><td>成本异常 — 单 request p95 &gt; 2× baseline.</td></tr><tr><td><strong>Margin</strong></td><td>利润率 — 成本 vs 收入.</td></tr></tbody></table></div>
+<h4>Agent 框架</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>LangGraph</strong></td><td>LangChain 的 stateful agent 框架.</td></tr><tr><td><strong>AutoGen</strong></td><td>Microsoft 的 multi-agent 框架.</td></tr><tr><td><strong>Plan-act-reflect loop</strong></td><td>agent 标准 3 步循环.</td></tr><tr><td><strong>Tool calling / MCP</strong></td><td>LLM 调外部 function 的协议.</td></tr><tr><td><strong>Multi-step agent</strong></td><td>多步 agent (不是单次 LLM call).</td></tr><tr><td><strong>Multi-turn</strong></td><td>多轮对话 — agent 有 conversation history.</td></tr><tr><td><strong>Multi-tenant</strong></td><td>多租户 — 服务多个 customer.</td></tr></tbody></table></div>
+<h4>部署 / 数据</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Iceberg lake</strong></td><td>数据湖表格式 — 用于 cold telemetry 存储.</td></tr><tr><td><strong>Snowflake</strong></td><td>数据仓库 — cost dashboard 源数据.</td></tr><tr><td><strong>FINRA / SOC 2 / HIPAA</strong></td><td>合规框架.</td></tr><tr><td><strong>RBAC</strong></td><td>角色 / 行级访问控制.</td></tr><tr><td><strong>Sankey diagram</strong></td><td>桑基图 — 显示 tool 调用顺序流.</td></tr><tr><td><strong>PSI (Population Stability Index)</strong></td><td>分布漂移度量.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 Datadog, 是考你<strong>真正 debug 过 agent production incident 的人才会想到</strong>:</p>
 <ol><li><strong>Trace per agent run</strong> — OpenTelemetry span chain, 每 LLM call / tool call 一个 span</li><li><strong>PII redact at telemetry layer</strong> — user query 含 PII, 不能直接 log</li><li><strong>Cost tracking per request</strong> — token cost + tool API cost, breakdown</li><li><strong>Eval scoring on sampled runs</strong> — LLM-as-judge in production loop</li><li><strong>Hallucination detection</strong> — claim 是否有 source</li><li><strong>Tool selection distribution</strong> — agent 是否过度 / 漏选某 tool</li><li><strong>Stuck detection</strong> — agent run &gt; p99 still running, alert</li><li><strong>Per-tenant view</strong> — customer 想看自己 agent 表现</li><li><strong>菜鸟答案失败点</strong>: "log everything to Datadog" — 没拆 trace/metric/log/eval, 没考虑 PII, 没考虑 agent 特有 signal.</li></ol>
@@ -505,6 +530,149 @@ SLO:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Sierra / Glean / LangChain · 行业: AI infra / agent platform
 **约束**: multi-step agent with tool calls / multi-tenant / PII redaction / cost tracking / debugging stuck or wrong runs / SLO tracking / per-customer view
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题是 agent 生产可观测性集大成. 名词不懂 dashboard / alert / eval 都搭不起来. 5 min 看完.
+
+### 5 Pillars / 整体框架
+
+| 术语 | 解释 |
+|---|---|
+| **Observability** ⭐ | 可观测性 — 通过外部输出推测系统内部状态. |
+| **Traces / Metrics / Logs** | 传统 3 pillars. |
+| **Evals / Costs** ⭐ | Agent 时代新增 2 pillar — 质量 + 成本. |
+| **Telemetry** | 遥测数据 — traces / metrics / logs 统称. |
+| **OpenTelemetry (OTel)** ⭐ | 跨厂商可观测性标准, CNCF 项目. |
+| **OTLP** | OTel 的传输协议. |
+| **OTel Collector** | 中间转发层 — 接收 + 处理 + 路由 telemetry. |
+| **GenAI semantic conventions** ⭐ | 2026 OTel 给 LLM 的标准属性 (gen_ai.request.model 等). |
+
+### Traces / Spans (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Trace** ⭐ | 一次请求的完整轨迹 — 由多个 span 组成. |
+| **Span** ⭐ | 一个操作单元 (一次 LLM call / 一次 tool call). |
+| **Root span** | trace 的最外层 span (agent.run). |
+| **Span hierarchy** | span 的父子关系树. |
+| **Span attributes** | span 上挂的 key/value (model name / cost / latency). |
+| **Trace context (W3C TraceContext)** | 跨 service 传 trace_id 的标准 — `traceparent` header. |
+| **trace_id / span_id** | 链路 / 操作的唯一 ID. |
+| **Trace waterfall** | trace 可视化 — span 按时间排列的瀑布图. |
+| **Tempo / Datadog APM / Jaeger** | 3 大 trace backend. |
+| **LangSmith** ⭐ | LangChain 出的 LLM-native trace + eval 平台. |
+| **Helicone** | OpenAI proxy 加可观测性. |
+
+### Sampling (采样)
+
+| 术语 | 解释 |
+|---|---|
+| **Sampling rate** | 采样率 — 1% 表示 1/100 trace 留下. |
+| **Head sampling** | 头部采样 — trace 开始时决定保留. 随机 1%. |
+| **Tail sampling** ⭐ | 尾部采样 — 看完整 trace 后决定 (错误 / 慢 / 贵 100% 保留, 其余 1%). |
+| **Tier-1 / tier-2 / tier-3** | 重要级 — tier-1 100% 采样, tier-3 1%. |
+
+### Metrics 方法论
+
+| 术语 | 解释 |
+|---|---|
+| **RED method** ⭐ | Rate / Errors / Duration — 服务级三件套. |
+| **USE method** ⭐ | Utilization / Saturation / Errors — 基础设施级. |
+| **Cardinality** | 维度基数 — per-tenant × per-flow × per-model 组合. 太高 metric 系统爆. |
+| **Pre-aggregation** | 预聚合 — 1min 桶降低 cardinality. |
+| **Prometheus / Grafana** | 开源 metrics + 可视化. |
+| **Datadog metrics** | Datadog 的 metrics SaaS. |
+
+### SLO / 告警
+
+| 术语 | 解释 |
+|---|---|
+| **SLO (Service Level Objective)** ⭐ | 服务水平目标 — 99.5% availability. |
+| **SLI (Service Level Indicator)** | 衡量 SLO 的具体指标 (成功率). |
+| **SLA (Service Level Agreement)** | 对客户的合同承诺, 通常宽于 SLO. |
+| **Error budget** ⭐ | 错误预算 — 99.5% = 月内允许 36h downtime. |
+| **MTTD (Mean Time To Detect)** ⭐ | 故障平均发现时间. |
+| **MTTR (Mean Time To Recover)** | 平均恢复时间. |
+| **PagerDuty / Slack alert** | 告警通道. |
+| **Alert fatigue** | 告警疲劳 — 假阳过多 on-call 麻木. |
+| **Compound conditions** | 复合条件 — 多个 metric 同时超阈才告警, 减少误报. |
+| **Anomaly detection (EWMA / z-score)** | 异常检测 — 不用固定阈值. |
+
+### Agent 特有指标
+
+| 术语 | 解释 |
+|---|---|
+| **Stuck detection** ⭐ | 卡住检测 — agent 长时间无 span emit 视为 hang. |
+| **Tool selection drift** ⭐ | 工具选择漂移 — agent 用工具的分布随时间变化. PSI > 0.2 告警. |
+| **Hallucination rate** ⭐ | 幻觉率 — agent 答案无 source 依据的比例. |
+| **NLI (Natural Language Inference)** | 蕴含判断 — 证据是否蕴含 claim. |
+| **Tool error rate** | 每个 tool 失败率, 识别 flaky integration. |
+| **LLM refusal rate** | LLM 拒绝回答率 — safety filter trigger. |
+| **Tokens per run** | 每 run 用的 token 数, runaway 信号. |
+| **Loop bug** | agent 死循环 bug — tool_calls 无界增长. |
+
+### Eval (生产环境)
+
+| 术语 | 解释 |
+|---|---|
+| **In-loop eval** ⭐ | 在生产中持续 eval, 不只 offline. |
+| **LLM-as-judge** ⭐ | 用 LLM 当 judge 评 quality. |
+| **Synthetic eval / Golden replay** | 定期跑 golden set 跟踪 quality. |
+| **Active learning queue** | 低 confidence 样本进人工标注. |
+| **Citation check** | 引用检查 — 答案声明能否定位到 source span. |
+| **NLI threshold** | NLI 阈值 (0.7 / 0.85). |
+| **Hourly batch eval** | 每小时批量 eval 已 log 的 run. |
+
+### Logs / PII
+
+| 术语 | 解释 |
+|---|---|
+| **Structured JSON logging** ⭐ | 结构化日志 — key/value JSON, 可 query. |
+| **Loki / ELK / Splunk** | 3 大 log backend. |
+| **PII redact** ⭐ | PII 脱敏 — 在 OTel collector 阶段处理. |
+| **Presidio** | Microsoft 开源的 PII 检测库. |
+| **Log levels** | DEBUG / INFO / WARN / ERROR. |
+| **Hot / Cold / Archive retention** | 3 层保留: 14-30d hot / 90d cold / 7yr archive. |
+| **Debug vault** | 受限的原始数据存储, 仅 break-glass 访问. |
+| **Break-glass access** | 紧急访问 — manager 审批 + 时间窗 + audit. |
+
+### Cost Tracking
+
+| 术语 | 解释 |
+|---|---|
+| **Per-request cost breakdown** ⭐ | 每次请求成本拆分 — LLM in/out + embedding + tool + storage. |
+| **Per-tenant budget** | 每客户月预算. |
+| **Runaway cost** ⭐ | 失控成本 — agent 死循环 / prompt 长 50% 时月底破产. |
+| **Cost burn rate** | 成本烧速 ($/hour). |
+| **Hard stop vs Soft throttle** | 超预算硬停 vs 软限速. |
+| **Cost anomaly** | 成本异常 — 单 request p95 > 2× baseline. |
+| **Margin** | 利润率 — 成本 vs 收入. |
+
+### Agent 框架
+
+| 术语 | 解释 |
+|---|---|
+| **LangGraph** | LangChain 的 stateful agent 框架. |
+| **AutoGen** | Microsoft 的 multi-agent 框架. |
+| **Plan-act-reflect loop** | agent 标准 3 步循环. |
+| **Tool calling / MCP** | LLM 调外部 function 的协议. |
+| **Multi-step agent** | 多步 agent (不是单次 LLM call). |
+| **Multi-turn** | 多轮对话 — agent 有 conversation history. |
+| **Multi-tenant** | 多租户 — 服务多个 customer. |
+
+### 部署 / 数据
+
+| 术语 | 解释 |
+|---|---|
+| **Iceberg lake** | 数据湖表格式 — 用于 cold telemetry 存储. |
+| **Snowflake** | 数据仓库 — cost dashboard 源数据. |
+| **FINRA / SOC 2 / HIPAA** | 合规框架. |
+| **RBAC** | 角色 / 行级访问控制. |
+| **Sankey diagram** | 桑基图 — 显示 tool 调用顺序流. |
+| **PSI (Population Stability Index)** | 分布漂移度量. |
 
 ---
 

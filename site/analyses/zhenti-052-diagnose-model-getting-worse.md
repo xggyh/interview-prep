@@ -7,6 +7,96 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Model drift 题. 涉及 ML 监控 + 统计 + Bayesian 思维.
+
+### Drift 类型 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Model drift** ⭐ | **Vendor 偷偷更新了 underlying model**. GPT-5.3 → 5.4 没说. 同 API call 行为变了. **2026 最常见的"突然变差"原因**. |
+| **Data drift** ⭐ | **输入分布变了** — 用户问题类型变了. 新 product line / 季节 / 营销活动. |
+| **Concept drift** ⭐ | **输入 → 输出的 mapping 变了**. 同 query 现在该有不同答案 (法规更新). 比 data drift 难抓. |
+| **Distribution shift** | 总称 — 包 data + concept drift. |
+| **Covariate shift** | 输入分布变, 但 conditional p(y|x) 不变. = pure data drift. |
+| **Label shift / Prior shift** | 类别比例变了 (e.g. fraud rate 涨了). |
+| **Prompt drift** ⭐ | **有人改了 prompt** 没走 review. Git log 能查. |
+| **Eval drift** | Rubric / judge model 升级 → 同输出新分不同. |
+| **Baseline shift** | 用户期望变高了 — model 没变差, 但 "feels worse" 是 expectation up. |
+| **Silent drift** | 没 alert 触发的 drift — 渐进式. 最危险. |
+
+### Drift 检测指标 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **KL divergence** ⭐ | **两分布的"距离"**. Drift 量化常用. 0 = 一样, 大 = 偏离多. |
+| **Wasserstein / KS test / Chi-square** | 类似 KL 不同场景 — 连续 / sparse / categorical 分布. |
+| **Embedding mean cosine** | 输入 embedding 平均的 cosine drift. Semantic shift 抓手. |
+| **Population Stability Index (PSI)** | 金融常用. > 0.25 = 严重 drift. |
+| **Refusal rate drift** | Model 越来越保守? Refusal % 涨 = 信号. |
+
+### Bayesian / Prior 思维 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Prior probability** ⭐ | **某假设的先验概率** — "model drift 是因, 40% prior". 没数据前的 belief. |
+| **Posterior probability** | 收了 evidence 后的概率. Posterior = prior × likelihood / normalize. |
+| **Bayesian thinking** | 用 prior + evidence 更新 belief. 不是 binary. |
+| **Likelihood** | 假设 H 为真时, 看到这个 evidence 的概率. |
+| **Hypothesis-driven debug** | 列假设 + 测每个 — 比 trial-and-error 高效. |
+| **Ablation** | 单变量改, 看影响. |
+| **Variable isolation** | 一次只动一个 variable, 其他固定. |
+| **Confounding variable** | 跟原因混淆的变量. e.g. deploy 跟 query growth 同时发生 → 哪个是因? |
+
+### Eval / 测量 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Vintage golden set** ⭐ | **2 月前的 eval set, 现在重跑**. 如果分掉了 → model 真变差. |
+| **Regression eval** | 改动后跑老 eval, 看 metric 退化没. |
+| **Stratified eval** ⭐ | 按 slice (language / intent / tenant) 拆开看. 整体 OK 但某 slice 挂. |
+| **Per-segment metric** | 跟 stratified eval 同义. |
+| **A/A test** | 同 version 分两组 — 应该无差异. 校准 A/B 系统. |
+| **Vintage queries vs new queries** | 老 query 重跑 vs 新 query 测 — 隔离 data drift vs model drift. |
+| **Time-of-day pattern** | Drift 跟时段相关? Peak hour traffic 不同? |
+
+### 监控 / Observability ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Continuous monitoring** | 一直 monitoring, 不是点状测. |
+| **Drift detection** | 自动检测 drift 的 alert system. |
+| **Golden set refresh** | Eval set 持续更新. 不 refresh 3 月就 stale. |
+| **Per-slice dashboard** ⭐ | **按 language / region / tenant 拆的 dashboard**. Worst slice catch issue. |
+| **Canary monitoring** | 1-5% 流量先 ship, 看 metric. |
+| **A/B against old version** | 跟之前 stable version 实时比. |
+| **Shadow mode** | 新 version 跟旧并跑, 新只记录. |
+
+### Vendor 升级 / API ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **API model version pinning** ⭐ | **指定 model version (gpt-5.5-2025-12)** 而不是 alias (gpt-5.5). Vendor 升级不影响你. |
+| **Model alias / Latest tag** | "gpt-4o" 这种, 跟着 vendor 自动升. 危险. |
+| **Deprecation notice** | Vendor 通知某 model 要废. 通常 30-90 天 notice. |
+| **Silent model update** | Vendor 没说就改了. Anthropic / OpenAI 一般会说, 但 minor patch 可能没说. |
+| **Vendor changelog** | Vendor 的 model 更新记录. Production 必 subscribe. |
+
+### 质量 metric + Prevention ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Hallucination rate / Faithfulness** | 编造比例 / 输出是否 grounded. RAG 重点 track. |
+| **Refusal rate** | 拒答比例. 涨 = 太保守了 — vendor 升级常见症状. |
+| **Verbosity / Tone drift** | 输出长度 / 风格变了 — model 升级最 visible. |
+| **Regression eval on every change** | CI 跑 golden set. |
+| **Pin model version** ⭐ | 不用 latest alias. 防 silent upgrade. |
+| **Drift alert** | KL > 0.1 时 page. |
+| **Customer perception survey** | 季度问客户 "feels worse?" — baseline shift 唯一抓手. |
+
+---
+
 ## 这道题在考什么
 
 表面是 model drift 题, 底下藏着 **8 个 FDE evaluation signal**:

@@ -9,6 +9,123 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> DB internals 术语墙. 不熟这堆 = 看不懂 EXPLAIN, 也讲不出 hypothesis. 5 min 扫完, 全局清晰.
+
+### Query plan / EXPLAIN
+
+| 术语 | 解释 |
+|---|---|
+| **`EXPLAIN ANALYZE`** ⭐ | 跑 query + 返真实 plan. `EXPLAIN` 只估, `ANALYZE` 真跑. |
+| **`BUFFERS`** | EXPLAIN 选项, 显示页缓存 hit / read. `hit=12345 read=987654` (read = 磁盘). |
+| **Cost vs Actual time** ⭐ | `cost=A..B rows=N` 是估计; `actual time=C..D rows=M` 是实际. 偏差 10x = 统计错. |
+| **Cardinality estimate** ⭐ | Planner 估某节点产生多少行. 估错 = 走错 join order / 选错 join type. |
+| **`loops=N`** | 该 node 执行了 N 次. Nested loop inner 高 loops = 灾难. |
+
+### Plan node 类型
+
+| 术语 | 解释 |
+|---|---|
+| **Seq Scan (Sequential Scan)** ⭐ | 全表扫. 表小 + filter 不 selective 时 OK; 大表 + selective filter 是 anti-pattern. |
+| **Index Scan** ⭐ | 走索引找 row 指针, 再去 heap 取. |
+| **Index Only Scan** ⭐ | 完全在索引页满足 query, 不访问 heap. **最快**. 需 visibility map + 索引覆盖所有 SELECT 列. |
+| **Bitmap Heap Scan** | 索引产 bitmap (页号 bitmap), 然后 heap 按页扫. Range query 友好. |
+| **Hash Join** | 小表 build hash table, 大表 probe. 非排序数据友好. |
+| **Merge Join** | 两边都排序后 merge. 已排序数据 (e.g., 索引顺序) 友好. |
+| **Nested Loop Join** ⭐ | outer × inner. outer 小 + inner 有 index 时高效; outer 大时灾难. |
+| **HashAggregate** | GROUP BY 用 hash table. 内存够时快; 不够 spill 到 disk. |
+| **Sort + GroupAggregate** | GROUP BY 用排序. 跟已排序输入配合好. |
+| **Append (partitioned)** | 多分区 union. Partition pruning 后只 Append 必要的. |
+| **`Rows Removed by Filter`** ⭐ | 索引取出后再被 WHERE filter 掉的行. 高 = 索引未覆盖完整 predicate. |
+
+### Index 类型
+
+| 术语 | 解释 |
+|---|---|
+| **B-tree** ⭐ | PostgreSQL 默认索引. range query + equality 都强. |
+| **Hash index** | 只支持等于. PG 罕用 (B-tree 也快). |
+| **GIN (Generalized Inverted)** | 多值列 (array, JSONB, full-text). |
+| **GiST (Generalized Search Tree)** | 几何 / 范围类型. PostGIS 用. |
+| **BRIN (Block Range Index)** | 大表 + 物理顺序好的列 (e.g., 时间). 索引小 (几 MB), 但选择性弱. |
+| **Composite index `(a, b, c)`** ⭐ | 多列索引. 列顺序: leading 是 range/equality predicate, 后续 equality. |
+| **`INCLUDE (cols)`** | Covering 列附在索引页, Index Only Scan 用. |
+| **Partial index** | `WHERE` 条件的索引: `CREATE INDEX ... WHERE status != 'COMPLETED'`. 跳过不需要的行, 索引小. |
+| **Expression index** | `CREATE INDEX ON tbl (UPPER(email))`. 让函数能走索引. |
+| **`CREATE INDEX CONCURRENTLY`** ⭐ | 不锁表, online 建索引. Production 必加 CONCURRENTLY. |
+| **Sargable (Search ARGument able)** | 谓词形式让 index 能用. `WHERE col > X` sargable; `WHERE func(col) = X` 不 sargable. |
+
+### 统计 / Planner
+
+| 术语 | 解释 |
+|---|---|
+| **`ANALYZE`** ⭐ | 收集统计信息 (直方图, n_distinct, correlation). Planner 用它估 cardinality. |
+| **`VACUUM`** ⭐ | 回收 dead tuple 空间, update visibility map. autovacuum 自动跑. |
+| **`VACUUM FULL`** | 重写整表, 真回收磁盘. **锁表**, 只 off-hour. |
+| **`pg_repack`** | 在线 vacuum full, 不锁. Production 必备. |
+| **Statistics target** | `ALTER TABLE ... SET STATISTICS 1000;` 让 histogram 更细, cardinality 估更准. |
+| **Extended statistics** | `CREATE STATISTICS ON (a, b)` 让 planner 知道 a/b 相关. correlated column 必备. |
+| **`autovacuum`** | PG 后台进程, dead tuple > 20% 或 row 改 > 阈值就跑. |
+| **`pg_stat_statements`** ⭐ | PG 扩展, 跟踪所有 query 统计. 找 top-N 慢. |
+| **`pg_hint_plan`** | PG 扩展, 用 comment 强干预 planner: `/*+ Leading(o r) HashJoin(o r) */`. 慎用. |
+| **`auto_explain`** | 自动 log 慢 query plan, post-incident 翻日志看. |
+
+### 性能问题分类
+
+| 术语 | 解释 |
+|---|---|
+| **Stale statistics** ⭐ | autovacuum 没及时跑, stats 跟数据脱钩. 80% "突然变慢" 的根因. |
+| **Bloat (膨胀)** | UPDATE/DELETE 后 dead tuple 不及时回收, 表变大. pct_dead > 20% 是警戒线. |
+| **Index bloat** | 索引也有 bloat. `REINDEX CONCURRENTLY`. |
+| **Plan flip / Plan regression** ⭐ | Planner 选不同 plan, 性能突变. 改一行 query / stats refresh 都可能触发. |
+| **Cardinality misestimate** | planner 估行数偏离实际. 致命: nested loop with huge outer. |
+| **Cache hit ratio** | `hit / (hit + read)`. < 99% = buffer pool 太小或 working set 太大. |
+| **`work_mem` spill** | sort/hash 内存不够 spill 到 disk. `Sort: external merge Disk: N kB` 警示. |
+| **Lock contention** | 等锁. `pg_stat_activity` 看 `wait_event_type=Lock`. |
+| **Connection pool exhausted** | client 拿不到 connection. PgBouncer / RDS Proxy 缓解. |
+
+### Partitioning
+
+| 术语 | 解释 |
+|---|---|
+| **`PARTITION BY RANGE / LIST / HASH`** ⭐ | 分区策略: range (date), list (region), hash (customer_id). |
+| **Partition pruning** ⭐ | query 只扫相关 partition. WHERE 必带 partition key. |
+| **Hot vs cold partitions** | 近期 partition 放 SSD, 老 partition 放 HDD / S3. |
+| **`DROP TABLE old_partition`** | 删老 partition 是 O(1) — 删整文件, 比 `DELETE` 快百万倍. |
+
+### 系统 / 配置
+
+| 术语 | 解释 |
+|---|---|
+| **`shared_buffers`** | PG 内存缓冲池 size. 一般 25% RAM. |
+| **`effective_cache_size`** | Planner 估的 OS + PG cache 大小. 影响 plan 选择 (大 → 偏好 random read 索引). |
+| **`work_mem`** | 单 sort/hash 操作可用内存. ad-hoc query SET 大, OLTP keep 小. |
+| **`random_page_cost` / `seq_page_cost`** | Planner 用的 cost 比例. SSD 应调低 `random_page_cost` (默认 4 → 1.1). |
+| **`max_parallel_workers_per_gather`** | 并行 worker 上限. 大 query 受益. |
+| **`iostat -x 1`** | Linux 看磁盘 IOPS / utilization. 100% = saturated. |
+| **EBS / IOPS** | AWS 块存储. gp3 默认 3000 IOPS, 可付费提到 16k. |
+
+### 客户沟通 / FDE 加分
+
+| 术语 | 解释 |
+|---|---|
+| **Customer empathy** ⭐ | 客户着急时你冷静 + 系统化排查. Don't blame customer. |
+| **Root cause + ETA + Prevention** | 客户报告 3 件套: 因 / 修 / 防. |
+| **Runbook / Playbook** | 团队 wiki: "若 X 慢 → 看 Y → 跑 Z". 新人也能 follow. |
+| **Slow query SLO** | 业务目标: p99 < 5s 等. 超阈值 → page on-call. |
+
+### 其他 DB 对照
+
+| 术语 | 解释 |
+|---|---|
+| **MySQL `EXPLAIN FORMAT=JSON`** | MySQL 版 plan, 跟 PG 差不多概念. |
+| **Snowflake query profile** | UI 看 stage 时间分布; `Bytes Spilled to Remote Storage` 警示. |
+| **BigQuery execution graph** | UI; `bytes_billed` 决定 $$. 无 index, 靠 partition + cluster columns. |
+| **ClickHouse** | 列存 OLAP, query 是 PG 100x. 不同的 mental model. |
+| **Trino / Presto** | 联邦 query engine. 跨数据源 SQL. |
+
+---
+
 ## 这道题在考什么
 
 不会写 SQL 也能装 1 年 — DB perf debugging 是真硬功夫:

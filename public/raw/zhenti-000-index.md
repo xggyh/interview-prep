@@ -6,6 +6,74 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这是全 52 题的总目录, 先把 FDE 相关角色 / 公司 / 题型术语过一遍. 后面具体题里再展开.
+
+### FDE / 角色术语 ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **FDE (Forward Deployed Engineer)** ⭐ | "前线部署工程师" — 在客户现场或者贴身服务客户的工程师. 不是普通 SWE, 60% 时间和客户 ops/product/compliance 对接, 把通用产品 deploy 到 customer 具体场景. Palantir 发明的角色, 现在 OpenAI / Anthropic / Databricks 都有. |
+| **FDSE (Forward Deployed Software Engineer)** | Palantir 的正式叫法, 等同于 FDE. |
+| **Deployment Strategist** | Palantir 的另一个 FDE-adjacent 角色, 偏 customer-facing strategy, 写代码少一点. |
+| **Applied AI Engineer** | Anthropic 的 FDE-equivalent, 也叫 "Applied Solutions". 偏 enterprise 客户部署 + Claude 集成. |
+| **SWE (Software Engineer)** ⭐ | 标准软件工程师. PM 给 PRD → ship feature → release notes. 信息流走 PM 中转, 不直接对接 customer. |
+| **MLE (Machine Learning Engineer)** | ML 工程师. Happiness function 是 model quality metrics (accuracy / latency), 不是 customer outcome. |
+| **SE (Sales Engineer / Solutions Engineer)** | 售前工程师. Deal close 之后就 hand off, 不 own deployment lifecycle. |
+| **Research Scientist** | 研究员. Unit of progress 是 paper, distance to customer = max. |
+
+### 公司 / 平台 ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Palantir** | 老牌数据 / ontology 平台公司. 客户 Airbus / JPMorgan / DoD. FDE 的发源地, 5+ 年 tenure 文化, 偏 regulated industry 长周期 deployment. |
+| **Foundry** | Palantir 的 data + ontology 平台. 把客户混乱的 data model codify 成统一 ontology. |
+| **AIP (Palantir AI Platform)** | Palantir 把 LLM 接到 Foundry 上的 layer. |
+| **OpenAI** | GPT / Operator / Codex 的公司. FDE 偏 enterprise + agent stack. |
+| **Anthropic** | Claude / Claude Code 的公司. FDE-equivalent 叫 Applied Solutions, 强调 safety + Constitutional AI. |
+| **Databricks** | Lakehouse 数据 + ML 平台. 客户 Block / Mastercard. 收购 Mosaic ML 之后做 Mosaic AI 全套 LLM lifecycle. |
+| **Scale AI** | 数据标注 + RLHF + evaluation 平台. 服务 OpenAI / Anthropic / Meta. Donovan 做 defense / federal sector. |
+| **ElevenLabs** | Voice AI / TTS / 声音克隆 leader. 紧凑创业流程, 看速度和端到端 ownership. |
+| **Exponent** | 面试题库 / mock interview 平台 (exponent.com). 这 52 道题的原始来源. |
+
+### 7 大题型 ⭐ 必懂
+
+| 术语 | 解释 |
+|---|---|
+| **Behavioral** | 行为题. STAR 框架讲故事, 测 mission fit / customer-handling / ownership. |
+| **Coding** | 编程题. FDE 偏真实工程问题 (rate limiter / 脏 CSV / RAG pipeline), 不是 LeetCode hard. |
+| **System Design** | 系统设计题. 带企业约束 (HIPAA / VPC / SSO), 不是设计 Twitter. |
+| **Decomposition** ⭐ | 问题拆解题. **FDE 最关键的一轮**, 给你一个大模糊问题 (e.g., "90 天统一 3 套反欺诈系统"), 看你怎么拆. 常见挂法: 还没厘清问题就冲方案. |
+| **Client Simulation** | 客户模拟题. 面试官扮客户 (有时刁难), 看你怎么沟通. |
+| **AI Specialty** | AI lab 专属深度题 (fine-tune vs RAG / eval / guardrails / prompt injection). |
+| **Production & Reliability** | 生产可靠性题. FDE 不只 ship 一次, 还要 keep it running (incident response / model drift). |
+
+### 方法论 / 框架
+
+| 术语 | 解释 |
+|---|---|
+| **STAR** | Situation / Task / Action / Result. Behavioral 题讲故事的标准框架. |
+| **Walking-skeleton MVP** | 走骨头 — 最薄端到端版本, 每组件 mock 但流程全跑通. 跑稳后再换真组件. Decomposition 题标准 MVP 方法论. |
+| **Take-home** | 带回家做的题, 通常 OpenAI 用 — 给你一个 dataset / API, 几天后 submit + 录视频讲解你的思路. |
+| **Ontology** | 数据 / 概念的统一定义体系 — 不是数据库 schema, 是上层业务概念词典. Palantir 的核心方法论. |
+| **RSP (Responsible Scaling Policy)** | Anthropic 的安全 scaling 政策, 模型能力到某个 threshold 才解锁部署. 面试 Anthropic 之前必读. |
+| **Core Views** | Anthropic 的 "Core Views on AI Safety" 公开文档, mission alignment 的考点. |
+
+### 高频公司侧重词
+
+| 术语 | 解释 |
+|---|---|
+| **lakehouse** | Databricks 的核心概念 — 把 data lake (raw data) 跟 data warehouse (structured) 合一. |
+| **MLflow** | Databricks 旗下 ML lifecycle 工具 (track / version / deploy model). |
+| **Mosaic AI** | Databricks 收购 Mosaic ML ($1.3B) 之后的 LLM 训练 + serving stack. |
+| **Operator** | OpenAI 的浏览器 / 计算机 use agent — agent 能在网页上点按钮 / 填表. |
+| **Codex** | OpenAI 的 code agent. |
+| **Claude Code** | Anthropic 的 code agent / CLI. |
+| **Constitutional AI** | Anthropic 用 AI 反馈替代部分人类反馈做 alignment 的方法 (RLAIF). |
+
+---
+
 ## 🎯 7 大类索引
 
 ### 一、行为 / 动机题 (Behavioral & Motivation) — 10 题

@@ -43,6 +43,21 @@
 <blockquote><p>"Your production system depends on a third-party API (LLM provider, payment processor, ASR service). <strong>You're seeing intermittent timeouts — some requests succeed, some hit 30-second timeout.</strong> Walk me through your diagnosis methodology and response. Not just 'check status page' — show me you've actually owned this before."</p></blockquote>
 <p><strong>Round</strong>: Production / Reliability (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production reality 必问</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>Reliability / on-call 题. 网络 / 分布式系统 / 监控术语堆.</p></blockquote>
+<h4>故障类型 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Intermittent / 间歇性</strong> ⭐</td><td><strong>有时成功有时失败</strong> — 跟 constant failure 截然不同的 debug. 难抓因为 reproduce 难, 但 patterns 通常存在 (peak hours / specific region).</td></tr><tr><td><strong>Timeout</strong></td><td>Request 超时. Hard timeout (30s 砍掉) vs slow (5s 慢但成).</td></tr><tr><td><strong>Cascading failure</strong> ⭐</td><td><strong>一个组件挂连带打挂下游</strong> — retry storm 是经典 cascade trigger.</td></tr><tr><td><strong>Retry storm / Retry amplification</strong> ⭐</td><td><strong>Vendor 慢 30% 时, 我们 5x retry → vendor 收 5x 流量 → 更慢 → 更多 retry</strong>. 死循环.</td></tr><tr><td><strong>Thundering herd</strong></td><td>大量 client 同时 retry 撞 vendor. 用 jitter 防.</td></tr><tr><td><strong>Partial outage</strong></td><td>部分功能挂, 其他正常. 比全挂难诊断.</td></tr><tr><td><strong>Regional outage</strong></td><td>只影响一个 region (e.g. AWS us-east-1).</td></tr><tr><td><strong>Silent failure</strong></td><td>没 error 但结果不对. 最可怕, 监控难捕.</td></tr></tbody></table></div>
+<h4>监控 / Observability ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>OpenTelemetry (OTEL)</strong> ⭐</td><td><strong>开源 observability 标准</strong> — trace / metric / log 统一. 2026 业界默认.</td></tr><tr><td><strong>Distributed tracing</strong> ⭐</td><td><strong>跨服务 request trace</strong> — 看哪步慢 / 挂. 每 request 一个 trace ID 串起来.</td></tr><tr><td><strong>Trace</strong></td><td>一个 request 完整路径.</td></tr><tr><td><strong>Span</strong></td><td>Trace 中的一段 — 一次 function / API call.</td></tr><tr><td><strong>Correlation ID</strong></td><td>跨服务关联 log 的 ID. 同 trace ID.</td></tr><tr><td><strong>Prometheus</strong></td><td>开源 metric 系统. Pull 模式从 service 抓 metric.</td></tr><tr><td><strong>Grafana</strong></td><td>Metric 可视化. 跟 Prometheus / Datadog 搭.</td></tr><tr><td><strong>Datadog</strong></td><td>商业 APM + monitoring + log. SaaS.</td></tr><tr><td><strong>APM (Application Performance Monitoring)</strong></td><td>New Relic / Datadog APM / Dynatrace 类工具.</td></tr><tr><td><strong>LangSmith / Phoenix</strong></td><td>LLM-specific tracing.</td></tr><tr><td><strong>Status page</strong></td><td>Vendor 公开的 incident 通知页 — status.openai.com 类型.</td></tr><tr><td><strong>Webhook</strong></td><td>Vendor push 通知到你 — incident 时收 alert.</td></tr></tbody></table></div>
+<h4>可靠性 Patterns ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Circuit breaker</strong> ⭐</td><td><strong>连续失败到 threshold 后停止调用 N 秒</strong>, 给 downstream 喘息. Hystrix 实现.</td></tr><tr><td><strong>Retry with exponential backoff</strong></td><td>Retry 间隔指数增长 (1s, 2s, 4s, 8s).</td></tr><tr><td><strong>Jitter</strong> ⭐</td><td><strong>Backoff 加随机抖动</strong> — 避免 thundering herd. ±20% randomness.</td></tr><tr><td><strong>Timeout</strong></td><td>请求超过 X 秒放弃. p99 × 2 常见.</td></tr><tr><td><strong>Bulkhead / 隔离舱</strong></td><td>隔离 user / tenant 资源池.</td></tr><tr><td><strong>Hedged request</strong></td><td>同 request 发 2 个 backend, 用先回的.</td></tr><tr><td><strong>Rate limiting / Throttling</strong></td><td>限 QPS / Server 拒收过载.</td></tr><tr><td><strong>DLQ (Dead Letter Queue)</strong> ⭐</td><td><strong>失败 N 次的 message 进 DLQ</strong>, 人工处理.</td></tr><tr><td><strong>Idempotency key</strong></td><td>Retry 安全必备.</td></tr><tr><td><strong>Graceful degradation / Cached fallback</strong></td><td>降级 mode 仍工作 / 返回缓存.</td></tr><tr><td><strong>Multi-vendor fallback</strong></td><td>Primary 挂时 auto-switch secondary.</td></tr></tbody></table></div>
+<h4>Headers / HTTP</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>x-ratelimit-remaining</strong></td><td>Vendor header 告知剩余 quota.</td></tr><tr><td><strong>request_id</strong></td><td>Vendor 给每 request 的 ID. Escalate 时必带.</td></tr><tr><td><strong>429 / 503 / 5xx</strong></td><td>Too many requests / Service unavailable / Server error 总称.</td></tr><tr><td><strong>Payload size</strong></td><td>Request body 大小. 大 payload 易超时.</td></tr></tbody></table></div>
+<h4>事故响应 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Incident</strong></td><td>影响 user 的故障.</td></tr><tr><td><strong>P0 / P1 / P2</strong></td><td>Severity. P0 = 立刻 page; P1 = 1h; P2 = 4h.</td></tr><tr><td><strong>On-call</strong></td><td>轮值待命. PagerDuty / Opsgenie alert routing.</td></tr><tr><td><strong>Page</strong></td><td>告警手段 — 打电话叫醒.</td></tr><tr><td><strong>MTTA / MTTD / MTTR</strong> ⭐</td><td><strong>Acknowledge / Detect / Resolve 时间</strong>. Reliability 核心指标.</td></tr><tr><td><strong>Blast radius</strong></td><td>故障影响范围 (用户 / region / tenant 数).</td></tr><tr><td><strong>Runbook</strong> ⭐</td><td><strong>"If X 告警, 跑 Y 步骤"</strong>. 应急手册. On-call 安全网.</td></tr><tr><td><strong>Postmortem</strong></td><td>事后复盘文档. Blameless 文化.</td></tr><tr><td><strong>5 whys / RCA</strong></td><td>Root cause analysis — 连续问 5 次 why.</td></tr><tr><td><strong>Action item</strong></td><td>Postmortem 后改进项 — 有 owner + ETA.</td></tr></tbody></table></div>
+<h4>SLO / Error Budget</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SLO (Service Level Objective)</strong> ⭐</td><td><strong>可靠性目标</strong> — e.g. 99.9% availability. Internal commit.</td></tr><tr><td><strong>SLA (Service Level Agreement)</strong></td><td>跟客户的合同 — breach 罚款.</td></tr><tr><td><strong>Error budget</strong> ⭐</td><td>100% - SLO. Burn 太快 = freeze feature ship.</td></tr><tr><td><strong>Golden signals</strong></td><td>Latency / Traffic / Errors / Saturation — Google SRE 经典.</td></tr><tr><td><strong>Saturation / Queue depth</strong></td><td>接近上限的预警信号.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>表面是 debug 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
 <ol><li><strong>Real on-call experience</strong> — 不是 "我看 metrics", 是 specific tools + workflow</li><li><strong>Diagnosis discipline</strong> — 系统化排除, 不是猜</li><li><strong>Intermittent vs constant</strong> — 区分 pattern, 不能 grep 一条 log</li><li><strong>Both sides</strong> — 知道是我们的问题 OR vendor 的问题</li><li><strong>Mitigation before root cause</strong> — stop bleeding first</li><li><strong>Customer comm</strong> — keeping stakeholders informed during incident</li><li><strong>Postmortem mindset</strong> — every incident becomes improvement</li><li><strong>STAR storytelling</strong> — voice agent Pakistan ASR 40-min outage 是 perfect story</li></ol>
@@ -877,6 +892,92 @@ Quotes for interview:
 
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production reality 必问
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> Reliability / on-call 题. 网络 / 分布式系统 / 监控术语堆.
+
+### 故障类型 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Intermittent / 间歇性** ⭐ | **有时成功有时失败** — 跟 constant failure 截然不同的 debug. 难抓因为 reproduce 难, 但 patterns 通常存在 (peak hours / specific region). |
+| **Timeout** | Request 超时. Hard timeout (30s 砍掉) vs slow (5s 慢但成). |
+| **Cascading failure** ⭐ | **一个组件挂连带打挂下游** — retry storm 是经典 cascade trigger. |
+| **Retry storm / Retry amplification** ⭐ | **Vendor 慢 30% 时, 我们 5x retry → vendor 收 5x 流量 → 更慢 → 更多 retry**. 死循环. |
+| **Thundering herd** | 大量 client 同时 retry 撞 vendor. 用 jitter 防. |
+| **Partial outage** | 部分功能挂, 其他正常. 比全挂难诊断. |
+| **Regional outage** | 只影响一个 region (e.g. AWS us-east-1). |
+| **Silent failure** | 没 error 但结果不对. 最可怕, 监控难捕. |
+
+### 监控 / Observability ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **OpenTelemetry (OTEL)** ⭐ | **开源 observability 标准** — trace / metric / log 统一. 2026 业界默认. |
+| **Distributed tracing** ⭐ | **跨服务 request trace** — 看哪步慢 / 挂. 每 request 一个 trace ID 串起来. |
+| **Trace** | 一个 request 完整路径. |
+| **Span** | Trace 中的一段 — 一次 function / API call. |
+| **Correlation ID** | 跨服务关联 log 的 ID. 同 trace ID. |
+| **Prometheus** | 开源 metric 系统. Pull 模式从 service 抓 metric. |
+| **Grafana** | Metric 可视化. 跟 Prometheus / Datadog 搭. |
+| **Datadog** | 商业 APM + monitoring + log. SaaS. |
+| **APM (Application Performance Monitoring)** | New Relic / Datadog APM / Dynatrace 类工具. |
+| **LangSmith / Phoenix** | LLM-specific tracing. |
+| **Status page** | Vendor 公开的 incident 通知页 — status.openai.com 类型. |
+| **Webhook** | Vendor push 通知到你 — incident 时收 alert. |
+
+### 可靠性 Patterns ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Circuit breaker** ⭐ | **连续失败到 threshold 后停止调用 N 秒**, 给 downstream 喘息. Hystrix 实现. |
+| **Retry with exponential backoff** | Retry 间隔指数增长 (1s, 2s, 4s, 8s). |
+| **Jitter** ⭐ | **Backoff 加随机抖动** — 避免 thundering herd. ±20% randomness. |
+| **Timeout** | 请求超过 X 秒放弃. p99 × 2 常见. |
+| **Bulkhead / 隔离舱** | 隔离 user / tenant 资源池. |
+| **Hedged request** | 同 request 发 2 个 backend, 用先回的. |
+| **Rate limiting / Throttling** | 限 QPS / Server 拒收过载. |
+| **DLQ (Dead Letter Queue)** ⭐ | **失败 N 次的 message 进 DLQ**, 人工处理. |
+| **Idempotency key** | Retry 安全必备. |
+| **Graceful degradation / Cached fallback** | 降级 mode 仍工作 / 返回缓存. |
+| **Multi-vendor fallback** | Primary 挂时 auto-switch secondary. |
+
+### Headers / HTTP
+
+| 术语 | 解释 |
+|---|---|
+| **x-ratelimit-remaining** | Vendor header 告知剩余 quota. |
+| **request_id** | Vendor 给每 request 的 ID. Escalate 时必带. |
+| **429 / 503 / 5xx** | Too many requests / Service unavailable / Server error 总称. |
+| **Payload size** | Request body 大小. 大 payload 易超时. |
+
+### 事故响应 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Incident** | 影响 user 的故障. |
+| **P0 / P1 / P2** | Severity. P0 = 立刻 page; P1 = 1h; P2 = 4h. |
+| **On-call** | 轮值待命. PagerDuty / Opsgenie alert routing. |
+| **Page** | 告警手段 — 打电话叫醒. |
+| **MTTA / MTTD / MTTR** ⭐ | **Acknowledge / Detect / Resolve 时间**. Reliability 核心指标. |
+| **Blast radius** | 故障影响范围 (用户 / region / tenant 数). |
+| **Runbook** ⭐ | **"If X 告警, 跑 Y 步骤"**. 应急手册. On-call 安全网. |
+| **Postmortem** | 事后复盘文档. Blameless 文化. |
+| **5 whys / RCA** | Root cause analysis — 连续问 5 次 why. |
+| **Action item** | Postmortem 后改进项 — 有 owner + ETA. |
+
+### SLO / Error Budget
+
+| 术语 | 解释 |
+|---|---|
+| **SLO (Service Level Objective)** ⭐ | **可靠性目标** — e.g. 99.9% availability. Internal commit. |
+| **SLA (Service Level Agreement)** | 跟客户的合同 — breach 罚款. |
+| **Error budget** ⭐ | 100% - SLO. Burn 太快 = freeze feature ship. |
+| **Golden signals** | Latency / Traffic / Errors / Saturation — Google SRE 经典. |
+| **Saturation / Queue depth** | 接近上限的预警信号. |
 
 ---
 

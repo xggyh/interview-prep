@@ -7,6 +7,81 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Eval 是 FDE 第二常考题, 术语堆叠. 5 min 扫完再读详解.
+
+### Eval 总论 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **3-layer eval pyramid** ⭐ | **Offline (CI 前跑) / Online A/B (canary 比) / Production monitoring (always-on)**. 三层各抓不同 failure, 缺一层 = 有盲区. |
+| **Golden set / Eval set** ⭐ | 200-2000 个手标的 (query, expected answer) 对. **每 3 月不 refresh 就 stale**. |
+| **Eval debt** | 上线时没 eval set, 6 周后 model 退化也发现不了 — 没 baseline 可比. 早期 FDE 最常踩坑. |
+| **Stratified sample** | 按 intent / language / difficulty 分层取样, 确保 eval set 各 slice 都覆盖. |
+
+### Metrics — 知道选哪个
+
+| 术语 | 解释 |
+|---|---|
+| **BLEU / ROUGE** | 旧式 n-gram 重叠分数 — 翻译/摘要时代用的. **对 LLM generation 几乎无用** (有多种正确答案, BLEU 鼓励冗长). |
+| **Recall@10 / NDCG@10 / MRR** | RAG 检索指标. Recall@10 = 正确文档在前 10 个的比例; NDCG = 加权排名好坏; MRR = 第一个正确答案的倒数排名. |
+| **F1 / Precision / Recall** | 分类任务标配. F1 = precision/recall 调和均. |
+| **Cosine similarity** | 两向量夹角余弦 — semantic 相似度的标准度量, -1 到 1. |
+| **Pass@k** | 采样 k 次, 至少一次对就算对. Coding eval 用. |
+| **Faithfulness** | RAG 输出有没有 grounding 在 retrieved chunks — hallucination 反指标. |
+
+### LLM-as-Judge ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **LLM-as-judge** ⭐ | **用一个 LLM 给另一个 LLM 输出打分**. Scale 关键 — 100k 输出人审不起, LLM-judge 0.001/sample. **但必须校准**. |
+| **Cohen's kappa** ⭐ | **Inter-rater agreement 系数**. 跟纯靠运气比的 agreement. < 0.4 别信; 0.4-0.6 凑合; **> 0.6 production-ready**; > 0.8 几乎完美 (常说明 overfit). |
+| **Inter-rater reliability** | 多个评审之间是否一致. 量化用 Cohen's kappa / Fleiss' kappa (3+ raters). |
+| **Pairwise judging** | 给 judge 看 A / B 两个答案问"哪个好". 比 1-5 absolute scoring 更稳 (绝对分会 drift). |
+| **Position bias** | Judge 倾向选第一个出现的 — pairwise 必须 randomize 顺序. |
+| **Self-eval bias** | Model 给自己输出打高分. **FT'd Sonnet 系统不能用 Sonnet 当 judge**. |
+| **Rubric** | 评分标准 (accuracy / completeness / tone / clarity 各一档). 比单分更可解释. |
+| **ELO** | 国际象棋评分系统迁移过来 — pairwise battle 多了, 自动给 model 排名. Chatbot Arena 用这个. |
+
+### Online A/B / Canary
+
+| 术语 | 解释 |
+|---|---|
+| **Canary rollout** ⭐ | 1% → 5% → 25% → 100% 阶梯式. 每阶段观察 metrics, 出 SLO breach 自动 rollback. |
+| **A/A test** | 把同一 version 分成两组对比 — 应该没 difference. 校准 A/B 测试系统本身有没有 bias. |
+| **Shadow mode** | 新 model 跟旧 model 并跑, 新 model 决策**只记录不生效**. 收数据零风险. |
+| **Statistical significance** | p-value < 0.05 才能说 difference 不是偶然. 但**实际 effect 太小 (lift < 1pp) 没业务意义也别 ship**. |
+| **Power / MDE** | Power = 测出真 effect 的概率 (target 0.8). MDE = 最小可探测 effect (typical 2pp). Sample size 不够 = underpowered, 测不出真 effect. |
+| **Business KPI** | 真业务指标 — resolved rate, conversion, repayment. LLM-judge 是 proxy, business KPI 是 truth. |
+
+### Drift / 持续监控 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Data drift** ⭐ | **输入分布变了** — 用户问的东西变了 (新 product line 上线, 季节性, 营销活动). Embedding cosine / KL divergence 量化. |
+| **Concept drift** | **输入 → 输出的 mapping 变了** — 同样的 query 现在该有不同答案 (法规更新, 退款政策改). 更难抓, 因为 input 看起来一样. |
+| **Model drift** | Model 行为变化 — 因为 dependency upgrade / config change / vendor model 升级. |
+| **Distribution shift** | 总称 — covers data drift + concept drift. |
+| **KL divergence** | 两个分布的"距离" — drift 量化常用. |
+| **Wasserstein distance** | 类似 KL 但对 sparse 分布更稳. |
+| **Per-slice metric** ⭐ | 不只看整体 89%, 看 Indonesia 60% vs 美国 92%. **Worst-slice 是真的 production 风险**. |
+| **Goodhart's Law** | "When a measure becomes a target, it ceases to be a good measure" — 优化 ROUGE → model 变冗长, ROUGE 升 user 不爽. |
+
+### 生产 Eval 工具 (2026)
+
+| 术语 | 解释 |
+|---|---|
+| **Braintrust** | 商业 eval pipeline. 标 ground truth + 跑 eval 套件. |
+| **Langfuse** | 开源 LLM 监控 + eval, self-host friendly. |
+| **Arize Phoenix** | 开源 LLM observability. Tracing + eval. |
+| **LangSmith** | LangChain 的 eval + tracing. |
+| **Ragas** | 专门 RAG eval — faithfulness, context relevance, answer correctness. |
+| **TruLens** | RAG triad eval (context relevance / groundedness / answer relevance). |
+| **PagerDuty** | On-call 告警 routing. Production AI 告警走这个. |
+
+---
+
 ## 这道题在考什么
 
 表面是 eval 题, 底下藏着 **8 个 FDE evaluation signal**:

@@ -9,6 +9,77 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题最杂 — CLI + PDF + NER + LLM 全混. 30+ 个术语先扫一遍.
+
+### CLI / 工程
+
+| 术语 | 解释 |
+|---|---|
+| **`argparse`** ⭐ | Python stdlib 命令行参数解析. `add_argument`, `subparsers`, `--flag` 标准 CLI UX. |
+| **`--dry-run`** | "假装跑一遍" — 只打印会做什么, 不真做. 文件操作工具的标配安全 flag. |
+| **Subcommand (子命令)** | `git commit` / `git push` 这种结构. `argparse.add_subparsers()` 实现. |
+| **Exit code** | 进程返回值: `0` = OK, `1` = 一般错误, `2` = 用法错误. shell 用 `$?` 读. |
+| **`rglob` (recursive glob)** | `Path.rglob('*.pdf')` 递归找所有 .pdf 文件. 替代 `os.listdir + walk`. |
+| **`logging` (而非 print)** | Python 标准日志库, 带 timestamp / level / handler. `print` 在 production 是 anti-pattern. |
+| **Atomic rename** ⭐ | 写文件先写 `.tmp`, 然后 `os.replace(tmp, final)` 原子改名. 防 crash 时 master index 损坏. |
+
+### PDF / OCR
+
+| 术语 | 解释 |
+|---|---|
+| **`pdfplumber`** ⭐ | 纯 Python PDF text + table 抽取库. mature, 不需要 native binding. |
+| **`PyMuPDF` (fitz)** | C 库 binding, 比 pdfplumber 快 10x, 但安装复杂. |
+| **`pdfminer.six`** | 老牌 PDF parser, pdfplumber 底层就是它. |
+| **OCR (Optical Character Recognition)** | 图像识别成文字. 扫描 PDF 必走. |
+| **`tesseract` / `pytesseract`** | Google 开源 OCR. CPU 跑, 1-3s/page. |
+| **`paddleocr` / `easyocr`** | 中国 / 中文 OCR, GPU 可加速, 比 tesseract 快 5x. |
+| **`pdf2image`** | 把 PDF 页面渲染成图像, OCR 前的中间步骤. Mac 需 `brew install poppler`. |
+| **Native PDF vs scanned PDF** | Native = 文字层可 extract; scanned = 图片需 OCR. 混合是常态 (封面扫描+正文 text). |
+| **DPI** | dots per inch. OCR 输入图像质量, 200 是 sweet spot, 300 更准但慢. |
+
+### NER (Named Entity Recognition) / LLM
+
+| 术语 | 解释 |
+|---|---|
+| **NER (Named Entity Recognition)** ⭐ | 命名实体识别 — 从文本抽 person / org / date / money / location. spaCy / BERT / LLM 都做. |
+| **spaCy** | 经典 Python NLP 库, mature. `en_core_web_sm` 50MB 模型, ~100k tokens/sec on CPU. |
+| **`en_core_web_sm/md/lg`** | spaCy 英文模型大小 sm/md/lg, 大的准但慢. `xx_ent_wiki_sm` = 多语言. |
+| **Entity label** (PERSON, ORG, DATE, MONEY, GPE) | spaCy NER 标签集. GPE = Geo-Political Entity (国家/城市). |
+| **Chunking (LLM 语境)** ⭐ | 把长文档切成 LLM context 能装的小块. 这题里 8000 chars per chunk, 200 chars overlap. |
+| **Overlap** | 相邻 chunk 重叠的 chars. 0 overlap 会切断跨边界的实体; 大 overlap 浪费 token. |
+| **`gpt-4o` / `gpt-4o-mini`** | OpenAI 模型. mini 比 4o 便宜 10x, 多数 NER 任务够用. |
+| **`response_format={'type': 'json_object'}`** | OpenAI API 强制返 valid JSON 的参数. 比让 LLM "自觉" 返 JSON 稳定. |
+| **`temperature=0.0`** | LLM 输出随机性, 0 = 最确定. 抽 entity 这类任务用 0. |
+| **`tool_use` / Structured output** | Anthropic / OpenAI 用 schema 约束 LLM 返结构化数据, 比纯 prompt 更稳. |
+| **Hallucination (幻觉)** | LLM 编造未出现的 entity. 防御: post-hoc verify (在原文里 string-match). |
+
+### 成本 / 限流
+
+| 术语 | 解释 |
+|---|---|
+| **Cost budget per doc** ⭐ | 单文档 LLM 调用上限 ($). 超了 stop. 防 cost runaway 关键. |
+| **`prompt_tokens / completion_tokens`** | LLM API usage 字段, 计费基础. Input 比 output 便宜 ~4x. |
+| **Pricing pluggability** | 价格写 yaml/config 不 hardcode, 因为 OpenAI/Anthropic 每月可能降价. |
+| **`logprobs`** | LLM 返回每个 token 的对数概率. 用来算 confidence score. |
+
+### Production 工程
+
+| 术语 | 解释 |
+|---|---|
+| **`file_hash` (SHA-1)** ⭐ | 文件内容的指纹. 用来 dedupe (同样 bytes) + change-detect (重新跑没必要). |
+| **Resume / checkpoint** | 跑 8 小时挂了不重跑 — 用 hash 记录已处理, 跳过. |
+| **`ProcessPoolExecutor`** | Python 多进程并行. CPU-bound 任务 (spaCy / OCR) 用这个, 不是 thread (有 GIL). |
+| **I/O-bound vs CPU-bound** | LLM API call = I/O-bound (用 thread / async); spaCy NER = CPU-bound (用 process). |
+| **`asdict()`** | dataclass 转 dict, 用于 JSON serialize. |
+| **PCI / GLBA / PII** | 监管: PCI = 信用卡, GLBA = 美国金融客户数据, PII = 可识别个人信息. ingestion 时要 redact. |
+| **Provenance** | 数据来源溯源 — 每个 entity 附 `{page, char_start, char_end}` 可点回原文. 法律 doc 必备. |
+| **Telemetry / Prometheus metrics** | Production 监控指标 (counter, gauge, histogram). `pdfindex.cost.usd`, `pdfindex.errors`. |
+| **Idempotent** | 同 input 同 output, 多次跑不出问题. 这题: 同 file_hash 不重复处理. |
+
+---
+
 ## 这道题在考什么
 
 这道题不是 algo, 是 **真 FDE 工程问题** — 客户给一堆 PDF (审计报告 / 法律合同 / 研究 paper), 让你 "搜得到 + 找得到关键人/公司/金额". 考察:

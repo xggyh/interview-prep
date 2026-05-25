@@ -7,6 +7,102 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Customer-facing postmortem 题. 涉及 IR / 通讯 / 合规 / 客户管理多领域.
+
+### Postmortem 类型 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Postmortem** ⭐ | **事后复盘文档**. Timeline + RCA + action items. |
+| **Internal postmortem** | 给自己 team 看 — 完整技术细节, "我们 screwed up" tone. |
+| **Customer-facing postmortem** ⭐ | **给客户看 — 技术但去 jargon, 抽象 internal team 名, "we own this" 但不 self-flagellate**. 跟 internal 截然不同. |
+| **Public postmortem** | 完全公开 — Cloudflare / GitLab 常发. 透明 = 信任. |
+| **24-hour brief / 24h initial** ⭐ | **事故 24h 内的简版 summary**. 5 elements: what / when / who-impacted / our actions / current status. |
+| **5-day full RCA** ⭐ | **5 天内完整 Root Cause Analysis**. 含 timeline, RCA, action items + owners + ETAs. |
+| **30-day status update** | 1 个月后 action items 进展. |
+| **Quarterly reliability review** | 季度 trust-rebuilding meeting. |
+
+### 通讯 Tone ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Blameless** ⭐ | **不甩锅个人**. 系统 / process 失败. Google SRE 文化. |
+| **Blameless but specific** ⭐ | **不甩锅 ≠ 模糊**. "We made mistake, here's exactly which gap, here's specific fix". |
+| **Accountable** | 担责. "We own this" tone. |
+| **Self-flagellating** | 自残式自责. 过头反而 erode customer trust. |
+| **Trust rebuilding** ⭐ | **事故损害 trust, postmortem 是 ER, 长期 trust 靠持续 action**. |
+| **Anonymize** | 去 internal team 名 — "team-X" 改 "our engineering team". |
+| **De-jargonize** | 去技术黑话 — "K8s HPA" 改 "auto-scaling system". |
+
+### RCA / 根因分析 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **RCA (Root Cause Analysis)** ⭐ | 找真正原因 — 不是症状. |
+| **5 whys** | 连续问 5 次 why 找根因. |
+| **Contributing factor** ⭐ | **不是根因但 made things worse 的因素**. 多因素并列比单根因诚实. |
+| **Trigger event / Root cause / Latent bug** | 直接触发 / 底层 gap / 老 bug 等触发. |
+| **Single point of failure (SPOF)** | 一个 component 挂全挂. |
+
+### Incident 元素 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Timeline** ⭐ | 事故 timestamp + event 列表. UTC 时间. |
+| **Detection / Mitigation / Resolution** | 怎么发现 / 怎么止血 / 完全恢复. |
+| **Impact / Blast radius** | User 数 / region / 持续时间 / business 损失. |
+| **Affected requests** | 多少 request 挂. |
+| **Data integrity** | 有没有丢 / 损坏数据. |
+| **Customer impact statement** | "X% of your traffic for Y minutes" 公式. |
+
+### Action Items ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Action item** | 具体改进项. 必须有: title / owner / ETA / customer-visible. |
+| **Owner** | 负责人. 不能是 "team", 必须 specific person. |
+| **ETA (Estimated Time of Arrival)** | 完成日期. Customer 看到的承诺. |
+| **Ticket ID / JIRA ticket** | 可 track 的工单. Customer 可 follow. |
+| **Customer-visible action item** | Customer 能看见进度的 item. 跟 internal-only 区分. |
+| **Trackable** | 有 ticket + 状态. |
+| **Reliability OKR** | 季度可靠性目标. 跟客户 joint OKR = trust signal. |
+
+### Customer Meeting ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Customer review meeting** | Postmortem 后跟客户的视频会. Exec sponsor 必到. |
+| **Walk-through + Q&A** | Doc 逐段读给客户听 + 答问. |
+| **Commitment dates** | 具体承诺的 fix 日期. |
+| **CSM / AE / TAM** | Customer Success Mgr / Account Exec / Technical Account Mgr — 客户管理三角. |
+
+### 合规 / 监管 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **HIPAA breach notification** ⭐ | **60 天内通知客户 + HHS**. PHI 涉及就触发. |
+| **GDPR 72-hour notification** ⭐ | **72h 内通知 supervisory authority**. EU 数据涉及. |
+| **SEC disclosure / SOX 404** | 上市公司重大 incident 披露 / 财报内控. |
+| **PCI DSS incident** | 信用卡数据 incident — 通知 acquirer / 卡组织. |
+| **DPO (Data Protection Officer)** | GDPR 下数据保护官. Breach 时要联系. |
+| **Audit trail** | 不可变 log. Postmortem RCA 必备数据源. |
+
+### 长期承诺 + IR 阶段 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Shared SLO dashboard** | 跟客户共享的可靠性 dashboard. 透明 = 信任. |
+| **Joint OKR** | 跟客户共定 reliability 目标. 强 trust 信号. |
+| **Quarterly business review (QBR)** | 季度业务回顾. 重大 incident 后强化频率. |
+| **Renewal risk** | 续约风险. 大 incident 后升高. |
+| **Detect → Triage → Mitigate → Investigate → Comm → Postmortem** | IR 6 阶段. |
+| **MTTA / MTTD / MTTR** | Acknowledge / Detect / Resolve 时间. |
+| **Steering committee** | 大 incident 升级到这里. |
+
+---
+
 ## 这道题在考什么
 
 表面是 postmortem 题, 底下藏着 **8 个 FDE evaluation signal**:

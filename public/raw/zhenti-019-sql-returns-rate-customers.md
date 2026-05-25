@@ -9,6 +9,100 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> SQL 题坑全在术语. 这堆词不熟 = edge case 漏一半, 面试官立刻 spot.
+
+### SQL 核心语法
+
+| 术语 | 解释 |
+|---|---|
+| **CTE (Common Table Expression)** ⭐ | `WITH name AS (SELECT ...)` 临时命名子查询. 让 query 像分步, 不写一团嵌套 subquery. |
+| **`WITH RECURSIVE`** | 递归 CTE — 树 / 图遍历. 跟普通 CTE 不同. |
+| **Window function** ⭐ | `OVER (PARTITION BY ... ORDER BY ...)` 在不 collapse rows 的前提下算聚合. 这题用 `RANK()`, `LAG`, `AVG OVER`. |
+| **`PARTITION BY`** | window function 内分组. 跟 `GROUP BY` 不同: 不 collapse rows. |
+| **`GROUP BY ... HAVING`** | aggregate 后再 filter. `WHERE` 在 aggregate 前, `HAVING` 在后. |
+| **`UNION ALL` vs `UNION`** | ALL 保留重复, UNION 去重. ALL 快很多. |
+| **`DISTINCT`** ⭐ | 去重. `COUNT(DISTINCT order_id)` 这题关键, 防 multi-return 导致 rate > 1. |
+
+### JOIN 类型
+
+| 术语 | 解释 |
+|---|---|
+| **INNER JOIN** ⭐ | 只保留两边都匹配的行. 默认 JOIN. |
+| **LEFT JOIN** ⭐ | 左表全保, 右表没匹配则 NULL. 这题 denom 要 LEFT 否则丢"无退货客户". |
+| **RIGHT JOIN** | 反过来. 不常用 (写 LEFT 反过来读). |
+| **FULL OUTER JOIN** | 两边都全保. 罕用. |
+| **CROSS JOIN** | 笛卡尔积. 这题 `FROM orders, quarter_bounds` 隐式 CROSS, 因为 quarter_bounds 只 1 行 OK. |
+| **USING (col)** | `JOIN ... USING (customer_id)` 简写 `ON a.customer_id = b.customer_id`. |
+
+### Date / 时间
+
+| 术语 | 解释 |
+|---|---|
+| **`DATE_TRUNC('quarter', ts)`** ⭐ | 截断到本季度初. 这题计算 "上季度" 的核心. |
+| **`INTERVAL '3 months'`** | 时间间隔. PostgreSQL `+ / -` interval. |
+| **`NOW() / CURRENT_TIMESTAMP`** | 当前时间. PG `NOW()` 带 timezone. |
+| **`TIMESTAMP` vs `TIMESTAMPTZ`** ⭐ | TS 不带 timezone (危险); TSTZ 自带. **Production 永远用 TIMESTAMPTZ**. |
+| **`AT TIME ZONE 'UTC'`** | 转 timezone. `ts AT TIME ZONE 'Asia/Jakarta'`. |
+| **Fiscal year vs Calendar year** | Calendar = Jan-Dec; Fiscal 公司定义 (e.g., Feb-Jan). 报表必区分. |
+| **Quarter cutover** | 季度切换的边界 (e.g., 4 月 1 日 0:00). 这题: `q_end = DATE_TRUNC('quarter', NOW())` exclusive 让边界正确. |
+| **`> q_start AND < q_end`** | 半开区间 `[start, end)`. 防双倍 count 边界. |
+
+### NULL / 防错
+
+| 术语 | 解释 |
+|---|---|
+| **`NULLIF(a, b)`** ⭐ | `a = b → NULL`, 否则 `a`. 防 divide by zero: `count / NULLIF(denom, 0)`. |
+| **`COALESCE(a, b, c)`** | 第一个非 NULL. 默认值用. |
+| **NULL semantics** | `NULL + 1 = NULL`, `NULL = NULL` 是 NULL (不是 TRUE!). 用 `IS NULL`. |
+| **3-valued logic** | TRUE / FALSE / NULL. WHERE 只保留 TRUE 的行. |
+| **`IS DISTINCT FROM`** | NULL-aware 不等. `a IS DISTINCT FROM b` 是 NULL 时也能比较. |
+
+### Aggregation
+
+| 术语 | 解释 |
+|---|---|
+| **`COUNT(*)` vs `COUNT(col)` vs `COUNT(DISTINCT col)`** ⭐ | * = 所有行; col = 非 NULL 行; DISTINCT col = 去重非 NULL 值. 这题 distinct 关键. |
+| **`SUM` / `AVG` / `MIN` / `MAX`** | 标准 aggregate. NULL 自动跳过. |
+| **`STRING_AGG / GROUP_CONCAT`** | 字符串聚合. |
+| **`FILTER (WHERE ...)`** | aggregate 条件: `COUNT(*) FILTER (WHERE status='ok')`. PostgreSQL ≥9.4. |
+
+### Performance / 索引
+
+| 术语 | 解释 |
+|---|---|
+| **Composite index** ⭐ | 多列索引 `(order_ts, status)`. 列顺序重要: range 列放前. |
+| **`INCLUDE (cols)`** | Covering index — 索引页带额外列, 走 Index Only Scan 不查 heap. PG 11+. |
+| **`EXPLAIN ANALYZE`** ⭐ | 跑 query 看真实 plan + 时间. 详见 Q20. |
+| **Partition pruning** | 分区表 query 只扫相关 partition. |
+| **`PARTITION BY RANGE`** | DDL: 按 range (date) 分区. |
+| **Materialized view** | 物化视图 — 预算好的 query 结果存表, `REFRESH MATERIALIZED VIEW CONCURRENTLY` 更新. 比普通 view 快, 但要 refresh. |
+| **`CONCURRENTLY`** | 在线操作不锁表. `CREATE INDEX CONCURRENTLY`, `REFRESH MATERIALIZED VIEW CONCURRENTLY`. |
+
+### Business semantics (这题特有)
+
+| 术语 | 解释 |
+|---|---|
+| **Return rate** ⭐ | 退货率. 3 种定义: (a) order count 比, (b) item count 比, (c) dollar amount 比. 必须 clarify. |
+| **Status whitelist vs blacklist** | Whitelist = `IN ('COMPLETED', 'SHIPPED')` 显式; Blacklist = `!= 'CANCELLED'` 漏未来新状态. **Whitelist > Blacklist**. |
+| **Sample size guard** | `orders_total >= 5` — 防 1/1 = 100% 噪声. 业务标准. |
+| **Chargeback** | 持卡人投诉发卡行强扣 + 罚款. 跟普通 refund 不同. |
+| **Cohort analysis** | 按入会季度 / 人群分组看 metric 趋势. |
+
+### 数据质量 / 工程
+
+| 术语 | 解释 |
+|---|---|
+| **dbt model** | dbt = data build tool. `model.sql` + tests, lineage 自动 build. 现代 BI 标准. |
+| **`pg_stat_statements`** | PG 扩展, 记录所有 query 统计. 找 top-N 慢查询. |
+| **Read replica** | 主库 → 从库. BI 走 replica 不卡 master. |
+| **Columnar OLAP store** | BigQuery / Snowflake / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍. |
+| **`(1,234.56)` 负数表示** | 财务报告习惯, 括号 = 负数. Parse 时要识别. |
+| **Currency / FX rates** | 多币种不能直接 SUM. 加 `fx_rates(date, ccy, rate)` JOIN. |
+
+---
+
 ## 这道题在考什么
 
 很多人写一个 `SELECT customer_id FROM orders JOIN returns ... GROUP BY ... HAVING count(*) > 0.3 * count(*)` 就交. 0 分. 真考的是:

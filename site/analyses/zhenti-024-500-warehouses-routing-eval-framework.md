@@ -8,6 +8,105 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题考的不是 ML 模型, 是 causal inference + A/B 设计. 名词不懂会答错方向. 5 min 看完.
+
+### 业务 / 行业
+
+| 术语 | 解释 |
+|---|---|
+| **On-time delivery rate** ⭐ | 在承诺时间窗内送达的比例. 这题 97% → 99% target. |
+| **Promised window** | 承诺时间窗 (e.g. 2-4pm). 超出 = miss. |
+| **Last-mile** | 最后一公里 — 从仓库到客户的最终配送段, 成本最大. |
+| **Hub** | 物流枢纽 — 仓库 / 中转站. |
+| **Expedite** | 加急配送 — 用更贵的方式 (UPS Next Day) 保证准时. Agent 容易 game 这个. |
+| **NPS (Net Promoter Score)** | 客户推荐净值 — 业务体验指标. |
+| **Driver attrition** | 司机流失率 — agent 不能压榨 driver 导致离职. |
+| **Hyperspace UI** | Palantir 的前端 platform — warehouse manager 操作界面. |
+
+### Eval / A/B 设计 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Baseline-relative metrics** ⭐ | 每个 warehouse 跟自己历史比, 不跟 fleet 平均比. 异质性大时必备. |
+| **North star metric** | 唯一最重要的业务目标指标 (这题: 加权 on-time rate). |
+| **Leading indicator** | 早于 outcome 出现的信号 (e.g. acceptance rate 早 outcome 14-30 天). |
+| **Guardrail metric** | 防 agent 作弊的反向指标 (e.g. cost / driver hours / 投诉). |
+| **Counter metric** | 防 dashboard 偏的指标 (e.g. bottom-quartile, worst-day). |
+| **A/B test (RCT)** ⭐ | Randomized Controlled Trial — 因果推断金标准. |
+| **Cluster random** ⭐ | 按 cluster (这题 = warehouse) 分组随机, 不按 request 随机. 防 spillover. |
+| **Stratified random** | 分层随机抽样 — 在每个 stratum 内做 random. |
+| **Stratification** | 分层 — 按 baseline / region / volume 把 warehouse 分组. |
+| **Spillover effect** | 溢出效应 — treat 组影响 control 组 (e.g. 共享 driver pool). |
+| **MDE (Minimum Detectable Effect)** | 能检测到的最小效应大小. Power 越高 MDE 越小. |
+| **Statistical power** | 检验功效 (1 - β), 通常要求 0.8 或 0.9. |
+| **α / β** | α = 假阳率 (通常 0.05); β = 假阴率 (通常 0.1-0.2). |
+
+### Causal Inference (深度)
+
+| 术语 | 解释 |
+|---|---|
+| **Counterfactual** ⭐ | 反事实 — "如果 agent 决定, outcome 是什么?" |
+| **Confounder / confounding** | 混淆变量 — 同时影响 treatment 和 outcome 的因素. |
+| **Doubly-Robust (DR)** ⭐ | 双重稳健估计器 — outcome model + IPW 结合, 任一对即一致. |
+| **IPW (Inverse Propensity Weighting)** | 用 propensity 倒数加权, 校正 selection bias. |
+| **Propensity score** | 倾向得分 — P(treatment | context), 用模型估. |
+| **Synthetic control** | 合成对照 — 用 control 加权组合构造 treated 的反事实. |
+| **DiD (Difference-in-Differences)** ⭐ | 双重差分 — (treat_post - treat_pre) - (control_post - control_pre). 业务友好. |
+| **Parallel trends assumption** | DiD 的核心假设 — treat 和 control 无 treatment 时趋势平行. |
+| **ITT (Intent-to-Treat)** | 按分配分析 (不按实际接受 / 拒绝). manager 拒绝 agent 仍算 treated. |
+| **ATE (Average Treatment Effect)** | 平均处置效应. |
+| **HTE (Heterogeneous Treatment Effect)** | 异质处置效应 — 不同 subgroup 反应不同. |
+| **Causal forest / X-learner** | 估计 HTE 的现代方法. |
+| **RLHF** | Reinforcement Learning from Human Feedback — 用 override 数据反向训 agent. |
+
+### Rollout / 阶段
+
+| 术语 | 解释 |
+|---|---|
+| **Offline replay** ⭐ | 用历史数据跑 agent, 看建议 vs 实际决定. |
+| **Shadow mode** ⭐ | 影子模式 — agent 在线但建议不显示, 收集真实数据. |
+| **Concordance** | 一致率 — agent 建议 == manager 实际的比例. |
+| **Gradual / cohort rollout** | 分批 rollout (100 → 250 → 500). |
+| **Halt criteria** | 触发暂停 / 回滚的红线指标. |
+| **Holdout / preserved control** | 永远不上 agent 的 10% 用作长期对照. |
+| **Cohort** | 队列 — 一批 warehouse 一起 rollout. |
+| **Power calculation** | 计算 sample 多大才能 detect 效应. |
+
+### Drift / 监控
+
+| 术语 | 解释 |
+|---|---|
+| **Feature drift** | 输入数据分布漂移. |
+| **Outcome drift** | 输出 / outcome 分布漂移. |
+| **Concept drift** | input → output 的映射关系变了. |
+| **PSI (Population Stability Index)** ⭐ | 群体稳定指数 — 监控数据分布漂移. PSI > 0.2 = 明显漂移. |
+| **KS-statistic** | Kolmogorov-Smirnov 检验 — 分布差异度量. |
+
+### HITL / Engagement
+
+| 术语 | 解释 |
+|---|---|
+| **HITL (Human-In-The-Loop)** ⭐ | 人在循环 — agent 建议, 人决定. 这题 manager 是 HITL. |
+| **Acceptance rate** | 接受率 — manager 接受 agent 建议的比例. 60-80% 健康. |
+| **Override / Override reason** | 推翻 / 推翻原因 — manager 拒绝 agent 时的原因 (UI dropdown). |
+| **Rubber stamping** | 橡皮图章 — manager 不思考全接受, agent 错了也照办. 危险信号. |
+| **Time-to-decide** | 决策时长 — manager 看 suggestion 后多久点接受 / 拒绝. |
+| **Manager segmentation** | 用户分群 — heavy / selective / rejector / rubber-stamper. |
+
+### 数据 / 基础设施
+
+| 术语 | 解释 |
+|---|---|
+| **Iceberg** | 数据湖表格式. |
+| **Decision log / Outcome log** | 决策 / 结果日志, 用于 eval. |
+| **Databricks** | 数据 + ML 平台. |
+| **PagerDuty** | 告警 + on-call 调度. |
+| **Datadog** | 监控 / observability 平台. |
+
+---
+
 ## 这道题在考什么
 
 不是考你 LLM eval, 是考你**在已经 97% baseline 上证明 agent 有用**, 哪些反直觉:

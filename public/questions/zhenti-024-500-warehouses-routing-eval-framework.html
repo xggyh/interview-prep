@@ -43,6 +43,23 @@
 <blockquote><p>"We're deploying an <strong>AI agent that suggests delivery rerouting</strong> to <strong>500 warehouse managers</strong>. Customer's existing rate is <strong>97% on-time, target 99%</strong>. <strong>Design the evaluation framework</strong> — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain <strong>约束</strong>: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题考的不是 ML 模型, 是 causal inference + A/B 设计. 名词不懂会答错方向. 5 min 看完.</p></blockquote>
+<h4>业务 / 行业</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>On-time delivery rate</strong> ⭐</td><td>在承诺时间窗内送达的比例. 这题 97% → 99% target.</td></tr><tr><td><strong>Promised window</strong></td><td>承诺时间窗 (e.g. 2-4pm). 超出 = miss.</td></tr><tr><td><strong>Last-mile</strong></td><td>最后一公里 — 从仓库到客户的最终配送段, 成本最大.</td></tr><tr><td><strong>Hub</strong></td><td>物流枢纽 — 仓库 / 中转站.</td></tr><tr><td><strong>Expedite</strong></td><td>加急配送 — 用更贵的方式 (UPS Next Day) 保证准时. Agent 容易 game 这个.</td></tr><tr><td><strong>NPS (Net Promoter Score)</strong></td><td>客户推荐净值 — 业务体验指标.</td></tr><tr><td><strong>Driver attrition</strong></td><td>司机流失率 — agent 不能压榨 driver 导致离职.</td></tr><tr><td><strong>Hyperspace UI</strong></td><td>Palantir 的前端 platform — warehouse manager 操作界面.</td></tr></tbody></table></div>
+<h4>Eval / A/B 设计 (核心)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Baseline-relative metrics</strong> ⭐</td><td>每个 warehouse 跟自己历史比, 不跟 fleet 平均比. 异质性大时必备.</td></tr><tr><td><strong>North star metric</strong></td><td>唯一最重要的业务目标指标 (这题: 加权 on-time rate).</td></tr><tr><td><strong>Leading indicator</strong></td><td>早于 outcome 出现的信号 (e.g. acceptance rate 早 outcome 14-30 天).</td></tr><tr><td><strong>Guardrail metric</strong></td><td>防 agent 作弊的反向指标 (e.g. cost / driver hours / 投诉).</td></tr><tr><td><strong>Counter metric</strong></td><td>防 dashboard 偏的指标 (e.g. bottom-quartile, worst-day).</td></tr><tr><td><strong>A/B test (RCT)</strong> ⭐</td><td>Randomized Controlled Trial — 因果推断金标准.</td></tr><tr><td><strong>Cluster random</strong> ⭐</td><td>按 cluster (这题 = warehouse) 分组随机, 不按 request 随机. 防 spillover.</td></tr><tr><td><strong>Stratified random</strong></td><td>分层随机抽样 — 在每个 stratum 内做 random.</td></tr><tr><td><strong>Stratification</strong></td><td>分层 — 按 baseline / region / volume 把 warehouse 分组.</td></tr><tr><td><strong>Spillover effect</strong></td><td>溢出效应 — treat 组影响 control 组 (e.g. 共享 driver pool).</td></tr><tr><td><strong>MDE (Minimum Detectable Effect)</strong></td><td>能检测到的最小效应大小. Power 越高 MDE 越小.</td></tr><tr><td><strong>Statistical power</strong></td><td>检验功效 (1 - β), 通常要求 0.8 或 0.9.</td></tr><tr><td><strong>α / β</strong></td><td>α = 假阳率 (通常 0.05); β = 假阴率 (通常 0.1-0.2).</td></tr></tbody></table></div>
+<h4>Causal Inference (深度)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Counterfactual</strong> ⭐</td><td>反事实 — "如果 agent 决定, outcome 是什么?"</td></tr><tr><td><strong>Confounder / confounding</strong></td><td>混淆变量 — 同时影响 treatment 和 outcome 的因素.</td></tr><tr><td><strong>Doubly-Robust (DR)</strong> ⭐</td><td>双重稳健估计器 — outcome model + IPW 结合, 任一对即一致.</td></tr><tr><td><strong>IPW (Inverse Propensity Weighting)</strong></td><td>用 propensity 倒数加权, 校正 selection bias.</td></tr><tr><td><strong>Propensity score</strong></td><td>倾向得分 — P(treatment</td><td>context), 用模型估.</td></tr><tr><td><strong>Synthetic control</strong></td><td>合成对照 — 用 control 加权组合构造 treated 的反事实.</td></tr><tr><td><strong>DiD (Difference-in-Differences)</strong> ⭐</td><td>双重差分 — (treat_post - treat_pre) - (control_post - control_pre). 业务友好.</td></tr><tr><td><strong>Parallel trends assumption</strong></td><td>DiD 的核心假设 — treat 和 control 无 treatment 时趋势平行.</td></tr><tr><td><strong>ITT (Intent-to-Treat)</strong></td><td>按分配分析 (不按实际接受 / 拒绝). manager 拒绝 agent 仍算 treated.</td></tr><tr><td><strong>ATE (Average Treatment Effect)</strong></td><td>平均处置效应.</td></tr><tr><td><strong>HTE (Heterogeneous Treatment Effect)</strong></td><td>异质处置效应 — 不同 subgroup 反应不同.</td></tr><tr><td><strong>Causal forest / X-learner</strong></td><td>估计 HTE 的现代方法.</td></tr><tr><td><strong>RLHF</strong></td><td>Reinforcement Learning from Human Feedback — 用 override 数据反向训 agent.</td></tr></tbody></table></div>
+<h4>Rollout / 阶段</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Offline replay</strong> ⭐</td><td>用历史数据跑 agent, 看建议 vs 实际决定.</td></tr><tr><td><strong>Shadow mode</strong> ⭐</td><td>影子模式 — agent 在线但建议不显示, 收集真实数据.</td></tr><tr><td><strong>Concordance</strong></td><td>一致率 — agent 建议 == manager 实际的比例.</td></tr><tr><td><strong>Gradual / cohort rollout</strong></td><td>分批 rollout (100 → 250 → 500).</td></tr><tr><td><strong>Halt criteria</strong></td><td>触发暂停 / 回滚的红线指标.</td></tr><tr><td><strong>Holdout / preserved control</strong></td><td>永远不上 agent 的 10% 用作长期对照.</td></tr><tr><td><strong>Cohort</strong></td><td>队列 — 一批 warehouse 一起 rollout.</td></tr><tr><td><strong>Power calculation</strong></td><td>计算 sample 多大才能 detect 效应.</td></tr></tbody></table></div>
+<h4>Drift / 监控</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Feature drift</strong></td><td>输入数据分布漂移.</td></tr><tr><td><strong>Outcome drift</strong></td><td>输出 / outcome 分布漂移.</td></tr><tr><td><strong>Concept drift</strong></td><td>input → output 的映射关系变了.</td></tr><tr><td><strong>PSI (Population Stability Index)</strong> ⭐</td><td>群体稳定指数 — 监控数据分布漂移. PSI &gt; 0.2 = 明显漂移.</td></tr><tr><td><strong>KS-statistic</strong></td><td>Kolmogorov-Smirnov 检验 — 分布差异度量.</td></tr></tbody></table></div>
+<h4>HITL / Engagement</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>HITL (Human-In-The-Loop)</strong> ⭐</td><td>人在循环 — agent 建议, 人决定. 这题 manager 是 HITL.</td></tr><tr><td><strong>Acceptance rate</strong></td><td>接受率 — manager 接受 agent 建议的比例. 60-80% 健康.</td></tr><tr><td><strong>Override / Override reason</strong></td><td>推翻 / 推翻原因 — manager 拒绝 agent 时的原因 (UI dropdown).</td></tr><tr><td><strong>Rubber stamping</strong></td><td>橡皮图章 — manager 不思考全接受, agent 错了也照办. 危险信号.</td></tr><tr><td><strong>Time-to-decide</strong></td><td>决策时长 — manager 看 suggestion 后多久点接受 / 拒绝.</td></tr><tr><td><strong>Manager segmentation</strong></td><td>用户分群 — heavy / selective / rejector / rubber-stamper.</td></tr></tbody></table></div>
+<h4>数据 / 基础设施</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Iceberg</strong></td><td>数据湖表格式.</td></tr><tr><td><strong>Decision log / Outcome log</strong></td><td>决策 / 结果日志, 用于 eval.</td></tr><tr><td><strong>Databricks</strong></td><td>数据 + ML 平台.</td></tr><tr><td><strong>PagerDuty</strong></td><td>告警 + on-call 调度.</td></tr><tr><td><strong>Datadog</strong></td><td>监控 / observability 平台.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 LLM eval, 是考你<strong>在已经 97% baseline 上证明 agent 有用</strong>, 哪些反直觉:</p>
 <ol><li><strong>Baseline-relative metrics</strong> — 不能只看 absolute 99%, 要 per-warehouse baseline (西雅图 historical 98% vs 拉斯维加斯 92% — 给到 99% 难度天差地远)</li><li><strong>Counterfactual evaluation</strong> — 500 manager 不一定听 agent, 即使送达率涨了, 是 agent 还是 manager 直觉?</li><li><strong>A/B by warehouse, not by request</strong> — 同一 warehouse 用 / 不用 agent 会造成 manager 困惑, 必须 cluster random</li><li><strong>Shadow mode</strong> before live — agent 在背后跑, 不显示 suggestion, 对比 agent 建议 vs manager 实际决定的 outcome</li><li><strong>Engagement signal</strong> — manager 是否接受 agent 建议 是 leading indicator (信不信)</li><li><strong>Drift detection</strong> — 旺季 (Q4 promo) / 异常天气 / staffing crisis 时 agent 表现怎样, 不只看 average</li><li><strong>HITL eval</strong> — manager 最终拍板, 你的 eval 要 attribute 决策, 不能 confound</li><li><strong>菜鸟答案失败点</strong>: "我用 accuracy / F1 score, 跑 holdout test set" — 完全错. 这是 sequential decision-making with delayed outcome, 不是分类问题. 需要 causal inference + A/B + counterfactual simulation.</li></ol>
@@ -417,6 +434,105 @@ Numbers:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain
 **约束**: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题考的不是 ML 模型, 是 causal inference + A/B 设计. 名词不懂会答错方向. 5 min 看完.
+
+### 业务 / 行业
+
+| 术语 | 解释 |
+|---|---|
+| **On-time delivery rate** ⭐ | 在承诺时间窗内送达的比例. 这题 97% → 99% target. |
+| **Promised window** | 承诺时间窗 (e.g. 2-4pm). 超出 = miss. |
+| **Last-mile** | 最后一公里 — 从仓库到客户的最终配送段, 成本最大. |
+| **Hub** | 物流枢纽 — 仓库 / 中转站. |
+| **Expedite** | 加急配送 — 用更贵的方式 (UPS Next Day) 保证准时. Agent 容易 game 这个. |
+| **NPS (Net Promoter Score)** | 客户推荐净值 — 业务体验指标. |
+| **Driver attrition** | 司机流失率 — agent 不能压榨 driver 导致离职. |
+| **Hyperspace UI** | Palantir 的前端 platform — warehouse manager 操作界面. |
+
+### Eval / A/B 设计 (核心)
+
+| 术语 | 解释 |
+|---|---|
+| **Baseline-relative metrics** ⭐ | 每个 warehouse 跟自己历史比, 不跟 fleet 平均比. 异质性大时必备. |
+| **North star metric** | 唯一最重要的业务目标指标 (这题: 加权 on-time rate). |
+| **Leading indicator** | 早于 outcome 出现的信号 (e.g. acceptance rate 早 outcome 14-30 天). |
+| **Guardrail metric** | 防 agent 作弊的反向指标 (e.g. cost / driver hours / 投诉). |
+| **Counter metric** | 防 dashboard 偏的指标 (e.g. bottom-quartile, worst-day). |
+| **A/B test (RCT)** ⭐ | Randomized Controlled Trial — 因果推断金标准. |
+| **Cluster random** ⭐ | 按 cluster (这题 = warehouse) 分组随机, 不按 request 随机. 防 spillover. |
+| **Stratified random** | 分层随机抽样 — 在每个 stratum 内做 random. |
+| **Stratification** | 分层 — 按 baseline / region / volume 把 warehouse 分组. |
+| **Spillover effect** | 溢出效应 — treat 组影响 control 组 (e.g. 共享 driver pool). |
+| **MDE (Minimum Detectable Effect)** | 能检测到的最小效应大小. Power 越高 MDE 越小. |
+| **Statistical power** | 检验功效 (1 - β), 通常要求 0.8 或 0.9. |
+| **α / β** | α = 假阳率 (通常 0.05); β = 假阴率 (通常 0.1-0.2). |
+
+### Causal Inference (深度)
+
+| 术语 | 解释 |
+|---|---|
+| **Counterfactual** ⭐ | 反事实 — "如果 agent 决定, outcome 是什么?" |
+| **Confounder / confounding** | 混淆变量 — 同时影响 treatment 和 outcome 的因素. |
+| **Doubly-Robust (DR)** ⭐ | 双重稳健估计器 — outcome model + IPW 结合, 任一对即一致. |
+| **IPW (Inverse Propensity Weighting)** | 用 propensity 倒数加权, 校正 selection bias. |
+| **Propensity score** | 倾向得分 — P(treatment | context), 用模型估. |
+| **Synthetic control** | 合成对照 — 用 control 加权组合构造 treated 的反事实. |
+| **DiD (Difference-in-Differences)** ⭐ | 双重差分 — (treat_post - treat_pre) - (control_post - control_pre). 业务友好. |
+| **Parallel trends assumption** | DiD 的核心假设 — treat 和 control 无 treatment 时趋势平行. |
+| **ITT (Intent-to-Treat)** | 按分配分析 (不按实际接受 / 拒绝). manager 拒绝 agent 仍算 treated. |
+| **ATE (Average Treatment Effect)** | 平均处置效应. |
+| **HTE (Heterogeneous Treatment Effect)** | 异质处置效应 — 不同 subgroup 反应不同. |
+| **Causal forest / X-learner** | 估计 HTE 的现代方法. |
+| **RLHF** | Reinforcement Learning from Human Feedback — 用 override 数据反向训 agent. |
+
+### Rollout / 阶段
+
+| 术语 | 解释 |
+|---|---|
+| **Offline replay** ⭐ | 用历史数据跑 agent, 看建议 vs 实际决定. |
+| **Shadow mode** ⭐ | 影子模式 — agent 在线但建议不显示, 收集真实数据. |
+| **Concordance** | 一致率 — agent 建议 == manager 实际的比例. |
+| **Gradual / cohort rollout** | 分批 rollout (100 → 250 → 500). |
+| **Halt criteria** | 触发暂停 / 回滚的红线指标. |
+| **Holdout / preserved control** | 永远不上 agent 的 10% 用作长期对照. |
+| **Cohort** | 队列 — 一批 warehouse 一起 rollout. |
+| **Power calculation** | 计算 sample 多大才能 detect 效应. |
+
+### Drift / 监控
+
+| 术语 | 解释 |
+|---|---|
+| **Feature drift** | 输入数据分布漂移. |
+| **Outcome drift** | 输出 / outcome 分布漂移. |
+| **Concept drift** | input → output 的映射关系变了. |
+| **PSI (Population Stability Index)** ⭐ | 群体稳定指数 — 监控数据分布漂移. PSI > 0.2 = 明显漂移. |
+| **KS-statistic** | Kolmogorov-Smirnov 检验 — 分布差异度量. |
+
+### HITL / Engagement
+
+| 术语 | 解释 |
+|---|---|
+| **HITL (Human-In-The-Loop)** ⭐ | 人在循环 — agent 建议, 人决定. 这题 manager 是 HITL. |
+| **Acceptance rate** | 接受率 — manager 接受 agent 建议的比例. 60-80% 健康. |
+| **Override / Override reason** | 推翻 / 推翻原因 — manager 拒绝 agent 时的原因 (UI dropdown). |
+| **Rubber stamping** | 橡皮图章 — manager 不思考全接受, agent 错了也照办. 危险信号. |
+| **Time-to-decide** | 决策时长 — manager 看 suggestion 后多久点接受 / 拒绝. |
+| **Manager segmentation** | 用户分群 — heavy / selective / rejector / rubber-stamper. |
+
+### 数据 / 基础设施
+
+| 术语 | 解释 |
+|---|---|
+| **Iceberg** | 数据湖表格式. |
+| **Decision log / Outcome log** | 决策 / 结果日志, 用于 eval. |
+| **Databricks** | 数据 + ML 平台. |
+| **PagerDuty** | 告警 + on-call 调度. |
+| **Datadog** | 监控 / observability 平台. |
 
 ---
 

@@ -8,6 +8,102 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 保险术语 + 50 州监管 + 大规模 LLM 批处理. 5 min 速查.
+
+### 保险行业核心
+
+| 术语 | 解释 |
+|---|---|
+| **Claim (理赔)** ⭐ | 保险事件 — 用户出险后向保险公司提交的赔付申请. 完整 claim 包含 ACORD 表 + 调查员笔记 + 警察报告 + 医疗记录 + 修理估价 + 照片 + 录音陈述. 这题 30M 件. |
+| **LOB (Line of Business)** ⭐ | 保险险种 — Auto / Homeowners / Health / Life / Workers Comp / Commercial. 每个 LOB schema + 监管 + 用户都不同, **不能混着 v1**. |
+| **Personal auto** | 个人车险 — 美国最大 LOB. 这题 v1 锁定. |
+| **Actuary / Actuarial team** ⭐ | 精算师 / 精算团队 — 用历史 claim 数据建模预测未来 loss, 决定 premium 定价. 这题 primary user. |
+| **Underwriting** | 核保 — 决定是否承保 + 价格. |
+| **Reserves** | 准备金 — 已知 claim 但还没结清的预估金额. 监管要求. |
+| **Reinsurance / Treaty pricing** | 再保险 / 条约定价 — 保险公司给保险公司投保. |
+| **Subrogation** | 代位求偿 — 我赔了客户, 我去找责任方追偿. |
+| **Loss amount / Fault attribution** | 损失金额 / 责任归属 — claim 关键事实. |
+| **Rate filing** | 保费定价文件 — 保险公司必须向州 DOI 申报费率. AI-derived 输入会被审查. |
+
+### 文档 / 数据格式
+
+| 术语 | 解释 |
+|---|---|
+| **ACORD form** | 美国保险行业标准化的 claim 表单. 结构化, 干净, 易处理. |
+| **Adjustor notes (调查员笔记)** | claim 调查员手写 / 打字的笔记 — 自由文本, 缩写 + 主观意见混事实. 50% claims 的内容. |
+| **Police report** | 警察报告 — PDF 扫描件, 含第三方 PII. |
+| **Medical record (bodily injury)** | 医疗记录 — HIPAA 保护, 单独 pipeline. |
+| **Recorded statement** | 录音陈述 — claimant + 证人, recording-consent law 各州不同. |
+| **Repair estimate** | 修理估价 — 来自维修厂. |
+| **Reserves history** | 准备金历史 — 时间序列, 每次估价调整. |
+
+### 50 州监管
+
+| 术语 | 解释 |
+|---|---|
+| **DOI (Department of Insurance)** ⭐ | 美国各州保险监管局 — 50 个州 50 个 DOI, 各有自己的规则. **跟联邦无关**. |
+| **NAIC (National Association of Insurance Commissioners)** | 全国保险监管协会 — 制定 model law (模板法), 各州可改可加. |
+| **NY DFS (Department of Financial Services)** | 纽约金融监管 — 最严, 2024 出 AI 在保险中的 model regulation. |
+| **CA DOI** | 加州保险监管 — 第二严, AI used in consumer-impact decisions 必看. |
+| **TX TDI / FL** | 德州 / 佛州监管 — 较 lenient. |
+| **Algorithmic accountability report** | 算法问责报告 — NY DFS 2024 directive 要求 AI 处理客户数据必须提交. |
+| **Explainable AI documentation** | 可解释 AI 文档 — 部分州要求 rate filing 用 AI 输入时必交. |
+| **Disparate impact / Bias eval** | 差别影响 / 偏见评估 — NAIC + 多州盯, AI 输出对不同人群是否有系统性偏差. |
+| **Right to know** | "知情权" — 部分州要求消费者知道 AI 是否影响了他们的 underwriting. |
+
+### 数据保护 / 法律
+
+| 术语 | 解释 |
+|---|---|
+| **HIPAA** | 医疗隐私法 — 医疗记录走单独 pipeline. |
+| **GLBA (Gramm-Leach-Bliley Act)** | 金融隐私法 — 金融机构客户数据保护. 保险适用. |
+| **Attorney-client privilege (律师-客户特权)** ⭐ | 律师-客户通讯不可被强制披露. **一份 privileged 文件进 LLM = 对方律师可主张 privilege waived = 灾难**. 必须分类排除. |
+| **PII (Personally Identifiable Information)** | 个人可识别信息 — SSN, DL, 地址. 进 LLM 前必 redact. |
+| **PHI (Protected Health Information)** | 受保护健康信息 — HIPAA 定义, 比 PII 更严. |
+| **Recording-consent law** | 录音同意法 — 各州不同: One-party (1 方同意即可) vs Two-party (双方都得同意, 如加州). |
+| **BAA (Business Associate Agreement)** | HIPAA 框架下的合规合同. 用 commercial API 必谈. |
+| **DPA (Data Processing Agreement)** | 数据处理合同. |
+
+### LLM / 系统架构
+
+| 术语 | 解释 |
+|---|---|
+| **Claude on AWS Bedrock + PrivateLink** | 私有部署 Claude — 数据不走公网, 中等合规适用. |
+| **Llama 3.1 70B fine-tuned** | 自托管开源模型. |
+| **Prompt caching** ⭐ | 提示缓存 — 相同 prompt 前缀的 token 缓存复用, 大幅降本. Batch 处理必用. |
+| **Citation tracking** ⭐ | 引用追踪 — 每个 fact 必须 trace 回源文档的 paragraph + sentence. 这题 non-negotiable, hallucination = 监管曝光. |
+| **Sub-paragraph granularity** | 引用必到段落 + 句子级, 不能仅 doc 级. 人能秒级验证. |
+| **Hallucination (幻觉)** | LLM 编造源文档没的事实. Claim summary 里 = 法律 / 监管曝光. |
+| **Stratified sampling (分层采样)** | 按 state + claim type + severity 分层抽样, 保证 pilot 代表性. 这题 100K 抽法. |
+| **RAG (Retrieval-Augmented Generation)** | 检索增强生成 — LLM 先检索源文档再生成. |
+| **Dense vs sparse retrieval** | 向量检索 vs 关键词检索 — recall@k 关键指标. |
+| **Tiered model use** | 分层模型 — 简单 claim 用 8B 小模型, 复杂用 70B / Claude. 省钱. |
+| **Stratified evaluation** | 分层评估 — 按 demographic / 文档类型分群验证, 找 bias. |
+
+### 方法论 / 流程
+
+| 术语 | 解释 |
+|---|---|
+| **Use case scoping** | 用例聚焦 — 1 LOB + 1 user, 不要 5M 同时多 use case. 这题 v1 = Actuarial + Personal Auto + 10 states. |
+| **Walking skeleton** | 端到端最薄版, 100 claim + 1 state + 手动 review. |
+| **Pilot before batch** | 先 pilot 后批量 — 100K 验证, 5M 批量. |
+| **Human-in-loop** | 人工复核 — 异常 case 人审, actuarial 关键决策必含. |
+| **Negative-result ablation** | 消融实验 — 系统性拆解 retrieval × prompt × model × CoT 各 component 的贡献. Gao Xin ConvFinQA 经验. |
+
+### 角色
+
+| 术语 | 解释 |
+|---|---|
+| **Chief Actuary** | 首席精算师 — 这题 sponsor. |
+| **General Counsel (GC)** | 总法律顾问 — 管 privilege + 诉讼风险. |
+| **CCO (Chief Compliance Officer)** | 首席合规官 — 管 50 州监管. |
+| **State DOI engagement officer** | 州 DOI 关系官 — 跟 CA / NY DFS 沟通的内部岗位. **不能跳过**. |
+| **CISO** | 信息安全官. |
+
+---
+
 ## 这道题在考什么
 
 **不是**: 考你能不能 estimate LLM cost.

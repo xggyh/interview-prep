@@ -43,6 +43,29 @@
 <blockquote><p>"Your team manages <strong>200+ prompts</strong> in production across 30 LLM features. PM wants to A/B test a new system prompt for the customer support bot. Eng wants to <strong>safely roll it out</strong>, and ops wants to <strong>rollback in 5 minutes</strong> if metrics regress. <strong>Design the prompt lifecycle system</strong> — versioning, eval, A/B, rollout, rollback, audit."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops <strong>约束</strong>: 200+ prompts / 30 features / per-tenant variants / non-eng (PM) authors / pre-deploy eval / canary rollout / auto-rollback / audit trail</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题是 LLM ops + 产品 ops + ML ops 三层混合. 名词不懂答不清 lifecycle. 5 min 看完.</p></blockquote>
+<h4>概念框架</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Prompt</strong> ⭐</td><td>LLM 的系统输入文本, 决定 LLM 行为. 这题 200+ 个 prompt 在跑.</td></tr><tr><td><strong>Prompt as data, not code</strong> ⭐</td><td>本题核心思维 — prompt 是产品 config (DB 管), 不是源码 (git 管).</td></tr><tr><td><strong>Prompt lifecycle</strong></td><td>创建 → eval → canary → A/B → prod → 回滚 / deprecate.</td></tr><tr><td><strong>System prompt</strong></td><td>定义 LLM 角色的指令文本.</td></tr><tr><td><strong>Variables / Jinja templating</strong></td><td>模板变量 — <code>{{ user_name }}</code> 这种占位符.</td></tr><tr><td><strong>Jinja2</strong></td><td>Python 模板引擎, 业界 prompt 标准.</td></tr><tr><td><strong>Tier-1 / Tier-2 / Tier-3</strong></td><td>重要度分级 — tier-1 关键 (支付 / 合规), tier-3 实验.</td></tr></tbody></table></div>
+<h4>版本 / 注册中心</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Prompt registry</strong> ⭐</td><td>集中存 prompt 的服务 — 这题主架构.</td></tr><tr><td><strong>Version tag (semver)</strong></td><td>语义化版本 1.2.3 — MAJOR.MINOR.PATCH.</td></tr><tr><td><strong>Parent version</strong></td><td>派生自哪个版本 (forking).</td></tr><tr><td><strong>State machine (draft/eval-passed/canary/prod/deprecated/rolled-back)</strong></td><td>prompt 版本的状态.</td></tr><tr><td><strong>Variables schema</strong></td><td>模板变量的 JSON Schema.</td></tr><tr><td><strong>PromptLayer / LangSmith / Helicone</strong></td><td>3 个商业 prompt 管理工具.</td></tr></tbody></table></div>
+<h4>Eval (评估)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Eval gate</strong> ⭐</td><td>评估卡口 — 必须过才能 promote.</td></tr><tr><td><strong>Golden set</strong> ⭐</td><td>黄金集 — 50-200 (input, expected) 对, 回归测试用.</td></tr><tr><td><strong>LLM-as-judge</strong> ⭐</td><td>用 LLM 当 judge 比较两个回复.</td></tr><tr><td><strong>Pairwise comparison</strong></td><td>配对比较 A vs B.</td></tr><tr><td><strong>Rubric-based scoring</strong></td><td>评分细则 — helpfulness/accuracy/tone 各打分.</td></tr><tr><td><strong>Human review</strong></td><td>人工审核 — tier-1 必须.</td></tr><tr><td><strong>Active learning queue</strong></td><td>低 confidence 样本进入人工标注队列.</td></tr><tr><td><strong>Lint</strong></td><td>语法检查 — Jinja syntax / PII / 长度 / model 兼容.</td></tr><tr><td><strong>Regression budget</strong></td><td>允许 quality 下降的预算 (e.g., 3%).</td></tr><tr><td><strong>BLEU / Exact match / nDCG</strong></td><td>不同任务的 scoring 指标.</td></tr></tbody></table></div>
+<h4>A/B 测试 / Rollout</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>A/B test</strong> ⭐</td><td>A 和 B 两组随机比较, 测效应大小.</td></tr><tr><td><strong>Canary rollout</strong> ⭐</td><td>灰度发布 — 1% → 10% → 50% → 100% 分阶段.</td></tr><tr><td><strong>Feature flag</strong> ⭐</td><td>功能开关 — runtime 控制 traffic 走哪个版本.</td></tr><tr><td><strong>LaunchDarkly / Statsig / Optimizely</strong></td><td>3 个商业 feature flag 平台.</td></tr><tr><td><strong>Sticky assignment</strong> ⭐</td><td>粘性分配 — 同 user 总走同 version, hash(user_id) % 100.</td></tr><tr><td><strong>Traffic split / Traffic percentage</strong></td><td>流量切分百分比.</td></tr><tr><td><strong>Multi-armed bandit (MAB)</strong></td><td>多臂老虎机 — 边 explore 边 exploit 找最优 arm.</td></tr><tr><td><strong>Thompson sampling</strong></td><td>MAB 的一种贝叶斯算法.</td></tr><tr><td><strong>Power calculation</strong></td><td>A/B 需要多少 sample 才能检测出 X% 效应.</td></tr><tr><td><strong>Holdout / Control group</strong></td><td>对照组.</td></tr><tr><td><strong>Cohort</strong></td><td>同质用户群.</td></tr></tbody></table></div>
+<h4>Rollback / 自动回滚</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Auto-rollback</strong> ⭐</td><td>自动回滚 — metric 超阈值时无需人工.</td></tr><tr><td><strong>Rollback trigger</strong></td><td>触发回滚的 metric 阈值.</td></tr><tr><td><strong>Baseline metric</strong></td><td>过去 7 天的基准.</td></tr><tr><td><strong>Sliding window</strong></td><td>滑动窗口比较.</td></tr><tr><td><strong>Flap loop</strong></td><td>反复回滚 + 重发的循环, 必须防.</td></tr><tr><td><strong>Freeze window</strong></td><td>回滚后冻结时间 (24h), 防 flap.</td></tr><tr><td><strong>Cache invalidation</strong> ⭐</td><td>缓存失效 — Redis cache 必须 &lt; 30s 失效让 rollback 生效.</td></tr><tr><td><strong>TTL (Time To Live)</strong></td><td>缓存过期时间.</td></tr><tr><td><strong>Fix forward</strong></td><td>不回滚, 直接发布修复版.</td></tr></tbody></table></div>
+<h4>多租户 / 变体</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Per-tenant variant</strong> ⭐</td><td>每客户的定制版本.</td></tr><tr><td><strong>Inheritance / extends</strong></td><td>Jinja extends 让 variant 继承 base 并覆盖部分块.</td></tr><tr><td><strong>Variant pool</strong></td><td>命名变体池 (formal / casual / multilingual).</td></tr><tr><td><strong>Tenant override</strong></td><td>租户级覆盖.</td></tr></tbody></table></div>
+<h4>监控 / 业务指标</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>CSAT</strong></td><td>Customer Satisfaction Score — 客户满意度.</td></tr><tr><td><strong>NPS (Net Promoter Score)</strong></td><td>净推荐值.</td></tr><tr><td><strong>Refund rate</strong></td><td>退款率.</td></tr><tr><td><strong>Conversion rate</strong></td><td>转化率.</td></tr><tr><td><strong>Acceptance rate</strong></td><td>用户对 LLM 答案的接受率 (thumbs up).</td></tr><tr><td><strong>Quality score</strong></td><td>LLM-judge 跑 1% 样本评的分.</td></tr><tr><td><strong>Token usage</strong></td><td>LLM 调用的 token 量, 直接关系 cost.</td></tr><tr><td><strong>Runaway cost</strong> ⭐</td><td>失控成本 — 新 prompt 长 50% → 月成本翻倍.</td></tr></tbody></table></div>
+<h4>合规 / 审计</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Audit log</strong> ⭐</td><td>审计日志 — 每次 prompt 变更的 who/what/when/why.</td></tr><tr><td><strong>Immutable log</strong></td><td>不可变日志 — WORM 写入.</td></tr><tr><td><strong>SOX (Sarbanes-Oxley)</strong></td><td>美国上市公司财务合规, 要求审计保留 7 年.</td></tr><tr><td><strong>SOC 2</strong></td><td>企业服务安全审计标准.</td></tr><tr><td><strong>Retention period</strong></td><td>保留期 (这题 7 年).</td></tr><tr><td><strong>Reason / change reason</strong></td><td>变更原因 — audit 必填.</td></tr></tbody></table></div>
+<h4>Auth / 部署</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SDK fetch</strong></td><td>应用通过 SDK runtime 拿当前 prompt 版本.</td></tr><tr><td><strong>Retool</strong></td><td>内部工具 UI 平台 — 适合搭 PM 友好编辑器.</td></tr><tr><td><strong>PagerDuty</strong></td><td>on-call + 告警.</td></tr><tr><td><strong>Slack notify</strong></td><td>Slack 通知.</td></tr><tr><td><strong>Anthropic prompt cache</strong></td><td>Anthropic 自己的 server-side prompt cache.</td></tr></tbody></table></div>
+<h4>模型 / Provider</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Claude Sonnet 4.6 / Opus 4.7</strong></td><td>Anthropic 模型 — Sonnet 主用, Opus judge.</td></tr><tr><td><strong>GPT-5.5</strong></td><td>OpenAI 旗舰.</td></tr><tr><td><strong>Gemini 3 Pro</strong></td><td>Google 旗舰.</td></tr><tr><td><strong>Model-agnostic prompt</strong></td><td>不绑死特定 model 的 prompt 设计.</td></tr><tr><td><strong>Cross-model eval</strong></td><td>同 prompt 跑多 model 对比.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 git, 是考你 <strong>prompt 不是普通 code, 需要 ML ops 加 web ops 加产品 ops 三层混合的 lifecycle 系统</strong>:</p>
 <ol><li><strong>Prompt 不是 source code</strong> — PM/non-eng author, can't require Pull Request review for every typo</li><li><strong>Eval gate</strong> — LLM-as-judge + human review before production</li><li><strong>Per-tenant variants</strong> — customer A 想 customize wording, multi-tenant prompt</li><li><strong>Feature flag for prompt</strong> — LaunchDarkly / Statsig pattern, but prompt-specific</li><li><strong>Auto-rollback</strong> — metric regression → revert without human</li><li><strong>Audit + immutable history</strong> — who changed what when, why</li><li><strong>Cost/latency monitoring</strong> — new prompt 长 50% token → cost +50%, need watch</li><li><strong>菜鸟答案失败点</strong>: "git 提交 prompt + feature flag" — too shallow. 没说 eval gate / canary / auto-rollback / per-tenant.</li></ol>
@@ -632,6 +655,133 @@ SLO:
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops
 **约束**: 200+ prompts / 30 features / per-tenant variants / non-eng (PM) authors / pre-deploy eval / canary rollout / auto-rollback / audit trail
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题是 LLM ops + 产品 ops + ML ops 三层混合. 名词不懂答不清 lifecycle. 5 min 看完.
+
+### 概念框架
+
+| 术语 | 解释 |
+|---|---|
+| **Prompt** ⭐ | LLM 的系统输入文本, 决定 LLM 行为. 这题 200+ 个 prompt 在跑. |
+| **Prompt as data, not code** ⭐ | 本题核心思维 — prompt 是产品 config (DB 管), 不是源码 (git 管). |
+| **Prompt lifecycle** | 创建 → eval → canary → A/B → prod → 回滚 / deprecate. |
+| **System prompt** | 定义 LLM 角色的指令文本. |
+| **Variables / Jinja templating** | 模板变量 — `{{ user_name }}` 这种占位符. |
+| **Jinja2** | Python 模板引擎, 业界 prompt 标准. |
+| **Tier-1 / Tier-2 / Tier-3** | 重要度分级 — tier-1 关键 (支付 / 合规), tier-3 实验. |
+
+### 版本 / 注册中心
+
+| 术语 | 解释 |
+|---|---|
+| **Prompt registry** ⭐ | 集中存 prompt 的服务 — 这题主架构. |
+| **Version tag (semver)** | 语义化版本 1.2.3 — MAJOR.MINOR.PATCH. |
+| **Parent version** | 派生自哪个版本 (forking). |
+| **State machine (draft/eval-passed/canary/prod/deprecated/rolled-back)** | prompt 版本的状态. |
+| **Variables schema** | 模板变量的 JSON Schema. |
+| **PromptLayer / LangSmith / Helicone** | 3 个商业 prompt 管理工具. |
+
+### Eval (评估)
+
+| 术语 | 解释 |
+|---|---|
+| **Eval gate** ⭐ | 评估卡口 — 必须过才能 promote. |
+| **Golden set** ⭐ | 黄金集 — 50-200 (input, expected) 对, 回归测试用. |
+| **LLM-as-judge** ⭐ | 用 LLM 当 judge 比较两个回复. |
+| **Pairwise comparison** | 配对比较 A vs B. |
+| **Rubric-based scoring** | 评分细则 — helpfulness/accuracy/tone 各打分. |
+| **Human review** | 人工审核 — tier-1 必须. |
+| **Active learning queue** | 低 confidence 样本进入人工标注队列. |
+| **Lint** | 语法检查 — Jinja syntax / PII / 长度 / model 兼容. |
+| **Regression budget** | 允许 quality 下降的预算 (e.g., 3%). |
+| **BLEU / Exact match / nDCG** | 不同任务的 scoring 指标. |
+
+### A/B 测试 / Rollout
+
+| 术语 | 解释 |
+|---|---|
+| **A/B test** ⭐ | A 和 B 两组随机比较, 测效应大小. |
+| **Canary rollout** ⭐ | 灰度发布 — 1% → 10% → 50% → 100% 分阶段. |
+| **Feature flag** ⭐ | 功能开关 — runtime 控制 traffic 走哪个版本. |
+| **LaunchDarkly / Statsig / Optimizely** | 3 个商业 feature flag 平台. |
+| **Sticky assignment** ⭐ | 粘性分配 — 同 user 总走同 version, hash(user_id) % 100. |
+| **Traffic split / Traffic percentage** | 流量切分百分比. |
+| **Multi-armed bandit (MAB)** | 多臂老虎机 — 边 explore 边 exploit 找最优 arm. |
+| **Thompson sampling** | MAB 的一种贝叶斯算法. |
+| **Power calculation** | A/B 需要多少 sample 才能检测出 X% 效应. |
+| **Holdout / Control group** | 对照组. |
+| **Cohort** | 同质用户群. |
+
+### Rollback / 自动回滚
+
+| 术语 | 解释 |
+|---|---|
+| **Auto-rollback** ⭐ | 自动回滚 — metric 超阈值时无需人工. |
+| **Rollback trigger** | 触发回滚的 metric 阈值. |
+| **Baseline metric** | 过去 7 天的基准. |
+| **Sliding window** | 滑动窗口比较. |
+| **Flap loop** | 反复回滚 + 重发的循环, 必须防. |
+| **Freeze window** | 回滚后冻结时间 (24h), 防 flap. |
+| **Cache invalidation** ⭐ | 缓存失效 — Redis cache 必须 < 30s 失效让 rollback 生效. |
+| **TTL (Time To Live)** | 缓存过期时间. |
+| **Fix forward** | 不回滚, 直接发布修复版. |
+
+### 多租户 / 变体
+
+| 术语 | 解释 |
+|---|---|
+| **Per-tenant variant** ⭐ | 每客户的定制版本. |
+| **Inheritance / extends** | Jinja extends 让 variant 继承 base 并覆盖部分块. |
+| **Variant pool** | 命名变体池 (formal / casual / multilingual). |
+| **Tenant override** | 租户级覆盖. |
+
+### 监控 / 业务指标
+
+| 术语 | 解释 |
+|---|---|
+| **CSAT** | Customer Satisfaction Score — 客户满意度. |
+| **NPS (Net Promoter Score)** | 净推荐值. |
+| **Refund rate** | 退款率. |
+| **Conversion rate** | 转化率. |
+| **Acceptance rate** | 用户对 LLM 答案的接受率 (thumbs up). |
+| **Quality score** | LLM-judge 跑 1% 样本评的分. |
+| **Token usage** | LLM 调用的 token 量, 直接关系 cost. |
+| **Runaway cost** ⭐ | 失控成本 — 新 prompt 长 50% → 月成本翻倍. |
+
+### 合规 / 审计
+
+| 术语 | 解释 |
+|---|---|
+| **Audit log** ⭐ | 审计日志 — 每次 prompt 变更的 who/what/when/why. |
+| **Immutable log** | 不可变日志 — WORM 写入. |
+| **SOX (Sarbanes-Oxley)** | 美国上市公司财务合规, 要求审计保留 7 年. |
+| **SOC 2** | 企业服务安全审计标准. |
+| **Retention period** | 保留期 (这题 7 年). |
+| **Reason / change reason** | 变更原因 — audit 必填. |
+
+### Auth / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **SDK fetch** | 应用通过 SDK runtime 拿当前 prompt 版本. |
+| **Retool** | 内部工具 UI 平台 — 适合搭 PM 友好编辑器. |
+| **PagerDuty** | on-call + 告警. |
+| **Slack notify** | Slack 通知. |
+| **Anthropic prompt cache** | Anthropic 自己的 server-side prompt cache. |
+
+### 模型 / Provider
+
+| 术语 | 解释 |
+|---|---|
+| **Claude Sonnet 4.6 / Opus 4.7** | Anthropic 模型 — Sonnet 主用, Opus judge. |
+| **GPT-5.5** | OpenAI 旗舰. |
+| **Gemini 3 Pro** | Google 旗舰. |
+| **Model-agnostic prompt** | 不绑死特定 model 的 prompt 设计. |
+| **Cross-model eval** | 同 prompt 跑多 model 对比. |
 
 ---
 

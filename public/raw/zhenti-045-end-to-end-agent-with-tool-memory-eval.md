@@ -7,6 +7,89 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> Agent 设计题混了 ML / 分布式系统 / workflow 术语. 5 min 速查再读详解.
+
+### Agent 架构 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Agent** ⭐ | **能调用 tool / 多步推理的 LLM 系统**. 不只生成文字, 而是 "查日历 → 找时间 → 发邮件" 这种 chain. |
+| **Tool / Function calling** ⭐ | **LLM 可调用的外部能力** (查 DB / 调 API / 算数). OpenAI 2023 推出 function calling, 现在通用. |
+| **Tool registry** | 系统 manage 所有可用 tool 的 catalog — schema, auth, idempotency 都登记. |
+| **Planner** | LLM 决定 "下一步调哪个 tool". Plan-then-execute 或 ReAct. |
+| **Executor** | 实际执行 tool call, 处理 retry / timeout. |
+| **ReAct (Reason + Act)** ⭐ | **Reasoning 和 Acting 交替** — think → act → observe → think → act ... 不预先规划全 pipeline. |
+| **Plan-then-execute** | 先 LLM 生成完整 plan, 然后 deterministic 执行. 比 ReAct 可控但少灵活. |
+| **Multi-agent / Swarm** | 多个 agent 协作 — planner agent + worker agent. 复杂任务用. |
+| **MCP (Model Context Protocol)** ⭐ | **Anthropic 2024.11 推的 tool standard**. Tool 提供方实现 MCP server, 任意 client (Claude / Cursor / Cline) 用. |
+| **OpenAI Agents SDK** | OpenAI 2024.10 推的 agent framework. |
+| **LangGraph** | LangChain 推的 state-machine-style agent framework. 适合复杂 flow. |
+| **LangChain** | Python LLM 框架, 提供 chain / tool / memory 抽象. |
+| **CrewAI / AutoGen** | Multi-agent frameworks. |
+
+### Memory 三层架构 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Working memory** ⭐ | **当前 conversation context window** — 这一轮对话的内容. 容量 = model context length. |
+| **Short-term memory** | 同 working memory, 用户的最近几轮对话. |
+| **Long-term memory** ⭐ | **跨 session 持久化的记忆**. 通常存 vector DB, 检索后注入 prompt. |
+| **Episodic memory** | 长记忆的一种 — 历史 conversation / event 的具体记录. |
+| **Semantic memory** | 长记忆的一种 — 抽象知识 / 偏好 (用户喜欢简洁回答). |
+| **Structured KV memory** | 结构化的 fact 存 KV store — 用户名 / 偏好 / business state. 比 vector 检索精确. |
+| **Memory consolidation** | 把 short-term 压缩 / abstract 后存 long-term. 模仿大脑机制. |
+| **Context window** | Model 一次能看的最大 token 数. 2026: Opus 4.7 1M / Gemini 3 Pro 2M. |
+| **Context stuffing** | 暴力把所有相关 context 塞进 prompt. 简单但贵 + 不 scale. |
+
+### Tool 设计
+
+| 术语 | 解释 |
+|---|---|
+| **JSON schema** | 定义 tool input/output 的 schema. LLM 用它知道 call 怎么写. |
+| **Idempotency** ⭐ | **同一 request 多次执行结果一致**. Retry 安全必备 — 否则 retry 可能扣两次钱. |
+| **Idempotency key** | Request 带的 unique ID, 系统识别重复. e.g. `Idempotency-Key: <uuid>`. |
+| **Function calling schema** | OpenAI/Anthropic 的 tool definition 格式 — name + description + parameters JSON schema. |
+| **Tool choice** | 强制 LLM call 特定 tool / 不 call tool / 自选. |
+
+### 可靠性 / Workflow ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Durable workflow** ⭐ | **Workflow 状态持久化, 中途崩了能从断点续跑**. Temporal / Inngest 实现. |
+| **Temporal** | Workflow orchestration 平台. Production agent 标配. |
+| **Inngest** | TypeScript-friendly durable workflow. |
+| **Saga pattern** | 长事务分多个 step, 每 step 有 compensating action (回滚). Distributed system 标准. |
+| **Circuit breaker** ⭐ | **连续失败到 threshold 后停止调用 N 秒**, 给 downstream 喘息. 防 cascading failure. |
+| **Retry with exponential backoff** | Retry 间隔指数增长 (1s, 2s, 4s, 8s ...). 防止 retry storm. |
+| **Jitter** | Backoff 加随机抖动 — 避免大量 client 同时 retry 撞车. |
+| **Timeout** | Request 超过 X 秒就放弃. 防 hang 死. |
+| **Dead letter queue (DLQ)** | 失败 N 次的 message 进 DLQ, 人工处理. 防止丢消息. |
+| **Rate limiting** | 限制 client QPS. Token bucket / leaky bucket 算法. |
+
+### Eval — Agent 特别篇
+
+| 术语 | 解释 |
+|---|---|
+| **Per-step success rate** | 每个 tool call 成功比例. End-to-end 看不出哪 step 挂. |
+| **End-to-end task completion** | 整个 task 完成比例. 真目标. |
+| **Trajectory eval** | 看 agent 走过的 step 序列对不对. |
+| **Tool call accuracy** | LLM 选对 tool + 参数对的比例. |
+| **Self-consistency** | 同 query 跑 N 次, 看 result 一致性. 高 → 信心高. |
+
+### Production 工具
+
+| 术语 | 解释 |
+|---|---|
+| **OpenTelemetry / OTEL** | 开源 observability 标准 — trace / metric / log 统一. |
+| **Distributed tracing** | 跨服务的 request trace, 看哪 step 慢 / 挂. |
+| **Span** | Trace 中的一个 unit — 一次 function call / API call. |
+| **Pydantic** | Python schema validation. LLM 输出 → Pydantic 校验. |
+| **Sentry** | Error tracking. |
+
+---
+
 ## 这道题在考什么
 
 表面是 agent 题, 底下藏着 **8 个 FDE evaluation signal**:

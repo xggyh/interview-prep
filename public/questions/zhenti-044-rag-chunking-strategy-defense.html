@@ -43,6 +43,19 @@
 <blockquote><p>"You've built a RAG system for a customer. <strong>Defend your chunking strategy.</strong> Why these chunk sizes? Why this overlap? Why this method (recursive / semantic / heading-aware / fixed)? Walk me through the ablation that justifies your choice — including what you tried and rejected. The customer's data is mostly PDFs with sections, tables, code blocks, and inline figures."</p></blockquote>
 <p><strong>Round</strong>: AI Specialty (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — RAG specialty 必问</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>RAG 是 FDE 第一常考方向, 术语堆叠. 5 min 扫完再看 chunking 细节.</p></blockquote>
+<h4>Chunking 策略 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Chunking</strong> ⭐</td><td><strong>把长文档切成 chunk (块)</strong> 再 embed + 入库. Chunk 太小 = 没 context, 太大 = retrieval 不准. 默认 512 token + 50-100 overlap.</td></tr><tr><td><strong>Fixed-size chunking</strong></td><td>按字符 / token 数硬切. 最简单, 但会切断句子 / table / code. 只适合 uniform text.</td></tr><tr><td><strong>Recursive chunking</strong></td><td>按层级 separator (段 → 句 → 词) 递归切, 保持自然边界. 适合 long-form prose.</td></tr><tr><td><strong>Semantic chunking</strong></td><td>按 embedding 相似度切 — 相邻句相似度 drop 就切. 适合多 topic 文档但贵 (每句都 embed).</td></tr><tr><td><strong>Structure-aware chunking</strong> ⭐</td><td><strong>按文档结构 (heading / paragraph / table / code) 切</strong>. Table / code 当 atomic. Production 多数情况最优.</td></tr><tr><td><strong>AST-aware chunking</strong></td><td>代码专用 — 用 syntax tree 按 function / class 切, 不会切断函数.</td></tr><tr><td><strong>Heading-aware chunking</strong></td><td>按 markdown / HTML 标题级别切. 保留 section context.</td></tr><tr><td><strong>Late chunking</strong></td><td>句子级 embedding, 查询时动态 group 成 chunk. 2024 新 paradigm.</td></tr><tr><td><strong>Hierarchical chunking</strong> ⭐</td><td>Embed 小 chunk (子), retrieval 时返回大 chunk (父). 精确召回 + 充足 context.</td></tr><tr><td><strong>Contextual retrieval</strong> ⭐</td><td><strong>Anthropic 2024.9 patent</strong> — embed 前给每个 chunk 加 "这是 X 文档 Y 章节" 前缀. 报 +49% recall.</td></tr><tr><td><strong>Overlap</strong></td><td>相邻 chunk 重叠 50-100 token, 防止信息被 cut off 在 chunk 边界.</td></tr><tr><td><strong>Atomic unit</strong></td><td>不可切的最小单位. Tables / code blocks / equations 当 atomic.</td></tr></tbody></table></div>
+<h4>Embedding / 检索 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Embedding</strong> ⭐</td><td><strong>Text → 高维向量</strong> (1024 / 1536 / 3072 维). Cosine 距离 = semantic 相似度.</td></tr><tr><td><strong>Embedder / Embedding model</strong></td><td>生成 embedding 的模型. 2026 主流: text-embedding-3-large (OpenAI) / Voyage-3 (Anthropic) / BGE-M3 (BAAI) / Cohere embed-v4.</td></tr><tr><td><strong>Dense retrieval</strong></td><td>用 embedding 找相似 — semantic match 强 (paraphrase). 但抓不到 exact SKU / 人名.</td></tr><tr><td><strong>Sparse retrieval / BM25</strong></td><td>关键词匹配算法. 跟 dense 互补 — exact match 强.</td></tr><tr><td><strong>Hybrid retrieval</strong> ⭐</td><td><strong>Dense + BM25 同时跑, RRF/weighted 合并</strong>. 标准 production-grade, 比单一 +10pp recall.</td></tr><tr><td><strong>Reranker / cross-encoder</strong> ⭐</td><td>第二阶段精排. Top-50 候选 → cross-encoder 重新打分 → top-10. 比 bi-encoder 准但贵.</td></tr><tr><td><strong>bge-reranker</strong></td><td>BAAI 开源 reranker. Self-host.</td></tr><tr><td><strong>Cohere Rerank</strong></td><td>Cohere 商业 reranker API.</td></tr><tr><td><strong>Cross-encoder vs Bi-encoder</strong></td><td>Bi-encoder: query / doc 分别 embed, 比较 (快但糙). Cross-encoder: query + doc 一起进 model, 共同评分 (准但慢).</td></tr><tr><td><strong>HyDE (Hypothetical Document Embeddings)</strong></td><td>LLM 先生成"假想答案", 用其 embedding 检索. 对模糊 query 有效.</td></tr><tr><td><strong>Query rewriting</strong></td><td>LLM 把 user query 改写更搜索友好 — "我退款多久" → "BNPL refund processing timeline".</td></tr><tr><td><strong>MMR (Maximal Marginal Relevance)</strong></td><td>检索去重 — 不只取最相关, 还兼顾 diversity. 避免 top-10 都讲同一件事.</td></tr><tr><td><strong>Multi-vector retrieval</strong></td><td>一个 doc 生成多个 embedding (按 aspect / 段). ColBERT 是代表.</td></tr><tr><td><strong>CLIP embedding</strong></td><td>图文共享 embedding 空间 — 图查文 / 文查图. Multimodal RAG 用.</td></tr></tbody></table></div>
+<h4>Vector DB / 索引</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vector DB</strong></td><td>存 embedding + 支持 ANN 搜索的 DB.</td></tr><tr><td><strong>Qdrant</strong></td><td>Rust 写的开源 vector DB. Production 流行选择.</td></tr><tr><td><strong>Pinecone</strong></td><td>商业 managed vector DB. 起步快.</td></tr><tr><td><strong>Weaviate</strong></td><td>开源 vector DB, GraphQL API.</td></tr><tr><td><strong>Milvus</strong></td><td>开源 vector DB. 大规模 production.</td></tr><tr><td><strong>ANN (Approximate Nearest Neighbor)</strong></td><td>近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次.</td></tr><tr><td><strong>HNSW (Hierarchical Navigable Small World)</strong></td><td>ANN 算法, 多层图结构. 速度准度好平衡.</td></tr></tbody></table></div>
+<h4>Retrieval Metrics ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Recall@K</strong> ⭐</td><td><strong>正确文档在 top-K 检索结果中的比例</strong>. K=10 是 RAG 标准.</td></tr><tr><td><strong>NDCG@K (Normalized Discounted Cumulative Gain)</strong> ⭐</td><td>加权排名好坏 — 正确答案靠前 score 高. 0-1 scale.</td></tr><tr><td><strong>MRR (Mean Reciprocal Rank)</strong></td><td>第一个正确答案的倒数排名平均. 适合 "找到第一个对的就行" 场景.</td></tr><tr><td><strong>Precision@K</strong></td><td>Top-K 中相关的比例. 跟 recall 搭配看.</td></tr><tr><td><strong>Answer accuracy</strong></td><td>端到端 — RAG 找对了 + LLM 生成对了. 真目标.</td></tr><tr><td><strong>Faithfulness</strong></td><td>LLM 输出是否 grounded 在 retrieved chunks. Hallucination 的反指标.</td></tr></tbody></table></div>
+<h4>文档处理工具</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>PyMuPDF</strong></td><td>Python PDF 解析库.</td></tr><tr><td><strong>pdfplumber</strong></td><td>类似, 强于 table extraction.</td></tr><tr><td><strong>Unstructured.io</strong></td><td>商业文档解析 — PDF / DOCX / HTML 统一成结构化输出.</td></tr><tr><td><strong>tree-sitter</strong></td><td>多语言 syntax tree parser. AST-aware chunking 用.</td></tr><tr><td><strong>Markdown</strong></td><td>轻量标记 — heading / table / code 容易识别, RAG 友好.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>表面是 chunking 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
 <ol><li><strong>Data-shape awareness</strong> — 知道 chunking strategy 取决于 customer's data shape, 不是 one-size-fits-all</li><li><strong>Ablation methodology</strong> — 不是 "我选 512", 是 "我试了 5 种, 这是 winner with these numbers"</li><li><strong>Eval discipline</strong> — Recall@10, NDCG@10, downstream answer accuracy</li><li><strong>Mixed-modality</strong> — tables / code / figures 各自 atomic 处理</li><li><strong>Trade-off thinking</strong> — small chunk = high precision low context, big chunk = opposite</li><li><strong>Embedding model awareness</strong> — chunking 和 embed model 互动 (Voyage-3, BGE-M3, text-embedding-3-large)</li><li><strong>Production reality</strong> — re-indexing cost, hot-reload, multi-tenant</li><li><strong>2026 advanced</strong> — late-chunking, contextual retrieval, hierarchical chunks</li></ol>
@@ -809,6 +822,81 @@ Quotes for interview:
 
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — RAG specialty 必问
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> RAG 是 FDE 第一常考方向, 术语堆叠. 5 min 扫完再看 chunking 细节.
+
+### Chunking 策略 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Chunking** ⭐ | **把长文档切成 chunk (块)** 再 embed + 入库. Chunk 太小 = 没 context, 太大 = retrieval 不准. 默认 512 token + 50-100 overlap. |
+| **Fixed-size chunking** | 按字符 / token 数硬切. 最简单, 但会切断句子 / table / code. 只适合 uniform text. |
+| **Recursive chunking** | 按层级 separator (段 → 句 → 词) 递归切, 保持自然边界. 适合 long-form prose. |
+| **Semantic chunking** | 按 embedding 相似度切 — 相邻句相似度 drop 就切. 适合多 topic 文档但贵 (每句都 embed). |
+| **Structure-aware chunking** ⭐ | **按文档结构 (heading / paragraph / table / code) 切**. Table / code 当 atomic. Production 多数情况最优. |
+| **AST-aware chunking** | 代码专用 — 用 syntax tree 按 function / class 切, 不会切断函数. |
+| **Heading-aware chunking** | 按 markdown / HTML 标题级别切. 保留 section context. |
+| **Late chunking** | 句子级 embedding, 查询时动态 group 成 chunk. 2024 新 paradigm. |
+| **Hierarchical chunking** ⭐ | Embed 小 chunk (子), retrieval 时返回大 chunk (父). 精确召回 + 充足 context. |
+| **Contextual retrieval** ⭐ | **Anthropic 2024.9 patent** — embed 前给每个 chunk 加 "这是 X 文档 Y 章节" 前缀. 报 +49% recall. |
+| **Overlap** | 相邻 chunk 重叠 50-100 token, 防止信息被 cut off 在 chunk 边界. |
+| **Atomic unit** | 不可切的最小单位. Tables / code blocks / equations 当 atomic. |
+
+### Embedding / 检索 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Embedding** ⭐ | **Text → 高维向量** (1024 / 1536 / 3072 维). Cosine 距离 = semantic 相似度. |
+| **Embedder / Embedding model** | 生成 embedding 的模型. 2026 主流: text-embedding-3-large (OpenAI) / Voyage-3 (Anthropic) / BGE-M3 (BAAI) / Cohere embed-v4. |
+| **Dense retrieval** | 用 embedding 找相似 — semantic match 强 (paraphrase). 但抓不到 exact SKU / 人名. |
+| **Sparse retrieval / BM25** | 关键词匹配算法. 跟 dense 互补 — exact match 强. |
+| **Hybrid retrieval** ⭐ | **Dense + BM25 同时跑, RRF/weighted 合并**. 标准 production-grade, 比单一 +10pp recall. |
+| **Reranker / cross-encoder** ⭐ | 第二阶段精排. Top-50 候选 → cross-encoder 重新打分 → top-10. 比 bi-encoder 准但贵. |
+| **bge-reranker** | BAAI 开源 reranker. Self-host. |
+| **Cohere Rerank** | Cohere 商业 reranker API. |
+| **Cross-encoder vs Bi-encoder** | Bi-encoder: query / doc 分别 embed, 比较 (快但糙). Cross-encoder: query + doc 一起进 model, 共同评分 (准但慢). |
+| **HyDE (Hypothetical Document Embeddings)** | LLM 先生成"假想答案", 用其 embedding 检索. 对模糊 query 有效. |
+| **Query rewriting** | LLM 把 user query 改写更搜索友好 — "我退款多久" → "BNPL refund processing timeline". |
+| **MMR (Maximal Marginal Relevance)** | 检索去重 — 不只取最相关, 还兼顾 diversity. 避免 top-10 都讲同一件事. |
+| **Multi-vector retrieval** | 一个 doc 生成多个 embedding (按 aspect / 段). ColBERT 是代表. |
+| **CLIP embedding** | 图文共享 embedding 空间 — 图查文 / 文查图. Multimodal RAG 用. |
+
+### Vector DB / 索引
+
+| 术语 | 解释 |
+|---|---|
+| **Vector DB** | 存 embedding + 支持 ANN 搜索的 DB. |
+| **Qdrant** | Rust 写的开源 vector DB. Production 流行选择. |
+| **Pinecone** | 商业 managed vector DB. 起步快. |
+| **Weaviate** | 开源 vector DB, GraphQL API. |
+| **Milvus** | 开源 vector DB. 大规模 production. |
+| **ANN (Approximate Nearest Neighbor)** | 近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次. |
+| **HNSW (Hierarchical Navigable Small World)** | ANN 算法, 多层图结构. 速度准度好平衡. |
+
+### Retrieval Metrics ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Recall@K** ⭐ | **正确文档在 top-K 检索结果中的比例**. K=10 是 RAG 标准. |
+| **NDCG@K (Normalized Discounted Cumulative Gain)** ⭐ | 加权排名好坏 — 正确答案靠前 score 高. 0-1 scale. |
+| **MRR (Mean Reciprocal Rank)** | 第一个正确答案的倒数排名平均. 适合 "找到第一个对的就行" 场景. |
+| **Precision@K** | Top-K 中相关的比例. 跟 recall 搭配看. |
+| **Answer accuracy** | 端到端 — RAG 找对了 + LLM 生成对了. 真目标. |
+| **Faithfulness** | LLM 输出是否 grounded 在 retrieved chunks. Hallucination 的反指标. |
+
+### 文档处理工具
+
+| 术语 | 解释 |
+|---|---|
+| **PyMuPDF** | Python PDF 解析库. |
+| **pdfplumber** | 类似, 强于 table extraction. |
+| **Unstructured.io** | 商业文档解析 — PDF / DOCX / HTML 统一成结构化输出. |
+| **tree-sitter** | 多语言 syntax tree parser. AST-aware chunking 用. |
+| **Markdown** | 轻量标记 — heading / table / code 容易识别, RAG 友好. |
 
 ---
 

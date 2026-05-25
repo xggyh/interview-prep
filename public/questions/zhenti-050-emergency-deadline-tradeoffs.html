@@ -43,6 +43,23 @@
 <blockquote><p>"Customer escalation. <strong>Major customer says they need feature X live by Friday or they cancel</strong> (it's Tuesday). You estimated 2 weeks. Walk me through what you compromise on — and crucially, what you <strong>NEVER</strong> compromise on. Show me you've actually shipped under pressure."</p></blockquote>
 <p><strong>Round</strong>: Production / Reliability (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — judgment under pressure 必问</p>
 <hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>Deadline 题. 涉及 scope / 工程方法论 / 通讯 / tech debt 术语.</p></blockquote>
+<h4>Scope / Phasing ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>MVP (Minimum Viable Product)</strong> ⭐</td><td><strong>最小可行版</strong>. 70% 用例 + zero polish. 不是 cut corner 是 cut scope.</td></tr><tr><td><strong>Walking skeleton</strong> ⭐</td><td><strong>每组件 stub / mock 但端到端跑通</strong>. 跑稳后再换真组件. 不同于 MVP.</td></tr><tr><td><strong>Slice / Vertical slice</strong></td><td>一个功能完整的薄片. 比 horizontal feature 更可 ship.</td></tr><tr><td><strong>Happy path</strong></td><td>最常见的成功路径. Emergency 时只保 happy path.</td></tr><tr><td><strong>Edge case</strong></td><td>不常见但合法的情况. Emergency 时 defer.</td></tr><tr><td><strong>Phased rollout</strong></td><td>分阶段交付 — Tier 1 周五, Tier 2 下周.</td></tr><tr><td><strong>Tier 1/2/3</strong></td><td>按风险 / 复杂度分层 — 简单先 ship, 复杂的延后.</td></tr><tr><td><strong>Reverse scope</strong></td><td>客户 ask X, 你说 "X 太大, 给你 X' 小版本".</td></tr><tr><td><strong>Scope creep</strong></td><td>项目过程中不断加需求. Deadline 下死敌.</td></tr><tr><td><strong>Anchored ask</strong></td><td>客户随便说的 deadline 没想清楚 — push back 通常有 flex.</td></tr></tbody></table></div>
+<h4>工程妥协 / Trade-off ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Tech debt / 技术债</strong> ⭐</td><td><strong>赶工时省的 quality work</strong>. 不是 bad code, 是 "我们没时间做 right". 必须 track + 还.</td></tr><tr><td><strong>Debt log / Debt register</strong></td><td>列出所有 shortcut 的清单, 含 owner + payback date.</td></tr><tr><td><strong>Manual override</strong></td><td>自动化没跑通时, 人工干预 workflow. 短期 OK.</td></tr><tr><td><strong>Hardcode</strong></td><td>写死值不参数化. 短期 OK 长期问题.</td></tr><tr><td><strong>Hack / Quick fix</strong></td><td>不优雅但能跑的方案.</td></tr><tr><td><strong>Workaround</strong></td><td>绕过问题不修根因.</td></tr><tr><td><strong>Polish</strong></td><td>UI / UX / 边缘 case 抛光. Emergency 时第一个 cut.</td></tr><tr><td><strong>Code freeze</strong></td><td>暂停 feature ship, 只修 bug.</td></tr></tbody></table></div>
+<h4>永不妥协 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Reversibility</strong> ⭐</td><td><strong>必须能 rollback</strong>. Migration 必须 reversible, 否则 ship 错没法救.</td></tr><tr><td><strong>Data integrity</strong> ⭐</td><td>不能丢 / 损坏数据. Emergency 也不能省.</td></tr><tr><td><strong>Idempotency</strong></td><td>同 request 多次执行结果一致. Retry 安全必备.</td></tr><tr><td><strong>Observability</strong> ⭐</td><td><strong>能 debug</strong>. 没 log 没 metric 出问题瞎.</td></tr><tr><td><strong>Security / Auth</strong></td><td>认证授权. Emergency 时也不能跳.</td></tr><tr><td><strong>Compliance</strong></td><td>HIPAA / SOX / GDPR. 监管要求 hard requirement.</td></tr><tr><td><strong>Backward compatibility</strong></td><td>旧 client 还能跑. API breaking 时小心.</td></tr><tr><td><strong>Migration safety</strong></td><td>DB schema 改要 backfill + dual write + cutover, 不能直接砍.</td></tr></tbody></table></div>
+<h4>Deploy / Rollout ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Canary rollout</strong> ⭐</td><td>1% → 5% → 25% → 100%. 出 SLO breach 自动 rollback.</td></tr><tr><td><strong>Shadow mode</strong></td><td>新代码跟旧并跑, 新只记录不生效. 零风险收数据.</td></tr><tr><td><strong>Feature flag</strong> ⭐</td><td><strong>不重新部署就能开关功能</strong>. LaunchDarkly / Statsig 用. Emergency 时尤关键.</td></tr><tr><td><strong>Blue-green deployment</strong></td><td>两套环境切换 — blue 跑, green 待命; ship 时切到 green. 0 downtime.</td></tr><tr><td><strong>A/B test</strong></td><td>两 version 同跑比 metric. Statistical test.</td></tr><tr><td><strong>Kill switch</strong></td><td>一键关功能. Production 必备.</td></tr></tbody></table></div>
+<h4>通讯 / 客户管理 ⭐</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Push back</strong> ⭐</td><td><strong>温和拒绝客户 ask</strong>. 不是 "no", 是 "let's clarify why".</td></tr><tr><td><strong>Under-promise, over-deliver</strong> ⭐</td><td>承诺保守, 超额完成. 比反过来 trust 多 10x.</td></tr><tr><td><strong>Status update</strong></td><td>项目进度通报. Frequency 越高 trust 越高.</td></tr><tr><td><strong>Stakeholder alignment</strong></td><td>跟所有相关方 sync. Emergency 时尤其重要.</td></tr><tr><td><strong>Customer Success Manager (CSM)</strong></td><td>客户关系负责人. FDE 跟 CSM 配合.</td></tr><tr><td><strong>Executive sponsor</strong></td><td>客户那边出钱拍板的人.</td></tr><tr><td><strong>Steering committee</strong></td><td>项目治理委员会 — 出问题升级到这里.</td></tr><tr><td><strong>Escalation path</strong></td><td>升级链. Customer 不满意时.</td></tr></tbody></table></div>
+<h4>Eval / 验证</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Smoke test</strong></td><td>最低限度 "能跑就行" 测试. Emergency 时只跑这个.</td></tr><tr><td><strong>Regression test</strong></td><td>检查老功能没坏.</td></tr><tr><td><strong>Golden path test</strong></td><td>覆盖 happy path.</td></tr><tr><td><strong>0% wrong-call</strong></td><td>Indonesia refund tier 1 的 metric — 没 false positive.</td></tr><tr><td><strong>Coverage</strong></td><td>自动化覆盖比例. Tier 1 70% coverage = 7 成 case 自动处理.</td></tr></tbody></table></div>
+<h4>Postmortem / 学习</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Tech debt sprint</strong></td><td>Ship 完 emergency 后专门还债的迭代.</td></tr><tr><td><strong>Postmortem (no-incident)</strong></td><td>项目复盘 — 没事故也复盘 "what hurts".</td></tr><tr><td><strong>Wedding cake metaphor</strong></td><td>90% 完成的蛋糕能 ship, 50% 是另一种产品.</td></tr></tbody></table></div>
+<hr />
 <h3>这道题在考什么</h3>
 <p>表面是 timeline 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
 <ol><li><strong>Judgment under pressure</strong> — 知道 cut scope, not corner-cut quality</li><li><strong>Never-compromise discipline</strong> — data integrity, security, reversibility</li><li><strong>Scope reduction skill</strong> — what to cut to fit</li><li><strong>Negotiation with customer</strong> — push back vs accept</li><li><strong>Tech debt acceptance</strong> — short-term ugly OK, long-term debt tracked</li><li><strong>Reversibility obsession</strong> — must rollback if shipped breaks</li><li><strong>Customer relationship</strong> — over-deliver communication &gt; under-deliver code</li><li><strong>Specific shipped examples</strong> — Indonesia refund tiered approach, voice agent phased market rollout</li></ol>
@@ -767,6 +784,95 @@ Quotes for interview:
 
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — judgment under pressure 必问
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> Deadline 题. 涉及 scope / 工程方法论 / 通讯 / tech debt 术语.
+
+### Scope / Phasing ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **MVP (Minimum Viable Product)** ⭐ | **最小可行版**. 70% 用例 + zero polish. 不是 cut corner 是 cut scope. |
+| **Walking skeleton** ⭐ | **每组件 stub / mock 但端到端跑通**. 跑稳后再换真组件. 不同于 MVP. |
+| **Slice / Vertical slice** | 一个功能完整的薄片. 比 horizontal feature 更可 ship. |
+| **Happy path** | 最常见的成功路径. Emergency 时只保 happy path. |
+| **Edge case** | 不常见但合法的情况. Emergency 时 defer. |
+| **Phased rollout** | 分阶段交付 — Tier 1 周五, Tier 2 下周. |
+| **Tier 1/2/3** | 按风险 / 复杂度分层 — 简单先 ship, 复杂的延后. |
+| **Reverse scope** | 客户 ask X, 你说 "X 太大, 给你 X' 小版本". |
+| **Scope creep** | 项目过程中不断加需求. Deadline 下死敌. |
+| **Anchored ask** | 客户随便说的 deadline 没想清楚 — push back 通常有 flex. |
+
+### 工程妥协 / Trade-off ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Tech debt / 技术债** ⭐ | **赶工时省的 quality work**. 不是 bad code, 是 "我们没时间做 right". 必须 track + 还. |
+| **Debt log / Debt register** | 列出所有 shortcut 的清单, 含 owner + payback date. |
+| **Manual override** | 自动化没跑通时, 人工干预 workflow. 短期 OK. |
+| **Hardcode** | 写死值不参数化. 短期 OK 长期问题. |
+| **Hack / Quick fix** | 不优雅但能跑的方案. |
+| **Workaround** | 绕过问题不修根因. |
+| **Polish** | UI / UX / 边缘 case 抛光. Emergency 时第一个 cut. |
+| **Code freeze** | 暂停 feature ship, 只修 bug. |
+
+### 永不妥协 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Reversibility** ⭐ | **必须能 rollback**. Migration 必须 reversible, 否则 ship 错没法救. |
+| **Data integrity** ⭐ | 不能丢 / 损坏数据. Emergency 也不能省. |
+| **Idempotency** | 同 request 多次执行结果一致. Retry 安全必备. |
+| **Observability** ⭐ | **能 debug**. 没 log 没 metric 出问题瞎. |
+| **Security / Auth** | 认证授权. Emergency 时也不能跳. |
+| **Compliance** | HIPAA / SOX / GDPR. 监管要求 hard requirement. |
+| **Backward compatibility** | 旧 client 还能跑. API breaking 时小心. |
+| **Migration safety** | DB schema 改要 backfill + dual write + cutover, 不能直接砍. |
+
+### Deploy / Rollout ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Canary rollout** ⭐ | 1% → 5% → 25% → 100%. 出 SLO breach 自动 rollback. |
+| **Shadow mode** | 新代码跟旧并跑, 新只记录不生效. 零风险收数据. |
+| **Feature flag** ⭐ | **不重新部署就能开关功能**. LaunchDarkly / Statsig 用. Emergency 时尤关键. |
+| **Blue-green deployment** | 两套环境切换 — blue 跑, green 待命; ship 时切到 green. 0 downtime. |
+| **A/B test** | 两 version 同跑比 metric. Statistical test. |
+| **Kill switch** | 一键关功能. Production 必备. |
+
+### 通讯 / 客户管理 ⭐
+
+| 术语 | 解释 |
+|---|---|
+| **Push back** ⭐ | **温和拒绝客户 ask**. 不是 "no", 是 "let's clarify why". |
+| **Under-promise, over-deliver** ⭐ | 承诺保守, 超额完成. 比反过来 trust 多 10x. |
+| **Status update** | 项目进度通报. Frequency 越高 trust 越高. |
+| **Stakeholder alignment** | 跟所有相关方 sync. Emergency 时尤其重要. |
+| **Customer Success Manager (CSM)** | 客户关系负责人. FDE 跟 CSM 配合. |
+| **Executive sponsor** | 客户那边出钱拍板的人. |
+| **Steering committee** | 项目治理委员会 — 出问题升级到这里. |
+| **Escalation path** | 升级链. Customer 不满意时. |
+
+### Eval / 验证
+
+| 术语 | 解释 |
+|---|---|
+| **Smoke test** | 最低限度 "能跑就行" 测试. Emergency 时只跑这个. |
+| **Regression test** | 检查老功能没坏. |
+| **Golden path test** | 覆盖 happy path. |
+| **0% wrong-call** | Indonesia refund tier 1 的 metric — 没 false positive. |
+| **Coverage** | 自动化覆盖比例. Tier 1 70% coverage = 7 成 case 自动处理. |
+
+### Postmortem / 学习
+
+| 术语 | 解释 |
+|---|---|
+| **Tech debt sprint** | Ship 完 emergency 后专门还债的迭代. |
+| **Postmortem (no-incident)** | 项目复盘 — 没事故也复盘 "what hurts". |
+| **Wedding cake metaphor** | 90% 完成的蛋糕能 ship, 50% 是另一种产品. |
 
 ---
 

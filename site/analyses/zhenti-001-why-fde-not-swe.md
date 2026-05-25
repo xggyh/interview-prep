@@ -7,6 +7,70 @@
 
 ---
 
+## 📖 术语速查 (本题用到的)
+
+> 这题是 FDE 面试 opener, 涉及一堆 role / 公司 / 技术 stack 术语. 这张表过完, 后面回答里的术语就不慌.
+
+### FDE / 角色术语 ⭐ 这题的核心
+
+| 术语 | 解释 |
+|---|---|
+| **FDE (Forward Deployed Engineer)** ⭐ | 前线部署工程师. **distance to customer = min**, unit of progress = customer outcome (renewal / KPI lift / regulator pass). 跟 SWE 区别就是这题的核心. |
+| **SWE (Software Engineer)** ⭐ | 标准 SWE. Workflow = PM 给 PRD → ship feature. **缺直接对接 customer 的环节**, 信息要走 PM 中转, latency 4-8 周. Unit = feature shipped. |
+| **MLE (Machine Learning Engineer)** | ML 工程师. Happiness function = model quality metrics (accuracy / latency / throughput). Distance to customer = medium. |
+| **SE (Sales Engineer)** | 售前工程师. 在 deal close 之后就 cutoff, **不 own deployment 后 12 个月的 messy edge case**. |
+| **Research / Research Scientist** | 研究员. Unit = paper. Distance to customer = max. |
+| **Solution Architect** | 解决方案架构师. 偏售前设计, 不 own ship 后. |
+
+### 公司专属 FDE flavor
+
+| 术语 | 解释 |
+|---|---|
+| **Palantir FDE** | 偏 ops + data + ontology. 5+ 年 tenure 文化, embedded on-site. 不是 LLM-first. |
+| **OpenAI FDE** | 偏 enterprise + frontier model proximity + agent stack (Operator / Codex). |
+| **Anthropic Applied Solutions** | Anthropic 的 FDE-equivalent. 偏 safety framing + Constitutional AI deployment. |
+| **Google FDE** | Google Cloud 的 FDE 角色, 偏 enterprise cloud + Gemini deployment. |
+| **Databricks AI Engineer** | 客户向工程师 + lakehouse + MLflow. |
+| **Scale AI FDE** | 偏 defense / government (Donovan) + data labeling + RLHF. |
+
+### 技术 stack (简历钩子)
+
+| 术语 | 解释 |
+|---|---|
+| **vLLM** | 高吞吐 LLM inference engine, 用 PagedAttention 显存管理. 部署 LLM 标配之一. |
+| **SGLang** | 另一个高性能 LLM serving framework, 比 vLLM 在某些场景更快. |
+| **SFT (Supervised Fine-Tuning)** | 监督微调. 给模型 50k 高质量 (input, output) 对, 让它学新行为. |
+| **DPO (Direct Preference Optimization)** | 直接偏好优化. 给模型 preference pair (A 好于 B), 让它学人类偏好. 比 RLHF 简单. |
+| **RL / RLHF** | 强化学习 / 人类反馈强化学习. 比 DPO 复杂但 expressive. |
+| **RAG (Retrieval-Augmented Generation)** | 检索增强生成. 先检索 doc 再让 LLM 基于 doc 生成, 减少幻觉. |
+| **ConvFinQA** | 用户简历里的学术项目 — multi-hop financial QA (公开数据集 + paper). |
+| **ASR (Automatic Speech Recognition)** | 自动语音识别. 把语音转文本. Voice agent 第一步. |
+| **TTS (Text-to-Speech)** | 文本转语音. Voice agent 最后一步. |
+
+### 业务 / KPI 术语
+
+| 术语 | 解释 |
+|---|---|
+| **BNPL (Buy Now Pay Later)** | 先买后付. TikTok PayLater / Klarna / Affirm 这类产品. |
+| **CER (Catch / Conversion / Engagement Rate)** | 取决于上下文 — voice agent 里通常指 "成功 catch 客户对话 + 完成 tier 1/2 协商" 的比例. |
+| **OJK** | Indonesia 金融服务管理局 (Otoritas Jasa Keuangan), 印尼监管. |
+| **BACEN** | 巴西央行 (Banco Central do Brasil), 巴西监管. |
+| **CS team (Customer Service)** | 客服团队. Chatbot 服务对象 / 同事. |
+| **P0 incident** | 最高优先级生产故障 (P0 > P1 > P2). |
+| **JD (Job Description)** | 招聘 JD. |
+
+### 方法论
+
+| 术语 | 解释 |
+|---|---|
+| **STAR** | Situation / Task / Action / Result. Behavioral 题讲故事的标准框架. |
+| **Reversibility (one-way vs two-way door)** | 决策可逆性. Two-way = 错了易撤 (e.g., 改 prompt). One-way = 错了难撤 (e.g., 改监管 prompt 之后影响已训 model). 高 reversibility 题 ship fast, 低 reversibility 题 scope 慢. |
+| **Cascade fallback** | 级联兜底 — primary → fallback → last-resort. Voice agent / vendor 不稳时的标配设计. |
+| **Tier-based scoping** | 按风险分层 — tier 1 (low risk auto), tier 2 (medium risk, with guard), tier 3 (high risk, human-in-loop). |
+| **Stepping stone** | 跳板. "我把 FDE 当 stepping stone 到 PM" 是面试红线. |
+
+---
+
 ## 这道题在考什么
 
 表面是 motivation 题, 但底下藏着 **6 个 anti-signal 检测**:
