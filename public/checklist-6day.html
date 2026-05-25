@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📅 Google FDE 6 天冲刺 Checklist</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.container.checklist-page { max-width: 980px; }
+.global-progress {
+  position: sticky; top: 56px; z-index: 40;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid #d0d7de;
+  padding: 14px 20px; margin: -24px -20px 24px;
+}
+[data-theme="dark"] .global-progress { background: rgba(13,17,23,0.95); border-bottom-color: #30363d; }
+.global-progress h3 { margin: 0 0 8px; font-size: 16px; }
+.progress-bar { height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; margin: 6px 0; }
+[data-theme="dark"] .progress-bar { background: #21262d; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width 0.3s; width: 0; }
+.day {
+  background: #fff; border: 1px solid #d0d7de; border-radius: 12px;
+  padding: 20px 24px; margin-bottom: 24px;
+}
+[data-theme="dark"] .day { background: #161b22; border-color: #30363d; }
+.day h2 { margin-top: 0; font-size: 22px; }
+.day-num { display: inline-block; background: #0969da; color: white; padding: 2px 10px; border-radius: 12px; font-size: 14px; margin-right: 8px; vertical-align: middle; }
+.theme-sub { color: #57606a; font-size: 13px; margin: -8px 0 12px; }
+[data-theme="dark"] .theme-sub { color: #8b949e; }
+.progress-text { font-size: 13px; color: #57606a; margin: 4px 0 12px; }
+[data-theme="dark"] .progress-text { color: #8b949e; }
+details summary { cursor: pointer; padding: 8px 0; font-weight: 600; font-size: 15px; }
+.checklist { list-style: none; padding-left: 6px; margin: 8px 0 16px; }
+.checklist li { margin: 4px 0; padding: 4px 6px; border-radius: 4px; }
+.checklist li:hover { background: rgba(0,0,0,0.03); }
+[data-theme="dark"] .checklist li:hover { background: rgba(255,255,255,0.05); }
+.checklist label { cursor: pointer; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+.checklist input[type="checkbox"] { margin-top: 4px; flex-shrink: 0; width: 16px; height: 16px; }
+.checklist input:checked + .star + .rank + .reports + .algo + a,
+.checklist input:checked ~ * { opacity: 0.55; text-decoration: line-through; }
+.checklist input:checked ~ a { text-decoration: line-through; }
+.checklist li:has(input:checked) { background: rgba(22,163,74,0.08); }
+[data-theme="dark"] .checklist li:has(input:checked) { background: rgba(34,197,94,0.12); }
+.star { width: 18px; display: inline-block; text-align: center; }
+.rank { color: #6366f1; font-weight: 600; font-family: 'SF Mono', monospace; font-size: 13px; min-width: 44px; }
+.reports { color: #57606a; font-size: 12px; font-family: monospace; min-width: 40px; }
+[data-theme="dark"] .reports { color: #8b949e; }
+.algo { font-size: 12px; color: #7c3aed; min-width: 120px; font-family: monospace; }
+.reset-day {
+  background: transparent; border: 1px solid #d0d7de;
+  border-radius: 6px; padding: 6px 12px; font-size: 12px;
+  cursor: pointer; margin-top: 12px;
+}
+.reset-day:hover { background: #ffebe9; border-color: #cf222e; color: #cf222e; }
+[data-theme="dark"] .reset-day { border-color: #30363d; }
+[data-theme="dark"] .reset-day:hover { background: #2d0a0a; border-color: #cf222e; color: #ffaba8; }
+@media (max-width: 600px) {
+  .rank, .reports, .algo { display: none; }
+  .global-progress { position: relative; top: auto; }
+}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button">🌙</button>
+  </div>
+</header>
+<main class="container checklist-page">
+
+<div class="global-progress">
+  <h3>📅 Google FDE 6 天冲刺 Checklist</h3>
+  <div class="progress-bar"><div class="progress-fill" id="prog-total"></div></div>
+  <p class="progress-text"><span id="prog-text-total">0 / 149</span> · 完成 <span id="prog-pct">0%</span></p>
+</div>
+
+<div class="intro" style="margin-bottom: 24px;">
+  <p><strong>100 题 Coding + 35 篇 Read + 2 hands-on + 2 mocks</strong>. 数据存 localStorage, 跨设备不同步 (一个浏览器一份).</p>
+  <p>每天结构: 💻 Coding 17 题 → 📖 Read 5-6 篇深度 → 🛠 Hands-on / 🎤 Mock. 去重版 — 同题不同 board 只看最深的.</p>
+</div>
+
+
+<section class="day" data-day="1">
+  <h2><span class="day-num">Day 1</span> · Framework + Gemini Hands-on + Q-P1</h2>
+  <p class="theme-sub">建立全局视角, hands-on Gemini API, 看 Q-P1 找感觉</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d1"></div></div>
+  <p class="progress-text"><span id="prog-text-d1">0 / 25</span></p>
+
+  <details open>
+    <summary>💻 Coding (17 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c1"> <span class="star">⭐</span> <span class="rank">#1</span> <span class="reports">4rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/logger-rate-limiter/cm5eh7nri04wz838onqhny0wc?company=Google" target="_blank">Leetcode 359. Logger Rate Limiter</a></label></li>
+      <li><label><input type="checkbox" data-key="c2"> <span class="star"></span> <span class="rank">#2</span> <span class="reports">1rep</span> <span class="algo">[BFS]</span> <a href="https://www.hellointerview.com/community/questions/escape-spreading-fire/cm5eguhag03r4838oxwinb1f1?company=Google" target="_blank">Leetcode 2258. Escape the Spreading Fire</a></label></li>
+      <li><label><input type="checkbox" data-key="c3"> <span class="star"></span> <span class="rank">#3</span> <span class="reports">1rep</span> <span class="algo">[Sweep Line]</span> <a href="https://www.hellointerview.com/community/questions/maximum-population-year/cm5eguhaf03fw838ov742qh4i?company=Google" target="_blank">Leetcode 1854. Maximum Population Year</a></label></li>
+      <li><label><input type="checkbox" data-key="c4"> <span class="star"></span> <span class="rank">#4</span> <span class="reports">1rep</span> <span class="algo">[DFS]</span> <a href="https://www.hellointerview.com/community/questions/count-sub-islands/cm5eguhaf03hb838oy2txhlre?company=Google" target="_blank">Leetcode 1905. Count Sub Islands</a></label></li>
+      <li><label><input type="checkbox" data-key="c5"> <span class="star">•</span> <span class="rank">#5</span> <span class="reports">2rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/top-k-frequent-elements/cm5eh7nri04wn838o9sazfr53?company=Google" target="_blank">Leetcode 347. Top K Frequent Elements</a></label></li>
+      <li><label><input type="checkbox" data-key="c6"> <span class="star">⭐</span> <span class="rank">#6</span> <span class="reports">3rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/lfu-cache/cm5eguhab02d6838o87irm4sz?company=Google" target="_blank">Leetcode 460. LFU Cache</a></label></li>
+      <li><label><input type="checkbox" data-key="c7"> <span class="star"></span> <span class="rank">#7</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/leetcode-word-break/cm5eh7nrh04qv838o8afetv7s?company=Google" target="_blank">Leetcode 139. Word Break</a></label></li>
+      <li><label><input type="checkbox" data-key="c8"> <span class="star"></span> <span class="rank">#8</span> <span class="reports">1rep</span> <span class="algo">[Intervals]</span> <a href="https://www.hellointerview.com/community/questions/maximal-uncovered-ranges/cm5eguhah0425838oxxdnyjxu?company=Google" target="_blank">Leetcode 2655. Find Maximal Uncovered Ranges</a></label></li>
+      <li><label><input type="checkbox" data-key="c9"> <span class="star">•</span> <span class="rank">#9</span> <span class="reports">2rep</span> <span class="algo">[Backtracking]</span> <a href="https://www.hellointerview.com/community/questions/robot-room-cleaner/cm5eguhab02dz838oq3vp7bcd?company=Google" target="_blank">Leetcode 489. Robot Room Cleaner</a></label></li>
+      <li><label><input type="checkbox" data-key="c10"> <span class="star"></span> <span class="rank">#10</span> <span class="reports">1rep</span> <span class="algo">[Hash Map]</span> <a href="https://www.hellointerview.com/community/questions/group-shifted-strings/cm5eh7nrh04tx838olh23fjzs?company=Google" target="_blank">Leetcode 249. Group Shifted Strings</a></label></li>
+      <li><label><input type="checkbox" data-key="c11"> <span class="star">⭐</span> <span class="rank">#11</span> <span class="reports">4rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/number-lines-string/cm5eguhac02ms838oy2au8k7t?company=Google" target="_blank">Leetcode 806. Number of Lines To Write String</a></label></li>
+      <li><label><input type="checkbox" data-key="c12"> <span class="star"></span> <span class="rank">#12</span> <span class="reports">1rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/rle-iterator/cm5eguhac02pe838o36a7xof7?company=Google" target="_blank">Leetcode 900. RLE Iterator</a></label></li>
+      <li><label><input type="checkbox" data-key="c13"> <span class="star">⭐</span> <span class="rank">#13</span> <span class="reports">4rep</span> <span class="algo">[Greedy]</span> <a href="https://www.hellointerview.com/community/questions/rental-car-assignment/cm6jwxse800j9ui4biheeyqm2?company=Google" target="_blank">Car Rental Optimization</a></label></li>
+      <li><label><input type="checkbox" data-key="c14"> <span class="star">⭐</span> <span class="rank">#14</span> <span class="reports">3rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/knapsack-binary-profits/cm6jwy3cq00lbui4bm2uxmm9p?company=Google" target="_blank">Knapsack Problem Variations</a></label></li>
+      <li><label><input type="checkbox" data-key="c15"> <span class="star">⭐</span> <span class="rank">#15</span> <span class="reports">3rep</span> <span class="algo">[DFS]</span> <a href="https://www.hellointerview.com/community/questions/closed-islands-count/cm5eguhad02z8838ohwfcbu9z?company=Google" target="_blank">Leetcode 1254. Number of Closed Islands</a></label></li>
+      <li><label><input type="checkbox" data-key="c16"> <span class="star">⭐</span> <span class="rank">#16</span> <span class="reports">12rep</span> <span class="algo">[Intervals]</span> <a href="https://www.hellointerview.com/community/questions/merge-intervals/cm5eh7nrh04ok838oa0xi845w?company=Google" target="_blank">Leetcode 56. Merge Intervals</a></label></li>
+      <li><label><input type="checkbox" data-key="c17"> <span class="star">⭐</span> <span class="rank">#17</span> <span class="reports">4rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/filesystem-size-analysis/cm6k0f724000myis434q1atjv?company=Google" target="_blank">File System Size Analysis and Reporting</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (5 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d1r0"> <a href="zhenti-000-index.html" target="_blank">真题 [Index] · 52 题全清单</a></label></li>
+      <li><label><input type="checkbox" data-key="d1r1"> <a href="gfde-t1-overview.html" target="_blank">Google FDE Overview T1 · Tool Calling</a></label></li>
+      <li><label><input type="checkbox" data-key="d1r2"> <a href="gfde-t2-overview.html" target="_blank">Google FDE Overview T2 · RAG / Context</a></label></li>
+      <li><label><input type="checkbox" data-key="d1r3"> <a href="gfde-t3-overview.html" target="_blank">Google FDE Overview T3 · LLM Engineering</a></label></li>
+      <li><label><input type="checkbox" data-key="d1r4"> <a href="gfde-t4-overview.html" target="_blank">Google FDE Overview T4 · FDE Delivery</a></label></li>
+    </ul>
+  </details>
+  
+    <h4>🛠 Hands-on / 🎤 Mock / 📝 复盘</h4>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d1x0"> 🛠 Hands-on: `pip install google-cloud-aiplatform`</label></li>
+      <li><label><input type="checkbox" data-key="d1x1"> 🛠 跑通 1 个 Vertex AI Gemini 3 Pro call (30 min)</label></li>
+      <li><label><input type="checkbox" data-key="d1x2"> 🔮 Q-P1 · Vertex AI Clinical Q&amp;A (HIPAA) 看完 → <a href="zhenti-p01-vertex-ai-gemini-clinical-qa.html" target="_blank">📖 看页面</a></label></li>
+    </ul>
+
+  <button class="reset-day" data-day="1">🗑 Reset Day 1</button>
+</section>
+<section class="day" data-day="2">
+  <h2><span class="day-num">Day 2</span> · Decomposition 主场 + G·O·D·D·S 录音</h2>
+  <p class="theme-sub">5 步框架打透, 录音验证应答</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d2"></div></div>
+  <p class="progress-text"><span id="prog-text-d2">0 / 24</span></p>
+
+  <details open>
+    <summary>💻 Coding (17 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c18"> <span class="star"></span> <span class="rank">#18</span> <span class="reports">1rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/file-system-design/cm5eguhab02gq838obxubceit?company=Google" target="_blank">Leetcode 588. Design In-Memory File System</a></label></li>
+      <li><label><input type="checkbox" data-key="c19"> <span class="star"></span> <span class="rank">#19</span> <span class="reports">1rep</span> <span class="algo">[Stack]</span> <a href="https://www.hellointerview.com/community/questions/parse-lisp-expression/cm5eguhac02ku838o1xk0c1qq?company=Google" target="_blank">Leetcode 736. Parse Lisp Expression</a></label></li>
+      <li><label><input type="checkbox" data-key="c20"> <span class="star">•</span> <span class="rank">#20</span> <span class="reports">2rep</span> <span class="algo">[Game Theory]</span> <a href="https://www.hellointerview.com/community/questions/cat-mouse-game/cm5eguhac02pr838o7h4i703f?company=Google" target="_blank">Leetcode 913. Cat and Mouse</a></label></li>
+      <li><label><input type="checkbox" data-key="c21"> <span class="star">⭐</span> <span class="rank">#21</span> <span class="reports">10rep</span> <span class="algo">[DFS]</span> <a href="https://www.hellointerview.com/community/questions/count-islands-binary-trees/cm6jzrva4000gyis4tbslkc0q?company=Google" target="_blank">Count Islands in Binary Trees</a></label></li>
+      <li><label><input type="checkbox" data-key="c22"> <span class="star">⭐</span> <span class="rank">#22</span> <span class="reports">3rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/meeting-rooms-iii/cm5eguhah03v4838o6lf58qge?company=Google" target="_blank">Leetcode 2402. Meeting Rooms III</a></label></li>
+      <li><label><input type="checkbox" data-key="c23"> <span class="star">⭐</span> <span class="rank">#23</span> <span class="reports">3rep</span> <span class="algo">[BFS]</span> <a href="https://www.hellointerview.com/community/questions/minimum-knight-moves/cm5eguhad02xn838o2q3dvi00?company=Google" target="_blank">Leetcode 1197. Minimum Knight Moves</a></label></li>
+      <li><label><input type="checkbox" data-key="c24"> <span class="star"></span> <span class="rank">#24</span> <span class="reports">1rep</span> <span class="algo">[BFS]</span> <a href="https://www.hellointerview.com/community/questions/flood-fill-733/cm5eguhac02kr838olwvfh9me?company=Google" target="_blank">Leetcode 733. Flood Fill</a></label></li>
+      <li><label><input type="checkbox" data-key="c25"> <span class="star">•</span> <span class="rank">#25</span> <span class="reports">2rep</span> <span class="algo">[Trie]</span> <a href="https://www.hellointerview.com/community/questions/design-search-autocomplete-system/67257ab0-683b-481d-bfd2-f7e63258056e?company=Google" target="_blank">Leetcode 642. Design Search Autocomplete System</a></label></li>
+      <li><label><input type="checkbox" data-key="c26"> <span class="star"></span> <span class="rank">#26</span> <span class="reports">1rep</span> <span class="algo">[Hash Map]</span> <a href="https://www.hellointerview.com/community/questions/two-sum-sorted/cm5eh7nrh04rn838oj2kq0k1k?company=Google" target="_blank">Leetcode 167. Two Sum II - Input Array Is Sorted</a></label></li>
+      <li><label><input type="checkbox" data-key="c27"> <span class="star">•</span> <span class="rank">#27</span> <span class="reports">2rep</span> <span class="algo">[Topological Sort]</span> <a href="https://www.hellointerview.com/community/questions/alien-dictionary/cm5eh7nrh04uh838o2u70bl2w?company=Google" target="_blank">Leetcode 269. Alien Dictionary</a></label></li>
+      <li><label><input type="checkbox" data-key="c28"> <span class="star">•</span> <span class="rank">#28</span> <span class="reports">2rep</span> <span class="algo">[Trie]</span> <a href="https://www.hellointerview.com/community/questions/leetcode-212-word-search/cm5eh7nrh04sw838o1tr5hk57?company=Google" target="_blank">Leetcode 212. Word Search II</a></label></li>
+      <li><label><input type="checkbox" data-key="c29"> <span class="star">•</span> <span class="rank">#29</span> <span class="reports">2rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/meeting-rooms-2/cm5eh7nrh04u1838orn6jicpz?company=Google" target="_blank">Leetcode 253. Meeting Rooms II</a></label></li>
+      <li><label><input type="checkbox" data-key="c30"> <span class="star"></span> <span class="rank">#30</span> <span class="reports">1rep</span> <span class="algo">[Graph]</span> <a href="https://www.hellointerview.com/community/questions/max-min-path/cm5eguhad02v0838oji4e95ib?company=Google" target="_blank">Leetcode 1102. Path With Maximum Minimum Value</a></label></li>
+      <li><label><input type="checkbox" data-key="c31"> <span class="star"></span> <span class="rank">#31</span> <span class="reports">1rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/increasing-subarray-detection/cm5eguhaj04lg838o47btdwpe?company=Google" target="_blank">Leetcode 3350. Adjacent Increasing Subarrays Detection II</a></label></li>
+      <li><label><input type="checkbox" data-key="c32"> <span class="star"></span> <span class="rank">#32</span> <span class="reports">1rep</span> <span class="algo">[BFS]</span> <a href="https://www.hellointerview.com/community/questions/minimum-moves-box/cm5eguhad02zh838oa4lbcq1w?company=Google" target="_blank">Leetcode 1263. Minimum Moves to Move a Box to Their Target Location</a></label></li>
+      <li><label><input type="checkbox" data-key="c33"> <span class="star"></span> <span class="rank">#33</span> <span class="reports">1rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/traffic-light-intersection/cm5eguhae02zx838oeshehcvt?company=Google" target="_blank">Leetcode 1279. Traffic Light Controlled Intersection</a></label></li>
+      <li><label><input type="checkbox" data-key="c34"> <span class="star"></span> <span class="rank">#34</span> <span class="reports">1rep</span> <span class="algo">[Stack]</span> <a href="https://www.hellointerview.com/community/questions/stack-increment/cm5eguhae032r838owfplgsi3?company=Google" target="_blank">Leetcode 1381. Design a Stack With Increment Operation</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (6 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d2r0"> <a href="911-emergency-response.html" target="_blank">FDE Case Study #1 · 911 Emergency</a></label></li>
+      <li><label><input type="checkbox" data-key="d2r1"> <a href="logistics-ai-rerouting.html" target="_blank">FDE Case Study #2 · Logistics AI Rerouting</a></label></li>
+      <li><label><input type="checkbox" data-key="d2r2"> <a href="healthcare-12pct-adoption.html" target="_blank">FDE Case Study #3 · Healthcare 12% Adoption</a></label></li>
+      <li><label><input type="checkbox" data-key="d2r3"> <a href="legacy-erp-no-api.html" target="_blank">FDE Case Study #4 · Legacy ERP Without API</a></label></li>
+      <li><label><input type="checkbox" data-key="d2r4"> <a href="zhenti-032-bank-3-acquired-fraud-systems.html" target="_blank">真题 Q32 · 银行 3 套反欺诈系统</a></label></li>
+      <li><label><input type="checkbox" data-key="d2r5"> <a href="zhenti-033-pharma-ai-with-ip-compliance.html" target="_blank">真题 Q33 · 药企 IP / 合规</a></label></li>
+    </ul>
+  </details>
+  
+    <h4>🛠 Hands-on / 🎤 Mock / 📝 复盘</h4>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d2x0"> 🎤 G·O·D·D·S 录音: 拿真题 Q32 走一遍 5 维度 + 5 步, 回放找弱点</label></li>
+    </ul>
+
+  <button class="reset-day" data-day="2">🗑 Reset Day 2</button>
+</section>
+<section class="day" data-day="3">
+  <h2><span class="day-num">Day 3</span> · AI Specialty 5 道 + Q-P2 + Q-P3</h2>
+  <p class="theme-sub">AI 必杀技 + Gemini RAG 落地</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d3"></div></div>
+  <p class="progress-text"><span id="prog-text-d3">0 / 25</span></p>
+
+  <details open>
+    <summary>💻 Coding (17 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c35"> <span class="star">⭐</span> <span class="rank">#35</span> <span class="reports">16rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/number-unequal-triplets/cm5eguhah03x5838orhzbxjqw?company=Google" target="_blank">Leetcode 2475. Number of Unequal Triplets in Array</a></label></li>
+      <li><label><input type="checkbox" data-key="c36"> <span class="star"></span> <span class="rank">#36</span> <span class="reports">1rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/kth-smallest-bst/cm5eh7nrh04te838oog2p509p?company=Google" target="_blank">Leetcode 230. Kth Smallest Element in a BST</a></label></li>
+      <li><label><input type="checkbox" data-key="c37"> <span class="star">⭐</span> <span class="rank">#37</span> <span class="reports">3rep</span> <span class="algo">[Graph]</span> <a href="https://www.hellointerview.com/community/questions/nodes-value-one/cm5eguhah03wb838o5od801hg?company=Google" target="_blank">Leetcode 2445. Number of Nodes With Value One</a></label></li>
+      <li><label><input type="checkbox" data-key="c38"> <span class="star">•</span> <span class="rank">#38</span> <span class="reports">2rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/remove-bad-pairs/cm6jw3mad004ddar9au16elts?company=Google" target="_blank">Remove Bad Pairs from a String</a></label></li>
+      <li><label><input type="checkbox" data-key="c39"> <span class="star">•</span> <span class="rank">#39</span> <span class="reports">2rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/moving-average-stream/cm5eh7nri04wm838ohohaia3c?company=Google" target="_blank">Leetcode 346. Moving Average from Data Stream</a></label></li>
+      <li><label><input type="checkbox" data-key="c40"> <span class="star"></span> <span class="rank">#40</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/burst-balloons/cm5eh7nrh04vo838okqn1o6mb?company=Google" target="_blank">Leetcode 312. Burst Balloons</a></label></li>
+      <li><label><input type="checkbox" data-key="c41"> <span class="star"></span> <span class="rank">#41</span> <span class="reports">1rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/substring-concatenation-words/cm5eh7nrh04nu838o97mif3bb?company=Google" target="_blank">Leetcode 30. Substring with Concatenation of All Words</a></label></li>
+      <li><label><input type="checkbox" data-key="c42"> <span class="star">•</span> <span class="rank">#42</span> <span class="reports">2rep</span> <span class="algo">[Greedy]</span> <a href="https://www.hellointerview.com/community/questions/interns-flats-greedy/cm6jw06jt0007dar91f78lua0?company=Google" target="_blank">Problem About Interns and Flats Using a Greedy Approach</a></label></li>
+      <li><label><input type="checkbox" data-key="c43"> <span class="star"></span> <span class="rank">#43</span> <span class="reports">1rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/distinct-difference-array/cm5eguhah042k838onxx6sl6i?company=Google" target="_blank">Leetcode 2670. Find the Distinct Difference Array</a></label></li>
+      <li><label><input type="checkbox" data-key="c44"> <span class="star">•</span> <span class="rank">#44</span> <span class="reports">2rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/mk-average/cm5eguhaf03f3838oucezph3i?company=Google" target="_blank">Leetcode 1825. Finding MK Average</a></label></li>
+      <li><label><input type="checkbox" data-key="c45"> <span class="star">⭐</span> <span class="rank">#45</span> <span class="reports">4rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/leetcode-pour-water/cm5eguhac02ld838ohbze23r0?company=Google" target="_blank">Leetcode 755. Pour Water</a></label></li>
+      <li><label><input type="checkbox" data-key="c46"> <span class="star"></span> <span class="rank">#46</span> <span class="reports">1rep</span> <span class="algo">[DFS]</span> <a href="https://www.hellointerview.com/community/questions/reconstruct-itinerary/cm5eh7nrh04w8838oqbbhjhi0?company=Google" target="_blank">Leetcode 332. Reconstruct Itinerary</a></label></li>
+      <li><label><input type="checkbox" data-key="c47"> <span class="star">•</span> <span class="rank">#47</span> <span class="reports">2rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/playlist-shuffle/cm6jwvh80005vui4b4epro213?company=Google" target="_blank">Song Shuffler</a></label></li>
+      <li><label><input type="checkbox" data-key="c48"> <span class="star">•</span> <span class="rank">#48</span> <span class="reports">2rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/minimum-cost-cooking-time/cm5eguhag03og838o1xo4leeg?company=Google" target="_blank">Leetcode 2162. Minimum Cost to Set Cooking Time</a></label></li>
+      <li><label><input type="checkbox" data-key="c49"> <span class="star"></span> <span class="rank">#49</span> <span class="reports">1rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/separate-squares-i/55ab7839-b63b-494b-b842-d3bf74dde1c9?company=Google" target="_blank">Leetcode 3453. Separate Squares I</a></label></li>
+      <li><label><input type="checkbox" data-key="c50"> <span class="star"></span> <span class="rank">#50</span> <span class="reports">1rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/max-points-line/cm5eh7nrh04r5838o6xrbsdjd?company=Google" target="_blank">Leetcode 149. Max Points on a Line</a></label></li>
+      <li><label><input type="checkbox" data-key="c51"> <span class="star">⭐</span> <span class="rank">#51</span> <span class="reports">3rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/graph-binary-tree/cm6jwv6ar0033ui4bpqke1e4w?company=Google" target="_blank">Convert Graph to Binary Tree with Alternating Colors</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (7 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d3r0"> <a href="rag-vs-ft-vs-pe.html" target="_blank">FDE AI Deep Dive #4 · RAG vs FT vs PE</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r1"> <a href="how-know-ai-working.html" target="_blank">FDE AI Deep Dive #5 · How Know AI Working</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r2"> <a href="gfde-t2-chunking-decision.html" target="_blank">Google FDE T2.2 · Chunking Decision Tree</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r3"> <a href="gfde-t1-tool-output-validation.html" target="_blank">Google FDE T1.5 · Tool Output Validation + Prompt Injection</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r4"> <a href="zhenti-043-production-llm-guardrails.html" target="_blank">真题 Q43 · Production LLM Guardrails</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r5"> <a href="zhenti-p02-workspace-executive-assistant-agent.html" target="_blank">🔮 Q-P2 · Workspace Executive Assistant</a></label></li>
+      <li><label><input type="checkbox" data-key="d3r6"> <a href="zhenti-p03-2m-context-gemini-legal.html" target="_blank">🔮 Q-P3 · Gemini 2M Long-context Legal</a></label></li>
+    </ul>
+  </details>
+  
+    <h4>🛠 Hands-on / 🎤 Mock / 📝 复盘</h4>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d3x0"> 🛠 Hands-on: Vertex AI Search + Gemini grounding 写 10 行 RAG demo (45 min)</label></li>
+    </ul>
+
+  <button class="reset-day" data-day="3">🗑 Reset Day 3</button>
+</section>
+<section class="day" data-day="4">
+  <h2><span class="day-num">Day 4</span> · System Design + Q-P4 迁移</h2>
+  <p class="theme-sub">HIPAA / F500 / 1M QPS 等架构 + 客户迁移</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d4"></div></div>
+  <p class="progress-text"><span id="prog-text-d4">0 / 23</span></p>
+
+  <details open>
+    <summary>💻 Coding (17 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c52"> <span class="star">⭐</span> <span class="rank">#52</span> <span class="reports">3rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/colored-tree-root/cm6jwv68v002zui4bm2qok4b6?company=Google" target="_blank">Find Root Node in Colored Tree with Pattern Constraints</a></label></li>
+      <li><label><input type="checkbox" data-key="c53"> <span class="star"></span> <span class="rank">#53</span> <span class="reports">1rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/evaluate-bracket-pairs/cm5eguhaf03el838orjk694tw?company=Google" target="_blank">Leetcode 1807. Evaluate the Bracket Pairs of a String</a></label></li>
+      <li><label><input type="checkbox" data-key="c54"> <span class="star"></span> <span class="rank">#54</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/array-hopping-score/cm5eguhaj04hf838os0d60q68?company=Google" target="_blank">Leetcode 3205. Maximum Array Hopping Score I</a></label></li>
+      <li><label><input type="checkbox" data-key="c55"> <span class="star"></span> <span class="rank">#55</span> <span class="reports">1rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/change-root-binary-tree/cm5eguhaf03ao838o9lw323kn?company=Google" target="_blank">Leetcode 1666. Change the Root of a Binary Tree</a></label></li>
+      <li><label><input type="checkbox" data-key="c56"> <span class="star"></span> <span class="rank">#56</span> <span class="reports">1rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/least-unique-integers/cm5eguhae035j838oyf44h695?company=Google" target="_blank">Leetcode 1481. Least Number of Unique Integers after K Removals</a></label></li>
+      <li><label><input type="checkbox" data-key="c57"> <span class="star"></span> <span class="rank">#57</span> <span class="reports">1rep</span> <span class="algo">[Backtracking]</span> <a href="https://www.hellointerview.com/community/questions/android-unlock-patterns/cm5eh7nri04wr838o909fw8eh?company=Google" target="_blank">Leetcode 351. Android Unlock Patterns</a></label></li>
+      <li><label><input type="checkbox" data-key="c58"> <span class="star">•</span> <span class="rank">#58</span> <span class="reports">2rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/substring-map-backtracking/cm6jwxvny00juui4b1f03avuw?company=Google" target="_blank">String Template Substitution with Variable Replacement</a></label></li>
+      <li><label><input type="checkbox" data-key="c59"> <span class="star">•</span> <span class="rank">#59</span> <span class="reports">2rep</span> <span class="algo">[Prefix Sum]</span> <a href="https://www.hellointerview.com/community/questions/pivot-index/cm5eguhac02ki838ogxhczapt?company=Google" target="_blank">Leetcode 724. Find Pivot Index</a></label></li>
+      <li><label><input type="checkbox" data-key="c60"> <span class="star">•</span> <span class="rank">#60</span> <span class="reports">2rep</span> <span class="algo">[Backtracking]</span> <a href="https://www.hellointerview.com/community/questions/word-search-board/cm5eh7nrh04p7838oqkjadex3?company=Google" target="_blank">Leetcode 79. Word Search</a></label></li>
+      <li><label><input type="checkbox" data-key="c61"> <span class="star"></span> <span class="rank">#61</span> <span class="reports">1rep</span> <span class="algo">[Hash Set]</span> <a href="https://www.hellointerview.com/community/questions/repeated-dna-sequences/cm5eh7nrh04s7838o0yeutvb3?company=Google" target="_blank">Leetcode 187. Repeated DNA Sequences</a></label></li>
+      <li><label><input type="checkbox" data-key="c62"> <span class="star"></span> <span class="rank">#62</span> <span class="reports">1rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/text-editor-design/cm5eguhag03s6838omwgkgle3?company=Google" target="_blank">Leetcode 2296. Design a Text Editor</a></label></li>
+      <li><label><input type="checkbox" data-key="c63"> <span class="star">⭐</span> <span class="rank">#63</span> <span class="reports">3rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/count-good-triplets/cm5eguhae0370838ohe83yfdd?company=Google" target="_blank">Leetcode 1534. Count Good Triplets</a></label></li>
+      <li><label><input type="checkbox" data-key="c64"> <span class="star">•</span> <span class="rank">#64</span> <span class="reports">2rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/employee-free-time/cm5eguhac02lh838otstq4n40?company=Google" target="_blank">Leetcode 759. Employee Free Time</a></label></li>
+      <li><label><input type="checkbox" data-key="c65"> <span class="star">•</span> <span class="rank">#65</span> <span class="reports">2rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/read-n-characters-read4/cm5eh7nrh04rd838oagyvu2zw?company=Google" target="_blank">Leetcode 157. Read N Characters Given Read4</a></label></li>
+      <li><label><input type="checkbox" data-key="c66"> <span class="star">•</span> <span class="rank">#66</span> <span class="reports">2rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/binary-tree-leaves/cm5eh7nri04x6838o1f4f8f5b?company=Google" target="_blank">Leetcode 366. Find Leaves of Binary Tree</a></label></li>
+      <li><label><input type="checkbox" data-key="c67"> <span class="star">•</span> <span class="rank">#67</span> <span class="reports">2rep</span> <span class="algo">[Topological Sort]</span> <a href="https://www.hellointerview.com/community/questions/recipes-supplies/cm5eguhag03n5838oxu478f1d?company=Google" target="_blank">Leetcode 2115. Find All Possible Recipes from Given Supplies</a></label></li>
+      <li><label><input type="checkbox" data-key="c68"> <span class="star">•</span> <span class="rank">#68</span> <span class="reports">2rep</span> <span class="algo">[Stack]</span> <a href="https://www.hellointerview.com/community/questions/valid-parentheses/cm5eh7nrh04nk838on7tqow3r?company=Google" target="_blank">Leetcode 20. Valid Parentheses</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (6 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d4r0"> <a href="zhenti-021-hipaa-vpc-rag-50m-docs.html" target="_blank">真题 Q21 · HIPAA + 5000 万文档 RAG VPC</a></label></li>
+      <li><label><input type="checkbox" data-key="d4r1"> <a href="zhenti-022-12-source-ingest-pipeline.html" target="_blank">真题 Q22 · 12 个零散零售数据源 ingest</a></label></li>
+      <li><label><input type="checkbox" data-key="d4r2"> <a href="zhenti-023-fortune-500-aws-vpc-okta-snowflake.html" target="_blank">真题 Q23 · F500 AWS VPC + Okta + Snowflake</a></label></li>
+      <li><label><input type="checkbox" data-key="d4r3"> <a href="gfde-t3-high-throughput.html" target="_blank">Google FDE T3.3 · 1M QPS LLM Serving</a></label></li>
+      <li><label><input type="checkbox" data-key="d4r4"> <a href="gfde-t3-observability.html" target="_blank">Google FDE T3.4 · Agent Observability</a></label></li>
+      <li><label><input type="checkbox" data-key="d4r5"> <a href="zhenti-p04-migrate-openai-to-gemini.html" target="_blank">🔮 Q-P4 · F500 OpenAI → Gemini 迁移</a></label></li>
+    </ul>
+  </details>
+  
+
+  <button class="reset-day" data-day="4">🗑 Reset Day 4</button>
+</section>
+<section class="day" data-day="5">
+  <h2><span class="day-num">Day 5</span> · Production / Client Sim + Q-P5 + Mock #1</h2>
+  <p class="theme-sub">客户压力 + 事故响应 + 第一次 mock</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d5"></div></div>
+  <p class="progress-text"><span id="prog-text-d5">0 / 28</span></p>
+
+  <details open>
+    <summary>💻 Coding (17 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c69"> <span class="star"></span> <span class="rank">#69</span> <span class="reports">1rep</span> <span class="algo">[Queue]</span> <a href="https://www.hellointerview.com/community/questions/most-recently-used-queue/cm5eguhaf03d6838oe6bqla6h?company=Google" target="_blank">Leetcode 1756. Design Most Recently Used Queue</a></label></li>
+      <li><label><input type="checkbox" data-key="c70"> <span class="star"></span> <span class="rank">#70</span> <span class="reports">1rep</span> <span class="algo">[Matrix]</span> <a href="https://www.hellointerview.com/community/questions/safest-path-grid/cm5eguhai046i838o6759xdrx?company=Google" target="_blank">Leetcode 2812. Find the Safest Path in a Grid</a></label></li>
+      <li><label><input type="checkbox" data-key="c71"> <span class="star"></span> <span class="rank">#71</span> <span class="reports">1rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/count-complete-tree-nodes/cm5eh7nrh04t6838oiumjgavv?company=Google" target="_blank">Leetcode 222. Count Complete Tree Nodes</a></label></li>
+      <li><label><input type="checkbox" data-key="c72"> <span class="star"></span> <span class="rank">#72</span> <span class="reports">1rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/leetcode-decode-string/cm5eh7nri04xy838oo3y3ra9b?company=Google" target="_blank">Leetcode 394. Decode String</a></label></li>
+      <li><label><input type="checkbox" data-key="c73"> <span class="star"></span> <span class="rank">#73</span> <span class="reports">1rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/rectangle-area/cm5eh7nrh04t7838o0xfc0y2q?company=Google" target="_blank">Leetcode 223. Rectangle Area</a></label></li>
+      <li><label><input type="checkbox" data-key="c74"> <span class="star"></span> <span class="rank">#74</span> <span class="reports">1rep</span> <span class="algo">[Backtracking]</span> <a href="https://www.hellointerview.com/community/questions/partition-subset-sum/cm5eguhab02by838oo9ii95gh?company=Google" target="_blank">Leetcode 416. Partition Equal Subset Sum</a></label></li>
+      <li><label><input type="checkbox" data-key="c75"> <span class="star"></span> <span class="rank">#75</span> <span class="reports">1rep</span> <span class="algo">[Graph]</span> <a href="https://www.hellointerview.com/community/questions/shortest-common-supersequence/cm5eguhad02uq838o25eqv0mb?company=Google" target="_blank">Leetcode 1092. Shortest Common Supersequence</a></label></li>
+      <li><label><input type="checkbox" data-key="c76"> <span class="star"></span> <span class="rank">#76</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/longest-increasing-subsequence/cm5eguhah03v9838oz609h5ji?company=Google" target="_blank">Leetcode 2407. Longest Increasing Subsequence II</a></label></li>
+      <li><label><input type="checkbox" data-key="c77"> <span class="star"></span> <span class="rank">#77</span> <span class="reports">1rep</span> <span class="algo">[Union Find]</span> <a href="https://www.hellointerview.com/community/questions/sentence-similarity-2/cm5eguhac02kv838o77sz29i5?company=Google" target="_blank">Leetcode 737. Sentence Similarity II</a></label></li>
+      <li><label><input type="checkbox" data-key="c78"> <span class="star"></span> <span class="rank">#78</span> <span class="reports">1rep</span> <span class="algo">[Array]</span> <a href="https://www.hellointerview.com/community/questions/array-objects-matrix/cm5eguhah042p838o884xc7cw?company=Google" target="_blank">Leetcode 2675. Array of Objects to Matrix</a></label></li>
+      <li><label><input type="checkbox" data-key="c79"> <span class="star"></span> <span class="rank">#79</span> <span class="reports">1rep</span> <span class="algo">[Tree]</span> <a href="https://www.hellointerview.com/community/questions/nary-tree-diameter/cm5eguhae036o838o2n7mv9fa?company=Google" target="_blank">Leetcode 1522. Diameter of N-Ary Tree</a></label></li>
+      <li><label><input type="checkbox" data-key="c80"> <span class="star"></span> <span class="rank">#80</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/minimum-total-distance/cm5eguhah03wt838ol6q3ppiz?company=Google" target="_blank">Leetcode 2463. Minimum Total Distance Traveled</a></label></li>
+      <li><label><input type="checkbox" data-key="c81"> <span class="star">•</span> <span class="rank">#81</span> <span class="reports">2rep</span> <span class="algo">[Intervals]</span> <a href="https://www.hellointerview.com/community/questions/my-calendar/cm5eguhac02kn838olz4c4s7v?company=Google" target="_blank">Leetcode 729. My Calendar I</a></label></li>
+      <li><label><input type="checkbox" data-key="c82"> <span class="star"></span> <span class="rank">#82</span> <span class="reports">1rep</span> <span class="algo">[Heap]</span> <a href="https://www.hellointerview.com/community/questions/reschedule-meetings-for-maximum-free-time-i/e1ec9dca-fccd-4488-8ecb-890988d8772e?company=Google" target="_blank">Leetcode 3439. Reschedule Meetings for Maximum Free Time I</a></label></li>
+      <li><label><input type="checkbox" data-key="c83"> <span class="star"></span> <span class="rank">#83</span> <span class="reports">1rep</span> <span class="algo">[Stack]</span> <a href="https://www.hellointerview.com/community/questions/basic-calculator-3/cm5eguhac02lu838o3auubn93?company=Google" target="_blank">Leetcode 772. Basic Calculator III</a></label></li>
+      <li><label><input type="checkbox" data-key="c84"> <span class="star">⭐</span> <span class="rank">#84</span> <span class="reports">5rep</span> <span class="algo">[Binary Search]</span> <a href="https://www.hellointerview.com/community/questions/binary-search/cm5eguhac02jy838owzhaba8w?company=Google" target="_blank">Leetcode 704. Binary Search</a></label></li>
+      <li><label><input type="checkbox" data-key="c85"> <span class="star"></span> <span class="rank">#85</span> <span class="reports">1rep</span> <span class="algo">[Hash Map]</span> <a href="https://www.hellointerview.com/community/questions/arithmetic-triplets-count/cm5eguhah03u5838ob839c3fi?company=Google" target="_blank">Leetcode 2367. Number of Arithmetic Triplets</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (9 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d5r0"> <a href="live-demo-fails-execs.html" target="_blank">FDE Client Sim #1 · Demo Fails Before Execs</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r1"> <a href="cfo-model-variability.html" target="_blank">FDE Client Sim #4 · CFO Variable Model</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r2"> <a href="it-blocks-security.html" target="_blank">FDE Client Sim #5 · IT Blocks Security</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r3"> <a href="zhenti-048-third-party-api-intermittent-timeout.html" target="_blank">真题 Q48 · 3rd-party API timeout</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r4"> <a href="zhenti-049-2am-incident-response.html" target="_blank">真题 Q49 · 凌晨 2 点宕机响应</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r5"> <a href="zhenti-050-emergency-deadline-tradeoffs.html" target="_blank">真题 Q50 · 紧急 deadline 妥协</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r6"> <a href="zhenti-051-p0-postmortem-customer-env.html" target="_blank">真题 Q51 · P0 postmortem</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r7"> <a href="zhenti-052-diagnose-model-getting-worse.html" target="_blank">真题 Q52 · 模型越来越差 / drift</a></label></li>
+      <li><label><input type="checkbox" data-key="d5r8"> <a href="zhenti-p05-internal-gemini-platform-50-teams.html" target="_blank">🔮 Q-P5 · Internal Gemini Platform 50 teams</a></label></li>
+    </ul>
+  </details>
+  
+    <h4>🛠 Hands-on / 🎤 Mock / 📝 复盘</h4>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d5x0"> 🎤 Mock #1: 找朋友 mock System Design 题 (45 min, 真实 setting)</label></li>
+      <li><label><input type="checkbox" data-key="d5x1"> 🎤 录音回放找问题</label></li>
+    </ul>
+
+  <button class="reset-day" data-day="5">🗑 Reset Day 5</button>
+</section>
+<section class="day" data-day="6">
+  <h2><span class="day-num">Day 6</span> · 独有 Tech + 收尾 + Mock #2 + Pricing/英语</h2>
+  <p class="theme-sub">覆盖独有题 + 第二次 mock + 面试当天暖嗓</p>
+  <div class="progress-bar"><div class="progress-fill" id="prog-d6"></div></div>
+  <p class="progress-text"><span id="prog-text-d6">0 / 24</span></p>
+
+  <details open>
+    <summary>💻 Coding (15 题)</summary>
+    <ul class="checklist coding-list">
+      <li><label><input type="checkbox" data-key="c86"> <span class="star">•</span> <span class="rank">#86</span> <span class="reports">2rep</span> <span class="algo">[Sweep Line]</span> <a href="https://www.hellointerview.com/community/questions/overlapping-shifts/cm5eguhaj04j0838ok58kuv0h?company=Google" target="_blank">Leetcode 3262. Find Overlapping Shifts</a></label></li>
+      <li><label><input type="checkbox" data-key="c87"> <span class="star"></span> <span class="rank">#87</span> <span class="reports">1rep</span> <span class="algo">[Topological Sort]</span> <a href="https://www.hellointerview.com/community/questions/parallel-courses-3/cm5eguhag03lc838o6aqwvka2?company=Google" target="_blank">Leetcode 2050. Parallel Courses III</a></label></li>
+      <li><label><input type="checkbox" data-key="c88"> <span class="star"></span> <span class="rank">#88</span> <span class="reports">1rep</span> <span class="algo">[String]</span> <a href="https://www.hellointerview.com/community/questions/text-justification/cm5eh7nrh04ow838ouz9m4tic?company=Google" target="_blank">Leetcode 68. Text Justification</a></label></li>
+      <li><label><input type="checkbox" data-key="c89"> <span class="star"></span> <span class="rank">#89</span> <span class="reports">1rep</span> <span class="algo">[BFS]</span> <a href="https://www.hellointerview.com/community/questions/shortest-path-nodes/cm5eguhac02nx838ooq8ydo7c?company=Google" target="_blank">Leetcode 847. Shortest Path Visiting All Nodes</a></label></li>
+      <li><label><input type="checkbox" data-key="c90"> <span class="star"></span> <span class="rank">#90</span> <span class="reports">1rep</span> <span class="algo">[Design]</span> <a href="https://www.hellointerview.com/community/questions/flatten-2d-vector/cm5eh7nrh04tz838oubj3a5lq?company=Google" target="_blank">Leetcode 251. Flatten 2D Vector</a></label></li>
+      <li><label><input type="checkbox" data-key="c91"> <span class="star"></span> <span class="rank">#91</span> <span class="reports">1rep</span> <span class="algo">[Greedy]</span> <a href="https://www.hellointerview.com/community/questions/minimum-swaps-strings/cm5eguhad02z1838omvi6yuw0?company=Google" target="_blank">Leetcode 1247. Minimum Swaps to Make Strings Equal</a></label></li>
+      <li><label><input type="checkbox" data-key="c92"> <span class="star"></span> <span class="rank">#92</span> <span class="reports">1rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/stone-game/cm5eguhac02or838ogmb55u5u?company=Google" target="_blank">Leetcode 877. Stone Game</a></label></li>
+      <li><label><input type="checkbox" data-key="c93"> <span class="star">⭐</span> <span class="rank">#93</span> <span class="reports">3rep</span> <span class="algo">[Math]</span> <a href="https://www.hellointerview.com/community/questions/best-meeting-point/cm5eh7nrh04v8838ow0kepjo8?company=Google" target="_blank">Leetcode 296. Best Meeting Point</a></label></li>
+      <li><label><input type="checkbox" data-key="c96"> <span class="star">•</span> <span class="rank">#96</span> <span class="reports">2rep</span> <span class="algo">[Graph]</span> <a href="https://www.hellointerview.com/community/questions/restricted-paths-count/cm5eguhaf03e0838oscunecoj?company=Google" target="_blank">Leetcode 1786. Number of Restricted Paths From First to Last Node</a></label></li>
+      <li><label><input type="checkbox" data-key="c102"> <span class="star">•</span> <span class="rank">#102</span> <span class="reports">2rep</span> <span class="algo">[Greedy]</span> <a href="https://www.hellointerview.com/community/questions/job-scheduling-implementation/cm6k0flr7000nyis4gwnbys17?company=Google" target="_blank">Job Scheduling Algorithms Implementation</a></label></li>
+      <li><label><input type="checkbox" data-key="c105"> <span class="star">•</span> <span class="rank">#105</span> <span class="reports">2rep</span> <span class="algo">[DP]</span> <a href="https://www.hellointerview.com/community/questions/coin-change/cm5eh7nrh04vy838o09bz39wf?company=Google" target="_blank">Leetcode 322. Coin Change</a></label></li>
+      <li><label><input type="checkbox" data-key="c107"> <span class="star">•</span> <span class="rank">#107</span> <span class="reports">2rep</span> <span class="algo">[Union Find]</span> <a href="https://www.hellointerview.com/community/questions/earliest-moment-friends/cm5eguhad02uz838o1kqrsex3?company=Google" target="_blank">Leetcode 1101. The Earliest Moment When Everyone Become Friends</a></label></li>
+      <li><label><input type="checkbox" data-key="c108"> <span class="star">•</span> <span class="rank">#108</span> <span class="reports">2rep</span> <span class="algo">[Stack]</span> <a href="https://www.hellointerview.com/community/questions/basic-calculator-770/cm5eguhac02ls838o6qregta8?company=Google" target="_blank">Leetcode 770. Basic Calculator IV</a></label></li>
+      <li><label><input type="checkbox" data-key="c121"> <span class="star">⭐</span> <span class="rank">#121</span> <span class="reports">3rep</span> <span class="algo">[Intervals]</span> <a href="https://www.hellointerview.com/community/questions/count-days-without-meetings/cm5eguhaj04gf838op04okxxu?company=Google" target="_blank">Leetcode 3169. Count Days Without Meetings</a></label></li>
+      <li><label><input type="checkbox" data-key="c130"> <span class="star">•</span> <span class="rank">#130</span> <span class="reports">2rep</span> <span class="algo">[Hash Set]</span> <a href="https://www.hellointerview.com/community/questions/duplicates-order-preservation/cm6jx0k16014kui4bgtt1awf7?company=Google" target="_blank">Remove Duplicates with Order Preservation</a></label></li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>📖 Read (6 篇 deep dive, 去重版)</summary>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d6r0"> <a href="oauth-crm-platform-integration.html" target="_blank">FDE Technical #1 · OAuth 2.0 CRM Integration</a></label></li>
+      <li><label><input type="checkbox" data-key="d6r1"> <a href="webhook-flaky-clients.html" target="_blank">FDE Technical #5 · Reliable Webhook (Flaky Clients)</a></label></li>
+      <li><label><input type="checkbox" data-key="d6r2"> <a href="debug-staging-vs-prod.html" target="_blank">FDE Technical #2 · Debug Staging vs Prod</a></label></li>
+      <li><label><input type="checkbox" data-key="d6r3"> <a href="six-weeks-in-three-days.html" target="_blank">FDE Client Sim #2 · 6-Week in 3 Days</a></label></li>
+      <li><label><input type="checkbox" data-key="d6r4"> <a href="gfde-2026-llm-pricing.html" target="_blank">💵 Google FDE Pricing — Gemini / Claude / GPT</a></label></li>
+      <li><label><input type="checkbox" data-key="d6r5"> <a href="gfde-english-terminology.html" target="_blank">📣 Google FDE English Terminology + IPA</a></label></li>
+    </ul>
+  </details>
+  
+    <h4>🛠 Hands-on / 🎤 Mock / 📝 复盘</h4>
+    <ul class="checklist">
+      <li><label><input type="checkbox" data-key="d6x0"> 🎤 Mock #2: Decomposition 案例题 (60 min)</label></li>
+      <li><label><input type="checkbox" data-key="d6x1"> 📝 复盘: 6 天笔记里所有 ❌ 题盲写一遍</label></li>
+      <li><label><input type="checkbox" data-key="d6x2"> 📚 重读 Day 1 那 5 个 Overview cheat sheet</label></li>
+    </ul>
+
+  <button class="reset-day" data-day="6">🗑 Reset Day 6</button>
+</section>
+
+<div style="text-align: center; padding: 30px 0;">
+  <button class="reset-day" id="reset-all" style="font-size: 14px; padding: 10px 20px;">🗑 Reset 全部进度</button>
+</div>
+
+</main>
+
+<script>
+// LocalStorage key
+const STORE = 'fde-6day-checklist-v1';
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){ const t = document.documentElement.getAttribute('data-theme'); btn.textContent = t === 'dark' ? '☀️' : '🌙'; }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+
+// Restore + persist
+function getState() {
+  try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch(e) { return {}; }
+}
+function setState(s) {
+  try { localStorage.setItem(STORE, JSON.stringify(s)); } catch(e) {}
+}
+const state = getState();
+document.querySelectorAll('input[type="checkbox"][data-key]').forEach(cb => {
+  const k = cb.dataset.key;
+  if (state[k]) cb.checked = true;
+  cb.addEventListener('change', () => {
+    const s = getState();
+    if (cb.checked) s[cb.dataset.key] = 1;
+    else delete s[cb.dataset.key];
+    setState(s);
+    updateProgress();
+  });
+});
+
+function updateProgress() {
+  const allBoxes = document.querySelectorAll('input[type="checkbox"][data-key]');
+  const total = allBoxes.length;
+  const done = Array.from(allBoxes).filter(b => b.checked).length;
+  document.getElementById('prog-text-total').textContent = `${done} / ${total}`;
+  document.getElementById('prog-pct').textContent = total ? Math.round(done * 100 / total) + '%' : '0%';
+  document.getElementById('prog-fill') ?? null;
+  document.getElementById('prog-total').style.width = (total ? (done * 100 / total) : 0) + '%';
+
+  // Per-day
+  for (let d = 1; d <= 6; d++) {
+    const dayBoxes = document.querySelectorAll(`.day[data-day="${d}"] input[type="checkbox"][data-key]`);
+    const t = dayBoxes.length;
+    const c = Array.from(dayBoxes).filter(b => b.checked).length;
+    document.getElementById(`prog-text-d${d}`).textContent = `${c} / ${t}`;
+    document.getElementById(`prog-d${d}`).style.width = (t ? (c * 100 / t) : 0) + '%';
+  }
+}
+updateProgress();
+
+// Reset per day
+document.querySelectorAll('.reset-day[data-day]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const d = btn.dataset.day;
+    if (!confirm(`Reset Day ${d}?`)) return;
+    document.querySelectorAll(`.day[data-day="${d}"] input[type="checkbox"][data-key]`).forEach(cb => {
+      cb.checked = false;
+      const s = getState(); delete s[cb.dataset.key]; setState(s);
+    });
+    updateProgress();
+  });
+});
+document.getElementById('reset-all').addEventListener('click', () => {
+  if (!confirm('Reset 全部 6 天进度?')) return;
+  localStorage.removeItem(STORE);
+  document.querySelectorAll('input[type="checkbox"][data-key]').forEach(cb => cb.checked = false);
+  updateProgress();
+});
+</script>
+</body>
+</html>
