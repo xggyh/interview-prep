@@ -1,0 +1,2118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q42 · [AI 专项技术] 除了「看起来对」, 怎么评估 LLM 系统? (自动指标 + 分层抽样人工评审 + 持续用户反馈, LLM-as-judge 配 rubric) · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q42 · [AI 专项技术] 除了「看起来对」, 怎么评估 LLM 系统? (自动指标 + 分层抽样人工评审 + 持续用户反馈, LLM-as-judge 配 rubric)</div>
+  <h1>Q42 · [AI 专项技术] 除了「看起来对」, 怎么评估 LLM 系统? (自动指标 + 分层抽样人工评审 + 持续用户反馈, LLM-as-judge 配 rubric)</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-042-eval-llm-beyond-looks-right.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-042-eval-llm-beyond-looks-right.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q42 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q42 · How do you evaluate an LLM beyond "it looks right"?</h3>
+<blockquote><p>"Your model 'looks right' in dev. <strong>How do you actually know it works</strong> when you ship it to a customer's production environment? Walk me through your eval methodology — automated metrics, LLM-as-judge, human review, business KPI. Be specific about what you'd build in week 1 vs month 3."</p></blockquote>
+<p><strong>Round</strong>: AI Specialty (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — 分水岭 question. "你怎么知道它真的 работает"</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>表面是 eval 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
+<ol><li><strong>Offline / Online / Production 三层 eval pyramid</strong> — 知道 single metric 不够</li><li><strong>Automated metrics 局限</strong> — 知道 BLEU / ROUGE 对 generation 几乎无用</li><li><strong>LLM-as-judge methodology</strong> — 知道 calibration (Cohen's kappa &gt; 0.6) + bias risks</li><li><strong>Human-in-the-loop scaling</strong> — 怎么 scale 不靠 100% 人审</li><li><strong>Drift detection</strong> — 不只是 launch-day metric, 是持续 monitoring</li><li><strong>Per-slice metric</strong> — overall fine 但 worst slice 暴雷</li><li><strong>Business KPI vs technical metric</strong> — proxy vs truth</li><li><strong>Production sampling → golden set refresh</strong> loop — eval set 不是 static</li></ol>
+<p>不考「BLEU 是什么」, 考「你 own 过 production AI, sleep at night 靠什么」.</p>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Clarify 5 things</strong></td><td>3 min</td><td>Use case / ground truth / volume / stakes / existing monitoring</td><td>"Before I prescribe — what's the use case? Is there ground truth? What's the volume? Stakes?"</td></tr><tr><td>2</td><td><strong>3-layer pyramid</strong></td><td>5 min</td><td>Offline / Online A/B / Production monitoring</td><td>"I think about it as a pyramid — 3 layers, each catches different failures."</td></tr><tr><td>3</td><td><strong>Why 'looks right' fails</strong></td><td>3 min</td><td>5 failure modes (Goodhart, drift, slice, biz proxy mismatch, eval debt)</td><td>"Let me show 5 ways 'looks right' lies — Goodhart, distribution shift, masked slice failure, proxy/truth mismatch, eval debt."</td></tr><tr><td>4</td><td><strong>Offline: golden set + auto + LLM-judge + spot</strong></td><td>7 min</td><td>Stratified set, auto metrics, LLM-judge calibration</td><td>"Week 1 deliverable: 200-sample golden set stratified by intent / language / difficulty, with LLM-judge calibrated to kappa &gt; 0.6."</td></tr><tr><td>5</td><td><strong>LLM-as-judge methodology</strong></td><td>5 min</td><td>Calibration, ensemble, pairwise, anti-patterns</td><td>"Judge methodology has 5 non-negotiables — different model, kappa validated, ensemble for high-stakes, pairwise &gt; absolute, recalibrate quarterly."</td></tr><tr><td>6</td><td><strong>Online A/B + business metric</strong></td><td>5 min</td><td>Canary, phased rollout, statistical significance</td><td>"Online: 1% → 5% → 25% → 100% phased. Business metric is the real truth. Auto-rollback on SLO breach."</td></tr><tr><td>7</td><td><strong>Production monitoring + drift</strong></td><td>5 min</td><td>Always-on dashboard, per-slice, drift detection</td><td>"Always-on: latency / error / quality / drift / business — 5 sections. Per-tenant per-language per-region slicing."</td></tr><tr><td>8</td><td><strong>Continuous refresh</strong></td><td>3 min</td><td>Production sampling → golden set updates</td><td>"Golden set is dead within 3 months without refresh. Weekly production sampling + quarterly comprehensive audit."</td></tr><tr><td>9</td><td><strong>Quote ConvFinQA + voice agent</strong></td><td>4 min</td><td>Specific shipped numbers + negative result</td><td>"I shipped this exact system at TikTok. ConvFinQA 9-variant ablation including honest negative result. Voice agent 7-market per-slice dashboard caught Indonesia regression in week 2."</td></tr><tr><td>10</td><td><strong>Cost as % of inference</strong></td><td>2 min</td><td>5-15% mature, 20-50% early, 50%+ critical</td><td>"Mature production runs eval at 5-15% of inference cost. Early or critical domains more. Justified by avoided incidents."</td></tr></tbody></table></div>
+<hr />
+<h3>详细回答</h3>
+<h4>Step 1: Why "looks right" fails — 5 failure modes</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Failure 1: Goodhart's Law
+  You optimize for ROUGE → model becomes more verbose (matches reference longer)
+  → ROUGE up, user satisfaction down
+  
+Failure 2: Distribution shift
+  Eval set is queries from Q1 / dev team
+  Production users from Q3, ask different things
+  → eval passes, customers complain
+
+Failure 3: Masked slice failure
+  Overall 89% accuracy looks fine
+  But Indonesian users 60%, brings everyone else's 92% down
+  → 重要 customer 不爽, 但 dashboard 不显示
+
+Failure 4: Proxy/truth mismatch
+  LLM-judge says response is "polite and accurate" → 4.5/5
+  But user didn't actually take action (didn't pay, didn't convert)
+  → 优化了 proxy, 没 move business needle
+
+Failure 5: Eval debt
+  Launched without eval set
+  6 weeks later: model regression
+  No way to know if THIS regression or always was
+  No baseline to compare</code></pre>
+<p><strong>Conclusion</strong>: "Looks right" 是 single point. 真 reliable eval 是 <strong>layered ensemble of signals</strong>.</p>
+<h4>Step 2: The 3-Layer Eval Pyramid</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                       ┌────────────┐
+                       │  Customer  │
+                       │  outcomes  │  ← Ultimate truth (business KPI)
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │  Online    │  ← A/B, real user signal
+                       │  A/B test  │     Slow but real
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │ Production │  ← Always-on, drift, sampled judge
+                       │ monitoring │     Lag indicator but continuous
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │  Offline   │  ← Pre-deploy CI, fast cheap
+                       │  golden    │     Controlled but limited coverage
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │ Unit-level │  ← Per-component, fastest
+                       │ component  │     Prompt template, RAG, schema
+                       └────────────┘</code></pre>
+<p><strong>Each layer catches different failures</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Layer</th><th>Catches</th><th>Misses</th><th>Frequency</th><th>Cost</th></tr></thead><tbody><tr><td>Unit</td><td>Logic bugs, schema breaks</td><td>End-to-end behavior</td><td>Every commit</td><td>$0</td></tr><tr><td>Offline golden</td><td>Known failure modes</td><td>Distribution shift</td><td>Every PR</td><td>$20-100/run</td></tr><tr><td>Online A/B</td><td>Real user reactions</td><td>Long-term effects</td><td>Per feature</td><td>Time + monitoring</td></tr><tr><td>Production monitoring</td><td>Drift, latency</td><td>Subtle quality drops</td><td>Continuous</td><td>$50-500/day</td></tr><tr><td>Business KPI</td><td>True success</td><td>Causality, slow</td><td>Weekly</td><td>Data analyst time</td></tr></tbody></table></div>
+<h4>Step 3: Offline eval foundation (Week 1 deliverable)</h4>
+<p><strong>Component 1: Stratified golden set</strong></p>
+<pre class="language-python"><code class="language-python">from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class EvalSample:
+    id: str
+    query: str
+    expected: str  # or expected_schema for structured
+    category: Literal['factoid', 'reasoning', 'creative', 'classification']
+    difficulty: Literal['easy', 'medium', 'hard']
+    language: str  # 'en', 'id', 'vi', 'th', 'pt', 'es', 'fr'
+    tenant_segment: str  # 'enterprise', 'smb', 'consumer'
+    contains_pii: bool
+    edge_case: bool
+
+# Stratified construction
+def build_golden_set(production_samples, n=200):
+    """
+    Sample stratified by intent, difficulty, language.
+    Include happy path + edge cases proportionally.
+    """
+    stratify_keys = ['category', 'difficulty', 'language']
+    samples_per_stratum = max(5, n // (len(intents) * len(difficulties) * len(languages)))
+    
+    golden = []
+    for cat in CATEGORIES:
+        for diff in DIFFICULTIES:
+            for lang in LANGUAGES:
+                stratum = production_samples.filter(category=cat, difficulty=diff, language=lang)
+                sampled = stratum.sample(min(samples_per_stratum, len(stratum)))
+                golden.extend(sampled)
+    
+    # Ensure 20% edge cases
+    edge_count = int(n * 0.2)
+    edge_samples = production_samples.filter(edge_case=True).sample(edge_count)
+    golden.extend(edge_samples)
+    
+    # Human-label expected outputs (gold standard)
+    return [annotate_with_human(s) for s in golden]</code></pre>
+<p><strong>Component 2: Automated metrics (limited but cheap)</strong></p>
+<pre class="language-python"><code class="language-python">def auto_metrics(generated: str, expected: str, sample: EvalSample) -&gt; dict:
+    """
+    Cheap automated metrics. Useful for structured tasks, weak for generation.
+    """
+    metrics = {}
+    
+    # Structured output
+    metrics['valid_json'] = is_valid_json(generated)
+    metrics['has_required_fields'] = has_required_fields(generated, sample.schema)
+    metrics['schema_compliance'] = validate_schema(generated, sample.schema)
+    
+    # Exact match (only for factoid / classification)
+    if sample.category in ('factoid', 'classification'):
+        metrics['exact_match'] = generated.strip() == expected.strip()
+    
+    # Embedding similarity (semantic — better than BLEU)
+    metrics['cosine_to_expected'] = cosine(embed(generated), embed(expected))
+    
+    # Refusal detection
+    metrics['is_refusal'] = is_refusal(generated)
+    
+    # Length sanity
+    metrics['length_ratio'] = len(generated) / max(len(expected), 1)
+    
+    # PII leak check
+    metrics['contains_pii'] = detect_pii(generated)
+    
+    # Citation presence (for RAG)
+    metrics['has_citations'] = has_citations(generated)
+    
+    return metrics</code></pre>
+<p><strong>Why not BLEU / ROUGE for generation</strong>:</p>
+<ul><li>Designed for translation / summarization where reference is "the" correct answer</li><li>LLM generation has many valid answers — penalty for not matching exact reference is wrong signal</li><li>High BLEU ≠ user satisfaction (often inverse: BLEU rewards verbose padding)</li><li><strong>Use for narrow structured tasks only</strong></li></ul>
+<p><strong>Component 3: LLM-as-judge (the scale enabler)</strong></p>
+<pre class="language-python"><code class="language-python">async def llm_judge(query, generated, expected=None, rubric=None) -&gt; dict:
+    """
+    LLM-judge with rubric. Calibrated against human, kappa &gt; 0.6.
+    """
+    if rubric is None:
+        rubric = DEFAULT_RUBRIC
+    
+    if expected:
+        # Reference-based judging
+        prompt = f"""
+        Query: {query}
+        Reference answer: {expected}
+        Generated answer: {generated}
+        
+        Rate the generated answer:
+        1. Accuracy (1-5): Does it convey the same factual content?
+        2. Completeness (1-5): Does it cover what reference covers?
+        3. Tone (1-5): Is it appropriate?
+        4. Clarity (1-5): Is it understandable?
+        
+        Output strict JSON: {{"accuracy": int, "completeness": int, "tone": int, "clarity": int, "reasoning": str}}
+        """
+    else:
+        # Reference-free (rubric-only)
+        prompt = f"""
+        Query: {query}
+        Generated answer: {generated}
+        
+        {rubric}
+        
+        Output strict JSON with each dimension score and reasoning.
+        """
+    
+    # CRITICAL: judge must be DIFFERENT model from system under test
+    result = await claude_opus_47.generate(prompt, response_format=JudgeResult)
+    return result</code></pre>
+<p><strong>Component 4: LLM-judge calibration (non-negotiable)</strong></p>
+<pre class="language-python"><code class="language-python">async def calibrate_judge(judge_model, n=100):
+    """
+    Validate LLM-judge against human labels. Required before trusting.
+    """
+    # 1. Sample 100 production examples
+    samples = sample_production(n=n)
+    
+    # 2. 5 human labelers per sample, take consensus (mode)
+    human_labels = []
+    for s in samples:
+        labels = [human_labeler.label(s) for _ in range(5)]
+        consensus = mode(labels)
+        human_labels.append(consensus)
+    
+    # 3. LLM-judge labels same samples
+    judge_labels = []
+    for s in samples:
+        result = await judge_model.judge(s)
+        judge_labels.append(result.overall_score_bucket)  # discretize for kappa
+    
+    # 4. Compute agreement
+    from sklearn.metrics import cohen_kappa_score, classification_report
+    kappa = cohen_kappa_score(human_labels, judge_labels)
+    accuracy = mean([h == j for h, j in zip(human_labels, judge_labels)])
+    
+    # 5. Per-dimension calibration
+    per_dim_kappa = {}
+    for dim in ['accuracy', 'completeness', 'tone', 'clarity']:
+        per_dim_kappa[dim] = cohen_kappa_score(
+            [h[dim] for h in human_labels_detailed],
+            [j[dim] for j in judge_labels_detailed]
+        )
+    
+    return {
+        'overall_kappa': kappa,
+        'accuracy': accuracy,
+        'per_dim_kappa': per_dim_kappa,
+        'trustworthy': kappa &gt; 0.6,
+        'recommendations': diagnose_disagreements(human_labels, judge_labels)
+    }</code></pre>
+<p><strong>Cohen's kappa thresholds</strong>:</p>
+<ul><li>&lt; 0.4: poor agreement, <strong>don't trust judge</strong></li><li>0.4-0.6: moderate, <strong>only for rough triage</strong></li><li>0.6-0.8: substantial, <strong>production-ready</strong></li><li>0.8+: almost perfect (rare, suspect overfitting)</li></ul>
+<p><strong>Target: &gt; 0.6</strong>. Below, don't rely on judge for production decisions. <strong>Recalibrate quarterly</strong> (judge model upgrades, task drift).</p>
+<h4>Step 4: LLM-judge methodology — 5 non-negotiables</h4>
+<p><strong>1. Different model from system under test (no self-eval bias)</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">❌ FT'd Sonnet 4.6 system → Sonnet 4.6 judge
+   Bias toward own style, false confidence
+   
+✓ FT'd Sonnet 4.6 system → Opus 4.7 judge OR Gemini 3 Pro judge</code></pre>
+<p><strong>2. Calibrated against human (kappa &gt; 0.6)</strong> — covered above.</p>
+<p><strong>3. Multi-judge ensemble for high-stakes</strong></p>
+<pre class="language-python"><code class="language-python">async def ensemble_judge(sample):
+    judges = [opus_47, gemini_3_pro, gpt_5_5]
+    
+    results = await asyncio.gather(*[j.judge(sample) for j in judges])
+    
+    avg_score = mean([r.score for r in results])
+    median_score = median([r.score for r in results])  # outlier-resistant
+    std = stdev([r.score for r in results])
+    
+    return {
+        'score': avg_score,
+        'disagreement': std,
+        'individual_scores': [r.score for r in results],
+        'flag_for_human': std &gt; 1.0,  # high disagreement
+    }</code></pre>
+<p><strong>Trade-off</strong>: 3x cost. Worth it for high-stakes domains (medical, legal, financial).</p>
+<p><strong>4. Pairwise &gt; absolute scoring</strong></p>
+<pre class="language-python"><code class="language-python"># Absolute scoring (1-5) drifts over time, hard to calibrate
+# Pairwise comparison more reliable
+
+async def pairwise_judge(query, response_a, response_b):
+    prompt = f"""
+    Query: {query}
+    Response A: {response_a}
+    Response B: {response_b}
+    
+    Which response is better? Answer "A", "B", or "tie".
+    Reasoning: ...
+    """
+    return await sonnet_46.generate(prompt)
+
+# For A/B testing model versions
+async def compare_versions(query, v1, v2):
+    response_v1 = await system_v1.generate(query)
+    response_v2 = await system_v2.generate(query)
+    
+    # CRITICAL: randomize order to prevent position bias
+    if random.random() &gt; 0.5:
+        result = await pairwise_judge(query, response_v1, response_v2)
+        return 'v1' if result == 'A' else 'v2'
+    else:
+        result = await pairwise_judge(query, response_v2, response_v1)
+        return 'v2' if result == 'A' else 'v1'</code></pre>
+<p><strong>5. Recalibrate quarterly</strong> + strip metadata that could bias (user ratings, model name, version tags).</p>
+<h4>Step 5: Online A/B framework</h4>
+<pre class="language-python"><code class="language-python"># Phased canary rollout
+class CanaryRollout:
+    PHASES = [
+        ('canary', 0.01, hours=4),     # 1% for 4 hours
+        ('small', 0.05, hours=24),     # 5% for 1 day
+        ('medium', 0.25, days=3),      # 25% for 3 days
+        ('full', 1.0, None),           # 100%
+    ]
+    
+    async def run(self, experiment_id, control_version, treatment_version):
+        for phase_name, traffic_pct, duration in self.PHASES:
+            await self.shift_traffic(treatment_version, traffic_pct)
+            
+            start = now()
+            while now() - start &lt; duration:
+                metrics = await self.collect_metrics(experiment_id, last_5_min=True)
+                
+                # Auto-rollback triggers
+                if metrics['error_rate'] &gt; 0.05:
+                    await self.rollback(experiment_id, reason='error_rate spike')
+                    return 'rolled_back'
+                
+                if metrics['business_kpi_delta'] &lt; -0.05:  # 5pp regression
+                    await self.rollback(experiment_id, reason='business KPI regression')
+                    return 'rolled_back'
+                
+                if metrics['latency_p99'] &gt; 2000:
+                    await self.rollback(experiment_id, reason='latency breach')
+                    return 'rolled_back'
+                
+                await asyncio.sleep(60)
+            
+            print(f"Phase {phase_name} complete, advancing")
+        
+        return 'fully_deployed'
+
+# Statistical significance check
+from scipy.stats import ttest_ind
+
+def ab_analysis(experiment_id, days=7):
+    events = load_events(experiment_id, days=days)
+    
+    control = events.filter(variant='control')
+    treatment = events.filter(variant='treatment')
+    
+    # Continuous metric (e.g., resolve rate)
+    t_stat, p_value = ttest_ind(
+        [e.resolved for e in control],
+        [e.resolved for e in treatment]
+    )
+    
+    lift_pp = mean([e.resolved for e in treatment]) - mean([e.resolved for e in control])
+    
+    # Sample size sufficiency (power 0.8, alpha 0.05, MDE 2pp)
+    n_per_group = min(len(control), len(treatment))
+    required = compute_required_sample_size(effect_size=0.02, alpha=0.05, power=0.8)
+    
+    return {
+        'lift_pp': lift_pp * 100,
+        'p_value': p_value,
+        'significant': p_value &lt; 0.05,
+        'sample_size_per_group': n_per_group,
+        'required_sample_size': required,
+        'underpowered': n_per_group &lt; required,
+        'recommendation': 'ship' if (p_value &lt; 0.05 and lift_pp &gt; 0) else 'iterate'
+    }</code></pre>
+<p><strong>Business metric &gt; technical metric</strong> principle:</p>
+<ul><li>Voice agent: 7-day repayment rate &gt; LLM-judge accuracy</li><li>BNPL chatbot: resolved-without-escalation &gt; intent classification F1</li><li>ConvFinQA: financial decision quality &gt; BLEU on answer</li></ul>
+<h4>Step 6: Production monitoring + drift detection</h4>
+<p><strong>Dashboard sections</strong> (every production AI system needs):</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. Service Health:
+   - Request rate (per region / per tenant)
+   - Error rate (per error class)
+   - Latency p50 / p95 / p99 per stage
+   - Cost per request
+
+2. Quality Indicators:
+   - Daily LLM-judge sample score (500 samples)
+   - User feedback ratio (thumbs up / down)
+   - Refusal rate trend
+   - Hallucination rate (from sampled audit)
+
+3. Drift Indicators:
+   - Input length / type distribution Δ vs baseline
+   - Output length distribution Δ
+   - Intent distribution Δ
+   - Per-slice score delta
+
+4. Business Metrics:
+   - Resolve rate / conversion / retention
+   - NPS / CSAT
+   - Cost per resolved interaction
+
+5. Alerts:
+   - Active alerts + acknowledgment status
+   - Recent incident summary
+   - Error budget burn rate</code></pre>
+<p><strong>Drift detection (4 types)</strong>:</p>
+<pre class="language-python"><code class="language-python">def detect_drift(window_now, window_baseline):
+    # 1. Data drift (input distribution)
+    queries_now_emb = mean_embedding(window_now.queries)
+    queries_baseline_emb = mean_embedding(window_baseline.queries)
+    input_drift = 1 - cosine(queries_now_emb, queries_baseline_emb)
+    
+    # 2. Output drift
+    lengths_now = [len(r) for r in window_now.responses]
+    lengths_baseline = [len(r) for r in window_baseline.responses]
+    length_drift_pp = (median(lengths_now) - median(lengths_baseline)) / median(lengths_baseline)
+    
+    # 3. Refusal rate drift (model getting conservative?)
+    refusal_delta = mean([is_refusal(r) for r in window_now.responses]) - \
+                    mean([is_refusal(r) for r in window_baseline.responses])
+    
+    # 4. Intent distribution KL
+    intent_now = Counter([classify(q) for q in window_now.queries])
+    intent_baseline = Counter([classify(q) for q in window_baseline.queries])
+    intent_kl = kl_divergence(intent_now, intent_baseline)
+    
+    return {
+        'input_embedding_drift': input_drift,
+        'length_drift_pp': length_drift_pp,
+        'refusal_delta': refusal_delta,
+        'intent_kl': intent_kl,
+    }
+
+# Daily job
+async def daily_drift_check():
+    today = production_logs.last(hours=24)
+    baseline = production_logs.range(days=8, days_back=2)  # 7-day baseline
+    
+    drift = detect_drift(today, baseline)
+    db.insert('drift_daily', {**drift, 'date': today_date()})
+    
+    for metric, value in drift.items():
+        threshold = DRIFT_THRESHOLDS[metric]
+        if abs(value) &gt; threshold:
+            await page_oncall(f"Drift: {metric}={value:.3f} &gt; {threshold}")</code></pre>
+<p><strong>Per-slice drift</strong> (overall fine, slice broken):</p>
+<pre class="language-python"><code class="language-python">SLICES = ['language', 'tenant_segment', 'region', 'product_line', 'query_type']
+
+for slice in SLICES:
+    metric_per_group = production_logs.groupby(slice).agg({
+        'judge_score': 'mean',
+        'error_rate': 'mean',
+        'business_kpi': 'mean',
+    })
+    
+    for group, metric in metric_per_group.iterrows():
+        if metric.judge_score &lt; THRESHOLD:
+            alert(f"Slice {slice}={group} quality drop: {metric.judge_score}")</code></pre>
+<h4>Step 7: Continuous golden set refresh</h4>
+<p><strong>Golden set is dead within 3 months</strong> without active refresh.</p>
+<pre class="language-python"><code class="language-python"># Weekly: incorporate production findings
+def refresh_golden_set():
+    # 1. Find production samples that LLM-judge scored low
+    low_scored = production_logs.filter(judge_score &lt; 3).sample(50)
+    
+    # 2. Hand-label these
+    human_labeled = await human_label(low_scored)
+    
+    # 3. Add to golden set
+    golden_set.extend(human_labeled)
+    
+    # 4. Find LLM-judge / human disagreements
+    disagreements = find_disagreements(human_labels, judge_labels)
+    
+    # 5. Re-calibrate judge on disagreements
+    if len(disagreements) &gt; 10:
+        recalibrate(disagreements)
+
+# Quarterly: comprehensive audit
+def quarterly_audit():
+    # Are golden samples still representative?
+    prod_dist = compute_distribution(production_logs)
+    golden_dist = compute_distribution(golden_set)
+    
+    coverage = check_coverage(golden_dist, prod_dist)
+    if coverage &lt; 0.8:
+        alert_team("Golden set drift, needs refresh")
+    
+    # Are we still measuring the right things?
+    review_metrics_alignment_with_business()</code></pre>
+<h4>Step 8: Eval cost — how much should you spend?</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Mature production:  5-15% of inference cost on eval
+Early production:   20-50%
+Critical domain:    50%+ (medical, legal, regulated)
+
+ConvFinQA:         ~30% (research project, lots of iteration)
+Voice agent:       ~10% (mature, automated)
+BNPL chatbot:      ~15% (multi-market complexity)</code></pre>
+<p><strong>Cost is justified by avoided incidents</strong>. 1 silent quality regression = lost contract / churn / lawsuit.</p>
+<hr />
+<h3>关键决策 / 框架</h3>
+<h4>What to eval (5 layers)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Layer 1: Per-component unit tests
+  - Prompt template renders correctly (no unfilled vars)
+  - RAG retrieves expected chunks (ACL respected)
+  - JSON schema validates
+  - Tool function executes correctly
+  - Run: every commit, ~$0
+
+Layer 2: Integration / Offline eval
+  - End-to-end on golden set
+  - Auto metrics + LLM-judge + spot check
+  - Per-slice breakdowns
+  - Run: every PR + nightly, ~$20-100
+
+Layer 3: Online A/B
+  - Phased canary 1% → 5% → 25% → 100%
+  - Business metric vs control
+  - Statistical significance + power check
+  - Auto-rollback on SLO breach
+
+Layer 4: Production monitoring
+  - 5 sections: health, quality, drift, business, alerts
+  - Per-slice + per-tenant
+  - Continuous, ~$50-500/day
+
+Layer 5: Continuous improvement
+  - Weekly golden set refresh
+  - Quarterly judge recalibration
+  - Quarterly audit (representativeness)</code></pre>
+<h4>Metric selection by use case</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Classification (intent routing):
+  - Accuracy, F1, confusion matrix
+  - Per-class precision/recall
+  - Calibration (predicted prob vs actual)
+
+Generation (chat response):
+  - LLM-judge on rubric (accuracy, helpfulness, tone)
+  - User feedback (thumbs / rating)
+  - Behavioral (regeneration, abandonment)
+  - Business KPI (resolve rate, conversion)
+
+RAG:
+  - Retrieval: recall@10, NDCG@10, MRR
+  - Generation: faithfulness, hallucination rate
+  - End-to-end: answer correctness, citation accuracy
+
+Agent (tool-using):
+  - Per-step success rate
+  - End-to-end task completion
+  - Tool call accuracy
+  - Latency p99, cost per task
+
+Safety / Compliance:
+  - Refusal rate on disallowed content
+  - PII leak detection
+  - Per-jurisdiction policy adherence</code></pre>
+<hr />
+<h3>完整代码 / 架构图</h3>
+<h4>Full eval pipeline</h4>
+<pre class="language-python"><code class="language-python"># eval/pipeline.py
+
+import asyncio
+from dataclasses import dataclass
+from typing import List, Dict
+
+@dataclass
+class EvalConfig:
+    golden_set_path: str
+    judge_model: str = 'claude-opus-4-7'
+    threshold_overall: float = 0.85
+    threshold_per_slice: float = 0.80
+    judge_calibration_kappa: float = 0.60
+
+class EvalPipeline:
+    def __init__(self, config: EvalConfig):
+        self.config = config
+        self.golden_set = self._load_golden_set()
+        self.judge = init_judge(config.judge_model)
+    
+    async def run(self, system) -&gt; Dict:
+        """Full eval run."""
+        # 1. Per-component unit tests
+        unit_results = await self._unit_tests(system)
+        if not unit_results['all_pass']:
+            return {'status': 'fail', 'stage': 'unit', 'details': unit_results}
+        
+        # 2. Integration eval on golden set
+        integration_results = await self._integration_eval(system)
+        
+        # 3. Per-slice analysis
+        slice_results = self._per_slice_analysis(integration_results)
+        
+        # 4. Compare to baseline
+        baseline = self._load_baseline()
+        regression_check = self._regression_check(integration_results, baseline)
+        
+        # 5. Decide pass/fail
+        passed = (
+            integration_results['overall'] &gt;= self.config.threshold_overall and
+            all(s &gt;= self.config.threshold_per_slice for s in slice_results.values()) and
+            not regression_check['has_regression']
+        )
+        
+        return {
+            'status': 'pass' if passed else 'fail',
+            'overall': integration_results['overall'],
+            'per_slice': slice_results,
+            'regression': regression_check,
+            'baseline_delta': integration_results['overall'] - baseline['overall'],
+            'samples_evaluated': len(self.golden_set),
+        }
+    
+    async def _integration_eval(self, system) -&gt; Dict:
+        results = []
+        
+        # Parallel evaluation
+        async def eval_one(sample):
+            start = time.time()
+            output = await system.generate(sample.query, context=sample.context)
+            latency = time.time() - start
+            
+            auto = auto_metrics(output, sample.expected, sample)
+            judge = await self.judge.judge(sample.query, output, sample.expected)
+            
+            return {
+                'sample_id': sample.id,
+                'category': sample.category,
+                'language': sample.language,
+                'output': output,
+                'latency': latency,
+                **auto,
+                'judge_score': judge.overall,
+                'judge_per_dim': judge.per_dim,
+            }
+        
+        # Batch with concurrency control
+        sem = asyncio.Semaphore(20)
+        async def bounded(sample):
+            async with sem:
+                return await eval_one(sample)
+        
+        results = await asyncio.gather(*[bounded(s) for s in self.golden_set])
+        
+        # Aggregate
+        return {
+            'overall': mean([r['judge_score'] for r in results]) / 5,
+            'latency_p50': p50([r['latency'] for r in results]),
+            'latency_p99': p99([r['latency'] for r in results]),
+            'auto_metric_summary': aggregate_auto(results),
+            'samples': results,
+        }
+    
+    def _per_slice_analysis(self, results) -&gt; Dict:
+        slice_dims = ['category', 'language', 'difficulty', 'tenant_segment']
+        per_slice = {}
+        
+        for dim in slice_dims:
+            for value in set(s[dim] for s in results['samples']):
+                slice_samples = [s for s in results['samples'] if s[dim] == value]
+                per_slice[f"{dim}={value}"] = mean([s['judge_score'] for s in slice_samples]) / 5
+        
+        return per_slice
+    
+    def _regression_check(self, current, baseline) -&gt; Dict:
+        # Per-slice regression check
+        regressions = []
+        for slice_key, current_score in current['per_slice'].items():
+            baseline_score = baseline['per_slice'].get(slice_key, current_score)
+            if current_score &lt; baseline_score - 0.02:  # 2pp regression
+                regressions.append({
+                    'slice': slice_key,
+                    'baseline': baseline_score,
+                    'current': current_score,
+                    'delta_pp': (current_score - baseline_score) * 100
+                })
+        
+        return {
+            'has_regression': len(regressions) &gt; 0,
+            'regressions': regressions,
+        }
+
+
+# Usage in CI
+async def main():
+    config = EvalConfig(
+        golden_set_path='eval/golden_v3.jsonl',
+        threshold_overall=0.85,
+        threshold_per_slice=0.80,
+    )
+    
+    pipeline = EvalPipeline(config)
+    results = await pipeline.run(system)
+    
+    if results['status'] == 'fail':
+        print(f"FAIL: {results}")
+        sys.exit(1)
+    
+    print(f"PASS: overall={results['overall']:.2%}")</code></pre>
+<h4>Architecture diagram</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                    ┌──────────────────────────────────────┐
+                    │      Eval Pyramid (Production)       │
+                    └──────────────────────────────────────┘
+                                       │
+        ┌──────────────────────────────┼──────────────────────────────┐
+        │                              │                              │
+        ▼                              ▼                              ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│   OFFLINE     │            │    ONLINE     │            │  PRODUCTION   │
+│   (Pre-PR)    │            │  (A/B test)   │            │  (Always-on)  │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Golden set    │            │ Canary rollout│            │ Daily judge   │
+│ 200 stratified│            │ 1→5→25→100%   │            │ sample 500    │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Auto metrics  │            │ Business KPI  │            │ Drift detect  │
+│ (schema, sim) │            │ vs control    │            │ (4 types)     │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ LLM-judge     │            │ Stat signifi  │            │ Per-slice     │
+│ (kappa&gt;0.6)   │            │ + power check │            │ + per-tenant  │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Human spot    │            │ Auto-rollback │            │ Alerts        │
+│ check (50/wk) │            │ on SLO breach │            │ P1/P2/P3      │
+└───────────────┘            └───────────────┘            └───────────────┘
+        │                            │                            │
+        └────────────────────────────┴────────────────────────────┘
+                                     │
+                                     ▼
+                            ┌───────────────────┐
+                            │ Weekly refresh    │
+                            │ Quarterly audit   │
+                            └───────────────────┘</code></pre>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<h4>ConvFinQA — 9-variant ablation + honest negative result</h4>
+<p><strong>S</strong>: ConvFinQA multi-hop financial QA. 多 component (RAG + reasoning + tool + critic), 不知道每个 helps how much.</p>
+<p><strong>T</strong>: 设计 eval methodology 能 isolate 每个 component 的 contribution.</p>
+<p><strong>A</strong>: 我设计了 <strong>9-variant ablation</strong>:</p>
+<ul><li>Variant 1: base model only (PE baseline)</li><li>Variant 2: + RAG (knowledge retrieval)</li><li>Variant 3: + tool (calculator)</li><li>Variant 4: + CoT prompt</li><li>Variant 5-7: combinations</li><li>Variant 8: + critic agent (always trigger)</li><li>Variant 9: + critic agent (selectively trigger on percent_change / divide ops only)</li></ul>
+<p>Stratified 300-conversation eval set, per-hop-depth slices, per-difficulty slices.</p>
+<p><strong>R</strong>:</p>
+<ul><li>Variant 9 (selective critic) triggered on 358 reasoning steps</li><li>Caught useful errors on <strong>4/358</strong> (1.1%)</li><li><strong>Honest negative result</strong>: critic eval cost wasn't justified by signal</li></ul>
+<p><strong>Lesson</strong>: aggressive eval triggers cost more but mostly produce noise. <strong>Cheap broad eval + targeted expensive eval beats one-size-fits-all expensive eval</strong>.</p>
+<h4>Voice agent — 7-market per-slice dashboard caught Indonesia regression</h4>
+<p><strong>S</strong>: Voice agent deployed across 7 markets (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦).</p>
+<p><strong>T</strong>: Continuous quality monitoring without 100% human review.</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Offline</strong>: 500 golden calls per market × 7 = 3500 stratified</li><li><strong>LLM-judge</strong>: Opus 4.7 on rubric (empathy, accuracy, compliance), calibrated kappa = 0.72</li><li><strong>Online</strong>: phased canary 1% → 5% → 25% → 100% per market</li><li><strong>Business metric</strong>: 7-day repayment rate vs control (auto-rollback if -5pp)</li><li><strong>Production</strong>: per-market dashboard, daily 500 judge samples, drift on input dist + refusal rate</li></ul>
+<p><strong>R</strong>: Week 2 of Indonesia rollout, <strong>repayment rate -8pp vs control</strong> caught by canary monitoring. Investigation: model too apologetic, customers felt "bot doesn't take me seriously", disputes up. Fix: DPO refresh on Indonesian firm-but-polite examples. <strong>Without per-slice monitoring, would have lost a quarter before noticing</strong>.</p>
+<h4>BNPL chatbot — composite confidence + 4-signal escalation</h4>
+<p><strong>S</strong>: BNPL chatbot 70% intent routing accuracy. PM wanted 90%+.</p>
+<p><strong>T</strong>: Get routing to 90% without retraining (too expensive).</p>
+<p><strong>A</strong>: Built <strong>4-signal composite confidence</strong>:</p>
+<ol><li>LLM-reported confidence (calibrated against historical accuracy)</li><li>Top-1 vs top-2 probability margin</li><li>RAG retrieval score (NDCG@5)</li><li>Self-consistency (sample 3, agreement rate)</li></ol>
+<p>Composite = weighted sum, threshold tuned on held-out set.</p>
+<p><strong>R</strong>: Accuracy 70 → 92% by escalating bottom 8% to human. <strong>Composite confidence outperformed any single signal</strong>. Calibration story (Brier score) showed predicted probabilities matched actual accuracy within 2pp across deciles.</p>
+<h4>Pakistan ASR cascade — 40-minute outage incident eval</h4>
+<p><strong>S</strong>: Voice agent in Pakistan. ASR API (third-party) had intermittent 40-min outage during peak hours.</p>
+<p><strong>T</strong>: Detect and respond fast.</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Detection</strong>: drift dashboard caught ASR confidence drop in 3 minutes</li><li><strong>Triage</strong>: per-region dashboard isolated to Pakistan only</li><li><strong>Mitigation</strong>: failover to backup ASR provider (latency 1.5x but functional)</li><li><strong>Comm</strong>: status update to Pakistan ops team within 8 minutes</li><li><strong>Postmortem</strong>: action items — multi-vendor fallback policy, faster detection threshold</li></ul>
+<p><strong>R</strong>: 40-min outage with only ~12% calls affected (vs 100% if no failover). MTTR 8 min vs typical 30+ min.</p>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "LLM-as-judge — how do you know judge is reliable?"</p>
+<p><strong>A</strong>: 6-step validation:</p>
+<ol><li><strong>Hand-label 100 production examples</strong> by experts (gold standard, 5 labelers per sample, take consensus)</li><li><strong>Run judge on same 100</strong>, compute Cohen's kappa</li><li>Judge must reach <strong>kappa &gt; 0.6</strong> to be trusted (substantial agreement)</li><li><strong>Re-validate quarterly</strong> as model / task drift over time</li><li><strong>Avoid same model self-eval</strong> — significant bias toward own style</li><li><strong>Multi-judge ensemble</strong> (Opus 4.7 + Gemini 3 Pro + GPT-5.5) for high-stakes — average / median for outlier resistance</li><li><strong>Per-rubric-dimension calibration</strong> — judge might be good at accuracy but bad at tone</li></ol>
+<p><strong>Q2</strong>: "Customer asks: how confident are you the model is working today?"</p>
+<p><strong>A</strong>: Build a <strong>live confidence dashboard</strong>:</p>
+<ul><li>Error budget remaining (e.g., 99.5% SLO, 0.3% burned this month)</li><li>Drift indicators (input distribution Δ vs 7d baseline — currently +0.04, below 0.10 threshold)</li><li>Recent canary results (last 5 deploys passing? Latest deploy 3 days ago, +1.2pp on judge)</li><li>Human-flag rate (production samples flagged by LLM-judge or low confidence — 2% this week, baseline 2.1%)</li><li>"Latest weekly human eval pass rate: 94%, baseline 93%"</li><li>"Per-tenant health: 18 green / 2 yellow / 0 red"</li></ul>
+<p>Show numbers, trends, not feels. Customers trust numbers + graphs.</p>
+<p><strong>Q3</strong>: "We don't have user feedback signal. What do we use?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Implicit signals</strong>: regeneration rate (user hit retry), session length, click-through, completion rate</li><li><strong>Downstream</strong>: did user complete intended action (purchase, file ticket close)</li><li><strong>External sensors</strong>: changes in support ticket volume after deploy</li><li><strong>Self-consistency</strong>: same query sampled N times, low variance = high confidence</li><li><strong>Ensemble agreement</strong>: 3 models on same query, disagreement = uncertainty signal</li><li><strong>Contract human eval</strong>: if no implicit signal, $10/sample × 500/week = $26k/year, often worth it for high-stakes use case</li><li><strong>LLM-judge rubric</strong>: criteria-based (helpfulness, accuracy, tone, safety, clarity) without expected answer</li></ul>
+<p><strong>Q4</strong>: "How much should eval cost as % of inference cost?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Mature production</strong>: 5-15% of inference cost. Below 5% likely under-investing.</li><li><strong>Early production</strong>: 20-50% (need confidence in deploys, frequent eval iteration)</li><li><strong>Critical domains</strong> (medical, legal, financial): 50%+ — human review on most outputs</li><li>Cost is <strong>justified by avoided incidents</strong> — 1 silent quality regression in production can mean lost contract / churn / lawsuit</li></ul>
+<p><strong>Cost math example</strong> (BNPL chatbot, 100k queries/day):</p>
+<ul><li>Inference: ~$15k/month (Sonnet 4.6 + RAG)</li><li>Eval: ~$2k/month (daily 500 judge samples at Opus 4.7 × $4 + 10% human spot check)</li><li>Eval / inference = ~13% ✓ healthy range</li></ul>
+<p><strong>Q5</strong>: "Eval suite passes but customers complain. Why?"</p>
+<p><strong>A</strong>: Eval suite doesn't reflect production. Common causes:</p>
+<ul><li><strong>Golden set unrepresentative</strong> (synthetic queries vs real customer language)</li><li><strong>Wrong metric</strong>: ROUGE high but users hate verbose output</li><li><strong>No diversity</strong> in golden set (overfit to certain query type)</li><li><strong>Drift</strong>: production distribution shifted, eval set stale</li><li><strong>Missing slice</strong>: overall passes, but one important slice fails (e.g., new product line, new tenant)</li><li><strong>Goodhart</strong>: we optimized for our metric, gaming it without solving real problem</li></ul>
+<p><strong>Fix</strong>:</p>
+<ul><li><strong>Production sampling</strong>: 200 random samples/week → hand label → add to golden set</li><li><strong>Customer complaint mining</strong>: every complaint becomes eval case</li><li><strong>Slice expansion</strong>: ensure eval covers all customer segments</li><li><strong>Always have human review channel</strong> for unclear cases</li><li><strong>Quarterly golden set audit</strong>: is set still representative?</li></ul>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>BLEU / ROUGE only</strong> — weak for generation, misleading</li><li><strong>Same model judges itself</strong> — bias toward own style, false confidence</li><li><strong>Single overall metric</strong> — masks per-slice failures</li><li><strong>Static golden set</strong> — stale within 3 months</li><li><strong>Offline only, no production monitoring</strong> — drift undetected</li><li><strong>No business KPI correlation</strong> — optimizing proxy, not truth</li><li><strong>No alerts / SLOs</strong> — discover via customer complaint</li><li><strong>Skip LLM-judge calibration</strong> — judge may be biased / unreliable</li><li><strong>No human-in-loop</strong> — blind spots compound</li><li><strong>Optimize technical metric, ignore business outcome</strong> — Goodhart's Law</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>3-layer eval pyramid</strong> (offline / online / production) with concrete tools</li><li><strong>LLM-judge calibration via Cohen's kappa &gt; 0.6</strong> — quantitative trust threshold</li><li><strong>Production sampling → golden set refresh</strong> loop — keeps eval honest</li><li><strong>Goodhart's Law awareness</strong> — explicit anti-pattern</li><li><strong>Specific tools</strong> (Braintrust, Langfuse, Phoenix, Ragas, TruLens, LangSmith) — 2026 specificity</li><li><strong>Cost as % of inference</strong> (5-15% mature) — budget framing</li><li><strong>Quote ConvFinQA negative result + voice agent A/B + BNPL composite confidence</strong></li><li><strong>Confidence dashboard for customer-facing</strong> — trust transparency</li><li><strong>Per-slice + per-tenant decomposition</strong> — overall fine ≠ all slices fine</li><li><strong>Business KPI &gt; technical metric</strong> philosophy</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>"知道 AI 在 production working" = 多层 eval pyramid + 校准的 LLM-judge (kappa &gt; 0.6) + 持续 drift monitoring + business KPI correlation + golden set 持续 refresh. 不是 single metric, 是 ensemble of signals. Any silent system 都是 production 事故等待发生.</strong></p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">3-layer eval pyramid:
+  Offline (CI / pre-deploy): 
+    - Stratified golden set 200-2000
+    - Auto metrics (schema, sim, refusal)
+    - LLM-judge (kappa &gt; 0.6 vs human)
+    - Human spot check 50/week
+  
+  Online (canary + A/B):
+    - 1% → 5% → 25% → 100% phased
+    - Business metric vs control
+    - Auto-rollback on SLO breach
+    - Statistical significance + power check
+  
+  Production (always-on):
+    - Per-tenant / per-slice metric
+    - Drift detection (input/output/refusal/intent)
+    - LLM-judge daily 500 samples
+    - User feedback aggregation
+    - Cost / latency monitoring
+
+5 metric categories:
+  Technical: latency, error rate, throughput, cost
+  Quality: judge score, refusal, hallucination
+  User explicit: thumbs, rating, complaint
+  User implicit: regeneration, session length, completion
+  Business KPI: resolve rate, conversion, retention, NPS
+
+LLM-judge methodology:
+  - Different model from system under test
+  - Cohen's kappa &gt; 0.6 with human (calibrate quarterly)
+  - Multi-judge ensemble for high-stakes (3 judges)
+  - Pairwise &gt; absolute (more reliable)
+  - Strip metadata (no ground truth leak)
+  - Per-dimension rubric not single score
+
+Drift detection (4 types):
+  Data drift: input distribution change
+  Concept drift: true label changes over time
+  Model drift: dependency / config / model upgrade
+  Distribution shift: output behavior changes
+
+Drift metrics:
+  Input: embedding mean cosine, Wasserstein 1D, KL on topics
+  Output: length p50, refusal rate, JSON validity rate
+  Statistical: KS test continuous, chi-square categorical
+  Trend: 14-day rolling check
+
+Production monitoring (5 sections):
+  1. Service health
+  2. Quality indicators
+  3. Drift indicators
+  4. Business metrics
+  5. Alerts (P1 page / P2 30min / P3 slack)
+
+Cost target:
+  Mature production: 5-15% of inference cost
+  Early production: 20-50%
+  Critical domain: 50%+
+
+Tools 2026:
+  Eval pipelines: Braintrust, Langfuse, Phoenix, Ragas, TruLens
+  Tracing: LangSmith, Phoenix, Datadog APM
+  Drift: Custom + Arize / WhyLabs / Fiddler
+  Logging: W&amp;B Tables / MLflow
+  Dashboards: Grafana, Datadog
+  Alerts: PagerDuty + Slack
+  Human label: Scale AI / Labelbox / internal
+
+Pragmatic timeline:
+  Week 1: 100-sample golden set + basic CI eval
+  Week 2: LLM-judge with calibration (kappa &gt; 0.6)
+  Week 3: Production monitoring dashboard
+  Week 4: A/B test framework
+  Month 2: Drift detection
+  Month 3: Continuous golden set refresh
+  Ongoing: Quarterly judge recalibration
+
+Anti-patterns:
+  - BLEU/ROUGE for generation
+  - Same model self-eval
+  - Static golden set
+  - Single metric optimization (Goodhart)
+  - No human-in-loop
+  - No drift detection
+  - Optimize proxy not truth
+
+Case studies:
+  - ConvFinQA: 9-variant ablation + 4/358 honest negative result
+  - Voice agent: 7-market per-slice dashboard, Indonesia week-2 catch
+  - BNPL: 4-signal composite confidence, 70→92% via escalation
+  - Pakistan ASR: 40-min outage, MTTR 8 min via drift detection
+
+Quotes for interview:
+  - "3-layer pyramid: offline + online + production"
+  - "LLM-judge needs kappa &gt; 0.6 vs human, or don't trust it"
+  - "Per-slice &gt; overall — worst slice catches issues"
+  - "Business KPI &gt; technical metric — optimize truth not proxy"
+  - "Static golden set is dead within 3 months — production sampling is refresh loop"
+  - "Goodhart's Law: any single metric you optimize becomes gamed"
+  - "Eval cost 5-15% of inference is healthy"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-041-when-fine-tune-vs-rag-vs-pe.html">← Q41 · [AI 专项技术] 什么时候 fine-tune, 什么时候 RAG, 什么时候 prompt engineering</a>
+    <a href="zhenti-043-production-llm-guardrails.html">Q43 · [AI 专项技术] 怎么给生产 LLM 应用设计 guardrails →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q42 · How do you evaluate an LLM beyond "it looks right"?
+
+> "Your model 'looks right' in dev. **How do you actually know it works** when you ship it to a customer's production environment? Walk me through your eval methodology — automated metrics, LLM-as-judge, human review, business KPI. Be specific about what you'd build in week 1 vs month 3."
+
+**Round**: AI Specialty (45 min)
+**出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — 分水岭 question. "你怎么知道它真的 работает"
+
+---
+
+## 这道题在考什么
+
+表面是 eval 题, 底下藏着 **8 个 FDE evaluation signal**:
+
+1. **Offline / Online / Production 三层 eval pyramid** — 知道 single metric 不够
+2. **Automated metrics 局限** — 知道 BLEU / ROUGE 对 generation 几乎无用
+3. **LLM-as-judge methodology** — 知道 calibration (Cohen's kappa > 0.6) + bias risks
+4. **Human-in-the-loop scaling** — 怎么 scale 不靠 100% 人审
+5. **Drift detection** — 不只是 launch-day metric, 是持续 monitoring
+6. **Per-slice metric** — overall fine 但 worst slice 暴雷
+7. **Business KPI vs technical metric** — proxy vs truth
+8. **Production sampling → golden set refresh** loop — eval set 不是 static
+
+不考「BLEU 是什么」, 考「你 own 过 production AI, sleep at night 靠什么」.
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **Clarify 5 things** | 3 min | Use case / ground truth / volume / stakes / existing monitoring | "Before I prescribe — what's the use case? Is there ground truth? What's the volume? Stakes?" |
+| 2 | **3-layer pyramid** | 5 min | Offline / Online A/B / Production monitoring | "I think about it as a pyramid — 3 layers, each catches different failures." |
+| 3 | **Why 'looks right' fails** | 3 min | 5 failure modes (Goodhart, drift, slice, biz proxy mismatch, eval debt) | "Let me show 5 ways 'looks right' lies — Goodhart, distribution shift, masked slice failure, proxy/truth mismatch, eval debt." |
+| 4 | **Offline: golden set + auto + LLM-judge + spot** | 7 min | Stratified set, auto metrics, LLM-judge calibration | "Week 1 deliverable: 200-sample golden set stratified by intent / language / difficulty, with LLM-judge calibrated to kappa > 0.6." |
+| 5 | **LLM-as-judge methodology** | 5 min | Calibration, ensemble, pairwise, anti-patterns | "Judge methodology has 5 non-negotiables — different model, kappa validated, ensemble for high-stakes, pairwise > absolute, recalibrate quarterly." |
+| 6 | **Online A/B + business metric** | 5 min | Canary, phased rollout, statistical significance | "Online: 1% → 5% → 25% → 100% phased. Business metric is the real truth. Auto-rollback on SLO breach." |
+| 7 | **Production monitoring + drift** | 5 min | Always-on dashboard, per-slice, drift detection | "Always-on: latency / error / quality / drift / business — 5 sections. Per-tenant per-language per-region slicing." |
+| 8 | **Continuous refresh** | 3 min | Production sampling → golden set updates | "Golden set is dead within 3 months without refresh. Weekly production sampling + quarterly comprehensive audit." |
+| 9 | **Quote ConvFinQA + voice agent** | 4 min | Specific shipped numbers + negative result | "I shipped this exact system at TikTok. ConvFinQA 9-variant ablation including honest negative result. Voice agent 7-market per-slice dashboard caught Indonesia regression in week 2." |
+| 10 | **Cost as % of inference** | 2 min | 5-15% mature, 20-50% early, 50%+ critical | "Mature production runs eval at 5-15% of inference cost. Early or critical domains more. Justified by avoided incidents." |
+
+---
+
+## 详细回答
+
+### Step 1: Why "looks right" fails — 5 failure modes
+
+```
+Failure 1: Goodhart's Law
+  You optimize for ROUGE → model becomes more verbose (matches reference longer)
+  → ROUGE up, user satisfaction down
+  
+Failure 2: Distribution shift
+  Eval set is queries from Q1 / dev team
+  Production users from Q3, ask different things
+  → eval passes, customers complain
+
+Failure 3: Masked slice failure
+  Overall 89% accuracy looks fine
+  But Indonesian users 60%, brings everyone else's 92% down
+  → 重要 customer 不爽, 但 dashboard 不显示
+
+Failure 4: Proxy/truth mismatch
+  LLM-judge says response is "polite and accurate" → 4.5/5
+  But user didn't actually take action (didn't pay, didn't convert)
+  → 优化了 proxy, 没 move business needle
+
+Failure 5: Eval debt
+  Launched without eval set
+  6 weeks later: model regression
+  No way to know if THIS regression or always was
+  No baseline to compare
+```
+
+**Conclusion**: "Looks right" 是 single point. 真 reliable eval 是 **layered ensemble of signals**.
+
+### Step 2: The 3-Layer Eval Pyramid
+
+```
+                       ┌────────────┐
+                       │  Customer  │
+                       │  outcomes  │  ← Ultimate truth (business KPI)
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │  Online    │  ← A/B, real user signal
+                       │  A/B test  │     Slow but real
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │ Production │  ← Always-on, drift, sampled judge
+                       │ monitoring │     Lag indicator but continuous
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │  Offline   │  ← Pre-deploy CI, fast cheap
+                       │  golden    │     Controlled but limited coverage
+                       └────────────┘
+                              ▲
+                              │
+                       ┌────────────┐
+                       │ Unit-level │  ← Per-component, fastest
+                       │ component  │     Prompt template, RAG, schema
+                       └────────────┘
+```
+
+**Each layer catches different failures**:
+
+| Layer | Catches | Misses | Frequency | Cost |
+|---|---|---|---|---|
+| Unit | Logic bugs, schema breaks | End-to-end behavior | Every commit | $0 |
+| Offline golden | Known failure modes | Distribution shift | Every PR | $20-100/run |
+| Online A/B | Real user reactions | Long-term effects | Per feature | Time + monitoring |
+| Production monitoring | Drift, latency | Subtle quality drops | Continuous | $50-500/day |
+| Business KPI | True success | Causality, slow | Weekly | Data analyst time |
+
+### Step 3: Offline eval foundation (Week 1 deliverable)
+
+**Component 1: Stratified golden set**
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class EvalSample:
+    id: str
+    query: str
+    expected: str  # or expected_schema for structured
+    category: Literal['factoid', 'reasoning', 'creative', 'classification']
+    difficulty: Literal['easy', 'medium', 'hard']
+    language: str  # 'en', 'id', 'vi', 'th', 'pt', 'es', 'fr'
+    tenant_segment: str  # 'enterprise', 'smb', 'consumer'
+    contains_pii: bool
+    edge_case: bool
+
+# Stratified construction
+def build_golden_set(production_samples, n=200):
+    """
+    Sample stratified by intent, difficulty, language.
+    Include happy path + edge cases proportionally.
+    """
+    stratify_keys = ['category', 'difficulty', 'language']
+    samples_per_stratum = max(5, n // (len(intents) * len(difficulties) * len(languages)))
+    
+    golden = []
+    for cat in CATEGORIES:
+        for diff in DIFFICULTIES:
+            for lang in LANGUAGES:
+                stratum = production_samples.filter(category=cat, difficulty=diff, language=lang)
+                sampled = stratum.sample(min(samples_per_stratum, len(stratum)))
+                golden.extend(sampled)
+    
+    # Ensure 20% edge cases
+    edge_count = int(n * 0.2)
+    edge_samples = production_samples.filter(edge_case=True).sample(edge_count)
+    golden.extend(edge_samples)
+    
+    # Human-label expected outputs (gold standard)
+    return [annotate_with_human(s) for s in golden]
+```
+
+**Component 2: Automated metrics (limited but cheap)**
+
+```python
+def auto_metrics(generated: str, expected: str, sample: EvalSample) -> dict:
+    """
+    Cheap automated metrics. Useful for structured tasks, weak for generation.
+    """
+    metrics = {}
+    
+    # Structured output
+    metrics['valid_json'] = is_valid_json(generated)
+    metrics['has_required_fields'] = has_required_fields(generated, sample.schema)
+    metrics['schema_compliance'] = validate_schema(generated, sample.schema)
+    
+    # Exact match (only for factoid / classification)
+    if sample.category in ('factoid', 'classification'):
+        metrics['exact_match'] = generated.strip() == expected.strip()
+    
+    # Embedding similarity (semantic — better than BLEU)
+    metrics['cosine_to_expected'] = cosine(embed(generated), embed(expected))
+    
+    # Refusal detection
+    metrics['is_refusal'] = is_refusal(generated)
+    
+    # Length sanity
+    metrics['length_ratio'] = len(generated) / max(len(expected), 1)
+    
+    # PII leak check
+    metrics['contains_pii'] = detect_pii(generated)
+    
+    # Citation presence (for RAG)
+    metrics['has_citations'] = has_citations(generated)
+    
+    return metrics
+```
+
+**Why not BLEU / ROUGE for generation**:
+- Designed for translation / summarization where reference is "the" correct answer
+- LLM generation has many valid answers — penalty for not matching exact reference is wrong signal
+- High BLEU ≠ user satisfaction (often inverse: BLEU rewards verbose padding)
+- **Use for narrow structured tasks only**
+
+**Component 3: LLM-as-judge (the scale enabler)**
+
+```python
+async def llm_judge(query, generated, expected=None, rubric=None) -> dict:
+    """
+    LLM-judge with rubric. Calibrated against human, kappa > 0.6.
+    """
+    if rubric is None:
+        rubric = DEFAULT_RUBRIC
+    
+    if expected:
+        # Reference-based judging
+        prompt = f"""
+        Query: {query}
+        Reference answer: {expected}
+        Generated answer: {generated}
+        
+        Rate the generated answer:
+        1. Accuracy (1-5): Does it convey the same factual content?
+        2. Completeness (1-5): Does it cover what reference covers?
+        3. Tone (1-5): Is it appropriate?
+        4. Clarity (1-5): Is it understandable?
+        
+        Output strict JSON: {{"accuracy": int, "completeness": int, "tone": int, "clarity": int, "reasoning": str}}
+        """
+    else:
+        # Reference-free (rubric-only)
+        prompt = f"""
+        Query: {query}
+        Generated answer: {generated}
+        
+        {rubric}
+        
+        Output strict JSON with each dimension score and reasoning.
+        """
+    
+    # CRITICAL: judge must be DIFFERENT model from system under test
+    result = await claude_opus_47.generate(prompt, response_format=JudgeResult)
+    return result
+```
+
+**Component 4: LLM-judge calibration (non-negotiable)**
+
+```python
+async def calibrate_judge(judge_model, n=100):
+    """
+    Validate LLM-judge against human labels. Required before trusting.
+    """
+    # 1. Sample 100 production examples
+    samples = sample_production(n=n)
+    
+    # 2. 5 human labelers per sample, take consensus (mode)
+    human_labels = []
+    for s in samples:
+        labels = [human_labeler.label(s) for _ in range(5)]
+        consensus = mode(labels)
+        human_labels.append(consensus)
+    
+    # 3. LLM-judge labels same samples
+    judge_labels = []
+    for s in samples:
+        result = await judge_model.judge(s)
+        judge_labels.append(result.overall_score_bucket)  # discretize for kappa
+    
+    # 4. Compute agreement
+    from sklearn.metrics import cohen_kappa_score, classification_report
+    kappa = cohen_kappa_score(human_labels, judge_labels)
+    accuracy = mean([h == j for h, j in zip(human_labels, judge_labels)])
+    
+    # 5. Per-dimension calibration
+    per_dim_kappa = {}
+    for dim in ['accuracy', 'completeness', 'tone', 'clarity']:
+        per_dim_kappa[dim] = cohen_kappa_score(
+            [h[dim] for h in human_labels_detailed],
+            [j[dim] for j in judge_labels_detailed]
+        )
+    
+    return {
+        'overall_kappa': kappa,
+        'accuracy': accuracy,
+        'per_dim_kappa': per_dim_kappa,
+        'trustworthy': kappa > 0.6,
+        'recommendations': diagnose_disagreements(human_labels, judge_labels)
+    }
+```
+
+**Cohen's kappa thresholds**:
+- < 0.4: poor agreement, **don't trust judge**
+- 0.4-0.6: moderate, **only for rough triage**
+- 0.6-0.8: substantial, **production-ready**
+- 0.8+: almost perfect (rare, suspect overfitting)
+
+**Target: > 0.6**. Below, don't rely on judge for production decisions. **Recalibrate quarterly** (judge model upgrades, task drift).
+
+### Step 4: LLM-judge methodology — 5 non-negotiables
+
+**1. Different model from system under test (no self-eval bias)**
+
+```
+❌ FT'd Sonnet 4.6 system → Sonnet 4.6 judge
+   Bias toward own style, false confidence
+   
+✓ FT'd Sonnet 4.6 system → Opus 4.7 judge OR Gemini 3 Pro judge
+```
+
+**2. Calibrated against human (kappa > 0.6)** — covered above.
+
+**3. Multi-judge ensemble for high-stakes**
+
+```python
+async def ensemble_judge(sample):
+    judges = [opus_47, gemini_3_pro, gpt_5_5]
+    
+    results = await asyncio.gather(*[j.judge(sample) for j in judges])
+    
+    avg_score = mean([r.score for r in results])
+    median_score = median([r.score for r in results])  # outlier-resistant
+    std = stdev([r.score for r in results])
+    
+    return {
+        'score': avg_score,
+        'disagreement': std,
+        'individual_scores': [r.score for r in results],
+        'flag_for_human': std > 1.0,  # high disagreement
+    }
+```
+
+**Trade-off**: 3x cost. Worth it for high-stakes domains (medical, legal, financial).
+
+**4. Pairwise > absolute scoring**
+
+```python
+# Absolute scoring (1-5) drifts over time, hard to calibrate
+# Pairwise comparison more reliable
+
+async def pairwise_judge(query, response_a, response_b):
+    prompt = f"""
+    Query: {query}
+    Response A: {response_a}
+    Response B: {response_b}
+    
+    Which response is better? Answer "A", "B", or "tie".
+    Reasoning: ...
+    """
+    return await sonnet_46.generate(prompt)
+
+# For A/B testing model versions
+async def compare_versions(query, v1, v2):
+    response_v1 = await system_v1.generate(query)
+    response_v2 = await system_v2.generate(query)
+    
+    # CRITICAL: randomize order to prevent position bias
+    if random.random() > 0.5:
+        result = await pairwise_judge(query, response_v1, response_v2)
+        return 'v1' if result == 'A' else 'v2'
+    else:
+        result = await pairwise_judge(query, response_v2, response_v1)
+        return 'v2' if result == 'A' else 'v1'
+```
+
+**5. Recalibrate quarterly** + strip metadata that could bias (user ratings, model name, version tags).
+
+### Step 5: Online A/B framework
+
+```python
+# Phased canary rollout
+class CanaryRollout:
+    PHASES = [
+        ('canary', 0.01, hours=4),     # 1% for 4 hours
+        ('small', 0.05, hours=24),     # 5% for 1 day
+        ('medium', 0.25, days=3),      # 25% for 3 days
+        ('full', 1.0, None),           # 100%
+    ]
+    
+    async def run(self, experiment_id, control_version, treatment_version):
+        for phase_name, traffic_pct, duration in self.PHASES:
+            await self.shift_traffic(treatment_version, traffic_pct)
+            
+            start = now()
+            while now() - start < duration:
+                metrics = await self.collect_metrics(experiment_id, last_5_min=True)
+                
+                # Auto-rollback triggers
+                if metrics['error_rate'] > 0.05:
+                    await self.rollback(experiment_id, reason='error_rate spike')
+                    return 'rolled_back'
+                
+                if metrics['business_kpi_delta'] < -0.05:  # 5pp regression
+                    await self.rollback(experiment_id, reason='business KPI regression')
+                    return 'rolled_back'
+                
+                if metrics['latency_p99'] > 2000:
+                    await self.rollback(experiment_id, reason='latency breach')
+                    return 'rolled_back'
+                
+                await asyncio.sleep(60)
+            
+            print(f"Phase {phase_name} complete, advancing")
+        
+        return 'fully_deployed'
+
+# Statistical significance check
+from scipy.stats import ttest_ind
+
+def ab_analysis(experiment_id, days=7):
+    events = load_events(experiment_id, days=days)
+    
+    control = events.filter(variant='control')
+    treatment = events.filter(variant='treatment')
+    
+    # Continuous metric (e.g., resolve rate)
+    t_stat, p_value = ttest_ind(
+        [e.resolved for e in control],
+        [e.resolved for e in treatment]
+    )
+    
+    lift_pp = mean([e.resolved for e in treatment]) - mean([e.resolved for e in control])
+    
+    # Sample size sufficiency (power 0.8, alpha 0.05, MDE 2pp)
+    n_per_group = min(len(control), len(treatment))
+    required = compute_required_sample_size(effect_size=0.02, alpha=0.05, power=0.8)
+    
+    return {
+        'lift_pp': lift_pp * 100,
+        'p_value': p_value,
+        'significant': p_value < 0.05,
+        'sample_size_per_group': n_per_group,
+        'required_sample_size': required,
+        'underpowered': n_per_group < required,
+        'recommendation': 'ship' if (p_value < 0.05 and lift_pp > 0) else 'iterate'
+    }
+```
+
+**Business metric > technical metric** principle:
+- Voice agent: 7-day repayment rate > LLM-judge accuracy
+- BNPL chatbot: resolved-without-escalation > intent classification F1
+- ConvFinQA: financial decision quality > BLEU on answer
+
+### Step 6: Production monitoring + drift detection
+
+**Dashboard sections** (every production AI system needs):
+
+```
+1. Service Health:
+   - Request rate (per region / per tenant)
+   - Error rate (per error class)
+   - Latency p50 / p95 / p99 per stage
+   - Cost per request
+
+2. Quality Indicators:
+   - Daily LLM-judge sample score (500 samples)
+   - User feedback ratio (thumbs up / down)
+   - Refusal rate trend
+   - Hallucination rate (from sampled audit)
+
+3. Drift Indicators:
+   - Input length / type distribution Δ vs baseline
+   - Output length distribution Δ
+   - Intent distribution Δ
+   - Per-slice score delta
+
+4. Business Metrics:
+   - Resolve rate / conversion / retention
+   - NPS / CSAT
+   - Cost per resolved interaction
+
+5. Alerts:
+   - Active alerts + acknowledgment status
+   - Recent incident summary
+   - Error budget burn rate
+```
+
+**Drift detection (4 types)**:
+
+```python
+def detect_drift(window_now, window_baseline):
+    # 1. Data drift (input distribution)
+    queries_now_emb = mean_embedding(window_now.queries)
+    queries_baseline_emb = mean_embedding(window_baseline.queries)
+    input_drift = 1 - cosine(queries_now_emb, queries_baseline_emb)
+    
+    # 2. Output drift
+    lengths_now = [len(r) for r in window_now.responses]
+    lengths_baseline = [len(r) for r in window_baseline.responses]
+    length_drift_pp = (median(lengths_now) - median(lengths_baseline)) / median(lengths_baseline)
+    
+    # 3. Refusal rate drift (model getting conservative?)
+    refusal_delta = mean([is_refusal(r) for r in window_now.responses]) - \
+                    mean([is_refusal(r) for r in window_baseline.responses])
+    
+    # 4. Intent distribution KL
+    intent_now = Counter([classify(q) for q in window_now.queries])
+    intent_baseline = Counter([classify(q) for q in window_baseline.queries])
+    intent_kl = kl_divergence(intent_now, intent_baseline)
+    
+    return {
+        'input_embedding_drift': input_drift,
+        'length_drift_pp': length_drift_pp,
+        'refusal_delta': refusal_delta,
+        'intent_kl': intent_kl,
+    }
+
+# Daily job
+async def daily_drift_check():
+    today = production_logs.last(hours=24)
+    baseline = production_logs.range(days=8, days_back=2)  # 7-day baseline
+    
+    drift = detect_drift(today, baseline)
+    db.insert('drift_daily', {**drift, 'date': today_date()})
+    
+    for metric, value in drift.items():
+        threshold = DRIFT_THRESHOLDS[metric]
+        if abs(value) > threshold:
+            await page_oncall(f"Drift: {metric}={value:.3f} > {threshold}")
+```
+
+**Per-slice drift** (overall fine, slice broken):
+
+```python
+SLICES = ['language', 'tenant_segment', 'region', 'product_line', 'query_type']
+
+for slice in SLICES:
+    metric_per_group = production_logs.groupby(slice).agg({
+        'judge_score': 'mean',
+        'error_rate': 'mean',
+        'business_kpi': 'mean',
+    })
+    
+    for group, metric in metric_per_group.iterrows():
+        if metric.judge_score < THRESHOLD:
+            alert(f"Slice {slice}={group} quality drop: {metric.judge_score}")
+```
+
+### Step 7: Continuous golden set refresh
+
+**Golden set is dead within 3 months** without active refresh.
+
+```python
+# Weekly: incorporate production findings
+def refresh_golden_set():
+    # 1. Find production samples that LLM-judge scored low
+    low_scored = production_logs.filter(judge_score < 3).sample(50)
+    
+    # 2. Hand-label these
+    human_labeled = await human_label(low_scored)
+    
+    # 3. Add to golden set
+    golden_set.extend(human_labeled)
+    
+    # 4. Find LLM-judge / human disagreements
+    disagreements = find_disagreements(human_labels, judge_labels)
+    
+    # 5. Re-calibrate judge on disagreements
+    if len(disagreements) > 10:
+        recalibrate(disagreements)
+
+# Quarterly: comprehensive audit
+def quarterly_audit():
+    # Are golden samples still representative?
+    prod_dist = compute_distribution(production_logs)
+    golden_dist = compute_distribution(golden_set)
+    
+    coverage = check_coverage(golden_dist, prod_dist)
+    if coverage < 0.8:
+        alert_team("Golden set drift, needs refresh")
+    
+    # Are we still measuring the right things?
+    review_metrics_alignment_with_business()
+```
+
+### Step 8: Eval cost — how much should you spend?
+
+```
+Mature production:  5-15% of inference cost on eval
+Early production:   20-50%
+Critical domain:    50%+ (medical, legal, regulated)
+
+ConvFinQA:         ~30% (research project, lots of iteration)
+Voice agent:       ~10% (mature, automated)
+BNPL chatbot:      ~15% (multi-market complexity)
+```
+
+**Cost is justified by avoided incidents**. 1 silent quality regression = lost contract / churn / lawsuit.
+
+---
+
+## 关键决策 / 框架
+
+### What to eval (5 layers)
+
+```
+Layer 1: Per-component unit tests
+  - Prompt template renders correctly (no unfilled vars)
+  - RAG retrieves expected chunks (ACL respected)
+  - JSON schema validates
+  - Tool function executes correctly
+  - Run: every commit, ~$0
+
+Layer 2: Integration / Offline eval
+  - End-to-end on golden set
+  - Auto metrics + LLM-judge + spot check
+  - Per-slice breakdowns
+  - Run: every PR + nightly, ~$20-100
+
+Layer 3: Online A/B
+  - Phased canary 1% → 5% → 25% → 100%
+  - Business metric vs control
+  - Statistical significance + power check
+  - Auto-rollback on SLO breach
+
+Layer 4: Production monitoring
+  - 5 sections: health, quality, drift, business, alerts
+  - Per-slice + per-tenant
+  - Continuous, ~$50-500/day
+
+Layer 5: Continuous improvement
+  - Weekly golden set refresh
+  - Quarterly judge recalibration
+  - Quarterly audit (representativeness)
+```
+
+### Metric selection by use case
+
+```
+Classification (intent routing):
+  - Accuracy, F1, confusion matrix
+  - Per-class precision/recall
+  - Calibration (predicted prob vs actual)
+
+Generation (chat response):
+  - LLM-judge on rubric (accuracy, helpfulness, tone)
+  - User feedback (thumbs / rating)
+  - Behavioral (regeneration, abandonment)
+  - Business KPI (resolve rate, conversion)
+
+RAG:
+  - Retrieval: recall@10, NDCG@10, MRR
+  - Generation: faithfulness, hallucination rate
+  - End-to-end: answer correctness, citation accuracy
+
+Agent (tool-using):
+  - Per-step success rate
+  - End-to-end task completion
+  - Tool call accuracy
+  - Latency p99, cost per task
+
+Safety / Compliance:
+  - Refusal rate on disallowed content
+  - PII leak detection
+  - Per-jurisdiction policy adherence
+```
+
+---
+
+## 完整代码 / 架构图
+
+### Full eval pipeline
+
+```python
+# eval/pipeline.py
+
+import asyncio
+from dataclasses import dataclass
+from typing import List, Dict
+
+@dataclass
+class EvalConfig:
+    golden_set_path: str
+    judge_model: str = 'claude-opus-4-7'
+    threshold_overall: float = 0.85
+    threshold_per_slice: float = 0.80
+    judge_calibration_kappa: float = 0.60
+
+class EvalPipeline:
+    def __init__(self, config: EvalConfig):
+        self.config = config
+        self.golden_set = self._load_golden_set()
+        self.judge = init_judge(config.judge_model)
+    
+    async def run(self, system) -> Dict:
+        """Full eval run."""
+        # 1. Per-component unit tests
+        unit_results = await self._unit_tests(system)
+        if not unit_results['all_pass']:
+            return {'status': 'fail', 'stage': 'unit', 'details': unit_results}
+        
+        # 2. Integration eval on golden set
+        integration_results = await self._integration_eval(system)
+        
+        # 3. Per-slice analysis
+        slice_results = self._per_slice_analysis(integration_results)
+        
+        # 4. Compare to baseline
+        baseline = self._load_baseline()
+        regression_check = self._regression_check(integration_results, baseline)
+        
+        # 5. Decide pass/fail
+        passed = (
+            integration_results['overall'] >= self.config.threshold_overall and
+            all(s >= self.config.threshold_per_slice for s in slice_results.values()) and
+            not regression_check['has_regression']
+        )
+        
+        return {
+            'status': 'pass' if passed else 'fail',
+            'overall': integration_results['overall'],
+            'per_slice': slice_results,
+            'regression': regression_check,
+            'baseline_delta': integration_results['overall'] - baseline['overall'],
+            'samples_evaluated': len(self.golden_set),
+        }
+    
+    async def _integration_eval(self, system) -> Dict:
+        results = []
+        
+        # Parallel evaluation
+        async def eval_one(sample):
+            start = time.time()
+            output = await system.generate(sample.query, context=sample.context)
+            latency = time.time() - start
+            
+            auto = auto_metrics(output, sample.expected, sample)
+            judge = await self.judge.judge(sample.query, output, sample.expected)
+            
+            return {
+                'sample_id': sample.id,
+                'category': sample.category,
+                'language': sample.language,
+                'output': output,
+                'latency': latency,
+                **auto,
+                'judge_score': judge.overall,
+                'judge_per_dim': judge.per_dim,
+            }
+        
+        # Batch with concurrency control
+        sem = asyncio.Semaphore(20)
+        async def bounded(sample):
+            async with sem:
+                return await eval_one(sample)
+        
+        results = await asyncio.gather(*[bounded(s) for s in self.golden_set])
+        
+        # Aggregate
+        return {
+            'overall': mean([r['judge_score'] for r in results]) / 5,
+            'latency_p50': p50([r['latency'] for r in results]),
+            'latency_p99': p99([r['latency'] for r in results]),
+            'auto_metric_summary': aggregate_auto(results),
+            'samples': results,
+        }
+    
+    def _per_slice_analysis(self, results) -> Dict:
+        slice_dims = ['category', 'language', 'difficulty', 'tenant_segment']
+        per_slice = {}
+        
+        for dim in slice_dims:
+            for value in set(s[dim] for s in results['samples']):
+                slice_samples = [s for s in results['samples'] if s[dim] == value]
+                per_slice[f"{dim}={value}"] = mean([s['judge_score'] for s in slice_samples]) / 5
+        
+        return per_slice
+    
+    def _regression_check(self, current, baseline) -> Dict:
+        # Per-slice regression check
+        regressions = []
+        for slice_key, current_score in current['per_slice'].items():
+            baseline_score = baseline['per_slice'].get(slice_key, current_score)
+            if current_score < baseline_score - 0.02:  # 2pp regression
+                regressions.append({
+                    'slice': slice_key,
+                    'baseline': baseline_score,
+                    'current': current_score,
+                    'delta_pp': (current_score - baseline_score) * 100
+                })
+        
+        return {
+            'has_regression': len(regressions) > 0,
+            'regressions': regressions,
+        }
+
+
+# Usage in CI
+async def main():
+    config = EvalConfig(
+        golden_set_path='eval/golden_v3.jsonl',
+        threshold_overall=0.85,
+        threshold_per_slice=0.80,
+    )
+    
+    pipeline = EvalPipeline(config)
+    results = await pipeline.run(system)
+    
+    if results['status'] == 'fail':
+        print(f"FAIL: {results}")
+        sys.exit(1)
+    
+    print(f"PASS: overall={results['overall']:.2%}")
+```
+
+### Architecture diagram
+
+```
+                    ┌──────────────────────────────────────┐
+                    │      Eval Pyramid (Production)       │
+                    └──────────────────────────────────────┘
+                                       │
+        ┌──────────────────────────────┼──────────────────────────────┐
+        │                              │                              │
+        ▼                              ▼                              ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│   OFFLINE     │            │    ONLINE     │            │  PRODUCTION   │
+│   (Pre-PR)    │            │  (A/B test)   │            │  (Always-on)  │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Golden set    │            │ Canary rollout│            │ Daily judge   │
+│ 200 stratified│            │ 1→5→25→100%   │            │ sample 500    │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Auto metrics  │            │ Business KPI  │            │ Drift detect  │
+│ (schema, sim) │            │ vs control    │            │ (4 types)     │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ LLM-judge     │            │ Stat signifi  │            │ Per-slice     │
+│ (kappa>0.6)   │            │ + power check │            │ + per-tenant  │
+└───────┬───────┘            └───────┬───────┘            └───────┬───────┘
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ Human spot    │            │ Auto-rollback │            │ Alerts        │
+│ check (50/wk) │            │ on SLO breach │            │ P1/P2/P3      │
+└───────────────┘            └───────────────┘            └───────────────┘
+        │                            │                            │
+        └────────────────────────────┴────────────────────────────┘
+                                     │
+                                     ▼
+                            ┌───────────────────┐
+                            │ Weekly refresh    │
+                            │ Quarterly audit   │
+                            └───────────────────┘
+```
+
+---
+
+## Gao Xin 简历专属 reframe
+
+### ConvFinQA — 9-variant ablation + honest negative result
+
+**S**: ConvFinQA multi-hop financial QA. 多 component (RAG + reasoning + tool + critic), 不知道每个 helps how much.
+
+**T**: 设计 eval methodology 能 isolate 每个 component 的 contribution.
+
+**A**: 我设计了 **9-variant ablation**:
+- Variant 1: base model only (PE baseline)
+- Variant 2: + RAG (knowledge retrieval)
+- Variant 3: + tool (calculator)
+- Variant 4: + CoT prompt
+- Variant 5-7: combinations
+- Variant 8: + critic agent (always trigger)
+- Variant 9: + critic agent (selectively trigger on percent_change / divide ops only)
+
+Stratified 300-conversation eval set, per-hop-depth slices, per-difficulty slices.
+
+**R**: 
+- Variant 9 (selective critic) triggered on 358 reasoning steps
+- Caught useful errors on **4/358** (1.1%)
+- **Honest negative result**: critic eval cost wasn't justified by signal
+
+**Lesson**: aggressive eval triggers cost more but mostly produce noise. **Cheap broad eval + targeted expensive eval beats one-size-fits-all expensive eval**.
+
+### Voice agent — 7-market per-slice dashboard caught Indonesia regression
+
+**S**: Voice agent deployed across 7 markets (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦).
+
+**T**: Continuous quality monitoring without 100% human review.
+
+**A**: 
+- **Offline**: 500 golden calls per market × 7 = 3500 stratified
+- **LLM-judge**: Opus 4.7 on rubric (empathy, accuracy, compliance), calibrated kappa = 0.72
+- **Online**: phased canary 1% → 5% → 25% → 100% per market
+- **Business metric**: 7-day repayment rate vs control (auto-rollback if -5pp)
+- **Production**: per-market dashboard, daily 500 judge samples, drift on input dist + refusal rate
+
+**R**: Week 2 of Indonesia rollout, **repayment rate -8pp vs control** caught by canary monitoring. Investigation: model too apologetic, customers felt "bot doesn't take me seriously", disputes up. Fix: DPO refresh on Indonesian firm-but-polite examples. **Without per-slice monitoring, would have lost a quarter before noticing**.
+
+### BNPL chatbot — composite confidence + 4-signal escalation
+
+**S**: BNPL chatbot 70% intent routing accuracy. PM wanted 90%+.
+
+**T**: Get routing to 90% without retraining (too expensive).
+
+**A**: Built **4-signal composite confidence**:
+1. LLM-reported confidence (calibrated against historical accuracy)
+2. Top-1 vs top-2 probability margin
+3. RAG retrieval score (NDCG@5)
+4. Self-consistency (sample 3, agreement rate)
+
+Composite = weighted sum, threshold tuned on held-out set.
+
+**R**: Accuracy 70 → 92% by escalating bottom 8% to human. **Composite confidence outperformed any single signal**. Calibration story (Brier score) showed predicted probabilities matched actual accuracy within 2pp across deciles.
+
+### Pakistan ASR cascade — 40-minute outage incident eval
+
+**S**: Voice agent in Pakistan. ASR API (third-party) had intermittent 40-min outage during peak hours.
+
+**T**: Detect and respond fast.
+
+**A**:
+- **Detection**: drift dashboard caught ASR confidence drop in 3 minutes
+- **Triage**: per-region dashboard isolated to Pakistan only
+- **Mitigation**: failover to backup ASR provider (latency 1.5x but functional)
+- **Comm**: status update to Pakistan ops team within 8 minutes
+- **Postmortem**: action items — multi-vendor fallback policy, faster detection threshold
+
+**R**: 40-min outage with only ~12% calls affected (vs 100% if no failover). MTTR 8 min vs typical 30+ min.
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "LLM-as-judge — how do you know judge is reliable?"
+
+**A**: 6-step validation:
+1. **Hand-label 100 production examples** by experts (gold standard, 5 labelers per sample, take consensus)
+2. **Run judge on same 100**, compute Cohen's kappa
+3. Judge must reach **kappa > 0.6** to be trusted (substantial agreement)
+4. **Re-validate quarterly** as model / task drift over time
+5. **Avoid same model self-eval** — significant bias toward own style
+6. **Multi-judge ensemble** (Opus 4.7 + Gemini 3 Pro + GPT-5.5) for high-stakes — average / median for outlier resistance
+7. **Per-rubric-dimension calibration** — judge might be good at accuracy but bad at tone
+
+**Q2**: "Customer asks: how confident are you the model is working today?"
+
+**A**: Build a **live confidence dashboard**:
+- Error budget remaining (e.g., 99.5% SLO, 0.3% burned this month)
+- Drift indicators (input distribution Δ vs 7d baseline — currently +0.04, below 0.10 threshold)
+- Recent canary results (last 5 deploys passing? Latest deploy 3 days ago, +1.2pp on judge)
+- Human-flag rate (production samples flagged by LLM-judge or low confidence — 2% this week, baseline 2.1%)
+- "Latest weekly human eval pass rate: 94%, baseline 93%"
+- "Per-tenant health: 18 green / 2 yellow / 0 red"
+
+Show numbers, trends, not feels. Customers trust numbers + graphs.
+
+**Q3**: "We don't have user feedback signal. What do we use?"
+
+**A**:
+- **Implicit signals**: regeneration rate (user hit retry), session length, click-through, completion rate
+- **Downstream**: did user complete intended action (purchase, file ticket close)
+- **External sensors**: changes in support ticket volume after deploy
+- **Self-consistency**: same query sampled N times, low variance = high confidence
+- **Ensemble agreement**: 3 models on same query, disagreement = uncertainty signal
+- **Contract human eval**: if no implicit signal, $10/sample × 500/week = $26k/year, often worth it for high-stakes use case
+- **LLM-judge rubric**: criteria-based (helpfulness, accuracy, tone, safety, clarity) without expected answer
+
+**Q4**: "How much should eval cost as % of inference cost?"
+
+**A**:
+- **Mature production**: 5-15% of inference cost. Below 5% likely under-investing.
+- **Early production**: 20-50% (need confidence in deploys, frequent eval iteration)
+- **Critical domains** (medical, legal, financial): 50%+ — human review on most outputs
+- Cost is **justified by avoided incidents** — 1 silent quality regression in production can mean lost contract / churn / lawsuit
+
+**Cost math example** (BNPL chatbot, 100k queries/day):
+- Inference: ~$15k/month (Sonnet 4.6 + RAG)
+- Eval: ~$2k/month (daily 500 judge samples at Opus 4.7 × $4 + 10% human spot check)
+- Eval / inference = ~13% ✓ healthy range
+
+**Q5**: "Eval suite passes but customers complain. Why?"
+
+**A**: Eval suite doesn't reflect production. Common causes:
+- **Golden set unrepresentative** (synthetic queries vs real customer language)
+- **Wrong metric**: ROUGE high but users hate verbose output
+- **No diversity** in golden set (overfit to certain query type)
+- **Drift**: production distribution shifted, eval set stale
+- **Missing slice**: overall passes, but one important slice fails (e.g., new product line, new tenant)
+- **Goodhart**: we optimized for our metric, gaming it without solving real problem
+
+**Fix**:
+- **Production sampling**: 200 random samples/week → hand label → add to golden set
+- **Customer complaint mining**: every complaint becomes eval case
+- **Slice expansion**: ensure eval covers all customer segments
+- **Always have human review channel** for unclear cases
+- **Quarterly golden set audit**: is set still representative?
+
+---
+
+## ❌ 死路答法
+
+1. **BLEU / ROUGE only** — weak for generation, misleading
+2. **Same model judges itself** — bias toward own style, false confidence
+3. **Single overall metric** — masks per-slice failures
+4. **Static golden set** — stale within 3 months
+5. **Offline only, no production monitoring** — drift undetected
+6. **No business KPI correlation** — optimizing proxy, not truth
+7. **No alerts / SLOs** — discover via customer complaint
+8. **Skip LLM-judge calibration** — judge may be biased / unreliable
+9. **No human-in-loop** — blind spots compound
+10. **Optimize technical metric, ignore business outcome** — Goodhart's Law
+
+---
+
+## ✅ 加分项
+
+1. **3-layer eval pyramid** (offline / online / production) with concrete tools
+2. **LLM-judge calibration via Cohen's kappa > 0.6** — quantitative trust threshold
+3. **Production sampling → golden set refresh** loop — keeps eval honest
+4. **Goodhart's Law awareness** — explicit anti-pattern
+5. **Specific tools** (Braintrust, Langfuse, Phoenix, Ragas, TruLens, LangSmith) — 2026 specificity
+6. **Cost as % of inference** (5-15% mature) — budget framing
+7. **Quote ConvFinQA negative result + voice agent A/B + BNPL composite confidence**
+8. **Confidence dashboard for customer-facing** — trust transparency
+9. **Per-slice + per-tenant decomposition** — overall fine ≠ all slices fine
+10. **Business KPI > technical metric** philosophy
+
+---
+
+## 一句话总结
+
+> **"知道 AI 在 production working" = 多层 eval pyramid + 校准的 LLM-judge (kappa > 0.6) + 持续 drift monitoring + business KPI correlation + golden set 持续 refresh. 不是 single metric, 是 ensemble of signals. Any silent system 都是 production 事故等待发生.**
+
+---
+
+## Cheat Sheet
+
+```
+3-layer eval pyramid:
+  Offline (CI / pre-deploy): 
+    - Stratified golden set 200-2000
+    - Auto metrics (schema, sim, refusal)
+    - LLM-judge (kappa > 0.6 vs human)
+    - Human spot check 50/week
+  
+  Online (canary + A/B):
+    - 1% → 5% → 25% → 100% phased
+    - Business metric vs control
+    - Auto-rollback on SLO breach
+    - Statistical significance + power check
+  
+  Production (always-on):
+    - Per-tenant / per-slice metric
+    - Drift detection (input/output/refusal/intent)
+    - LLM-judge daily 500 samples
+    - User feedback aggregation
+    - Cost / latency monitoring
+
+5 metric categories:
+  Technical: latency, error rate, throughput, cost
+  Quality: judge score, refusal, hallucination
+  User explicit: thumbs, rating, complaint
+  User implicit: regeneration, session length, completion
+  Business KPI: resolve rate, conversion, retention, NPS
+
+LLM-judge methodology:
+  - Different model from system under test
+  - Cohen's kappa > 0.6 with human (calibrate quarterly)
+  - Multi-judge ensemble for high-stakes (3 judges)
+  - Pairwise > absolute (more reliable)
+  - Strip metadata (no ground truth leak)
+  - Per-dimension rubric not single score
+
+Drift detection (4 types):
+  Data drift: input distribution change
+  Concept drift: true label changes over time
+  Model drift: dependency / config / model upgrade
+  Distribution shift: output behavior changes
+
+Drift metrics:
+  Input: embedding mean cosine, Wasserstein 1D, KL on topics
+  Output: length p50, refusal rate, JSON validity rate
+  Statistical: KS test continuous, chi-square categorical
+  Trend: 14-day rolling check
+
+Production monitoring (5 sections):
+  1. Service health
+  2. Quality indicators
+  3. Drift indicators
+  4. Business metrics
+  5. Alerts (P1 page / P2 30min / P3 slack)
+
+Cost target:
+  Mature production: 5-15% of inference cost
+  Early production: 20-50%
+  Critical domain: 50%+
+
+Tools 2026:
+  Eval pipelines: Braintrust, Langfuse, Phoenix, Ragas, TruLens
+  Tracing: LangSmith, Phoenix, Datadog APM
+  Drift: Custom + Arize / WhyLabs / Fiddler
+  Logging: W&B Tables / MLflow
+  Dashboards: Grafana, Datadog
+  Alerts: PagerDuty + Slack
+  Human label: Scale AI / Labelbox / internal
+
+Pragmatic timeline:
+  Week 1: 100-sample golden set + basic CI eval
+  Week 2: LLM-judge with calibration (kappa > 0.6)
+  Week 3: Production monitoring dashboard
+  Week 4: A/B test framework
+  Month 2: Drift detection
+  Month 3: Continuous golden set refresh
+  Ongoing: Quarterly judge recalibration
+
+Anti-patterns:
+  - BLEU/ROUGE for generation
+  - Same model self-eval
+  - Static golden set
+  - Single metric optimization (Goodhart)
+  - No human-in-loop
+  - No drift detection
+  - Optimize proxy not truth
+
+Case studies:
+  - ConvFinQA: 9-variant ablation + 4/358 honest negative result
+  - Voice agent: 7-market per-slice dashboard, Indonesia week-2 catch
+  - BNPL: 4-signal composite confidence, 70→92% via escalation
+  - Pakistan ASR: 40-min outage, MTTR 8 min via drift detection
+
+Quotes for interview:
+  - "3-layer pyramid: offline + online + production"
+  - "LLM-judge needs kappa > 0.6 vs human, or don't trust it"
+  - "Per-slice > overall — worst slice catches issues"
+  - "Business KPI > technical metric — optimize truth not proxy"
+  - "Static golden set is dead within 3 months — production sampling is refresh loop"
+  - "Goodhart's Law: any single metric you optimize becomes gamed"
+  - "Eval cost 5-15% of inference is healthy"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

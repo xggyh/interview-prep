@@ -1,0 +1,1572 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、A/B 测试、回滚 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、A/B 测试、回滚</div>
+  <h1>Q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、A/B 测试、回滚</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-029-prompt-version-ab-rollback.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-029-prompt-version-ab-rollback.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q29 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q29 · 生产环境 prompt 版本管理 / A/B / 回滚</h3>
+<blockquote><p>"Your team manages <strong>200+ prompts</strong> in production across 30 LLM features. PM wants to A/B test a new system prompt for the customer support bot. Eng wants to <strong>safely roll it out</strong>, and ops wants to <strong>rollback in 5 minutes</strong> if metrics regress. <strong>Design the prompt lifecycle system</strong> — versioning, eval, A/B, rollout, rollback, audit."</p></blockquote>
+<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops <strong>约束</strong>: 200+ prompts / 30 features / per-tenant variants / non-eng (PM) authors / pre-deploy eval / canary rollout / auto-rollback / audit trail</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>不是考你 git, 是考你 <strong>prompt 不是普通 code, 需要 ML ops 加 web ops 加产品 ops 三层混合的 lifecycle 系统</strong>:</p>
+<ol><li><strong>Prompt 不是 source code</strong> — PM/non-eng author, can't require Pull Request review for every typo</li><li><strong>Eval gate</strong> — LLM-as-judge + human review before production</li><li><strong>Per-tenant variants</strong> — customer A 想 customize wording, multi-tenant prompt</li><li><strong>Feature flag for prompt</strong> — LaunchDarkly / Statsig pattern, but prompt-specific</li><li><strong>Auto-rollback</strong> — metric regression → revert without human</li><li><strong>Audit + immutable history</strong> — who changed what when, why</li><li><strong>Cost/latency monitoring</strong> — new prompt 长 50% token → cost +50%, need watch</li><li><strong>菜鸟答案失败点</strong>: "git 提交 prompt + feature flag" — too shallow. 没说 eval gate / canary / auto-rollback / per-tenant.</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<ol><li><strong>Who authors prompts?</strong>: PM 直接 edit 还是 eng 翻译? 影响 UI / approval</li><li><strong>Prompt count</strong>: 200 多少 active? 多少 archived?</li><li><strong>Per-tenant variants needed?</strong>: customer-specific wording vs single prompt for all</li><li><strong>Auto-rollback metric</strong>: latency / error rate / refund rate / NPS, 哪些用作 trigger?</li><li><strong>A/B traffic split</strong>: 1% / 50% / 100% 步骤? 决定 ramp-up time</li><li><strong>Time budget</strong>: 1 week iteration vs 1 hour hotfix?</li><li><strong>Compliance</strong>: 需要 audit who changed when (SOX / SOC 2)?</li><li><strong>Existing infra</strong>: 用 Git? Postgres? LaunchDarkly?</li></ol>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify + framing</td><td>5 min</td><td>Prompt 是 product config, 不是 code</td><td>"Prompt 既不是 code 也不是 doc, 是 product config, 需要 ML ops + product ops"</td></tr><tr><td>2</td><td>Prompt as data</td><td>8 min</td><td>Schema + registry + version</td><td>"Prompt registry 是 DB, 不是 git, 因为 PM author + per-tenant + run-time fetch"</td></tr><tr><td>3</td><td>Eval pipeline</td><td>10 min</td><td>Pre-deploy + golden + LLM-judge</td><td>"Eval gate 4 层: lint, golden, LLM-judge, human review"</td></tr><tr><td>4</td><td>A/B + canary rollout</td><td>10 min</td><td>Feature flag + traffic split + cohort</td><td>"LaunchDarkly-style flag, 1% → 10% → 50% → 100%"</td></tr><tr><td>5</td><td>Auto-rollback</td><td>8 min</td><td>Metric trigger + diff + revert</td><td>"Rollback &lt; 5min = pre-promote shadow + auto trigger"</td></tr><tr><td>6</td><td>Per-tenant variants</td><td>6 min</td><td>Inheritance + override + governance</td><td>"Base prompt + per-tenant override, customer 自定义但 governance 在我们"</td></tr><tr><td>7</td><td>Audit + observability</td><td>7 min</td><td>Immutable history + dashboard</td><td>"Every prompt change is event in audit log, dashboard per prompt"</td></tr><tr><td>8</td><td>Trade-offs + close</td><td>6 min</td><td>DB vs Git, build vs buy (PromptLayer/LangSmith)</td><td>"DB-based registry + LangSmith eval, 不全自建"</td></tr></tbody></table></div>
+<hr />
+<h3>端到端架构图 (ASCII)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                          Prompt Lifecycle System                                        │
+│                                                                                         │
+│  ┌─AUTHORING (PM-friendly UI)──────────────────────────────────────┐                    │
+│  │   Web UI (Retool / custom):                                     │                    │
+│  │   - Edit prompt content (markdown editor)                       │                    │
+│  │   - Sidebar: variables, model, temperature                      │                    │
+│  │   - Inline test: try sample input                               │                    │
+│  │   - Version history                                             │                    │
+│  │   - Save as draft / propose for review                          │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─PROMPT REGISTRY (Postgres + Redis cache)────────────────────────┐                    │
+│  │   Table: prompts                                                │                    │
+│  │     id, name (unique), domain, owner, current_version           │                    │
+│  │   Table: prompt_versions                                        │                    │
+│  │     id, prompt_id, version_tag (semver), content,               │                    │
+│  │     model, temperature, max_tokens, variables_schema,           │                    │
+│  │     state (draft, eval-passed, canary, prod, deprecated),       │                    │
+│  │     created_by, created_at, eval_results, parent_version        │                    │
+│  │   Table: prompt_assignments                                     │                    │
+│  │     prompt_id, tenant_id, version_id, traffic_pct, started_at   │                    │
+│  │   Table: prompt_audit_log                                       │                    │
+│  │     prompt_id, action, actor, ts, before, after, reason         │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─EVAL PIPELINE (gate before promote)─────────────────────────────┐                    │
+│  │   1. Lint: variable schema match, no PII leak, length, model    │                    │
+│  │      compatibility check                                        │                    │
+│  │   2. Golden set: 50-200 (input, expected) per prompt            │                    │
+│  │      Run new version, compare to current. nDCG / accuracy /     │                    │
+│  │      exact match etc. depending on task                         │                    │
+│  │   3. LLM-as-judge: Claude Opus 4.7 evaluates quality on         │                    │
+│  │      sampled outputs (rubric-based)                             │                    │
+│  │   4. Human review: 1-5% sample queue to human evaluator         │                    │
+│  │      (mandatory for prompts above tier-2 importance)            │                    │
+│  │   5. Cost / latency check: new version's token usage,           │                    │
+│  │      compare. &gt; 10% increase → flag                             │                    │
+│  │                                                                 │                    │
+│  │   Pass → state: 'eval-passed', eligible for canary              │                    │
+│  │   Fail → reject with detailed report                            │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─FEATURE FLAG / TRAFFIC SPLIT (LaunchDarkly-style)───────────────┐                    │
+│  │   Resolution at request time:                                   │                    │
+│  │     SDK: get_prompt("customer_support_v2", user, tenant)        │                    │
+│  │     1. Lookup tenant override (if tenant has custom variant)    │                    │
+│  │     2. Lookup A/B assignment (sticky by user_id hash)           │                    │
+│  │     3. Return prompt version + content                          │                    │
+│  │                                                                 │                    │
+│  │   Ramp-up: 1% canary → 10% → 50% → 100% (per-stage observation) │                    │
+│  │   Sticky: user_id hash mod 100 &lt; pct → treat                    │                    │
+│  │   Override: specific user/tenant force into bucket              │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─PRODUCTION INFERENCE (with prompt SDK)──────────────────────────┐                    │
+│  │   def chat(user, message):                                      │                    │
+│  │     prompt_v = prompt_sdk.get(                                  │                    │
+│  │         name="customer_support",                                │                    │
+│  │         user_id=user.id,                                        │                    │
+│  │         tenant=user.tenant                                      │                    │
+│  │     )                                                           │                    │
+│  │     # SDK returns version_tag + content                         │                    │
+│  │     resp = llm.chat(prompt_v.content, message)                  │                    │
+│  │     # Log version_tag with response                             │                    │
+│  │     observability.emit(prompt_version=prompt_v.tag, ...)        │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─MONITORING + AUTO-ROLLBACK───────────────────────────────────────┐                   │
+│  │   Per-prompt-version dashboard:                                 │                    │
+│  │     - p50/p99 latency                                           │                    │
+│  │     - token usage in/out (cost)                                 │                    │
+│  │     - error rate (LLM refuses, timeouts)                        │                    │
+│  │     - quality score (LLM-judge sample 1%)                       │                    │
+│  │     - business metric (refund rate, CSAT, conversion)           │                    │
+│  │     - acceptance rate (e.g., user clicked thumb-up)             │                    │
+│  │                                                                 │                    │
+│  │   Auto-rollback triggers:                                       │                    │
+│  │     - error rate &gt; 2× baseline for 5 min                        │                    │
+│  │     - p99 latency &gt; 1.5× baseline for 10 min                    │                    │
+│  │     - business metric regression &gt; 5% in 1h                     │                    │
+│  │     - cost &gt; 2× baseline for 30 min                             │                    │
+│  │                                                                 │                    │
+│  │   On rollback:                                                  │                    │
+│  │     1. Flip traffic 100% back to last 'prod' version             │                    │
+│  │     2. Mark new version as 'rolled-back' with reason             │                    │
+│  │     3. PagerDuty alert to prompt owner                          │                    │
+│  │     4. Slack notification to team                               │                    │
+│  │     5. Time to rollback &lt; 30 sec (Redis cache invalidate)       │                    │
+│  └─────────────────────────────────────────────────────────────────┘                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘</code></pre>
+<hr />
+<h3>详细设计 (60-min walkthrough)</h3>
+<h4>Phase 1: Clarify + framing (5 min)</h4>
+<p>开口:</p>
+<ul><li>"Prompt 200+ 中, active production 大约多少? Tier-1 重要 vs tier-3 实验性 mix"</li><li>"Per-tenant variants 需要吗? customer A 想 'be more formal' 类 customization?"</li><li>"Auto-rollback metric: latency / error / refund rate / NPS, 哪个主?"</li></ul>
+<p>假设: 150 production active + 50 dev/archive, 30 feature, 60% tier-2+, per-tenant customization 给 paid only (10 tenants), auto-rollback 主用 error rate + 业务 metric.</p>
+<p>KPI:</p>
+<ul><li><strong>Time to promote (new version → 100% prod)</strong>: 1 day for tier-3, 1 week for tier-1</li><li><strong>Time to rollback</strong>: &lt; 5 min</li><li><strong>Eval coverage</strong>: 100% prod prompts have golden set</li><li><strong>Audit</strong>: 100% changes logged with actor + reason</li></ul>
+<p>Framing: prompt 不是 code. Treat as <strong>product config managed via versioned data store</strong>.</p>
+<ul><li>Code: PR review, CI, deploy</li><li>Prompt: edit in UI, eval gate, traffic split, runtime fetch</li><li>共同: version control, audit, rollback. But mechanism different.</li></ul>
+<h4>Phase 2: Prompt as data (8 min)</h4>
+<p><strong>2.1 Schema design</strong></p>
+<pre class="language-sql"><code class="language-sql">CREATE TABLE prompts (
+    id UUID PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,  -- 'customer_support', 'order_classifier'
+    domain TEXT,                -- 'support', 'sales', 'analytics'
+    description TEXT,
+    owner_team TEXT,
+    tier SMALLINT DEFAULT 2,    -- 1 = critical, 3 = experimental
+    current_version_id UUID,    -- pointer to current prod
+    archived BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE prompt_versions (
+    id UUID PRIMARY KEY,
+    prompt_id UUID REFERENCES prompts(id),
+    version_tag TEXT NOT NULL,    -- semver: '1.2.3'
+    content TEXT NOT NULL,
+    model TEXT,                   -- 'claude-sonnet-4.6', 'gpt-5.5'
+    temperature FLOAT,
+    max_tokens INT,
+    variables_schema JSONB,       -- e.g., {"user_name": "string", "order_id": "string"}
+    state TEXT DEFAULT 'draft',   -- draft, eval-passed, canary, prod, deprecated, rolled-back
+    eval_results JSONB,
+    parent_version_id UUID,       -- forking
+    created_by TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    promoted_at TIMESTAMPTZ,
+    deprecated_at TIMESTAMPTZ,
+    UNIQUE (prompt_id, version_tag)
+);
+
+CREATE TABLE prompt_assignments (
+    id UUID PRIMARY KEY,
+    prompt_id UUID,
+    tenant_id TEXT,              -- NULL = global default
+    version_id UUID,
+    traffic_pct INT,             -- 0-100, what % of (tenant) traffic gets this version
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ       -- for A/B time-bound
+);
+
+CREATE TABLE prompt_audit_log (
+    id UUID PRIMARY KEY,
+    prompt_id UUID,
+    version_id UUID,
+    action TEXT,                 -- 'created', 'promoted', 'rolled_back', 'edited'
+    actor TEXT,
+    ts TIMESTAMPTZ DEFAULT NOW(),
+    before JSONB,
+    after JSONB,
+    reason TEXT
+);</code></pre>
+<p>Postgres for source of truth. Redis cache for fast read (10ms target).</p>
+<p><strong>2.2 Versioning convention</strong></p>
+<p>semver: MAJOR.MINOR.PATCH</p>
+<ul><li>MAJOR: breaking change (variable schema change, output format change)</li><li>MINOR: new capability (e.g., handle new query type)</li><li>PATCH: bug fix / wording tweak</li></ul>
+<p>Tag examples:</p>
+<ul><li><code>customer_support@1.0.0</code>: initial</li><li><code>customer_support@1.1.0</code>: added "handle refund" capability</li><li><code>customer_support@1.1.1</code>: typo fix</li><li><code>customer_support@2.0.0</code>: changed output to JSON</li></ul>
+<p><strong>2.3 Variable schema (Jinja templating)</strong></p>
+<p>Prompts use Jinja templates:</p>
+<pre class="language-plaintext"><code class="language-plaintext">You are a helpful customer support agent for {{ company_name }}.
+The customer is {{ user.name }} with order #{{ order_id }}.
+Their issue: {{ issue }}</code></pre>
+<p>Variables declared in schema:</p>
+<pre class="language-json"><code class="language-json">{
+  "company_name": {"type": "string", "required": true},
+  "user": {"type": "object", "properties": {"name": "string"}},
+  "order_id": {"type": "string"},
+  "issue": {"type": "string"}
+}</code></pre>
+<p>Renderer (Jinja2) validates at compile time. Missing variable → error fast, not runtime.</p>
+<h4>Phase 3: Eval pipeline (10 min)</h4>
+<p><strong>Multi-layer gate</strong> before promote to prod:</p>
+<p><strong>Layer 1: Lint (1 sec)</strong></p>
+<pre class="language-python"><code class="language-python">def lint(prompt_version):
+    issues = []
+    # Schema validation
+    if not prompt_version.variables_schema:
+        issues.append("missing variables_schema")
+    
+    # Template syntax
+    try:
+        jinja_env.parse(prompt_version.content)
+    except TemplateSyntaxError as e:
+        issues.append(f"jinja syntax: {e}")
+    
+    # PII / secret leak check
+    if re.search(r'\bsk-[a-zA-Z0-9]{40}', prompt_version.content):
+        issues.append("API key in prompt")
+    
+    # Length warning
+    if len(prompt_version.content) &gt; 10000:
+        issues.append("prompt &gt; 10k chars, cost concern")
+    
+    # Model compatibility
+    if prompt_version.model not in supported_models:
+        issues.append(f"unsupported model: {prompt_version.model}")
+    
+    return issues</code></pre>
+<p><strong>Layer 2: Golden set (5-30 min)</strong></p>
+<p>50-200 (input, expected) pairs per prompt. Run new version on golden, compare to current:</p>
+<pre class="language-python"><code class="language-python">async def golden_eval(prompt_id, new_version):
+    golden = await db.fetch_golden(prompt_id)  # list of (input, expected)
+    
+    results = []
+    for ex in golden:
+        new_output = await llm.run(new_version, ex.input)
+        score = scoring_fn(new_output, ex.expected)  # exact, BLEU, etc.
+        results.append({
+            'input': ex.input,
+            'expected': ex.expected,
+            'actual': new_output,
+            'score': score
+        })
+    
+    new_avg = mean([r['score'] for r in results])
+    # Compare to current version's golden eval (stored at promote time)
+    current_avg = await db.fetch_current_avg(prompt_id)
+    
+    return {
+        'pass': new_avg &gt;= current_avg * 0.97,  # 3% regression budget
+        'new_avg': new_avg,
+        'baseline': current_avg,
+        'regressions': [r for r in results if r['score'] &lt; threshold]
+    }</code></pre>
+<p><strong>Layer 3: LLM-as-judge (10-20 min)</strong></p>
+<p>Sample 50-100 production-realistic inputs. Use Claude Opus 4.7 to judge new vs current:</p>
+<pre class="language-python"><code class="language-python">JUDGE_PROMPT = """
+You are evaluating two responses to a customer query.
+Rate each on: helpfulness (1-5), accuracy (1-5), tone (1-5).
+
+Query: {query}
+Response A: {a}
+Response B: {b}
+
+Output JSON: {{"a": {{"helpfulness": 4, ...}}, "b": ..., "winner": "a" | "b" | "tie"}}
+"""
+
+results = []
+for sample in samples:
+    new_resp = await llm.run(new_version, sample.input)
+    cur_resp = await llm.run(current_version, sample.input)
+    judgment = await judge_llm.run(JUDGE_PROMPT, query=sample.input, a=new_resp, b=cur_resp)
+    results.append(judgment)
+
+new_win_rate = sum(j['winner'] == 'a' for j in results) / len(results)
+# Pass if new wins or ties &gt;= 50%</code></pre>
+<p><strong>Layer 4: Human review (1-3 day async)</strong></p>
+<p>Tier-1 prompts MUST have human review. Sampled 10-30 outputs queued to human reviewer (subject matter expert, e.g., support manager):</p>
+<pre class="language-plaintext"><code class="language-plaintext">Reviewer dashboard:
+  - Side-by-side: current vs new output
+  - Score: 1-5 (better, same, worse)
+  - Comment box
+  - Reject button</code></pre>
+<p>Required for tier-1, optional for tier-2, skip for tier-3.</p>
+<p><strong>Layer 5: Cost + latency check (1 min)</strong></p>
+<pre class="language-python"><code class="language-python">def cost_latency_check(new_version, samples):
+    # Run on samples, measure
+    measurements = []
+    for s in samples[:20]:  # 20 sample is enough
+        with timer() as t:
+            resp = await llm.run(new_version, s.input)
+        measurements.append({
+            'latency_ms': t.duration,
+            'tokens_in': count_tokens(s.input + new_version.content),
+            'tokens_out': count_tokens(resp)
+        })
+    
+    new_p95_latency = percentile([m['latency_ms'] for m in measurements], 95)
+    new_avg_cost = mean([m['tokens_in'] * price_in + m['tokens_out'] * price_out for m in measurements])
+    
+    baseline = await db.fetch_current_cost_latency(prompt_id)
+    
+    return {
+        'latency_change_pct': (new_p95_latency - baseline['p95']) / baseline['p95'],
+        'cost_change_pct': (new_avg_cost - baseline['cost']) / baseline['cost'],
+        'flag': new_avg_cost &gt; baseline['cost'] * 1.1  # &gt;10% increase
+    }</code></pre>
+<p>Flag for review if cost +10% or latency +20%.</p>
+<h4>Phase 4: A/B + canary rollout (10 min)</h4>
+<p><strong>4.1 Traffic split implementation</strong></p>
+<pre class="language-python"><code class="language-python">class PromptSDK:
+    def get_prompt(self, name, user_id, tenant_id) -&gt; PromptVersion:
+        # 1. Lookup assignments for this prompt
+        assignments = self.cache.get(f"assign:{name}:{tenant_id or 'global'}")
+        if not assignments:
+            assignments = self.db.fetch_assignments(name, tenant_id)
+            self.cache.set(..., ttl=60)
+        
+        # 2. Resolve which version (sticky hash)
+        bucket = hash(f"{user_id}:{name}") % 100
+        cumulative = 0
+        for a in assignments:
+            cumulative += a.traffic_pct
+            if bucket &lt; cumulative:
+                return self.cache.get_version(a.version_id)
+        
+        # Fallback to default
+        return self.cache.get_version_default(name)</code></pre>
+<p>User-sticky: same user always gets same version (consistent UX, avoid flapping).</p>
+<p><strong>4.2 Rollout stages</strong></p>
+<p>Tier-1 critical prompt rollout:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Stage 1: 1% (canary) — 24h observation
+Stage 2: 10%         — 48h observation
+Stage 3: 50%         — 48h observation
+Stage 4: 100%        — promote, deprecate old</code></pre>
+<p>Tier-3 experimental: 50% → 100% in 1 day.</p>
+<p><strong>4.3 A/B vs canary</strong></p>
+<p>A/B test: compare A and B with statistical rigor</p>
+<ul><li>Hypothesis: new prompt improves CSAT</li><li>Sample size: power calc (e.g., 5000 users for 2pp lift detect)</li><li>50/50 split for fast convergence</li><li>Duration: until n_samples reached</li></ul>
+<p>Canary: roll out gradually, monitor for regression</p>
+<ul><li>Goal: deploy safely, not measure effect</li><li>1% → 10% → ... ramp</li><li>Halt at any metric breach</li></ul>
+<p>These are different. PM 想 A/B = measure effect. Eng 想 canary = safe deploy. 一般 sequence: canary first (no regression), then A/B (measure benefit).</p>
+<p><strong>4.4 Per-tenant override</strong></p>
+<pre class="language-sql"><code class="language-sql">-- Default for all
+INSERT INTO prompt_assignments (prompt_id, tenant_id, version_id, traffic_pct)
+VALUES ('customer_support', NULL, 'v1.2.0', 100);
+
+-- Custom for tenant ACME
+INSERT INTO prompt_assignments (prompt_id, tenant_id, version_id, traffic_pct)
+VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);</code></pre>
+<p>Tenant ACME 总 hit <code>v1.2.0-acme-formal</code>, 其他 tenant hit <code>v1.2.0</code>.</p>
+<h4>Phase 5: Auto-rollback (8 min)</h4>
+<p><strong>5.1 Trigger metrics</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Metric</th><th>Trigger</th><th>Notes</th></tr></thead><tbody><tr><td>Error rate</td><td>&gt; 2× baseline 5 min</td><td>LLM refuse / timeout / 5xx</td></tr><tr><td>p99 latency</td><td>&gt; 1.5× baseline 10 min</td><td>UX degradation</td></tr><tr><td>Quality score</td><td>&lt; baseline -5% 1 hour</td><td>LLM-judge sample</td></tr><tr><td>Refund rate</td><td>&gt; 1.2× baseline 1 hour</td><td>Business signal</td></tr><tr><td>Cost</td><td>&gt; 2× baseline 30 min</td><td>runaway token usage</td></tr><tr><td>CSAT</td><td>&lt; baseline -5pp 24 hour</td><td>slow signal</td></tr></tbody></table></div>
+<p>Per-prompt baseline computed from last 7 days. Sliding window comparison.</p>
+<p><strong>5.2 Rollback action</strong></p>
+<pre class="language-python"><code class="language-python">async def rollback(prompt_id, new_version_id, reason):
+    # 1. Find previous prod version
+    prev = await db.fetch_one("""
+        SELECT * FROM prompt_versions
+        WHERE prompt_id = $1 AND state = 'prod' AND id != $2
+        ORDER BY promoted_at DESC LIMIT 1
+    """, prompt_id, new_version_id)
+    
+    # 2. Atomically flip traffic
+    async with db.transaction():
+        await db.execute("""
+            UPDATE prompt_assignments SET traffic_pct = 0, expires_at = NOW()
+            WHERE prompt_id = $1 AND version_id = $2
+        """, prompt_id, new_version_id)
+        
+        await db.execute("""
+            INSERT INTO prompt_assignments (prompt_id, version_id, traffic_pct)
+            VALUES ($1, $2, 100)
+        """, prompt_id, prev.id)
+        
+        await db.execute("""
+            UPDATE prompt_versions SET state = 'rolled-back', rollback_reason = $1
+            WHERE id = $2
+        """, reason, new_version_id)
+    
+    # 3. Invalidate cache (must be &lt; 30 sec to take effect)
+    await redis.delete(f"assign:{prompt_id}:*")  # all tenants
+    
+    # 4. Audit log
+    await db.execute("""
+        INSERT INTO prompt_audit_log (prompt_id, version_id, action, actor, reason)
+        VALUES ($1, $2, 'rolled_back', 'auto-rollback', $3)
+    """, prompt_id, new_version_id, reason)
+    
+    # 5. Alerts
+    await pagerduty.alert(prompt_id, reason)
+    await slack.notify(f"Auto-rollback of {prompt_id}: {reason}")</code></pre>
+<p><strong>5.3 Cache invalidation &lt; 30s</strong></p>
+<p>Redis cache TTL 60s + active invalidation on rollback. SDK in-process LRU cache TTL 30s.</p>
+<p>Total time from trigger to effect: detection (5 min metric window) + invalidation (30 sec) ≈ 6 min. Tight, but within 5 min hard requirement IF detection window shortened.</p>
+<p>Tight rollback (&lt; 5 min): use shorter detection window for tier-1 (e.g., 1 min). But more false positive risk.</p>
+<p><strong>5.4 Manual rollback button</strong></p>
+<p>PM / on-call can rollback via UI:</p>
+<ul><li>Click "rollback" → confirm → 30s effect</li><li>Same flow as auto, just human-triggered</li></ul>
+<p><strong>5.5 Avoid rollback loop</strong></p>
+<p>After rollback, freeze new version 24h (can't re-promote without team review). Avoid: rollback → re-promote → rollback flap.</p>
+<h4>Phase 6: Per-tenant variants (6 min)</h4>
+<p><strong>6.1 Inheritance model</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Base prompt: customer_support@1.2.0 (default for all)
+  └─ Variant: customer_support@1.2.0-acme-formal (ACME inherits + override sections)
+      Content:
+        {% extends "customer_support_v1.2.0" %}
+        {% block tone %}Use formal language. Always say "Mr/Ms. &lt;surname&gt;".{% endblock %}</code></pre>
+<p>Jinja extends/block: variant inherits base, overrides specific sections.</p>
+<p><strong>6.2 Governance</strong></p>
+<p>Customer wants custom prompt → can be:</p>
+<ul><li>(a) Self-serve UI within constraints (variables only, no content edit)</li><li>(b) Submit request → our team author + eval → deploy</li></ul>
+<p>99% case use (b). Self-serve (a) risky (compliance, brand violation).</p>
+<p>Approval flow:</p>
+<ul><li>Customer requests in support portal</li><li>Customer success team validates business reason</li><li>Eng team authors variant</li><li>Eval gate same as base</li><li>Customer approves output sample</li><li>Deploy as tenant override</li></ul>
+<p><strong>6.3 Variant explosion</strong></p>
+<p>10 tenants × 200 prompts = potentially 2000 variants. Reality:</p>
+<ul><li>80% of customer requests are minor (tone, language)</li><li>90% can be handled by parametrized base prompt (variables: tone="formal", language="es")</li><li>Hard custom = 1-2 per tier-1 prompt per top customer = ~50 actual variants</li></ul>
+<p>Manage via "variant pool": each tier-1 prompt has 3-5 named variants (default, formal, casual, multilingual), tenant picks one.</p>
+<h4>Phase 7: Audit + observability (7 min)</h4>
+<p><strong>7.1 Audit trail</strong></p>
+<p>Every change → immutable log:</p>
+<pre class="language-json"><code class="language-json">{
+  "prompt_id": "customer_support",
+  "version_id": "v1.2.0",
+  "action": "promoted",
+  "actor": "alice@company.com",
+  "ts": "2026-05-25T10:30:00Z",
+  "before": {"state": "canary", "traffic_pct": 50},
+  "after": {"state": "prod", "traffic_pct": 100},
+  "reason": "All KPIs green after 48h canary at 50%",
+  "eval_results": {...}
+}</code></pre>
+<p>Stored 7 years (SOX retention).</p>
+<p><strong>7.2 Per-prompt dashboard</strong></p>
+<p>Datadog / Grafana dashboard per prompt:</p>
+<ul><li>Traffic split (which versions running)</li><li>Latency p50/p99</li><li>Cost ($ per call)</li><li>Error rate</li><li>Quality score (LLM-judge)</li><li>Business metric (CSAT, refund, NPS)</li><li>Refund rate (if applicable)</li></ul>
+<p>Color: green / yellow / red against baseline.</p>
+<p><strong>7.3 Prompt lineage</strong></p>
+<p>UI shows version tree:</p>
+<pre class="language-plaintext"><code class="language-plaintext">customer_support
+├── 1.0.0 (deprecated 2026-01)
+├── 1.1.0 (deprecated 2026-03)
+│   └── 1.1.1 (deprecated 2026-04)
+├── 1.2.0 (prod, 100%)
+│   ├── 1.2.0-acme-formal (tenant variant)
+│   └── 1.2.0-globex-casual (tenant variant)
+└── 1.3.0-rc1 (canary, 10%)</code></pre>
+<p><strong>7.4 Alerts</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Alert</th><th>Channel</th><th>Severity</th></tr></thead><tbody><tr><td>Auto-rollback triggered</td><td>PagerDuty</td><td>P1</td></tr><tr><td>Quality drop &gt; 5% on canary</td><td>Slack</td><td>P3</td></tr><tr><td>Eval gate failing</td><td>Slack to prompt owner</td><td>P3</td></tr><tr><td>Cost spike &gt; 50% per prompt</td><td>Slack</td><td>P2</td></tr><tr><td>Manual rollback by team</td><td>Slack (no page)</td><td>Info</td></tr></tbody></table></div>
+<h4>Phase 8: Trade-offs + alternatives (6 min)</h4>
+<p><strong>Decision 8.1 — DB vs Git for prompt storage</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Git repo</td><td>Familiar to eng, code review pattern</td><td>PM can't edit, slow, conflict-prone</td></tr><tr><td>DB (我推)</td><td>Fast read, runtime lookup, per-tenant, audit native</td><td>Need build UI, not just <code>git log</code></td></tr><tr><td>Hybrid (DB + git sync)</td><td>Versioned audit</td><td>Complex sync</td></tr></tbody></table></div>
+<p>我推 DB. Add git backup nightly for DR.</p>
+<p><strong>Decision 8.2 — Build vs buy</strong></p>
+<p>Tools to consider:</p>
+<ul><li><strong>LangSmith</strong> (LangChain) — prompt registry + eval + tracing</li><li><strong>Helicone</strong> — LLM observability + experiments</li><li><strong>Promptlayer</strong> — prompt versioning + comparison</li><li><strong>Statsig / LaunchDarkly</strong> — feature flag generic, can do prompts</li></ul>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>决策</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Build all</td><td>Customize, no vendor lock</td><td>6 month build, ongoing maintain</td></tr><tr><td>Buy all (LangSmith)</td><td>Fast</td><td>Lock-in, may not fit</td></tr><tr><td>Hybrid (我推)</td><td>Best of both</td><td>Some integration</td></tr></tbody></table></div>
+<p>我推: LangSmith for eval + tracing (mature), LaunchDarkly for traffic split (mature), Postgres DB for registry (custom, simple), custom UI in Retool.</p>
+<p><strong>Decision 8.3 — A/B vs multi-armed bandit</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>A/B (50/50, time-bound)</td><td>Clean stats</td><td>Slow to find winner, wastes traffic</td></tr><tr><td>Multi-armed bandit (Thompson sampling)</td><td>Learn fast, exploit</td><td>Less clean stats</td></tr></tbody></table></div>
+<p>I推 A/B for tier-1 (cleaner), MAB for tier-3 experimental.</p>
+<p><strong>Decision 8.4 — When to roll back vs when to fix forward</strong></p>
+<p>Roll back if:</p>
+<ul><li>Quick regression (5 min)</li><li>Unknown root cause</li><li>Tier-1 critical</li></ul>
+<p>Fix forward if:</p>
+<ul><li>Known issue with quick fix</li><li>Tier-3 / low risk</li><li>Rolling back loses too much value (e.g., new feature)</li></ul>
+<hr />
+<h3>关键决策点 (with rationale)</h3>
+<ol><li><strong>Prompt as data (DB), not code (Git)</strong> — PM author + runtime fetch + per-tenant.</li></ol>
+<ol><li><strong>Eval 4-layer gate (lint + golden + LLM-judge + human)</strong> — quality before promote.</li></ol>
+<ol><li><strong>Cost/latency check in eval</strong> — runaway token cost是真实事故.</li></ol>
+<ol><li><strong>Sticky user_id hash for A/B</strong> — consistent UX, no flapping.</li></ol>
+<ol><li><strong>Per-tenant variants via Jinja inheritance</strong> — DRY but customizable.</li></ol>
+<ol><li><strong>5-layer auto-rollback triggers</strong> — multiple signals, robust.</li></ol>
+<ol><li><strong>Cache TTL 60s + active invalidation</strong> — &lt; 30s rollback effect.</li></ol>
+<ol><li><strong>24h freeze post-rollback</strong> — avoid flap loop.</li></ol>
+<ol><li><strong>Audit log immutable + 7yr retention</strong> — SOX compliance.</li></ol>
+<ol><li><strong>Buy LangSmith for eval + LaunchDarkly for traffic + build registry</strong> — hybrid pragmatism.</li></ol>
+<hr />
+<h3>数字 (capacity sizing, cost math)</h3>
+<p><strong>Volumes</strong>:</p>
+<ul><li>200 prompts × 1M calls/day = 200M LLM calls/day</li><li>SDK fetch (cached): 200M × 95% cache hit = ~10M DB reads/day = 120 QPS</li><li>Audit log: ~100 entries/day (changes), 7yr retention = ~250K rows</li></ul>
+<p><strong>Storage</strong>:</p>
+<ul><li>prompts: 200 rows</li><li>prompt_versions: ~2000 (10 versions per prompt avg)</li><li>prompt_assignments: 200 × 10 tenant variants = ~2K rows</li><li>prompt_audit_log: 250K rows over 7 years</li><li>Total: ~5MB ≈ nothing</li></ul>
+<p><strong>Cache</strong>:</p>
+<ul><li>Redis: 200 prompt × 5 active version × 1KB content = 1MB hot</li><li>60s TTL, ~10K reads/min hit</li></ul>
+<p><strong>Eval cost</strong>:</p>
+<ul><li>Per new version: lint (free) + golden 100 samples × $0.01 each = $1 + LLM-judge 50 samples × $0.10 = $5 = <strong>$6 per eval</strong></li><li>Tier-1 human review: ~$50 reviewer time</li><li>200 prompts × 1 update/month × $6 = $1200/month eval cost (auto)</li></ul>
+<p><strong>Cost monitoring</strong>:</p>
+<ul><li>New prompt longer 50% → 200M × 50% × $0.005/k token avg = $5M/month overrun if undetected</li><li>Our cost-gate catches at canary 1%</li></ul>
+<p><strong>Infra cost</strong>:</p>
+<ul><li>Postgres: ~$200/month (overkill for size)</li><li>Redis: ~$100/month</li><li>LangSmith: ~$2K/month (1M trace/day plan)</li><li>LaunchDarkly: $1K/month (100K MAU plan)</li><li>Custom UI (Retool): $500/month</li><li>Total: ~$4K/month</li></ul>
+<p><strong>Time to detect + rollback</strong>:</p>
+<ul><li>Detection window: 1-5 min (tier dependent)</li><li>Decision (auto rule): &lt; 1 sec</li><li>Cache invalidate + propagate: 30 sec</li><li>Total: ≤ 6 min worst case, ≤ 1 min if tier-1 with 30s window</li></ul>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<ol><li><strong>TikTok PayLater BNPL prompt management</strong> — 你做过 prompt 多版本管理, A/B for default rate optimization.</li></ol>
+<ol><li><strong>TikTok Voice agent 7 markets</strong> — 你做过 per-market prompt variants (语言 + tone + 合规), 直接套.</li></ol>
+<ol><li><strong>Indonesia OJK 合规 prompt audit</strong> — 监管要求 immutable audit, 你做过.</li></ol>
+<ol><li><strong>Internal Agent Platform prompt registry</strong> — 你做过内部 prompt 中央仓库, 给 30+ 团队用.</li></ol>
+<ol><li><strong>ConvFinQA / financial agent eval</strong> — golden set + LLM-judge, 你跑过 production eval.</li></ol>
+<p>reframe: "我在字节做 voice agent 时 prompt 跨 7 market × 5 intent = 35 个 + tier-1 critical (compliance disclosure) 需要 audit, 直接做过这道题. 我的 stack 是 自建 Postgres registry + 自建 UI + 自建 A/B + LangSmith 集成. 这道题如果重做我会加 LaunchDarkly 替代自建 flag, 更稳."</p>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<ol><li><strong>"如果同一 user 不同 session, hash 同会得到同 version, 但用户感觉跟昨天不一样. 怎么 align?"</strong> — 答: User-sticky 已用 user_id 不是 session. 但 user 跨 device 可能不同 cookie. 解决: hash on permanent user_id (DB id, not cookie). 同时记录 (user, prompt, version) 在 user profile, 跨 device 一致.</li></ol>
+<ol><li><strong>"如果一个 prompt 同时 100 个 customer 用, 1 个 customer 用自己 variant. 我们怎么 do A/B 不污染 base?"</strong> — 答: 这 customer 的 variant 自己 stream, 不参与 base A/B. Base A/B 拿剩 99 customer 数据. Variant 自己有 baseline + eval, customer 自己愿意 A/B 也可 (但 stat power 弱).</li></ol>
+<ol><li><strong>"PM 想直接 prod edit prompt, 不走 eval gate, 怎么 govern?"</strong> — 答: (a) UI-level role: PM 不能 edit tier-1, 只能 propose; (b) Tier-3 (experimental) 给 PM 直接 edit + auto-canary 1%; (c) Manager approval for tier-1 promote; (d) After-incident review: 如果 bypass 导致问题, 加 friction (force review). 平衡 friction vs speed.</li></ol>
+<ol><li><strong>"prompts 在 LLM provider 端 cache (Anthropic prompt cache), 我们 rollback 后 cache 仍 stale, 怎么办?"</strong> — 答: Anthropic prompt cache 是 server-side semantic cache. Rollback 改 prompt content → cache hash 变 → automatic miss + recompute. 5 min 内自然 propagate. 强制 invalidate: client SDK 加 cache_breaker hash on prompt change.</li></ol>
+<ol><li><strong>"我们 prompt 用 Claude, 想 cross-test 同 prompt 在 GPT 上表现, 怎么 design?"</strong> — 答: (a) prompt model-agnostic 设计 (无 Claude-specific 句法); (b) Eval golden 跑多 model 并存; (c) UI shows side-by-side: GPT-5.5 vs Claude Sonnet 4.6 vs Gemini 3 Pro on same prompt; (d) Per-prompt model recommendation (有些 prompt 在 Claude 强, 有些 GPT 强); (e) Allow per-tenant model choice if quality tied.</li></ol>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>"git + PR review"</strong> — PM 不会用, 慢, 不支持 runtime fetch.</li><li><strong>"YAML config in deploy"</strong> — change 要 deploy, 不是 minute 改.</li><li><strong>"prompt in code"</strong> — change = code release, 慢.</li><li><strong>"无 eval gate, deploy 直接 A/B"</strong> — 1% canary 可能就 5% user 受害.</li><li><strong>"全 manual rollback"</strong> — &lt; 5 min 不可能 manual.</li><li><strong>"无 per-tenant"</strong> — 失去 customization 价值.</li><li><strong>"无 audit"</strong> — SOX 合规挂.</li><li><strong>"无 cost monitor"</strong> — 新 prompt 长 50% 月费爆炸不知道.</li><li><strong>"binary on/off feature flag"</strong> — 没 gradual rollout.</li><li><strong>"prompt 写 Jinja 太复杂"</strong> — Jinja 是 industry standard, PM 学 30min 会用.</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Prompt as data, not code</strong> — framework correctness</li><li><strong>4-layer eval gate (lint + golden + LLM-judge + human)</strong> — production-grade</li><li><strong>Sticky user_id hash for A/B</strong> — 真懂 UX</li><li><strong>Per-tenant variants via Jinja inheritance</strong> — DRY + customizable</li><li><strong>5 auto-rollback triggers</strong> — multiple signals</li><li><strong>Cache TTL 60s + active invalidation = &lt; 30s rollback effect</strong> — fast</li><li><strong>24h freeze post-rollback</strong> — avoid flap</li><li><strong>Cost / latency in eval gate</strong> — token cost runaway prevention</li><li><strong>Buy LangSmith + LaunchDarkly + Retool, build registry</strong> — pragmatic build/buy</li><li><strong>Numbers 给得出来</strong> (200M calls/day, $4K/month infra, $6 per eval, $5M/month cost runaway risk)</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>Prompt 生命周期不是 git, 是 <strong>DB registry + Jinja templating + 4-layer eval gate + LangSmith eval + LaunchDarkly traffic split + sticky user A/B + 5-signal auto-rollback + per-tenant Jinja inheritance + immutable audit + per-prompt cost/quality dashboard</strong> 的 ML ops + 产品 ops 混合系统.</p>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Registry: Postgres + Redis (60s TTL)
+  Tables: prompts, prompt_versions, prompt_assignments, prompt_audit_log
+  Versioning: semver (MAJOR.MINOR.PATCH)
+  Templating: Jinja2
+
+Eval Gate (before promote):
+  1. Lint:        schema, syntax, PII, length, model compat (1 sec)
+  2. Golden:      50-200 (input, expected) regression check (5-30 min)
+  3. LLM-judge:   Claude Opus 4.7 pairwise vs current (10-20 min)
+  4. Human:       tier-1 mandatory, sampled (1-3 day async)
+  5. Cost/latency: token usage + p95 latency (1 min)
+  Pass criteria: ≥ 97% of baseline quality + &lt; 10% cost overrun
+
+Rollout Stages (tier-1):
+  Canary 1% → 10% → 50% → 100% (24h+48h+48h observation)
+Tier-3: 50% → 100% in 1 day
+
+Traffic Split:
+  Sticky: hash(user_id + prompt_name) % 100 vs cumulative pct
+  Per-tenant override possible
+
+Auto-Rollback Triggers:
+  Error rate &gt; 2× baseline 5 min
+  p99 latency &gt; 1.5× baseline 10 min
+  Quality &lt; baseline -5% 1h
+  Refund &gt; 1.2× baseline 1h
+  Cost &gt; 2× baseline 30 min
+  CSAT &lt; -5pp 24h
+
+Rollback Action:
+  1. Flip traffic 100% → prev version
+  2. Invalidate Redis cache (active)
+  3. Mark new as 'rolled-back'
+  4. Audit + PagerDuty + Slack
+  5. Effect within 30s, total &lt; 5 min from trigger
+
+Per-Tenant Variants:
+  Jinja inheritance: variant extends base, overrides blocks
+  Variant pool: 3-5 named variants (formal, casual, multilingual)
+  Customer self-serve: parametrized only (variables)
+  Hard custom: submit-request flow
+
+Stack (build / buy):
+  Registry:        Postgres + Redis (build, simple)
+  Eval:            LangSmith (buy, ~$2K/m)
+  Traffic split:   LaunchDarkly (buy, ~$1K/m)
+  UI:              Retool (buy, ~$500/m)
+  Observability:   Datadog + LangSmith traces
+
+Cost (200 prompts, 200M calls/day):
+  Infra: ~$4K/m
+  Eval auto: $1200/m
+  Per-prompt update eval: $6 each (auto), +$50 human review
+
+Audit: 7yr retention, immutable, $0 storage (logs)
+
+SLO:
+  Time to promote new (tier-1): 1 week
+  Time to rollback: &lt; 5 min (target &lt; 1 min for tier-1)
+  Eval coverage: 100% prod prompts</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-028-llm-search-1500ms-to-100ms.html">← Q28 · [系统设计/架构] 客户要求 LLM 搜索 sub-100ms, 朴素 RAG 要 1.5s, 怎么压到 100ms</a>
+    <a href="zhenti-030-agent-observability-design.html">Q30 · [系统设计/架构] 为 agent 系统设计可观测性: 记录什么、告警什么、做哪些看板 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q29 · 生产环境 prompt 版本管理 / A/B / 回滚
+
+> "Your team manages **200+ prompts** in production across 30 LLM features. PM wants to A/B test a new system prompt for the customer support bot. Eng wants to **safely roll it out**, and ops wants to **rollback in 5 minutes** if metrics regress. **Design the prompt lifecycle system** — versioning, eval, A/B, rollout, rollback, audit."
+
+**Round**: System Design (60 min)
+**出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops
+**约束**: 200+ prompts / 30 features / per-tenant variants / non-eng (PM) authors / pre-deploy eval / canary rollout / auto-rollback / audit trail
+
+---
+
+## 这道题在考什么
+
+不是考你 git, 是考你 **prompt 不是普通 code, 需要 ML ops 加 web ops 加产品 ops 三层混合的 lifecycle 系统**:
+
+1. **Prompt 不是 source code** — PM/non-eng author, can't require Pull Request review for every typo
+2. **Eval gate** — LLM-as-judge + human review before production
+3. **Per-tenant variants** — customer A 想 customize wording, multi-tenant prompt
+4. **Feature flag for prompt** — LaunchDarkly / Statsig pattern, but prompt-specific
+5. **Auto-rollback** — metric regression → revert without human
+6. **Audit + immutable history** — who changed what when, why
+7. **Cost/latency monitoring** — new prompt 长 50% token → cost +50%, need watch
+8. **菜鸟答案失败点**: "git 提交 prompt + feature flag" — too shallow. 没说 eval gate / canary / auto-rollback / per-tenant.
+
+---
+
+## 必问 clarifying questions
+
+1. **Who authors prompts?**: PM 直接 edit 还是 eng 翻译? 影响 UI / approval
+2. **Prompt count**: 200 多少 active? 多少 archived?
+3. **Per-tenant variants needed?**: customer-specific wording vs single prompt for all
+4. **Auto-rollback metric**: latency / error rate / refund rate / NPS, 哪些用作 trigger?
+5. **A/B traffic split**: 1% / 50% / 100% 步骤? 决定 ramp-up time
+6. **Time budget**: 1 week iteration vs 1 hour hotfix?
+7. **Compliance**: 需要 audit who changed when (SOX / SOC 2)?
+8. **Existing infra**: 用 Git? Postgres? LaunchDarkly?
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|------|------|------|
+| 1 | Clarify + framing | 5 min | Prompt 是 product config, 不是 code | "Prompt 既不是 code 也不是 doc, 是 product config, 需要 ML ops + product ops" |
+| 2 | Prompt as data | 8 min | Schema + registry + version | "Prompt registry 是 DB, 不是 git, 因为 PM author + per-tenant + run-time fetch" |
+| 3 | Eval pipeline | 10 min | Pre-deploy + golden + LLM-judge | "Eval gate 4 层: lint, golden, LLM-judge, human review" |
+| 4 | A/B + canary rollout | 10 min | Feature flag + traffic split + cohort | "LaunchDarkly-style flag, 1% → 10% → 50% → 100%" |
+| 5 | Auto-rollback | 8 min | Metric trigger + diff + revert | "Rollback < 5min = pre-promote shadow + auto trigger" |
+| 6 | Per-tenant variants | 6 min | Inheritance + override + governance | "Base prompt + per-tenant override, customer 自定义但 governance 在我们" |
+| 7 | Audit + observability | 7 min | Immutable history + dashboard | "Every prompt change is event in audit log, dashboard per prompt" |
+| 8 | Trade-offs + close | 6 min | DB vs Git, build vs buy (PromptLayer/LangSmith) | "DB-based registry + LangSmith eval, 不全自建" |
+
+---
+
+## 端到端架构图 (ASCII)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                          Prompt Lifecycle System                                        │
+│                                                                                         │
+│  ┌─AUTHORING (PM-friendly UI)──────────────────────────────────────┐                    │
+│  │   Web UI (Retool / custom):                                     │                    │
+│  │   - Edit prompt content (markdown editor)                       │                    │
+│  │   - Sidebar: variables, model, temperature                      │                    │
+│  │   - Inline test: try sample input                               │                    │
+│  │   - Version history                                             │                    │
+│  │   - Save as draft / propose for review                          │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─PROMPT REGISTRY (Postgres + Redis cache)────────────────────────┐                    │
+│  │   Table: prompts                                                │                    │
+│  │     id, name (unique), domain, owner, current_version           │                    │
+│  │   Table: prompt_versions                                        │                    │
+│  │     id, prompt_id, version_tag (semver), content,               │                    │
+│  │     model, temperature, max_tokens, variables_schema,           │                    │
+│  │     state (draft, eval-passed, canary, prod, deprecated),       │                    │
+│  │     created_by, created_at, eval_results, parent_version        │                    │
+│  │   Table: prompt_assignments                                     │                    │
+│  │     prompt_id, tenant_id, version_id, traffic_pct, started_at   │                    │
+│  │   Table: prompt_audit_log                                       │                    │
+│  │     prompt_id, action, actor, ts, before, after, reason         │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─EVAL PIPELINE (gate before promote)─────────────────────────────┐                    │
+│  │   1. Lint: variable schema match, no PII leak, length, model    │                    │
+│  │      compatibility check                                        │                    │
+│  │   2. Golden set: 50-200 (input, expected) per prompt            │                    │
+│  │      Run new version, compare to current. nDCG / accuracy /     │                    │
+│  │      exact match etc. depending on task                         │                    │
+│  │   3. LLM-as-judge: Claude Opus 4.7 evaluates quality on         │                    │
+│  │      sampled outputs (rubric-based)                             │                    │
+│  │   4. Human review: 1-5% sample queue to human evaluator         │                    │
+│  │      (mandatory for prompts above tier-2 importance)            │                    │
+│  │   5. Cost / latency check: new version's token usage,           │                    │
+│  │      compare. > 10% increase → flag                             │                    │
+│  │                                                                 │                    │
+│  │   Pass → state: 'eval-passed', eligible for canary              │                    │
+│  │   Fail → reject with detailed report                            │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─FEATURE FLAG / TRAFFIC SPLIT (LaunchDarkly-style)───────────────┐                    │
+│  │   Resolution at request time:                                   │                    │
+│  │     SDK: get_prompt("customer_support_v2", user, tenant)        │                    │
+│  │     1. Lookup tenant override (if tenant has custom variant)    │                    │
+│  │     2. Lookup A/B assignment (sticky by user_id hash)           │                    │
+│  │     3. Return prompt version + content                          │                    │
+│  │                                                                 │                    │
+│  │   Ramp-up: 1% canary → 10% → 50% → 100% (per-stage observation) │                    │
+│  │   Sticky: user_id hash mod 100 < pct → treat                    │                    │
+│  │   Override: specific user/tenant force into bucket              │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─PRODUCTION INFERENCE (with prompt SDK)──────────────────────────┐                    │
+│  │   def chat(user, message):                                      │                    │
+│  │     prompt_v = prompt_sdk.get(                                  │                    │
+│  │         name="customer_support",                                │                    │
+│  │         user_id=user.id,                                        │                    │
+│  │         tenant=user.tenant                                      │                    │
+│  │     )                                                           │                    │
+│  │     # SDK returns version_tag + content                         │                    │
+│  │     resp = llm.chat(prompt_v.content, message)                  │                    │
+│  │     # Log version_tag with response                             │                    │
+│  │     observability.emit(prompt_version=prompt_v.tag, ...)        │                    │
+│  └─────────────────────────────────┬───────────────────────────────┘                    │
+│                                    │                                                    │
+│                                    ▼                                                    │
+│  ┌─MONITORING + AUTO-ROLLBACK───────────────────────────────────────┐                   │
+│  │   Per-prompt-version dashboard:                                 │                    │
+│  │     - p50/p99 latency                                           │                    │
+│  │     - token usage in/out (cost)                                 │                    │
+│  │     - error rate (LLM refuses, timeouts)                        │                    │
+│  │     - quality score (LLM-judge sample 1%)                       │                    │
+│  │     - business metric (refund rate, CSAT, conversion)           │                    │
+│  │     - acceptance rate (e.g., user clicked thumb-up)             │                    │
+│  │                                                                 │                    │
+│  │   Auto-rollback triggers:                                       │                    │
+│  │     - error rate > 2× baseline for 5 min                        │                    │
+│  │     - p99 latency > 1.5× baseline for 10 min                    │                    │
+│  │     - business metric regression > 5% in 1h                     │                    │
+│  │     - cost > 2× baseline for 30 min                             │                    │
+│  │                                                                 │                    │
+│  │   On rollback:                                                  │                    │
+│  │     1. Flip traffic 100% back to last 'prod' version             │                    │
+│  │     2. Mark new version as 'rolled-back' with reason             │                    │
+│  │     3. PagerDuty alert to prompt owner                          │                    │
+│  │     4. Slack notification to team                               │                    │
+│  │     5. Time to rollback < 30 sec (Redis cache invalidate)       │                    │
+│  └─────────────────────────────────────────────────────────────────┘                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 详细设计 (60-min walkthrough)
+
+### Phase 1: Clarify + framing (5 min)
+
+开口:
+- "Prompt 200+ 中, active production 大约多少? Tier-1 重要 vs tier-3 实验性 mix"
+- "Per-tenant variants 需要吗? customer A 想 'be more formal' 类 customization?"
+- "Auto-rollback metric: latency / error / refund rate / NPS, 哪个主?"
+
+假设: 150 production active + 50 dev/archive, 30 feature, 60% tier-2+, per-tenant customization 给 paid only (10 tenants), auto-rollback 主用 error rate + 业务 metric.
+
+KPI:
+- **Time to promote (new version → 100% prod)**: 1 day for tier-3, 1 week for tier-1
+- **Time to rollback**: < 5 min
+- **Eval coverage**: 100% prod prompts have golden set
+- **Audit**: 100% changes logged with actor + reason
+
+Framing: prompt 不是 code. Treat as **product config managed via versioned data store**.
+- Code: PR review, CI, deploy
+- Prompt: edit in UI, eval gate, traffic split, runtime fetch
+- 共同: version control, audit, rollback. But mechanism different.
+
+### Phase 2: Prompt as data (8 min)
+
+**2.1 Schema design**
+
+```sql
+CREATE TABLE prompts (
+    id UUID PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,  -- 'customer_support', 'order_classifier'
+    domain TEXT,                -- 'support', 'sales', 'analytics'
+    description TEXT,
+    owner_team TEXT,
+    tier SMALLINT DEFAULT 2,    -- 1 = critical, 3 = experimental
+    current_version_id UUID,    -- pointer to current prod
+    archived BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE prompt_versions (
+    id UUID PRIMARY KEY,
+    prompt_id UUID REFERENCES prompts(id),
+    version_tag TEXT NOT NULL,    -- semver: '1.2.3'
+    content TEXT NOT NULL,
+    model TEXT,                   -- 'claude-sonnet-4.6', 'gpt-5.5'
+    temperature FLOAT,
+    max_tokens INT,
+    variables_schema JSONB,       -- e.g., {"user_name": "string", "order_id": "string"}
+    state TEXT DEFAULT 'draft',   -- draft, eval-passed, canary, prod, deprecated, rolled-back
+    eval_results JSONB,
+    parent_version_id UUID,       -- forking
+    created_by TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    promoted_at TIMESTAMPTZ,
+    deprecated_at TIMESTAMPTZ,
+    UNIQUE (prompt_id, version_tag)
+);
+
+CREATE TABLE prompt_assignments (
+    id UUID PRIMARY KEY,
+    prompt_id UUID,
+    tenant_id TEXT,              -- NULL = global default
+    version_id UUID,
+    traffic_pct INT,             -- 0-100, what % of (tenant) traffic gets this version
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ       -- for A/B time-bound
+);
+
+CREATE TABLE prompt_audit_log (
+    id UUID PRIMARY KEY,
+    prompt_id UUID,
+    version_id UUID,
+    action TEXT,                 -- 'created', 'promoted', 'rolled_back', 'edited'
+    actor TEXT,
+    ts TIMESTAMPTZ DEFAULT NOW(),
+    before JSONB,
+    after JSONB,
+    reason TEXT
+);
+```
+
+Postgres for source of truth. Redis cache for fast read (10ms target).
+
+**2.2 Versioning convention**
+
+semver: MAJOR.MINOR.PATCH
+- MAJOR: breaking change (variable schema change, output format change)
+- MINOR: new capability (e.g., handle new query type)
+- PATCH: bug fix / wording tweak
+
+Tag examples:
+- `customer_support@1.0.0`: initial
+- `customer_support@1.1.0`: added "handle refund" capability
+- `customer_support@1.1.1`: typo fix
+- `customer_support@2.0.0`: changed output to JSON
+
+**2.3 Variable schema (Jinja templating)**
+
+Prompts use Jinja templates:
+```
+You are a helpful customer support agent for {{ company_name }}.
+The customer is {{ user.name }} with order #{{ order_id }}.
+Their issue: {{ issue }}
+```
+
+Variables declared in schema:
+```json
+{
+  "company_name": {"type": "string", "required": true},
+  "user": {"type": "object", "properties": {"name": "string"}},
+  "order_id": {"type": "string"},
+  "issue": {"type": "string"}
+}
+```
+
+Renderer (Jinja2) validates at compile time. Missing variable → error fast, not runtime.
+
+### Phase 3: Eval pipeline (10 min)
+
+**Multi-layer gate** before promote to prod:
+
+**Layer 1: Lint (1 sec)**
+
+```python
+def lint(prompt_version):
+    issues = []
+    # Schema validation
+    if not prompt_version.variables_schema:
+        issues.append("missing variables_schema")
+    
+    # Template syntax
+    try:
+        jinja_env.parse(prompt_version.content)
+    except TemplateSyntaxError as e:
+        issues.append(f"jinja syntax: {e}")
+    
+    # PII / secret leak check
+    if re.search(r'\bsk-[a-zA-Z0-9]{40}', prompt_version.content):
+        issues.append("API key in prompt")
+    
+    # Length warning
+    if len(prompt_version.content) > 10000:
+        issues.append("prompt > 10k chars, cost concern")
+    
+    # Model compatibility
+    if prompt_version.model not in supported_models:
+        issues.append(f"unsupported model: {prompt_version.model}")
+    
+    return issues
+```
+
+**Layer 2: Golden set (5-30 min)**
+
+50-200 (input, expected) pairs per prompt. Run new version on golden, compare to current:
+
+```python
+async def golden_eval(prompt_id, new_version):
+    golden = await db.fetch_golden(prompt_id)  # list of (input, expected)
+    
+    results = []
+    for ex in golden:
+        new_output = await llm.run(new_version, ex.input)
+        score = scoring_fn(new_output, ex.expected)  # exact, BLEU, etc.
+        results.append({
+            'input': ex.input,
+            'expected': ex.expected,
+            'actual': new_output,
+            'score': score
+        })
+    
+    new_avg = mean([r['score'] for r in results])
+    # Compare to current version's golden eval (stored at promote time)
+    current_avg = await db.fetch_current_avg(prompt_id)
+    
+    return {
+        'pass': new_avg >= current_avg * 0.97,  # 3% regression budget
+        'new_avg': new_avg,
+        'baseline': current_avg,
+        'regressions': [r for r in results if r['score'] < threshold]
+    }
+```
+
+**Layer 3: LLM-as-judge (10-20 min)**
+
+Sample 50-100 production-realistic inputs. Use Claude Opus 4.7 to judge new vs current:
+
+```python
+JUDGE_PROMPT = """
+You are evaluating two responses to a customer query.
+Rate each on: helpfulness (1-5), accuracy (1-5), tone (1-5).
+
+Query: {query}
+Response A: {a}
+Response B: {b}
+
+Output JSON: {{"a": {{"helpfulness": 4, ...}}, "b": ..., "winner": "a" | "b" | "tie"}}
+"""
+
+results = []
+for sample in samples:
+    new_resp = await llm.run(new_version, sample.input)
+    cur_resp = await llm.run(current_version, sample.input)
+    judgment = await judge_llm.run(JUDGE_PROMPT, query=sample.input, a=new_resp, b=cur_resp)
+    results.append(judgment)
+
+new_win_rate = sum(j['winner'] == 'a' for j in results) / len(results)
+# Pass if new wins or ties >= 50%
+```
+
+**Layer 4: Human review (1-3 day async)**
+
+Tier-1 prompts MUST have human review. Sampled 10-30 outputs queued to human reviewer (subject matter expert, e.g., support manager):
+
+```
+Reviewer dashboard:
+  - Side-by-side: current vs new output
+  - Score: 1-5 (better, same, worse)
+  - Comment box
+  - Reject button
+```
+
+Required for tier-1, optional for tier-2, skip for tier-3.
+
+**Layer 5: Cost + latency check (1 min)**
+
+```python
+def cost_latency_check(new_version, samples):
+    # Run on samples, measure
+    measurements = []
+    for s in samples[:20]:  # 20 sample is enough
+        with timer() as t:
+            resp = await llm.run(new_version, s.input)
+        measurements.append({
+            'latency_ms': t.duration,
+            'tokens_in': count_tokens(s.input + new_version.content),
+            'tokens_out': count_tokens(resp)
+        })
+    
+    new_p95_latency = percentile([m['latency_ms'] for m in measurements], 95)
+    new_avg_cost = mean([m['tokens_in'] * price_in + m['tokens_out'] * price_out for m in measurements])
+    
+    baseline = await db.fetch_current_cost_latency(prompt_id)
+    
+    return {
+        'latency_change_pct': (new_p95_latency - baseline['p95']) / baseline['p95'],
+        'cost_change_pct': (new_avg_cost - baseline['cost']) / baseline['cost'],
+        'flag': new_avg_cost > baseline['cost'] * 1.1  # >10% increase
+    }
+```
+
+Flag for review if cost +10% or latency +20%.
+
+### Phase 4: A/B + canary rollout (10 min)
+
+**4.1 Traffic split implementation**
+
+```python
+class PromptSDK:
+    def get_prompt(self, name, user_id, tenant_id) -> PromptVersion:
+        # 1. Lookup assignments for this prompt
+        assignments = self.cache.get(f"assign:{name}:{tenant_id or 'global'}")
+        if not assignments:
+            assignments = self.db.fetch_assignments(name, tenant_id)
+            self.cache.set(..., ttl=60)
+        
+        # 2. Resolve which version (sticky hash)
+        bucket = hash(f"{user_id}:{name}") % 100
+        cumulative = 0
+        for a in assignments:
+            cumulative += a.traffic_pct
+            if bucket < cumulative:
+                return self.cache.get_version(a.version_id)
+        
+        # Fallback to default
+        return self.cache.get_version_default(name)
+```
+
+User-sticky: same user always gets same version (consistent UX, avoid flapping).
+
+**4.2 Rollout stages**
+
+Tier-1 critical prompt rollout:
+```
+Stage 1: 1% (canary) — 24h observation
+Stage 2: 10%         — 48h observation
+Stage 3: 50%         — 48h observation
+Stage 4: 100%        — promote, deprecate old
+```
+
+Tier-3 experimental: 50% → 100% in 1 day.
+
+**4.3 A/B vs canary**
+
+A/B test: compare A and B with statistical rigor
+- Hypothesis: new prompt improves CSAT
+- Sample size: power calc (e.g., 5000 users for 2pp lift detect)
+- 50/50 split for fast convergence
+- Duration: until n_samples reached
+
+Canary: roll out gradually, monitor for regression
+- Goal: deploy safely, not measure effect
+- 1% → 10% → ... ramp
+- Halt at any metric breach
+
+These are different. PM 想 A/B = measure effect. Eng 想 canary = safe deploy. 一般 sequence: canary first (no regression), then A/B (measure benefit).
+
+**4.4 Per-tenant override**
+
+```sql
+-- Default for all
+INSERT INTO prompt_assignments (prompt_id, tenant_id, version_id, traffic_pct)
+VALUES ('customer_support', NULL, 'v1.2.0', 100);
+
+-- Custom for tenant ACME
+INSERT INTO prompt_assignments (prompt_id, tenant_id, version_id, traffic_pct)
+VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);
+```
+
+Tenant ACME 总 hit `v1.2.0-acme-formal`, 其他 tenant hit `v1.2.0`.
+
+### Phase 5: Auto-rollback (8 min)
+
+**5.1 Trigger metrics**
+
+| Metric | Trigger | Notes |
+|---|---|---|
+| Error rate | > 2× baseline 5 min | LLM refuse / timeout / 5xx |
+| p99 latency | > 1.5× baseline 10 min | UX degradation |
+| Quality score | < baseline -5% 1 hour | LLM-judge sample |
+| Refund rate | > 1.2× baseline 1 hour | Business signal |
+| Cost | > 2× baseline 30 min | runaway token usage |
+| CSAT | < baseline -5pp 24 hour | slow signal |
+
+Per-prompt baseline computed from last 7 days. Sliding window comparison.
+
+**5.2 Rollback action**
+
+```python
+async def rollback(prompt_id, new_version_id, reason):
+    # 1. Find previous prod version
+    prev = await db.fetch_one("""
+        SELECT * FROM prompt_versions
+        WHERE prompt_id = $1 AND state = 'prod' AND id != $2
+        ORDER BY promoted_at DESC LIMIT 1
+    """, prompt_id, new_version_id)
+    
+    # 2. Atomically flip traffic
+    async with db.transaction():
+        await db.execute("""
+            UPDATE prompt_assignments SET traffic_pct = 0, expires_at = NOW()
+            WHERE prompt_id = $1 AND version_id = $2
+        """, prompt_id, new_version_id)
+        
+        await db.execute("""
+            INSERT INTO prompt_assignments (prompt_id, version_id, traffic_pct)
+            VALUES ($1, $2, 100)
+        """, prompt_id, prev.id)
+        
+        await db.execute("""
+            UPDATE prompt_versions SET state = 'rolled-back', rollback_reason = $1
+            WHERE id = $2
+        """, reason, new_version_id)
+    
+    # 3. Invalidate cache (must be < 30 sec to take effect)
+    await redis.delete(f"assign:{prompt_id}:*")  # all tenants
+    
+    # 4. Audit log
+    await db.execute("""
+        INSERT INTO prompt_audit_log (prompt_id, version_id, action, actor, reason)
+        VALUES ($1, $2, 'rolled_back', 'auto-rollback', $3)
+    """, prompt_id, new_version_id, reason)
+    
+    # 5. Alerts
+    await pagerduty.alert(prompt_id, reason)
+    await slack.notify(f"Auto-rollback of {prompt_id}: {reason}")
+```
+
+**5.3 Cache invalidation < 30s**
+
+Redis cache TTL 60s + active invalidation on rollback. SDK in-process LRU cache TTL 30s.
+
+Total time from trigger to effect: detection (5 min metric window) + invalidation (30 sec) ≈ 6 min. Tight, but within 5 min hard requirement IF detection window shortened.
+
+Tight rollback (< 5 min): use shorter detection window for tier-1 (e.g., 1 min). But more false positive risk.
+
+**5.4 Manual rollback button**
+
+PM / on-call can rollback via UI:
+- Click "rollback" → confirm → 30s effect
+- Same flow as auto, just human-triggered
+
+**5.5 Avoid rollback loop**
+
+After rollback, freeze new version 24h (can't re-promote without team review). Avoid: rollback → re-promote → rollback flap.
+
+### Phase 6: Per-tenant variants (6 min)
+
+**6.1 Inheritance model**
+
+```
+Base prompt: customer_support@1.2.0 (default for all)
+  └─ Variant: customer_support@1.2.0-acme-formal (ACME inherits + override sections)
+      Content:
+        {% extends "customer_support_v1.2.0" %}
+        {% block tone %}Use formal language. Always say "Mr/Ms. <surname>".{% endblock %}
+```
+
+Jinja extends/block: variant inherits base, overrides specific sections.
+
+**6.2 Governance**
+
+Customer wants custom prompt → can be:
+- (a) Self-serve UI within constraints (variables only, no content edit)
+- (b) Submit request → our team author + eval → deploy
+
+99% case use (b). Self-serve (a) risky (compliance, brand violation).
+
+Approval flow:
+- Customer requests in support portal
+- Customer success team validates business reason
+- Eng team authors variant
+- Eval gate same as base
+- Customer approves output sample
+- Deploy as tenant override
+
+**6.3 Variant explosion**
+
+10 tenants × 200 prompts = potentially 2000 variants. Reality:
+- 80% of customer requests are minor (tone, language)
+- 90% can be handled by parametrized base prompt (variables: tone="formal", language="es")
+- Hard custom = 1-2 per tier-1 prompt per top customer = ~50 actual variants
+
+Manage via "variant pool": each tier-1 prompt has 3-5 named variants (default, formal, casual, multilingual), tenant picks one.
+
+### Phase 7: Audit + observability (7 min)
+
+**7.1 Audit trail**
+
+Every change → immutable log:
+```json
+{
+  "prompt_id": "customer_support",
+  "version_id": "v1.2.0",
+  "action": "promoted",
+  "actor": "alice@company.com",
+  "ts": "2026-05-25T10:30:00Z",
+  "before": {"state": "canary", "traffic_pct": 50},
+  "after": {"state": "prod", "traffic_pct": 100},
+  "reason": "All KPIs green after 48h canary at 50%",
+  "eval_results": {...}
+}
+```
+
+Stored 7 years (SOX retention).
+
+**7.2 Per-prompt dashboard**
+
+Datadog / Grafana dashboard per prompt:
+- Traffic split (which versions running)
+- Latency p50/p99
+- Cost ($ per call)
+- Error rate
+- Quality score (LLM-judge)
+- Business metric (CSAT, refund, NPS)
+- Refund rate (if applicable)
+
+Color: green / yellow / red against baseline.
+
+**7.3 Prompt lineage**
+
+UI shows version tree:
+```
+customer_support
+├── 1.0.0 (deprecated 2026-01)
+├── 1.1.0 (deprecated 2026-03)
+│   └── 1.1.1 (deprecated 2026-04)
+├── 1.2.0 (prod, 100%)
+│   ├── 1.2.0-acme-formal (tenant variant)
+│   └── 1.2.0-globex-casual (tenant variant)
+└── 1.3.0-rc1 (canary, 10%)
+```
+
+**7.4 Alerts**
+
+| Alert | Channel | Severity |
+|---|---|---|
+| Auto-rollback triggered | PagerDuty | P1 |
+| Quality drop > 5% on canary | Slack | P3 |
+| Eval gate failing | Slack to prompt owner | P3 |
+| Cost spike > 50% per prompt | Slack | P2 |
+| Manual rollback by team | Slack (no page) | Info |
+
+### Phase 8: Trade-offs + alternatives (6 min)
+
+**Decision 8.1 — DB vs Git for prompt storage**
+
+| 选项 | Pros | Cons |
+|---|---|---|
+| Git repo | Familiar to eng, code review pattern | PM can't edit, slow, conflict-prone |
+| DB (我推) | Fast read, runtime lookup, per-tenant, audit native | Need build UI, not just `git log` |
+| Hybrid (DB + git sync) | Versioned audit | Complex sync |
+
+我推 DB. Add git backup nightly for DR.
+
+**Decision 8.2 — Build vs buy**
+
+Tools to consider:
+- **LangSmith** (LangChain) — prompt registry + eval + tracing
+- **Helicone** — LLM observability + experiments
+- **Promptlayer** — prompt versioning + comparison
+- **Statsig / LaunchDarkly** — feature flag generic, can do prompts
+
+| 决策 | Pros | Cons |
+|---|---|---|
+| Build all | Customize, no vendor lock | 6 month build, ongoing maintain |
+| Buy all (LangSmith) | Fast | Lock-in, may not fit |
+| Hybrid (我推) | Best of both | Some integration |
+
+我推: LangSmith for eval + tracing (mature), LaunchDarkly for traffic split (mature), Postgres DB for registry (custom, simple), custom UI in Retool.
+
+**Decision 8.3 — A/B vs multi-armed bandit**
+
+| 选项 | Pros | Cons |
+|---|---|---|
+| A/B (50/50, time-bound) | Clean stats | Slow to find winner, wastes traffic |
+| Multi-armed bandit (Thompson sampling) | Learn fast, exploit | Less clean stats |
+
+I推 A/B for tier-1 (cleaner), MAB for tier-3 experimental.
+
+**Decision 8.4 — When to roll back vs when to fix forward**
+
+Roll back if:
+- Quick regression (5 min)
+- Unknown root cause
+- Tier-1 critical
+
+Fix forward if:
+- Known issue with quick fix
+- Tier-3 / low risk
+- Rolling back loses too much value (e.g., new feature)
+
+---
+
+## 关键决策点 (with rationale)
+
+1. **Prompt as data (DB), not code (Git)** — PM author + runtime fetch + per-tenant.
+
+2. **Eval 4-layer gate (lint + golden + LLM-judge + human)** — quality before promote.
+
+3. **Cost/latency check in eval** — runaway token cost是真实事故.
+
+4. **Sticky user_id hash for A/B** — consistent UX, no flapping.
+
+5. **Per-tenant variants via Jinja inheritance** — DRY but customizable.
+
+6. **5-layer auto-rollback triggers** — multiple signals, robust.
+
+7. **Cache TTL 60s + active invalidation** — < 30s rollback effect.
+
+8. **24h freeze post-rollback** — avoid flap loop.
+
+9. **Audit log immutable + 7yr retention** — SOX compliance.
+
+10. **Buy LangSmith for eval + LaunchDarkly for traffic + build registry** — hybrid pragmatism.
+
+---
+
+## 数字 (capacity sizing, cost math)
+
+**Volumes**:
+- 200 prompts × 1M calls/day = 200M LLM calls/day
+- SDK fetch (cached): 200M × 95% cache hit = ~10M DB reads/day = 120 QPS
+- Audit log: ~100 entries/day (changes), 7yr retention = ~250K rows
+
+**Storage**:
+- prompts: 200 rows
+- prompt_versions: ~2000 (10 versions per prompt avg)
+- prompt_assignments: 200 × 10 tenant variants = ~2K rows
+- prompt_audit_log: 250K rows over 7 years
+- Total: ~5MB ≈ nothing
+
+**Cache**:
+- Redis: 200 prompt × 5 active version × 1KB content = 1MB hot
+- 60s TTL, ~10K reads/min hit
+
+**Eval cost**:
+- Per new version: lint (free) + golden 100 samples × $0.01 each = $1 + LLM-judge 50 samples × $0.10 = $5 = **$6 per eval**
+- Tier-1 human review: ~$50 reviewer time
+- 200 prompts × 1 update/month × $6 = $1200/month eval cost (auto)
+
+**Cost monitoring**:
+- New prompt longer 50% → 200M × 50% × $0.005/k token avg = $5M/month overrun if undetected
+- Our cost-gate catches at canary 1%
+
+**Infra cost**:
+- Postgres: ~$200/month (overkill for size)
+- Redis: ~$100/month
+- LangSmith: ~$2K/month (1M trace/day plan)
+- LaunchDarkly: $1K/month (100K MAU plan)
+- Custom UI (Retool): $500/month
+- Total: ~$4K/month
+
+**Time to detect + rollback**:
+- Detection window: 1-5 min (tier dependent)
+- Decision (auto rule): < 1 sec
+- Cache invalidate + propagate: 30 sec
+- Total: ≤ 6 min worst case, ≤ 1 min if tier-1 with 30s window
+
+---
+
+## Gao Xin 简历专属 reframe
+
+1. **TikTok PayLater BNPL prompt management** — 你做过 prompt 多版本管理, A/B for default rate optimization.
+
+2. **TikTok Voice agent 7 markets** — 你做过 per-market prompt variants (语言 + tone + 合规), 直接套.
+
+3. **Indonesia OJK 合规 prompt audit** — 监管要求 immutable audit, 你做过.
+
+4. **Internal Agent Platform prompt registry** — 你做过内部 prompt 中央仓库, 给 30+ 团队用.
+
+5. **ConvFinQA / financial agent eval** — golden set + LLM-judge, 你跑过 production eval.
+
+reframe: "我在字节做 voice agent 时 prompt 跨 7 market × 5 intent = 35 个 + tier-1 critical (compliance disclosure) 需要 audit, 直接做过这道题. 我的 stack 是 自建 Postgres registry + 自建 UI + 自建 A/B + LangSmith 集成. 这道题如果重做我会加 LaunchDarkly 替代自建 flag, 更稳."
+
+---
+
+## 5 个 Follow-ups
+
+1. **"如果同一 user 不同 session, hash 同会得到同 version, 但用户感觉跟昨天不一样. 怎么 align?"** — 答: User-sticky 已用 user_id 不是 session. 但 user 跨 device 可能不同 cookie. 解决: hash on permanent user_id (DB id, not cookie). 同时记录 (user, prompt, version) 在 user profile, 跨 device 一致.
+
+2. **"如果一个 prompt 同时 100 个 customer 用, 1 个 customer 用自己 variant. 我们怎么 do A/B 不污染 base?"** — 答: 这 customer 的 variant 自己 stream, 不参与 base A/B. Base A/B 拿剩 99 customer 数据. Variant 自己有 baseline + eval, customer 自己愿意 A/B 也可 (但 stat power 弱).
+
+3. **"PM 想直接 prod edit prompt, 不走 eval gate, 怎么 govern?"** — 答: (a) UI-level role: PM 不能 edit tier-1, 只能 propose; (b) Tier-3 (experimental) 给 PM 直接 edit + auto-canary 1%; (c) Manager approval for tier-1 promote; (d) After-incident review: 如果 bypass 导致问题, 加 friction (force review). 平衡 friction vs speed.
+
+4. **"prompts 在 LLM provider 端 cache (Anthropic prompt cache), 我们 rollback 后 cache 仍 stale, 怎么办?"** — 答: Anthropic prompt cache 是 server-side semantic cache. Rollback 改 prompt content → cache hash 变 → automatic miss + recompute. 5 min 内自然 propagate. 强制 invalidate: client SDK 加 cache_breaker hash on prompt change.
+
+5. **"我们 prompt 用 Claude, 想 cross-test 同 prompt 在 GPT 上表现, 怎么 design?"** — 答: (a) prompt model-agnostic 设计 (无 Claude-specific 句法); (b) Eval golden 跑多 model 并存; (c) UI shows side-by-side: GPT-5.5 vs Claude Sonnet 4.6 vs Gemini 3 Pro on same prompt; (d) Per-prompt model recommendation (有些 prompt 在 Claude 强, 有些 GPT 强); (e) Allow per-tenant model choice if quality tied.
+
+---
+
+## ❌ 死路答法
+
+1. **"git + PR review"** — PM 不会用, 慢, 不支持 runtime fetch.
+2. **"YAML config in deploy"** — change 要 deploy, 不是 minute 改.
+3. **"prompt in code"** — change = code release, 慢.
+4. **"无 eval gate, deploy 直接 A/B"** — 1% canary 可能就 5% user 受害.
+5. **"全 manual rollback"** — < 5 min 不可能 manual.
+6. **"无 per-tenant"** — 失去 customization 价值.
+7. **"无 audit"** — SOX 合规挂.
+8. **"无 cost monitor"** — 新 prompt 长 50% 月费爆炸不知道.
+9. **"binary on/off feature flag"** — 没 gradual rollout.
+10. **"prompt 写 Jinja 太复杂"** — Jinja 是 industry standard, PM 学 30min 会用.
+
+---
+
+## ✅ 加分项
+
+1. **Prompt as data, not code** — framework correctness
+2. **4-layer eval gate (lint + golden + LLM-judge + human)** — production-grade
+3. **Sticky user_id hash for A/B** — 真懂 UX
+4. **Per-tenant variants via Jinja inheritance** — DRY + customizable
+5. **5 auto-rollback triggers** — multiple signals
+6. **Cache TTL 60s + active invalidation = < 30s rollback effect** — fast
+7. **24h freeze post-rollback** — avoid flap
+8. **Cost / latency in eval gate** — token cost runaway prevention
+9. **Buy LangSmith + LaunchDarkly + Retool, build registry** — pragmatic build/buy
+10. **Numbers 给得出来** (200M calls/day, $4K/month infra, $6 per eval, $5M/month cost runaway risk)
+
+---
+
+## 一句话总结
+
+Prompt 生命周期不是 git, 是 **DB registry + Jinja templating + 4-layer eval gate + LangSmith eval + LaunchDarkly traffic split + sticky user A/B + 5-signal auto-rollback + per-tenant Jinja inheritance + immutable audit + per-prompt cost/quality dashboard** 的 ML ops + 产品 ops 混合系统.
+
+---
+
+## Cheat Sheet
+
+```
+Registry: Postgres + Redis (60s TTL)
+  Tables: prompts, prompt_versions, prompt_assignments, prompt_audit_log
+  Versioning: semver (MAJOR.MINOR.PATCH)
+  Templating: Jinja2
+
+Eval Gate (before promote):
+  1. Lint:        schema, syntax, PII, length, model compat (1 sec)
+  2. Golden:      50-200 (input, expected) regression check (5-30 min)
+  3. LLM-judge:   Claude Opus 4.7 pairwise vs current (10-20 min)
+  4. Human:       tier-1 mandatory, sampled (1-3 day async)
+  5. Cost/latency: token usage + p95 latency (1 min)
+  Pass criteria: ≥ 97% of baseline quality + < 10% cost overrun
+
+Rollout Stages (tier-1):
+  Canary 1% → 10% → 50% → 100% (24h+48h+48h observation)
+Tier-3: 50% → 100% in 1 day
+
+Traffic Split:
+  Sticky: hash(user_id + prompt_name) % 100 vs cumulative pct
+  Per-tenant override possible
+
+Auto-Rollback Triggers:
+  Error rate > 2× baseline 5 min
+  p99 latency > 1.5× baseline 10 min
+  Quality < baseline -5% 1h
+  Refund > 1.2× baseline 1h
+  Cost > 2× baseline 30 min
+  CSAT < -5pp 24h
+
+Rollback Action:
+  1. Flip traffic 100% → prev version
+  2. Invalidate Redis cache (active)
+  3. Mark new as 'rolled-back'
+  4. Audit + PagerDuty + Slack
+  5. Effect within 30s, total < 5 min from trigger
+
+Per-Tenant Variants:
+  Jinja inheritance: variant extends base, overrides blocks
+  Variant pool: 3-5 named variants (formal, casual, multilingual)
+  Customer self-serve: parametrized only (variables)
+  Hard custom: submit-request flow
+
+Stack (build / buy):
+  Registry:        Postgres + Redis (build, simple)
+  Eval:            LangSmith (buy, ~$2K/m)
+  Traffic split:   LaunchDarkly (buy, ~$1K/m)
+  UI:              Retool (buy, ~$500/m)
+  Observability:   Datadog + LangSmith traces
+
+Cost (200 prompts, 200M calls/day):
+  Infra: ~$4K/m
+  Eval auto: $1200/m
+  Per-prompt update eval: $6 each (auto), +$50 human review
+
+Audit: 7yr retention, immutable, $0 storage (logs)
+
+SLO:
+  Time to promote new (tier-1): 1 week
+  Time to rollback: < 5 min (target < 1 min for tier-1)
+  Eval coverage: 100% prod prompts
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

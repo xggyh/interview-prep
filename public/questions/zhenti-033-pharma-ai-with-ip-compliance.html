@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q33 · [问题拆解/案例] 某药企想部署 AI 助手让研究员查内部化合物数据, 有法务/IP/合规约束, 怎么起步 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q33 · [问题拆解/案例] 某药企想部署 AI 助手让研究员查内部化合物数据, 有法务/IP/合规约束, 怎么起步</div>
+  <h1>Q33 · [问题拆解/案例] 某药企想部署 AI 助手让研究员查内部化合物数据, 有法务/IP/合规约束, 怎么起步</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-033-pharma-ai-with-ip-compliance.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-033-pharma-ai-with-ip-compliance.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q33 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q33 · 药企内部化合物 AI 助手 (IP + 合规约束)</h3>
+<blockquote><p>"A <strong>top-10 pharma company</strong> wants to deploy an <strong>AI assistant for researchers</strong> to query <strong>internal compound libraries, assay data, and patent claims</strong>. Their <strong>legal, IP, and compliance teams</strong> have strong concerns. Walk me through how you'd <strong>scope</strong> this in the first 90 days."</p></blockquote>
+<p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir / Anthropic (life sciences) · OpenAI Enterprise <strong>行业</strong>: Pharma / life sciences / IP-sensitive</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 build 一个 RAG.</p>
+<p><strong>是</strong>: 考你能不能在<strong>最 IP-sensitive 行业 + 多 veto 持有者 + 全球合规拼盘</strong>下做 careful, conservative scoping. 这是 FDE 题里<strong>政治维度最重</strong>的之一.</p>
+<p>4 个 signal:</p>
+<ol><li><strong>Stop and ask before architecting</strong> — 90% 候选人开始讲 RAG / vector DB. 实际 90 天里 60-70% 时间是法务 / IP / 合规审批, 不是技术</li><li><strong>Data classification first</strong> — 化合物结构 + 临床试验 + 专利说明书 + assay data 各自 IP / 合规等级不同, 不能一刀切</li><li><strong>Pilot scope discipline</strong> — pilot 不是 "全公司 5000 研究员", 是 "1 个 therapeutic area 的 30 人 team 用 6 个月"</li><li><strong>Self-host vs API as a decision, not a default</strong> — IP 暴露容忍度决定 architecture, FDE 必须帮客户做这个 tradeoff</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 立刻冲 RAG architecture</strong></p>
+<blockquote><p>"Sure, I'd ingest compound data + assays + patents into a vector DB, use Anthropic Claude API with prompt caching, add reranker, build a Slack bot..."</p></blockquote>
+<p>死. 你<strong>没问</strong>:</p>
+<ul><li>化合物数据是 <strong>public domain</strong> (FDA filed) 还是 <strong>trade secret pre-filing</strong>? 这是天差地别</li><li>用 commercial API 是否违反内部 IP policy? (大药企经常禁)</li><li>临床试验数据 (BLA / NDA 涉及) 跟 prescriber 数据有 HIPAA 合规</li><li>用户是 medicinal chemist / biologist / regulatory / IP attorney? 各自需求完全不同</li><li>跨国 (欧盟 GDPR + 中国 PIPL + 美国) 是否要求 data residency?</li></ul>
+<p><strong>挂法 #2: 假设 self-host vs API 是技术选择</strong></p>
+<blockquote><p>"We can use OpenAI API, it's the most cost-effective."</p></blockquote>
+<p>死. 在大药企<strong>这是 legal + IP 决策, 不是技术决策</strong>. 候选人没意识到 → 整个 architecture 假设破产.</p>
+<p><strong>挂法 #3: 把 IP attorney 当 "blocker" 而不是 partner</strong></p>
+<blockquote><p>"We'll work around legal."</p></blockquote>
+<p>死. IP attorney 在大药企<strong>是 sponsor 之一</strong>. 把他们当 blocker = 项目政治上死.</p>
+<hr />
+<h3>完美答案架构 (5 步)</h3>
+<h4>Step 1: 澄清问题 (10 min)</h4>
+<blockquote><p>"Before I sketch, I want to ask 10 things. The reason: pharma is the <strong>most IP-sensitive industry</strong> I work with, and the answer depends entirely on data sensitivity + user role + jurisdictional constraints. None of these are software questions."</p></blockquote>
+<p><strong>10 个 clarifying questions</strong>:</p>
+<blockquote><p><strong>Q1</strong>: "Who is the <strong>primary user</strong>? Medicinal chemist? Biologist? Regulatory affairs? IP attorney? Each role has different queries, different data access, different risk tolerance. 'Researcher' is too broad."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "<strong>Data classification tiers</strong>: what's public (FDA-filed, published patents), what's confidential (active program but no IP filed), what's trade-secret (pre-filing, lead optimization)? Each tier likely has different policy on AI ingestion."</p></blockquote>
+<blockquote><p><strong>Q3</strong>: "Is <strong>commercial AI API</strong> allowed by IP policy? Or must this run <strong>self-hosted</strong> (no data leaves company perimeter)? <strong>This is THE architecture-determining question</strong> and is a legal/IP call, not technical."</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "Are there <strong>jurisdictional data residency</strong> requirements — EU GDPR / SCC, China PIPL, US state laws (CCPA / NYSHIELD)? Pharma is global; can data move across borders?"</p></blockquote>
+<blockquote><p><strong>Q5</strong>: "What's the <strong>regulatory exposure</strong> of the use case? Querying compound library for pre-research = low. Querying clinical trial efficacy data = high (could be deemed 'promotion' under FDA / EMA rules if leaked). Querying adverse event database = HIPAA + 21 CFR Part 11."</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "<strong>Is the goal exploration or evidence</strong>? Exploration ('show me molecules similar to X') is brainstorming, LLM is fine. Evidence (deciding to terminate a $500M program) needs deterministic citation + reproducibility."</p></blockquote>
+<blockquote><p><strong>Q7</strong>: "Are you <strong>already FDA-validated</strong> for any AI? 21 CFR Part 11 + GxP + EMA AI policy mean some AI usage requires formal validation. <strong>Is this 'validated' use or 'non-validated' (R&amp;D only)?</strong>"</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "Who has <strong>veto</strong> — Chief Medical Officer? Chief Legal Officer? Chief Compliance Officer? IP team? Information Security? List them so I know who needs to sign off."</p></blockquote>
+<blockquote><p><strong>Q9</strong>: "Is there a <strong>previous failed AI deployment</strong> at this company? (Often yes.) Why did it fail — IP leak, hallucination on assay, regulatory finding? That history shapes everything."</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "What's the <strong>specific business value</strong> they want — speeding lit review (low risk, easy), accelerating compound prioritization (medium risk, harder), automating clinical narrative generation (high risk, FDA-watched)? Per use case, the scope is different."</p></blockquote>
+<p><strong>面试官 likely 回答</strong>:</p>
+<ul><li>Primary user: medicinal chemists in <strong>Oncology</strong> therapeutic area, ~30 people in 1 site</li><li>Data: compound library (mix of public + confidential pre-filing), assay results (confidential), patent literature (public + internal patent prep notes)</li><li>API: commercial API <strong>explicitly forbidden</strong> by IP policy. Self-host or nothing.</li><li>Residency: must stay in US for US program, EU for EU program (cross-border is veto)</li><li>Regulatory: non-validated use only (R&amp;D, no FDA submissions). If used in submission later, formal validation required.</li><li>Exploration, not evidence (in v1)</li><li>Veto: CMO + CLO + Chief IP Officer + InfoSec</li><li>Previous attempt: 18 months ago, killed by IP leak (researcher pasted compound structure into ChatGPT, structure showed up in OpenAI's blog post months later — embarrassing). <strong>The trauma is real</strong>.</li><li>Business value v1: speeding internal literature review + compound similarity search within library</li></ul>
+<p>→ <strong>Real scope</strong>: 90 days = pilot for 30 oncology medicinal chemists, self-hosted, internal data only, low-risk exploration use cases, IP + compliance team sign-off on architecture before pilot starts.</p>
+<p>This is <strong>NOT</strong> "deploy AI assistant across the company". It's "<strong>get one team using one carefully-scoped use case after IP + compliance say yes</strong>".</p>
+<hr />
+<h4>Step 2: 找干系人 + 成功指标 (10 min)</h4>
+<p><strong>Stakeholder map (pharma is heavy on veto)</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>对项目态度</th><th>我对他们的关键动作</th></tr></thead><tbody><tr><td><strong>Chief Medical Officer (CMO)</strong></td><td>Patient safety, GxP, regulatory</td><td>Cautious, wants validation path</td><td>Quarterly review, FDA AI guidance briefing</td></tr><tr><td><strong>Chief Legal Officer (CLO)</strong></td><td>Liability, contracts, exposure</td><td>Gates everything</td><td>Weekly during pilot, written architecture doc</td></tr><tr><td><strong>Chief IP Officer</strong></td><td>Trade secret protection, freedom-to-operate</td><td><strong>Highest veto, most trauma from past leak</strong></td><td>Daily during week 1, sign-off on every data class</td></tr><tr><td><strong>InfoSec / CISO</strong></td><td>Encryption, access control, breach</td><td>Approval needed</td><td>Network architecture, pen test</td></tr><tr><td><strong>Chief Compliance Officer (CCO)</strong></td><td>21 CFR Part 11, GxP, FDA / EMA</td><td>Gates "validated use"</td><td>Pre-validation checklist for v2</td></tr><tr><td><strong>Head of Research (Oncology)</strong></td><td>Speed of research, scientist productivity</td><td><strong>Champion / sponsor for pilot</strong></td><td>Weekly, demo to chemists</td></tr><tr><td><strong>Medicinal chemists (~30)</strong></td><td>Daily usability, time saved</td><td><strong>End users, ultimate veto via non-adoption</strong></td><td>Daily during pilot, office hours</td></tr><tr><td><strong>Patent attorneys</strong></td><td>Won't accidentally disclose pre-filing</td><td>Need consult</td><td>Ensure pre-filing data NOT in pilot v1</td></tr><tr><td><strong>Internal Audit</strong></td><td>SOX-adjacent controls</td><td>Need approval for production</td><td>Audit log architecture</td></tr></tbody></table></div>
+<p><strong>Key insight</strong>: Chief IP Officer's <strong>18-month-old trauma</strong> (ChatGPT leak) is the <strong>single biggest blocker</strong>. They will <strong>demand</strong>: data stays within perimeter, audit log of every query, ability to redact / pull data, periodic re-review.</p>
+<p><strong>Success metrics (3 layers)</strong>:</p>
+<p><strong>Layer 1 — Pilot KPIs</strong> (Head of Research + chemists view):</p>
+<ul><li>Time-to-answer for "compound similarity / lit review" queries (currently 30-60 min via SciFinder + manual, target &lt; 5 min)</li><li>Adoption: % of 30 chemists using weekly (target &gt; 60%)</li><li>Satisfaction: NPS from chemists (target &gt; 30)</li></ul>
+<p><strong>Layer 2 — Compliance KPIs</strong> (CLO / CIPO view):</p>
+<ul><li>0 IP leaks (binary)</li><li>0 hallucinated citations going into formal docs (track via audit log review)</li><li>100% audit log coverage of every query</li></ul>
+<p><strong>Layer 3 — Strategic</strong> (CEO / board view):</p>
+<ul><li>Time-to-clinical-candidate (lagging, 12-24 months)</li><li>Cost per drug program (lagging)</li></ul>
+<p><strong>Counter-metrics (must not move negatively)</strong>:</p>
+<ul><li>Number of compliance findings during/after pilot</li><li>Researcher complaints about restrictiveness ("this AI doesn't know anything useful")</li><li>IP team workload (review queue)</li></ul>
+<p><strong>The framing</strong>:</p>
+<blockquote><p>"90 days is a pilot, not a launch. Success = (a) 30 chemists getting real value, (b) 0 IP / compliance incidents, (c) clear path to expand to 200+ chemists in month 4-6 and validated use in year 2."</p></blockquote>
+<hr />
+<h4>Step 3: 梳理输入数据 (10 min)</h4>
+<p><strong>Data inventory + classification (THE central artifact)</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Data type</th><th>Source</th><th>Classification</th><th>Pilot scope?</th><th>Rationale</th></tr></thead><tbody><tr><td><strong>FDA-filed patents (own + competitor)</strong></td><td>PubMed, USPTO, internal Patent DB</td><td><strong>PUBLIC</strong></td><td>YES</td><td>Already disclosed</td></tr><tr><td><strong>Published literature (PubMed, etc)</strong></td><td>External</td><td>PUBLIC</td><td>YES</td><td>Standard lit search</td></tr><tr><td><strong>Internal patent prep notes (pre-filing)</strong></td><td>IP team docs</td><td><strong>TRADE SECRET</strong></td><td><strong>NO (defer to v2 after IP approval)</strong></td><td>Highest risk</td></tr><tr><td><strong>Compound library structures (cleared for disclosure)</strong></td><td>Internal LIMS</td><td>CONFIDENTIAL</td><td>YES (with controls)</td><td>Internal use OK</td></tr><tr><td><strong>Compound library structures (lead opt, pre-filing)</strong></td><td>Internal LIMS</td><td><strong>TRADE SECRET</strong></td><td><strong>NO (defer to v2)</strong></td><td>One leak = entire program exposed</td></tr><tr><td><strong>Assay results (cleared)</strong></td><td>LIMS</td><td>CONFIDENTIAL</td><td>YES</td><td>Standard</td></tr><tr><td><strong>Assay results (active lead optimization)</strong></td><td>LIMS</td><td>TRADE SECRET</td><td><strong>NO</strong></td><td>Same reason</td></tr><tr><td><strong>Clinical trial protocols (published)</strong></td><td>ClinicalTrials.gov</td><td>PUBLIC</td><td>YES</td><td>Already public</td></tr><tr><td><strong>Clinical trial raw data (BLA / NDA stage)</strong></td><td>Internal</td><td><strong>REGULATED + CONFIDENTIAL</strong></td><td><strong>NO (separate platform)</strong></td><td>GxP, separate compliance path</td></tr><tr><td><strong>Adverse event reports</strong></td><td>Pharmacovigilance DB</td><td><strong>HIPAA + 21 CFR Part 11</strong></td><td><strong>NO</strong></td><td>Different system, validation required</td></tr><tr><td><strong>HR / employee data</strong></td><td>HR</td><td>PERSONAL</td><td>NO</td><td>Not relevant</td></tr><tr><td><strong>Financial data</strong></td><td>Finance</td><td>CONFIDENTIAL</td><td>NO</td><td>Not relevant</td></tr></tbody></table></div>
+<p><strong>Pilot v1 data scope</strong>: ONLY public + confidential-cleared data. <strong>No trade secret, no clinical trial raw data, no adverse events</strong>.</p>
+<p><strong>Data movement constraints</strong>:</p>
+<ul><li>All data stays within company perimeter (self-hosted LLM, no commercial API)</li><li>US-data only for US oncology pilot (EU pilot would be separate)</li><li>Audit log captures every query + every retrieved document</li></ul>
+<p><strong>Key gap / risk</strong>:</p>
+<ul><li>LIMS data isn't pre-classified by trade-secret status. <strong>Someone has to label which compounds are pre-filing and which are cleared</strong>. This is human work, not automation. Estimated 2 weeks.</li><li>Patent prep notes are in Word docs on individual attorneys' laptops, not in any DB. Defer permanently to v2 if ever.</li></ul>
+<p><strong>Architecture implications</strong>:</p>
+<ul><li><strong>Must be self-hosted</strong>: Llama 3 / Mistral / Anthropic claude on AWS Bedrock with PrivateLink (depending on what IP / InfoSec approves)</li><li><strong>Likely choice</strong>: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster</li><li><strong>Backup model</strong>: smaller (8B) for cost / latency optimization, with re-ranker</li><li><strong>Vector DB</strong>: self-hosted (Qdrant / Weaviate), NOT Pinecone (multi-tenant SaaS, IP team won't approve)</li></ul>
+<hr />
+<h4>Step 4: 拆成可解子问题 (15 min)</h4>
+<blockquote><p>"Now decomposition. The unique thing about pharma is the <strong>'easy' subproblems are legal/compliance, the 'hard' subproblems are model quality on chemistry-specific queries</strong>. Both have to be solved."</p></blockquote>
+<p><strong>9 subproblems</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>子问题</th><th>Risk</th><th>Value</th><th>90-day pri</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>IP + Compliance sign-off</strong>: architecture review, data classification, audit log design</td><td>Critical</td><td>Gates everything</td><td><strong>1 (week 1-3)</strong></td></tr><tr><td><strong>B</strong></td><td><strong>Self-hosted LLM stack</strong>: model selection, infra, deploy</td><td>Medium</td><td>Foundation</td><td><strong>2 (week 1-4)</strong></td></tr><tr><td><strong>C</strong></td><td><strong>Data ingestion + classification labeling</strong>: only cleared data, with provenance</td><td>High</td><td>Foundation</td><td><strong>3 (week 2-6)</strong></td></tr><tr><td><strong>D</strong></td><td><strong>RAG over chemistry corpus</strong>: retrieval that handles SMILES + chemical names + assay vocabulary</td><td>Medium</td><td>High</td><td><strong>4 (week 4-8)</strong></td></tr><tr><td><strong>E</strong></td><td><strong>UI + workflow integration</strong>: Slack? web? embed in existing tools?</td><td>Low</td><td>Medium</td><td><strong>5 (week 6-10)</strong></td></tr><tr><td><strong>F</strong></td><td><strong>Citation + provenance</strong>: every answer cites source documents</td><td>Medium</td><td>High (audit)</td><td><strong>6 (week 6-10)</strong></td></tr><tr><td><strong>G</strong></td><td><strong>Hallucination detection on chemistry-specific outputs</strong></td><td>High</td><td>High</td><td><strong>7 (week 8-12)</strong></td></tr><tr><td><strong>H</strong></td><td><strong>Pilot run + iteration</strong>: 30 chemists, weekly retros</td><td>Low</td><td>Critical</td><td><strong>8 (week 10-13)</strong></td></tr><tr><td><strong>I</strong></td><td><strong>Validated use path (for v2)</strong>: 21 CFR Part 11 documentation framework</td><td>High</td><td>Future</td><td>Document, don't ship in 90 days</td></tr></tbody></table></div>
+<p><strong>Sequencing rationale</strong>:</p>
+<blockquote><p><strong>A first</strong> because: without IP + compliance sign-off, <strong>everything else is wasted work</strong>. Spend week 1-3 in meetings with CIPO, CLO, CCO, InfoSec. <strong>No code merge before week 2</strong>.</p></blockquote>
+<blockquote><p><strong>B parallel with A</strong> because: while legal is reviewing, our infra team can stand up self-hosted Llama on internal GPU cluster. This is approvable in parallel.</p></blockquote>
+<blockquote><p><strong>C requires data classification labels</strong> which is human work — defer until week 2 when classification is approved.</p></blockquote>
+<blockquote><p><strong>D-F build on B + C</strong>.</p></blockquote>
+<blockquote><p><strong>G is the unique pharma technical risk</strong>: hallucinating a compound structure or assay result. Need eval set + classifier.</p></blockquote>
+<blockquote><p><strong>I documented but not shipped</strong> — validated use is year 2.</p></blockquote>
+<hr />
+<h4>Step 5: Walking-skeleton MVP (15 min)</h4>
+<p><strong>Walking-skeleton (Week 1-4)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Week 1: Legal + IP + Compliance meetings (NO code)
+Week 2: Self-hosted Llama 3.1 stood up on internal AWS, basic prompt eval
+Week 3: Public-only RAG (PubMed lit search), tested by FDE team
+Week 4: Show to Head of Research with 5 sample queries (lit search only)</code></pre>
+<p><strong>Walking-skeleton has ZERO confidential data in v1</strong>.</p>
+<p><strong>Why</strong>:</p>
+<ul><li><strong>Risk mitigation</strong>: if anything leaks during the demo, it's already public data</li><li><strong>Architectural proof</strong>: shows the stack works end-to-end without IP exposure</li><li><strong>Buy-in from chemists</strong>: even just lit search faster than SciFinder is value</li><li><strong>Trust building with IP team</strong>: see system works without touching their crown jewels</li></ul>
+<p><strong>Phase 2 (Week 5-8) — Add Confidential Internal Data</strong>:</p>
+<p>After IP team approves the architecture review:</p>
+<ul><li>Ingest "cleared compound library" data</li><li>Add "cleared assay results"</li><li>Run pilot internally with 5 friendly chemists (not full 30 yet)</li></ul>
+<p><strong>Phase 3 (Week 9-13) — 30-Chemist Pilot</strong>:</p>
+<ul><li>All 30 oncology chemists onboarded</li><li>Weekly retro with researchers + IP team</li><li>Daily audit log review by InfoSec</li><li>Bi-weekly checkpoint with CMO / CLO</li></ul>
+<p><strong>Phase 4 (Month 4-6) — Expansion</strong>:</p>
+<ul><li>Other therapeutic areas</li><li>Expand data scope (with re-classification)</li><li>Begin validated-use documentation framework</li></ul>
+<p><strong>Phase 5 (Year 2) — Validated Use</strong>:</p>
+<ul><li>21 CFR Part 11 documented validation</li><li>Used in regulatory submissions</li></ul>
+<hr />
+<h3>详细回答 (Sample 60-min monologue)</h3>
+<blockquote><p>"Before I sketch, I want to ask 10 things. Pharma is the most IP-sensitive industry I work with, and the architecture depends entirely on data classification + IP policy + jurisdictional constraints. These are legal, not software, questions.</p>
+<p><em>(asks 10 Qs)</em></p>
+<p><em>(gets answers: 30 oncology chemists, self-hosted only, no commercial API, US-only, non-validated R&amp;D use, exploration-not-evidence, CIPO has highest veto, previous ChatGPT leak trauma 18 months ago, low-risk lit search + compound similarity)</em></p>
+<p>OK so real scope: <strong>90 days = pilot for 30 oncology chemists. Self-hosted. Internal data only. Low-risk exploration use cases. Sign-off from IP / Compliance / Legal before any data ingest</strong>.</p>
+<p>This is <strong>NOT</strong> 'deploy AI assistant across the company'. It's 'get one team using one carefully-scoped use case after IP + compliance say yes'.</p>
+<p><strong>Stakeholders</strong>: CIPO has highest veto — and they're traumatized by 18-month-old ChatGPT leak. CLO and CMO gate compliance. Head of Research (Oncology) is sponsor. 30 medicinal chemists are end users.</p>
+<p><strong>Key insight</strong>: 60-70% of the 90 days is <strong>legal / compliance / IP review work</strong>, not technical. Week 1-3 is meetings, not code.</p>
+<p><strong>Data classification table</strong> (I'd want to show this in the first review):</p>
+<ul><li><strong>Public</strong> (PubMed, USPTO patents): YES in pilot</li><li><strong>Confidential cleared</strong> (cleared compound library, cleared assays): YES in pilot</li><li><strong>Trade secret</strong> (pre-filing structures, lead opt assays, patent prep notes): <strong>NO, defer to v2 after IP approval</strong></li><li><strong>Regulated</strong> (clinical trial raw, adverse events): NO, separate validated platform</li></ul>
+<p><strong>9 subproblems</strong>:</p>
+<ol><li><strong>IP + Compliance sign-off</strong> (gates everything, week 1-3, no code yet)</li><li><strong>Self-hosted LLM stack</strong> (parallel, week 1-4, Llama 3.1 70B on internal AWS)</li><li><strong>Data ingestion + classification</strong> (week 2-6)</li><li><strong>RAG over chemistry corpus</strong> (handles SMILES + chemical names)</li><li><strong>UI / workflow integration</strong></li><li><strong>Citation + provenance</strong></li><li><strong>Hallucination detection on chemistry outputs</strong> (unique pharma risk)</li><li><strong>Pilot run + iteration</strong></li><li><strong>Validated use documentation</strong> (year 2, just framework)</li></ol>
+<p><strong>Walking-skeleton Week 1-4</strong>: NO confidential data. Public-only RAG (PubMed). Demos that the stack works end-to-end without IP exposure. Trust-build with IP team.</p>
+<p><strong>Phase 2 Week 5-8</strong>: add cleared confidential data after IP signs off. Pilot with 5 friendly chemists first.</p>
+<p><strong>Phase 3 Week 9-13</strong>: full 30-chemist pilot, weekly retro with researchers + IP team.</p>
+<p><strong>Three things to flag proactively</strong>:</p>
+<p><strong>(a) Self-hosted is non-negotiable</strong>. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Pinecone is out, Qdrant / Weaviate self-hosted are in.</p>
+<p><strong>(b) Trade secret data is DEFERRED</strong>. Pre-filing compound structures + patent prep notes are the highest-risk data and adding them to pilot v1 = repeat of the ChatGPT leak trauma. IP team will block. Defer to v2 after pilot proves architecture.</p>
+<p><strong>(c) Chemistry-specific hallucination is the technical risk</strong>. LLM will make up compound structures + assay values if not constrained. Need (1) RAG forcing answers to cite retrieved documents, (2) refusal when retrieval is weak, (3) eval set of 'gotcha' chemistry questions that the model should say 'I don't know' on, not hallucinate.</p>
+<p>Want me to deep-dive the IP sign-off process, self-hosted architecture, or hallucination defense?"</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<p>This is the most regulator-heavy scenario in the 5 decomposition cases, and your <strong>Indonesia OJK + Vietnam SBV + Thailand BoT</strong> experience translates directly:</p>
+<blockquote><p>"I had this pattern at TikTok PayLater across 7 markets. Each market regulator (OJK in Indonesia, BACEN in Brazil, CNBV in Mexico, etc.) had <strong>different requirements about what data could be processed by AI and where</strong>. Some required data residency, some restricted certain AI applications entirely, some required pre-approval.</p>
+<p><strong>The 5-step that worked</strong>:</p>
+<ol><li><strong>Clarify</strong>: I learned to ask 'what's the regulatory framework' BEFORE 'what does the product do'. In Indonesia, OJK's Fintech P2P regulation explicitly required certain decisioning logic to be <strong>deterministic and auditable</strong>, not pure ML. That constraint shaped architecture before any model selection.</li></ol>
+<ol><li><strong>Stakeholder map</strong>: per market, the regulator's compliance officer was a stakeholder. Plus our internal Legal + Compliance + Product. Plus the local market General Manager. <strong>Treating regulators as partners, not blockers, was the unlock</strong>.</li></ol>
+<ol><li><strong>Data classification</strong>: I built a per-market data classification matrix similar to what I'd build for pharma here. Some data could go through LLM (e.g., open-ended customer chat for empathy), some couldn't (e.g., credit decisioning required deterministic logic).</li></ol>
+<ol><li><strong>Decompose</strong>: scope reduction was constant. The version we eventually shipped to OJK was 1/3 of what product team originally wanted. The remaining 2/3 went to a v2 / v3 roadmap with regulator co-design.</li></ol>
+<ol><li><strong>Walking-skeleton</strong>: in Indonesia, I shipped a <strong>voice agent that could only do 3 things initially</strong>: (a) confirm identity, (b) share payment due date, (c) escalate to human if customer said anything beyond these. OJK approved it because the scope was clearly bounded and auditable. Then we expanded one capability at a time, each with re-approval.</li></ol>
+<p>The pattern that transfers to pharma: <strong>scope reduction is the FDE's job</strong>. The customer wants 'AI assistant for everything'. The right v1 is 'PubMed lit search and cleared compound similarity for 30 chemists in oncology, defending IP team's veto with explicit data exclusions'.</p>
+<p>Also — I've shipped to a customer who had <strong>previous-AI-deployment trauma</strong> before (a market where a previous vendor had a chatbot leak issue). I know the conversation: validate the trauma, name it, explicitly architect to make that specific failure impossible, demo before launch. Don't hand-wave 'we're different'."</p></blockquote>
+<p><strong>Other resume hooks</strong>:</p>
+<ul><li><strong>ConvFinQA negative-result ablation</strong> — you've done careful eval to figure out what really matters. Chemistry-specific hallucination eval is the same craft, different domain.</li><li><strong>Internal Agent Platform onboarding multiple teams</strong> — you've negotiated scope reduction with multiple internal customers, this is the same skill.</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "What if IP team rejects self-hosted Llama because 'open-source models could have unknown data in their training set'?"</p>
+<p><strong>A</strong>: This is a legitimate concern (theoretical data leakage from training set into outputs). Mitigations:</p>
+<ul><li><strong>Use a model with documented training data</strong> (e.g., Mistral's training data is more documented than some)</li><li><strong>Add output filter</strong>: post-generation classifier that checks if output contains anything that looks like a specific compound structure or company name not in retrieved context</li><li><strong>Use retrieval-grounded generation</strong> with strict requirement that response must cite retrieved documents (no free-form generation)</li><li><strong>Run dedicated red-team</strong> before launch: probe model with "tell me about [competitor's compound]" and verify it doesn't reveal training-leaked info</li></ul>
+<p>If IP team still rejects: <strong>escalate to alternatives</strong> like running a smaller in-house-trained model on company data only. Slower to ship, but if that's what they need, accommodate.</p>
+<p><strong>Q2</strong>: "What if researchers complain pilot is too restrictive ('it doesn't know any of the interesting compounds')?"</p>
+<p><strong>A</strong>: This is the <strong>value vs IP tension</strong>. Diagnose first:</p>
+<ul><li><strong>What specific queries are failing?</strong> Get examples. Often it's something we can add (e.g., compound is already in public patent, just not in our ingestion).</li><li><strong>Categorize complaints</strong>:</li><li>"I need to query trade-secret data" → "We're working on v2 IP approval, here's the timeline. Use case is logged."</li><li>"Lit search results are slow / bad" → fix retrieval</li><li>"It hallucinated a structure" → reproduce, add to eval set, fix</li><li><strong>Don't expand scope unilaterally</strong>. Bring complaints to IP team in weekly retro. Let IP team decide what to add.</li><li><strong>Set expectations early</strong>: in onboarding, tell chemists "v1 is limited by design, here's what's in scope, here's what's coming, here's how to log requests".</li></ul>
+<p><strong>Q3</strong>: "What's your audit log architecture? IP team wants to know."</p>
+<p><strong>A</strong>: Every query logs:</p>
+<ul><li>User ID + role</li><li>Timestamp</li><li>Raw query text</li><li>Retrieved documents (IDs + chunks)</li><li>Generated response</li><li>Token counts</li><li>Latency</li><li>User feedback (thumbs up/down)</li><li>Trust score (model confidence)</li></ul>
+<p><strong>Storage</strong>: append-only, immutable, separate from main app DB, retained 7 years (matches pharma standard).</p>
+<p><strong>Access</strong>: IP team + InfoSec + Internal Audit have read access. Searchable by user, by query keywords, by retrieved document. Daily aggregate report sent to IP team.</p>
+<p><strong>Red flag detection</strong>: query containing competitor names, query mentioning pre-filing keywords, query returning trade-secret-tagged document — all auto-flagged for IP team review.</p>
+<p><strong>Q4</strong>: "Why not just use Anthropic's enterprise tier with HIPAA-compliant + zero-retention API?"</p>
+<p><strong>A</strong>: Good question, and worth raising with IP team because the tradeoff matters:</p>
+<ul><li><strong>Pro</strong>: faster to ship, better model quality, lower infra burden</li><li><strong>Pro</strong>: enterprise tier doesn't retain customer data, doesn't train on customer data</li><li><strong>Con (IP team view)</strong>: data physically leaves company perimeter. If Anthropic has a breach, our compound structures are in third-party hands.</li><li><strong>Con</strong>: legal exposure analysis required (BAA-equivalent for pharma data + IP indemnification)</li><li><strong>Con</strong>: if our regulator (FDA, EMA) audits and asks where the data was processed, "third party" answer is harder than "internal cluster"</li></ul>
+<p><strong>If IP team open to this path</strong>: pursue it as a parallel track. Could ship faster. But <strong>respect the 18-month-old trauma</strong> — they may need 6 months of architecture review + Anthropic team meetings + indemnification negotiation before saying yes.</p>
+<p><strong>My default recommendation</strong>: start with self-hosted for fast pilot approval, document the API alternative as v2 if pilot proves value and IP team comfort grows.</p>
+<p><strong>Q5</strong>: "How would you scope this differently if it were 30 days instead of 90?"</p>
+<p><strong>A</strong>: 30 days is too short for any data ingestion + IP review. Would scope to:</p>
+<ul><li><strong>Day 1-7</strong>: Just legal + IP review meetings. No code.</li><li><strong>Day 8-21</strong>: Self-hosted Llama stood up. Public-only RAG (PubMed). Demo internal.</li><li><strong>Day 22-30</strong>: Demo to Head of Research + 3 friendly chemists. NO production. NO confidential data. <strong>Decision point</strong>: is the company committed to a longer engagement?</li></ul>
+<p><strong>30 days delivers</strong>: architecture review approval, working public-data demo, friendly-chemist feedback. <strong>NOT</strong> production pilot.</p>
+<p>This is honest scoping. Customers who insist on 30-day production in pharma are unrealistic and that's a project I'd politely decline.</p>
+<hr />
+<h3>❌ 死路答法 (top 7)</h3>
+<ol><li><strong>冲 RAG architecture</strong> without checking commercial-API policy</li><li><strong>Assume self-host vs API is technical</strong> (it's legal)</li><li><strong>Treat IP attorney as blocker</strong> instead of partner</li><li><strong>Skip data classification</strong> (one-size-fits-all data ingest)</li><li><strong>Include trade secret in pilot v1</strong> (repeats the leak trauma)</li><li><strong>Promise 100% accurate</strong> (chemistry hallucination is real)</li><li><strong>Don't budget time for legal review</strong> (60-70% of 90 days is non-code)</li></ol>
+<hr />
+<h3>✅ 加分项 (top 7)</h3>
+<ol><li><strong>Data classification table</strong> as a central artifact</li><li><strong>Self-host explicitly defended</strong> as not-just-default</li><li><strong>Validate IP team's past trauma</strong> ("18-month ago leak") explicitly</li><li><strong>Walking-skeleton with public-only data</strong> in week 1-4</li><li><strong>Defer trade secret to v2</strong> with documented criteria</li><li><strong>Audit log architecture</strong> with red-flag detection</li><li><strong>Quote your Indonesia OJK / multi-regulator experience</strong></li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>Pharma AI 部署 = "60% legal/IP/compliance, 40% engineering" + "data classification BEFORE architecture" + "scope reduction is your job"</strong>.</p>
+<p>真正的 win 不是大 RAG, 是<strong>让 30 个 oncology 化学家 6 个月内日常用上、0 IP incident, 同时为 v2 expansion 留路径</strong>. 防止 "ChatGPT 那次的事" 再发生比任何模型 metric 都重要.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 冲 RAG / vector DB design
+  - 假设 commercial API 可用
+  - 把 IP team 当 blocker
+  - 跳过 data classification
+  - V1 含 trade secret
+  - 承诺 100% 准确
+  - 低估 legal review 时间
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁数据敏感度 + API policy
+  2. Stakeholder: CIPO 最大 veto, 验证 trauma
+  3. Data: 4 tier 分类表 (public / confidential / trade secret / regulated)
+  4. Decompose: 9 subproblem, IP sign-off 第一
+  5. MVP: 4 周 walking-skeleton, 公开数据 only
+
+Clarify Q 必问:
+  - 用户角色 (chemist / biologist / regulatory / IP)?
+  - 数据 tier (public / confidential / trade secret / regulated)?
+  - Commercial API 允许吗?
+  - Jurisdictional residency?
+  - Regulatory exposure (validated / non-validated)?
+  - Exploration vs evidence?
+  - Veto 谁?
+  - 过去失败案例?
+  - 具体 use case (lit search / similarity / generation)?
+
+Veto holders:
+  - Chief IP Officer (highest, trauma)
+  - CLO
+  - CMO
+  - CCO
+  - InfoSec
+  - Head of Research (sponsor)
+
+Data classification (THE artifact):
+  Public (PubMed, USPTO): pilot YES
+  Confidential cleared (LIMS cleared): pilot YES
+  Trade secret (pre-filing): pilot NO, defer v2
+  Regulated (CT raw, AE): NO, separate platform
+
+Architecture (IP-forced):
+  Self-hosted Llama 3.1 70B or Mistral
+  Internal AWS / SageMaker
+  Qdrant / Weaviate self-host (NOT Pinecone)
+  PrivateLink, no public internet egress
+  Audit log immutable 7 yr
+
+9 subproblems:
+  1. IP + Compliance sign-off (1st, gates all)
+  2. Self-hosted stack (parallel)
+  3. Data ingest + classify
+  4. RAG over chemistry
+  5. UI / workflow
+  6. Citation / provenance
+  7. Chemistry hallucination defense
+  8. Pilot run + iterate
+  9. Validated use doc (yr 2)
+
+Walking-skeleton Week 1-4:
+  Week 1: legal/IP/compliance meetings, NO code
+  Week 2: Llama self-hosted internal
+  Week 3: Public-only RAG (PubMed)
+  Week 4: Demo to Head of Research
+
+Phase plan:
+  W1-4: legal + public-data MVP
+  W5-8: confidential-cleared data, 5 friendly chemists
+  W9-13: 30-chemist pilot
+  M4-6: expansion
+  Yr 2: validated use
+
+Trauma handling:
+  "18-month-ago ChatGPT leak":
+   - Acknowledge explicitly
+   - Architecture to make that failure impossible
+   - Demo before launch
+   - Don't hand-wave "we're different"
+
+Hallucination defense (chemistry-specific):
+  - RAG forces citation
+  - Refuse when retrieval weak
+  - Eval set of "gotcha" questions
+  - Output filter for compound structures
+  - Red team before launch
+
+Audit log fields:
+  user_id, role, timestamp, query, retrieved_docs,
+  response, tokens, latency, feedback, confidence
+  red-flag detection: competitor names, pre-filing keywords,
+                      trade-secret tag retrieval
+
+Resume quote:
+  "TikTok PayLater 7 markets — each regulator
+   different framework. OJK Indonesia required
+   deterministic decisioning. I scope-reduced product
+   by 2/3, shipped narrow v1, expanded with re-approval.
+   Same scope-reduction-is-FDE-job pattern."
+
+Key phrases:
+  - "Before I sketch, 10 questions..."
+  - "60-70% of 90 days is legal review, not code"
+  - "Self-host is non-negotiable per IP policy"
+  - "Trade secret deferred to v2"
+  - "Walking-skeleton: public-only data, week 1-4"
+  - "Validate the past leak trauma explicitly"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-032-bank-3-acquired-fraud-systems.html">← Q32 · [问题拆解/案例] 某地区银行想统一 3 套并购来的、标签不一致的反欺诈系统, 规划前 90 天</a>
+    <a href="zhenti-034-logistics-sap-weather-500-managers.html">Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q33 · 药企内部化合物 AI 助手 (IP + 合规约束)
+
+> "A **top-10 pharma company** wants to deploy an **AI assistant for researchers** to query **internal compound libraries, assay data, and patent claims**. Their **legal, IP, and compliance teams** have strong concerns. Walk me through how you'd **scope** this in the first 90 days."
+
+**Round**: Decomposition Case (60 min)
+**出处**: Exponent 2026 FDE · Palantir / Anthropic (life sciences) · OpenAI Enterprise
+**行业**: Pharma / life sciences / IP-sensitive
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 build 一个 RAG.
+
+**是**: 考你能不能在**最 IP-sensitive 行业 + 多 veto 持有者 + 全球合规拼盘**下做 careful, conservative scoping. 这是 FDE 题里**政治维度最重**的之一.
+
+4 个 signal:
+
+1. **Stop and ask before architecting** — 90% 候选人开始讲 RAG / vector DB. 实际 90 天里 60-70% 时间是法务 / IP / 合规审批, 不是技术
+2. **Data classification first** — 化合物结构 + 临床试验 + 专利说明书 + assay data 各自 IP / 合规等级不同, 不能一刀切
+3. **Pilot scope discipline** — pilot 不是 "全公司 5000 研究员", 是 "1 个 therapeutic area 的 30 人 team 用 6 个月"
+4. **Self-host vs API as a decision, not a default** — IP 暴露容忍度决定 architecture, FDE 必须帮客户做这个 tradeoff
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 立刻冲 RAG architecture**
+
+> "Sure, I'd ingest compound data + assays + patents into a vector DB, use Anthropic Claude API with prompt caching, add reranker, build a Slack bot..."
+
+死. 你**没问**:
+- 化合物数据是 **public domain** (FDA filed) 还是 **trade secret pre-filing**? 这是天差地别
+- 用 commercial API 是否违反内部 IP policy? (大药企经常禁)
+- 临床试验数据 (BLA / NDA 涉及) 跟 prescriber 数据有 HIPAA 合规
+- 用户是 medicinal chemist / biologist / regulatory / IP attorney? 各自需求完全不同
+- 跨国 (欧盟 GDPR + 中国 PIPL + 美国) 是否要求 data residency?
+
+**挂法 #2: 假设 self-host vs API 是技术选择**
+
+> "We can use OpenAI API, it's the most cost-effective."
+
+死. 在大药企**这是 legal + IP 决策, 不是技术决策**. 候选人没意识到 → 整个 architecture 假设破产.
+
+**挂法 #3: 把 IP attorney 当 "blocker" 而不是 partner**
+
+> "We'll work around legal."
+
+死. IP attorney 在大药企**是 sponsor 之一**. 把他们当 blocker = 项目政治上死.
+
+---
+
+## 完美答案架构 (5 步)
+
+### Step 1: 澄清问题 (10 min)
+
+> "Before I sketch, I want to ask 10 things. The reason: pharma is the **most IP-sensitive industry** I work with, and the answer depends entirely on data sensitivity + user role + jurisdictional constraints. None of these are software questions."
+
+**10 个 clarifying questions**:
+
+> **Q1**: "Who is the **primary user**? Medicinal chemist? Biologist? Regulatory affairs? IP attorney? Each role has different queries, different data access, different risk tolerance. 'Researcher' is too broad."
+
+> **Q2**: "**Data classification tiers**: what's public (FDA-filed, published patents), what's confidential (active program but no IP filed), what's trade-secret (pre-filing, lead optimization)? Each tier likely has different policy on AI ingestion."
+
+> **Q3**: "Is **commercial AI API** allowed by IP policy? Or must this run **self-hosted** (no data leaves company perimeter)? **This is THE architecture-determining question** and is a legal/IP call, not technical."
+
+> **Q4**: "Are there **jurisdictional data residency** requirements — EU GDPR / SCC, China PIPL, US state laws (CCPA / NYSHIELD)? Pharma is global; can data move across borders?"
+
+> **Q5**: "What's the **regulatory exposure** of the use case? Querying compound library for pre-research = low. Querying clinical trial efficacy data = high (could be deemed 'promotion' under FDA / EMA rules if leaked). Querying adverse event database = HIPAA + 21 CFR Part 11."
+
+> **Q6**: "**Is the goal exploration or evidence**? Exploration ('show me molecules similar to X') is brainstorming, LLM is fine. Evidence (deciding to terminate a $500M program) needs deterministic citation + reproducibility."
+
+> **Q7**: "Are you **already FDA-validated** for any AI? 21 CFR Part 11 + GxP + EMA AI policy mean some AI usage requires formal validation. **Is this 'validated' use or 'non-validated' (R&D only)?**"
+
+> **Q8**: "Who has **veto** — Chief Medical Officer? Chief Legal Officer? Chief Compliance Officer? IP team? Information Security? List them so I know who needs to sign off."
+
+> **Q9**: "Is there a **previous failed AI deployment** at this company? (Often yes.) Why did it fail — IP leak, hallucination on assay, regulatory finding? That history shapes everything."
+
+> **Q10**: "What's the **specific business value** they want — speeding lit review (low risk, easy), accelerating compound prioritization (medium risk, harder), automating clinical narrative generation (high risk, FDA-watched)? Per use case, the scope is different."
+
+**面试官 likely 回答**:
+- Primary user: medicinal chemists in **Oncology** therapeutic area, ~30 people in 1 site
+- Data: compound library (mix of public + confidential pre-filing), assay results (confidential), patent literature (public + internal patent prep notes)
+- API: commercial API **explicitly forbidden** by IP policy. Self-host or nothing.
+- Residency: must stay in US for US program, EU for EU program (cross-border is veto)
+- Regulatory: non-validated use only (R&D, no FDA submissions). If used in submission later, formal validation required.
+- Exploration, not evidence (in v1)
+- Veto: CMO + CLO + Chief IP Officer + InfoSec
+- Previous attempt: 18 months ago, killed by IP leak (researcher pasted compound structure into ChatGPT, structure showed up in OpenAI's blog post months later — embarrassing). **The trauma is real**.
+- Business value v1: speeding internal literature review + compound similarity search within library
+
+→ **Real scope**: 90 days = pilot for 30 oncology medicinal chemists, self-hosted, internal data only, low-risk exploration use cases, IP + compliance team sign-off on architecture before pilot starts.
+
+This is **NOT** "deploy AI assistant across the company". It's "**get one team using one carefully-scoped use case after IP + compliance say yes**".
+
+---
+
+### Step 2: 找干系人 + 成功指标 (10 min)
+
+**Stakeholder map (pharma is heavy on veto)**:
+
+| Stakeholder | 在意什么 | 对项目态度 | 我对他们的关键动作 |
+|---|---|---|---|
+| **Chief Medical Officer (CMO)** | Patient safety, GxP, regulatory | Cautious, wants validation path | Quarterly review, FDA AI guidance briefing |
+| **Chief Legal Officer (CLO)** | Liability, contracts, exposure | Gates everything | Weekly during pilot, written architecture doc |
+| **Chief IP Officer** | Trade secret protection, freedom-to-operate | **Highest veto, most trauma from past leak** | Daily during week 1, sign-off on every data class |
+| **InfoSec / CISO** | Encryption, access control, breach | Approval needed | Network architecture, pen test |
+| **Chief Compliance Officer (CCO)** | 21 CFR Part 11, GxP, FDA / EMA | Gates "validated use" | Pre-validation checklist for v2 |
+| **Head of Research (Oncology)** | Speed of research, scientist productivity | **Champion / sponsor for pilot** | Weekly, demo to chemists |
+| **Medicinal chemists (~30)** | Daily usability, time saved | **End users, ultimate veto via non-adoption** | Daily during pilot, office hours |
+| **Patent attorneys** | Won't accidentally disclose pre-filing | Need consult | Ensure pre-filing data NOT in pilot v1 |
+| **Internal Audit** | SOX-adjacent controls | Need approval for production | Audit log architecture |
+
+**Key insight**: Chief IP Officer's **18-month-old trauma** (ChatGPT leak) is the **single biggest blocker**. They will **demand**: data stays within perimeter, audit log of every query, ability to redact / pull data, periodic re-review.
+
+**Success metrics (3 layers)**:
+
+**Layer 1 — Pilot KPIs** (Head of Research + chemists view):
+- Time-to-answer for "compound similarity / lit review" queries (currently 30-60 min via SciFinder + manual, target < 5 min)
+- Adoption: % of 30 chemists using weekly (target > 60%)
+- Satisfaction: NPS from chemists (target > 30)
+
+**Layer 2 — Compliance KPIs** (CLO / CIPO view):
+- 0 IP leaks (binary)
+- 0 hallucinated citations going into formal docs (track via audit log review)
+- 100% audit log coverage of every query
+
+**Layer 3 — Strategic** (CEO / board view):
+- Time-to-clinical-candidate (lagging, 12-24 months)
+- Cost per drug program (lagging)
+
+**Counter-metrics (must not move negatively)**:
+- Number of compliance findings during/after pilot
+- Researcher complaints about restrictiveness ("this AI doesn't know anything useful")
+- IP team workload (review queue)
+
+**The framing**:
+
+> "90 days is a pilot, not a launch. Success = (a) 30 chemists getting real value, (b) 0 IP / compliance incidents, (c) clear path to expand to 200+ chemists in month 4-6 and validated use in year 2."
+
+---
+
+### Step 3: 梳理输入数据 (10 min)
+
+**Data inventory + classification (THE central artifact)**:
+
+| Data type | Source | Classification | Pilot scope? | Rationale |
+|---|---|---|---|---|
+| **FDA-filed patents (own + competitor)** | PubMed, USPTO, internal Patent DB | **PUBLIC** | YES | Already disclosed |
+| **Published literature (PubMed, etc)** | External | PUBLIC | YES | Standard lit search |
+| **Internal patent prep notes (pre-filing)** | IP team docs | **TRADE SECRET** | **NO (defer to v2 after IP approval)** | Highest risk |
+| **Compound library structures (cleared for disclosure)** | Internal LIMS | CONFIDENTIAL | YES (with controls) | Internal use OK |
+| **Compound library structures (lead opt, pre-filing)** | Internal LIMS | **TRADE SECRET** | **NO (defer to v2)** | One leak = entire program exposed |
+| **Assay results (cleared)** | LIMS | CONFIDENTIAL | YES | Standard |
+| **Assay results (active lead optimization)** | LIMS | TRADE SECRET | **NO** | Same reason |
+| **Clinical trial protocols (published)** | ClinicalTrials.gov | PUBLIC | YES | Already public |
+| **Clinical trial raw data (BLA / NDA stage)** | Internal | **REGULATED + CONFIDENTIAL** | **NO (separate platform)** | GxP, separate compliance path |
+| **Adverse event reports** | Pharmacovigilance DB | **HIPAA + 21 CFR Part 11** | **NO** | Different system, validation required |
+| **HR / employee data** | HR | PERSONAL | NO | Not relevant |
+| **Financial data** | Finance | CONFIDENTIAL | NO | Not relevant |
+
+**Pilot v1 data scope**: ONLY public + confidential-cleared data. **No trade secret, no clinical trial raw data, no adverse events**.
+
+**Data movement constraints**:
+- All data stays within company perimeter (self-hosted LLM, no commercial API)
+- US-data only for US oncology pilot (EU pilot would be separate)
+- Audit log captures every query + every retrieved document
+
+**Key gap / risk**:
+- LIMS data isn't pre-classified by trade-secret status. **Someone has to label which compounds are pre-filing and which are cleared**. This is human work, not automation. Estimated 2 weeks.
+- Patent prep notes are in Word docs on individual attorneys' laptops, not in any DB. Defer permanently to v2 if ever.
+
+**Architecture implications**:
+- **Must be self-hosted**: Llama 3 / Mistral / Anthropic claude on AWS Bedrock with PrivateLink (depending on what IP / InfoSec approves)
+- **Likely choice**: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster
+- **Backup model**: smaller (8B) for cost / latency optimization, with re-ranker
+- **Vector DB**: self-hosted (Qdrant / Weaviate), NOT Pinecone (multi-tenant SaaS, IP team won't approve)
+
+---
+
+### Step 4: 拆成可解子问题 (15 min)
+
+> "Now decomposition. The unique thing about pharma is the **'easy' subproblems are legal/compliance, the 'hard' subproblems are model quality on chemistry-specific queries**. Both have to be solved."
+
+**9 subproblems**:
+
+| # | 子问题 | Risk | Value | 90-day pri |
+|---|---|---|---|---|
+| **A** | **IP + Compliance sign-off**: architecture review, data classification, audit log design | Critical | Gates everything | **1 (week 1-3)** |
+| **B** | **Self-hosted LLM stack**: model selection, infra, deploy | Medium | Foundation | **2 (week 1-4)** |
+| **C** | **Data ingestion + classification labeling**: only cleared data, with provenance | High | Foundation | **3 (week 2-6)** |
+| **D** | **RAG over chemistry corpus**: retrieval that handles SMILES + chemical names + assay vocabulary | Medium | High | **4 (week 4-8)** |
+| **E** | **UI + workflow integration**: Slack? web? embed in existing tools? | Low | Medium | **5 (week 6-10)** |
+| **F** | **Citation + provenance**: every answer cites source documents | Medium | High (audit) | **6 (week 6-10)** |
+| **G** | **Hallucination detection on chemistry-specific outputs** | High | High | **7 (week 8-12)** |
+| **H** | **Pilot run + iteration**: 30 chemists, weekly retros | Low | Critical | **8 (week 10-13)** |
+| **I** | **Validated use path (for v2)**: 21 CFR Part 11 documentation framework | High | Future | Document, don't ship in 90 days |
+
+**Sequencing rationale**:
+
+> **A first** because: without IP + compliance sign-off, **everything else is wasted work**. Spend week 1-3 in meetings with CIPO, CLO, CCO, InfoSec. **No code merge before week 2**.
+
+> **B parallel with A** because: while legal is reviewing, our infra team can stand up self-hosted Llama on internal GPU cluster. This is approvable in parallel.
+
+> **C requires data classification labels** which is human work — defer until week 2 when classification is approved.
+
+> **D-F build on B + C**.
+
+> **G is the unique pharma technical risk**: hallucinating a compound structure or assay result. Need eval set + classifier.
+
+> **I documented but not shipped** — validated use is year 2.
+
+---
+
+### Step 5: Walking-skeleton MVP (15 min)
+
+**Walking-skeleton (Week 1-4)**:
+
+```
+Week 1: Legal + IP + Compliance meetings (NO code)
+Week 2: Self-hosted Llama 3.1 stood up on internal AWS, basic prompt eval
+Week 3: Public-only RAG (PubMed lit search), tested by FDE team
+Week 4: Show to Head of Research with 5 sample queries (lit search only)
+```
+
+**Walking-skeleton has ZERO confidential data in v1**.
+
+**Why**:
+- **Risk mitigation**: if anything leaks during the demo, it's already public data
+- **Architectural proof**: shows the stack works end-to-end without IP exposure
+- **Buy-in from chemists**: even just lit search faster than SciFinder is value
+- **Trust building with IP team**: see system works without touching their crown jewels
+
+**Phase 2 (Week 5-8) — Add Confidential Internal Data**:
+
+After IP team approves the architecture review:
+- Ingest "cleared compound library" data
+- Add "cleared assay results"
+- Run pilot internally with 5 friendly chemists (not full 30 yet)
+
+**Phase 3 (Week 9-13) — 30-Chemist Pilot**:
+
+- All 30 oncology chemists onboarded
+- Weekly retro with researchers + IP team
+- Daily audit log review by InfoSec
+- Bi-weekly checkpoint with CMO / CLO
+
+**Phase 4 (Month 4-6) — Expansion**:
+
+- Other therapeutic areas
+- Expand data scope (with re-classification)
+- Begin validated-use documentation framework
+
+**Phase 5 (Year 2) — Validated Use**:
+
+- 21 CFR Part 11 documented validation
+- Used in regulatory submissions
+
+---
+
+## 详细回答 (Sample 60-min monologue)
+
+> "Before I sketch, I want to ask 10 things. Pharma is the most IP-sensitive industry I work with, and the architecture depends entirely on data classification + IP policy + jurisdictional constraints. These are legal, not software, questions.
+>
+> *(asks 10 Qs)*
+>
+> *(gets answers: 30 oncology chemists, self-hosted only, no commercial API, US-only, non-validated R&D use, exploration-not-evidence, CIPO has highest veto, previous ChatGPT leak trauma 18 months ago, low-risk lit search + compound similarity)*
+>
+> OK so real scope: **90 days = pilot for 30 oncology chemists. Self-hosted. Internal data only. Low-risk exploration use cases. Sign-off from IP / Compliance / Legal before any data ingest**.
+>
+> This is **NOT** 'deploy AI assistant across the company'. It's 'get one team using one carefully-scoped use case after IP + compliance say yes'.
+>
+> **Stakeholders**: CIPO has highest veto — and they're traumatized by 18-month-old ChatGPT leak. CLO and CMO gate compliance. Head of Research (Oncology) is sponsor. 30 medicinal chemists are end users.
+>
+> **Key insight**: 60-70% of the 90 days is **legal / compliance / IP review work**, not technical. Week 1-3 is meetings, not code.
+>
+> **Data classification table** (I'd want to show this in the first review):
+>
+> - **Public** (PubMed, USPTO patents): YES in pilot
+> - **Confidential cleared** (cleared compound library, cleared assays): YES in pilot
+> - **Trade secret** (pre-filing structures, lead opt assays, patent prep notes): **NO, defer to v2 after IP approval**
+> - **Regulated** (clinical trial raw, adverse events): NO, separate validated platform
+>
+> **9 subproblems**:
+>
+> 1. **IP + Compliance sign-off** (gates everything, week 1-3, no code yet)
+> 2. **Self-hosted LLM stack** (parallel, week 1-4, Llama 3.1 70B on internal AWS)
+> 3. **Data ingestion + classification** (week 2-6)
+> 4. **RAG over chemistry corpus** (handles SMILES + chemical names)
+> 5. **UI / workflow integration**
+> 6. **Citation + provenance**
+> 7. **Hallucination detection on chemistry outputs** (unique pharma risk)
+> 8. **Pilot run + iteration**
+> 9. **Validated use documentation** (year 2, just framework)
+>
+> **Walking-skeleton Week 1-4**: NO confidential data. Public-only RAG (PubMed). Demos that the stack works end-to-end without IP exposure. Trust-build with IP team.
+>
+> **Phase 2 Week 5-8**: add cleared confidential data after IP signs off. Pilot with 5 friendly chemists first.
+>
+> **Phase 3 Week 9-13**: full 30-chemist pilot, weekly retro with researchers + IP team.
+>
+> **Three things to flag proactively**:
+>
+> **(a) Self-hosted is non-negotiable**. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Pinecone is out, Qdrant / Weaviate self-hosted are in.
+>
+> **(b) Trade secret data is DEFERRED**. Pre-filing compound structures + patent prep notes are the highest-risk data and adding them to pilot v1 = repeat of the ChatGPT leak trauma. IP team will block. Defer to v2 after pilot proves architecture.
+>
+> **(c) Chemistry-specific hallucination is the technical risk**. LLM will make up compound structures + assay values if not constrained. Need (1) RAG forcing answers to cite retrieved documents, (2) refusal when retrieval is weak, (3) eval set of 'gotcha' chemistry questions that the model should say 'I don't know' on, not hallucinate.
+>
+> Want me to deep-dive the IP sign-off process, self-hosted architecture, or hallucination defense?"
+
+---
+
+## Gao Xin 简历专属 reframe
+
+This is the most regulator-heavy scenario in the 5 decomposition cases, and your **Indonesia OJK + Vietnam SBV + Thailand BoT** experience translates directly:
+
+> "I had this pattern at TikTok PayLater across 7 markets. Each market regulator (OJK in Indonesia, BACEN in Brazil, CNBV in Mexico, etc.) had **different requirements about what data could be processed by AI and where**. Some required data residency, some restricted certain AI applications entirely, some required pre-approval.
+>
+> **The 5-step that worked**:
+>
+> 1. **Clarify**: I learned to ask 'what's the regulatory framework' BEFORE 'what does the product do'. In Indonesia, OJK's Fintech P2P regulation explicitly required certain decisioning logic to be **deterministic and auditable**, not pure ML. That constraint shaped architecture before any model selection.
+>
+> 2. **Stakeholder map**: per market, the regulator's compliance officer was a stakeholder. Plus our internal Legal + Compliance + Product. Plus the local market General Manager. **Treating regulators as partners, not blockers, was the unlock**.
+>
+> 3. **Data classification**: I built a per-market data classification matrix similar to what I'd build for pharma here. Some data could go through LLM (e.g., open-ended customer chat for empathy), some couldn't (e.g., credit decisioning required deterministic logic).
+>
+> 4. **Decompose**: scope reduction was constant. The version we eventually shipped to OJK was 1/3 of what product team originally wanted. The remaining 2/3 went to a v2 / v3 roadmap with regulator co-design.
+>
+> 5. **Walking-skeleton**: in Indonesia, I shipped a **voice agent that could only do 3 things initially**: (a) confirm identity, (b) share payment due date, (c) escalate to human if customer said anything beyond these. OJK approved it because the scope was clearly bounded and auditable. Then we expanded one capability at a time, each with re-approval.
+>
+> The pattern that transfers to pharma: **scope reduction is the FDE's job**. The customer wants 'AI assistant for everything'. The right v1 is 'PubMed lit search and cleared compound similarity for 30 chemists in oncology, defending IP team's veto with explicit data exclusions'.
+>
+> Also — I've shipped to a customer who had **previous-AI-deployment trauma** before (a market where a previous vendor had a chatbot leak issue). I know the conversation: validate the trauma, name it, explicitly architect to make that specific failure impossible, demo before launch. Don't hand-wave 'we're different'."
+
+**Other resume hooks**:
+
+- **ConvFinQA negative-result ablation** — you've done careful eval to figure out what really matters. Chemistry-specific hallucination eval is the same craft, different domain.
+- **Internal Agent Platform onboarding multiple teams** — you've negotiated scope reduction with multiple internal customers, this is the same skill.
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "What if IP team rejects self-hosted Llama because 'open-source models could have unknown data in their training set'?"
+
+**A**: This is a legitimate concern (theoretical data leakage from training set into outputs). Mitigations:
+
+- **Use a model with documented training data** (e.g., Mistral's training data is more documented than some)
+- **Add output filter**: post-generation classifier that checks if output contains anything that looks like a specific compound structure or company name not in retrieved context
+- **Use retrieval-grounded generation** with strict requirement that response must cite retrieved documents (no free-form generation)
+- **Run dedicated red-team** before launch: probe model with "tell me about [competitor's compound]" and verify it doesn't reveal training-leaked info
+
+If IP team still rejects: **escalate to alternatives** like running a smaller in-house-trained model on company data only. Slower to ship, but if that's what they need, accommodate.
+
+**Q2**: "What if researchers complain pilot is too restrictive ('it doesn't know any of the interesting compounds')?"
+
+**A**: This is the **value vs IP tension**. Diagnose first:
+
+- **What specific queries are failing?** Get examples. Often it's something we can add (e.g., compound is already in public patent, just not in our ingestion).
+- **Categorize complaints**:
+  - "I need to query trade-secret data" → "We're working on v2 IP approval, here's the timeline. Use case is logged."
+  - "Lit search results are slow / bad" → fix retrieval
+  - "It hallucinated a structure" → reproduce, add to eval set, fix
+- **Don't expand scope unilaterally**. Bring complaints to IP team in weekly retro. Let IP team decide what to add.
+- **Set expectations early**: in onboarding, tell chemists "v1 is limited by design, here's what's in scope, here's what's coming, here's how to log requests".
+
+**Q3**: "What's your audit log architecture? IP team wants to know."
+
+**A**: Every query logs:
+- User ID + role
+- Timestamp
+- Raw query text
+- Retrieved documents (IDs + chunks)
+- Generated response
+- Token counts
+- Latency
+- User feedback (thumbs up/down)
+- Trust score (model confidence)
+
+**Storage**: append-only, immutable, separate from main app DB, retained 7 years (matches pharma standard).
+
+**Access**: IP team + InfoSec + Internal Audit have read access. Searchable by user, by query keywords, by retrieved document. Daily aggregate report sent to IP team.
+
+**Red flag detection**: query containing competitor names, query mentioning pre-filing keywords, query returning trade-secret-tagged document — all auto-flagged for IP team review.
+
+**Q4**: "Why not just use Anthropic's enterprise tier with HIPAA-compliant + zero-retention API?"
+
+**A**: Good question, and worth raising with IP team because the tradeoff matters:
+
+- **Pro**: faster to ship, better model quality, lower infra burden
+- **Pro**: enterprise tier doesn't retain customer data, doesn't train on customer data
+- **Con (IP team view)**: data physically leaves company perimeter. If Anthropic has a breach, our compound structures are in third-party hands.
+- **Con**: legal exposure analysis required (BAA-equivalent for pharma data + IP indemnification)
+- **Con**: if our regulator (FDA, EMA) audits and asks where the data was processed, "third party" answer is harder than "internal cluster"
+
+**If IP team open to this path**: pursue it as a parallel track. Could ship faster. But **respect the 18-month-old trauma** — they may need 6 months of architecture review + Anthropic team meetings + indemnification negotiation before saying yes.
+
+**My default recommendation**: start with self-hosted for fast pilot approval, document the API alternative as v2 if pilot proves value and IP team comfort grows.
+
+**Q5**: "How would you scope this differently if it were 30 days instead of 90?"
+
+**A**: 30 days is too short for any data ingestion + IP review. Would scope to:
+
+- **Day 1-7**: Just legal + IP review meetings. No code.
+- **Day 8-21**: Self-hosted Llama stood up. Public-only RAG (PubMed). Demo internal.
+- **Day 22-30**: Demo to Head of Research + 3 friendly chemists. NO production. NO confidential data. **Decision point**: is the company committed to a longer engagement?
+
+**30 days delivers**: architecture review approval, working public-data demo, friendly-chemist feedback. **NOT** production pilot.
+
+This is honest scoping. Customers who insist on 30-day production in pharma are unrealistic and that's a project I'd politely decline.
+
+---
+
+## ❌ 死路答法 (top 7)
+
+1. **冲 RAG architecture** without checking commercial-API policy
+2. **Assume self-host vs API is technical** (it's legal)
+3. **Treat IP attorney as blocker** instead of partner
+4. **Skip data classification** (one-size-fits-all data ingest)
+5. **Include trade secret in pilot v1** (repeats the leak trauma)
+6. **Promise 100% accurate** (chemistry hallucination is real)
+7. **Don't budget time for legal review** (60-70% of 90 days is non-code)
+
+---
+
+## ✅ 加分项 (top 7)
+
+1. **Data classification table** as a central artifact
+2. **Self-host explicitly defended** as not-just-default
+3. **Validate IP team's past trauma** ("18-month ago leak") explicitly
+4. **Walking-skeleton with public-only data** in week 1-4
+5. **Defer trade secret to v2** with documented criteria
+6. **Audit log architecture** with red-flag detection
+7. **Quote your Indonesia OJK / multi-regulator experience**
+
+---
+
+## 一句话总结
+
+> **Pharma AI 部署 = "60% legal/IP/compliance, 40% engineering" + "data classification BEFORE architecture" + "scope reduction is your job"**.
+>
+> 真正的 win 不是大 RAG, 是**让 30 个 oncology 化学家 6 个月内日常用上、0 IP incident, 同时为 v2 expansion 留路径**. 防止 "ChatGPT 那次的事" 再发生比任何模型 metric 都重要.
+
+---
+
+## Cheat Sheet
+
+```
+不要做:
+  - 冲 RAG / vector DB design
+  - 假设 commercial API 可用
+  - 把 IP team 当 blocker
+  - 跳过 data classification
+  - V1 含 trade secret
+  - 承诺 100% 准确
+  - 低估 legal review 时间
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁数据敏感度 + API policy
+  2. Stakeholder: CIPO 最大 veto, 验证 trauma
+  3. Data: 4 tier 分类表 (public / confidential / trade secret / regulated)
+  4. Decompose: 9 subproblem, IP sign-off 第一
+  5. MVP: 4 周 walking-skeleton, 公开数据 only
+
+Clarify Q 必问:
+  - 用户角色 (chemist / biologist / regulatory / IP)?
+  - 数据 tier (public / confidential / trade secret / regulated)?
+  - Commercial API 允许吗?
+  - Jurisdictional residency?
+  - Regulatory exposure (validated / non-validated)?
+  - Exploration vs evidence?
+  - Veto 谁?
+  - 过去失败案例?
+  - 具体 use case (lit search / similarity / generation)?
+
+Veto holders:
+  - Chief IP Officer (highest, trauma)
+  - CLO
+  - CMO
+  - CCO
+  - InfoSec
+  - Head of Research (sponsor)
+
+Data classification (THE artifact):
+  Public (PubMed, USPTO): pilot YES
+  Confidential cleared (LIMS cleared): pilot YES
+  Trade secret (pre-filing): pilot NO, defer v2
+  Regulated (CT raw, AE): NO, separate platform
+
+Architecture (IP-forced):
+  Self-hosted Llama 3.1 70B or Mistral
+  Internal AWS / SageMaker
+  Qdrant / Weaviate self-host (NOT Pinecone)
+  PrivateLink, no public internet egress
+  Audit log immutable 7 yr
+
+9 subproblems:
+  1. IP + Compliance sign-off (1st, gates all)
+  2. Self-hosted stack (parallel)
+  3. Data ingest + classify
+  4. RAG over chemistry
+  5. UI / workflow
+  6. Citation / provenance
+  7. Chemistry hallucination defense
+  8. Pilot run + iterate
+  9. Validated use doc (yr 2)
+
+Walking-skeleton Week 1-4:
+  Week 1: legal/IP/compliance meetings, NO code
+  Week 2: Llama self-hosted internal
+  Week 3: Public-only RAG (PubMed)
+  Week 4: Demo to Head of Research
+
+Phase plan:
+  W1-4: legal + public-data MVP
+  W5-8: confidential-cleared data, 5 friendly chemists
+  W9-13: 30-chemist pilot
+  M4-6: expansion
+  Yr 2: validated use
+
+Trauma handling:
+  "18-month-ago ChatGPT leak":
+   - Acknowledge explicitly
+   - Architecture to make that failure impossible
+   - Demo before launch
+   - Don't hand-wave "we're different"
+
+Hallucination defense (chemistry-specific):
+  - RAG forces citation
+  - Refuse when retrieval weak
+  - Eval set of "gotcha" questions
+  - Output filter for compound structures
+  - Red team before launch
+
+Audit log fields:
+  user_id, role, timestamp, query, retrieved_docs,
+  response, tokens, latency, feedback, confidence
+  red-flag detection: competitor names, pre-filing keywords,
+                      trade-secret tag retrieval
+
+Resume quote:
+  "TikTok PayLater 7 markets — each regulator
+   different framework. OJK Indonesia required
+   deterministic decisioning. I scope-reduced product
+   by 2/3, shipped narrow v1, expanded with re-approval.
+   Same scope-reduction-is-FDE-job pattern."
+
+Key phrases:
+  - "Before I sketch, 10 questions..."
+  - "60-70% of 90 days is legal review, not code"
+  - "Self-host is non-negotiable per IP policy"
+  - "Trade secret deferred to v2"
+  - "Walking-skeleton: public-only data, week 1-4"
+  - "Validate the past leak trauma explicitly"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

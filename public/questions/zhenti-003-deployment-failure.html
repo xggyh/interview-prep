@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q3 · [行为/动机] 讲一次部署失败的经历, 你怎么处理的 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q3 · [行为/动机] 讲一次部署失败的经历, 你怎么处理的</div>
+  <h1>Q3 · [行为/动机] 讲一次部署失败的经历, 你怎么处理的</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-003-deployment-failure.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-003-deployment-failure.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q3 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q03 · 一次部署失败的经历, 你怎么处理的</h3>
+<blockquote><p>"Tell me about a time a deployment failed. Walk me through what happened, how you handled it, and what you learned. I want to hear the technical details and the customer-facing communication."</p></blockquote>
+<p><strong>Round</strong>: Behavioral (30-45 min, hiring manager 或 cross-functional round) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a production incident" / "describe a time something broke after you shipped"</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>这是 <strong>FDE 题里 vulnerability signal density 最高的一道</strong>. 表面问失败, 实际筛 6 件事:</p>
+<ul><li><strong>诚实</strong> —— 你是否真的承认了 ownership, 还是 blame vendor / 数据 / 客户</li><li><strong>Incident response 系统化</strong> —— 你有 detect → triage → mitigate → root cause → prevent 的闭环吗</li><li><strong>Customer communication 能力</strong> —— 失败时怎么跟 client 沟通, 这是 FDE 区别于 SWE 的核心</li><li><strong>Calm under pressure</strong> —— 你在 production down 时的 mental state 是 panic 还是 process</li><li><strong>Learning extraction</strong> —— 不是 "学到了 monitoring 重要", 是 "我现在 default 在每个 deployment 加 X / Y / Z 三件事"</li><li><strong>Blast radius awareness</strong> —— 你能不能 articulate "我的失败影响了多少 user / dollar / 监管暴露"</li></ul>
+<p><strong>没说出口的红线</strong>:</p>
+<ul><li>"It wasn't really my fault, but..." → blame shifting, 立刻挂</li><li>"I haven't really had a failure" → 说谎 或 没真实 production 经验</li><li>"Vendor was unreliable" → 不 take ownership of vendor selection</li><li>"We rolled back and it was fine" → 表面 mitigation, 没讲 root cause</li><li>故事里没有 customer 沟通 part → 你只是 SWE 视角, 没 FDE 视角</li><li>故事里没有 "我学到 X 现在 default" → learning 不 actionable</li></ul>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<p>7 段结构, total ~4-5 分钟:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Context</strong></td><td>20s</td><td>项目 + scope + 我的角色</td><td>"Last year I shipped a voice agent update in Indonesia..."</td></tr><tr><td>2</td><td><strong>What broke (specific)</strong></td><td>30s</td><td>具体什么坏了, 不要 vague</td><td>"On Tuesday morning, calls started routing to wrong tier — tier 2 calls got tier 1 prompt, 14% of traffic in 90 minutes..."</td></tr><tr><td>3</td><td><strong>Detect → Triage (mins)</strong></td><td>45s</td><td>你怎么知道 + 多快 + 第一反应</td><td>"Detection: customer satisfaction dashboard dropped 8pp in 30 min, alerts fired. Triage: I called ops lead, paused new sessions, kept existing alive..."</td></tr><tr><td>4</td><td><strong>Customer comm (critical)</strong></td><td>45s</td><td>你怎么 communicate 给 stakeholder</td><td>"I drafted a 3-line status: 'we detected at 9:42, paused new at 9:55, ETA mitigation 11:00'. Sent to ops + compliance + product VP simultaneously..."</td></tr><tr><td>5</td><td><strong>Root cause (technical)</strong></td><td>60s</td><td>真正什么导致, 不是 superficial</td><td>"Root cause: I changed embedding model 2 weeks earlier, didn't realize routing prompt was tuned to old embedding distribution..."</td></tr><tr><td>6</td><td><strong>Permanent fix + safety nets</strong></td><td>45s</td><td>不只是 fix bug, 是 build defense</td><td>"Fix: pinned embedding version + 加 routing eval to CI. Safety nets: shadow mode for routing model swap..."</td></tr><tr><td>7</td><td><strong>What I default now (transferable)</strong></td><td>30s</td><td>你现在 by default 做什么</td><td>"Now every deployment touching routing has: shadow mode + eval gate + rollback runbook + ops Slack 提前 ping..."</td></tr></tbody></table></div>
+<p>Total: ~4-5 min. 留 buffer 给 follow-up.</p>
+<hr />
+<h3>详细回答 (Sample Monologue) — 可以照背</h3>
+<blockquote><p>"我讲一个真实的, 我现在 still wince when I think about it.</p>
+<p><strong>Context</strong>: 印尼 voice agent 跑了 8 个月很稳定. 我做了一个看似 routine 的 embedding model upgrade —— BGE base → BGE large, 因为新版在 multilingual benchmark 上 +3%. 我在 staging 跑了 1 周, eval suite 全 green, 周一晚 21:00 (印尼半夜) push 到 production. 我打算第二天早上 ops 上班前 monitor 几个小时再撤手.</p>
+<p><strong>What broke</strong>: 周二早 08:42, 印尼时间 ops team 上班 42 分钟后, customer satisfaction dashboard 显示 30 分钟内掉了 <strong>8 个百分点</strong>. 同时间, tier routing 准确度从 92% 掉到 78%. 具体表现: tier 2 calls (账户特定问题) 被 route 成 tier 1 (通用 FAQ), agent 回复 generic 信息, 用户挂电话. <strong>14% 的 inbound traffic 在 90 分钟里收到 wrong-tier response</strong>.</p>
+<p><strong>Detect</strong>: Alerts 在 09:05 fire (3 min 内, 因为我之前 alert threshold 设的 tight). 但 ops team 8 分钟前已经在 group chat 抱怨 'agent 答非所问'. 这种 <strong>ops 比 alert 先发现的情况</strong> —— 它本身就是 signal, 说明我的 monitoring 漏了一个维度 (routing accuracy 我有, 但 'response relevance' 是上层 signal).</p>
+<p><strong>Triage (第一反应)</strong>:</p>
+<ul><li>第 1 步: 9:08, 我 Slack ops lead, '我看到了, 我在 triage, 给我 10 分钟'</li><li>第 2 步: 9:10, 我 pause new sessions (现有 session 不 kill, 因为 mid-call drop 比 wrong-answer 更糟). 这是 reversibility 判断 —— pause new 是 two-way, kill 现有是 one-way</li><li>第 3 步: 9:12, 我 trigger rollback runbook —— 回退到 1 周前 stable embedding. 不 debug live, 先 stop bleeding</li><li>第 4 步: 9:28, rollback 完成, routing accuracy 30 分钟内回 92%</li></ul>
+<p><strong>Customer comm (这是关键)</strong>:</p>
+<ul><li>9:32, 我发了一个 3-line status 给 ops lead + compliance + product VP:</li></ul>
+<blockquote><p>'Routing degradation detected 08:42, embedding model swap suspected, rolled back 09:28, accuracy recovering. Impact window: 90 min, ~14% traffic. No regulator-reportable wrong-info incidents (preliminary). Full post-mortem by EOD Wed.'</p></blockquote>
+<ul><li>9:45, 我跟 ops lead 30 分钟 Zoom, 一起 review 30 个 sample wrong-routed calls, 评估 customer harm. 没有 dollar harm (tier 1 vs tier 2 prompt 都不 surface 具体金额), 只有 customer experience harm.</li><li>14:00, 我发 full status update with timeline + impact + next steps</li><li>第二天 17:00 (印尼时间), full post-mortem published 给 ops + product + compliance</li></ul>
+<p><strong>Root cause</strong>:</p>
+<p>真正的原因不是 embedding 升级本身, 是 <strong>我对 deployment 边界的判断错误</strong>.</p>
+<p>Embedding model 升级 我假设是 'isolated change' —— 我只改了 retrieval module. 但实际上, 我们的 routing prompt 6 个月前 tuned 在 BGE base 的 embedding distribution 上 (specifically, similarity score 阈值是 calibrated 在那个 distribution). 换成 BGE large 后, embedding distribution shifted, similarity score 范围变化, routing 阈值不再 align.</p>
+<p>我 missed 的是: embedding 不是 isolated component, 是 <strong>整个 routing system 的隐式 dependency</strong>. Staging eval suite 跑过 routing test, 但 test cases 是我设计的, 覆盖 'happy path', 没 cover 'similarity 分布 edge case'. Eval suite green 不等于 production safe.</p>
+<p><strong>Permanent fix + safety nets</strong>:</p>
+<p>三件事 by default 现在 mandatory:</p>
+<p><strong>One</strong>: Embedding model swap 走 shadow mode 至少 1 周. Shadow mode = 旧 embedding 出结果给用户, 新 embedding 后台 evaluate, A/B 比较 routing accuracy / response relevance. Shadow 数据 pass 才上线.</p>
+<p><strong>Two</strong>: Eval suite 加 'distribution shift detection'. 不是 test 'is similarity &gt; threshold', 是 test 'is similarity distribution similar to baseline'. 这一项捕捉 embedding swap, retrieval data 变化, prompt tweak 等所有可能 shift similarity 的修改.</p>
+<p><strong>Three</strong>: Rollback runbook standardized. 之前 rollback 是我 ad-hoc 操作, 现在每个 deployment 有 written runbook 包括 'who pauses sessions, who reverts, who notifies ops, ETA'. Junior 也能 execute.</p>
+<p><strong>What I default now</strong>:</p>
+<p>三个 lesson:</p>
+<p>一, <strong>'Isolated change' 是 illusion</strong>. AI 系统 component 之间的 hidden dependency 经常通过 distribution / threshold / prompt-data coupling 隐藏. 现在我每个 deployment 写 'dependency map' 列出 explicit + implicit dependency.</p>
+<p>二, <strong>Ops 比 alert 先发现 = monitoring gap</strong>. 这次事故后我加了 'response relevance' classifier 作为 upper-level signal, 不只看 accuracy.</p>
+<p>三, <strong>Customer comm 优先级 = stop bleeding 之后立刻</strong>. 不要 wait full root cause, 先给 status. 'I'm aware, I'm acting, ETA Y' 比沉默 60 分钟好 10×.</p>
+<p><strong>Outcome impact</strong>: Recovery 33 分钟. 90 分钟 impact window 内 ~140 用户 wrong-tier response, 0 regulator incident. Ops lead 后来跟 manager 说 'incident handling 让我对他更信任不是更怀疑'. 我自己学到的 lesson 现在是每个 multi-market deployment 的 default."</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 STAR 模板</h3>
+<p>至少 1 完整 STAR (Indonesia embedding swap), 2 个 alternate STAR.</p>
+<h4>★ STAR 1: Indonesia Embedding Swap Routing Degradation (★ PRIMARY)</h4>
+<p><strong>S</strong> (Situation):</p>
+<blockquote><p>"印尼 voice agent 跑了 8 个月稳定, 92% routing accuracy. 我做了一个 routine embedding model upgrade (BGE base → BGE large), staging eval 1 周全 green, 周一晚 21:00 push production."</p></blockquote>
+<p><strong>T</strong> (Task):</p>
+<blockquote><p>"Detect → mitigate → root cause → prevent. 同时 own customer communication 给 ops / compliance / product VP."</p></blockquote>
+<p><strong>A</strong> (Action — 5 个 sub-action):</p>
+<ol><li><strong>Detect (3 min from alert, but ops 8 min 提前发现)</strong>: 这本身是 signal, monitoring gap</li><li><strong>Triage (20 min)</strong>:</li></ol>
+<ul><li>9:08 Slack ops lead "我在 triage, 10 分钟"</li><li>9:10 pause new sessions (不 kill 现有 — reversibility 判断)</li><li>9:12 trigger rollback runbook</li><li>9:28 rollback 完成</li></ul>
+<ol><li><strong>Customer comm</strong>:</li></ol>
+<ul><li>9:32 3-line status (detected / suspected cause / rolled back / impact / post-mortem ETA)</li><li>9:45 Zoom 30 分钟 with ops, sample 30 wrong-routed calls 评估 customer harm</li><li>14:00 full status update</li><li>24h 内 full post-mortem</li></ul>
+<ol><li><strong>Root cause</strong>:</li></ol>
+<ul><li>不是 embedding 本身, 是 routing prompt 6 个月前 tuned 在 BGE base distribution</li><li>Embedding swap = implicit dependency 触发, distribution shift</li><li>Staging eval covers happy path, 不 cover distribution edge case</li></ul>
+<ol><li><strong>Permanent fix + safety nets</strong>:</li></ol>
+<ul><li>Shadow mode 1 周 mandatory for embedding/retrieval changes</li><li>Eval suite 加 distribution shift detection</li><li>Rollback runbook standardized</li></ul>
+<p><strong>R</strong> (Result):</p>
+<ul><li>Recovery: <strong>33 分钟 from detect to rollback complete</strong></li><li>Impact window: 90 分钟, <strong>14% traffic, ~140 用户</strong></li><li><strong>0 regulator-reportable incident</strong> (因为没 surface 具体金额)</li><li>之后 12 个月 0 类似 incident (shadow mode 工作)</li><li>Ops lead 反馈 "incident handling 让我更信任你"</li></ul>
+<p><strong>Vulnerability line</strong>:</p>
+<blockquote><p>"我 ownership clear admit: 我以为 embedding 升级是 isolated change, 我错了. AI 系统的 hidden dependency 比传统软件多. 这是 architecturally my responsibility, 不是 eval suite 的问题 —— eval suite 是我设计的."</p></blockquote>
+<hr />
+<h4>STAR 2: BNPL Chatbot Compliance Wrong-Surface Incident (Alternate)</h4>
+<p><strong>S</strong>: BNPL chatbot 上线 3 个月, 我加了一个 new tool "check eligibility for credit increase". Tool 设计意图是 surface 'eligible' / 'not eligible' boolean. 实际上线后 1 周, <strong>3% queries 意外 surface 了具体额度数字</strong> (e.g., "你 eligible to increase by RMB 5000").</p>
+<p><strong>T</strong>: 这违反 compliance 红线 (specific 数字 promise = regulator 红线). Detect + mitigate + report to compliance + permanent fix.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Detect (delayed)</strong>: Compliance team 1 周后 audit 抽样发现. <strong>我 own 这个 delay</strong> — 我 monitoring 没覆盖 "tool output surface area" 这个维度</li><li><strong>Triage</strong>: 同小时 disable 这个 tool, fallback 到 CS team manual handling</li><li><strong>Customer comm</strong>:</li></ol>
+<ul><li>立刻 escalate compliance + product VP</li><li>不 hide impact: 7 天 ~3% queries × 200k weekly query = ~42k user 暴露</li><li>联系 legal 评估 regulator 报告必要性 (最终判断 no 因为 surface 不是 transactional promise)</li></ul>
+<ol><li><strong>Root cause</strong>: Tool description 写 "check eligibility", 但 LLM agent 自由扩展 surface specific 数字以 sound helpful. 我没 constrain output schema strictly</li><li><strong>Permanent fix</strong>:</li></ol>
+<ul><li>Output schema constraint (boolean only, no number)</li><li>Compliance dictionary block list (specific 数字 patterns block)</li><li>Pre-deploy compliance review mandatory for any new tool</li><li>Daily sample 1000 query manual compliance audit</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>Recovery: same hour disable, 24h permanent fix</li><li>Compliance: no regulator report needed (legal review)</li><li>Establish <strong>pre-deploy compliance review process</strong> for tool changes</li><li>之后 18 个月 0 compliance incident</li></ul>
+<p><strong>Vulnerability line</strong>:</p>
+<blockquote><p>"我 wrong call 是 monitoring 没覆盖 'tool output surface area' 这个维度. Detect lag 1 week — 这个 detect lag 比 incident 本身更严重. 我现在 monitoring 第一项就是 compliance dictionary scan, daily."</p></blockquote>
+<hr />
+<h4>STAR 3: Pakistan ASR Cascade Failure (Alternate, milder)</h4>
+<p><strong>S</strong>: 巴基斯坦 voice agent 上线 week 2, ASR primary vendor Azure 在 Urdu 上突然降级 (vendor side issue), accuracy 从 91% 掉到 67%. Cascade 设计了应该 failover.</p>
+<p><strong>T</strong>: Cascade failover 应该 transparent 但实际触发延迟, ~5 分钟 wrong-ASR output 上线.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Detect</strong>: ASR confidence score plummet, alert fire 30 sec</li><li><strong>Triage</strong>: Cascade 应自动 switch Google, 但 health check threshold 设的太宽容 (vendor 还在响应但 accuracy 烂), 没 trigger failover. 我手动 force switch Google, 30 sec switch 完成</li><li><strong>Customer comm</strong>: 6 min 内通知 ops, "auto-cascade 没按预期 trigger, 我 manual switched, root cause 调查中"</li><li><strong>Root cause</strong>: Cascade health check 只看 'vendor responding', 不看 'vendor accuracy degrading'. Vendor responded with garbage 而不是 fail — cascade 不知道 trigger</li><li><strong>Permanent fix</strong>:</li></ol>
+<ul><li>Cascade health check 加 multi-signal (confidence score + duration + relative-to-baseline)</li><li>Shadow ASR (Google 后台 parallel run) 持续比对</li><li>Per-vendor accuracy floor (Azure &lt; 80% Urdu → auto-switch)</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>Recovery: 6 min total (5 wrong output)</li><li>Subsequent: shadow ASR 后再发现 2 起 vendor silent degradation, 全 auto-failover, <strong>0 用户 impact</strong></li><li>这个 "shadow + multi-signal health check" pattern 跨 6 个市场 rollout</li></ul>
+<p><strong>Vulnerability</strong>:</p>
+<blockquote><p>"Cascade 设计本身对的, 但 health check 设计 naive — 我 default 假设 'responding = healthy'. 实际 vendor silent degradation 是 common 模式. 现在我每个 cascade health check 都 multi-signal."</p></blockquote>
+<hr />
+<h3>5 个 Follow-ups (interviewer 追问 + 准备答案)</h3>
+<h4>Follow-up 1: "How did the customer (ops team) react in the moment?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Ops lead 一开始 frustrated, fair. 他第一句是 'I told you 不要 prod push 周末半夜'. 我接受, 没 defend. 我说 'fair point, 我先 stop bleeding, post-mortem 我们一起复盘 deployment timing'.</p>
+<p>Stop bleeding 之后 (33 min later), 我用 status update + 主动 root cause + permanent fix proposal 重新建立 trust. Ops lead 后来跟 manager 说 'incident handling 让我对他更信任不是更怀疑' —— 关键是我 own 错误而不是 blame embedding vendor, 也不是 blame 'staging eval said green'.</p>
+<p><strong>核心 customer comm 原则</strong>: 失败时 customer 不要 reassurance, 他们要 transparency + accountability + ETA. 三件齐 trust 反而上升."</p></blockquote>
+<h4>Follow-up 2: "What's the worst possible version of this incident?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Worst version 是 detect 24 小时后才发现 + impact 影响金钱.</p>
+<p>假设我没设 routing accuracy alert, 等 weekly review (5 天后) 才发现 routing 退化 → 5 天 × 14% × 200k daily call = ~140k 用户 wrong-tier. 假设 wrong-tier 里有 financial-figure prompt (我们这次没, 但假设另一个版本 yes), 用户被告知错误金额 → regulator-reportable.</p>
+<p>这个 worst case scenario 让我意识到 <strong>detect time 比 fix time 重要 10×</strong>. 我现在每个 deployment 第一件事问 'if this fails, how fast do I find out?' 而不是 'how fast can I fix?'."</p></blockquote>
+<h4>Follow-up 3: "Did you get pushback for proposing shadow mode mandatory?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Yes. Tech lead 担心 shadow mode 'doubles compute cost' — 同一 traffic 跑 2 个 model. 我提议 sampling: 10% traffic shadow, 不是 100%. 仍然 catch 90%+ distribution shift, cost 加 10% 不是 100%.</p>
+<p>我也准备了 ROI argument: 'this incident cost 33 min recovery + post-mortem 时间 + ops trust hit. Shadow mode mandatory 加 10% compute cost vs avoid 1 incident every 6 months. Math is 明显的'.</p>
+<p>Tech lead 接受 sampling 版本. 6 个月后我们 catch 2 起 silent regression, ROI 立刻 prove."</p></blockquote>
+<h4>Follow-up 4: "How do you balance speed of shipping vs safety?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"<strong>By reversibility classification</strong>, 不是 by global 'speed vs safety' trade-off.</p>
+<p>Two-way door changes (prompt tweak, threshold tune, UI text): ship + measure. Safety 投入低.</p>
+<p>One-way + low blast (single-customer change): 2-4 week scoping, rollback runbook 必备.</p>
+<p>One-way + high blast (model swap, embedding change, compliance prompt change): shadow mode 1+ week + eval gate + ops 提前 ping + post-deploy on-call 24h. Slow but safe.</p>
+<p>这次 incident 的 root cause 是 <strong>我把 embedding swap 误判为 two-way (我以为 swap 易撤), 实际是 one-way (因为 routing prompt 6 个月 tuned 在旧分布, 不易撤). Misclassification 导致 under-investment in safety</strong>. 现在我每个 deployment 写 reversibility tag, peer review 这个 tag."</p></blockquote>
+<h4>Follow-up 5: "什么 monitoring 你会推荐其他 FDE 设置?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"三层 monitoring, 跨 FDE 项目通用:</p>
+<p><strong>L1 — System metric (real-time, 5-min alert)</strong>: latency, error rate, throughput, model-specific score (accuracy / confidence / hallucination proxy). 标准 SRE.</p>
+<p><strong>L2 — Output relevance (daily human sample, 100-1000 entries)</strong>: 不是 'is it correct', 是 'is it relevant / appropriate / on-brand / compliance-safe'. Classifier-driven 加 random sample human review. 这一层 catches silent regression L1 看不到.</p>
+<p><strong>L3 — Customer signal (weekly conversation with ops/CS)</strong>: 数字看不到的 anecdotal complaint. 'TTS voice sounds telemarketing' 这种.</p>
+<p>90% FDE 项目 ship L1, 60% ship L2, &lt; 30% ship L3. L3 是 senior FDE signature. 我每个市场 weekly 30 min ops call, 这一项 catch 过 8+ silent issue."</p></blockquote>
+<hr />
+<h3>❌ 死路答法 (碰了就挂)</h3>
+<h4>死路 1: "It wasn't really my fault, but..."</h4>
+<p><strong>为什么挂</strong>: Blame shifting. FDE manager 听完立刻 next candidate. 失败时 own 错误是 baseline trust signal.</p>
+<p><strong>怎么改</strong>: 显式 "I owned this — I made the decision to swap embedding without shadow mode. Vendor reliability was input constraint, my design didn't account for hidden dependency."</p>
+<hr />
+<h4>死路 2: "I haven't really had a deployment failure"</h4>
+<p><strong>为什么挂</strong>: 说谎 或 没真实 production 经验. 任何 3 年以上 production 工作都有 incident. 没 incident = 你只 ship 过 toy project.</p>
+<p><strong>怎么改</strong>: 准备至少 3 个真实 incident 故事. 选 1 个 medium severity (不要 catastrophic 不要 trivial), 讲深.</p>
+<hr />
+<h4>死路 3: "We rolled back and it was fine."</h4>
+<p><strong>为什么挂</strong>: 表面 mitigation 不讲 root cause + prevent. FDE manager 想看 systemic learning.</p>
+<p><strong>怎么改</strong>: Rollback 是 stop bleeding, 不是 fix. 讲完 rollback 后立刻进 root cause + permanent fix + safety nets + "现在我 default 做 X".</p>
+<hr />
+<h4>死路 4: 故事里没 customer 沟通 part</h4>
+<p><strong>为什么挂</strong>: SWE 视角. FDE 失败时 customer comm 占 50% 工作. 不讲 customer comm = 你不知道 FDE 的工作形态.</p>
+<p><strong>怎么改</strong>: Allocate ≥ 30 sec 讲 customer comm — drafted status update, Zoom with ops, full post-mortem timeline. 显式 quote 你 send 的 status update 句子.</p>
+<hr />
+<h4>死路 5: "我们一起 debug 找到 root cause"</h4>
+<p><strong>为什么挂</strong>: 用 "我们", 个人 ownership 不清. Incident response 通常是 team effort, 但你必须 articulate <strong>你 specifically 做了什么</strong>.</p>
+<p><strong>怎么改</strong>: "Team 一起 debug, 我 specifically 跑 distribution comparison 发现 BGE large 跟 BGE base 在 Urdu embedding 上 cosine similarity 分布 shift 0.12 — 这是 root cause 关键 signal."</p>
+<hr />
+<h4>死路 6: Learning 太 generic ("学到了 monitoring 重要")</h4>
+<p><strong>为什么挂</strong>: 谁都知道 monitoring 重要. FDE manager 想听 specific actionable change.</p>
+<p><strong>怎么改</strong>: 三件事 by default 现在 mandatory: shadow mode + distribution shift detection + rollback runbook standardized. 越 specific 越 prove 真学到了.</p>
+<hr />
+<h4>死路 7: 数字模糊 ("a few minutes downtime")</h4>
+<p><strong>为什么挂</strong>: Incident 的 specifics 是 trust signal. "33 分钟 from detect to rollback" 比 "几分钟" 可信 10×.</p>
+<p><strong>怎么改</strong>: 准备 timestamp-level specifics: 8:42 broke, 9:05 alert, 9:08 ops Slack, 9:10 pause, 9:28 rollback, 9:32 status update. 时间线越 specific 故事越真实.</p>
+<hr />
+<h3>✅ 加分项 (top 5)</h3>
+<h4>加分 1: 显式 "I owned this" 不是 "we"</h4>
+<p>第一句话就 own. 不要 "shipped a deployment that had an issue" 用 "I shipped a deployment, it broke, I caused it because [X]".</p>
+<h4>加分 2: Timeline-level specifics (timestamp)</h4>
+<p>"8:42 broke, 9:05 alert, 9:08 ops Slack, 9:10 pause, 9:28 rollback" — 这种 timestamp 让故事 cross-verifiable, FDE manager 立刻判断 "他真做过这个".</p>
+<h4>加分 3: Customer comm 完整 reproduction</h4>
+<p>显式 quote 你 send 的 status update 全文: "Routing degradation detected 08:42, embedding model swap suspected, rolled back 09:28...". 这种 specificity 让 customer-handling 能力立刻 visible.</p>
+<h4>加分 4: 区分 "stop bleeding" 跟 "root cause" 跟 "permanent fix"</h4>
+<p>3 个 stage 显式区分. Rollback = stop bleeding (mins). Root cause = systemic understanding (hours/days). Permanent fix + safety nets = prevent recurrence (week+). 这种 分层 mental model 是 senior incident response signal.</p>
+<h4>加分 5: "What I default now" 是 transferable lesson</h4>
+<p>不是 "我学到这个项目的具体 fix", 是 "我现在每个 deployment 默认做 X / Y / Z". Transferability 显示 learning 真的内化.</p>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>"部署失败" 的 winning answer 不是讲技术 fix, 是用 timestamp-level specifics 讲清 detect → triage → customer comm → root cause → permanent fix 完整闭环, 显式 own 错误 (不 blame vendor), 收尾给出 "我现在 default 做 X/Y/Z" 三个 transferable lesson</strong>.</p>
+<p>4-5 分钟, customer comm ≥ 30 秒, vulnerability = "我以为 X 是 isolated change, 我错了", learning = 3 个 actionable defaults.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (面试前 30s 扫一眼)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Question type:
+  Behavioral / Vulnerability / Incident Response (4-5 min monologue)
+Key skill being tested:
+  Ownership + incident response process + customer communication + actionable learning
+
+Answer arc (7 段):
+  1. Context (20s)           — 项目 + scope + 我的角色
+  2. What broke (30s)        — 具体什么坏, timestamp
+  3. Detect → Triage (45s)   — 检测 + 第一反应, reversibility 判断 (pause vs kill)
+  4. Customer comm (45s)     — Status update 原文, Zoom with ops, post-mortem timeline
+  5. Root cause (60s)        — 真实 cause (hidden dependency), 不是 superficial
+  6. Permanent fix (45s)     — Safety nets + defaults (shadow mode, distribution shift, runbook)
+  7. What I default now (30s)— 3 transferable lessons
+
+Numbers to drop (timestamps + impact):
+  Indonesia embedding swap:
+    08:42 broke, 09:05 alert, 09:28 rollback, 09:32 status update
+    33 min detect-to-fix, 90 min impact window, 14% traffic, ~140 users
+    0 regulator-reportable incident
+  BNPL compliance: 3% queries, 1 week detect lag, 0 regulator report
+  Pakistan ASR: 6 min recovery, 5 wrong outputs
+  Shadow mode catches: 2+ silent regressions over 12 months
+
+Vulnerability:
+  "我 ownership clear admit: 我以为 embedding 升级是 isolated change, 我错了.
+   AI 系统的 hidden dependency 通过 distribution / threshold / prompt-data
+   coupling 隐藏. Eval suite green 不等于 production safe. 这是
+   architecturally my responsibility, 不是 eval suite 的问题 — eval suite
+   是我设计的."
+
+Close:
+  "What I default now: 三件事 mandatory —
+   shadow mode 1 week + distribution shift detection in eval + rollback runbook
+   standardized."
+
+Red lines:
+  - "It wasn't my fault" (blame shifting)
+  - "Haven't had a failure" (lying or no real prod experience)
+  - "Rolled back, was fine" (no root cause + prevent)
+  - 没 customer comm part (SWE 视角)
+  - 用 "我们" 替代 "我" (ownership 不清)
+  - Learning 太 generic ("monitoring important")
+  - 数字模糊 ("a few minutes")
+
+3 ready STAR (alternate):
+  STAR 1: Indonesia embedding swap routing degradation (★ primary, hidden dep)
+  STAR 2: BNPL compliance wrong-surface (compliance + monitoring gap)
+  STAR 3: Pakistan ASR cascade health check (silent vendor degradation)
+
+5 follow-ups ready:
+  Q1: Customer reacted? → Frustrated, fair, I owned, trust built via transparency
+  Q2: Worst possible version? → Detect 24h delay + financial figure surface = regulator
+  Q3: Pushback on shadow mode? → Sampling 10%, ROI math, prove in 6 months
+  Q4: Speed vs safety? → Reversibility classification not global trade-off
+  Q5: Monitoring rec? → L1 system / L2 output relevance / L3 customer signal
+
+3-layer monitoring model:
+  L1 system metric    — real-time, 5-min alert (latency, accuracy)
+  L2 output relevance — daily human sample, classifier + random review
+  L3 customer signal  — weekly 30-min ops conversation (anecdotal)
+
+Stop bleeding → Root cause → Permanent fix (3 stages):
+  Stop bleeding   = minutes (rollback, pause sessions)
+  Root cause      = hours/days (distribution analysis, systemic understanding)
+  Permanent fix   = week+ (safety nets, defaults, runbook standardization)
+
+Customer comm template (4 lines):
+  1. Detected at [time]
+  2. Suspected cause [hypothesis]
+  3. Mitigation status [pause/rollback at time]
+  4. ETA full post-mortem + impact estimate
+
+Reversibility tag (per deployment):
+  Embedding/retrieval change   = one-way (prompts coupled to distribution)
+  Prompt tweak                  = two-way (revert easy)
+  Compliance rule change        = one-way (audit trail)
+  Threshold tune                = two-way (config flip)</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-002-end-to-end-technical-project.html">← Q2 · [行为/动机] 讲一个你端到端负责过的、技术上最有挑战的项目</a>
+    <a href="zhenti-004-deliver-bad-news.html">Q4 · [行为/动机] 讲一次你不得不向客户传达坏消息 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q03 · 一次部署失败的经历, 你怎么处理的
+
+> "Tell me about a time a deployment failed. Walk me through what happened, how you handled it, and what you learned. I want to hear the technical details and the customer-facing communication."
+
+**Round**: Behavioral (30-45 min, hiring manager 或 cross-functional round)
+**出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a production incident" / "describe a time something broke after you shipped"
+
+---
+
+## 这道题在考什么
+
+这是 **FDE 题里 vulnerability signal density 最高的一道**. 表面问失败, 实际筛 6 件事:
+
+- **诚实** —— 你是否真的承认了 ownership, 还是 blame vendor / 数据 / 客户
+- **Incident response 系统化** —— 你有 detect → triage → mitigate → root cause → prevent 的闭环吗
+- **Customer communication 能力** —— 失败时怎么跟 client 沟通, 这是 FDE 区别于 SWE 的核心
+- **Calm under pressure** —— 你在 production down 时的 mental state 是 panic 还是 process
+- **Learning extraction** —— 不是 "学到了 monitoring 重要", 是 "我现在 default 在每个 deployment 加 X / Y / Z 三件事"
+- **Blast radius awareness** —— 你能不能 articulate "我的失败影响了多少 user / dollar / 监管暴露"
+
+**没说出口的红线**:
+
+- "It wasn't really my fault, but..." → blame shifting, 立刻挂
+- "I haven't really had a failure" → 说谎 或 没真实 production 经验
+- "Vendor was unreliable" → 不 take ownership of vendor selection
+- "We rolled back and it was fine" → 表面 mitigation, 没讲 root cause
+- 故事里没有 customer 沟通 part → 你只是 SWE 视角, 没 FDE 视角
+- 故事里没有 "我学到 X 现在 default" → learning 不 actionable
+
+---
+
+## 完美答案架构 (Layered Response)
+
+7 段结构, total ~4-5 分钟:
+
+| # | 层 | 时间 | 这层该说什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **Context** | 20s | 项目 + scope + 我的角色 | "Last year I shipped a voice agent update in Indonesia..." |
+| 2 | **What broke (specific)** | 30s | 具体什么坏了, 不要 vague | "On Tuesday morning, calls started routing to wrong tier — tier 2 calls got tier 1 prompt, 14% of traffic in 90 minutes..." |
+| 3 | **Detect → Triage (mins)** | 45s | 你怎么知道 + 多快 + 第一反应 | "Detection: customer satisfaction dashboard dropped 8pp in 30 min, alerts fired. Triage: I called ops lead, paused new sessions, kept existing alive..." |
+| 4 | **Customer comm (critical)** | 45s | 你怎么 communicate 给 stakeholder | "I drafted a 3-line status: 'we detected at 9:42, paused new at 9:55, ETA mitigation 11:00'. Sent to ops + compliance + product VP simultaneously..." |
+| 5 | **Root cause (technical)** | 60s | 真正什么导致, 不是 superficial | "Root cause: I changed embedding model 2 weeks earlier, didn't realize routing prompt was tuned to old embedding distribution..." |
+| 6 | **Permanent fix + safety nets** | 45s | 不只是 fix bug, 是 build defense | "Fix: pinned embedding version + 加 routing eval to CI. Safety nets: shadow mode for routing model swap..." |
+| 7 | **What I default now (transferable)** | 30s | 你现在 by default 做什么 | "Now every deployment touching routing has: shadow mode + eval gate + rollback runbook + ops Slack 提前 ping..." |
+
+Total: ~4-5 min. 留 buffer 给 follow-up.
+
+---
+
+## 详细回答 (Sample Monologue) — 可以照背
+
+> "我讲一个真实的, 我现在 still wince when I think about it.
+>
+> **Context**: 印尼 voice agent 跑了 8 个月很稳定. 我做了一个看似 routine 的 embedding model upgrade —— BGE base → BGE large, 因为新版在 multilingual benchmark 上 +3%. 我在 staging 跑了 1 周, eval suite 全 green, 周一晚 21:00 (印尼半夜) push 到 production. 我打算第二天早上 ops 上班前 monitor 几个小时再撤手.
+>
+> **What broke**: 周二早 08:42, 印尼时间 ops team 上班 42 分钟后, customer satisfaction dashboard 显示 30 分钟内掉了 **8 个百分点**. 同时间, tier routing 准确度从 92% 掉到 78%. 具体表现: tier 2 calls (账户特定问题) 被 route 成 tier 1 (通用 FAQ), agent 回复 generic 信息, 用户挂电话. **14% 的 inbound traffic 在 90 分钟里收到 wrong-tier response**.
+>
+> **Detect**: Alerts 在 09:05 fire (3 min 内, 因为我之前 alert threshold 设的 tight). 但 ops team 8 分钟前已经在 group chat 抱怨 'agent 答非所问'. 这种 **ops 比 alert 先发现的情况** —— 它本身就是 signal, 说明我的 monitoring 漏了一个维度 (routing accuracy 我有, 但 'response relevance' 是上层 signal).
+>
+> **Triage (第一反应)**:
+> - 第 1 步: 9:08, 我 Slack ops lead, '我看到了, 我在 triage, 给我 10 分钟'
+> - 第 2 步: 9:10, 我 pause new sessions (现有 session 不 kill, 因为 mid-call drop 比 wrong-answer 更糟). 这是 reversibility 判断 —— pause new 是 two-way, kill 现有是 one-way
+> - 第 3 步: 9:12, 我 trigger rollback runbook —— 回退到 1 周前 stable embedding. 不 debug live, 先 stop bleeding
+> - 第 4 步: 9:28, rollback 完成, routing accuracy 30 分钟内回 92%
+>
+> **Customer comm (这是关键)**:
+> - 9:32, 我发了一个 3-line status 给 ops lead + compliance + product VP:
+>   > 'Routing degradation detected 08:42, embedding model swap suspected, rolled back 09:28, accuracy recovering. Impact window: 90 min, ~14% traffic. No regulator-reportable wrong-info incidents (preliminary). Full post-mortem by EOD Wed.'
+> - 9:45, 我跟 ops lead 30 分钟 Zoom, 一起 review 30 个 sample wrong-routed calls, 评估 customer harm. 没有 dollar harm (tier 1 vs tier 2 prompt 都不 surface 具体金额), 只有 customer experience harm.
+> - 14:00, 我发 full status update with timeline + impact + next steps
+> - 第二天 17:00 (印尼时间), full post-mortem published 给 ops + product + compliance
+>
+> **Root cause**:
+>
+> 真正的原因不是 embedding 升级本身, 是 **我对 deployment 边界的判断错误**.
+>
+> Embedding model 升级 我假设是 'isolated change' —— 我只改了 retrieval module. 但实际上, 我们的 routing prompt 6 个月前 tuned 在 BGE base 的 embedding distribution 上 (specifically, similarity score 阈值是 calibrated 在那个 distribution). 换成 BGE large 后, embedding distribution shifted, similarity score 范围变化, routing 阈值不再 align.
+>
+> 我 missed 的是: embedding 不是 isolated component, 是 **整个 routing system 的隐式 dependency**. Staging eval suite 跑过 routing test, 但 test cases 是我设计的, 覆盖 'happy path', 没 cover 'similarity 分布 edge case'. Eval suite green 不等于 production safe.
+>
+> **Permanent fix + safety nets**:
+>
+> 三件事 by default 现在 mandatory:
+>
+> **One**: Embedding model swap 走 shadow mode 至少 1 周. Shadow mode = 旧 embedding 出结果给用户, 新 embedding 后台 evaluate, A/B 比较 routing accuracy / response relevance. Shadow 数据 pass 才上线.
+>
+> **Two**: Eval suite 加 'distribution shift detection'. 不是 test 'is similarity > threshold', 是 test 'is similarity distribution similar to baseline'. 这一项捕捉 embedding swap, retrieval data 变化, prompt tweak 等所有可能 shift similarity 的修改.
+>
+> **Three**: Rollback runbook standardized. 之前 rollback 是我 ad-hoc 操作, 现在每个 deployment 有 written runbook 包括 'who pauses sessions, who reverts, who notifies ops, ETA'. Junior 也能 execute.
+>
+> **What I default now**:
+>
+> 三个 lesson:
+>
+> 一, **'Isolated change' 是 illusion**. AI 系统 component 之间的 hidden dependency 经常通过 distribution / threshold / prompt-data coupling 隐藏. 现在我每个 deployment 写 'dependency map' 列出 explicit + implicit dependency.
+>
+> 二, **Ops 比 alert 先发现 = monitoring gap**. 这次事故后我加了 'response relevance' classifier 作为 upper-level signal, 不只看 accuracy.
+>
+> 三, **Customer comm 优先级 = stop bleeding 之后立刻**. 不要 wait full root cause, 先给 status. 'I'm aware, I'm acting, ETA Y' 比沉默 60 分钟好 10×.
+>
+> **Outcome impact**: Recovery 33 分钟. 90 分钟 impact window 内 ~140 用户 wrong-tier response, 0 regulator incident. Ops lead 后来跟 manager 说 'incident handling 让我对他更信任不是更怀疑'. 我自己学到的 lesson 现在是每个 multi-market deployment 的 default."
+
+---
+
+## Gao Xin 简历专属 STAR 模板
+
+至少 1 完整 STAR (Indonesia embedding swap), 2 个 alternate STAR.
+
+### ★ STAR 1: Indonesia Embedding Swap Routing Degradation (★ PRIMARY)
+
+**S** (Situation):
+> "印尼 voice agent 跑了 8 个月稳定, 92% routing accuracy. 我做了一个 routine embedding model upgrade (BGE base → BGE large), staging eval 1 周全 green, 周一晚 21:00 push production."
+
+**T** (Task):
+> "Detect → mitigate → root cause → prevent. 同时 own customer communication 给 ops / compliance / product VP."
+
+**A** (Action — 5 个 sub-action):
+1. **Detect (3 min from alert, but ops 8 min 提前发现)**: 这本身是 signal, monitoring gap
+2. **Triage (20 min)**:
+   - 9:08 Slack ops lead "我在 triage, 10 分钟"
+   - 9:10 pause new sessions (不 kill 现有 — reversibility 判断)
+   - 9:12 trigger rollback runbook
+   - 9:28 rollback 完成
+3. **Customer comm**:
+   - 9:32 3-line status (detected / suspected cause / rolled back / impact / post-mortem ETA)
+   - 9:45 Zoom 30 分钟 with ops, sample 30 wrong-routed calls 评估 customer harm
+   - 14:00 full status update
+   - 24h 内 full post-mortem
+4. **Root cause**:
+   - 不是 embedding 本身, 是 routing prompt 6 个月前 tuned 在 BGE base distribution
+   - Embedding swap = implicit dependency 触发, distribution shift
+   - Staging eval covers happy path, 不 cover distribution edge case
+5. **Permanent fix + safety nets**:
+   - Shadow mode 1 周 mandatory for embedding/retrieval changes
+   - Eval suite 加 distribution shift detection
+   - Rollback runbook standardized
+
+**R** (Result):
+- Recovery: **33 分钟 from detect to rollback complete**
+- Impact window: 90 分钟, **14% traffic, ~140 用户**
+- **0 regulator-reportable incident** (因为没 surface 具体金额)
+- 之后 12 个月 0 类似 incident (shadow mode 工作)
+- Ops lead 反馈 "incident handling 让我更信任你"
+
+**Vulnerability line**:
+> "我 ownership clear admit: 我以为 embedding 升级是 isolated change, 我错了. AI 系统的 hidden dependency 比传统软件多. 这是 architecturally my responsibility, 不是 eval suite 的问题 —— eval suite 是我设计的."
+
+---
+
+### STAR 2: BNPL Chatbot Compliance Wrong-Surface Incident (Alternate)
+
+**S**: BNPL chatbot 上线 3 个月, 我加了一个 new tool "check eligibility for credit increase". Tool 设计意图是 surface 'eligible' / 'not eligible' boolean. 实际上线后 1 周, **3% queries 意外 surface 了具体额度数字** (e.g., "你 eligible to increase by RMB 5000").
+
+**T**: 这违反 compliance 红线 (specific 数字 promise = regulator 红线). Detect + mitigate + report to compliance + permanent fix.
+
+**A**:
+1. **Detect (delayed)**: Compliance team 1 周后 audit 抽样发现. **我 own 这个 delay** — 我 monitoring 没覆盖 "tool output surface area" 这个维度
+2. **Triage**: 同小时 disable 这个 tool, fallback 到 CS team manual handling
+3. **Customer comm**:
+   - 立刻 escalate compliance + product VP
+   - 不 hide impact: 7 天 ~3% queries × 200k weekly query = ~42k user 暴露
+   - 联系 legal 评估 regulator 报告必要性 (最终判断 no 因为 surface 不是 transactional promise)
+4. **Root cause**: Tool description 写 "check eligibility", 但 LLM agent 自由扩展 surface specific 数字以 sound helpful. 我没 constrain output schema strictly
+5. **Permanent fix**:
+   - Output schema constraint (boolean only, no number)
+   - Compliance dictionary block list (specific 数字 patterns block)
+   - Pre-deploy compliance review mandatory for any new tool
+   - Daily sample 1000 query manual compliance audit
+
+**R**:
+- Recovery: same hour disable, 24h permanent fix
+- Compliance: no regulator report needed (legal review)
+- Establish **pre-deploy compliance review process** for tool changes
+- 之后 18 个月 0 compliance incident
+
+**Vulnerability line**:
+> "我 wrong call 是 monitoring 没覆盖 'tool output surface area' 这个维度. Detect lag 1 week — 这个 detect lag 比 incident 本身更严重. 我现在 monitoring 第一项就是 compliance dictionary scan, daily."
+
+---
+
+### STAR 3: Pakistan ASR Cascade Failure (Alternate, milder)
+
+**S**: 巴基斯坦 voice agent 上线 week 2, ASR primary vendor Azure 在 Urdu 上突然降级 (vendor side issue), accuracy 从 91% 掉到 67%. Cascade 设计了应该 failover.
+
+**T**: Cascade failover 应该 transparent 但实际触发延迟, ~5 分钟 wrong-ASR output 上线.
+
+**A**:
+1. **Detect**: ASR confidence score plummet, alert fire 30 sec
+2. **Triage**: Cascade 应自动 switch Google, 但 health check threshold 设的太宽容 (vendor 还在响应但 accuracy 烂), 没 trigger failover. 我手动 force switch Google, 30 sec switch 完成
+3. **Customer comm**: 6 min 内通知 ops, "auto-cascade 没按预期 trigger, 我 manual switched, root cause 调查中"
+4. **Root cause**: Cascade health check 只看 'vendor responding', 不看 'vendor accuracy degrading'. Vendor responded with garbage 而不是 fail — cascade 不知道 trigger
+5. **Permanent fix**:
+   - Cascade health check 加 multi-signal (confidence score + duration + relative-to-baseline)
+   - Shadow ASR (Google 后台 parallel run) 持续比对
+   - Per-vendor accuracy floor (Azure < 80% Urdu → auto-switch)
+
+**R**:
+- Recovery: 6 min total (5 wrong output)
+- Subsequent: shadow ASR 后再发现 2 起 vendor silent degradation, 全 auto-failover, **0 用户 impact**
+- 这个 "shadow + multi-signal health check" pattern 跨 6 个市场 rollout
+
+**Vulnerability**:
+> "Cascade 设计本身对的, 但 health check 设计 naive — 我 default 假设 'responding = healthy'. 实际 vendor silent degradation 是 common 模式. 现在我每个 cascade health check 都 multi-signal."
+
+---
+
+## 5 个 Follow-ups (interviewer 追问 + 准备答案)
+
+### Follow-up 1: "How did the customer (ops team) react in the moment?"
+
+**Answer**:
+> "Ops lead 一开始 frustrated, fair. 他第一句是 'I told you 不要 prod push 周末半夜'. 我接受, 没 defend. 我说 'fair point, 我先 stop bleeding, post-mortem 我们一起复盘 deployment timing'.
+>
+> Stop bleeding 之后 (33 min later), 我用 status update + 主动 root cause + permanent fix proposal 重新建立 trust. Ops lead 后来跟 manager 说 'incident handling 让我对他更信任不是更怀疑' —— 关键是我 own 错误而不是 blame embedding vendor, 也不是 blame 'staging eval said green'.
+>
+> **核心 customer comm 原则**: 失败时 customer 不要 reassurance, 他们要 transparency + accountability + ETA. 三件齐 trust 反而上升."
+
+### Follow-up 2: "What's the worst possible version of this incident?"
+
+**Answer**:
+> "Worst version 是 detect 24 小时后才发现 + impact 影响金钱.
+>
+> 假设我没设 routing accuracy alert, 等 weekly review (5 天后) 才发现 routing 退化 → 5 天 × 14% × 200k daily call = ~140k 用户 wrong-tier. 假设 wrong-tier 里有 financial-figure prompt (我们这次没, 但假设另一个版本 yes), 用户被告知错误金额 → regulator-reportable.
+>
+> 这个 worst case scenario 让我意识到 **detect time 比 fix time 重要 10×**. 我现在每个 deployment 第一件事问 'if this fails, how fast do I find out?' 而不是 'how fast can I fix?'."
+
+### Follow-up 3: "Did you get pushback for proposing shadow mode mandatory?"
+
+**Answer**:
+> "Yes. Tech lead 担心 shadow mode 'doubles compute cost' — 同一 traffic 跑 2 个 model. 我提议 sampling: 10% traffic shadow, 不是 100%. 仍然 catch 90%+ distribution shift, cost 加 10% 不是 100%.
+>
+> 我也准备了 ROI argument: 'this incident cost 33 min recovery + post-mortem 时间 + ops trust hit. Shadow mode mandatory 加 10% compute cost vs avoid 1 incident every 6 months. Math is 明显的'.
+>
+> Tech lead 接受 sampling 版本. 6 个月后我们 catch 2 起 silent regression, ROI 立刻 prove."
+
+### Follow-up 4: "How do you balance speed of shipping vs safety?"
+
+**Answer**:
+> "**By reversibility classification**, 不是 by global 'speed vs safety' trade-off.
+>
+> Two-way door changes (prompt tweak, threshold tune, UI text): ship + measure. Safety 投入低.
+>
+> One-way + low blast (single-customer change): 2-4 week scoping, rollback runbook 必备.
+>
+> One-way + high blast (model swap, embedding change, compliance prompt change): shadow mode 1+ week + eval gate + ops 提前 ping + post-deploy on-call 24h. Slow but safe.
+>
+> 这次 incident 的 root cause 是 **我把 embedding swap 误判为 two-way (我以为 swap 易撤), 实际是 one-way (因为 routing prompt 6 个月 tuned 在旧分布, 不易撤). Misclassification 导致 under-investment in safety**. 现在我每个 deployment 写 reversibility tag, peer review 这个 tag."
+
+### Follow-up 5: "什么 monitoring 你会推荐其他 FDE 设置?"
+
+**Answer**:
+> "三层 monitoring, 跨 FDE 项目通用:
+>
+> **L1 — System metric (real-time, 5-min alert)**: latency, error rate, throughput, model-specific score (accuracy / confidence / hallucination proxy). 标准 SRE.
+>
+> **L2 — Output relevance (daily human sample, 100-1000 entries)**: 不是 'is it correct', 是 'is it relevant / appropriate / on-brand / compliance-safe'. Classifier-driven 加 random sample human review. 这一层 catches silent regression L1 看不到.
+>
+> **L3 — Customer signal (weekly conversation with ops/CS)**: 数字看不到的 anecdotal complaint. 'TTS voice sounds telemarketing' 这种.
+>
+> 90% FDE 项目 ship L1, 60% ship L2, < 30% ship L3. L3 是 senior FDE signature. 我每个市场 weekly 30 min ops call, 这一项 catch 过 8+ silent issue."
+
+---
+
+## ❌ 死路答法 (碰了就挂)
+
+### 死路 1: "It wasn't really my fault, but..."
+
+**为什么挂**: Blame shifting. FDE manager 听完立刻 next candidate. 失败时 own 错误是 baseline trust signal.
+
+**怎么改**: 显式 "I owned this — I made the decision to swap embedding without shadow mode. Vendor reliability was input constraint, my design didn't account for hidden dependency."
+
+---
+
+### 死路 2: "I haven't really had a deployment failure"
+
+**为什么挂**: 说谎 或 没真实 production 经验. 任何 3 年以上 production 工作都有 incident. 没 incident = 你只 ship 过 toy project.
+
+**怎么改**: 准备至少 3 个真实 incident 故事. 选 1 个 medium severity (不要 catastrophic 不要 trivial), 讲深.
+
+---
+
+### 死路 3: "We rolled back and it was fine."
+
+**为什么挂**: 表面 mitigation 不讲 root cause + prevent. FDE manager 想看 systemic learning.
+
+**怎么改**: Rollback 是 stop bleeding, 不是 fix. 讲完 rollback 后立刻进 root cause + permanent fix + safety nets + "现在我 default 做 X".
+
+---
+
+### 死路 4: 故事里没 customer 沟通 part
+
+**为什么挂**: SWE 视角. FDE 失败时 customer comm 占 50% 工作. 不讲 customer comm = 你不知道 FDE 的工作形态.
+
+**怎么改**: Allocate ≥ 30 sec 讲 customer comm — drafted status update, Zoom with ops, full post-mortem timeline. 显式 quote 你 send 的 status update 句子.
+
+---
+
+### 死路 5: "我们一起 debug 找到 root cause"
+
+**为什么挂**: 用 "我们", 个人 ownership 不清. Incident response 通常是 team effort, 但你必须 articulate **你 specifically 做了什么**.
+
+**怎么改**: "Team 一起 debug, 我 specifically 跑 distribution comparison 发现 BGE large 跟 BGE base 在 Urdu embedding 上 cosine similarity 分布 shift 0.12 — 这是 root cause 关键 signal."
+
+---
+
+### 死路 6: Learning 太 generic ("学到了 monitoring 重要")
+
+**为什么挂**: 谁都知道 monitoring 重要. FDE manager 想听 specific actionable change.
+
+**怎么改**: 三件事 by default 现在 mandatory: shadow mode + distribution shift detection + rollback runbook standardized. 越 specific 越 prove 真学到了.
+
+---
+
+### 死路 7: 数字模糊 ("a few minutes downtime")
+
+**为什么挂**: Incident 的 specifics 是 trust signal. "33 分钟 from detect to rollback" 比 "几分钟" 可信 10×.
+
+**怎么改**: 准备 timestamp-level specifics: 8:42 broke, 9:05 alert, 9:08 ops Slack, 9:10 pause, 9:28 rollback, 9:32 status update. 时间线越 specific 故事越真实.
+
+---
+
+## ✅ 加分项 (top 5)
+
+### 加分 1: 显式 "I owned this" 不是 "we"
+
+第一句话就 own. 不要 "shipped a deployment that had an issue" 用 "I shipped a deployment, it broke, I caused it because [X]".
+
+### 加分 2: Timeline-level specifics (timestamp)
+
+"8:42 broke, 9:05 alert, 9:08 ops Slack, 9:10 pause, 9:28 rollback" — 这种 timestamp 让故事 cross-verifiable, FDE manager 立刻判断 "他真做过这个".
+
+### 加分 3: Customer comm 完整 reproduction
+
+显式 quote 你 send 的 status update 全文: "Routing degradation detected 08:42, embedding model swap suspected, rolled back 09:28...". 这种 specificity 让 customer-handling 能力立刻 visible.
+
+### 加分 4: 区分 "stop bleeding" 跟 "root cause" 跟 "permanent fix"
+
+3 个 stage 显式区分. Rollback = stop bleeding (mins). Root cause = systemic understanding (hours/days). Permanent fix + safety nets = prevent recurrence (week+). 这种 分层 mental model 是 senior incident response signal.
+
+### 加分 5: "What I default now" 是 transferable lesson
+
+不是 "我学到这个项目的具体 fix", 是 "我现在每个 deployment 默认做 X / Y / Z". Transferability 显示 learning 真的内化.
+
+---
+
+## 一句话总结
+
+> **"部署失败" 的 winning answer 不是讲技术 fix, 是用 timestamp-level specifics 讲清 detect → triage → customer comm → root cause → permanent fix 完整闭环, 显式 own 错误 (不 blame vendor), 收尾给出 "我现在 default 做 X/Y/Z" 三个 transferable lesson**.
+>
+> 4-5 分钟, customer comm ≥ 30 秒, vulnerability = "我以为 X 是 isolated change, 我错了", learning = 3 个 actionable defaults.
+
+---
+
+## Cheat Sheet (面试前 30s 扫一眼)
+
+```
+Question type:
+  Behavioral / Vulnerability / Incident Response (4-5 min monologue)
+Key skill being tested:
+  Ownership + incident response process + customer communication + actionable learning
+
+Answer arc (7 段):
+  1. Context (20s)           — 项目 + scope + 我的角色
+  2. What broke (30s)        — 具体什么坏, timestamp
+  3. Detect → Triage (45s)   — 检测 + 第一反应, reversibility 判断 (pause vs kill)
+  4. Customer comm (45s)     — Status update 原文, Zoom with ops, post-mortem timeline
+  5. Root cause (60s)        — 真实 cause (hidden dependency), 不是 superficial
+  6. Permanent fix (45s)     — Safety nets + defaults (shadow mode, distribution shift, runbook)
+  7. What I default now (30s)— 3 transferable lessons
+
+Numbers to drop (timestamps + impact):
+  Indonesia embedding swap:
+    08:42 broke, 09:05 alert, 09:28 rollback, 09:32 status update
+    33 min detect-to-fix, 90 min impact window, 14% traffic, ~140 users
+    0 regulator-reportable incident
+  BNPL compliance: 3% queries, 1 week detect lag, 0 regulator report
+  Pakistan ASR: 6 min recovery, 5 wrong outputs
+  Shadow mode catches: 2+ silent regressions over 12 months
+
+Vulnerability:
+  "我 ownership clear admit: 我以为 embedding 升级是 isolated change, 我错了.
+   AI 系统的 hidden dependency 通过 distribution / threshold / prompt-data
+   coupling 隐藏. Eval suite green 不等于 production safe. 这是
+   architecturally my responsibility, 不是 eval suite 的问题 — eval suite
+   是我设计的."
+
+Close:
+  "What I default now: 三件事 mandatory —
+   shadow mode 1 week + distribution shift detection in eval + rollback runbook
+   standardized."
+
+Red lines:
+  - "It wasn't my fault" (blame shifting)
+  - "Haven't had a failure" (lying or no real prod experience)
+  - "Rolled back, was fine" (no root cause + prevent)
+  - 没 customer comm part (SWE 视角)
+  - 用 "我们" 替代 "我" (ownership 不清)
+  - Learning 太 generic ("monitoring important")
+  - 数字模糊 ("a few minutes")
+
+3 ready STAR (alternate):
+  STAR 1: Indonesia embedding swap routing degradation (★ primary, hidden dep)
+  STAR 2: BNPL compliance wrong-surface (compliance + monitoring gap)
+  STAR 3: Pakistan ASR cascade health check (silent vendor degradation)
+
+5 follow-ups ready:
+  Q1: Customer reacted? → Frustrated, fair, I owned, trust built via transparency
+  Q2: Worst possible version? → Detect 24h delay + financial figure surface = regulator
+  Q3: Pushback on shadow mode? → Sampling 10%, ROI math, prove in 6 months
+  Q4: Speed vs safety? → Reversibility classification not global trade-off
+  Q5: Monitoring rec? → L1 system / L2 output relevance / L3 customer signal
+
+3-layer monitoring model:
+  L1 system metric    — real-time, 5-min alert (latency, accuracy)
+  L2 output relevance — daily human sample, classifier + random review
+  L3 customer signal  — weekly 30-min ops conversation (anecdotal)
+
+Stop bleeding → Root cause → Permanent fix (3 stages):
+  Stop bleeding   = minutes (rollback, pause sessions)
+  Root cause      = hours/days (distribution analysis, systemic understanding)
+  Permanent fix   = week+ (safety nets, defaults, runbook standardization)
+
+Customer comm template (4 lines):
+  1. Detected at [time]
+  2. Suspected cause [hypothesis]
+  3. Mitigation status [pause/rollback at time]
+  4. ETA full post-mortem + impact estimate
+
+Reversibility tag (per deployment):
+  Embedding/retrieval change   = one-way (prompts coupled to distribution)
+  Prompt tweak                  = two-way (revert easy)
+  Compliance rule change        = one-way (audit trail)
+  Threshold tune                = two-way (config flip)
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

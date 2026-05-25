@@ -1,0 +1,1893 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q49 · [生产/可靠性] 凌晨 2 点部署宕机, 你的事故响应流程 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q49 · [生产/可靠性] 凌晨 2 点部署宕机, 你的事故响应流程</div>
+  <h1>Q49 · [生产/可靠性] 凌晨 2 点部署宕机, 你的事故响应流程</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-049-2am-incident-response.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-049-2am-incident-response.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q49 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q49 · 2 AM incident — show me you've been paged</h3>
+<blockquote><p>"It's 2 AM. PagerDuty wakes you up. <strong>Walk me through the next 30 minutes.</strong> Not generic 'I look at metrics' — show me you've actually been on-call. Be specific: what dashboards, what commands, what comms, how you decide P0 vs P1, when you wake someone up."</p></blockquote>
+<p><strong>Round</strong>: Production / Reliability (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — on-call experience 必问</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>表面是 IR 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
+<ol><li><strong>Real on-call experience</strong> — specifically know what dashboards to open at 2 AM</li><li><strong>Triage discipline</strong> — severity classification under sleepy conditions</li><li><strong>Mitigate before root cause</strong> — stop bleeding first</li><li><strong>Customer comm timing</strong> — when status page, when phone customer</li><li><strong>Knowing when to wake teammates</strong> — P0 vs heroics</li><li><strong>Blameless culture</strong> — postmortem mindset baked in</li><li><strong>Real numbers</strong> — MTTR, MTTA, error budget burn rate</li><li><strong>Pakistan ASR 40-min outage</strong> — STAR ready story</li></ol>
+<p>不考「incident response 是什么」, 考「2 AM 你 phone 响, 30 秒后你做什么」.</p>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>First 60 seconds</strong></td><td>2 min</td><td>What I do literally first</td><td>"First 60 seconds: open laptop, ack page, open Slack #incidents, glance at dashboard."</td></tr><tr><td>2</td><td><strong>5-phase IR framework</strong></td><td>4 min</td><td>Detect / triage / mitigate / comm / investigate / resolve / postmortem</td><td>"5 phases — detect, triage, mitigate, comm, investigate. 30 min covers detect through mitigate."</td></tr><tr><td>3</td><td><strong>Triage in 5 minutes</strong></td><td>6 min</td><td>Severity scoring, scope, blast radius</td><td>"Triage in 5 min — severity (P0/P1/P2), scope (all? subset?), blast radius, customer impact, then announce."</td></tr><tr><td>4</td><td><strong>Mitigate within 15 min</strong></td><td>6 min</td><td>Stop bleeding patterns</td><td>"Mitigate before root cause — 5 levers: rollback, circuit breaker, traffic shape, scale, kill switch."</td></tr><tr><td>5</td><td><strong>Customer comm during</strong></td><td>4 min</td><td>Status page, slack, leadership, customer direct</td><td>"Comm in parallel with mitigation — status page within 5 min, internal Slack live, customer if &gt;P1."</td></tr><tr><td>6</td><td><strong>When to wake people</strong></td><td>3 min</td><td>P0 yes, P1 maybe, P2 morning</td><td>"Wake teammates: P0 always (multiple people, multiple roles). P1 if I'm stuck &gt; 15 min. P2 wait for morning."</td></tr><tr><td>7</td><td><strong>Runbook discipline</strong></td><td>3 min</td><td>Standard runbooks for common incidents</td><td>"Every common incident has runbook. New incident → write runbook after postmortem."</td></tr><tr><td>8</td><td><strong>MTTR / MTTA targets</strong></td><td>3 min</td><td>Real numbers</td><td>"MTTA target &lt; 5 min (acknowledge), MTTR &lt; 30 min (resolve degradation) / &lt; 1 hour (full resolve)."</td></tr><tr><td>9</td><td><strong>Quote Pakistan ASR + BNPL Anthropic spike</strong></td><td>4 min</td><td>Specific STAR</td><td>"Pakistan ASR 2 AM page — drift detected in 3 min, MTTR 12 min via failover."</td></tr><tr><td>10</td><td><strong>Blameless culture</strong></td><td>2 min</td><td>Postmortem mindset</td><td>"Always blameless — incidents are system failures, not person failures. Every incident becomes runbook update."</td></tr></tbody></table></div>
+<hr />
+<h3>详细回答</h3>
+<h4>Step 1: First 60 seconds (the literal sequence)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">2:03:00 AM  Phone rings. PagerDuty.
+2:03:15 AM  Snooze alarm. Sit up. (Yes, I sleep with laptop in reach.)
+2:03:30 AM  Look at PagerDuty:
+            - What service?
+            - What metric tripped?
+            - What threshold? Critical or warning?
+            - How many alerts firing? (One = isolated; many = cascade)
+2:04:00 AM  Open laptop. VPN.
+2:04:30 AM  Acknowledge page in PagerDuty
+            (this stops escalation to next on-call)
+2:05:00 AM  Open 3 tabs:
+            - Slack #incidents
+            - Grafana / Datadog primary dashboard for that service
+            - Internal incident comm channel
+2:05:30 AM  Quick scan:
+            - Error rate spike? Latency spike? Throughput drop?
+            - Self-healed? (Sometimes alerts fire on transient)
+            - Affecting which segments? (One region / one tenant?)
+2:06:00 AM  Post in Slack:
+            "@here On-call ack'd, investigating ${service} alert"
+            (lets team know I'm awake and looking)</code></pre>
+<p><strong>Why this sequence</strong>:</p>
+<ul><li><strong>Acknowledge first</strong> stops escalation to backup on-call (don't wake them too)</li><li><strong>Slack post early</strong> so anyone else awake can help / observe</li><li><strong>Glance dashboard before deep-dive</strong> to know if self-healed or active</li></ul>
+<h4>Step 2: Triage in 5 minutes</h4>
+<pre class="language-python"><code class="language-python"># Mental triage checklist
+
+# Severity scoring (3-axis)
+def assess_severity(symptoms):
+    user_impact = score_user_impact(symptoms)  # % affected
+    severity_type = score_severity_type(symptoms)  # hard fail vs degraded
+    business_impact = score_business_impact(symptoms)  # revenue/hour, compliance
+    
+    if user_impact &gt; 0.5 or severity_type == 'hard_fail' or business_impact &gt; 10000:
+        return 'P0'
+    elif user_impact &gt; 0.1 or severity_type == 'major_degrad' or business_impact &gt; 1000:
+        return 'P1'
+    elif user_impact &gt; 0.01:
+        return 'P2'
+    else:
+        return 'P3'</code></pre>
+<p><strong>Triage questions (literally what I ask in Slack)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">"Triage update T+5:
+- Severity: P1 (would be P0 but only EU region affected)
+- Scope: EU region, 30% of EU users
+- Symptoms: 503s on /v1/chat/completions, p99 latency 8s (baseline 800ms)
+- Started: 1:55 AM UTC (deploy?)
+- Recent changes: deploy at 23:30 (might be related)
+- Blast radius: ~5000 users active in EU right now
+- Self-healing? No, error rate stable at 30%
+- Mitigation in progress: investigating rollback option"</code></pre>
+<p><strong>Severity ladder (with examples from real incidents)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">P0 (page everyone, all-hands):
+  - Service completely down
+  - Data loss in progress
+  - Security breach
+  - Major customer can't use product
+  - Regulatory breach (HIPAA, SOX in progress)
+  Examples:
+  - "All inference returning 503"
+  - "Database write replica down, writes failing"
+  - "Bug discovered exposing customer PII"
+
+P1 (urgent, single on-call, wake teammates if stuck):
+  - Major degradation (&gt;10% users)
+  - Single major customer broken
+  - SLO breach in progress
+  - Latency 5x baseline
+  Examples:
+  - "EU region 30% error rate"
+  - "One enterprise customer's tenant returning 500s"
+  - "Latency p99 8s, baseline 800ms"
+
+P2 (investigate within 1 hour):
+  - Minor degradation (&lt;10% users)
+  - Non-critical service slow
+  - Error budget burning faster than SLO
+  Examples:
+  - "Embedding latency 2x normal"
+  - "Some users reporting slowness, &lt; 5% by metric"
+
+P3 (track, fix during work hours):
+  - Edge case bug
+  - Tech debt manifesting
+  - Single-user issue (might not be system fault)</code></pre>
+<h4>Step 3: Mitigate within 15 minutes</h4>
+<p><strong>Principle: Stop bleeding before root cause.</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">5 mitigation levers (cheapest first):
+
+Lever 1: Roll back recent change (1-5 min)
+  - Last deploy in suspicious window? Roll back.
+  - Last config change? Revert.
+  - Cost: lose forward progress on whatever was deployed
+  - Benefit: often fastest fix
+
+Lever 2: Traffic shape (5 min)
+  - Reduce concurrency to vendor / downstream
+  - Throttle expensive operations
+  - Disable non-critical features
+  - Cost: capacity reduction
+  - Benefit: stops cascading failure
+
+Lever 3: Failover / circuit break (5-10 min)
+  - Failover to backup vendor / region
+  - Activate circuit breaker on failing dep
+  - Serve cached responses
+  - Cost: degraded experience
+  - Benefit: keeps functional
+
+Lever 4: Scale up (5-15 min)
+  - Add capacity (autoscaler trigger / manual)
+  - Increase rate limit
+  - Cost: $$$
+  - Benefit: handles transient load
+
+Lever 5: Kill switch (immediate)
+  - Disable feature / service entirely
+  - Show maintenance page
+  - Cost: bad UX
+  - Benefit: prevents worse damage (data loss, security)</code></pre>
+<p><strong>Decision matrix</strong>:</p>
+<pre class="language-python"><code class="language-python">def choose_mitigation(severity, root_cause_hypothesis):
+    if severity == 'P0':
+        # Stop bleeding immediately, even if drastic
+        if root_cause_hypothesis == 'recent_deploy':
+            return 'rollback'
+        elif root_cause_hypothesis == 'vendor_failure':
+            return 'failover'
+        elif root_cause_hypothesis == 'data_corruption':
+            return 'kill_switch'  # prevent further damage
+        else:
+            return 'traffic_shape + kill_switch'
+    
+    elif severity == 'P1':
+        # Significant mitigation, but try less drastic first
+        if root_cause_hypothesis == 'recent_deploy':
+            return 'rollback'
+        elif root_cause_hypothesis == 'vendor_slow':
+            return 'circuit_breaker + cached_fallback'
+        elif root_cause_hypothesis == 'load_spike':
+            return 'scale_up + traffic_shape'
+        else:
+            return 'traffic_shape'
+    
+    elif severity == 'P2':
+        # Investigate first, mitigate if needed
+        return 'investigate'</code></pre>
+<p><strong>Specific mitigation commands (no improvisation under stress)</strong>:</p>
+<pre class="language-bash"><code class="language-bash"># Rollback (Kubernetes)
+kubectl rollout undo deployment/inference-service -n production
+kubectl rollout status deployment/inference-service -n production
+
+# Rollback (specific version)
+kubectl set image deployment/inference-service container=inference:v1.4.2 -n production
+
+# Scale up
+kubectl scale deployment inference-service --replicas=20 -n production
+
+# Disable feature via config
+curl -X POST https://config.internal/api/features/long_context_mode \
+  -d '{"enabled": false, "reason": "incident_2026_05_25", "ttl_minutes": 60}'
+
+# Circuit breaker (via runtime config)
+curl -X POST https://config.internal/api/circuit/openai_api \
+  -d '{"state": "open", "reason": "vendor_latency_spike", "ttl_minutes": 30}'
+
+# Drain traffic from region
+aws elbv2 modify-rule --rule-arn $RULE_ARN --conditions '[{"Field":"path-pattern","Values":["/v1/*"]}]' \
+  --actions Type=forward,TargetGroupArn=$BACKUP_REGION_TG_ARN
+
+# Kill switch
+curl -X POST https://config.internal/api/services/risky-feature/disable
+
+# Database — set read-only
+mysql -h $DB_HOST -u admin -e "SET GLOBAL read_only = ON;"</code></pre>
+<p><strong>Mitigation report after 15 min</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">T+15 Mitigation Update:
+- Action: rolled back inference-service to v1.4.2
+- Result: error rate 30% → 4% within 3 min
+- Latency p99: 8s → 1.2s
+- Still elevated baseline 800ms — investigating residual
+- Customer-facing: status page updated, "monitoring"
+- ETA full recovery: 30 min more</code></pre>
+<h4>Step 4: Customer communication during</h4>
+<pre class="language-plaintext"><code class="language-plaintext">3 audiences, 3 channels, different cadence:
+
+1. Internal #incidents (real-time, every 5-10 min)
+   - For: on-call team, leadership watching
+   - Content: full technical detail
+   - Format: "T+15: rolled back to v1.4.2, errors 30%→4%"
+
+2. Status page (public, every 15-30 min)
+   - For: customers, users
+   - Content: user-facing impact only, no internal jargon
+   - Format: "We're investigating elevated errors for some users in EU."
+   - Updates: "Issue identified, deploying fix."
+   - Updates: "Service restored. Monitoring."
+
+3. Direct customer (phone / Slack / email)
+   - For: major customers affected (single tenant impacted)
+   - Content: personalized, includes impact estimate
+   - Trigger: P0 or specific large customer</code></pre>
+<p><strong>Status page progression</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">T+5  Initial: "Investigating reports of elevated error rates affecting some users."
+T+15 Identified: "We've identified a recent deployment causing the issue. 
+                  Rolling back now."
+T+30 Mitigating: "Rollback complete. Error rates returning to normal."
+T+60 Resolved: "Service fully restored. Postmortem will follow."</code></pre>
+<p><strong>Customer phone call template</strong> (for major enterprise customer):</p>
+<pre class="language-plaintext"><code class="language-plaintext">"Hi [name], this is Gao Xin from TikTok PayLater on-call.
+We've experienced a degradation affecting your tenant starting at 1:55 AM your time.
+Symptoms: elevated errors and latency.
+We've mitigated via rollback at 2:15 AM. Currently monitoring.
+Estimated full recovery: 2:45 AM.
+We'll send written incident summary within 24 hours, full postmortem within 5 days.
+Anything urgent on your side I can help with?"</code></pre>
+<p><strong>Why call vs text</strong>: high-stakes customer feels valued by phone. Text feels cold.</p>
+<h4>Step 5: When to wake teammates</h4>
+<pre class="language-plaintext"><code class="language-plaintext">P0:
+  ALWAYS wake:
+  - On-call lead (always)
+  - Engineering manager
+  - VP eng if persisting &gt; 30 min
+  - PR / Comms if customer-visible
+  - Compliance if regulatory implications
+  
+  Get on call: 2-3 people minimum
+
+P1:
+  WAKE IF:
+  - You're stuck after 15 min
+  - Need second opinion on mitigation
+  - Need specific expert (database, security)
+  - Pattern unfamiliar
+  
+  Don't wake if:
+  - You have a mitigation plan
+  - It's clearly recoverable
+  - Backup on-call also paged
+
+P2:
+  Wait for morning unless:
+  - Affects major customer
+  - Could escalate to P1
+  - You need an expert</code></pre>
+<p><strong>Don't be a hero</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Anti-pattern: "I'll figure it out alone"
+  Risks:
+  - Cognitive impairment from sleep deprivation
+  - Wrong decision under stress
+  - Missing context (other team knows something)
+  - Wasted time exploring known issues
+
+Pattern: "Lift the team"
+  Benefits:
+  - 2 brains see what 1 misses
+  - Documented decision-making
+  - Faster resolution
+  - Doesn't burn out solo</code></pre>
+<h4>Step 6: Runbook discipline</h4>
+<p><strong>Every common incident has a runbook</strong>:</p>
+<pre class="language-markdown"><code class="language-markdown"># Runbook: Inference service 503 spike
+
+## Symptoms
+- Error rate &gt; 5% sustained for 2+ min
+- p99 latency &gt; 5x baseline
+- Drift dashboard alert
+
+## First Actions (within 5 min)
+1. Check status page: https://status.openai.com
+2. Check our deploy log: was there a deploy in last 30 min?
+3. Check Grafana: which region/endpoint affected?
+
+## Common Causes + Mitigations
+
+### Cause: Vendor outage
+- Check: vendor status page, our circuit breaker metrics
+- Mitigate: trigger circuit breaker, failover to backup
+- Command: `curl -X POST https://config.internal/api/circuit/openai/open`
+
+### Cause: Recent deploy
+- Check: deploy log, error correlates with deploy time
+- Mitigate: rollback
+- Command: `kubectl rollout undo deployment/inference-service`
+
+### Cause: Load spike
+- Check: QPS dashboard, autoscaler decisions
+- Mitigate: manually scale up, throttle low-priority
+- Command: `kubectl scale deployment inference-service --replicas=30`
+
+### Cause: Database degradation
+- Check: DB metrics, slow query log
+- Mitigate: failover to read replica, kill long-running queries
+- Command: `mysql -e "SHOW PROCESSLIST" then "KILL ${id}"`
+
+## Communication
+- T+5: First Slack post
+- T+5: Status page initial
+- T+15: Status page update
+- T+30: Status page update or resolved
+- T+24h: Internal postmortem doc
+
+## Escalation
+- After 15 min stuck: page backup on-call
+- After 30 min: page eng manager
+- P0: page VP eng
+
+## Last Updated
+2026-04-12 by Gao Xin
+Incident: pakistan-asr-outage-2026-03-15</code></pre>
+<p><strong>Runbook discipline</strong>:</p>
+<ul><li>Every postmortem updates a runbook</li><li>New incident type → write runbook within 1 week</li><li>Quarterly runbook audit (still accurate?)</li></ul>
+<h4>Step 7: MTTA / MTTR targets</h4>
+<pre class="language-plaintext"><code class="language-plaintext">MTTA (Mean Time To Acknowledge):
+  - Target: &lt; 5 minutes
+  - Industry baseline: 5-10 min
+  - Tracked per on-call shift
+  - If consistently &gt; 5 min: improve alerting / wake-up SOP
+
+MTTR (Mean Time To Resolve):
+  - Mitigation MTTR: &lt; 30 min (degradation stopped)
+  - Full MTTR: &lt; 2 hours (fully resolved)
+  - Tracked per service per quarter
+  - SLO ties: 99.5% uptime → 21.6 min/month budget
+
+Error budget burn rate:
+  - 99.5% SLO = 21.6 min/month allowable downtime
+  - Burn rate 1x = on track
+  - Burn rate 2x = at risk (action item: investigate)
+  - Burn rate 5x = will breach SLO this month
+  - Burn rate 10x = freeze deploys, all-hands on reliability
+
+P0 incident contributes to SLO breach risk
+P1 may or may not (depends on duration + severity)</code></pre>
+<h4>Step 8: Postmortem culture (blameless)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Within 48 hours: postmortem doc draft
+Within 1 week: postmortem review meeting
+
+Template:
+
+# Postmortem: [Incident name + date]
+
+## Summary (one paragraph)
+What happened in 3 sentences for execs.
+
+## Timeline (every event &gt; 1 min)
+00:00 — Event
+00:01 — Event
+...
+
+## Impact
+- Duration: X minutes
+- Users affected: Y%
+- Revenue impact: $Z
+- SLO impact: SLO Q1 down to W%
+
+## Root Cause Analysis (5 whys)
+Why did errors spike?  → Deploy introduced bug.
+Why was the bug not caught?  → No regression test for this case.
+Why was no test? → Edge case not in test suite.
+Why missed in QA? → QA focused on happy path.
+Why? → QA process doesn't include adversarial cases.
+
+→ Real cause: QA process gap, not "developer made bug"
+
+## What Went Well
+- Detection in 3 min via drift dashboard
+- Mitigation in 12 min via rollback
+- Customer comms timely
+
+## What Went Poorly
+- No regression test caught this
+- Runbook for this case was outdated
+- Postmortem took 8 days (target 5)
+
+## Action Items
+- [HIGH] Add regression test for X scenario (Owner: A, Due: 1 week)
+- [HIGH] Update runbook (Owner: B, Due: 3 days)
+- [MED] Improve QA adversarial test coverage (Owner: C, Due: 1 month)
+- [LOW] Investigate alert noise from yesterday (Owner: D, Due: 2 weeks)
+
+## Lessons Learned
+- Adversarial QA gap
+- Runbook staleness
+- (Generalizable insights for org)
+
+## Action Item Tracking
+- Tracked in [tool] with status
+- Reviewed weekly until all closed</code></pre>
+<p><strong>Blameless principles</strong>:</p>
+<ul><li>Focus on <strong>system failures</strong>, not person failures</li><li>"Why was it possible for X to happen?" not "Why did X do this?"</li><li>Mistakes are learning opportunities for the team</li><li>Reward people who flag incidents, not punish</li></ul>
+<hr />
+<h3>关键决策 / 框架</h3>
+<h4>30-minute timeline (canonical)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">T+0   Phone rings
+T+1   Ack page, snooze alarm
+T+3   Laptop open, VPN, Slack
+T+5   Triage post: severity + scope
+T+8   First dashboard scan, hypothesis
+T+10  Choose mitigation lever
+T+12  Apply mitigation
+T+15  Verify mitigation impact
+T+20  Customer comm (status page + internal Slack)
+T+25  Wake teammates if needed
+T+30  Investigation continues, mitigation holding</code></pre>
+<h4>Severity → Action matrix</h4>
+<pre class="language-plaintext"><code class="language-plaintext">P0 → page everyone, mitigate aggressively, customer comm immediate
+P1 → solo first, escalate at 15 min stuck, status page in 5 min
+P2 → investigate, mitigate if needed, comm if customer-visible
+P3 → track, fix during work hours</code></pre>
+<h4>Mitigation lever cost/benefit</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Lever        Speed     Reversibility   Cost
+Rollback     1-5 min   Easy            Lose forward progress
+Traffic shape 5 min    Easy            Capacity reduction
+Failover     5-10 min  Medium          Degraded experience
+Scale up     5-15 min  Easy            $$$
+Kill switch  Immediate Easy            Bad UX</code></pre>
+<hr />
+<h3>完整代码 / 架构图</h3>
+<h4>On-call dashboard checklist</h4>
+<pre class="language-python"><code class="language-python"># I open these tabs in order, every page:
+
+DASHBOARDS = [
+    # 1. Service health (am I burning error budget?)
+    ('Grafana', 'https://grafana.internal/d/service-health'),
+    
+    # 2. Per-region status
+    ('Grafana', 'https://grafana.internal/d/by-region'),
+    
+    # 3. Deploy log (recent changes?)
+    ('Deploy log', 'https://argo.internal/deploys?service=inference'),
+    
+    # 4. Vendor status
+    ('Status pages', [
+        'https://status.openai.com',
+        'https://status.anthropic.com',
+        'https://status.aws.amazon.com',
+    ]),
+    
+    # 5. Slack channels
+    ('Slack', [
+        '#incidents-current',
+        '#oncall-handoff',  # context from previous shift
+        '#alerts-firing',   # raw alerts
+    ]),
+    
+    # 6. Customer-facing status page (am I lying to customers?)
+    ('Public status', 'https://status.tiktok-pay.com'),
+]</code></pre>
+<h4>Resilience patterns inventory</h4>
+<pre class="language-python"><code class="language-python"># All these should be pre-built, deployed, tested before they're needed
+
+class IncidentResponseToolkit:
+    """Everything I need at 2 AM, pre-built and tested."""
+    
+    def __init__(self):
+        self.runbooks = load_runbooks()
+        self.feature_flags = FeatureFlagClient()
+        self.circuit_breakers = CircuitBreakerClient()
+        self.k8s = KubernetesClient()
+        self.alerts = AlertManager()
+        self.status_page = StatusPageClient()
+    
+    async def rollback_service(self, service_name, target_version=None):
+        """One-liner rollback with audit."""
+        if target_version:
+            await self.k8s.set_image(service_name, target_version)
+        else:
+            await self.k8s.rollout_undo(service_name)
+        await self.alerts.log_incident_action(
+            action='rollback',
+            service=service_name,
+            target=target_version or 'previous'
+        )
+    
+    async def trigger_circuit_breaker(self, dependency, reason, ttl_minutes=30):
+        """Open circuit breaker, log action."""
+        await self.circuit_breakers.open(dependency, reason, ttl_minutes)
+        await self.alerts.log_incident_action(
+            action='circuit_break',
+            dependency=dependency,
+            reason=reason
+        )
+    
+    async def failover_region(self, from_region, to_region):
+        """Drain traffic from one region."""
+        await self.k8s.update_loadbalancer(from_region, weight=0)
+        await self.k8s.update_loadbalancer(to_region, weight=100)
+    
+    async def kill_switch(self, feature_name, reason):
+        """Disable a feature immediately."""
+        await self.feature_flags.set(feature_name, enabled=False, reason=reason)
+    
+    async def post_status_update(self, severity, message, eta=None):
+        """Update public status page."""
+        await self.status_page.create_incident(
+            severity=severity,
+            message=message,
+            eta=eta,
+        )
+    
+    async def page_teammates(self, severity, message, who):
+        """Wake people up."""
+        await self.alerts.page(
+            severity=severity,
+            message=message,
+            recipients=who
+        )</code></pre>
+<h4>Architecture: incident response observability</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                   ┌─────────────────────────────────┐
+                   │   Production System             │
+                   │   (LLM service, RAG, agents)    │
+                   └────────────────┬────────────────┘
+                                    │
+                          ┌─────────┴─────────┐
+                          │                   │
+                          ▼                   ▼
+              ┌──────────────────┐  ┌──────────────────┐
+              │  Metrics         │  │  Logs (centralized)│
+              │  (Prometheus)    │  │  (Elastic / Loki) │
+              └────────┬─────────┘  └──────────┬───────┘
+                       │                       │
+                       ▼                       ▼
+              ┌──────────────────────────────────────┐
+              │  Dashboards (Grafana / Datadog)      │
+              │  - Service health                    │
+              │  - Per-region                        │
+              │  - Per-tenant                        │
+              │  - Drift / quality                   │
+              │  - Business metrics                  │
+              └────────────────┬─────────────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  Alert Manager           │
+                  │  - SLO-based alerts      │
+                  │  - Burn rate alerts      │
+                  │  - Per-component alerts  │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  PagerDuty / Opsgenie    │
+                  │  - On-call schedule      │
+                  │  - Escalation policy     │
+                  │  - Acknowledgment        │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                       [Sleepy on-call]
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  Incident Response       │
+                  │  - Runbooks              │
+                  │  - Toolkit (rollback,    │
+                  │    circuit breaker, etc) │
+                  │  - Status page           │
+                  │  - Slack #incidents      │
+                  └──────────────────────────┘</code></pre>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<h4>Pakistan ASR 40-minute outage (PRIMARY 2 AM STAR)</h4>
+<p><strong>S</strong> (Situation):</p>
+<blockquote><p>"March 15, 2026, 2:14 AM Singapore time (which is 11:14 PM Pakistan time). Voice agent in Pakistan, peak hours for our debt collection (people answer phones in evening). Third-party ASR API (audio → text) starts showing 30-second timeouts. Approximately 40% of calls affected over 5-minute window."</p></blockquote>
+<p><strong>T</strong> (Task):</p>
+<blockquote><p>"Triage, mitigate, restore service. Constraints:</p>
+<ul><li>Regulator-watched pilot — can't have outage publicized</li><li>Other 6 markets unaffected — don't break them</li><li>MTTR target &lt; 15 min for P1</li><li>I'm primary on-call, backup is in San Francisco (just got off work)"</li></ul></blockquote>
+<p><strong>A</strong> (Action with concrete timestamps):</p>
+<pre class="language-plaintext"><code class="language-plaintext">2:14:00 AM  Phone rings (PagerDuty: ASR confidence drop)
+2:14:30 AM  Ack page, lap top open
+2:15:00 AM  Slack post: "On-call ack'd, investigating ASR alert Pakistan"
+2:16:00 AM  Triage:
+            - Severity: P1 (Pakistan-only, but high impact)
+            - Scope: Pakistan region only (verified via per-region dashboard)
+            - Symptoms: 40% calls failing transcription, 30s timeouts
+            - Started: 2:09 AM (5 min before alert — detection lag we'll fix)
+            - Recent changes: no deploy on our side past 4 hours
+2:18:00 AM  Hypothesis: vendor ASR issue in Pakistan POP
+            - Status page: no incident yet (vendors slow to update)
+            - Cross-check: Down Detector shows some reports
+2:20:00 AM  Mitigation decision: failover to backup ASR vendor
+            - Pre-configured backup vendor for this exact case
+            - Manual trigger (planning to automate post-incident)
+            
+2:21:00 AM  Failover command:
+            curl -X POST config/api/asr/primary -d '{"vendor": "backup", "reason": "pakistan_outage"}'
+            
+2:22:00 AM  Verification: error rate 40% → 8% within 1 min (some in-flight)
+2:24:00 AM  Verification: error rate 8% → 0% (all in-flight rotated)
+            Latency 1.5x normal (backup vendor higher latency, acceptable)
+2:25:00 AM  Slack update:
+            "T+11: Failed over to backup ASR vendor.
+             Error rate 40% → 0%. Latency 1.5x normal.
+             Investigating primary vendor."
+2:27:00 AM  Vendor escalation:
+            Email to ASR vendor support with:
+            - Request_ids from failed transcriptions
+            - Time window
+            - Pakistan POP affected
+            - Business impact (regulator-watched pilot)
+2:30:00 AM  Customer-facing: Pakistan ops team Slack notified
+            (no public status page because no user-visible impact)
+2:35:00 AM  Vendor responded: "Investigating Pakistan POP routing issue"
+2:50:00 AM  Vendor confirmed mitigation deployed
+2:55:00 AM  Tested primary vendor: low error rate
+2:57:00 AM  Failed back to primary, monitoring
+2:59:00 AM  Verification: stable, latency normal
+3:00:00 AM  Slack: "Incident resolved. Full timeline + AI in postmortem."
+3:30:00 AM  Postmortem draft started
+4:00:00 AM  Back to sleep</code></pre>
+<p><strong>R</strong> (Result with concrete numbers):</p>
+<ul><li><strong>MTTR (degradation stopped)</strong>: 12 minutes (target was 15)</li><li><strong>MTTR (full resolution)</strong>: 43 minutes</li><li><strong>0 user-facing calls failed</strong> (failover absorbed)</li><li><strong>Regulator unaware</strong> (no public-visible outage)</li><li><strong>Cost</strong>: backup vendor 1.5x cost for 43 min = ~$300</li><li><strong>vs estimated</strong>: $50k revenue impact + pilot suspension if no failover</li></ul>
+<p><strong>Postmortem action items</strong> (implemented):</p>
+<ol><li><strong>Automated failover on circuit breaker</strong> (was manual)</li><li><strong>Lower detection threshold</strong> — 5% → 3% (would have caught 2 min earlier)</li><li><strong>Multi-vendor for ALL markets</strong> (was only Pakistan pre-configured)</li><li><strong>Vendor SLA enforcement</strong> — MTTR clause added at renewal</li><li><strong>Status page automation</strong> on circuit breaker open (for future user-visible cases)</li></ol>
+<h4>BNPL Anthropic latency spike (secondary STAR)</h4>
+<p><strong>S</strong>: 2026 February, Anthropic API latency spike (regional, US-East). Affected BNPL chatbot during Asia peak hours.</p>
+<p><strong>T</strong>: Detect, mitigate without user-facing failure.</p>
+<p><strong>A</strong>:</p>
+<ul><li>Drift on response_latency_p99 caught in 2 min</li><li>Mitigation: cached fallback for high-similarity queries (acceptable quality)</li><li>Escalated to Anthropic Enterprise with request_ids</li><li>Anthropic confirmed regional issue, resolved in 25 min</li></ul>
+<p><strong>R</strong>: 30% of requests hit cached fallback during outage (acceptable quality), 0 user-facing errors.</p>
+<h4>TikTok PayLater payment provider intermittent failure (third STAR)</h4>
+<p><strong>S</strong>: Payment provider intermittent 5xx errors (1-3% rate).</p>
+<p><strong>T</strong>: Don't drop transactions, don't double-charge.</p>
+<p><strong>A</strong>:</p>
+<ul><li>Idempotency key on all transactions (preexisting)</li><li>Retry with exponential backoff + jitter</li><li>After 3 retries, queue for async processing</li><li>Customer notified "processing" + later confirmation</li></ul>
+<p><strong>R</strong>: 0 lost transactions, 0 double-charges, ~50ms p99 latency increase.</p>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "What if you can't immediately determine root cause?"</p>
+<p><strong>A</strong>: Mitigate anyway. Real principles:</p>
+<ol><li><strong>Stop bleeding first</strong> — most mitigations are reversible (rollback, circuit breaker, traffic shape)</li><li><strong>Hypothesis-driven investigation</strong> — pick 2-3 likely causes, validate or rule out</li><li><strong>Don't be paralyzed by uncertainty</strong> — apply safest mitigation (e.g., rollback to known-good)</li><li><strong>Time-box investigation</strong> — if not closer to root cause after 30 min, wake teammate</li><li><strong>Document hypotheses</strong> in Slack — let team see your reasoning</li></ol>
+<p><strong>Q2</strong>: "How do you handle on-call burnout?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Rotation discipline</strong>: max 7 days on-call per month per person</li><li><strong>Backup on-call</strong>: 2-person rotation minimum</li><li><strong>Page reduction</strong>: every page audited weekly — was it actionable? noise reduced.</li><li><strong>Runbooks</strong> reduce cognitive load (don't think under stress, follow procedure)</li><li><strong>Postmortem fixes</strong> prevent recurrence (same incident shouldn't happen twice)</li><li><strong>Compensation</strong>: on-call differential pay ($5-10k/month extra)</li><li><strong>Recovery time</strong>: half-day off after major P0 incident</li></ul>
+<p><strong>Q3</strong>: "Communication during incident — what's the right cadence?"</p>
+<p><strong>A</strong>:</p>
+<ul><li><strong>Internal Slack</strong>: every 5-10 min, real-time updates</li><li><strong>Status page</strong>: 5 min for initial, every 15-30 min until resolved</li><li><strong>Stakeholders</strong>: 15 min initial, hourly during incident</li><li><strong>Customer (direct)</strong>: phone for major customers, email for others, within 30 min for P0</li></ul>
+<p><strong>Cadence rule</strong>: communicate proactively, even when "nothing new" — silence creates anxiety.</p>
+<p><strong>Q4</strong>: "When do you call it 'resolved'?"</p>
+<p><strong>A</strong>: 4 criteria:</p>
+<ol><li><strong>Metrics back to baseline</strong> for at least 15 min sustained</li><li><strong>No new alerts firing</strong></li><li><strong>Customer-visible impact confirmed restored</strong> (sample customer queries succeed)</li><li><strong>Team consensus</strong> — not just on-call's call</li></ol>
+<p><strong>Pattern</strong>: "Resolved" doesn't mean "done." Postmortem starts. Watch for 24 hours for recurrence. Some incidents have "long tail" — don't celebrate too early.</p>
+<p><strong>Q5</strong>: "What's the most important thing for someone new to on-call?"</p>
+<p><strong>A</strong>: 3 things:</p>
+<ol><li><strong>Read every existing runbook</strong> before first shift. Don't improvise under stress.</li><li><strong>Shadow experienced on-call</strong> for 2-3 incidents before primary. Learn the patterns.</li><li><strong>Ask for help early</strong> — heroism is a bad habit. Wake teammates at 15 min stuck, not 30.</li></ol>
+<p>Plus: <strong>practice incident drills</strong>. We do quarterly "wheel of misfortune" — random incident scenario, on-call practices response with team observing. Catches process gaps before real incidents.</p>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>"I check the metrics"</strong> — too vague, no specifics</li><li><strong>No severity classification</strong> — P0 vs P1 vs P2 matters for response</li><li><strong>Investigate before mitigate</strong> — keeps users impacted longer</li><li><strong>No customer comm during</strong> — silent outage is worse than communicated</li><li><strong>Heroic solo approach</strong> — burns out, slower resolution</li><li><strong>No runbook reference</strong> — improvising under stress is error-prone</li><li><strong>No specific dashboards / commands</strong> — shows lack of real on-call</li><li><strong>No MTTA / MTTR numbers</strong> — shows no operational measurement</li><li><strong>Blame individual</strong> — incidents are system failures</li><li><strong>No postmortem follow-through</strong> — same incident recurs</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Literal 60-second sequence</strong> (ack page, Slack post, dashboards)</li><li><strong>3-axis severity scoring</strong> (user impact + severity + business)</li><li><strong>5 mitigation levers</strong> with cost/benefit</li><li><strong>Specific commands</strong> (kubectl rollout, curl config API)</li><li><strong>Customer comm cadence</strong> (Slack 5-10 min, status page 15-30, customer 30)</li><li><strong>Wake teammates rules</strong> (P0 always, P1 if stuck 15 min)</li><li><strong>MTTA &lt; 5 min, MTTR &lt; 30 min targets</strong></li><li><strong>Error budget burn rate awareness</strong></li><li><strong>Blameless postmortem culture</strong></li><li><strong>Quote Pakistan ASR with timestamp-level detail</strong> — credible STAR</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>2 AM incident response: ack page in 60 sec, triage in 5 min (severity + scope), mitigate before root cause within 15 min (rollback / circuit break / failover / scale / kill switch), comm in parallel (status page + Slack + customer if P0), wake teammates when stuck &gt; 15 min, MTTR target &lt; 30 min for degradation, blameless postmortem within 1 week. Pakistan ASR 40-min outage with MTTR 12 min is the gold-standard STAR.</strong></p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">First 60 seconds:
+  - Phone rings → ack page (stops escalation)
+  - Laptop open → VPN
+  - Slack #incidents post: "On-call ack'd, investigating"
+  - 3 dashboards: service health, deploy log, vendor status
+
+Triage in 5 min:
+  - Severity (3-axis): user impact + severity + business
+  - Scope: all/subset/single tenant?
+  - Blast radius
+  - Acknowledge to team
+
+Severity ladder:
+  P0: &gt;50% users / hard fail / &gt;$10k/hour / regulatory
+  P1: 10-50% users / major degrad / $1-10k/hour
+  P2: &lt;10% users / minor / &lt;$1k/hour
+  P3: edge cases / tech debt
+
+5 mitigation levers (cheapest first):
+  1. Rollback (1-5 min, reversible)
+  2. Traffic shape (5 min, capacity drop)
+  3. Failover / circuit break (5-10 min, degraded)
+  4. Scale up (5-15 min, $$$)
+  5. Kill switch (immediate, bad UX)
+
+Mitigation by hypothesis:
+  Recent deploy → rollback
+  Vendor issue → failover or circuit break
+  Load spike → scale + shape
+  Data corruption → kill switch
+  Unknown → traffic shape (safer)
+
+Communication (3 audiences):
+  Internal #incidents: every 5-10 min, full detail
+  Status page: 5 min initial, 15-30 min updates
+  Customers (direct): phone for P0, within 30 min
+
+Wake teammates:
+  P0 always (multiple roles)
+  P1 if stuck 15 min, expert needed
+  P2 wait for morning unless escalating
+
+MTTA / MTTR targets:
+  MTTA: &lt; 5 min
+  MTTR (mitigation): &lt; 30 min
+  MTTR (full): &lt; 2 hours
+  Error budget: 99.5% SLO = 21.6 min/month
+
+Runbook discipline:
+  Common incident has runbook
+  Every postmortem updates runbook
+  Quarterly runbook audit
+
+Postmortem (within 1 week):
+  Timeline, impact, root cause (5 whys)
+  What went well/poorly
+  Action items + owners + dates
+  Blameless: system not person
+
+Specific commands:
+  Rollback: kubectl rollout undo deployment/X
+  Scale: kubectl scale deployment X --replicas=N
+  Circuit break: curl -X POST config/circuit/Y/open
+  Disable feature: curl -X POST config/features/Z/disable
+  Drain region: aws elbv2 modify-rule
+
+Dashboard checklist (open every page):
+  1. Grafana service health
+  2. Per-region
+  3. Deploy log
+  4. Vendor status pages
+  5. Slack #incidents
+  6. Public status page
+
+Toolkit pre-built:
+  - Rollback automation
+  - Circuit breaker control
+  - Feature flag service
+  - Region drain
+  - Kill switch UI
+  - Status page API
+  - Page teammates
+
+Anti-patterns:
+  - Vague "I check metrics"
+  - No severity classification
+  - Investigate before mitigate
+  - Silent outage (no comm)
+  - Heroic solo approach
+  - No runbook follow
+  - Blame individual
+
+Case studies:
+  - Pakistan ASR 2 AM: MTTR 12 min, 0 failed calls
+  - BNPL Anthropic spike: 30% cached fallback, 0 errors
+  - Payment 5xx: idempotency + queue, 0 lost
+
+Quotes for interview:
+  - "Ack page in 60 sec, triage in 5 min, mitigate in 15"
+  - "Stop bleeding before root cause"
+  - "Heroism is anti-pattern — wake teammates at 15 min stuck"
+  - "Every postmortem becomes runbook update"
+  - "Blameless culture — system not person"
+  - "Pakistan ASR: MTTR 12 min, 0 failed calls"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-048-third-party-api-intermittent-timeout.html">← Q48 · [生产/可靠性] 客户依赖的第三方 API 开始间歇性超时, 讲你的排查过程</a>
+    <a href="zhenti-050-emergency-deadline-tradeoffs.html">Q50 · [生产/可靠性] 紧急 deadline 要上线关键功能, 你会在什么上妥协、什么上绝不妥协 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q49 · 2 AM incident — show me you've been paged
+
+> "It's 2 AM. PagerDuty wakes you up. **Walk me through the next 30 minutes.** Not generic 'I look at metrics' — show me you've actually been on-call. Be specific: what dashboards, what commands, what comms, how you decide P0 vs P1, when you wake someone up."
+
+**Round**: Production / Reliability (45 min)
+**出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — on-call experience 必问
+
+---
+
+## 这道题在考什么
+
+表面是 IR 题, 底下藏着 **8 个 FDE evaluation signal**:
+
+1. **Real on-call experience** — specifically know what dashboards to open at 2 AM
+2. **Triage discipline** — severity classification under sleepy conditions
+3. **Mitigate before root cause** — stop bleeding first
+4. **Customer comm timing** — when status page, when phone customer
+5. **Knowing when to wake teammates** — P0 vs heroics
+6. **Blameless culture** — postmortem mindset baked in
+7. **Real numbers** — MTTR, MTTA, error budget burn rate
+8. **Pakistan ASR 40-min outage** — STAR ready story
+
+不考「incident response 是什么」, 考「2 AM 你 phone 响, 30 秒后你做什么」.
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **First 60 seconds** | 2 min | What I do literally first | "First 60 seconds: open laptop, ack page, open Slack #incidents, glance at dashboard." |
+| 2 | **5-phase IR framework** | 4 min | Detect / triage / mitigate / comm / investigate / resolve / postmortem | "5 phases — detect, triage, mitigate, comm, investigate. 30 min covers detect through mitigate." |
+| 3 | **Triage in 5 minutes** | 6 min | Severity scoring, scope, blast radius | "Triage in 5 min — severity (P0/P1/P2), scope (all? subset?), blast radius, customer impact, then announce." |
+| 4 | **Mitigate within 15 min** | 6 min | Stop bleeding patterns | "Mitigate before root cause — 5 levers: rollback, circuit breaker, traffic shape, scale, kill switch." |
+| 5 | **Customer comm during** | 4 min | Status page, slack, leadership, customer direct | "Comm in parallel with mitigation — status page within 5 min, internal Slack live, customer if >P1." |
+| 6 | **When to wake people** | 3 min | P0 yes, P1 maybe, P2 morning | "Wake teammates: P0 always (multiple people, multiple roles). P1 if I'm stuck > 15 min. P2 wait for morning." |
+| 7 | **Runbook discipline** | 3 min | Standard runbooks for common incidents | "Every common incident has runbook. New incident → write runbook after postmortem." |
+| 8 | **MTTR / MTTA targets** | 3 min | Real numbers | "MTTA target < 5 min (acknowledge), MTTR < 30 min (resolve degradation) / < 1 hour (full resolve)." |
+| 9 | **Quote Pakistan ASR + BNPL Anthropic spike** | 4 min | Specific STAR | "Pakistan ASR 2 AM page — drift detected in 3 min, MTTR 12 min via failover." |
+| 10 | **Blameless culture** | 2 min | Postmortem mindset | "Always blameless — incidents are system failures, not person failures. Every incident becomes runbook update." |
+
+---
+
+## 详细回答
+
+### Step 1: First 60 seconds (the literal sequence)
+
+```
+2:03:00 AM  Phone rings. PagerDuty.
+2:03:15 AM  Snooze alarm. Sit up. (Yes, I sleep with laptop in reach.)
+2:03:30 AM  Look at PagerDuty:
+            - What service?
+            - What metric tripped?
+            - What threshold? Critical or warning?
+            - How many alerts firing? (One = isolated; many = cascade)
+2:04:00 AM  Open laptop. VPN.
+2:04:30 AM  Acknowledge page in PagerDuty
+            (this stops escalation to next on-call)
+2:05:00 AM  Open 3 tabs:
+            - Slack #incidents
+            - Grafana / Datadog primary dashboard for that service
+            - Internal incident comm channel
+2:05:30 AM  Quick scan:
+            - Error rate spike? Latency spike? Throughput drop?
+            - Self-healed? (Sometimes alerts fire on transient)
+            - Affecting which segments? (One region / one tenant?)
+2:06:00 AM  Post in Slack:
+            "@here On-call ack'd, investigating ${service} alert"
+            (lets team know I'm awake and looking)
+```
+
+**Why this sequence**:
+- **Acknowledge first** stops escalation to backup on-call (don't wake them too)
+- **Slack post early** so anyone else awake can help / observe
+- **Glance dashboard before deep-dive** to know if self-healed or active
+
+### Step 2: Triage in 5 minutes
+
+```python
+# Mental triage checklist
+
+# Severity scoring (3-axis)
+def assess_severity(symptoms):
+    user_impact = score_user_impact(symptoms)  # % affected
+    severity_type = score_severity_type(symptoms)  # hard fail vs degraded
+    business_impact = score_business_impact(symptoms)  # revenue/hour, compliance
+    
+    if user_impact > 0.5 or severity_type == 'hard_fail' or business_impact > 10000:
+        return 'P0'
+    elif user_impact > 0.1 or severity_type == 'major_degrad' or business_impact > 1000:
+        return 'P1'
+    elif user_impact > 0.01:
+        return 'P2'
+    else:
+        return 'P3'
+```
+
+**Triage questions (literally what I ask in Slack)**:
+
+```
+"Triage update T+5:
+- Severity: P1 (would be P0 but only EU region affected)
+- Scope: EU region, 30% of EU users
+- Symptoms: 503s on /v1/chat/completions, p99 latency 8s (baseline 800ms)
+- Started: 1:55 AM UTC (deploy?)
+- Recent changes: deploy at 23:30 (might be related)
+- Blast radius: ~5000 users active in EU right now
+- Self-healing? No, error rate stable at 30%
+- Mitigation in progress: investigating rollback option"
+```
+
+**Severity ladder (with examples from real incidents)**:
+
+```
+P0 (page everyone, all-hands):
+  - Service completely down
+  - Data loss in progress
+  - Security breach
+  - Major customer can't use product
+  - Regulatory breach (HIPAA, SOX in progress)
+  Examples:
+  - "All inference returning 503"
+  - "Database write replica down, writes failing"
+  - "Bug discovered exposing customer PII"
+
+P1 (urgent, single on-call, wake teammates if stuck):
+  - Major degradation (>10% users)
+  - Single major customer broken
+  - SLO breach in progress
+  - Latency 5x baseline
+  Examples:
+  - "EU region 30% error rate"
+  - "One enterprise customer's tenant returning 500s"
+  - "Latency p99 8s, baseline 800ms"
+
+P2 (investigate within 1 hour):
+  - Minor degradation (<10% users)
+  - Non-critical service slow
+  - Error budget burning faster than SLO
+  Examples:
+  - "Embedding latency 2x normal"
+  - "Some users reporting slowness, < 5% by metric"
+
+P3 (track, fix during work hours):
+  - Edge case bug
+  - Tech debt manifesting
+  - Single-user issue (might not be system fault)
+```
+
+### Step 3: Mitigate within 15 minutes
+
+**Principle: Stop bleeding before root cause.**
+
+```
+5 mitigation levers (cheapest first):
+
+Lever 1: Roll back recent change (1-5 min)
+  - Last deploy in suspicious window? Roll back.
+  - Last config change? Revert.
+  - Cost: lose forward progress on whatever was deployed
+  - Benefit: often fastest fix
+
+Lever 2: Traffic shape (5 min)
+  - Reduce concurrency to vendor / downstream
+  - Throttle expensive operations
+  - Disable non-critical features
+  - Cost: capacity reduction
+  - Benefit: stops cascading failure
+
+Lever 3: Failover / circuit break (5-10 min)
+  - Failover to backup vendor / region
+  - Activate circuit breaker on failing dep
+  - Serve cached responses
+  - Cost: degraded experience
+  - Benefit: keeps functional
+
+Lever 4: Scale up (5-15 min)
+  - Add capacity (autoscaler trigger / manual)
+  - Increase rate limit
+  - Cost: $$$
+  - Benefit: handles transient load
+
+Lever 5: Kill switch (immediate)
+  - Disable feature / service entirely
+  - Show maintenance page
+  - Cost: bad UX
+  - Benefit: prevents worse damage (data loss, security)
+```
+
+**Decision matrix**:
+
+```python
+def choose_mitigation(severity, root_cause_hypothesis):
+    if severity == 'P0':
+        # Stop bleeding immediately, even if drastic
+        if root_cause_hypothesis == 'recent_deploy':
+            return 'rollback'
+        elif root_cause_hypothesis == 'vendor_failure':
+            return 'failover'
+        elif root_cause_hypothesis == 'data_corruption':
+            return 'kill_switch'  # prevent further damage
+        else:
+            return 'traffic_shape + kill_switch'
+    
+    elif severity == 'P1':
+        # Significant mitigation, but try less drastic first
+        if root_cause_hypothesis == 'recent_deploy':
+            return 'rollback'
+        elif root_cause_hypothesis == 'vendor_slow':
+            return 'circuit_breaker + cached_fallback'
+        elif root_cause_hypothesis == 'load_spike':
+            return 'scale_up + traffic_shape'
+        else:
+            return 'traffic_shape'
+    
+    elif severity == 'P2':
+        # Investigate first, mitigate if needed
+        return 'investigate'
+```
+
+**Specific mitigation commands (no improvisation under stress)**:
+
+```bash
+# Rollback (Kubernetes)
+kubectl rollout undo deployment/inference-service -n production
+kubectl rollout status deployment/inference-service -n production
+
+# Rollback (specific version)
+kubectl set image deployment/inference-service container=inference:v1.4.2 -n production
+
+# Scale up
+kubectl scale deployment inference-service --replicas=20 -n production
+
+# Disable feature via config
+curl -X POST https://config.internal/api/features/long_context_mode \
+  -d '{"enabled": false, "reason": "incident_2026_05_25", "ttl_minutes": 60}'
+
+# Circuit breaker (via runtime config)
+curl -X POST https://config.internal/api/circuit/openai_api \
+  -d '{"state": "open", "reason": "vendor_latency_spike", "ttl_minutes": 30}'
+
+# Drain traffic from region
+aws elbv2 modify-rule --rule-arn $RULE_ARN --conditions '[{"Field":"path-pattern","Values":["/v1/*"]}]' \
+  --actions Type=forward,TargetGroupArn=$BACKUP_REGION_TG_ARN
+
+# Kill switch
+curl -X POST https://config.internal/api/services/risky-feature/disable
+
+# Database — set read-only
+mysql -h $DB_HOST -u admin -e "SET GLOBAL read_only = ON;"
+```
+
+**Mitigation report after 15 min**:
+
+```
+T+15 Mitigation Update:
+- Action: rolled back inference-service to v1.4.2
+- Result: error rate 30% → 4% within 3 min
+- Latency p99: 8s → 1.2s
+- Still elevated baseline 800ms — investigating residual
+- Customer-facing: status page updated, "monitoring"
+- ETA full recovery: 30 min more
+```
+
+### Step 4: Customer communication during
+
+```
+3 audiences, 3 channels, different cadence:
+
+1. Internal #incidents (real-time, every 5-10 min)
+   - For: on-call team, leadership watching
+   - Content: full technical detail
+   - Format: "T+15: rolled back to v1.4.2, errors 30%→4%"
+
+2. Status page (public, every 15-30 min)
+   - For: customers, users
+   - Content: user-facing impact only, no internal jargon
+   - Format: "We're investigating elevated errors for some users in EU."
+   - Updates: "Issue identified, deploying fix."
+   - Updates: "Service restored. Monitoring."
+
+3. Direct customer (phone / Slack / email)
+   - For: major customers affected (single tenant impacted)
+   - Content: personalized, includes impact estimate
+   - Trigger: P0 or specific large customer
+```
+
+**Status page progression**:
+
+```
+T+5  Initial: "Investigating reports of elevated error rates affecting some users."
+T+15 Identified: "We've identified a recent deployment causing the issue. 
+                  Rolling back now."
+T+30 Mitigating: "Rollback complete. Error rates returning to normal."
+T+60 Resolved: "Service fully restored. Postmortem will follow."
+```
+
+**Customer phone call template** (for major enterprise customer):
+
+```
+"Hi [name], this is Gao Xin from TikTok PayLater on-call.
+We've experienced a degradation affecting your tenant starting at 1:55 AM your time.
+Symptoms: elevated errors and latency.
+We've mitigated via rollback at 2:15 AM. Currently monitoring.
+Estimated full recovery: 2:45 AM.
+We'll send written incident summary within 24 hours, full postmortem within 5 days.
+Anything urgent on your side I can help with?"
+```
+
+**Why call vs text**: high-stakes customer feels valued by phone. Text feels cold.
+
+### Step 5: When to wake teammates
+
+```
+P0:
+  ALWAYS wake:
+  - On-call lead (always)
+  - Engineering manager
+  - VP eng if persisting > 30 min
+  - PR / Comms if customer-visible
+  - Compliance if regulatory implications
+  
+  Get on call: 2-3 people minimum
+
+P1:
+  WAKE IF:
+  - You're stuck after 15 min
+  - Need second opinion on mitigation
+  - Need specific expert (database, security)
+  - Pattern unfamiliar
+  
+  Don't wake if:
+  - You have a mitigation plan
+  - It's clearly recoverable
+  - Backup on-call also paged
+
+P2:
+  Wait for morning unless:
+  - Affects major customer
+  - Could escalate to P1
+  - You need an expert
+```
+
+**Don't be a hero**:
+
+```
+Anti-pattern: "I'll figure it out alone"
+  Risks:
+  - Cognitive impairment from sleep deprivation
+  - Wrong decision under stress
+  - Missing context (other team knows something)
+  - Wasted time exploring known issues
+
+Pattern: "Lift the team"
+  Benefits:
+  - 2 brains see what 1 misses
+  - Documented decision-making
+  - Faster resolution
+  - Doesn't burn out solo
+```
+
+### Step 6: Runbook discipline
+
+**Every common incident has a runbook**:
+
+```markdown
+# Runbook: Inference service 503 spike
+
+## Symptoms
+- Error rate > 5% sustained for 2+ min
+- p99 latency > 5x baseline
+- Drift dashboard alert
+
+## First Actions (within 5 min)
+1. Check status page: https://status.openai.com
+2. Check our deploy log: was there a deploy in last 30 min?
+3. Check Grafana: which region/endpoint affected?
+
+## Common Causes + Mitigations
+
+### Cause: Vendor outage
+- Check: vendor status page, our circuit breaker metrics
+- Mitigate: trigger circuit breaker, failover to backup
+- Command: `curl -X POST https://config.internal/api/circuit/openai/open`
+
+### Cause: Recent deploy
+- Check: deploy log, error correlates with deploy time
+- Mitigate: rollback
+- Command: `kubectl rollout undo deployment/inference-service`
+
+### Cause: Load spike
+- Check: QPS dashboard, autoscaler decisions
+- Mitigate: manually scale up, throttle low-priority
+- Command: `kubectl scale deployment inference-service --replicas=30`
+
+### Cause: Database degradation
+- Check: DB metrics, slow query log
+- Mitigate: failover to read replica, kill long-running queries
+- Command: `mysql -e "SHOW PROCESSLIST" then "KILL ${id}"`
+
+## Communication
+- T+5: First Slack post
+- T+5: Status page initial
+- T+15: Status page update
+- T+30: Status page update or resolved
+- T+24h: Internal postmortem doc
+
+## Escalation
+- After 15 min stuck: page backup on-call
+- After 30 min: page eng manager
+- P0: page VP eng
+
+## Last Updated
+2026-04-12 by Gao Xin
+Incident: pakistan-asr-outage-2026-03-15
+```
+
+**Runbook discipline**:
+- Every postmortem updates a runbook
+- New incident type → write runbook within 1 week
+- Quarterly runbook audit (still accurate?)
+
+### Step 7: MTTA / MTTR targets
+
+```
+MTTA (Mean Time To Acknowledge):
+  - Target: < 5 minutes
+  - Industry baseline: 5-10 min
+  - Tracked per on-call shift
+  - If consistently > 5 min: improve alerting / wake-up SOP
+
+MTTR (Mean Time To Resolve):
+  - Mitigation MTTR: < 30 min (degradation stopped)
+  - Full MTTR: < 2 hours (fully resolved)
+  - Tracked per service per quarter
+  - SLO ties: 99.5% uptime → 21.6 min/month budget
+
+Error budget burn rate:
+  - 99.5% SLO = 21.6 min/month allowable downtime
+  - Burn rate 1x = on track
+  - Burn rate 2x = at risk (action item: investigate)
+  - Burn rate 5x = will breach SLO this month
+  - Burn rate 10x = freeze deploys, all-hands on reliability
+
+P0 incident contributes to SLO breach risk
+P1 may or may not (depends on duration + severity)
+```
+
+### Step 8: Postmortem culture (blameless)
+
+```
+Within 48 hours: postmortem doc draft
+Within 1 week: postmortem review meeting
+
+Template:
+
+# Postmortem: [Incident name + date]
+
+## Summary (one paragraph)
+What happened in 3 sentences for execs.
+
+## Timeline (every event > 1 min)
+00:00 — Event
+00:01 — Event
+...
+
+## Impact
+- Duration: X minutes
+- Users affected: Y%
+- Revenue impact: $Z
+- SLO impact: SLO Q1 down to W%
+
+## Root Cause Analysis (5 whys)
+Why did errors spike?  → Deploy introduced bug.
+Why was the bug not caught?  → No regression test for this case.
+Why was no test? → Edge case not in test suite.
+Why missed in QA? → QA focused on happy path.
+Why? → QA process doesn't include adversarial cases.
+
+→ Real cause: QA process gap, not "developer made bug"
+
+## What Went Well
+- Detection in 3 min via drift dashboard
+- Mitigation in 12 min via rollback
+- Customer comms timely
+
+## What Went Poorly
+- No regression test caught this
+- Runbook for this case was outdated
+- Postmortem took 8 days (target 5)
+
+## Action Items
+- [HIGH] Add regression test for X scenario (Owner: A, Due: 1 week)
+- [HIGH] Update runbook (Owner: B, Due: 3 days)
+- [MED] Improve QA adversarial test coverage (Owner: C, Due: 1 month)
+- [LOW] Investigate alert noise from yesterday (Owner: D, Due: 2 weeks)
+
+## Lessons Learned
+- Adversarial QA gap
+- Runbook staleness
+- (Generalizable insights for org)
+
+## Action Item Tracking
+- Tracked in [tool] with status
+- Reviewed weekly until all closed
+```
+
+**Blameless principles**:
+- Focus on **system failures**, not person failures
+- "Why was it possible for X to happen?" not "Why did X do this?"
+- Mistakes are learning opportunities for the team
+- Reward people who flag incidents, not punish
+
+---
+
+## 关键决策 / 框架
+
+### 30-minute timeline (canonical)
+
+```
+T+0   Phone rings
+T+1   Ack page, snooze alarm
+T+3   Laptop open, VPN, Slack
+T+5   Triage post: severity + scope
+T+8   First dashboard scan, hypothesis
+T+10  Choose mitigation lever
+T+12  Apply mitigation
+T+15  Verify mitigation impact
+T+20  Customer comm (status page + internal Slack)
+T+25  Wake teammates if needed
+T+30  Investigation continues, mitigation holding
+```
+
+### Severity → Action matrix
+
+```
+P0 → page everyone, mitigate aggressively, customer comm immediate
+P1 → solo first, escalate at 15 min stuck, status page in 5 min
+P2 → investigate, mitigate if needed, comm if customer-visible
+P3 → track, fix during work hours
+```
+
+### Mitigation lever cost/benefit
+
+```
+Lever        Speed     Reversibility   Cost
+Rollback     1-5 min   Easy            Lose forward progress
+Traffic shape 5 min    Easy            Capacity reduction
+Failover     5-10 min  Medium          Degraded experience
+Scale up     5-15 min  Easy            $$$
+Kill switch  Immediate Easy            Bad UX
+```
+
+---
+
+## 完整代码 / 架构图
+
+### On-call dashboard checklist
+
+```python
+# I open these tabs in order, every page:
+
+DASHBOARDS = [
+    # 1. Service health (am I burning error budget?)
+    ('Grafana', 'https://grafana.internal/d/service-health'),
+    
+    # 2. Per-region status
+    ('Grafana', 'https://grafana.internal/d/by-region'),
+    
+    # 3. Deploy log (recent changes?)
+    ('Deploy log', 'https://argo.internal/deploys?service=inference'),
+    
+    # 4. Vendor status
+    ('Status pages', [
+        'https://status.openai.com',
+        'https://status.anthropic.com',
+        'https://status.aws.amazon.com',
+    ]),
+    
+    # 5. Slack channels
+    ('Slack', [
+        '#incidents-current',
+        '#oncall-handoff',  # context from previous shift
+        '#alerts-firing',   # raw alerts
+    ]),
+    
+    # 6. Customer-facing status page (am I lying to customers?)
+    ('Public status', 'https://status.tiktok-pay.com'),
+]
+```
+
+### Resilience patterns inventory
+
+```python
+# All these should be pre-built, deployed, tested before they're needed
+
+class IncidentResponseToolkit:
+    """Everything I need at 2 AM, pre-built and tested."""
+    
+    def __init__(self):
+        self.runbooks = load_runbooks()
+        self.feature_flags = FeatureFlagClient()
+        self.circuit_breakers = CircuitBreakerClient()
+        self.k8s = KubernetesClient()
+        self.alerts = AlertManager()
+        self.status_page = StatusPageClient()
+    
+    async def rollback_service(self, service_name, target_version=None):
+        """One-liner rollback with audit."""
+        if target_version:
+            await self.k8s.set_image(service_name, target_version)
+        else:
+            await self.k8s.rollout_undo(service_name)
+        await self.alerts.log_incident_action(
+            action='rollback',
+            service=service_name,
+            target=target_version or 'previous'
+        )
+    
+    async def trigger_circuit_breaker(self, dependency, reason, ttl_minutes=30):
+        """Open circuit breaker, log action."""
+        await self.circuit_breakers.open(dependency, reason, ttl_minutes)
+        await self.alerts.log_incident_action(
+            action='circuit_break',
+            dependency=dependency,
+            reason=reason
+        )
+    
+    async def failover_region(self, from_region, to_region):
+        """Drain traffic from one region."""
+        await self.k8s.update_loadbalancer(from_region, weight=0)
+        await self.k8s.update_loadbalancer(to_region, weight=100)
+    
+    async def kill_switch(self, feature_name, reason):
+        """Disable a feature immediately."""
+        await self.feature_flags.set(feature_name, enabled=False, reason=reason)
+    
+    async def post_status_update(self, severity, message, eta=None):
+        """Update public status page."""
+        await self.status_page.create_incident(
+            severity=severity,
+            message=message,
+            eta=eta,
+        )
+    
+    async def page_teammates(self, severity, message, who):
+        """Wake people up."""
+        await self.alerts.page(
+            severity=severity,
+            message=message,
+            recipients=who
+        )
+```
+
+### Architecture: incident response observability
+
+```
+                   ┌─────────────────────────────────┐
+                   │   Production System             │
+                   │   (LLM service, RAG, agents)    │
+                   └────────────────┬────────────────┘
+                                    │
+                          ┌─────────┴─────────┐
+                          │                   │
+                          ▼                   ▼
+              ┌──────────────────┐  ┌──────────────────┐
+              │  Metrics         │  │  Logs (centralized)│
+              │  (Prometheus)    │  │  (Elastic / Loki) │
+              └────────┬─────────┘  └──────────┬───────┘
+                       │                       │
+                       ▼                       ▼
+              ┌──────────────────────────────────────┐
+              │  Dashboards (Grafana / Datadog)      │
+              │  - Service health                    │
+              │  - Per-region                        │
+              │  - Per-tenant                        │
+              │  - Drift / quality                   │
+              │  - Business metrics                  │
+              └────────────────┬─────────────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  Alert Manager           │
+                  │  - SLO-based alerts      │
+                  │  - Burn rate alerts      │
+                  │  - Per-component alerts  │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  PagerDuty / Opsgenie    │
+                  │  - On-call schedule      │
+                  │  - Escalation policy     │
+                  │  - Acknowledgment        │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                       [Sleepy on-call]
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │  Incident Response       │
+                  │  - Runbooks              │
+                  │  - Toolkit (rollback,    │
+                  │    circuit breaker, etc) │
+                  │  - Status page           │
+                  │  - Slack #incidents      │
+                  └──────────────────────────┘
+```
+
+---
+
+## Gao Xin 简历专属 reframe
+
+### Pakistan ASR 40-minute outage (PRIMARY 2 AM STAR)
+
+**S** (Situation):
+> "March 15, 2026, 2:14 AM Singapore time (which is 11:14 PM Pakistan time). Voice agent in Pakistan, peak hours for our debt collection (people answer phones in evening). Third-party ASR API (audio → text) starts showing 30-second timeouts. Approximately 40% of calls affected over 5-minute window."
+
+**T** (Task):
+> "Triage, mitigate, restore service. Constraints:
+> - Regulator-watched pilot — can't have outage publicized
+> - Other 6 markets unaffected — don't break them
+> - MTTR target < 15 min for P1
+> - I'm primary on-call, backup is in San Francisco (just got off work)"
+
+**A** (Action with concrete timestamps):
+
+```
+2:14:00 AM  Phone rings (PagerDuty: ASR confidence drop)
+2:14:30 AM  Ack page, lap top open
+2:15:00 AM  Slack post: "On-call ack'd, investigating ASR alert Pakistan"
+2:16:00 AM  Triage:
+            - Severity: P1 (Pakistan-only, but high impact)
+            - Scope: Pakistan region only (verified via per-region dashboard)
+            - Symptoms: 40% calls failing transcription, 30s timeouts
+            - Started: 2:09 AM (5 min before alert — detection lag we'll fix)
+            - Recent changes: no deploy on our side past 4 hours
+2:18:00 AM  Hypothesis: vendor ASR issue in Pakistan POP
+            - Status page: no incident yet (vendors slow to update)
+            - Cross-check: Down Detector shows some reports
+2:20:00 AM  Mitigation decision: failover to backup ASR vendor
+            - Pre-configured backup vendor for this exact case
+            - Manual trigger (planning to automate post-incident)
+            
+2:21:00 AM  Failover command:
+            curl -X POST config/api/asr/primary -d '{"vendor": "backup", "reason": "pakistan_outage"}'
+            
+2:22:00 AM  Verification: error rate 40% → 8% within 1 min (some in-flight)
+2:24:00 AM  Verification: error rate 8% → 0% (all in-flight rotated)
+            Latency 1.5x normal (backup vendor higher latency, acceptable)
+2:25:00 AM  Slack update:
+            "T+11: Failed over to backup ASR vendor.
+             Error rate 40% → 0%. Latency 1.5x normal.
+             Investigating primary vendor."
+2:27:00 AM  Vendor escalation:
+            Email to ASR vendor support with:
+            - Request_ids from failed transcriptions
+            - Time window
+            - Pakistan POP affected
+            - Business impact (regulator-watched pilot)
+2:30:00 AM  Customer-facing: Pakistan ops team Slack notified
+            (no public status page because no user-visible impact)
+2:35:00 AM  Vendor responded: "Investigating Pakistan POP routing issue"
+2:50:00 AM  Vendor confirmed mitigation deployed
+2:55:00 AM  Tested primary vendor: low error rate
+2:57:00 AM  Failed back to primary, monitoring
+2:59:00 AM  Verification: stable, latency normal
+3:00:00 AM  Slack: "Incident resolved. Full timeline + AI in postmortem."
+3:30:00 AM  Postmortem draft started
+4:00:00 AM  Back to sleep
+```
+
+**R** (Result with concrete numbers):
+
+- **MTTR (degradation stopped)**: 12 minutes (target was 15)
+- **MTTR (full resolution)**: 43 minutes
+- **0 user-facing calls failed** (failover absorbed)
+- **Regulator unaware** (no public-visible outage)
+- **Cost**: backup vendor 1.5x cost for 43 min = ~$300
+- **vs estimated**: $50k revenue impact + pilot suspension if no failover
+
+**Postmortem action items** (implemented):
+1. **Automated failover on circuit breaker** (was manual)
+2. **Lower detection threshold** — 5% → 3% (would have caught 2 min earlier)
+3. **Multi-vendor for ALL markets** (was only Pakistan pre-configured)
+4. **Vendor SLA enforcement** — MTTR clause added at renewal
+5. **Status page automation** on circuit breaker open (for future user-visible cases)
+
+### BNPL Anthropic latency spike (secondary STAR)
+
+**S**: 2026 February, Anthropic API latency spike (regional, US-East). Affected BNPL chatbot during Asia peak hours.
+
+**T**: Detect, mitigate without user-facing failure.
+
+**A**:
+- Drift on response_latency_p99 caught in 2 min
+- Mitigation: cached fallback for high-similarity queries (acceptable quality)
+- Escalated to Anthropic Enterprise with request_ids
+- Anthropic confirmed regional issue, resolved in 25 min
+
+**R**: 30% of requests hit cached fallback during outage (acceptable quality), 0 user-facing errors.
+
+### TikTok PayLater payment provider intermittent failure (third STAR)
+
+**S**: Payment provider intermittent 5xx errors (1-3% rate).
+
+**T**: Don't drop transactions, don't double-charge.
+
+**A**:
+- Idempotency key on all transactions (preexisting)
+- Retry with exponential backoff + jitter
+- After 3 retries, queue for async processing
+- Customer notified "processing" + later confirmation
+
+**R**: 0 lost transactions, 0 double-charges, ~50ms p99 latency increase.
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "What if you can't immediately determine root cause?"
+
+**A**: Mitigate anyway. Real principles:
+1. **Stop bleeding first** — most mitigations are reversible (rollback, circuit breaker, traffic shape)
+2. **Hypothesis-driven investigation** — pick 2-3 likely causes, validate or rule out
+3. **Don't be paralyzed by uncertainty** — apply safest mitigation (e.g., rollback to known-good)
+4. **Time-box investigation** — if not closer to root cause after 30 min, wake teammate
+5. **Document hypotheses** in Slack — let team see your reasoning
+
+**Q2**: "How do you handle on-call burnout?"
+
+**A**:
+- **Rotation discipline**: max 7 days on-call per month per person
+- **Backup on-call**: 2-person rotation minimum
+- **Page reduction**: every page audited weekly — was it actionable? noise reduced.
+- **Runbooks** reduce cognitive load (don't think under stress, follow procedure)
+- **Postmortem fixes** prevent recurrence (same incident shouldn't happen twice)
+- **Compensation**: on-call differential pay ($5-10k/month extra)
+- **Recovery time**: half-day off after major P0 incident
+
+**Q3**: "Communication during incident — what's the right cadence?"
+
+**A**:
+- **Internal Slack**: every 5-10 min, real-time updates
+- **Status page**: 5 min for initial, every 15-30 min until resolved
+- **Stakeholders**: 15 min initial, hourly during incident
+- **Customer (direct)**: phone for major customers, email for others, within 30 min for P0
+
+**Cadence rule**: communicate proactively, even when "nothing new" — silence creates anxiety.
+
+**Q4**: "When do you call it 'resolved'?"
+
+**A**: 4 criteria:
+1. **Metrics back to baseline** for at least 15 min sustained
+2. **No new alerts firing**
+3. **Customer-visible impact confirmed restored** (sample customer queries succeed)
+4. **Team consensus** — not just on-call's call
+
+**Pattern**: "Resolved" doesn't mean "done." Postmortem starts. Watch for 24 hours for recurrence. Some incidents have "long tail" — don't celebrate too early.
+
+**Q5**: "What's the most important thing for someone new to on-call?"
+
+**A**: 3 things:
+1. **Read every existing runbook** before first shift. Don't improvise under stress.
+2. **Shadow experienced on-call** for 2-3 incidents before primary. Learn the patterns.
+3. **Ask for help early** — heroism is a bad habit. Wake teammates at 15 min stuck, not 30.
+
+Plus: **practice incident drills**. We do quarterly "wheel of misfortune" — random incident scenario, on-call practices response with team observing. Catches process gaps before real incidents.
+
+---
+
+## ❌ 死路答法
+
+1. **"I check the metrics"** — too vague, no specifics
+2. **No severity classification** — P0 vs P1 vs P2 matters for response
+3. **Investigate before mitigate** — keeps users impacted longer
+4. **No customer comm during** — silent outage is worse than communicated
+5. **Heroic solo approach** — burns out, slower resolution
+6. **No runbook reference** — improvising under stress is error-prone
+7. **No specific dashboards / commands** — shows lack of real on-call
+8. **No MTTA / MTTR numbers** — shows no operational measurement
+9. **Blame individual** — incidents are system failures
+10. **No postmortem follow-through** — same incident recurs
+
+---
+
+## ✅ 加分项
+
+1. **Literal 60-second sequence** (ack page, Slack post, dashboards)
+2. **3-axis severity scoring** (user impact + severity + business)
+3. **5 mitigation levers** with cost/benefit
+4. **Specific commands** (kubectl rollout, curl config API)
+5. **Customer comm cadence** (Slack 5-10 min, status page 15-30, customer 30)
+6. **Wake teammates rules** (P0 always, P1 if stuck 15 min)
+7. **MTTA < 5 min, MTTR < 30 min targets**
+8. **Error budget burn rate awareness**
+9. **Blameless postmortem culture**
+10. **Quote Pakistan ASR with timestamp-level detail** — credible STAR
+
+---
+
+## 一句话总结
+
+> **2 AM incident response: ack page in 60 sec, triage in 5 min (severity + scope), mitigate before root cause within 15 min (rollback / circuit break / failover / scale / kill switch), comm in parallel (status page + Slack + customer if P0), wake teammates when stuck > 15 min, MTTR target < 30 min for degradation, blameless postmortem within 1 week. Pakistan ASR 40-min outage with MTTR 12 min is the gold-standard STAR.**
+
+---
+
+## Cheat Sheet
+
+```
+First 60 seconds:
+  - Phone rings → ack page (stops escalation)
+  - Laptop open → VPN
+  - Slack #incidents post: "On-call ack'd, investigating"
+  - 3 dashboards: service health, deploy log, vendor status
+
+Triage in 5 min:
+  - Severity (3-axis): user impact + severity + business
+  - Scope: all/subset/single tenant?
+  - Blast radius
+  - Acknowledge to team
+
+Severity ladder:
+  P0: >50% users / hard fail / >$10k/hour / regulatory
+  P1: 10-50% users / major degrad / $1-10k/hour
+  P2: <10% users / minor / <$1k/hour
+  P3: edge cases / tech debt
+
+5 mitigation levers (cheapest first):
+  1. Rollback (1-5 min, reversible)
+  2. Traffic shape (5 min, capacity drop)
+  3. Failover / circuit break (5-10 min, degraded)
+  4. Scale up (5-15 min, $$$)
+  5. Kill switch (immediate, bad UX)
+
+Mitigation by hypothesis:
+  Recent deploy → rollback
+  Vendor issue → failover or circuit break
+  Load spike → scale + shape
+  Data corruption → kill switch
+  Unknown → traffic shape (safer)
+
+Communication (3 audiences):
+  Internal #incidents: every 5-10 min, full detail
+  Status page: 5 min initial, 15-30 min updates
+  Customers (direct): phone for P0, within 30 min
+
+Wake teammates:
+  P0 always (multiple roles)
+  P1 if stuck 15 min, expert needed
+  P2 wait for morning unless escalating
+
+MTTA / MTTR targets:
+  MTTA: < 5 min
+  MTTR (mitigation): < 30 min
+  MTTR (full): < 2 hours
+  Error budget: 99.5% SLO = 21.6 min/month
+
+Runbook discipline:
+  Common incident has runbook
+  Every postmortem updates runbook
+  Quarterly runbook audit
+
+Postmortem (within 1 week):
+  Timeline, impact, root cause (5 whys)
+  What went well/poorly
+  Action items + owners + dates
+  Blameless: system not person
+
+Specific commands:
+  Rollback: kubectl rollout undo deployment/X
+  Scale: kubectl scale deployment X --replicas=N
+  Circuit break: curl -X POST config/circuit/Y/open
+  Disable feature: curl -X POST config/features/Z/disable
+  Drain region: aws elbv2 modify-rule
+
+Dashboard checklist (open every page):
+  1. Grafana service health
+  2. Per-region
+  3. Deploy log
+  4. Vendor status pages
+  5. Slack #incidents
+  6. Public status page
+
+Toolkit pre-built:
+  - Rollback automation
+  - Circuit breaker control
+  - Feature flag service
+  - Region drain
+  - Kill switch UI
+  - Status page API
+  - Page teammates
+
+Anti-patterns:
+  - Vague "I check metrics"
+  - No severity classification
+  - Investigate before mitigate
+  - Silent outage (no comm)
+  - Heroic solo approach
+  - No runbook follow
+  - Blame individual
+
+Case studies:
+  - Pakistan ASR 2 AM: MTTR 12 min, 0 failed calls
+  - BNPL Anthropic spike: 30% cached fallback, 0 errors
+  - Payment 5xx: idempotency + queue, 0 lost
+
+Quotes for interview:
+  - "Ack page in 60 sec, triage in 5 min, mitigate in 15"
+  - "Stop bleeding before root cause"
+  - "Heroism is anti-pattern — wake teammates at 15 min stuck"
+  - "Every postmortem becomes runbook update"
+  - "Blameless culture — system not person"
+  - "Pakistan ASR: MTTR 12 min, 0 failed calls"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -43,6 +43,8 @@ SOURCES = [
     ("Google FDE", ROOT / "site" / "data" / "google-fde-prep.json"),
     # Review / rapid-recall pages — extracted Extended Cheat Sheets from the 49 full pages
     ("Review", ROOT / "site" / "data" / "review-pages.json"),
+    # 真题 — Exponent 2026 整理的 FDE 52 道高频真题 (Palantir/OpenAI/Anthropic/Databricks/Scale/ElevenLabs)
+    ("真题", ROOT / "site" / "data" / "fde-real-questions.json"),
 ]
 
 def main():

@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计</div>
+  <h1>Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-034-logistics-sap-weather-500-managers.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-034-logistics-sap-weather-500-managers.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q34 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q34 · 物流公司自动重路由 Agent (SAP + 天气 + 500 仓库经理)</h3>
+<blockquote><p>"A <strong>large logistics company</strong> wants to build an <strong>AI agent</strong> that can <strong>automatically re-route shipments</strong> based on <strong>SAP data, weather API, and input from 500 warehouse managers</strong>. Design the <strong>end-to-end architecture</strong>. <strong>You have 60 minutes</strong>."</p></blockquote>
+<p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir Foundry-style + OpenAI Enterprise Agents <strong>行业</strong>: Logistics / supply chain</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 design 一个 multi-agent system.</p>
+<p><strong>是</strong>: 考你能不能克制冲动<strong>不 build autonomous agent from day 1</strong>, 而是用 <strong>shadow → recommend → auto-with-override → autonomous</strong> 的渐进 trust ladder.</p>
+<p>4 个 signal:</p>
+<ol><li><strong>Don't build autonomous agent from day 1</strong> — 90% 候选人冲去讲 LangGraph / multi-agent / tool use. 真实部署是 <strong>shadow mode 12 周 + opt-in 12 周 + 渐进 autonomy</strong></li><li><strong>500 managers are users, not data sources</strong> — 候选人把 "500 manager input" 当训练数据. 实际他们是 <strong>决策权持有者</strong>, agent 要赢得他们信任, 不是 fit 他们历史</li><li><strong>Define trust thresholds explicitly</strong> — 哪个时机系统可 auto-decide vs 必须 ask manager? 哪些 case 永远 ask?</li><li><strong>Per-manager calibration matters</strong> — 一个 manager 是 10-yr veteran, 另一个是 6-month junior. Agent's confidence threshold per manager 不同</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 立刻 build autonomous multi-agent system</strong></p>
+<blockquote><p>"I'd use LangGraph with a planner agent, weather agent, SAP agent, routing agent, with tool use to talk to the warehouse system..."</p></blockquote>
+<p>死. 你<strong>没问</strong>:</p>
+<ul><li>当前重路由谁做? (Dispatcher / manager / 自动?)</li><li>重路由的<strong>决策约束</strong> (合同 SLA / 客户偏好 / hazmat 限制 / 货车类型) 是什么?</li><li>错误的代价 — 路由错一次 = $X loss + customer churn risk?</li><li>500 个 manager 各自的 trust level?</li><li>工会 / 司机协议是否限制 algorithmic dispatch?</li></ul>
+<p><strong>挂法 #2: 把 manager 当数据源</strong></p>
+<blockquote><p>"We'd ingest manager inputs as training data and have the agent learn their patterns."</p></blockquote>
+<p>死. Manager 们正在做决策. 你 ingest 他们 = 把活的决策者当死数据. 反应: managers 不输入了, 因为他们觉得自己在 train replace themselves.</p>
+<p><strong>挂法 #3: 一步到 fully autonomous</strong></p>
+<blockquote><p>"Phase 1 we'll launch shadow mode for 2 weeks, then go autonomous in week 3."</p></blockquote>
+<p>死. 仓库 manager + dispatcher + 司机的 trust takes months, 不是 weeks. 跳级 = silent sabotage (managers ignore agent, agent gets stale).</p>
+<hr />
+<h3>完美答案架构 (5 步)</h3>
+<h4>Step 1: 澄清问题 (10 min)</h4>
+<blockquote><p>"Before I sketch, 10 questions. The architecture depends on what 'auto-route' actually means — degree of autonomy is THE design decision."</p></blockquote>
+<p><strong>10 个 clarifying questions</strong>:</p>
+<blockquote><p><strong>Q1</strong>: "What's the <strong>scope of re-routing</strong> — change carrier? Change route within a carrier? Reschedule pickup/delivery? Re-stage in a different warehouse? <strong>Different decisions have different stakeholders + risks</strong>."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "<strong>Who decides today</strong> — dispatcher? Warehouse manager? Central operations? Customer service when problem reported? <strong>The current decision-maker is the agent's primary stakeholder</strong>."</p></blockquote>
+<blockquote><p><strong>Q3</strong>: "What's the <strong>error cost</strong> — wrong route = how much $? Mis-routed shipment = customer claim? Late delivery = SLA penalty? <strong>This dictates how conservative we must be</strong>."</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "What's the <strong>trigger</strong> for re-routing — weather event, equipment failure, customer change, hub overflow? <strong>Different triggers have different urgency + data</strong>."</p></blockquote>
+<blockquote><p><strong>Q5</strong>: "What's the <strong>decision constraint set</strong> — contract SLA, customer preferences (some refuse certain carriers), hazmat restrictions, driver hours of service (HOS regulation), vehicle capabilities? <strong>These are hard constraints</strong>."</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "What's the <strong>role of 500 warehouse managers</strong> — they input ad-hoc info ('dock 4 broken'), they approve agent recommendations, they override agent decisions, they request re-routes? <strong>Different roles imply different UX</strong>."</p></blockquote>
+<blockquote><p><strong>Q7</strong>: "Are there <strong>union / driver protocols</strong> limiting algorithmic dispatch? (Some US Teamsters contracts restrict algorithmic re-routing without driver concurrence.)"</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "What's the <strong>integration with SAP</strong> — read access to TM / EM modules? Write access to update routes? Custom IDocs? <strong>This is THE integration pain</strong>."</p></blockquote>
+<blockquote><p><strong>Q9</strong>: "What's the <strong>scale + latency</strong> — N shipments / day, peak QPS, real-time decision required vs daily batch? <strong>Different operating modes</strong>."</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "<strong>Stakeholder map</strong>: COO? CIO? VP of Ops? Each region's Operations Director? Driver union rep? 500 managers themselves? <strong>Veto holders?</strong>"</p></blockquote>
+<p><strong>面试官 likely 回答</strong>:</p>
+<ul><li>Re-routing scope: change route within carrier + reschedule pickup, NOT change carrier</li><li>Current decisioning: central dispatch (5-person team) handles regional, warehouse manager handles local</li><li>Error cost: avg $300 per mis-route + customer trust impact. Catastrophic mis-routes (hazmat) = $50K+</li><li>Triggers: weather (60%), equipment failure (20%), hub overflow (15%), customer change (5%)</li><li>Constraints: SLA (next-day, 2-day), customer "no overnight near my building", hazmat compatibility, driver HOS, vehicle type</li><li>Manager role: input local info (dock broken, weather impact local), approve agent suggestion (initially), eventually monitor agent</li><li>Union: Teamsters contract in 30% of regions restricts auto-dispatch without driver opt-in</li><li>SAP: read TM (Transportation Mgmt), write back through IDoc framework. Notoriously painful integration</li><li>Scale: 50K shipments/day, peak 6K/hr, target 5-minute decision latency</li><li>Veto: COO + VP Ops + Driver Union rep (in unionized regions)</li></ul>
+<p>→ <strong>Real scope</strong>: in 90 days, build an <strong>agent that recommends re-routes</strong> for weather + hub overflow triggers, with <strong>shadow → recommend → opt-in autonomy</strong> trust ladder. NOT fully autonomous in 90 days.</p>
+<hr />
+<h4>Step 2: 找干系人 + 成功指标 (10 min)</h4>
+<p><strong>Stakeholder map</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>对项目态度</th><th>我对他们的关键动作</th></tr></thead><tbody><tr><td><strong>COO</strong></td><td>Cost + customer SLA + driver retention</td><td>Sponsor, wants quick win</td><td>Quarterly review</td></tr><tr><td><strong>VP Ops</strong></td><td>Daily ops stability</td><td>Cautious — owns risk</td><td>Weekly, ride-along with dispatch</td></tr><tr><td><strong>Central Dispatch (5)</strong></td><td>Their job, their judgment</td><td><strong>Defensive about replacement</strong></td><td>Co-design, "augment not replace"</td></tr><tr><td><strong>500 Warehouse Managers</strong></td><td>Local autonomy, response time</td><td>Mixed — some champions, some skeptics</td><td>Field visits, segment by attitude</td></tr><tr><td><strong>Driver Union rep</strong></td><td>Driver autonomy, HOS compliance</td><td><strong>Highly skeptical, can veto in 30% of regions</strong></td><td>Early engagement, opt-in framework</td></tr><tr><td><strong>CIO</strong></td><td>SAP integration cost / risk</td><td>Approval gate</td><td>Integration architecture review</td></tr><tr><td><strong>CISO</strong></td><td>Data security, third-party</td><td>Approval gate</td><td>SOC2 controls</td></tr><tr><td><strong>Customer Service</strong></td><td>Avoid customer complaints</td><td>Operational</td><td>Brief on what changes</td></tr><tr><td><strong>Legal</strong></td><td>Liability, regulatory</td><td>Approval gate</td><td>Liability allocation in re-route docs</td></tr></tbody></table></div>
+<p><strong>Key insight</strong>: Driver Union is the <strong>veto holder in 30% of regions</strong>. <strong>Project will fail politically before failing technically if union not engaged</strong>. Plus central dispatch's 5 person team is defensive about replacement — they're the agent's <strong>primary co-designers</strong>.</p>
+<p><strong>Success metrics (3 layers)</strong>:</p>
+<p><strong>Layer 1 — Operational KPIs</strong> (VP Ops daily view):</p>
+<ul><li>% of shipments on-time (target: maintain or improve current baseline)</li><li>Re-route cost per event ($ saved vs. baseline manual re-route)</li><li>Decision latency (current ~30 min for weather event, target &lt; 5 min)</li><li>Manager satisfaction (NPS, quarterly)</li></ul>
+<p><strong>Layer 2 — Trust KPIs</strong> (process metrics):</p>
+<ul><li>Agent recommendation acceptance rate by central dispatch (target 60-80%, NOT &gt; 95% which means rubber stamp)</li><li>Override rate by warehouse managers (target 20-40%)</li><li>Agent autonomy mode mix: % shadow / % recommend / % auto-with-override / % autonomous</li><li>Time to detect bad recommendation</li></ul>
+<p><strong>Layer 3 — Strategic KPIs</strong> (COO quarterly):</p>
+<ul><li>Total logistics cost trend</li><li>Customer SLA breach rate</li><li>Driver retention rate (don't break it!)</li></ul>
+<p><strong>Counter-metrics</strong>:</p>
+<ul><li>Hazmat mis-routes (must be 0)</li><li>Union grievances filed</li><li>Manager complaints ("agent overrides me, doesn't listen")</li><li>Driver complaints (HOS violation, unreasonable schedule)</li></ul>
+<p><strong>The framing</strong>:</p>
+<blockquote><p>"90 days is NOT 'fully autonomous re-routing across the network'. It's '<strong>weather + hub-overflow triggered recommendations</strong> for the central dispatch team to approve, with a clear ladder to expand to opt-in autonomy in month 6-12'."</p></blockquote>
+<hr />
+<h4>Step 3: 梳理输入数据 (10 min)</h4>
+<p><strong>Data inventory</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Dataset</th><th>Source</th><th>Format</th><th>Freshness</th><th>Issue</th></tr></thead><tbody><tr><td><strong>Shipment master</strong></td><td>SAP TM</td><td>IDoc / BAPI</td><td>Real-time</td><td>Notoriously complex schema, 100+ fields</td></tr><tr><td><strong>Active shipments + locations</strong></td><td>SAP TM + Telematics</td><td>Mixed</td><td>5-30 min</td><td>Telematics provider differs by region</td></tr><tr><td><strong>Hub capacity + dock status</strong></td><td>SAP EWM + manual</td><td>Mixed</td><td>Real-time + manual</td><td>Dock status often stale, manager updates</td></tr><tr><td><strong>Driver assignments + HOS</strong></td><td>Mobile DVR</td><td>API</td><td>Real-time</td><td>HOS compliance critical, FMCSA regulated</td></tr><tr><td><strong>Carrier network + lanes</strong></td><td>SAP TM</td><td>Static + updates</td><td>Daily</td><td>Some carriers don't share back data</td></tr><tr><td><strong>Weather</strong></td><td>NOAA + commercial</td><td>API</td><td>5-min</td><td>Reliable but geographic granularity varies</td></tr><tr><td><strong>Traffic</strong></td><td>INRIX / Google</td><td>API</td><td>1-5 min</td><td>Coverage gaps in rural</td></tr><tr><td><strong>Customer SLA / preferences</strong></td><td>CRM</td><td>API</td><td>Daily</td><td>Some customers have unwritten preferences</td></tr><tr><td><strong>Manager-input local context</strong></td><td>Internal app</td><td>Free text + structured</td><td>Ad-hoc</td><td><strong>Critical signal, NOT in SAP</strong></td></tr><tr><td><strong>Historical re-routes</strong></td><td>SAP archive</td><td>T+1</td><td>Daily</td><td>Has outcome (delivered on-time? cost?)</td></tr></tbody></table></div>
+<p><strong>Key gaps + dirty data fights</strong>:</p>
+<ol><li><strong>Manager local context is critical but ad-hoc</strong>: "dock 4 broken until Tuesday" — no structured field for this. Currently lives in email + Slack + manager memory. Need a structured input app.</li><li><strong>SAP TM schema is the deep end</strong>: each customer's SAP TM customization is different. 80% of integration cost is mapping their specific implementation.</li><li><strong>Telematics provider differs by region</strong> (Lytx in some, Samsara in others, in-house in some). Need adapter pattern.</li><li><strong>HOS compliance is non-negotiable</strong>: re-route that violates driver HOS = FMCSA violation = company-wide audit. Must validate every recommendation against current driver HOS state.</li><li><strong>Customer preferences in CRM are partial</strong>: "no overnight near my building", "prefer FedEx", "this lane is hazmat-cleared" — half written, half tribal knowledge in dispatcher heads.</li></ol>
+<p><strong>What I'd call in week 1</strong>:</p>
+<ul><li>SAP architect — get TM module schema dump</li><li>Each telematics provider account manager — confirm API access</li><li>Customer Service lead — pull unwritten customer preferences out of CS team heads</li><li>Driver Union rep in 1 unionized region — first conversation</li><li>5 central dispatchers — ride-along for 1 day each</li></ul>
+<hr />
+<h4>Step 4: 拆成可解子问题 (15 min)</h4>
+<p><strong>11 subproblems</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>子问题</th><th>Risk</th><th>Value</th><th>90-day pri</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>Trigger detection</strong>: weather, hub overflow, equipment failure → shipments affected</td><td>Low</td><td>Foundation</td><td><strong>1</strong></td></tr><tr><td><strong>B</strong></td><td><strong>Decision engine</strong>: scoring re-route options under hard constraints (HOS, hazmat, SLA)</td><td>High</td><td>Critical</td><td><strong>2</strong></td></tr><tr><td><strong>C</strong></td><td><strong>Manager input UI</strong>: structured way to enter local context</td><td>Low</td><td>High (unique signal)</td><td><strong>3</strong></td></tr><tr><td><strong>D</strong></td><td><strong>SAP TM integration</strong>: read shipments, write re-route IDoc</td><td>High</td><td>Critical</td><td><strong>4</strong></td></tr><tr><td><strong>E</strong></td><td><strong>Shadow mode logging + retro</strong>: agent makes silent decisions, we measure vs human</td><td>Low</td><td>Foundation for trust</td><td><strong>5</strong></td></tr><tr><td><strong>F</strong></td><td><strong>Recommend UI for central dispatch</strong>: AI suggests, human approves</td><td>Medium</td><td>High</td><td><strong>6</strong></td></tr><tr><td><strong>G</strong></td><td><strong>Per-manager calibration</strong>: trust threshold per manager based on tenure / track record</td><td>Medium</td><td>High</td><td><strong>7</strong></td></tr><tr><td><strong>H</strong></td><td><strong>Union opt-in framework</strong>: agent recommendations only act in unionized regions when driver opts in</td><td>High</td><td>Critical (veto avoidance)</td><td><strong>8</strong></td></tr><tr><td><strong>I</strong></td><td><strong>Audit trail + liability allocation</strong>: every re-route decision logged with reasoning</td><td>Medium</td><td>Critical</td><td><strong>9</strong></td></tr><tr><td><strong>J</strong></td><td><strong>Autonomy ladder</strong>: programmatic graduation rules from shadow → recommend → auto-with-override → autonomous</td><td>Medium</td><td>Future</td><td>Document, don't ship in 90 days</td></tr><tr><td><strong>K</strong></td><td><strong>LLM-assisted dispatcher chat</strong>: dispatcher talks to agent in NL ("re-route everything from hub 7 today")</td><td>Low</td><td>UX delight</td><td>Phase 2</td></tr></tbody></table></div>
+<p><strong>Sequencing rationale</strong>:</p>
+<blockquote><p><strong>A + D first</strong> because: without trigger detection and SAP integration, agent has no data. Both are foundation.</p></blockquote>
+<blockquote><p><strong>B critical</strong> because: scoring re-route options under HARD constraints (HOS, hazmat, SLA) is the core decision logic. Must be deterministic on hard constraints (you don't ML your way through hazmat regs), ML on soft preferences.</p></blockquote>
+<blockquote><p><strong>C unique signal</strong> because: manager local context is in NO existing system. Building structured input app captures invaluable real-time data.</p></blockquote>
+<blockquote><p><strong>E shadow mode</strong> is the only way to build trust without risking damage. Run shadow for 8-12 weeks minimum.</p></blockquote>
+<blockquote><p><strong>F recommend mode</strong> ships when shadow shows agreement rate &gt; 70% with dispatchers.</p></blockquote>
+<blockquote><p><strong>G per-manager calibration</strong> matters because 500 managers vary wildly. Veteran's 95% override = "veteran knows something we don't", junior's 95% override = "junior doesn't trust".</p></blockquote>
+<blockquote><p><strong>H union opt-in</strong> is non-negotiable in unionized regions.</p></blockquote>
+<blockquote><p><strong>J autonomy ladder</strong> documented but NOT shipped in 90 days. Year 1+.</p></blockquote>
+<blockquote><p><strong>K LLM chat</strong> is a delight feature, phase 2.</p></blockquote>
+<hr />
+<h4>Step 5: Walking-skeleton MVP (15 min)</h4>
+<p><strong>Walking-skeleton (Week 1-4)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">[SAP TM read API] ──┐
+                    │
+[Weather API]       ├──→ [Trigger detector] ──→ [Shipment scoring] ──→ [Recommendation log]
+                    │                                                          │
+[Manager UI input] ──┘                                                          ▼
+                                                              [Internal dashboard only]
+                                                              "Here's what AI would recommend"
+                                                              (Central dispatch reviews,
+                                                               does NOT use yet)</code></pre>
+<p><strong>Week 1</strong>:</p>
+<ul><li>Day 1-2: Meetings with COO, VP Ops, Central Dispatch lead, Union rep (in 1 unionized region)</li><li>Day 3-5: SAP TM API credentials, schema dump, first test read</li></ul>
+<p><strong>Week 2</strong>:</p>
+<ul><li>Trigger detector (just weather + hub overflow in v1)</li><li>Mock scoring: rule-based, no ML yet</li><li>Mock manager input UI (just a Slack bot in v1)</li></ul>
+<p><strong>Week 3</strong>:</p>
+<ul><li>End-to-end: weather alert → identify affected shipments → score re-route options (rule-based) → log recommendation</li><li>Central dispatch reviews log daily, gives feedback</li></ul>
+<p><strong>Week 4</strong>:</p>
+<ul><li>Show to VP Ops + Union rep + Central Dispatch</li><li>Decision: scope phase 2</li></ul>
+<p><strong>Walking-skeleton has ZERO autonomy in v1</strong>. It's a <strong>passive observer + logger</strong>. Builds trust by:</p>
+<ul><li>Central dispatch sees AI's reasoning daily without risk</li><li>Compare to what they would do, comment on disagreements</li><li>Union rep sees agent's reasoning, understands logic</li></ul>
+<p><strong>Phase 2 (Week 5-12) — Shadow Mode</strong>:</p>
+<ul><li>Agent shadows real-time decisions</li><li>Dispatcher still controls</li><li>Weekly retro on agreement rate + outcome</li></ul>
+<p><strong>Success criteria to graduate to phase 3</strong>:</p>
+<ul><li>Agreement rate with dispatcher &gt; 70%</li><li>For disagreements, AI's predicted outcome (cost, on-time) matches actual within 10%</li><li>0 hazmat / HOS violations in shadow recommendations</li><li>Union rep signs off on shadow log review</li></ul>
+<p><strong>Phase 3 (Month 4-6) — Recommend Mode</strong>:</p>
+<ul><li>Central dispatch sees AI recommendation in UI</li><li>Dispatcher approves / overrides</li><li>Override rate target 20-40%</li></ul>
+<p><strong>Phase 4 (Month 7-12) — Opt-in Autonomy with Manager Override</strong>:</p>
+<ul><li>For low-risk re-routes (within-region weather, hub overflow only, NO hazmat, NO HOS-tight), agent acts automatically</li><li>Manager + dispatcher can override within 5-min window</li><li>Union regions still require driver opt-in</li></ul>
+<p><strong>Phase 5 (Year 2) — Tiered Autonomy</strong>:</p>
+<ul><li>Per-manager autonomy levels based on track record</li><li>Veteran managers' regions = more autonomy</li><li>Junior managers' regions = manual default</li></ul>
+<hr />
+<h3>详细回答 (Sample 60-min monologue)</h3>
+<blockquote><p>"Before I sketch, I want to ask 10 questions. The architecture depends entirely on what 'auto-route' means and how much autonomy in 90 days vs. year 1.</p>
+<p><em>(asks 10 Qs, gets answers above)</em></p>
+<p>OK so real scope: <strong>90 days = recommendation system for weather + hub overflow triggers</strong>, with central dispatch approving. NOT fully autonomous.</p>
+<p>Most candidates rush autonomous agent. Here's why I won't:</p>
+<ol><li><strong>HOS regulation</strong> is non-negotiable, costs of violation are auditable</li><li><strong>Driver union</strong> has veto in 30% of regions</li><li><strong>Central dispatch's 5 people</strong> are the ones whose judgment we're trying to augment — replacing them in 90 days is political suicide</li><li><strong>Trust ladders take months not weeks</strong>: shadow → recommend → opt-in autonomy → full autonomy</li></ol>
+<p><strong>Stakeholders</strong>: COO sponsor, VP Ops owns risk, central dispatch (5) are co-designers (NOT replacement targets), 500 managers are users with varying tenure (per-manager calibration matters), driver union has veto in unionized regions, CIO + CISO + Legal gate.</p>
+<p><strong>Data</strong>: SAP TM (notoriously complex, 80% of integration cost), telematics differs by region, weather + traffic public APIs, manager-input local context is a unique signal NOT in any system today, HOS data is non-negotiable.</p>
+<p><strong>11 subproblems</strong>:</p>
+<ol><li>Trigger detection (weather, overflow)</li><li>Decision engine (hard constraints HOS / hazmat / SLA, ML on soft preferences)</li><li>Manager input UI (structured local context)</li><li>SAP TM integration (read + write IDoc)</li><li>Shadow mode logging + retro</li><li>Recommend UI for central dispatch</li><li>Per-manager calibration</li><li>Union opt-in framework</li><li>Audit trail + liability allocation</li><li>Autonomy ladder (documented, not shipped)</li><li>LLM chat for dispatcher (phase 2)</li></ol>
+<p><strong>Walking-skeleton Week 1-4</strong>: passive observer + logger. Trigger detection on weather, score re-route options rule-based, log recommendations daily for central dispatch to review. NO autonomy, NO production write to SAP. Internal dashboard only.</p>
+<p><strong>Phase 2 Week 5-12</strong>: shadow mode — agent shadows real decisions, dispatcher still controls, weekly retro.</p>
+<p><strong>Phase 3 Month 4-6</strong>: recommend mode — central dispatch sees AI suggestion in UI.</p>
+<p><strong>Phase 4 Month 7-12</strong>: opt-in autonomy for LOW-RISK re-routes only (within-region weather, hub overflow, no hazmat, no HOS-tight).</p>
+<p><strong>Three things to flag proactively</strong>:</p>
+<p><strong>(a) Union opt-in is non-negotiable</strong>. In 30% of regions Teamsters contract restricts algorithmic dispatch. We engage Union rep week 1, design opt-in framework, do NOT skip.</p>
+<p><strong>(b) Per-manager calibration matters</strong>. Veteran with 80% override rate ≠ junior with 80% override rate. We track per-manager and surface to autonomy decisions.</p>
+<p><strong>(c) Hard constraints are deterministic, NOT ML</strong>. HOS, hazmat, SLA = rules. Soft preferences (customer 'no overnight') = ML. Mixing them = catastrophe.</p>
+<p>Want me to deep-dive the autonomy ladder, decision engine architecture, or union engagement?"</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<blockquote><p>"I shipped exactly this trust ladder pattern at TikTok PayLater. The voice agent for debt collection started in <strong>shadow mode</strong> (recommends what to say to customer, human collector still spoke), then <strong>recommend mode</strong> (human picked from agent's suggestions), then <strong>opt-in autonomous</strong> (agent talks to specific tiers of accounts, human can break in), then <strong>autonomous with override</strong> for the safest segments.</p>
+<p><strong>It took 9 months from shadow to first autonomous segment</strong>, and that was for a use case much less consequential than mis-routing shipments. Logistics with HOS regulation + union veto + customer SLA is MORE conservative than I was, not less.</p>
+<p>Specific transferable lessons:</p>
+<ol><li><strong>Shadow mode log review with the humans you're 'augmenting'</strong>: in PayLater, I sat with collectors every Friday and reviewed disagreements between agent's suggested response and what they actually said. They taught me what the agent was missing. In logistics: weekly retro with central dispatch reviewing disagreement cases.</li></ol>
+<ol><li><strong>Per-segment autonomy graduation</strong>: not all accounts get same autonomy. Veteran customers, simple repayment patterns → more agent autonomy. Disputed / multi-party / law-mentioned accounts → human always. <strong>For logistics: per-region (unionized vs not), per-trigger (weather low risk vs equipment failure higher), per-shipment (hazmat = never autonomous)</strong>.</li></ol>
+<ol><li><strong>Hard constraints are deterministic, soft preferences are ML</strong>: in PayLater, regulator-mandated disclosure text was a hard-coded string (no ML). Empathy + persuasion was LLM-generated. We never mixed them. In logistics: HOS / hazmat / SLA = rule engine. Customer 'no overnight near building' = learned.</li></ol>
+<ol><li><strong>The first 4 weeks is about trust-building infrastructure, not value</strong>: in PayLater, weeks 1-4 we shipped audit log + replay tool + Slack-bot dashboard for collectors to see agent's reasoning. ZERO model improvement in 4 weeks. By week 5 we had trust to ship the real thing.</li></ol>
+<p>The pattern: <strong>infrastructure for trust ships before product for value</strong>."</p></blockquote>
+<p><strong>Other resume hooks</strong>:</p>
+<ul><li><strong>Indonesia voice agent partner negotiations</strong> — direct parallel to union rep engagement. Both are "veto holder you can't ship without".</li><li><strong>Internal Agent Platform onboarding multiple teams</strong> — onboarding 500 managers is the same pattern: segment by champion / skeptic / fence-sitter, win champions first.</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "Why not just build fully autonomous from day 1 with a high confidence threshold?"</p>
+<p><strong>A</strong>: 3 reasons it fails:</p>
+<ol><li><strong>Confidence is not calibrated on day 1</strong>. You don't know what "0.9 confidence" actually means until you've measured against ground truth on YOUR data. Shadow mode is how you measure.</li><li><strong>Edge cases are 80% of the value</strong>. Easy cases agent handles fine. The cases that matter (driver near HOS limit, customer-mentioned-law account, unusual weather) need human judgment until model is trained on enough of them.</li><li><strong>Union + regulatory exposure</strong>. Even if model were perfect, deploying autonomous without union opt-in = grievance + work stoppage in unionized regions. Even one HOS violation = FMCSA audit.</li></ol>
+<p>The cost of going-too-fast is much higher than the cost of phased rollout. <strong>Phased is the optimal path, not the safe path</strong>.</p>
+<p><strong>Q2</strong>: "How do you get 500 warehouse managers to actually input local context?"</p>
+<p><strong>A</strong>: This is <strong>the</strong> UX challenge. Approach:</p>
+<ul><li><strong>Make input dead-simple</strong>: Slack bot or mobile app, structured but quick ("dock 4 broken, expected back Tuesday")</li><li><strong>Show value to them</strong>: their input shows up as a tag on affected shipments, agent recommends differently. They see "my input changed the route" — that's the carrot.</li><li><strong>Segment managers by attitude</strong>:</li><li><strong>Champions</strong> (~10%): power users, give them advanced features, name them in launch readme</li><li><strong>Fence-sitters</strong> (~70%): need to see colleagues use it, show stats "your team's average usage"</li><li><strong>Skeptics</strong> (~20%): don't fight them, but track and engage personally</li><li><strong>Don't penalize non-input</strong>: if a manager doesn't input, agent operates as if no context — that's fine. We're not making it mandatory.</li><li><strong>Quarterly review</strong>: present "input → outcome" stories at all-hands. Managers see their input matters.</li></ul>
+<p><strong>Q3</strong>: "Driver union rep refuses to allow shadow mode even, says any algorithmic logging is grievance-worthy."</p>
+<p><strong>A</strong>: Different from "no autonomy" stance. Need to diagnose:</p>
+<ul><li><strong>Is the concern about individual driver tracking?</strong> If yes, ensure logging is at shipment level not driver level. Aggregate by region not individual.</li><li><strong>Is the concern about discipline based on log?</strong> Commit in writing: logs cannot be used in disciplinary actions against drivers.</li><li><strong>Is the concern about job security?</strong> Commit to no force reductions tied to project. Co-sign by COO.</li><li><strong>If still no</strong>: project doesn't proceed in unionized regions. Stay in non-unionized regions for v1, demonstrate value, revisit union with data.</li></ul>
+<p>Walking away from 30% of regions is acceptable in v1. Forcing it = company-wide work stoppage risk.</p>
+<p><strong>Q4</strong>: "What if SAP integration is too painful and adds 30 days to v1 timeline?"</p>
+<p><strong>A</strong>: Reverse scope. 2 options:</p>
+<p><strong>Option A</strong>: ship MVP with <strong>read-only</strong> SAP (just consume shipment data). Recommendations are logged + emailed to central dispatch. Dispatcher manually executes in SAP. This avoids write-back integration but reduces value.</p>
+<p><strong>Option B</strong>: ship MVP for <strong>single SAP region</strong> (1 customer's installation of SAP TM, not their global system). Validate architecture, then expand to other regions in phase 2.</p>
+<p><strong>My recommendation</strong>: Option A for proving model + Option B for proving write-back. Combine: read-only globally, write-back in 1 pilot region.</p>
+<p>This is the <strong>scope reduction is FDE core skill</strong> moment. Customer wants global write-back day 1 — they're wrong about the cost.</p>
+<p><strong>Q5</strong>: "How does this scale to 50K shipments / day at peak 6K / hr?"</p>
+<p><strong>A</strong>: Latency targets:</p>
+<ul><li>Trigger detection: 1-min loop</li><li>Affected shipment query: &lt; 10s</li><li>Re-route scoring per shipment: &lt; 1s (rule-based scoring is cheap)</li><li>Manager notification: real-time push</li></ul>
+<p><strong>Scaling</strong>:</p>
+<ul><li>Trigger detection runs as background job, not per-shipment</li><li>Shipment scoring is embarrassingly parallel: 6K/hr = 1.7/sec, trivial</li><li>Bottleneck is SAP TM API rate limits (typically 100-500 IDoc/min, vendor-specific)</li></ul>
+<p><strong>Architecture for scale</strong>:</p>
+<ul><li>Trigger detector → SQS / Kafka queue</li><li>Scoring workers (horizontal scale, 5-20 workers)</li><li>SAP write rate-limited with backoff</li><li>Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)</li></ul>
+<p>This is <strong>system design within the FDE answer</strong>, not the main exam. Mention it briefly, deep-dive if asked.</p>
+<hr />
+<h3>❌ 死路答法 (top 7)</h3>
+<ol><li><strong>冲 autonomous multi-agent system</strong> from day 1</li><li><strong>Treat 500 managers as data source</strong> instead of decision-holders</li><li><strong>Skip union engagement</strong> in unionized regions</li><li><strong>Mix hard constraints (HOS) with ML</strong> for soft preferences</li><li><strong>Ship shadow → autonomous in weeks</strong> (takes months minimum)</li><li><strong>Same autonomy threshold for veteran vs junior manager</strong></li><li><strong>Underestimate SAP TM integration</strong> (80% of integration cost)</li></ol>
+<hr />
+<h3>✅ 加分项 (top 7)</h3>
+<ol><li><strong>Trust ladder explicit</strong>: shadow → recommend → opt-in auto → autonomous, <strong>with graduation criteria</strong></li><li><strong>Hard constraints deterministic, soft preferences ML</strong> distinction</li><li><strong>Per-manager calibration</strong> based on tenure / track record</li><li><strong>Union opt-in framework</strong> for unionized regions</li><li><strong>Manager-input UI as unique signal source</strong></li><li><strong>Walking-skeleton with ZERO autonomy</strong> in week 1-4</li><li><strong>Quote your TikTok PayLater 9-month trust ladder experience</strong></li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>物流 auto-routing agent = "trust ladder 12 周 shadow → 12 周 recommend → 12 周 opt-in auto → autonomous" + "hard constraints deterministic, soft preferences ML" + "500 managers per-tenure calibration" + "union opt-in non-negotiable"</strong>.</p>
+<p>真正的 win 不是炫酷 multi-agent, 是<strong>让 central dispatch 信任、500 managers 用起来、union rep 不否决</strong>. 90 天 = recommendation system + 路径明确到 year 1 autonomy, NOT autonomous in 90 days.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 冲 autonomous multi-agent day 1
+  - 把 500 managers 当 data
+  - 跳过 union engagement
+  - 混合 hard constraints + ML
+  - 周级 graduation 速度
+  - 一刀切 manager 阈值
+  - 低估 SAP TM 集成
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁 autonomy 程度 + 触发场景
+  2. Stakeholder: COO sponsor, central dispatch 是 co-designer, union 是 veto
+  3. Data: SAP + telematics + weather + manager input
+  4. Decompose: 11 subproblem, trust ladder 是核心
+  5. MVP: 4 周 passive observer, 0 autonomy
+
+Clarify Q 必问:
+  - Re-routing scope (carrier / route / reschedule)?
+  - 当前 decider 是谁?
+  - Error cost (avg + catastrophic)?
+  - Triggers (weather / equipment / overflow)?
+  - 决策约束 (HOS / hazmat / SLA / customer)?
+  - 500 managers 的 role?
+  - Union / driver protocol?
+  - SAP TM 集成模式?
+  - Scale + latency?
+  - Stakeholder veto?
+
+Veto holders:
+  - COO
+  - Driver Union rep (in 30% regions)
+  - CIO (SAP integration)
+  - VP Ops (owns risk)
+
+Trust ladder (核心):
+  W1-4: passive observer + logger (NO autonomy)
+  W5-12: shadow mode
+  M4-6: recommend mode
+  M7-12: opt-in autonomy for LOW-RISK only
+  Yr 2: per-manager tiered autonomy
+
+Graduation criteria (shadow → recommend):
+  - Agreement rate &gt; 70%
+  - Disagreement outcome match within 10%
+  - 0 hazmat / HOS violations
+  - Union sign-off
+
+11 subproblems:
+  1. Trigger detection (weather / overflow)
+  2. Decision engine (hard rules + soft ML)
+  3. Manager input UI
+  4. SAP TM integration
+  5. Shadow mode logging + retro
+  6. Recommend UI for dispatch
+  7. Per-manager calibration
+  8. Union opt-in framework
+  9. Audit + liability allocation
+  10. Autonomy ladder (doc, not ship)
+  11. LLM chat (phase 2)
+
+Walking-skeleton Week 1-4:
+  Day 1-2: meetings (COO / VP Ops / Dispatch / Union)
+  Day 3-5: SAP credentials + schema
+  Week 2: trigger detector + rule scoring
+  Week 3: end-to-end log of "what AI would recommend"
+  Week 4: Show to VP Ops, decision on phase 2
+
+Hard constraints (deterministic, rule engine):
+  HOS (driver hours of service)
+  Hazmat compatibility
+  SLA (contract delivery commitment)
+  Vehicle capability (refrigerated / oversize)
+
+Soft preferences (ML / scoring):
+  Customer preferences ("no overnight near building")
+  Cost minimization
+  ETA quality
+
+Per-manager calibration:
+  Veteran (10+ yr): higher autonomy threshold
+  Junior (&lt;2 yr): lower autonomy
+  Track record: agent agreement rate as signal
+
+Union engagement (30% regions):
+  Week 1 first meeting
+  Co-design opt-in framework
+  Logs NOT for individual discipline (in writing)
+  Aggregate not individual-driver tracking
+  Region-level if needed
+
+Resume quote:
+  "TikTok PayLater voice agent — 9 months
+   from shadow to first autonomous segment.
+   Logistics with HOS + union is more conservative
+   than that. Trust ladder, NOT autonomous day 1."
+
+Key phrases:
+  - "Before I sketch, 10 Qs..."
+  - "Why I won't build autonomous day 1..."
+  - "Trust ladder: shadow → recommend → opt-in → auto"
+  - "Hard constraints deterministic, soft preferences ML"
+  - "Per-manager calibration based on tenure"
+  - "Union opt-in non-negotiable"
+  - "Walking-skeleton: passive observer + logger, 0 autonomy"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-033-pharma-ai-with-ip-compliance.html">← Q33 · [问题拆解/案例] 某药企想部署 AI 助手让研究员查内部化合物数据, 有法务/IP/合规约束, 怎么起步</a>
+    <a href="zhenti-035-insurance-3000-claims-llm-summary.html">Q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 LLM 摘要, 受各州监管约束, 怎么 scope →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q34 · 物流公司自动重路由 Agent (SAP + 天气 + 500 仓库经理)
+
+> "A **large logistics company** wants to build an **AI agent** that can **automatically re-route shipments** based on **SAP data, weather API, and input from 500 warehouse managers**. Design the **end-to-end architecture**. **You have 60 minutes**."
+
+**Round**: Decomposition Case (60 min)
+**出处**: Exponent 2026 FDE · Palantir Foundry-style + OpenAI Enterprise Agents
+**行业**: Logistics / supply chain
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 design 一个 multi-agent system.
+
+**是**: 考你能不能克制冲动**不 build autonomous agent from day 1**, 而是用 **shadow → recommend → auto-with-override → autonomous** 的渐进 trust ladder.
+
+4 个 signal:
+
+1. **Don't build autonomous agent from day 1** — 90% 候选人冲去讲 LangGraph / multi-agent / tool use. 真实部署是 **shadow mode 12 周 + opt-in 12 周 + 渐进 autonomy**
+2. **500 managers are users, not data sources** — 候选人把 "500 manager input" 当训练数据. 实际他们是 **决策权持有者**, agent 要赢得他们信任, 不是 fit 他们历史
+3. **Define trust thresholds explicitly** — 哪个时机系统可 auto-decide vs 必须 ask manager? 哪些 case 永远 ask?
+4. **Per-manager calibration matters** — 一个 manager 是 10-yr veteran, 另一个是 6-month junior. Agent's confidence threshold per manager 不同
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 立刻 build autonomous multi-agent system**
+
+> "I'd use LangGraph with a planner agent, weather agent, SAP agent, routing agent, with tool use to talk to the warehouse system..."
+
+死. 你**没问**:
+- 当前重路由谁做? (Dispatcher / manager / 自动?)
+- 重路由的**决策约束** (合同 SLA / 客户偏好 / hazmat 限制 / 货车类型) 是什么?
+- 错误的代价 — 路由错一次 = $X loss + customer churn risk?
+- 500 个 manager 各自的 trust level?
+- 工会 / 司机协议是否限制 algorithmic dispatch?
+
+**挂法 #2: 把 manager 当数据源**
+
+> "We'd ingest manager inputs as training data and have the agent learn their patterns."
+
+死. Manager 们正在做决策. 你 ingest 他们 = 把活的决策者当死数据. 反应: managers 不输入了, 因为他们觉得自己在 train replace themselves.
+
+**挂法 #3: 一步到 fully autonomous**
+
+> "Phase 1 we'll launch shadow mode for 2 weeks, then go autonomous in week 3."
+
+死. 仓库 manager + dispatcher + 司机的 trust takes months, 不是 weeks. 跳级 = silent sabotage (managers ignore agent, agent gets stale).
+
+---
+
+## 完美答案架构 (5 步)
+
+### Step 1: 澄清问题 (10 min)
+
+> "Before I sketch, 10 questions. The architecture depends on what 'auto-route' actually means — degree of autonomy is THE design decision."
+
+**10 个 clarifying questions**:
+
+> **Q1**: "What's the **scope of re-routing** — change carrier? Change route within a carrier? Reschedule pickup/delivery? Re-stage in a different warehouse? **Different decisions have different stakeholders + risks**."
+
+> **Q2**: "**Who decides today** — dispatcher? Warehouse manager? Central operations? Customer service when problem reported? **The current decision-maker is the agent's primary stakeholder**."
+
+> **Q3**: "What's the **error cost** — wrong route = how much $? Mis-routed shipment = customer claim? Late delivery = SLA penalty? **This dictates how conservative we must be**."
+
+> **Q4**: "What's the **trigger** for re-routing — weather event, equipment failure, customer change, hub overflow? **Different triggers have different urgency + data**."
+
+> **Q5**: "What's the **decision constraint set** — contract SLA, customer preferences (some refuse certain carriers), hazmat restrictions, driver hours of service (HOS regulation), vehicle capabilities? **These are hard constraints**."
+
+> **Q6**: "What's the **role of 500 warehouse managers** — they input ad-hoc info ('dock 4 broken'), they approve agent recommendations, they override agent decisions, they request re-routes? **Different roles imply different UX**."
+
+> **Q7**: "Are there **union / driver protocols** limiting algorithmic dispatch? (Some US Teamsters contracts restrict algorithmic re-routing without driver concurrence.)"
+
+> **Q8**: "What's the **integration with SAP** — read access to TM / EM modules? Write access to update routes? Custom IDocs? **This is THE integration pain**."
+
+> **Q9**: "What's the **scale + latency** — N shipments / day, peak QPS, real-time decision required vs daily batch? **Different operating modes**."
+
+> **Q10**: "**Stakeholder map**: COO? CIO? VP of Ops? Each region's Operations Director? Driver union rep? 500 managers themselves? **Veto holders?**"
+
+**面试官 likely 回答**:
+- Re-routing scope: change route within carrier + reschedule pickup, NOT change carrier
+- Current decisioning: central dispatch (5-person team) handles regional, warehouse manager handles local
+- Error cost: avg $300 per mis-route + customer trust impact. Catastrophic mis-routes (hazmat) = $50K+
+- Triggers: weather (60%), equipment failure (20%), hub overflow (15%), customer change (5%)
+- Constraints: SLA (next-day, 2-day), customer "no overnight near my building", hazmat compatibility, driver HOS, vehicle type
+- Manager role: input local info (dock broken, weather impact local), approve agent suggestion (initially), eventually monitor agent
+- Union: Teamsters contract in 30% of regions restricts auto-dispatch without driver opt-in
+- SAP: read TM (Transportation Mgmt), write back through IDoc framework. Notoriously painful integration
+- Scale: 50K shipments/day, peak 6K/hr, target 5-minute decision latency
+- Veto: COO + VP Ops + Driver Union rep (in unionized regions)
+
+→ **Real scope**: in 90 days, build an **agent that recommends re-routes** for weather + hub overflow triggers, with **shadow → recommend → opt-in autonomy** trust ladder. NOT fully autonomous in 90 days.
+
+---
+
+### Step 2: 找干系人 + 成功指标 (10 min)
+
+**Stakeholder map**:
+
+| Stakeholder | 在意什么 | 对项目态度 | 我对他们的关键动作 |
+|---|---|---|---|
+| **COO** | Cost + customer SLA + driver retention | Sponsor, wants quick win | Quarterly review |
+| **VP Ops** | Daily ops stability | Cautious — owns risk | Weekly, ride-along with dispatch |
+| **Central Dispatch (5)** | Their job, their judgment | **Defensive about replacement** | Co-design, "augment not replace" |
+| **500 Warehouse Managers** | Local autonomy, response time | Mixed — some champions, some skeptics | Field visits, segment by attitude |
+| **Driver Union rep** | Driver autonomy, HOS compliance | **Highly skeptical, can veto in 30% of regions** | Early engagement, opt-in framework |
+| **CIO** | SAP integration cost / risk | Approval gate | Integration architecture review |
+| **CISO** | Data security, third-party | Approval gate | SOC2 controls |
+| **Customer Service** | Avoid customer complaints | Operational | Brief on what changes |
+| **Legal** | Liability, regulatory | Approval gate | Liability allocation in re-route docs |
+
+**Key insight**: Driver Union is the **veto holder in 30% of regions**. **Project will fail politically before failing technically if union not engaged**. Plus central dispatch's 5 person team is defensive about replacement — they're the agent's **primary co-designers**.
+
+**Success metrics (3 layers)**:
+
+**Layer 1 — Operational KPIs** (VP Ops daily view):
+- % of shipments on-time (target: maintain or improve current baseline)
+- Re-route cost per event ($ saved vs. baseline manual re-route)
+- Decision latency (current ~30 min for weather event, target < 5 min)
+- Manager satisfaction (NPS, quarterly)
+
+**Layer 2 — Trust KPIs** (process metrics):
+- Agent recommendation acceptance rate by central dispatch (target 60-80%, NOT > 95% which means rubber stamp)
+- Override rate by warehouse managers (target 20-40%)
+- Agent autonomy mode mix: % shadow / % recommend / % auto-with-override / % autonomous
+- Time to detect bad recommendation
+
+**Layer 3 — Strategic KPIs** (COO quarterly):
+- Total logistics cost trend
+- Customer SLA breach rate
+- Driver retention rate (don't break it!)
+
+**Counter-metrics**:
+- Hazmat mis-routes (must be 0)
+- Union grievances filed
+- Manager complaints ("agent overrides me, doesn't listen")
+- Driver complaints (HOS violation, unreasonable schedule)
+
+**The framing**:
+
+> "90 days is NOT 'fully autonomous re-routing across the network'. It's '**weather + hub-overflow triggered recommendations** for the central dispatch team to approve, with a clear ladder to expand to opt-in autonomy in month 6-12'."
+
+---
+
+### Step 3: 梳理输入数据 (10 min)
+
+**Data inventory**:
+
+| Dataset | Source | Format | Freshness | Issue |
+|---|---|---|---|---|
+| **Shipment master** | SAP TM | IDoc / BAPI | Real-time | Notoriously complex schema, 100+ fields |
+| **Active shipments + locations** | SAP TM + Telematics | Mixed | 5-30 min | Telematics provider differs by region |
+| **Hub capacity + dock status** | SAP EWM + manual | Mixed | Real-time + manual | Dock status often stale, manager updates |
+| **Driver assignments + HOS** | Mobile DVR | API | Real-time | HOS compliance critical, FMCSA regulated |
+| **Carrier network + lanes** | SAP TM | Static + updates | Daily | Some carriers don't share back data |
+| **Weather** | NOAA + commercial | API | 5-min | Reliable but geographic granularity varies |
+| **Traffic** | INRIX / Google | API | 1-5 min | Coverage gaps in rural |
+| **Customer SLA / preferences** | CRM | API | Daily | Some customers have unwritten preferences |
+| **Manager-input local context** | Internal app | Free text + structured | Ad-hoc | **Critical signal, NOT in SAP** |
+| **Historical re-routes** | SAP archive | T+1 | Daily | Has outcome (delivered on-time? cost?) |
+
+**Key gaps + dirty data fights**:
+
+1. **Manager local context is critical but ad-hoc**: "dock 4 broken until Tuesday" — no structured field for this. Currently lives in email + Slack + manager memory. Need a structured input app.
+2. **SAP TM schema is the deep end**: each customer's SAP TM customization is different. 80% of integration cost is mapping their specific implementation.
+3. **Telematics provider differs by region** (Lytx in some, Samsara in others, in-house in some). Need adapter pattern.
+4. **HOS compliance is non-negotiable**: re-route that violates driver HOS = FMCSA violation = company-wide audit. Must validate every recommendation against current driver HOS state.
+5. **Customer preferences in CRM are partial**: "no overnight near my building", "prefer FedEx", "this lane is hazmat-cleared" — half written, half tribal knowledge in dispatcher heads.
+
+**What I'd call in week 1**:
+- SAP architect — get TM module schema dump
+- Each telematics provider account manager — confirm API access
+- Customer Service lead — pull unwritten customer preferences out of CS team heads
+- Driver Union rep in 1 unionized region — first conversation
+- 5 central dispatchers — ride-along for 1 day each
+
+---
+
+### Step 4: 拆成可解子问题 (15 min)
+
+**11 subproblems**:
+
+| # | 子问题 | Risk | Value | 90-day pri |
+|---|---|---|---|---|
+| **A** | **Trigger detection**: weather, hub overflow, equipment failure → shipments affected | Low | Foundation | **1** |
+| **B** | **Decision engine**: scoring re-route options under hard constraints (HOS, hazmat, SLA) | High | Critical | **2** |
+| **C** | **Manager input UI**: structured way to enter local context | Low | High (unique signal) | **3** |
+| **D** | **SAP TM integration**: read shipments, write re-route IDoc | High | Critical | **4** |
+| **E** | **Shadow mode logging + retro**: agent makes silent decisions, we measure vs human | Low | Foundation for trust | **5** |
+| **F** | **Recommend UI for central dispatch**: AI suggests, human approves | Medium | High | **6** |
+| **G** | **Per-manager calibration**: trust threshold per manager based on tenure / track record | Medium | High | **7** |
+| **H** | **Union opt-in framework**: agent recommendations only act in unionized regions when driver opts in | High | Critical (veto avoidance) | **8** |
+| **I** | **Audit trail + liability allocation**: every re-route decision logged with reasoning | Medium | Critical | **9** |
+| **J** | **Autonomy ladder**: programmatic graduation rules from shadow → recommend → auto-with-override → autonomous | Medium | Future | Document, don't ship in 90 days |
+| **K** | **LLM-assisted dispatcher chat**: dispatcher talks to agent in NL ("re-route everything from hub 7 today") | Low | UX delight | Phase 2 |
+
+**Sequencing rationale**:
+
+> **A + D first** because: without trigger detection and SAP integration, agent has no data. Both are foundation.
+
+> **B critical** because: scoring re-route options under HARD constraints (HOS, hazmat, SLA) is the core decision logic. Must be deterministic on hard constraints (you don't ML your way through hazmat regs), ML on soft preferences.
+
+> **C unique signal** because: manager local context is in NO existing system. Building structured input app captures invaluable real-time data.
+
+> **E shadow mode** is the only way to build trust without risking damage. Run shadow for 8-12 weeks minimum.
+
+> **F recommend mode** ships when shadow shows agreement rate > 70% with dispatchers.
+
+> **G per-manager calibration** matters because 500 managers vary wildly. Veteran's 95% override = "veteran knows something we don't", junior's 95% override = "junior doesn't trust".
+
+> **H union opt-in** is non-negotiable in unionized regions.
+
+> **J autonomy ladder** documented but NOT shipped in 90 days. Year 1+.
+
+> **K LLM chat** is a delight feature, phase 2.
+
+---
+
+### Step 5: Walking-skeleton MVP (15 min)
+
+**Walking-skeleton (Week 1-4)**:
+
+```
+[SAP TM read API] ──┐
+                    │
+[Weather API]       ├──→ [Trigger detector] ──→ [Shipment scoring] ──→ [Recommendation log]
+                    │                                                          │
+[Manager UI input] ──┘                                                          ▼
+                                                              [Internal dashboard only]
+                                                              "Here's what AI would recommend"
+                                                              (Central dispatch reviews,
+                                                               does NOT use yet)
+```
+
+**Week 1**:
+- Day 1-2: Meetings with COO, VP Ops, Central Dispatch lead, Union rep (in 1 unionized region)
+- Day 3-5: SAP TM API credentials, schema dump, first test read
+
+**Week 2**:
+- Trigger detector (just weather + hub overflow in v1)
+- Mock scoring: rule-based, no ML yet
+- Mock manager input UI (just a Slack bot in v1)
+
+**Week 3**:
+- End-to-end: weather alert → identify affected shipments → score re-route options (rule-based) → log recommendation
+- Central dispatch reviews log daily, gives feedback
+
+**Week 4**:
+- Show to VP Ops + Union rep + Central Dispatch
+- Decision: scope phase 2
+
+**Walking-skeleton has ZERO autonomy in v1**. It's a **passive observer + logger**. Builds trust by:
+- Central dispatch sees AI's reasoning daily without risk
+- Compare to what they would do, comment on disagreements
+- Union rep sees agent's reasoning, understands logic
+
+**Phase 2 (Week 5-12) — Shadow Mode**:
+
+- Agent shadows real-time decisions
+- Dispatcher still controls
+- Weekly retro on agreement rate + outcome
+
+**Success criteria to graduate to phase 3**:
+- Agreement rate with dispatcher > 70%
+- For disagreements, AI's predicted outcome (cost, on-time) matches actual within 10%
+- 0 hazmat / HOS violations in shadow recommendations
+- Union rep signs off on shadow log review
+
+**Phase 3 (Month 4-6) — Recommend Mode**:
+
+- Central dispatch sees AI recommendation in UI
+- Dispatcher approves / overrides
+- Override rate target 20-40%
+
+**Phase 4 (Month 7-12) — Opt-in Autonomy with Manager Override**:
+
+- For low-risk re-routes (within-region weather, hub overflow only, NO hazmat, NO HOS-tight), agent acts automatically
+- Manager + dispatcher can override within 5-min window
+- Union regions still require driver opt-in
+
+**Phase 5 (Year 2) — Tiered Autonomy**:
+
+- Per-manager autonomy levels based on track record
+- Veteran managers' regions = more autonomy
+- Junior managers' regions = manual default
+
+---
+
+## 详细回答 (Sample 60-min monologue)
+
+> "Before I sketch, I want to ask 10 questions. The architecture depends entirely on what 'auto-route' means and how much autonomy in 90 days vs. year 1.
+>
+> *(asks 10 Qs, gets answers above)*
+>
+> OK so real scope: **90 days = recommendation system for weather + hub overflow triggers**, with central dispatch approving. NOT fully autonomous.
+>
+> Most candidates rush autonomous agent. Here's why I won't:
+>
+> 1. **HOS regulation** is non-negotiable, costs of violation are auditable
+> 2. **Driver union** has veto in 30% of regions
+> 3. **Central dispatch's 5 people** are the ones whose judgment we're trying to augment — replacing them in 90 days is political suicide
+> 4. **Trust ladders take months not weeks**: shadow → recommend → opt-in autonomy → full autonomy
+>
+> **Stakeholders**: COO sponsor, VP Ops owns risk, central dispatch (5) are co-designers (NOT replacement targets), 500 managers are users with varying tenure (per-manager calibration matters), driver union has veto in unionized regions, CIO + CISO + Legal gate.
+>
+> **Data**: SAP TM (notoriously complex, 80% of integration cost), telematics differs by region, weather + traffic public APIs, manager-input local context is a unique signal NOT in any system today, HOS data is non-negotiable.
+>
+> **11 subproblems**:
+>
+> 1. Trigger detection (weather, overflow)
+> 2. Decision engine (hard constraints HOS / hazmat / SLA, ML on soft preferences)
+> 3. Manager input UI (structured local context)
+> 4. SAP TM integration (read + write IDoc)
+> 5. Shadow mode logging + retro
+> 6. Recommend UI for central dispatch
+> 7. Per-manager calibration
+> 8. Union opt-in framework
+> 9. Audit trail + liability allocation
+> 10. Autonomy ladder (documented, not shipped)
+> 11. LLM chat for dispatcher (phase 2)
+>
+> **Walking-skeleton Week 1-4**: passive observer + logger. Trigger detection on weather, score re-route options rule-based, log recommendations daily for central dispatch to review. NO autonomy, NO production write to SAP. Internal dashboard only.
+>
+> **Phase 2 Week 5-12**: shadow mode — agent shadows real decisions, dispatcher still controls, weekly retro.
+>
+> **Phase 3 Month 4-6**: recommend mode — central dispatch sees AI suggestion in UI.
+>
+> **Phase 4 Month 7-12**: opt-in autonomy for LOW-RISK re-routes only (within-region weather, hub overflow, no hazmat, no HOS-tight).
+>
+> **Three things to flag proactively**:
+>
+> **(a) Union opt-in is non-negotiable**. In 30% of regions Teamsters contract restricts algorithmic dispatch. We engage Union rep week 1, design opt-in framework, do NOT skip.
+>
+> **(b) Per-manager calibration matters**. Veteran with 80% override rate ≠ junior with 80% override rate. We track per-manager and surface to autonomy decisions.
+>
+> **(c) Hard constraints are deterministic, NOT ML**. HOS, hazmat, SLA = rules. Soft preferences (customer 'no overnight') = ML. Mixing them = catastrophe.
+>
+> Want me to deep-dive the autonomy ladder, decision engine architecture, or union engagement?"
+
+---
+
+## Gao Xin 简历专属 reframe
+
+> "I shipped exactly this trust ladder pattern at TikTok PayLater. The voice agent for debt collection started in **shadow mode** (recommends what to say to customer, human collector still spoke), then **recommend mode** (human picked from agent's suggestions), then **opt-in autonomous** (agent talks to specific tiers of accounts, human can break in), then **autonomous with override** for the safest segments.
+>
+> **It took 9 months from shadow to first autonomous segment**, and that was for a use case much less consequential than mis-routing shipments. Logistics with HOS regulation + union veto + customer SLA is MORE conservative than I was, not less.
+>
+> Specific transferable lessons:
+>
+> 1. **Shadow mode log review with the humans you're 'augmenting'**: in PayLater, I sat with collectors every Friday and reviewed disagreements between agent's suggested response and what they actually said. They taught me what the agent was missing. In logistics: weekly retro with central dispatch reviewing disagreement cases.
+>
+> 2. **Per-segment autonomy graduation**: not all accounts get same autonomy. Veteran customers, simple repayment patterns → more agent autonomy. Disputed / multi-party / law-mentioned accounts → human always. **For logistics: per-region (unionized vs not), per-trigger (weather low risk vs equipment failure higher), per-shipment (hazmat = never autonomous)**.
+>
+> 3. **Hard constraints are deterministic, soft preferences are ML**: in PayLater, regulator-mandated disclosure text was a hard-coded string (no ML). Empathy + persuasion was LLM-generated. We never mixed them. In logistics: HOS / hazmat / SLA = rule engine. Customer 'no overnight near building' = learned.
+>
+> 4. **The first 4 weeks is about trust-building infrastructure, not value**: in PayLater, weeks 1-4 we shipped audit log + replay tool + Slack-bot dashboard for collectors to see agent's reasoning. ZERO model improvement in 4 weeks. By week 5 we had trust to ship the real thing.
+>
+> The pattern: **infrastructure for trust ships before product for value**."
+
+**Other resume hooks**:
+
+- **Indonesia voice agent partner negotiations** — direct parallel to union rep engagement. Both are "veto holder you can't ship without".
+- **Internal Agent Platform onboarding multiple teams** — onboarding 500 managers is the same pattern: segment by champion / skeptic / fence-sitter, win champions first.
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "Why not just build fully autonomous from day 1 with a high confidence threshold?"
+
+**A**: 3 reasons it fails:
+
+1. **Confidence is not calibrated on day 1**. You don't know what "0.9 confidence" actually means until you've measured against ground truth on YOUR data. Shadow mode is how you measure.
+2. **Edge cases are 80% of the value**. Easy cases agent handles fine. The cases that matter (driver near HOS limit, customer-mentioned-law account, unusual weather) need human judgment until model is trained on enough of them.
+3. **Union + regulatory exposure**. Even if model were perfect, deploying autonomous without union opt-in = grievance + work stoppage in unionized regions. Even one HOS violation = FMCSA audit.
+
+The cost of going-too-fast is much higher than the cost of phased rollout. **Phased is the optimal path, not the safe path**.
+
+**Q2**: "How do you get 500 warehouse managers to actually input local context?"
+
+**A**: This is **the** UX challenge. Approach:
+
+- **Make input dead-simple**: Slack bot or mobile app, structured but quick ("dock 4 broken, expected back Tuesday")
+- **Show value to them**: their input shows up as a tag on affected shipments, agent recommends differently. They see "my input changed the route" — that's the carrot.
+- **Segment managers by attitude**:
+  - **Champions** (~10%): power users, give them advanced features, name them in launch readme
+  - **Fence-sitters** (~70%): need to see colleagues use it, show stats "your team's average usage"
+  - **Skeptics** (~20%): don't fight them, but track and engage personally
+- **Don't penalize non-input**: if a manager doesn't input, agent operates as if no context — that's fine. We're not making it mandatory.
+- **Quarterly review**: present "input → outcome" stories at all-hands. Managers see their input matters.
+
+**Q3**: "Driver union rep refuses to allow shadow mode even, says any algorithmic logging is grievance-worthy."
+
+**A**: Different from "no autonomy" stance. Need to diagnose:
+
+- **Is the concern about individual driver tracking?** If yes, ensure logging is at shipment level not driver level. Aggregate by region not individual.
+- **Is the concern about discipline based on log?** Commit in writing: logs cannot be used in disciplinary actions against drivers.
+- **Is the concern about job security?** Commit to no force reductions tied to project. Co-sign by COO.
+- **If still no**: project doesn't proceed in unionized regions. Stay in non-unionized regions for v1, demonstrate value, revisit union with data.
+
+Walking away from 30% of regions is acceptable in v1. Forcing it = company-wide work stoppage risk.
+
+**Q4**: "What if SAP integration is too painful and adds 30 days to v1 timeline?"
+
+**A**: Reverse scope. 2 options:
+
+**Option A**: ship MVP with **read-only** SAP (just consume shipment data). Recommendations are logged + emailed to central dispatch. Dispatcher manually executes in SAP. This avoids write-back integration but reduces value.
+
+**Option B**: ship MVP for **single SAP region** (1 customer's installation of SAP TM, not their global system). Validate architecture, then expand to other regions in phase 2.
+
+**My recommendation**: Option A for proving model + Option B for proving write-back. Combine: read-only globally, write-back in 1 pilot region.
+
+This is the **scope reduction is FDE core skill** moment. Customer wants global write-back day 1 — they're wrong about the cost.
+
+**Q5**: "How does this scale to 50K shipments / day at peak 6K / hr?"
+
+**A**: Latency targets:
+- Trigger detection: 1-min loop
+- Affected shipment query: < 10s
+- Re-route scoring per shipment: < 1s (rule-based scoring is cheap)
+- Manager notification: real-time push
+
+**Scaling**:
+- Trigger detection runs as background job, not per-shipment
+- Shipment scoring is embarrassingly parallel: 6K/hr = 1.7/sec, trivial
+- Bottleneck is SAP TM API rate limits (typically 100-500 IDoc/min, vendor-specific)
+
+**Architecture for scale**:
+- Trigger detector → SQS / Kafka queue
+- Scoring workers (horizontal scale, 5-20 workers)
+- SAP write rate-limited with backoff
+- Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)
+
+This is **system design within the FDE answer**, not the main exam. Mention it briefly, deep-dive if asked.
+
+---
+
+## ❌ 死路答法 (top 7)
+
+1. **冲 autonomous multi-agent system** from day 1
+2. **Treat 500 managers as data source** instead of decision-holders
+3. **Skip union engagement** in unionized regions
+4. **Mix hard constraints (HOS) with ML** for soft preferences
+5. **Ship shadow → autonomous in weeks** (takes months minimum)
+6. **Same autonomy threshold for veteran vs junior manager**
+7. **Underestimate SAP TM integration** (80% of integration cost)
+
+---
+
+## ✅ 加分项 (top 7)
+
+1. **Trust ladder explicit**: shadow → recommend → opt-in auto → autonomous, **with graduation criteria**
+2. **Hard constraints deterministic, soft preferences ML** distinction
+3. **Per-manager calibration** based on tenure / track record
+4. **Union opt-in framework** for unionized regions
+5. **Manager-input UI as unique signal source**
+6. **Walking-skeleton with ZERO autonomy** in week 1-4
+7. **Quote your TikTok PayLater 9-month trust ladder experience**
+
+---
+
+## 一句话总结
+
+> **物流 auto-routing agent = "trust ladder 12 周 shadow → 12 周 recommend → 12 周 opt-in auto → autonomous" + "hard constraints deterministic, soft preferences ML" + "500 managers per-tenure calibration" + "union opt-in non-negotiable"**.
+>
+> 真正的 win 不是炫酷 multi-agent, 是**让 central dispatch 信任、500 managers 用起来、union rep 不否决**. 90 天 = recommendation system + 路径明确到 year 1 autonomy, NOT autonomous in 90 days.
+
+---
+
+## Cheat Sheet
+
+```
+不要做:
+  - 冲 autonomous multi-agent day 1
+  - 把 500 managers 当 data
+  - 跳过 union engagement
+  - 混合 hard constraints + ML
+  - 周级 graduation 速度
+  - 一刀切 manager 阈值
+  - 低估 SAP TM 集成
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁 autonomy 程度 + 触发场景
+  2. Stakeholder: COO sponsor, central dispatch 是 co-designer, union 是 veto
+  3. Data: SAP + telematics + weather + manager input
+  4. Decompose: 11 subproblem, trust ladder 是核心
+  5. MVP: 4 周 passive observer, 0 autonomy
+
+Clarify Q 必问:
+  - Re-routing scope (carrier / route / reschedule)?
+  - 当前 decider 是谁?
+  - Error cost (avg + catastrophic)?
+  - Triggers (weather / equipment / overflow)?
+  - 决策约束 (HOS / hazmat / SLA / customer)?
+  - 500 managers 的 role?
+  - Union / driver protocol?
+  - SAP TM 集成模式?
+  - Scale + latency?
+  - Stakeholder veto?
+
+Veto holders:
+  - COO
+  - Driver Union rep (in 30% regions)
+  - CIO (SAP integration)
+  - VP Ops (owns risk)
+
+Trust ladder (核心):
+  W1-4: passive observer + logger (NO autonomy)
+  W5-12: shadow mode
+  M4-6: recommend mode
+  M7-12: opt-in autonomy for LOW-RISK only
+  Yr 2: per-manager tiered autonomy
+
+Graduation criteria (shadow → recommend):
+  - Agreement rate > 70%
+  - Disagreement outcome match within 10%
+  - 0 hazmat / HOS violations
+  - Union sign-off
+
+11 subproblems:
+  1. Trigger detection (weather / overflow)
+  2. Decision engine (hard rules + soft ML)
+  3. Manager input UI
+  4. SAP TM integration
+  5. Shadow mode logging + retro
+  6. Recommend UI for dispatch
+  7. Per-manager calibration
+  8. Union opt-in framework
+  9. Audit + liability allocation
+  10. Autonomy ladder (doc, not ship)
+  11. LLM chat (phase 2)
+
+Walking-skeleton Week 1-4:
+  Day 1-2: meetings (COO / VP Ops / Dispatch / Union)
+  Day 3-5: SAP credentials + schema
+  Week 2: trigger detector + rule scoring
+  Week 3: end-to-end log of "what AI would recommend"
+  Week 4: Show to VP Ops, decision on phase 2
+
+Hard constraints (deterministic, rule engine):
+  HOS (driver hours of service)
+  Hazmat compatibility
+  SLA (contract delivery commitment)
+  Vehicle capability (refrigerated / oversize)
+
+Soft preferences (ML / scoring):
+  Customer preferences ("no overnight near building")
+  Cost minimization
+  ETA quality
+
+Per-manager calibration:
+  Veteran (10+ yr): higher autonomy threshold
+  Junior (<2 yr): lower autonomy
+  Track record: agent agreement rate as signal
+
+Union engagement (30% regions):
+  Week 1 first meeting
+  Co-design opt-in framework
+  Logs NOT for individual discipline (in writing)
+  Aggregate not individual-driver tracking
+  Region-level if needed
+
+Resume quote:
+  "TikTok PayLater voice agent — 9 months
+   from shadow to first autonomous segment.
+   Logistics with HOS + union is more conservative
+   than that. Trust ladder, NOT autonomous day 1."
+
+Key phrases:
+  - "Before I sketch, 10 Qs..."
+  - "Why I won't build autonomous day 1..."
+  - "Trust ladder: shadow → recommend → opt-in → auto"
+  - "Hard constraints deterministic, soft preferences ML"
+  - "Per-manager calibration based on tenure"
+  - "Union opt-in non-negotiable"
+  - "Walking-skeleton: passive observer + logger, 0 autonomy"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

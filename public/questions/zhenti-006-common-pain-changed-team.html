@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q6 · [行为/动机] 讲一次你发现多个客户的共性、并改变了团队做法 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q6 · [行为/动机] 讲一次你发现多个客户的共性、并改变了团队做法</div>
+  <h1>Q6 · [行为/动机] 讲一次你发现多个客户的共性、并改变了团队做法</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-006-common-pain-changed-team.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-006-common-pain-changed-team.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q6 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q06 · 你发现多个客户的共性、并改变了团队做法</h3>
+<blockquote><p>"Tell me about a time you noticed a pattern across multiple customers and influenced your team to change how you work. How did you spot the pattern, what did you propose, and how did the team adopt it?"</p></blockquote>
+<p><strong>Round</strong>: Behavioral (30-45 min, hiring manager round) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a time you identified a systemic issue" / "describe a time you influenced team processes" / "when did your customer insights change a product"</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>这是 <strong>FDE 跟 SE / Implementation 区分度最高的题之一</strong>. 表面问 pattern recognition, 实际筛 6 件事:</p>
+<ul><li><strong>Pattern recognition across customers</strong> —— 你能不能从 N 个 individual 故事抽 abstract pattern. 这是 FDE → Product 的核心 muscle</li><li><strong>Influence without authority</strong> —— 你不是 manager, 不是 product owner. 你怎么 change team practice</li><li><strong>Customer-to-product loop closure</strong> —— FDE 的 unique value 是 customer insight 反哺 product. 你 demonstrate 过这个 loop 吗</li><li><strong>Data-driven proposal</strong> —— 不是 "we should change X", 是 "看 N 个 customer 的 data, 80% 都 hit Y problem, 建议 change X"</li><li><strong>Adoption / change management</strong> —— 你 propose 之后怎么 onboard team / 处理 resistance / measure success</li><li><strong>Generality vs specificity trade-off</strong> —— 你抽的 pattern 是真 pattern 还是 noise</li></ul>
+<p><strong>没说出口的红线</strong>:</p>
+<ul><li>"We noticed all customers had the same problem and fixed it" → 太 vague, 没 specific pattern</li><li>"I told my manager and they fixed it" → no personal agency</li><li>"I proposed but team didn't adopt" → 没 close loop, no influence demonstrated</li><li>没量化 pattern (e.g., "5 of 7 markets") → 数字 specific 才信</li><li>没量化 outcome (after change, what metric changed) → 没 follow through</li><li>一个 customer 的 lesson → 不 generalize, 不是 pattern</li></ul>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<p>8 段结构, total ~4-5 分钟:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Context — 我服务多少 customer</strong></td><td>20s</td><td>Setup 多 customer 视角</td><td>"I was rolling out voice agent across 7 markets serving 7 ops teams..."</td></tr><tr><td>2</td><td><strong>Pattern detection (specific signal)</strong></td><td>30s</td><td>什么信号让你 spot pattern</td><td>"After Vietnam, Thailand launches, I noticed both ops teams complained about same thing: 4-week delay between scoping and pilot..."</td></tr><tr><td>3</td><td><strong>Why I trusted it (validation)</strong></td><td>30s</td><td>1 个 customer 是 noise, 你怎么 confirm pattern</td><td>"I went back to Indonesia logs — same pattern. Checked Philippines (in scoping) — also same. 3/3 markets..."</td></tr><tr><td>4</td><td><strong>Root cause analysis</strong></td><td>45s</td><td>Pattern 背后 systemic reason</td><td>"Root cause was 'spec doc' phase — 4 weeks of doc round-trip, but actual implementation 1 week. Doc was wrong abstraction..."</td></tr><tr><td>5</td><td><strong>The proposal (specific)</strong></td><td>60s</td><td>你 propose 什么具体 change</td><td>"I proposed: replace spec doc with 1-week 'workshop + skeleton commit'. Workshop = stakeholder in room, skeleton = working code on day 5..."</td></tr><tr><td>6</td><td><strong>Adoption challenge + how I navigated</strong></td><td>60s</td><td>团队 resistance, 你怎么 onboard</td><td>"Tech lead pushed back: 'workshops don't scale'. I proposed pilot on Philippines + Pakistan. Data after 2 markets prove pattern..."</td></tr><tr><td>7</td><td><strong>Outcome (quantified for team)</strong></td><td>30s</td><td>Team metric change after adoption</td><td>"Per-market onboarding time: 6 months Indonesia → 3 months Vietnam → 6 weeks Pakistan. Pattern adopted by 3 other internal teams..."</td></tr><tr><td>8</td><td><strong>What I learned about influencing</strong></td><td>30s</td><td>Meta lesson about change management</td><td>"Lesson: pattern by itself doesn't change practice. Pattern + pilot + data + champion = change..."</td></tr></tbody></table></div>
+<p>Total: ~4-5 min. 8 段都重要, 段 6 (adoption challenge) 是 senior signal.</p>
+<hr />
+<h3>详细回答 (Sample Monologue) — 可以照背</h3>
+<blockquote><p>"我讲 voice agent multi-market rollout 期间发现的 'scoping doc 是 wrong abstraction' 这个 pattern, 因为它 cleanly hit pattern recognition + influence + adoption 三件事.</p>
+<p><strong>Context</strong>: 我做 voice agent debt collection, 跨 7 个市场 (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦), 6 种语言. 每个市场我跟 ops + product + compliance 三方对接. 印尼 first launch 6 个月, 团队习惯流程是: scoping (4 周) → spec doc 写完 → kickoff (4 周) → pilot (2 周) → production (2 周). Total ~14 周/市场.</p>
+<p><strong>Pattern detection — specific signal</strong>:</p>
+<p>印尼 launch 完之后, 我做越南. 越南 ops team 在 scoping 第 3 周突然 frustrated, 跟我说: 'doc 上写的 escalation flow 跟我们实际工作流不像. 我们 review doc 3 周还在 round trip 修改.'</p>
+<p>我以为是越南 ops 特殊. 但泰国 month 1 同样事情 — ops 抱怨 'spec doc 跟实际不像, 我 review 不出真问题'. 菲律宾 (next in line) scoping 启动第 1 周, ops 跟我说 'doc 我们 review 来回 4 周, 然后实际 implementation 才 1 周才发现问题'.</p>
+<p><strong>3 个 customer, 同一个 specific complaint</strong>. 这就是 pattern.</p>
+<p><strong>Validation — 我怎么 confirm 不是 noise</strong>:</p>
+<p>我回头看印尼 log. 印尼当时 scoping doc round trip 是 4 周 (我以为 normal). 但 implementation 第 1 周, ops 发现 doc 里 2 个 escalation case 跟实际工作流不像, 我们 redo 1 周. 印尼实际上也有同 pattern, 只是我当时 first launch 没意识到.</p>
+<p>4/4 markets 同 pattern. 不是 noise.</p>
+<p>我也 quantify: 14 周 typical timeline 里, 8 周是 scoping + spec doc (round trip), 4 周是 implementation + pilot. <strong>57% 时间花在 doc, 只 29% 时间写代码</strong>. Doc-heavy 流程明显不对.</p>
+<p><strong>Root cause analysis</strong>:</p>
+<p>我跟 4 个 ops lead 各做 30 分钟 retro. 抽出 root cause:</p>
+<p><strong>One — Doc 是 wrong abstraction for AI deployment</strong>. Traditional software spec doc 适合 deterministic system (input X → output Y, ops review yes/no). AI system 行为概率性, doc 写 'agent will respond politely' ops 无法 review, 必须看 actual sample dialog.</p>
+<p><strong>Two — Doc round trip latency 太高</strong>. Ops 周一 send comment, 我周二 incorporate, 周三 ops review, 周四 next comment. 1 个 round trip 4 天. 通常 5-6 rounds = 4 周.</p>
+<p><strong>Three — Ops 不读完 doc</strong>. Doc 20-30 页, ops 时间紧, 读 30%. 真正问题在没读的 70%.</p>
+<p>这 3 个 root cause 共同结果: doc 给 false confidence + delay implementation 真正 problem 浮现.</p>
+<p><strong>The proposal — 'Workshop + Skeleton' replace spec doc</strong>:</p>
+<p>我 propose 替代 spec doc 阶段 (8 周) with 1-week 'workshop + skeleton commit':</p>
+<ul><li><strong>Day 1-3: Workshop</strong>. Ops + product + compliance 三方 in room 3 天. 我 demo 一个 working voice agent prototype (印尼 base 改 prompt). 三方现场 react to actual sample dialog, 不是 doc abstract description.</li><li><strong>Day 4-5: Skeleton commit</strong>. 我把 workshop output codify 成 working skeleton — 真的能跑, 真的能拨电话. Skeleton 不是 finished product, 是 first iteration to react to.</li><li><strong>Day 6-7: Iterate on skeleton</strong>. Ops review skeleton, give comment, 我 patch.</li></ul>
+<p>Total 1 周 vs 原来 8 周. <strong>8× speed up</strong>.</p>
+<p>加 1 周 pilot, 总 onboarding 2 周 vs 原 14 周.</p>
+<p><strong>Adoption challenge — tech lead pushback</strong>:</p>
+<p>我 propose 完, tech lead immediate push back:</p>
+<p>'Workshop 不 scale. 我们如果未来要做 30 个客户 deployment, 每个 1 周 3 天 workshop 我们 deploy team 全年 booked.'</p>
+<p>Valid concern. 我 steel man: workshops 确实 expensive in eng time.</p>
+<p>我 counter:</p>
+<ul><li>8 周 spec doc round trip 也 expensive — ops + product + compliance + eng 4 方时间. Workshop 3 天集中, 总时间反而少.</li><li>Skeleton-based iteration 比 doc-based iteration cheaper, 因为 ops 看真东西不读 doc.</li><li>30 客户 scale 不需要 30 个独立 workshop. 同 vertical (e.g. 7 个 debt collection market) skeleton 可复用, workshop 缩短到 1.5 天.</li></ul>
+<p>我提议 <strong>pilot on Philippines + Pakistan</strong>, 数据出来再 commit.</p>
+<p>Tech lead 同意 pilot.</p>
+<p><strong>Outcome — quantified</strong>:</p>
+<p>Philippines pilot:</p>
+<ul><li>原本 estimate 14 周 onboarding</li><li>实际 workshop + skeleton + pilot, <strong>6 周 onboarding</strong> (57% reduction)</li><li>Ops satisfaction (NPS-style) 比 印尼 / 越南 / 泰国 高 35%</li></ul>
+<p>巴基斯坦 (next):</p>
+<ul><li><strong>6 周 onboarding</strong> confirmed</li><li>加上 cultural workshop component (我学的另一 lesson)</li></ul>
+<p>Tech lead 在数据出来后 fully convert. 'Workshop + skeleton' 成为 voice agent 团队 default scoping pattern.</p>
+<p>12 个月后:</p>
+<ul><li>7 个市场全部 onboarded, average 6 周 vs original 14 周</li><li>这个 pattern 反哺 BNPL chatbot 团队 (他们 spec doc 风格也类似 broken)</li><li>后来 Internal Agent Platform onboarding 也 default workshop + skeleton</li></ul>
+<p>3 个 internal team adoption.</p>
+<p><strong>What I learned about influencing — meta lesson</strong>:</p>
+<p>Pattern by itself doesn't change practice. Pattern + pilot + data + champion = change.</p>
+<ul><li><strong>Pattern</strong>: 3/3 → 4/4 markets, quantified (57% time on doc)</li><li><strong>Pilot</strong>: Philippines + Pakistan, low-risk validation</li><li><strong>Data</strong>: 6 weeks vs 14, ops NPS +35</li><li><strong>Champion</strong>: tech lead 一旦 convert, 他 push 比我 push effective 10×. 我不 fight tech lead, 我 convert tech lead.</li></ul>
+<p>Influence without authority = 4 个 element 同时 land. 缺任何一个 = proposal die."</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 STAR 模板</h3>
+<p>至少 1 完整 STAR (workshop + skeleton), 2 alternate.</p>
+<h4>★ STAR 1: Spec Doc → Workshop + Skeleton Pattern (★ PRIMARY)</h4>
+<p><strong>S</strong> (Situation):</p>
+<blockquote><p>"Voice agent multi-market rollout, 7 markets. 印尼 first launch 6 个月, 团队 default 流程 spec doc → kickoff → pilot → production, 14 周/市场. 越南 / 泰国 / 菲律宾 ops 都抱怨同一件事: 'spec doc 跟实际不像, round trip 太长'. "</p></blockquote>
+<p><strong>T</strong> (Task):</p>
+<blockquote><p>"Detect pattern, validate, propose alternative, navigate adoption resistance, prove ROI."</p></blockquote>
+<p><strong>A</strong> (Action):</p>
+<ol><li><strong>Pattern detection</strong>: 3 个 customer 同 complaint, 我回头看印尼 log 4/4 confirm</li><li><strong>Quantify</strong>: 57% timeline on doc, 29% on implementation</li><li><strong>Root cause</strong> (3 个 underlying reasons):</li></ol>
+<ul><li>Doc 是 wrong abstraction for AI (probabilistic behavior 不能 doc review)</li><li>Round trip latency 4 days/round, 5-6 rounds = 4 weeks</li><li>Ops 不读完 doc (30% read, 70% miss)</li></ul>
+<ol><li><strong>Propose</strong>: Workshop (3 days, stakeholder in room, react to actual prototype) + Skeleton (day 5, working code) + Iterate (1-2 weeks)</li><li><strong>Adoption — tech lead pushback</strong>:</li></ol>
+<ul><li>Steel-man: workshops expensive in eng time (valid)</li><li>Counter with data: 8 weeks doc 4 stakeholder time vs 3 days workshop concentrated</li><li>Counter with reuse: same vertical 可复用 skeleton, workshop 缩短</li><li>Propose pilot 2 markets first (Philippines + Pakistan), low-risk validation</li></ul>
+<ol><li><strong>Pilot execution + data</strong>:</li></ol>
+<ul><li>Philippines: 6 weeks vs 14 weeks (57% reduction)</li><li>Ops NPS +35% vs prior markets</li><li>Pakistan: 6 weeks confirmed</li></ul>
+<ol><li><strong>Scaling</strong>:</li></ol>
+<ul><li>Tech lead full convert, becomes champion</li><li>7 markets total avg 6 weeks</li><li>Pattern adopt by BNPL chatbot team</li><li>Pattern adopt by Internal Agent Platform team</li></ul>
+<p><strong>R</strong> (Result):</p>
+<ul><li>7 markets onboarded <strong>avg 6 weeks vs original 14 weeks</strong> (57% reduction)</li><li>Ops NPS +35%</li><li><strong>3 internal teams adopted</strong> workshop + skeleton pattern (voice agent, BNPL chatbot, Internal Agent Platform)</li><li>Tech lead becomes champion, 'workshop + skeleton' becomes default</li></ul>
+<p><strong>Vulnerability line</strong>:</p>
+<blockquote><p>"我 initial pattern detection 是 lucky — 越南 ops 主动 frustrated 找我, 我才意识到. 印尼 6 个月我 own 一个 market 时没 spot. 我 1-market 时 ignore signal, 2-market 时 ignore again, 3-market 才 spot. Lesson: pattern recognition 需要意识到 'maybe this is not just this customer's problem'. 现在每个 customer complaint 我都问 '其他 customer 也碰到吗?', 不再等到 3 个 confirm."</p></blockquote>
+<hr />
+<h4>STAR 2: BNPL Chatbot Tool Description Discovery (Alternate)</h4>
+<p><strong>S</strong>: BNPL chatbot 上线后, 我跟 5 个内部 tool team (账户查询 / 信用查询 / 还款 / 投诉 / 转 CS) 对接. 每个 team 给我一个 tool, 我做 prompt routing.</p>
+<p><strong>T</strong>: Initially 我做 manual prompt routing (hard-coded if-else based on intent). Pattern across 5 teams: 每个 team 都说 "我的 tool 没被 chatbot 用够, 用户 query 应该 route 给我但没有".</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Pattern detection</strong>: 5/5 teams 同 complaint, 各自 attribute to "intent classifier 不行"</li><li><strong>Diagnostic</strong>: 我看 confusion matrix, 60% mis-route 是 tool description 模糊不是 intent classifier</li><li><strong>Root cause</strong>: tool description 是 5 个 team 各自写的, 没 standardize, 模型分不清 "check balance" vs "check past due"</li><li><strong>Propose RAG-based tool discovery</strong>:</li></ol>
+<ul><li>Tool description 用 semantic embedding store</li><li>Query 时 dynamic retrieve top-K tool descriptions</li><li>LLM 看 description 选 best tool</li></ul>
+<ol><li><strong>Adoption</strong>:</li></ol>
+<ul><li>Tool team push back: "我们要写更清楚 description?"</li><li>我 push back to them: "Description template 我提供, 你按 template 写 takes 30 min/tool"</li><li>5 个 team 30 分钟 onboard</li></ul>
+<ol><li><strong>Pattern extract</strong>:</li></ol>
+<ul><li>这个 'RAG-based tool discovery' pattern 后来 transferred to Internal Agent Platform</li><li>14 个 internal team 都用同 pattern</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>BNPL routing accuracy: <strong>70% → 92% in 6 weeks</strong></li><li>5 个 tool team 各自 tool usage +50-200%</li><li>Internal Agent Platform adopt 同 pattern, 14 teams</li><li>后来这个 pattern paper'd internally as "RAG-based tool discovery"</li></ul>
+<p><strong>Vulnerability</strong>:</p>
+<blockquote><p>"我 initial mistake 是 attribute 5 teams 都说 'classifier 不行' 听成 face value. 我 spent 1 week 调 classifier, 没 fix. 然后回到 confusion matrix 看 root cause. Lesson: customer-reported root cause 经常 wrong, customer-reported symptom 通常 right. Listen to symptom, diagnose root cause yourself."</p></blockquote>
+<hr />
+<h4>STAR 3: Cultural Localization &gt; Translation Pattern (Alternate)</h4>
+<p><strong>S</strong>: Voice agent 扩展 6 markets after Indonesia. 我 initial scope 是 "translate prompts per language, reuse persona".</p>
+<p><strong>T</strong>: After Thailand launch, ops 反馈 catch rate 比印尼低 8pp. After Brazil launch, 反馈 hang-up rate 高 30%. Pattern is emerging.</p>
+<p><strong>A</strong>:</p>
+<ol><li><strong>Pattern detection (slow)</strong>:</li></ol>
+<ul><li>Thailand: politeness culture, direct "pay debt" sounds rude</li><li>Brazil: TTS female voice sounds like telemarketing scam</li><li>Mexico: same as Brazil but different female voice frequency band trigger</li><li>3 markets same essential pattern: <strong>persona ≠ translation</strong></li></ul>
+<ol><li><strong>Root cause</strong>: I treated "localization" as translation. Actually = translation + cultural framing + persona + TTS voice selection + escalation rules.</li><li><strong>Propose multi-layer localization</strong> as default scoping item:</li></ol>
+<ul><li>Translation (existing)</li><li>Cultural workshop with local ops (1 week)</li><li>Persona design with local cultural advisor</li><li>TTS voice A/B with local sample audience</li><li>Escalation rule per-market</li></ul>
+<ol><li><strong>Adoption challenge</strong>:</li></ol>
+<ul><li>Product VP: "this adds 4 weeks per market"</li><li>I counter: "Thailand cost us 4 weeks redo. Brazil cost 3 weeks. Adding 1 week scoping front saves 4 weeks fix."</li><li>Data: prior 2 markets average redo 3.5 weeks → new pattern 1 week scoping = 2.5 weeks net save</li></ul>
+<ol><li><strong>Bake into default scoping doc</strong>:</li></ol>
+<ul><li>Workshop + skeleton template (from STAR 1) updated to include cultural review section</li><li>All future markets pass through</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>3 后续 markets (Philippines / Mexico / Pakistan) <strong>0 cultural redo</strong> after launch</li><li>Catch rate variance across markets: prior 8pp range → 3pp range</li><li>Pattern adopted by BNPL chatbot 多市场 effort</li><li>Documented as "localization for AI &gt; translation" team principle</li></ul>
+<p><strong>Vulnerability</strong>:</p>
+<blockquote><p>"Thailand 上线后我 wrong-attribute catch rate drop to '泰国 ops less mature'. Wrong attribution. 是我的 scope problem. 3 markets 后我才 admit pattern. 现在我 每个 multi-market launch failure mode 我 first question 是 'is this our scope or their execution?' Default assume scope problem until 反证."</p></blockquote>
+<hr />
+<h3>5 个 Follow-ups (interviewer 追问 + 准备答案)</h3>
+<h4>Follow-up 1: "How do you distinguish a real pattern from noise?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"<strong>3 criteria</strong>:</p>
+<p><strong>One — N ≥ 3 customers with same specific complaint</strong>. Same vague complaint (e.g., 'AI 不准确') doesn't count. Same specific complaint ('spec doc 跟实际不像, round trip 太长') counts.</p>
+<p><strong>Two — Quantify</strong>. 57% timeline on doc 是 cross-customer 可比. 'feels slow' 不是 pattern.</p>
+<p><strong>Three — Root cause survives steel man</strong>. 我 steel man 'maybe each customer is just lazy / inexperienced / 不同 timezone'. 这些 explanation if they were true, 不应该 quantify 一致.</p>
+<p>反例: 单 customer 抱怨 'response too slow'. 我看 metric, 1 customer 网络环境 latency 高. Not pattern, 是 environmental.</p>
+<p>反例 2: 3 customer 抱怨 'AI 不智能'. Vague. 不是 pattern, 是 vague complaint.</p>
+<p>真 pattern: 3 customer 抱怨 'spec doc 4 round trip 之后 implementation 第 1 周才发现 doc 跟实际不像'. Specific + quantifiable + survives steel man."</p></blockquote>
+<h4>Follow-up 2: "How do you influence without authority?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"我用 4-element framework: <strong>Pattern + Pilot + Data + Champion</strong>.</p>
+<p><strong>Pattern</strong>: 量化 customer-side evidence (57% time on doc, 4/4 markets)</p>
+<p><strong>Pilot</strong>: Low-risk validation (Philippines + Pakistan first, 不是 all 7 markets)</p>
+<p><strong>Data</strong>: Post-pilot 数据 (6 weeks vs 14, NPS +35%)</p>
+<p><strong>Champion</strong>: Identify the influential blocker, convert them. Tech lead 一开始 push back, 我没 fight, 我 convert. 一旦 tech lead 是 champion, 他 push 比我 effective 10×.</p>
+<p>缺 element:</p>
+<ul><li>Pattern only → 'interesting observation, no urgency'</li><li>Pattern + Pilot → 'might work, who's responsible'</li><li>Pattern + Pilot + Data → 'evidence-based but no political backing'</li><li>Pattern + Pilot + Data + Champion → adopted</li></ul>
+<p>Influence without authority 不是 charisma, 是 systematically build 4 elements."</p></blockquote>
+<h4>Follow-up 3: "What if no other customer agrees with the pattern?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Then it's not a pattern, it's that customer's specific situation. 我 respect 这个 outcome.</p>
+<p>反例 (我 wrong pattern detection 之一): Internal Agent Platform 我 initial assume '5 teams 都想 standardize memory layer storage'. 我 propose vector DB standard. 实际 4/5 happy, 1 (Risk team) reject. 不是 5/5 pattern, 是 4/5 pattern + 1 outlier.</p>
+<p>我 propose 时不 force outlier in. Memory layer 加 pluggable backend, Risk team 保留 SQL.</p>
+<p>Lesson: pattern 不必 100% 才 actionable. 4/5 pattern 适合 default with escape hatch. 5/5 pattern 适合 hard requirement. Distinguish 这两种."</p></blockquote>
+<h4>Follow-up 4: "How do you balance pattern abstraction vs customer-specific needs?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Pattern 抽象时容易 over-generalize. 我用 <strong>escape hatch design</strong>:</p>
+<p>'Workshop + Skeleton' pattern 是 default, 但 each market 可以 customize 比例 (Indonesia 3 days workshop, Pakistan 1.5 days because shorter cultural distance from Indonesia).</p>
+<p>'Cultural review' pattern 是 default scope item, 但 each market 决定 review depth (Brazil 因为 most cultural distance from Indonesia, 1 full week. Vietnam 因为 closer, 2 days).</p>
+<p>Pattern 不是 'one size fits all'. Pattern 是 'default with parameters'. Default = team 复用; parameters = customer 适配.</p>
+<p>这种 thinking 我从 Internal Agent Platform 学到 — 3-layer abstraction 每层 escape hatch. Same mental model."</p></blockquote>
+<h4>Follow-up 5: "Have you ever proposed a change that didn't get adopted?"</h4>
+<p><strong>Answer</strong>:</p>
+<blockquote><p>"Yes — 一次 proposal 没 adopted, 我 also 学到了:</p>
+<p><strong>Proposal</strong>: 我提议 voice agent multi-market 用 'central observability dashboard' (Grafana + Prometheus, 跨 7 个市场 unified view).</p>
+<p><strong>Push back</strong>: 每个市场 ops 用 own preferred tool (印尼 Looker, 巴西 Tableau, 巴基斯坦 自己 Excel dashboard).</p>
+<p><strong>Why didn't adopt</strong>: 没 pain that central dashboard solves more than per-market dashboard adds friction. Per-market ops 已 onboard 自己 tool, central dashboard 是 my convenience 不是 their convenience.</p>
+<p><strong>What I learned</strong>: Pattern detection 我做对了 (我 cross-market 看数据 friction 高). But proposal 服务 my pain not customer pain. <strong>Pattern detection ≠ customer pain detection</strong>. Customer pain detection 才 trigger adoption.</p>
+<p>后来我 build personal dashboard tool (just for me + my manager), 不 force on ops. Pragmatic compromise.</p>
+<p>Lesson: 'pattern I see' ≠ 'pattern customers feel'. 我 propose 前 verify 'customer 是否 also see this as pain'."</p></blockquote>
+<hr />
+<h3>❌ 死路答法 (碰了就挂)</h3>
+<h4>死路 1: "We noticed all customers had the same problem."</h4>
+<p><strong>为什么挂</strong>: Vague. 哪个 specific problem? 多少 customer? Quantify?</p>
+<p><strong>怎么改</strong>: "3 of 3 markets reported same specific complaint: 'spec doc 跟实际不像, round trip 4 weeks'. 4-th market confirm with log review."</p>
+<hr />
+<h4>死路 2: "I told my manager and they fixed it."</h4>
+<p><strong>为什么挂</strong>: No personal agency. FDE manager 想看 你 personally drive change.</p>
+<p><strong>怎么改</strong>: 显式 quote 你的 proposal + adoption work. Steel-man push back, pilot design, champion conversion.</p>
+<hr />
+<h4>死路 3: "I proposed but team didn't adopt."</h4>
+<p><strong>为什么挂</strong>: 没 close loop. Pattern recognition 容易, influence 难. 不 adopt = no influence demonstrated.</p>
+<p><strong>怎么改</strong>: 即使 partial adoption, 显式 quote 哪 part adopted, 哪 part 没, 为什么没 (lesson). 或选另一个 story 是 adopted.</p>
+<hr />
+<h4>死路 4: "We changed our process based on customer feedback."</h4>
+<p><strong>为什么挂</strong>: 太 generic. 哪个 process? 怎么 change? Outcome metric?</p>
+<p><strong>怎么改</strong>: 具体: spec doc (14 周) → workshop + skeleton (1 周). Specific before/after.</p>
+<hr />
+<h4>死路 5: 一个 customer 的 lesson</h4>
+<p><strong>为什么挂</strong>: 不是 pattern, 是 individual. 题目明确要 multiple customers.</p>
+<p><strong>怎么改</strong>: 强调 N ≥ 3 customer 同 complaint. Quantify cross-customer.</p>
+<hr />
+<h4>死路 6: 没 pushback adoption challenge</h4>
+<p><strong>为什么挂</strong>: 显得 proposal 没 friction = 不 important enough OR 你 sugar-coat.</p>
+<p><strong>怎么改</strong>: 必须有 段 6 (tech lead pushback). Steel-man + counter + pilot proposal. 这是 senior signal.</p>
+<hr />
+<h4>死路 7: 数字模糊 ("improved efficiency")</h4>
+<p><strong>为什么挂</strong>: 没 metric = 没 outcome.</p>
+<p><strong>怎么改</strong>: 14 周 → 6 周, NPS +35%, 3 team adopt. Specific.</p>
+<hr />
+<h3>✅ 加分项 (top 5)</h3>
+<h4>加分 1: "Pattern + Pilot + Data + Champion" 4-element framework</h4>
+<p>显式 frame 你的 influence approach. 这种 systematic 是 senior signal.</p>
+<h4>加分 2: Quantify pattern 跨 customer</h4>
+<p>"3/3 markets same complaint", "57% timeline on doc", "4 weeks round trip". Specific cross-customer 数字让 pattern claim credible.</p>
+<h4>加分 3: Convert champion not fight blocker</h4>
+<p>"Tech lead push back, 我没 fight, 我 convert. Champion conversion 比 fight 有效 10×". 这种 political maturity 是 senior FDE signal.</p>
+<h4>加分 4: Escape hatch design</h4>
+<p>"Pattern 是 default with parameters, 不是 one size fits all". Cultural review pattern 让 each market 决定 depth. Memory layer SQL escape hatch. 这种 over-generalization 自觉是 senior signal.</p>
+<h4>加分 5: Failed adoption example for balance</h4>
+<p>"Central observability dashboard 我 proposed, no adopted. Customer pain ≠ my pain". 这种 self-honesty 让 success story 更 credible.</p>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>"Common pain → team change" 的 winning answer 不是讲你 spot 了 pattern, 是用 4-element framework (Pattern + Pilot + Data + Champion) + escape hatch design + 1 failed adoption example 证明 "我从 customer signal 抽 systemic pattern, 用 pilot 验证, 用 data 说服, 用 champion 落地, 同时 distinguish 我的 pain vs customer pain"</strong>.</p>
+<p>Pattern detection + influence without authority + change management = FDE → Product feedback loop demonstrated.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (面试前 30s 扫一眼)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Question type:
+  Behavioral / Pattern Recognition / Influence Without Authority (4-5 min)
+Key skill being tested:
+  Cross-customer pattern detection + propose change + adoption resistance + champion conversion + outcome metric
+
+Answer arc (8 段):
+  1. Context (20s)             — 多 customer 视角 (7 markets)
+  2. Pattern detection (30s)   — 3 customers same specific complaint
+  3. Validation (30s)          — N ≥ 3, quantify, steel-man
+  4. Root cause (45s)          — Why pattern exists (3 reasons)
+  5. The proposal (60s)        — Specific change (workshop + skeleton)
+  6. Adoption challenge (60s)  — Tech lead pushback + pilot proposal
+  7. Outcome quantified (30s)  — 6 weeks vs 14, NPS +35%, 3 teams adopt
+  8. Meta lesson (30s)         — 4-element framework: Pattern + Pilot + Data + Champion
+
+Numbers to drop:
+  Voice agent workshop + skeleton:
+    4/4 markets same complaint
+    57% timeline on doc, 29% on implementation
+    4 day per round, 5-6 rounds = 4 weeks
+    Onboarding: 14 weeks → 6 weeks (57% reduction)
+    Ops NPS +35% vs prior
+    3 internal teams adopted (voice agent, BNPL, Internal Agent Platform)
+  BNPL routing tool discovery: 70% → 92% in 6 weeks
+  Cultural localization: 8pp catch rate variance → 3pp
+  Failed: central observability dashboard (per-market ops preferred own tool)
+
+Vulnerability:
+  "Thailand 上线后 catch rate drop, 我 wrong-attribute '泰国 ops less mature'.
+   3 markets 后我才 admit pattern (scope problem not their execution).
+   现在每个 multi-market failure mode 我 first question:
+   'is this our scope or their execution?' Default assume scope until 反证."
+
+Close:
+  "Influence without authority = Pattern + Pilot + Data + Champion.
+   缺任何一个 = proposal die. 这 4 elements 是 systematic 不是 charisma."
+
+Red lines:
+  - "All customers had same problem" (vague)
+  - "Told manager, they fixed" (no agency)
+  - "Proposed but team didn't adopt" (no loop closure)
+  - "Changed process based on feedback" (generic)
+  - 1 customer story (not pattern)
+  - 没 pushback adoption challenge (sugar-coat)
+  - 数字模糊 ("improved efficiency")
+
+3 ready STAR (alternate):
+  STAR 1: Spec doc → workshop + skeleton (★ primary, 57% time reduction)
+  STAR 2: BNPL tool description RAG-based discovery (70→92%, 14 team adopt)
+  STAR 3: Cultural localization &gt; translation (8pp → 3pp variance)
+
+5 follow-ups ready:
+  Q1: Real pattern vs noise? → N≥3 + quantify + survives steel-man
+  Q2: Influence without authority? → 4-element framework
+  Q3: No other customer agrees? → 4/5 with escape hatch vs 5/5 hard requirement
+  Q4: Pattern abstraction vs specific need? → Default with parameters, not one-size-fits-all
+  Q5: Proposed change not adopted? → Central dashboard, customer pain ≠ my pain
+
+4-element framework (Influence Without Authority):
+  Pattern  — quantified cross-customer evidence
+  Pilot    — low-risk validation (2-3 customer subset)
+  Data     — post-pilot quantified outcome
+  Champion — convert influential blocker, don't fight
+
+Pattern criteria (3):
+  N ≥ 3 customers
+  Same specific complaint (not vague)
+  Quantifiable (% time, $, etc.)
+  Survives steel-man alternative explanations
+
+Adoption playbook:
+  Steel-man pushback first
+  Counter with data
+  Counter with reuse story (skeleton reuse, workshop short)
+  Propose pilot 2-3 customers (low risk)
+  Convert champion not fight blocker
+  Document as team principle
+
+Escape hatch design (over-generalization 防御):
+  Pattern is default with parameters
+  Each customer decides depth/customization
+  4/5 pattern → default with escape hatch
+  5/5 pattern → hard requirement</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-005-disagreed-stood-firm.html">← Q5 · [行为/动机] 讲一次你和客户意见不合并坚持了立场</a>
+    <a href="zhenti-007-work-without-full-context.html">Q7 · [行为/动机] 讲一次你在一个并不完全理解的环境里工作 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q06 · 你发现多个客户的共性、并改变了团队做法
+
+> "Tell me about a time you noticed a pattern across multiple customers and influenced your team to change how you work. How did you spot the pattern, what did you propose, and how did the team adopt it?"
+
+**Round**: Behavioral (30-45 min, hiring manager round)
+**出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a time you identified a systemic issue" / "describe a time you influenced team processes" / "when did your customer insights change a product"
+
+---
+
+## 这道题在考什么
+
+这是 **FDE 跟 SE / Implementation 区分度最高的题之一**. 表面问 pattern recognition, 实际筛 6 件事:
+
+- **Pattern recognition across customers** —— 你能不能从 N 个 individual 故事抽 abstract pattern. 这是 FDE → Product 的核心 muscle
+- **Influence without authority** —— 你不是 manager, 不是 product owner. 你怎么 change team practice
+- **Customer-to-product loop closure** —— FDE 的 unique value 是 customer insight 反哺 product. 你 demonstrate 过这个 loop 吗
+- **Data-driven proposal** —— 不是 "we should change X", 是 "看 N 个 customer 的 data, 80% 都 hit Y problem, 建议 change X"
+- **Adoption / change management** —— 你 propose 之后怎么 onboard team / 处理 resistance / measure success
+- **Generality vs specificity trade-off** —— 你抽的 pattern 是真 pattern 还是 noise
+
+**没说出口的红线**:
+
+- "We noticed all customers had the same problem and fixed it" → 太 vague, 没 specific pattern
+- "I told my manager and they fixed it" → no personal agency
+- "I proposed but team didn't adopt" → 没 close loop, no influence demonstrated
+- 没量化 pattern (e.g., "5 of 7 markets") → 数字 specific 才信
+- 没量化 outcome (after change, what metric changed) → 没 follow through
+- 一个 customer 的 lesson → 不 generalize, 不是 pattern
+
+---
+
+## 完美答案架构 (Layered Response)
+
+8 段结构, total ~4-5 分钟:
+
+| # | 层 | 时间 | 这层该说什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **Context — 我服务多少 customer** | 20s | Setup 多 customer 视角 | "I was rolling out voice agent across 7 markets serving 7 ops teams..." |
+| 2 | **Pattern detection (specific signal)** | 30s | 什么信号让你 spot pattern | "After Vietnam, Thailand launches, I noticed both ops teams complained about same thing: 4-week delay between scoping and pilot..." |
+| 3 | **Why I trusted it (validation)** | 30s | 1 个 customer 是 noise, 你怎么 confirm pattern | "I went back to Indonesia logs — same pattern. Checked Philippines (in scoping) — also same. 3/3 markets..." |
+| 4 | **Root cause analysis** | 45s | Pattern 背后 systemic reason | "Root cause was 'spec doc' phase — 4 weeks of doc round-trip, but actual implementation 1 week. Doc was wrong abstraction..." |
+| 5 | **The proposal (specific)** | 60s | 你 propose 什么具体 change | "I proposed: replace spec doc with 1-week 'workshop + skeleton commit'. Workshop = stakeholder in room, skeleton = working code on day 5..." |
+| 6 | **Adoption challenge + how I navigated** | 60s | 团队 resistance, 你怎么 onboard | "Tech lead pushed back: 'workshops don't scale'. I proposed pilot on Philippines + Pakistan. Data after 2 markets prove pattern..." |
+| 7 | **Outcome (quantified for team)** | 30s | Team metric change after adoption | "Per-market onboarding time: 6 months Indonesia → 3 months Vietnam → 6 weeks Pakistan. Pattern adopted by 3 other internal teams..." |
+| 8 | **What I learned about influencing** | 30s | Meta lesson about change management | "Lesson: pattern by itself doesn't change practice. Pattern + pilot + data + champion = change..." |
+
+Total: ~4-5 min. 8 段都重要, 段 6 (adoption challenge) 是 senior signal.
+
+---
+
+## 详细回答 (Sample Monologue) — 可以照背
+
+> "我讲 voice agent multi-market rollout 期间发现的 'scoping doc 是 wrong abstraction' 这个 pattern, 因为它 cleanly hit pattern recognition + influence + adoption 三件事.
+>
+> **Context**: 我做 voice agent debt collection, 跨 7 个市场 (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥 / 巴基斯坦), 6 种语言. 每个市场我跟 ops + product + compliance 三方对接. 印尼 first launch 6 个月, 团队习惯流程是: scoping (4 周) → spec doc 写完 → kickoff (4 周) → pilot (2 周) → production (2 周). Total ~14 周/市场.
+>
+> **Pattern detection — specific signal**:
+>
+> 印尼 launch 完之后, 我做越南. 越南 ops team 在 scoping 第 3 周突然 frustrated, 跟我说: 'doc 上写的 escalation flow 跟我们实际工作流不像. 我们 review doc 3 周还在 round trip 修改.'
+>
+> 我以为是越南 ops 特殊. 但泰国 month 1 同样事情 — ops 抱怨 'spec doc 跟实际不像, 我 review 不出真问题'. 菲律宾 (next in line) scoping 启动第 1 周, ops 跟我说 'doc 我们 review 来回 4 周, 然后实际 implementation 才 1 周才发现问题'.
+>
+> **3 个 customer, 同一个 specific complaint**. 这就是 pattern.
+>
+> **Validation — 我怎么 confirm 不是 noise**:
+>
+> 我回头看印尼 log. 印尼当时 scoping doc round trip 是 4 周 (我以为 normal). 但 implementation 第 1 周, ops 发现 doc 里 2 个 escalation case 跟实际工作流不像, 我们 redo 1 周. 印尼实际上也有同 pattern, 只是我当时 first launch 没意识到.
+>
+> 4/4 markets 同 pattern. 不是 noise.
+>
+> 我也 quantify: 14 周 typical timeline 里, 8 周是 scoping + spec doc (round trip), 4 周是 implementation + pilot. **57% 时间花在 doc, 只 29% 时间写代码**. Doc-heavy 流程明显不对.
+>
+> **Root cause analysis**:
+>
+> 我跟 4 个 ops lead 各做 30 分钟 retro. 抽出 root cause:
+>
+> **One — Doc 是 wrong abstraction for AI deployment**. Traditional software spec doc 适合 deterministic system (input X → output Y, ops review yes/no). AI system 行为概率性, doc 写 'agent will respond politely' ops 无法 review, 必须看 actual sample dialog.
+>
+> **Two — Doc round trip latency 太高**. Ops 周一 send comment, 我周二 incorporate, 周三 ops review, 周四 next comment. 1 个 round trip 4 天. 通常 5-6 rounds = 4 周.
+>
+> **Three — Ops 不读完 doc**. Doc 20-30 页, ops 时间紧, 读 30%. 真正问题在没读的 70%.
+>
+> 这 3 个 root cause 共同结果: doc 给 false confidence + delay implementation 真正 problem 浮现.
+>
+> **The proposal — 'Workshop + Skeleton' replace spec doc**:
+>
+> 我 propose 替代 spec doc 阶段 (8 周) with 1-week 'workshop + skeleton commit':
+>
+> - **Day 1-3: Workshop**. Ops + product + compliance 三方 in room 3 天. 我 demo 一个 working voice agent prototype (印尼 base 改 prompt). 三方现场 react to actual sample dialog, 不是 doc abstract description.
+> - **Day 4-5: Skeleton commit**. 我把 workshop output codify 成 working skeleton — 真的能跑, 真的能拨电话. Skeleton 不是 finished product, 是 first iteration to react to.
+> - **Day 6-7: Iterate on skeleton**. Ops review skeleton, give comment, 我 patch.
+>
+> Total 1 周 vs 原来 8 周. **8× speed up**.
+>
+> 加 1 周 pilot, 总 onboarding 2 周 vs 原 14 周.
+>
+> **Adoption challenge — tech lead pushback**:
+>
+> 我 propose 完, tech lead immediate push back:
+>
+> 'Workshop 不 scale. 我们如果未来要做 30 个客户 deployment, 每个 1 周 3 天 workshop 我们 deploy team 全年 booked.'
+>
+> Valid concern. 我 steel man: workshops 确实 expensive in eng time.
+>
+> 我 counter:
+> - 8 周 spec doc round trip 也 expensive — ops + product + compliance + eng 4 方时间. Workshop 3 天集中, 总时间反而少.
+> - Skeleton-based iteration 比 doc-based iteration cheaper, 因为 ops 看真东西不读 doc.
+> - 30 客户 scale 不需要 30 个独立 workshop. 同 vertical (e.g. 7 个 debt collection market) skeleton 可复用, workshop 缩短到 1.5 天.
+>
+> 我提议 **pilot on Philippines + Pakistan**, 数据出来再 commit.
+>
+> Tech lead 同意 pilot.
+>
+> **Outcome — quantified**:
+>
+> Philippines pilot:
+> - 原本 estimate 14 周 onboarding
+> - 实际 workshop + skeleton + pilot, **6 周 onboarding** (57% reduction)
+> - Ops satisfaction (NPS-style) 比 印尼 / 越南 / 泰国 高 35%
+>
+> 巴基斯坦 (next):
+> - **6 周 onboarding** confirmed
+> - 加上 cultural workshop component (我学的另一 lesson)
+>
+> Tech lead 在数据出来后 fully convert. 'Workshop + skeleton' 成为 voice agent 团队 default scoping pattern.
+>
+> 12 个月后:
+> - 7 个市场全部 onboarded, average 6 周 vs original 14 周
+> - 这个 pattern 反哺 BNPL chatbot 团队 (他们 spec doc 风格也类似 broken)
+> - 后来 Internal Agent Platform onboarding 也 default workshop + skeleton
+>
+> 3 个 internal team adoption.
+>
+> **What I learned about influencing — meta lesson**:
+>
+> Pattern by itself doesn't change practice. Pattern + pilot + data + champion = change.
+>
+> - **Pattern**: 3/3 → 4/4 markets, quantified (57% time on doc)
+> - **Pilot**: Philippines + Pakistan, low-risk validation
+> - **Data**: 6 weeks vs 14, ops NPS +35
+> - **Champion**: tech lead 一旦 convert, 他 push 比我 push effective 10×. 我不 fight tech lead, 我 convert tech lead.
+>
+> Influence without authority = 4 个 element 同时 land. 缺任何一个 = proposal die."
+
+---
+
+## Gao Xin 简历专属 STAR 模板
+
+至少 1 完整 STAR (workshop + skeleton), 2 alternate.
+
+### ★ STAR 1: Spec Doc → Workshop + Skeleton Pattern (★ PRIMARY)
+
+**S** (Situation):
+> "Voice agent multi-market rollout, 7 markets. 印尼 first launch 6 个月, 团队 default 流程 spec doc → kickoff → pilot → production, 14 周/市场. 越南 / 泰国 / 菲律宾 ops 都抱怨同一件事: 'spec doc 跟实际不像, round trip 太长'. "
+
+**T** (Task):
+> "Detect pattern, validate, propose alternative, navigate adoption resistance, prove ROI."
+
+**A** (Action):
+1. **Pattern detection**: 3 个 customer 同 complaint, 我回头看印尼 log 4/4 confirm
+2. **Quantify**: 57% timeline on doc, 29% on implementation
+3. **Root cause** (3 个 underlying reasons):
+   - Doc 是 wrong abstraction for AI (probabilistic behavior 不能 doc review)
+   - Round trip latency 4 days/round, 5-6 rounds = 4 weeks
+   - Ops 不读完 doc (30% read, 70% miss)
+4. **Propose**: Workshop (3 days, stakeholder in room, react to actual prototype) + Skeleton (day 5, working code) + Iterate (1-2 weeks)
+5. **Adoption — tech lead pushback**:
+   - Steel-man: workshops expensive in eng time (valid)
+   - Counter with data: 8 weeks doc 4 stakeholder time vs 3 days workshop concentrated
+   - Counter with reuse: same vertical 可复用 skeleton, workshop 缩短
+   - Propose pilot 2 markets first (Philippines + Pakistan), low-risk validation
+6. **Pilot execution + data**:
+   - Philippines: 6 weeks vs 14 weeks (57% reduction)
+   - Ops NPS +35% vs prior markets
+   - Pakistan: 6 weeks confirmed
+7. **Scaling**:
+   - Tech lead full convert, becomes champion
+   - 7 markets total avg 6 weeks
+   - Pattern adopt by BNPL chatbot team
+   - Pattern adopt by Internal Agent Platform team
+
+**R** (Result):
+- 7 markets onboarded **avg 6 weeks vs original 14 weeks** (57% reduction)
+- Ops NPS +35%
+- **3 internal teams adopted** workshop + skeleton pattern (voice agent, BNPL chatbot, Internal Agent Platform)
+- Tech lead becomes champion, 'workshop + skeleton' becomes default
+
+**Vulnerability line**:
+> "我 initial pattern detection 是 lucky — 越南 ops 主动 frustrated 找我, 我才意识到. 印尼 6 个月我 own 一个 market 时没 spot. 我 1-market 时 ignore signal, 2-market 时 ignore again, 3-market 才 spot. Lesson: pattern recognition 需要意识到 'maybe this is not just this customer's problem'. 现在每个 customer complaint 我都问 '其他 customer 也碰到吗?', 不再等到 3 个 confirm."
+
+---
+
+### STAR 2: BNPL Chatbot Tool Description Discovery (Alternate)
+
+**S**: BNPL chatbot 上线后, 我跟 5 个内部 tool team (账户查询 / 信用查询 / 还款 / 投诉 / 转 CS) 对接. 每个 team 给我一个 tool, 我做 prompt routing.
+
+**T**: Initially 我做 manual prompt routing (hard-coded if-else based on intent). Pattern across 5 teams: 每个 team 都说 "我的 tool 没被 chatbot 用够, 用户 query 应该 route 给我但没有".
+
+**A**:
+1. **Pattern detection**: 5/5 teams 同 complaint, 各自 attribute to "intent classifier 不行"
+2. **Diagnostic**: 我看 confusion matrix, 60% mis-route 是 tool description 模糊不是 intent classifier
+3. **Root cause**: tool description 是 5 个 team 各自写的, 没 standardize, 模型分不清 "check balance" vs "check past due"
+4. **Propose RAG-based tool discovery**:
+   - Tool description 用 semantic embedding store
+   - Query 时 dynamic retrieve top-K tool descriptions
+   - LLM 看 description 选 best tool
+5. **Adoption**:
+   - Tool team push back: "我们要写更清楚 description?"
+   - 我 push back to them: "Description template 我提供, 你按 template 写 takes 30 min/tool"
+   - 5 个 team 30 分钟 onboard
+6. **Pattern extract**:
+   - 这个 'RAG-based tool discovery' pattern 后来 transferred to Internal Agent Platform
+   - 14 个 internal team 都用同 pattern
+
+**R**:
+- BNPL routing accuracy: **70% → 92% in 6 weeks**
+- 5 个 tool team 各自 tool usage +50-200%
+- Internal Agent Platform adopt 同 pattern, 14 teams
+- 后来这个 pattern paper'd internally as "RAG-based tool discovery"
+
+**Vulnerability**:
+> "我 initial mistake 是 attribute 5 teams 都说 'classifier 不行' 听成 face value. 我 spent 1 week 调 classifier, 没 fix. 然后回到 confusion matrix 看 root cause. Lesson: customer-reported root cause 经常 wrong, customer-reported symptom 通常 right. Listen to symptom, diagnose root cause yourself."
+
+---
+
+### STAR 3: Cultural Localization > Translation Pattern (Alternate)
+
+**S**: Voice agent 扩展 6 markets after Indonesia. 我 initial scope 是 "translate prompts per language, reuse persona".
+
+**T**: After Thailand launch, ops 反馈 catch rate 比印尼低 8pp. After Brazil launch, 反馈 hang-up rate 高 30%. Pattern is emerging.
+
+**A**:
+1. **Pattern detection (slow)**:
+   - Thailand: politeness culture, direct "pay debt" sounds rude
+   - Brazil: TTS female voice sounds like telemarketing scam
+   - Mexico: same as Brazil but different female voice frequency band trigger
+   - 3 markets same essential pattern: **persona ≠ translation**
+2. **Root cause**: I treated "localization" as translation. Actually = translation + cultural framing + persona + TTS voice selection + escalation rules.
+3. **Propose multi-layer localization** as default scoping item:
+   - Translation (existing)
+   - Cultural workshop with local ops (1 week)
+   - Persona design with local cultural advisor
+   - TTS voice A/B with local sample audience
+   - Escalation rule per-market
+4. **Adoption challenge**:
+   - Product VP: "this adds 4 weeks per market"
+   - I counter: "Thailand cost us 4 weeks redo. Brazil cost 3 weeks. Adding 1 week scoping front saves 4 weeks fix."
+   - Data: prior 2 markets average redo 3.5 weeks → new pattern 1 week scoping = 2.5 weeks net save
+5. **Bake into default scoping doc**:
+   - Workshop + skeleton template (from STAR 1) updated to include cultural review section
+   - All future markets pass through
+
+**R**:
+- 3 后续 markets (Philippines / Mexico / Pakistan) **0 cultural redo** after launch
+- Catch rate variance across markets: prior 8pp range → 3pp range
+- Pattern adopted by BNPL chatbot 多市场 effort
+- Documented as "localization for AI > translation" team principle
+
+**Vulnerability**:
+> "Thailand 上线后我 wrong-attribute catch rate drop to '泰国 ops less mature'. Wrong attribution. 是我的 scope problem. 3 markets 后我才 admit pattern. 现在我 每个 multi-market launch failure mode 我 first question 是 'is this our scope or their execution?' Default assume scope problem until 反证."
+
+---
+
+## 5 个 Follow-ups (interviewer 追问 + 准备答案)
+
+### Follow-up 1: "How do you distinguish a real pattern from noise?"
+
+**Answer**:
+> "**3 criteria**:
+>
+> **One — N ≥ 3 customers with same specific complaint**. Same vague complaint (e.g., 'AI 不准确') doesn't count. Same specific complaint ('spec doc 跟实际不像, round trip 太长') counts.
+>
+> **Two — Quantify**. 57% timeline on doc 是 cross-customer 可比. 'feels slow' 不是 pattern.
+>
+> **Three — Root cause survives steel man**. 我 steel man 'maybe each customer is just lazy / inexperienced / 不同 timezone'. 这些 explanation if they were true, 不应该 quantify 一致.
+>
+> 反例: 单 customer 抱怨 'response too slow'. 我看 metric, 1 customer 网络环境 latency 高. Not pattern, 是 environmental.
+>
+> 反例 2: 3 customer 抱怨 'AI 不智能'. Vague. 不是 pattern, 是 vague complaint.
+>
+> 真 pattern: 3 customer 抱怨 'spec doc 4 round trip 之后 implementation 第 1 周才发现 doc 跟实际不像'. Specific + quantifiable + survives steel man."
+
+### Follow-up 2: "How do you influence without authority?"
+
+**Answer**:
+> "我用 4-element framework: **Pattern + Pilot + Data + Champion**.
+>
+> **Pattern**: 量化 customer-side evidence (57% time on doc, 4/4 markets)
+>
+> **Pilot**: Low-risk validation (Philippines + Pakistan first, 不是 all 7 markets)
+>
+> **Data**: Post-pilot 数据 (6 weeks vs 14, NPS +35%)
+>
+> **Champion**: Identify the influential blocker, convert them. Tech lead 一开始 push back, 我没 fight, 我 convert. 一旦 tech lead 是 champion, 他 push 比我 effective 10×.
+>
+> 缺 element:
+> - Pattern only → 'interesting observation, no urgency'
+> - Pattern + Pilot → 'might work, who's responsible'
+> - Pattern + Pilot + Data → 'evidence-based but no political backing'
+> - Pattern + Pilot + Data + Champion → adopted
+>
+> Influence without authority 不是 charisma, 是 systematically build 4 elements."
+
+### Follow-up 3: "What if no other customer agrees with the pattern?"
+
+**Answer**:
+> "Then it's not a pattern, it's that customer's specific situation. 我 respect 这个 outcome.
+>
+> 反例 (我 wrong pattern detection 之一): Internal Agent Platform 我 initial assume '5 teams 都想 standardize memory layer storage'. 我 propose vector DB standard. 实际 4/5 happy, 1 (Risk team) reject. 不是 5/5 pattern, 是 4/5 pattern + 1 outlier.
+>
+> 我 propose 时不 force outlier in. Memory layer 加 pluggable backend, Risk team 保留 SQL.
+>
+> Lesson: pattern 不必 100% 才 actionable. 4/5 pattern 适合 default with escape hatch. 5/5 pattern 适合 hard requirement. Distinguish 这两种."
+
+### Follow-up 4: "How do you balance pattern abstraction vs customer-specific needs?"
+
+**Answer**:
+> "Pattern 抽象时容易 over-generalize. 我用 **escape hatch design**:
+>
+> 'Workshop + Skeleton' pattern 是 default, 但 each market 可以 customize 比例 (Indonesia 3 days workshop, Pakistan 1.5 days because shorter cultural distance from Indonesia).
+>
+> 'Cultural review' pattern 是 default scope item, 但 each market 决定 review depth (Brazil 因为 most cultural distance from Indonesia, 1 full week. Vietnam 因为 closer, 2 days).
+>
+> Pattern 不是 'one size fits all'. Pattern 是 'default with parameters'. Default = team 复用; parameters = customer 适配.
+>
+> 这种 thinking 我从 Internal Agent Platform 学到 — 3-layer abstraction 每层 escape hatch. Same mental model."
+
+### Follow-up 5: "Have you ever proposed a change that didn't get adopted?"
+
+**Answer**:
+> "Yes — 一次 proposal 没 adopted, 我 also 学到了:
+>
+> **Proposal**: 我提议 voice agent multi-market 用 'central observability dashboard' (Grafana + Prometheus, 跨 7 个市场 unified view).
+>
+> **Push back**: 每个市场 ops 用 own preferred tool (印尼 Looker, 巴西 Tableau, 巴基斯坦 自己 Excel dashboard).
+>
+> **Why didn't adopt**: 没 pain that central dashboard solves more than per-market dashboard adds friction. Per-market ops 已 onboard 自己 tool, central dashboard 是 my convenience 不是 their convenience.
+>
+> **What I learned**: Pattern detection 我做对了 (我 cross-market 看数据 friction 高). But proposal 服务 my pain not customer pain. **Pattern detection ≠ customer pain detection**. Customer pain detection 才 trigger adoption.
+>
+> 后来我 build personal dashboard tool (just for me + my manager), 不 force on ops. Pragmatic compromise.
+>
+> Lesson: 'pattern I see' ≠ 'pattern customers feel'. 我 propose 前 verify 'customer 是否 also see this as pain'."
+
+---
+
+## ❌ 死路答法 (碰了就挂)
+
+### 死路 1: "We noticed all customers had the same problem."
+
+**为什么挂**: Vague. 哪个 specific problem? 多少 customer? Quantify?
+
+**怎么改**: "3 of 3 markets reported same specific complaint: 'spec doc 跟实际不像, round trip 4 weeks'. 4-th market confirm with log review."
+
+---
+
+### 死路 2: "I told my manager and they fixed it."
+
+**为什么挂**: No personal agency. FDE manager 想看 你 personally drive change.
+
+**怎么改**: 显式 quote 你的 proposal + adoption work. Steel-man push back, pilot design, champion conversion.
+
+---
+
+### 死路 3: "I proposed but team didn't adopt."
+
+**为什么挂**: 没 close loop. Pattern recognition 容易, influence 难. 不 adopt = no influence demonstrated.
+
+**怎么改**: 即使 partial adoption, 显式 quote 哪 part adopted, 哪 part 没, 为什么没 (lesson). 或选另一个 story 是 adopted.
+
+---
+
+### 死路 4: "We changed our process based on customer feedback."
+
+**为什么挂**: 太 generic. 哪个 process? 怎么 change? Outcome metric?
+
+**怎么改**: 具体: spec doc (14 周) → workshop + skeleton (1 周). Specific before/after.
+
+---
+
+### 死路 5: 一个 customer 的 lesson
+
+**为什么挂**: 不是 pattern, 是 individual. 题目明确要 multiple customers.
+
+**怎么改**: 强调 N ≥ 3 customer 同 complaint. Quantify cross-customer.
+
+---
+
+### 死路 6: 没 pushback adoption challenge
+
+**为什么挂**: 显得 proposal 没 friction = 不 important enough OR 你 sugar-coat.
+
+**怎么改**: 必须有 段 6 (tech lead pushback). Steel-man + counter + pilot proposal. 这是 senior signal.
+
+---
+
+### 死路 7: 数字模糊 ("improved efficiency")
+
+**为什么挂**: 没 metric = 没 outcome.
+
+**怎么改**: 14 周 → 6 周, NPS +35%, 3 team adopt. Specific.
+
+---
+
+## ✅ 加分项 (top 5)
+
+### 加分 1: "Pattern + Pilot + Data + Champion" 4-element framework
+
+显式 frame 你的 influence approach. 这种 systematic 是 senior signal.
+
+### 加分 2: Quantify pattern 跨 customer
+
+"3/3 markets same complaint", "57% timeline on doc", "4 weeks round trip". Specific cross-customer 数字让 pattern claim credible.
+
+### 加分 3: Convert champion not fight blocker
+
+"Tech lead push back, 我没 fight, 我 convert. Champion conversion 比 fight 有效 10×". 这种 political maturity 是 senior FDE signal.
+
+### 加分 4: Escape hatch design
+
+"Pattern 是 default with parameters, 不是 one size fits all". Cultural review pattern 让 each market 决定 depth. Memory layer SQL escape hatch. 这种 over-generalization 自觉是 senior signal.
+
+### 加分 5: Failed adoption example for balance
+
+"Central observability dashboard 我 proposed, no adopted. Customer pain ≠ my pain". 这种 self-honesty 让 success story 更 credible.
+
+---
+
+## 一句话总结
+
+> **"Common pain → team change" 的 winning answer 不是讲你 spot 了 pattern, 是用 4-element framework (Pattern + Pilot + Data + Champion) + escape hatch design + 1 failed adoption example 证明 "我从 customer signal 抽 systemic pattern, 用 pilot 验证, 用 data 说服, 用 champion 落地, 同时 distinguish 我的 pain vs customer pain"**.
+>
+> Pattern detection + influence without authority + change management = FDE → Product feedback loop demonstrated.
+
+---
+
+## Cheat Sheet (面试前 30s 扫一眼)
+
+```
+Question type:
+  Behavioral / Pattern Recognition / Influence Without Authority (4-5 min)
+Key skill being tested:
+  Cross-customer pattern detection + propose change + adoption resistance + champion conversion + outcome metric
+
+Answer arc (8 段):
+  1. Context (20s)             — 多 customer 视角 (7 markets)
+  2. Pattern detection (30s)   — 3 customers same specific complaint
+  3. Validation (30s)          — N ≥ 3, quantify, steel-man
+  4. Root cause (45s)          — Why pattern exists (3 reasons)
+  5. The proposal (60s)        — Specific change (workshop + skeleton)
+  6. Adoption challenge (60s)  — Tech lead pushback + pilot proposal
+  7. Outcome quantified (30s)  — 6 weeks vs 14, NPS +35%, 3 teams adopt
+  8. Meta lesson (30s)         — 4-element framework: Pattern + Pilot + Data + Champion
+
+Numbers to drop:
+  Voice agent workshop + skeleton:
+    4/4 markets same complaint
+    57% timeline on doc, 29% on implementation
+    4 day per round, 5-6 rounds = 4 weeks
+    Onboarding: 14 weeks → 6 weeks (57% reduction)
+    Ops NPS +35% vs prior
+    3 internal teams adopted (voice agent, BNPL, Internal Agent Platform)
+  BNPL routing tool discovery: 70% → 92% in 6 weeks
+  Cultural localization: 8pp catch rate variance → 3pp
+  Failed: central observability dashboard (per-market ops preferred own tool)
+
+Vulnerability:
+  "Thailand 上线后 catch rate drop, 我 wrong-attribute '泰国 ops less mature'.
+   3 markets 后我才 admit pattern (scope problem not their execution).
+   现在每个 multi-market failure mode 我 first question:
+   'is this our scope or their execution?' Default assume scope until 反证."
+
+Close:
+  "Influence without authority = Pattern + Pilot + Data + Champion.
+   缺任何一个 = proposal die. 这 4 elements 是 systematic 不是 charisma."
+
+Red lines:
+  - "All customers had same problem" (vague)
+  - "Told manager, they fixed" (no agency)
+  - "Proposed but team didn't adopt" (no loop closure)
+  - "Changed process based on feedback" (generic)
+  - 1 customer story (not pattern)
+  - 没 pushback adoption challenge (sugar-coat)
+  - 数字模糊 ("improved efficiency")
+
+3 ready STAR (alternate):
+  STAR 1: Spec doc → workshop + skeleton (★ primary, 57% time reduction)
+  STAR 2: BNPL tool description RAG-based discovery (70→92%, 14 team adopt)
+  STAR 3: Cultural localization > translation (8pp → 3pp variance)
+
+5 follow-ups ready:
+  Q1: Real pattern vs noise? → N≥3 + quantify + survives steel-man
+  Q2: Influence without authority? → 4-element framework
+  Q3: No other customer agrees? → 4/5 with escape hatch vs 5/5 hard requirement
+  Q4: Pattern abstraction vs specific need? → Default with parameters, not one-size-fits-all
+  Q5: Proposed change not adopted? → Central dashboard, customer pain ≠ my pain
+
+4-element framework (Influence Without Authority):
+  Pattern  — quantified cross-customer evidence
+  Pilot    — low-risk validation (2-3 customer subset)
+  Data     — post-pilot quantified outcome
+  Champion — convert influential blocker, don't fight
+
+Pattern criteria (3):
+  N ≥ 3 customers
+  Same specific complaint (not vague)
+  Quantifiable (% time, $, etc.)
+  Survives steel-man alternative explanations
+
+Adoption playbook:
+  Steel-man pushback first
+  Counter with data
+  Counter with reuse story (skeleton reuse, workshop short)
+  Propose pilot 2-3 customers (low risk)
+  Convert champion not fight blocker
+  Document as team principle
+
+Escape hatch design (over-generalization 防御):
+  Pattern is default with parameters
+  Each customer decides depth/customization
+  4/5 pattern → default with escape hatch
+  5/5 pattern → hard requirement
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

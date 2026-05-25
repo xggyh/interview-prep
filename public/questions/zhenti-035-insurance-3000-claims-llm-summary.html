@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 LLM 摘要, 受各州监管约束, 怎么 scope · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 LLM 摘要, 受各州监管约束, 怎么 scope</div>
+  <h1>Q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 LLM 摘要, 受各州监管约束, 怎么 scope</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-035-insurance-3000-claims-llm-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-035-insurance-3000-claims-llm-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q35 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q35 · 保险公司 3000 万历史理赔 LLM 摘要 (多州监管约束)</h3>
+<blockquote><p>"An insurance company wants to use <strong>LLM to summarize 30 million historical claims</strong> for downstream actuarial / legal / customer-service use. They operate across <strong>all 50 US states</strong>, each with its own insurance regulator. <strong>How would you scope this in 60 minutes?</strong>"</p></blockquote>
+<p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir + OpenAI Enterprise + Anthropic insurance vertical <strong>行业</strong>: Insurance / regulated data / large-scale ETL</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 estimate LLM cost.</p>
+<p><strong>是</strong>: 考你能不能克制 <strong>"30M × $0.05 = $1.5M for LLM cost"</strong> 的反射性回答, 先去问 <strong>"为什么要 summary? 谁用? 哪种 use case?"</strong></p>
+<p>4 个 signal:</p>
+<ol><li><strong>Don't estimate cost first</strong> — 90% candidates 立刻算 token cost. Real win: ask <strong>what downstream use needs summary</strong>? Actuarial wants different summary than legal vs CS.</li><li><strong>Per-state regulatory variance is HUGE</strong> — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic</li><li><strong>Sample for pilot, NOT batch everything</strong> — running 30M through LLM = $1M-5M of compute. Sample 100K stratified, prove value, batch later</li><li><strong>Citation-required output</strong> — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination = legal exposure</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 立刻冲 LLM cost estimate</strong></p>
+<blockquote><p>"30M claims × ~500 tokens × $0.005/1K = $750K, plus storage and indexing..."</p></blockquote>
+<p>死. 你<strong>没问</strong>:</p>
+<ul><li>Summary 给谁用 (actuarial 模型输入? Legal e-discovery? CS deflection?)</li><li>每个 use case 需要什么粒度的 summary (1-line vs 500-word)</li><li>不同 use case 是否可共用同一个 summary</li><li>哪些 claim 类型最有价值 (auto &gt; life &gt; homeowners &gt; workers comp 等)</li><li>50 个州对 AI processing claim 数据的合规要求</li></ul>
+<p><strong>挂法 #2: 把它当 batch ETL 题做</strong></p>
+<blockquote><p>"30M claims, peak 50 TPS to LLM, distribute across 100 workers, total time 5 days..."</p></blockquote>
+<p>死. 当 system design 题做 = miss the point. 这道题考的是 scope discipline.</p>
+<p><strong>挂法 #3: 假设 1 个 universal summary 适合所有 use case</strong></p>
+<blockquote><p>"We'd generate a 200-word summary per claim, store, and query."</p></blockquote>
+<p>死. Actuarial 用结构化 fields, 不是 narrative. Legal 需要 timeline + key facts + parties. CS 需要 status + next action. 你 generate 1 个 generic 等于没 generate.</p>
+<hr />
+<h3>完美答案架构 (5 步)</h3>
+<h4>Step 1: 澄清问题 (10 min)</h4>
+<blockquote><p>"Before I sketch, 10 questions. The key issue: 30M claims is a big number, but <strong>'summarize' means 5 different things</strong> to 5 different downstream users."</p></blockquote>
+<p><strong>10 个 clarifying questions</strong>:</p>
+<blockquote><p><strong>Q1</strong>: "<strong>Who's the downstream user</strong>? Actuarial (modeling future loss)? Legal (e-discovery, dispute review)? Customer service (status lookup, deflection)? Underwriting (risk assessment)? Reinsurance (treaty pricing)? Fraud (pattern detection)? <strong>Each needs different summary structure</strong>."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "What's the <strong>business value</strong> for each user? Actuarial saving X hours? Legal saving Y in litigation prep? CS deflection rate +Z%? Without value attributed to use case, we can't prioritize."</p></blockquote>
+<blockquote><p><strong>Q3</strong>: "<strong>Per-state regulatory</strong>: NY DFS + CA DOI + TX TDI etc each has guidance on AI processing of claim data. Some states require <strong>algorithmic accountability reports</strong>. Have you mapped state-by-state requirements?"</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "<strong>PII / PHI handling</strong>: claims contain medical records (workers comp, health), driver's license + SSN (auto), property valuations. <strong>HIPAA + GLBA + state privacy laws</strong>. What's your current data classification?"</p></blockquote>
+<blockquote><p><strong>Q5</strong>: "Is this <strong>all lines of business</strong> (auto, homeowners, commercial, life, health, workers comp) or one line? <strong>Each has different schema, different regulator, different downstream user</strong>."</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "What's the <strong>target use case for v1</strong> — actuarial 1 LOB seems most tractable, vs all-LOBs-all-use-cases."</p></blockquote>
+<blockquote><p><strong>Q7</strong>: "<strong>Latency requirement</strong> — real-time on new claims (every claim summarized as it closes) vs <strong>batch historical</strong> (process 30M backlog once)? <strong>The first is operations, the second is research</strong>."</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "Are there <strong>previous AI deployments</strong> (e.g., claim adjustor chatbot, fraud ML)? Reputation history shapes this project."</p></blockquote>
+<blockquote><p><strong>Q9</strong>: "What's the <strong>document format</strong> — structured (ACORD claim forms), semi-structured (claim adjustor notes), unstructured (medical records PDFs, photos)? <strong>Each requires different ingestion</strong>."</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "<strong>Veto holders</strong>: General Counsel, Chief Actuary, Chief Compliance Officer, state DOI compliance team, CISO, IT director?"</p></blockquote>
+<p><strong>面试官 likely 回答</strong>:</p>
+<ul><li>Use case v1: <strong>Actuarial modeling</strong> for <strong>personal auto</strong> in <strong>top 10 states by claim volume</strong> (representing 70% of claims)</li><li>Business value: replace manual claim review (currently 3 hrs/claim for sampling 1% for model retraining)</li><li>10 states have varying rules; CA + NY most strict; some require <strong>explainable AI</strong> documentation for any model using AI-processed inputs</li><li>PII: contains SSN, license, medical records, repair shop addresses. Currently in encrypted DB + RBAC + audit log</li><li>LOB: scope to personal auto first (5M of the 30M claims)</li><li>Latency: batch historical 5M backlog + then real-time on new closures</li><li>Previous AI: fraud ML in production 3 years. <strong>No customer-facing AI</strong> yet. Conservative culture.</li><li>Format: ~40% structured ACORD, ~50% adjustor notes (PDF/Word), ~10% medical records + photos</li><li>Veto: GC + Chief Actuary + CCO + State DOI engagement officer</li></ul>
+<p>→ <strong>Real scope</strong>: in 90 days, build a <strong>summarization pipeline for personal auto claims in 10 states</strong>, producing <strong>actuarial-structured summaries</strong> with citations to source documents, sampling 100K for pilot validation before batching the 5M backlog.</p>
+<p>NOT "summarize 30M claims for everyone".</p>
+<hr />
+<h4>Step 2: 找干系人 + 成功指标 (10 min)</h4>
+<p><strong>Stakeholder map</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>对项目态度</th><th>我对他们的关键动作</th></tr></thead><tbody><tr><td><strong>Chief Actuary</strong></td><td>Model quality, actuarial defensibility</td><td>Primary sponsor</td><td>Weekly review, validation methodology</td></tr><tr><td><strong>General Counsel</strong></td><td>Litigation risk, attorney-client privilege</td><td>Gates everything</td><td>Architecture review, citation chain</td></tr><tr><td><strong>CCO</strong></td><td>State DOI compliance</td><td>Critical gate</td><td>State-by-state matrix review</td></tr><tr><td><strong>State DOI engagement officer</strong></td><td>Regulator relationships</td><td>Critical for blocked states</td><td>Pre-brief CA / NY DOI</td></tr><tr><td><strong>CISO</strong></td><td>Encryption, PII handling</td><td>Approval gate</td><td>Data flow + audit</td></tr><tr><td><strong>IT Director</strong></td><td>Cloud cost, integration with policy admin</td><td>Operational</td><td>Architecture + cost ceiling</td></tr><tr><td><strong>Actuarial team (50)</strong></td><td>Daily usability, model quality</td><td>End users</td><td>Pilot feedback loop</td></tr><tr><td><strong>Legal e-discovery team</strong></td><td>Phase 2 customer (litigation prep)</td><td>Watching</td><td>Future use case, not v1</td></tr><tr><td><strong>Customer Service Director</strong></td><td>Phase 3 customer (deflection)</td><td>Future</td><td>Not v1</td></tr><tr><td><strong>Internal Audit</strong></td><td>SOX-adjacent controls</td><td>Approval for production</td><td>Audit log architecture</td></tr></tbody></table></div>
+<p><strong>Key insight</strong>: <strong>State DOI engagement is the silent risk</strong>. NY DFS has issued AI directives (2024 model regulation). CA DOI follows up on AI used in consumer-impact decisions. Even if your use case is <strong>internal actuarial</strong>, if outputs influence pricing → state DOI cares. <strong>Must pre-brief CA and NY DOI</strong>.</p>
+<p><strong>Success metrics (3 layers)</strong>:</p>
+<p><strong>Layer 1 — Pilot KPIs</strong> (Chief Actuary):</p>
+<ul><li>Actuarial reviewer agreement with LLM-extracted facts (target &gt; 95% on key fields like loss amount, accident date, fault attribution)</li><li>Time-to-summary per claim (manual 3 hrs → target &lt; 1 min)</li><li>Pilot ROI: hours saved × actuary hourly rate</li></ul>
+<p><strong>Layer 2 — Compliance KPIs</strong>:</p>
+<ul><li>100% citation coverage (every claim in summary cites source paragraphs)</li><li>0 PII leakage in summaries</li><li>100% audit log of LLM calls (input, output, model version, prompt template version)</li><li>State-by-state compliance check pass</li></ul>
+<p><strong>Layer 3 — Strategic</strong> (CEO / board):</p>
+<ul><li>Total actuarial efficiency gain</li><li>Foundation for Phase 2/3 (legal, CS)</li></ul>
+<p><strong>Counter-metrics</strong>:</p>
+<ul><li>Hallucination rate (facts in summary NOT in source)</li><li>Privilege violation (attorney-client communications in summary)</li><li>State DOI inquiry count</li><li>Actuarial team complaints</li></ul>
+<hr />
+<h4>Step 3: 梳理输入数据 (10 min)</h4>
+<p><strong>Data inventory</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Dataset</th><th>Format</th><th>Quality</th><th>Privacy tier</th><th>Notes</th></tr></thead><tbody><tr><td><strong>Structured claim header (ACORD)</strong></td><td>DB</td><td>Clean</td><td>Medium</td><td>Loss type, amount, dates, parties</td></tr><tr><td><strong>Adjustor notes</strong></td><td>Text in claim system</td><td>Free-form, abbreviations</td><td>High</td><td>Personal opinion + facts mixed</td></tr><tr><td><strong>Police reports</strong></td><td>PDF attachments</td><td>Scanned, OCR'd</td><td>High</td><td>Includes other parties' PII</td></tr><tr><td><strong>Medical records (auto bodily injury)</strong></td><td>PDF</td><td>Scanned, varied quality</td><td><strong>HIPAA</strong></td><td>Restricted access</td></tr><tr><td><strong>Repair estimates / invoices</strong></td><td>PDF / structured</td><td>Semi-clean</td><td>Medium</td><td>Vendor data</td></tr><tr><td><strong>Photos (vehicle damage, property)</strong></td><td>Image</td><td>High</td><td>Medium</td><td>May contain license plates</td></tr><tr><td><strong>Recorded statements</strong></td><td>Audio + transcript</td><td>Transcript quality varies</td><td>High</td><td>Witness, claimant</td></tr><tr><td><strong>Litigation documents (subset)</strong></td><td>PDF</td><td>Varies</td><td><strong>Attorney-client privilege</strong></td><td>Filtered access</td></tr><tr><td><strong>Reserves history</strong></td><td>DB</td><td>Clean</td><td>Medium</td><td>Time-series</td></tr><tr><td><strong>Subrogation outcomes</strong></td><td>DB</td><td>Clean</td><td>Medium</td><td>Recovery from other carrier</td></tr></tbody></table></div>
+<p><strong>Critical privacy fences</strong>:</p>
+<ol><li><strong>Attorney-client privileged</strong> documents must be excluded from LLM pipeline entirely. If even one privileged document goes into LLM, opposing counsel can argue privilege is waived. <strong>Need separate ingestion classifier</strong>.</li><li><strong>Other-party PII</strong>: police reports name 3rd parties. Their PII may be subject to different state laws. <strong>Need PII redaction layer</strong>.</li><li><strong>HIPAA-protected health information</strong> in bodily injury claims requires separate HIPAA-compliant pipeline.</li><li><strong>Recorded statements</strong> include claimant + witness statements, governed by recording-consent laws (varies by state).</li></ol>
+<p><strong>Data movement constraints</strong>:</p>
+<ul><li>Self-hosted LLM strongly preferred (insurance is risk-averse like pharma)</li><li>If using commercial API: requires BAA + DPA + indemnification</li><li>Some states (e.g., NY DFS) require <strong>algorithmic accountability documentation</strong> for any AI processing customer data</li></ul>
+<p><strong>Architecture implications</strong>:</p>
+<ul><li><strong>Self-hosted LLM</strong>: Claude on Bedrock (AWS PrivateLink) or Llama 3.1 70B fine-tuned</li><li><strong>Privacy layer FIRST</strong>: classifier separates privileged / HIPAA / standard claims, routes accordingly</li><li><strong>Citation tracking</strong>: every fact in output traces to a source paragraph (chunk ID + offset)</li><li><strong>Per-state config</strong>: model + prompt template differs by state per regulatory requirement</li></ul>
+<hr />
+<h4>Step 4: 拆成可解子问题 (15 min)</h4>
+<p><strong>10 subproblems</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>子问题</th><th>Risk</th><th>Value</th><th>90-day pri</th></tr></thead><tbody><tr><td><strong>A</strong></td><td><strong>Use case scoping</strong>: lock to 1 LOB + 1 user (actuarial + auto), defer rest</td><td>Low</td><td>Foundation</td><td><strong>1</strong></td></tr><tr><td><strong>B</strong></td><td><strong>Ingestion + privacy classification</strong>: separate privileged / HIPAA / standard</td><td>High</td><td>Critical</td><td><strong>2</strong></td></tr><tr><td><strong>C</strong></td><td><strong>PII redaction layer</strong>: SSN / DL / medical removed before LLM</td><td>Medium</td><td>Required</td><td><strong>3</strong></td></tr><tr><td><strong>D</strong></td><td><strong>Stratified sampling for pilot</strong>: 100K of 5M, representative across states</td><td>Low</td><td>High</td><td><strong>4</strong></td></tr><tr><td><strong>E</strong></td><td><strong>LLM summarization with citations</strong>: every fact traces to source</td><td>Medium</td><td>Critical</td><td><strong>5</strong></td></tr><tr><td><strong>F</strong></td><td><strong>Actuarial validation</strong>: human reviews sample, agreement rate</td><td>Low</td><td>Critical</td><td><strong>6</strong></td></tr><tr><td><strong>G</strong></td><td><strong>State-by-state regulatory matrix</strong>: per-state prompt + audit config</td><td>High</td><td>Critical</td><td><strong>7</strong></td></tr><tr><td><strong>H</strong></td><td><strong>Cost optimization</strong>: model selection + prompt caching for batch</td><td>Low</td><td>High (financial)</td><td><strong>8</strong></td></tr><tr><td><strong>I</strong></td><td><strong>Batch infrastructure</strong>: process 5M when pilot proven</td><td>Low</td><td>Future</td><td>Defer to month 4-6</td></tr><tr><td><strong>J</strong></td><td><strong>Real-time on new claims</strong>: hook into claim closure</td><td>Low</td><td>Future</td><td>Defer to month 6+</td></tr></tbody></table></div>
+<p><strong>Sequencing rationale</strong>:</p>
+<blockquote><p><strong>A first</strong> because: scoping to 1 LOB + 1 user removes 80% of complexity. Actuarial-only-auto-only is the right v1.</p></blockquote>
+<blockquote><p><strong>B + C critical</strong> because: getting privilege wrong = litigation exposure. Getting PII wrong = HIPAA + state law violation. Both must be solid before any LLM call.</p></blockquote>
+<blockquote><p><strong>D before batch</strong> because: running 5M through LLM = $250K-$500K of compute, plus weeks of time, before knowing if output is useful. Sample 100K (stratified across states + claim types) for pilot → validate → batch.</p></blockquote>
+<blockquote><p><strong>E with citations</strong> because: actuarial use of LLM output requires defensibility. Hallucinated fact in summary that gets into actuarial model = potential rate-filing challenge. Citation = trace + verify.</p></blockquote>
+<blockquote><p><strong>F validation</strong> because: agreement rate with senior actuarial reviewer is the only credible metric.</p></blockquote>
+<blockquote><p><strong>G state matrix</strong> because: CA + NY + WA = strict; some states require algorithmic accountability docs. <strong>Per-state config</strong>, not monolithic.</p></blockquote>
+<blockquote><p><strong>H cost optimization</strong> matters because batch is $$$. <strong>Caching common context + selective re-ranking + tiered model use (small for easy claims, large for complex)</strong>.</p></blockquote>
+<blockquote><p><strong>I + J deferred</strong> to month 4-6+ after pilot validates.</p></blockquote>
+<hr />
+<h4>Step 5: Walking-skeleton MVP (15 min)</h4>
+<p><strong>Walking-skeleton (Week 1-4)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Week 1: Use case scoping + GC + CCO + State DOI engagement officer meetings
+Week 2: 100-claim sample, manual hand-tag "ideal summary"
+Week 3: Self-hosted LLM stack + first prompt + citation tracking
+Week 4: Show actuarial reviewer the 100-claim output, get agreement rate</code></pre>
+<p><strong>Walking-skeleton scope</strong>:</p>
+<ul><li>100 claims, not 5M</li><li>1 state (e.g., Texas as least strict)</li><li>Actuarial use case only</li><li>Manual privacy review (no automated classifier yet)</li><li>No batch infra</li><li>No state-by-state config yet</li></ul>
+<p><strong>Why this works</strong>:</p>
+<ul><li><strong>Tiny cost</strong> (~$10 of LLM compute)</li><li><strong>Tight feedback loop</strong> with actuarial reviewer</li><li><strong>No PII exposure risk</strong> at this scale (manual review)</li><li><strong>Validates the hardest thing</strong>: can LLM produce defensible summaries with citations?</li></ul>
+<p><strong>Phase 2 (Week 5-8) — Pilot Sampling</strong>:</p>
+<p>After walking-skeleton validates approach:</p>
+<ul><li>Stratified 100K sample across 10 states + claim severity tiers</li><li>Build privacy classification automation</li><li>Build per-state prompt config</li><li>Self-hosted LLM with cost projection</li></ul>
+<p><strong>Phase 3 (Week 9-12) — Validation Methodology</strong>:</p>
+<ul><li>1000-claim stratified subset → 3 senior actuaries independently review LLM output</li><li>Agreement rate by field (loss amount, fault, dates)</li><li>Bias analysis: are LLM summaries systematically over/under-stating reserves?</li><li>State DOI pre-brief: show CA + NY DOI the methodology</li></ul>
+<p><strong>Phase 4 (Month 4-6) — Batch the 5M</strong>:</p>
+<p>After phase 3 sign-off:</p>
+<ul><li>Cost optimization: prompt caching, batch API, tiered model</li><li>Distributed batch processing (5M / 5K/hr = ~6 weeks)</li><li>Quality monitoring during batch</li></ul>
+<p><strong>Phase 5 (Month 7+) — Real-time + Expansion</strong>:</p>
+<ul><li>Hook into claim closure (real-time)</li><li>Expand to other LOBs (one at a time)</li><li>Expand to other use cases (legal, CS) — each is a re-scoping exercise</li></ul>
+<hr />
+<h3>详细回答 (Sample 60-min monologue)</h3>
+<blockquote><p>"Before I sketch, 10 questions. The key issue: '30M claims' is a big number, but 'summarize' means 5 totally different things to 5 different users.</p>
+<p><em>(asks 10 Qs)</em></p>
+<p><em>(gets answers: actuarial use case, personal auto, top 10 states, 5M of 30M claims, batch + real-time, conservative culture, GC + Chief Actuary + CCO veto)</em></p>
+<p>OK so real scope: <strong>90 days = pilot summarization pipeline for personal auto claims in 10 states, actuarial use case only, sampling 100K of 5M for validation before batch</strong>.</p>
+<p>NOT '30M claims for everyone'. That's year 2+.</p>
+<p><strong>The reflex answer</strong> that costs people the round: 'Let me estimate LLM cost. 30M × 500 tokens × $0.005/1K = $750K.' I won't lead with that.</p>
+<p><strong>Why scope matters more than cost</strong>: running 30M through LLM = $1M-$5M of compute. <strong>Before spending any of that, I need to know who uses the output, in what format, with what regulatory constraint</strong>. Actuarial wants structured fields + reserves history. Legal wants timeline + parties. CS wants status. 1 generic summary fails all 3.</p>
+<p><strong>Stakeholders</strong>: Chief Actuary sponsor, GC gates legal, CCO gates 10-state compliance, State DOI engagement officer is critical (CA + NY DOI will care about any AI processing). Conservative culture means slow + careful, not fast + scrappy.</p>
+<p><strong>Data sensitivity</strong>:</p>
+<ul><li>Structured ACORD = clean, low risk</li><li>Adjustor notes = free text, opinion mixed with fact</li><li>Police reports = third-party PII</li><li>Medical records = HIPAA</li><li>Litigation docs = attorney-client privilege, MUST be excluded</li><li>Recorded statements = recording-consent law varies by state</li></ul>
+<p>Privacy classifier is the FIRST production layer before any LLM call.</p>
+<p><strong>10 subproblems</strong>:</p>
+<ol><li>Use case scoping (actuarial + auto only)</li><li>Ingestion + privacy classification (privileged / HIPAA / standard)</li><li>PII redaction</li><li>Stratified sampling 100K for pilot</li><li>LLM summarization with citations</li><li>Actuarial validation methodology</li><li>State-by-state regulatory matrix</li><li>Cost optimization (model selection, caching)</li><li>Batch infra (defer to month 4-6)</li><li>Real-time on new claims (defer to month 6+)</li></ol>
+<p><strong>Walking-skeleton Week 1-4</strong>:</p>
+<p>100 claims, 1 state (Texas, least strict), manual hand-tag ideal summary, self-hosted LLM, citation tracking. ~$10 of compute. Show actuarial reviewer the 100-claim output, get agreement rate.</p>
+<p>If 95%+ agreement → expand to 100K stratified across 10 states.</p>
+<p><strong>Phase 2 Week 5-8</strong>: 100K stratified sample, build privacy classification automation, per-state prompts.</p>
+<p><strong>Phase 3 Week 9-12</strong>: 1000-claim subset validation with 3 senior actuaries, bias analysis, State DOI pre-brief.</p>
+<p><strong>Phase 4 Month 4-6</strong>: batch 5M (after pilot signed off).</p>
+<p><strong>Three things to flag proactively</strong>:</p>
+<p><strong>(a) Citation tracking is non-negotiable</strong>. Every fact in summary traces to a source paragraph. Otherwise actuarial output uses LLM-hallucinated fact → rate-filing challenge → state DOI inquiry.</p>
+<p><strong>(b) Privilege classifier in ingestion</strong>. One privileged document in LLM pipeline = opposing counsel argues privilege waived = catastrophe. Auto-classify + manual review for borderline.</p>
+<p><strong>(c) State DOI pre-brief in week 6-8, NOT after launch</strong>. CA + NY DOI want to see methodology before you ship. Building the relationship is project insurance.</p>
+<p>Want me to deep-dive citation architecture, state regulatory matrix, or cost optimization?"</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<p>The <strong>ConvFinQA</strong> project is directly relevant — that's where you did <strong>multi-hop QA over financial documents with citation requirement</strong>, exactly the structural problem here:</p>
+<blockquote><p>"ConvFinQA was the most directly applicable project for this. I built multi-hop QA over financial reports — required structured answers with <strong>citation back to source paragraphs</strong>. The setup is very close to insurance claim summary:</p>
+<ul><li><strong>Multi-paragraph source documents</strong> (financial reports = claim files)</li><li><strong>Multi-fact extraction</strong> (revenue, segment, growth = loss amount, fault, dates)</li><li><strong>Citation required</strong> for defensibility</li><li><strong>Hallucination detection</strong> as core eval metric</li></ul>
+<p>What I learned that I'd apply here:</p>
+<ol><li><strong>Citation must be at sub-paragraph granularity, not document level</strong>. Saying 'this fact comes from doc 47' isn't enough — needs to be 'paragraph 3, sentence 2' so a human can verify in seconds.</li></ol>
+<ol><li><strong>Negative-result ablation methodology</strong>: I systematically ablated retrieval quality, prompt format, model size, CoT. For claim summaries I'd do same:</li></ol>
+<ul><li>Retrieval ablation: dense vs sparse vs hybrid; what's the recall@k for finding the loss-amount paragraph?</li><li>Prompt format: structured field extraction vs narrative summary vs hybrid; which gives best actuary agreement rate?</li><li>Model size: 8B vs 70B vs Claude; cost vs accuracy tradeoff per claim</li><li>This is the <strong>measure-then-decide</strong> discipline that turns 'we built a LLM pipeline' into 'we built the right LLM pipeline'.</li></ul>
+<ol><li><strong>Bias analysis matters</strong>: ConvFinQA showed me that LLMs systematically miss certain types of facts (e.g., footnotes, parenthetical adjustments). For claims: LLM may systematically under-extract from handwritten adjustor notes, photo captions, or medical record annotations. <strong>Need stratified eval across document type</strong>.</li></ol>
+<p>Also — my <strong>TikTok PayLater work in Indonesia</strong> taught me to ask 'what does the REGULATOR think about AI processing this data' before any code. Same instinct here for state DOI engagement.</p>
+<p>The pattern: <strong>don't run 30M through LLM first and ask 'is it useful'. Sample 100K, hand-validate, prove value, THEN batch</strong>. That's the difference between $5K of compute and $5M."</p></blockquote>
+<p><strong>Other resume hooks</strong>:</p>
+<ul><li><strong>Internal Agent Platform onboarding</strong> — translated different team needs into a shared platform. Same skill as translating actuarial vs legal vs CS into a shared summary architecture (where it makes sense) vs separate (where it doesn't).</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "What's your cost estimate for batching 5M claims?"</p>
+<p><strong>A</strong>: Order-of-magnitude with assumptions stated:</p>
+<ul><li>Avg claim file: ~10K tokens (mix of structured + notes + reports)</li><li>Model: Claude 3.5 Sonnet on AWS Bedrock with prompt caching</li><li>Input tokens: 5M × 10K = 50B; at $3/1M with caching effective rate ~$1.5/1M = <strong>$75K</strong></li><li>Output tokens: 5M × 500 = 2.5B; at $15/1M = <strong>$37.5K</strong></li><li>Embedding for retrieval: 5M × ~1500 chunks × 384-dim = ~$5K (one-time)</li><li>Infrastructure (S3, Bedrock, compute, monitoring): ~$10K</li><li><strong>Total batch one-time: ~$130K</strong></li></ul>
+<p>This is an order of magnitude smaller than my "$1M-$5M" mention earlier — that's the spread depending on model choice and document size. <strong>For a $X billion insurer, $130K is a rounding error</strong>.</p>
+<p><strong>Caveats</strong>: depends on actual avg document size (could be 50K not 10K), model choice (Claude vs GPT-4 vs Llama hosted), and quality requirements (more re-tries = more cost). Pilot will produce the real number.</p>
+<p><strong>Q2</strong>: "How do you ensure the LLM doesn't introduce bias in summaries that affects actuarial pricing fairness?"</p>
+<p><strong>A</strong>: This is exactly what NAIC and several state DOIs are pushing on (model disparate impact):</p>
+<ul><li><strong>Stratified evaluation</strong>: validation set has claims from all demographic segments (where claim file contains demographic info). Compare LLM extraction agreement rate per segment.</li><li><strong>Bias test</strong>: take same factual claim, vary only the demographic-correlated fields (zip code, name, etc.) → does LLM produce systematically different summaries?</li><li><strong>Documentation</strong>: write the bias eval methodology in algorithmic accountability doc. Submit to state DOIs that require (NY DFS 2024 directive).</li><li><strong>Human-in-loop</strong>: any claim used in actuarial model with anomalous summary metrics goes to human review.</li></ul>
+<p><strong>Caveat</strong>: claim files contain less directly demographic info than e.g. lending data, so disparate impact risk is lower than other use cases — but not zero. Still need eval.</p>
+<p><strong>Q3</strong>: "Why not just use GPT-4 API directly? Saves all the self-hosting hassle."</p>
+<p><strong>A</strong>: Tradeoff depending on customer's risk tolerance:</p>
+<p><strong>Pro API</strong>: faster ship, better quality, less infra.</p>
+<p><strong>Con API</strong> (per insurance customer):</p>
+<ul><li>Data movement compliance: must negotiate BAA + DPA + indemnification with OpenAI. Insurance legal teams typically take 3-6 months for these.</li><li>State DOI exposure: NY DFS will ask "where physically does the data go for processing?" Answering "OpenAI" needs documentation.</li><li>Audit log access: when you use API, you don't fully control the audit log retention or access.</li><li>Catastrophic event risk: if OpenAI has a breach, customer claim data is in third-party hands.</li></ul>
+<p><strong>My recommendation</strong>: explicitly raise this with GC + CCO. <strong>If they're OK</strong> with API + BAA, go faster. <strong>If they want self-host</strong>, plan for longer engagement. <strong>Don't make the call unilaterally</strong>.</p>
+<p>For a conservative carrier, default is self-host. For a more aggressive carrier (digital-native, established API risk framework), API is acceptable.</p>
+<p><strong>Q4</strong>: "What if we need the summaries to feed into a regulatory rate filing? Does the LLM need to be 'qualified'?"</p>
+<p><strong>A</strong>: This is where state DOI conversations matter:</p>
+<ul><li><strong>For internal actuarial modeling</strong> (not used in rate filing): use freely with documentation</li><li><strong>For rate filing input</strong>: many states (CA, FL especially) require "<strong>actuarially sound and explainable</strong>" inputs. LLM-derived inputs may need:</li><li>Disclosure to state DOI that LLM was used</li><li>Methodology document (what model, what prompt, what validation)</li><li>Sample audit (DOI requests N claims for verification)</li><li><strong>For underwriting decisioning</strong>: many states restrict AI in consumer-impact decisions (some require "right to know" disclosures)</li><li><strong>For claims handling automated decisions</strong> (denial, etc.): heavily regulated</li></ul>
+<p><strong>My recommendation</strong>: scope v1 to <strong>non-rate-filing use</strong> (actuarial research, claim audit prep) to avoid this. Year 2+ engage state DOIs on rate-filing usage.</p>
+<p><strong>Q5</strong>: "How do you handle the case where adjustor notes contain personal opinions that aren't facts?"</p>
+<p><strong>A</strong>: This is a quality issue specific to insurance. Adjustor notes often have "claimant seems exaggerating" or "vehicle appears modified" — opinion not fact. Approach:</p>
+<ul><li><strong>Prompt engineering</strong>: instruct LLM to <strong>extract objective facts</strong> with citation, <strong>flag subjective opinions</strong> separately</li><li><strong>Schema</strong>: summary has two sections — "Facts (with citations)" and "Subjective notes (with citations)"</li><li><strong>Downstream guidance</strong>: actuarial training emphasizes that subjective section is informational only, not for model input</li><li><strong>Eval</strong>: include "opinion vs fact" classification in agreement rate metric</li></ul>
+<p><strong>Risk</strong>: LLM may treat opinion as fact (hallucination of confidence). Eval set includes claims with known subjective notes to catch this.</p>
+<hr />
+<h3>❌ 死路答法 (top 7)</h3>
+<ol><li><strong>冲 cost estimate</strong> before use-case scoping</li><li><strong>当 batch ETL system design 题做</strong> (TPS calculation等)</li><li><strong>1 generic summary</strong> for all downstream uses</li><li><strong>Run 30M before validating on 100</strong></li><li><strong>Skip per-state regulatory matrix</strong></li><li><strong>Skip citation tracking</strong> (legal exposure)</li><li><strong>Include privileged documents</strong> in LLM pipeline</li></ol>
+<hr />
+<h3>✅ 加分项 (top 7)</h3>
+<ol><li><strong>Scope to 1 LOB + 1 user</strong> for v1 explicitly</li><li><strong>Citation at sub-paragraph granularity</strong> required</li><li><strong>Stratified sampling 100K</strong> before batching 5M</li><li><strong>State DOI pre-brief</strong> in week 6-8</li><li><strong>Privacy classification (privileged / HIPAA / standard)</strong> as first production layer</li><li><strong>Tiered model use</strong> (small for easy, large for complex) for cost</li><li><strong>Quote your ConvFinQA citation + ablation methodology</strong></li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>保险 30M 理赔 LLM summary = "scope reduction 是核心: 1 LOB + 1 user + 100K pilot 之前不要批量 + citation 不可省 + per-state regulatory matrix"</strong>.</p>
+<p>真正的 win 不是处理 30M, 是<strong>让 actuary 用 100K 的 LLM summary 替代 3 hr 手动 review, 同时 GC + CCO + state DOI 全部满意</strong>. 30M batch 是 month 4+ 的事, 不是 90 天.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 冲 cost estimate 算 token
+  - 当 batch ETL 题做
+  - 1 generic summary for everyone
+  - Batch 30M 前 validate
+  - 跳过 state regulatory matrix
+  - 跳过 citation tracking
+  - Include privileged 文档
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁 use case + state + LOB
+  2. Stakeholder: Chief Actuary sponsor, GC + CCO + State DOI veto
+  3. Data: ACORD / adjustor notes / police / medical / litigation
+  4. Decompose: 10 subproblem, privacy classification 第一
+  5. MVP: 4 周, 100 claim, 1 state, manual review
+
+Clarify Q 必问:
+  - 谁用 summary (actuarial / legal / CS / 等)?
+  - 每个 use case 的 value?
+  - State regulatory map?
+  - PII / HIPAA / privilege handling?
+  - 哪个 LOB?
+  - V1 use case 优先?
+  - Latency (batch / real-time)?
+  - 之前 AI 部署?
+  - Document format?
+  - Veto holders?
+
+Veto holders:
+  - Chief Actuary (sponsor)
+  - General Counsel
+  - Chief Compliance Officer
+  - State DOI engagement officer
+  - CISO
+
+Data privacy tiers:
+  - Attorney-client privileged (EXCLUDE from LLM)
+  - HIPAA (separate pipeline)
+  - PII (redact before LLM)
+  - Standard (process normally)
+
+10 subproblems:
+  1. Use case scoping (1 LOB + 1 user)
+  2. Ingestion + privacy classification
+  3. PII redaction
+  4. Stratified sampling 100K pilot
+  5. LLM summarization with citations
+  6. Actuarial validation
+  7. State-by-state regulatory matrix
+  8. Cost optimization
+  9. Batch infra (month 4+)
+  10. Real-time (month 6+)
+
+Walking-skeleton Week 1-4:
+  100 claims, 1 state (Texas easy), manual privacy review,
+  ~$10 compute, show actuarial reviewer
+  Goal: 95%+ agreement on fact extraction
+
+Phase plan:
+  W1-4: 100-claim walking-skeleton
+  W5-8: 100K stratified pilot
+  W9-12: 1000-claim 3-actuary validation, state DOI pre-brief
+  M4-6: batch 5M
+  M7+: real-time + expansion
+
+Citation requirement:
+  - Sub-paragraph granularity (not doc-level)
+  - "para 3, sentence 2" specificity
+  - Human can verify in seconds
+
+State regulatory map:
+  CA + NY = strict (algorithmic accountability)
+  TX + FL = less strict
+  Some require explainable AI documentation
+
+Cost estimate (5M claims):
+  Input tokens (caching): ~$75K
+  Output tokens: ~$37.5K
+  Infrastructure: ~$10K
+  Total batch one-time: ~$130K
+  (small for $X-billion insurer)
+
+Resume quote:
+  "ConvFinQA: multi-hop QA over financial docs
+   with citation, same structure as claim summary.
+   Negative-result ablation methodology applies:
+   retrieval × prompt × model × CoT.
+   100K stratified BEFORE 5M batch."
+
+Key phrases:
+  - "Before cost estimate, who uses the summary..."
+  - "Sample 100K before batching 5M"
+  - "Citation at sub-paragraph granularity"
+  - "Privacy classifier is the first production layer"
+  - "Per-state regulatory matrix, not monolithic"
+  - "State DOI pre-brief in week 6-8"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-034-logistics-sap-weather-500-managers.html">← Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计</a>
+    <a href="zhenti-036-deployment-3-weeks-late-cto.html">Q36 · [客户模拟/沟通] 部署延期了三周, 客户 CTO 在线上, 告诉他 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q35 · 保险公司 3000 万历史理赔 LLM 摘要 (多州监管约束)
+
+> "An insurance company wants to use **LLM to summarize 30 million historical claims** for downstream actuarial / legal / customer-service use. They operate across **all 50 US states**, each with its own insurance regulator. **How would you scope this in 60 minutes?**"
+
+**Round**: Decomposition Case (60 min)
+**出处**: Exponent 2026 FDE · Palantir + OpenAI Enterprise + Anthropic insurance vertical
+**行业**: Insurance / regulated data / large-scale ETL
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 estimate LLM cost.
+
+**是**: 考你能不能克制 **"30M × $0.05 = $1.5M for LLM cost"** 的反射性回答, 先去问 **"为什么要 summary? 谁用? 哪种 use case?"**
+
+4 个 signal:
+
+1. **Don't estimate cost first** — 90% candidates 立刻算 token cost. Real win: ask **what downstream use needs summary**? Actuarial wants different summary than legal vs CS.
+2. **Per-state regulatory variance is HUGE** — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic
+3. **Sample for pilot, NOT batch everything** — running 30M through LLM = $1M-5M of compute. Sample 100K stratified, prove value, batch later
+4. **Citation-required output** — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination = legal exposure
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 立刻冲 LLM cost estimate**
+
+> "30M claims × ~500 tokens × $0.005/1K = $750K, plus storage and indexing..."
+
+死. 你**没问**:
+- Summary 给谁用 (actuarial 模型输入? Legal e-discovery? CS deflection?)
+- 每个 use case 需要什么粒度的 summary (1-line vs 500-word)
+- 不同 use case 是否可共用同一个 summary
+- 哪些 claim 类型最有价值 (auto > life > homeowners > workers comp 等)
+- 50 个州对 AI processing claim 数据的合规要求
+
+**挂法 #2: 把它当 batch ETL 题做**
+
+> "30M claims, peak 50 TPS to LLM, distribute across 100 workers, total time 5 days..."
+
+死. 当 system design 题做 = miss the point. 这道题考的是 scope discipline.
+
+**挂法 #3: 假设 1 个 universal summary 适合所有 use case**
+
+> "We'd generate a 200-word summary per claim, store, and query."
+
+死. Actuarial 用结构化 fields, 不是 narrative. Legal 需要 timeline + key facts + parties. CS 需要 status + next action. 你 generate 1 个 generic 等于没 generate.
+
+---
+
+## 完美答案架构 (5 步)
+
+### Step 1: 澄清问题 (10 min)
+
+> "Before I sketch, 10 questions. The key issue: 30M claims is a big number, but **'summarize' means 5 different things** to 5 different downstream users."
+
+**10 个 clarifying questions**:
+
+> **Q1**: "**Who's the downstream user**? Actuarial (modeling future loss)? Legal (e-discovery, dispute review)? Customer service (status lookup, deflection)? Underwriting (risk assessment)? Reinsurance (treaty pricing)? Fraud (pattern detection)? **Each needs different summary structure**."
+
+> **Q2**: "What's the **business value** for each user? Actuarial saving X hours? Legal saving Y in litigation prep? CS deflection rate +Z%? Without value attributed to use case, we can't prioritize."
+
+> **Q3**: "**Per-state regulatory**: NY DFS + CA DOI + TX TDI etc each has guidance on AI processing of claim data. Some states require **algorithmic accountability reports**. Have you mapped state-by-state requirements?"
+
+> **Q4**: "**PII / PHI handling**: claims contain medical records (workers comp, health), driver's license + SSN (auto), property valuations. **HIPAA + GLBA + state privacy laws**. What's your current data classification?"
+
+> **Q5**: "Is this **all lines of business** (auto, homeowners, commercial, life, health, workers comp) or one line? **Each has different schema, different regulator, different downstream user**."
+
+> **Q6**: "What's the **target use case for v1** — actuarial 1 LOB seems most tractable, vs all-LOBs-all-use-cases."
+
+> **Q7**: "**Latency requirement** — real-time on new claims (every claim summarized as it closes) vs **batch historical** (process 30M backlog once)? **The first is operations, the second is research**."
+
+> **Q8**: "Are there **previous AI deployments** (e.g., claim adjustor chatbot, fraud ML)? Reputation history shapes this project."
+
+> **Q9**: "What's the **document format** — structured (ACORD claim forms), semi-structured (claim adjustor notes), unstructured (medical records PDFs, photos)? **Each requires different ingestion**."
+
+> **Q10**: "**Veto holders**: General Counsel, Chief Actuary, Chief Compliance Officer, state DOI compliance team, CISO, IT director?"
+
+**面试官 likely 回答**:
+- Use case v1: **Actuarial modeling** for **personal auto** in **top 10 states by claim volume** (representing 70% of claims)
+- Business value: replace manual claim review (currently 3 hrs/claim for sampling 1% for model retraining)
+- 10 states have varying rules; CA + NY most strict; some require **explainable AI** documentation for any model using AI-processed inputs
+- PII: contains SSN, license, medical records, repair shop addresses. Currently in encrypted DB + RBAC + audit log
+- LOB: scope to personal auto first (5M of the 30M claims)
+- Latency: batch historical 5M backlog + then real-time on new closures
+- Previous AI: fraud ML in production 3 years. **No customer-facing AI** yet. Conservative culture.
+- Format: ~40% structured ACORD, ~50% adjustor notes (PDF/Word), ~10% medical records + photos
+- Veto: GC + Chief Actuary + CCO + State DOI engagement officer
+
+→ **Real scope**: in 90 days, build a **summarization pipeline for personal auto claims in 10 states**, producing **actuarial-structured summaries** with citations to source documents, sampling 100K for pilot validation before batching the 5M backlog.
+
+NOT "summarize 30M claims for everyone".
+
+---
+
+### Step 2: 找干系人 + 成功指标 (10 min)
+
+**Stakeholder map**:
+
+| Stakeholder | 在意什么 | 对项目态度 | 我对他们的关键动作 |
+|---|---|---|---|
+| **Chief Actuary** | Model quality, actuarial defensibility | Primary sponsor | Weekly review, validation methodology |
+| **General Counsel** | Litigation risk, attorney-client privilege | Gates everything | Architecture review, citation chain |
+| **CCO** | State DOI compliance | Critical gate | State-by-state matrix review |
+| **State DOI engagement officer** | Regulator relationships | Critical for blocked states | Pre-brief CA / NY DOI |
+| **CISO** | Encryption, PII handling | Approval gate | Data flow + audit |
+| **IT Director** | Cloud cost, integration with policy admin | Operational | Architecture + cost ceiling |
+| **Actuarial team (50)** | Daily usability, model quality | End users | Pilot feedback loop |
+| **Legal e-discovery team** | Phase 2 customer (litigation prep) | Watching | Future use case, not v1 |
+| **Customer Service Director** | Phase 3 customer (deflection) | Future | Not v1 |
+| **Internal Audit** | SOX-adjacent controls | Approval for production | Audit log architecture |
+
+**Key insight**: **State DOI engagement is the silent risk**. NY DFS has issued AI directives (2024 model regulation). CA DOI follows up on AI used in consumer-impact decisions. Even if your use case is **internal actuarial**, if outputs influence pricing → state DOI cares. **Must pre-brief CA and NY DOI**.
+
+**Success metrics (3 layers)**:
+
+**Layer 1 — Pilot KPIs** (Chief Actuary):
+- Actuarial reviewer agreement with LLM-extracted facts (target > 95% on key fields like loss amount, accident date, fault attribution)
+- Time-to-summary per claim (manual 3 hrs → target < 1 min)
+- Pilot ROI: hours saved × actuary hourly rate
+
+**Layer 2 — Compliance KPIs**:
+- 100% citation coverage (every claim in summary cites source paragraphs)
+- 0 PII leakage in summaries
+- 100% audit log of LLM calls (input, output, model version, prompt template version)
+- State-by-state compliance check pass
+
+**Layer 3 — Strategic** (CEO / board):
+- Total actuarial efficiency gain
+- Foundation for Phase 2/3 (legal, CS)
+
+**Counter-metrics**:
+- Hallucination rate (facts in summary NOT in source)
+- Privilege violation (attorney-client communications in summary)
+- State DOI inquiry count
+- Actuarial team complaints
+
+---
+
+### Step 3: 梳理输入数据 (10 min)
+
+**Data inventory**:
+
+| Dataset | Format | Quality | Privacy tier | Notes |
+|---|---|---|---|---|
+| **Structured claim header (ACORD)** | DB | Clean | Medium | Loss type, amount, dates, parties |
+| **Adjustor notes** | Text in claim system | Free-form, abbreviations | High | Personal opinion + facts mixed |
+| **Police reports** | PDF attachments | Scanned, OCR'd | High | Includes other parties' PII |
+| **Medical records (auto bodily injury)** | PDF | Scanned, varied quality | **HIPAA** | Restricted access |
+| **Repair estimates / invoices** | PDF / structured | Semi-clean | Medium | Vendor data |
+| **Photos (vehicle damage, property)** | Image | High | Medium | May contain license plates |
+| **Recorded statements** | Audio + transcript | Transcript quality varies | High | Witness, claimant |
+| **Litigation documents (subset)** | PDF | Varies | **Attorney-client privilege** | Filtered access |
+| **Reserves history** | DB | Clean | Medium | Time-series |
+| **Subrogation outcomes** | DB | Clean | Medium | Recovery from other carrier |
+
+**Critical privacy fences**:
+
+1. **Attorney-client privileged** documents must be excluded from LLM pipeline entirely. If even one privileged document goes into LLM, opposing counsel can argue privilege is waived. **Need separate ingestion classifier**.
+2. **Other-party PII**: police reports name 3rd parties. Their PII may be subject to different state laws. **Need PII redaction layer**.
+3. **HIPAA-protected health information** in bodily injury claims requires separate HIPAA-compliant pipeline.
+4. **Recorded statements** include claimant + witness statements, governed by recording-consent laws (varies by state).
+
+**Data movement constraints**:
+- Self-hosted LLM strongly preferred (insurance is risk-averse like pharma)
+- If using commercial API: requires BAA + DPA + indemnification
+- Some states (e.g., NY DFS) require **algorithmic accountability documentation** for any AI processing customer data
+
+**Architecture implications**:
+- **Self-hosted LLM**: Claude on Bedrock (AWS PrivateLink) or Llama 3.1 70B fine-tuned
+- **Privacy layer FIRST**: classifier separates privileged / HIPAA / standard claims, routes accordingly
+- **Citation tracking**: every fact in output traces to a source paragraph (chunk ID + offset)
+- **Per-state config**: model + prompt template differs by state per regulatory requirement
+
+---
+
+### Step 4: 拆成可解子问题 (15 min)
+
+**10 subproblems**:
+
+| # | 子问题 | Risk | Value | 90-day pri |
+|---|---|---|---|---|
+| **A** | **Use case scoping**: lock to 1 LOB + 1 user (actuarial + auto), defer rest | Low | Foundation | **1** |
+| **B** | **Ingestion + privacy classification**: separate privileged / HIPAA / standard | High | Critical | **2** |
+| **C** | **PII redaction layer**: SSN / DL / medical removed before LLM | Medium | Required | **3** |
+| **D** | **Stratified sampling for pilot**: 100K of 5M, representative across states | Low | High | **4** |
+| **E** | **LLM summarization with citations**: every fact traces to source | Medium | Critical | **5** |
+| **F** | **Actuarial validation**: human reviews sample, agreement rate | Low | Critical | **6** |
+| **G** | **State-by-state regulatory matrix**: per-state prompt + audit config | High | Critical | **7** |
+| **H** | **Cost optimization**: model selection + prompt caching for batch | Low | High (financial) | **8** |
+| **I** | **Batch infrastructure**: process 5M when pilot proven | Low | Future | Defer to month 4-6 |
+| **J** | **Real-time on new claims**: hook into claim closure | Low | Future | Defer to month 6+ |
+
+**Sequencing rationale**:
+
+> **A first** because: scoping to 1 LOB + 1 user removes 80% of complexity. Actuarial-only-auto-only is the right v1.
+
+> **B + C critical** because: getting privilege wrong = litigation exposure. Getting PII wrong = HIPAA + state law violation. Both must be solid before any LLM call.
+
+> **D before batch** because: running 5M through LLM = $250K-$500K of compute, plus weeks of time, before knowing if output is useful. Sample 100K (stratified across states + claim types) for pilot → validate → batch.
+
+> **E with citations** because: actuarial use of LLM output requires defensibility. Hallucinated fact in summary that gets into actuarial model = potential rate-filing challenge. Citation = trace + verify.
+
+> **F validation** because: agreement rate with senior actuarial reviewer is the only credible metric.
+
+> **G state matrix** because: CA + NY + WA = strict; some states require algorithmic accountability docs. **Per-state config**, not monolithic.
+
+> **H cost optimization** matters because batch is $$$. **Caching common context + selective re-ranking + tiered model use (small for easy claims, large for complex)**.
+
+> **I + J deferred** to month 4-6+ after pilot validates.
+
+---
+
+### Step 5: Walking-skeleton MVP (15 min)
+
+**Walking-skeleton (Week 1-4)**:
+
+```
+Week 1: Use case scoping + GC + CCO + State DOI engagement officer meetings
+Week 2: 100-claim sample, manual hand-tag "ideal summary"
+Week 3: Self-hosted LLM stack + first prompt + citation tracking
+Week 4: Show actuarial reviewer the 100-claim output, get agreement rate
+```
+
+**Walking-skeleton scope**:
+- 100 claims, not 5M
+- 1 state (e.g., Texas as least strict)
+- Actuarial use case only
+- Manual privacy review (no automated classifier yet)
+- No batch infra
+- No state-by-state config yet
+
+**Why this works**:
+- **Tiny cost** (~$10 of LLM compute)
+- **Tight feedback loop** with actuarial reviewer
+- **No PII exposure risk** at this scale (manual review)
+- **Validates the hardest thing**: can LLM produce defensible summaries with citations?
+
+**Phase 2 (Week 5-8) — Pilot Sampling**:
+
+After walking-skeleton validates approach:
+- Stratified 100K sample across 10 states + claim severity tiers
+- Build privacy classification automation
+- Build per-state prompt config
+- Self-hosted LLM with cost projection
+
+**Phase 3 (Week 9-12) — Validation Methodology**:
+
+- 1000-claim stratified subset → 3 senior actuaries independently review LLM output
+- Agreement rate by field (loss amount, fault, dates)
+- Bias analysis: are LLM summaries systematically over/under-stating reserves?
+- State DOI pre-brief: show CA + NY DOI the methodology
+
+**Phase 4 (Month 4-6) — Batch the 5M**:
+
+After phase 3 sign-off:
+- Cost optimization: prompt caching, batch API, tiered model
+- Distributed batch processing (5M / 5K/hr = ~6 weeks)
+- Quality monitoring during batch
+
+**Phase 5 (Month 7+) — Real-time + Expansion**:
+
+- Hook into claim closure (real-time)
+- Expand to other LOBs (one at a time)
+- Expand to other use cases (legal, CS) — each is a re-scoping exercise
+
+---
+
+## 详细回答 (Sample 60-min monologue)
+
+> "Before I sketch, 10 questions. The key issue: '30M claims' is a big number, but 'summarize' means 5 totally different things to 5 different users.
+>
+> *(asks 10 Qs)*
+>
+> *(gets answers: actuarial use case, personal auto, top 10 states, 5M of 30M claims, batch + real-time, conservative culture, GC + Chief Actuary + CCO veto)*
+>
+> OK so real scope: **90 days = pilot summarization pipeline for personal auto claims in 10 states, actuarial use case only, sampling 100K of 5M for validation before batch**.
+>
+> NOT '30M claims for everyone'. That's year 2+.
+>
+> **The reflex answer** that costs people the round: 'Let me estimate LLM cost. 30M × 500 tokens × $0.005/1K = $750K.' I won't lead with that.
+>
+> **Why scope matters more than cost**: running 30M through LLM = $1M-$5M of compute. **Before spending any of that, I need to know who uses the output, in what format, with what regulatory constraint**. Actuarial wants structured fields + reserves history. Legal wants timeline + parties. CS wants status. 1 generic summary fails all 3.
+>
+> **Stakeholders**: Chief Actuary sponsor, GC gates legal, CCO gates 10-state compliance, State DOI engagement officer is critical (CA + NY DOI will care about any AI processing). Conservative culture means slow + careful, not fast + scrappy.
+>
+> **Data sensitivity**:
+> - Structured ACORD = clean, low risk
+> - Adjustor notes = free text, opinion mixed with fact
+> - Police reports = third-party PII
+> - Medical records = HIPAA
+> - Litigation docs = attorney-client privilege, MUST be excluded
+> - Recorded statements = recording-consent law varies by state
+>
+> Privacy classifier is the FIRST production layer before any LLM call.
+>
+> **10 subproblems**:
+>
+> 1. Use case scoping (actuarial + auto only)
+> 2. Ingestion + privacy classification (privileged / HIPAA / standard)
+> 3. PII redaction
+> 4. Stratified sampling 100K for pilot
+> 5. LLM summarization with citations
+> 6. Actuarial validation methodology
+> 7. State-by-state regulatory matrix
+> 8. Cost optimization (model selection, caching)
+> 9. Batch infra (defer to month 4-6)
+> 10. Real-time on new claims (defer to month 6+)
+>
+> **Walking-skeleton Week 1-4**:
+>
+> 100 claims, 1 state (Texas, least strict), manual hand-tag ideal summary, self-hosted LLM, citation tracking. ~$10 of compute. Show actuarial reviewer the 100-claim output, get agreement rate.
+>
+> If 95%+ agreement → expand to 100K stratified across 10 states.
+>
+> **Phase 2 Week 5-8**: 100K stratified sample, build privacy classification automation, per-state prompts.
+>
+> **Phase 3 Week 9-12**: 1000-claim subset validation with 3 senior actuaries, bias analysis, State DOI pre-brief.
+>
+> **Phase 4 Month 4-6**: batch 5M (after pilot signed off).
+>
+> **Three things to flag proactively**:
+>
+> **(a) Citation tracking is non-negotiable**. Every fact in summary traces to a source paragraph. Otherwise actuarial output uses LLM-hallucinated fact → rate-filing challenge → state DOI inquiry.
+>
+> **(b) Privilege classifier in ingestion**. One privileged document in LLM pipeline = opposing counsel argues privilege waived = catastrophe. Auto-classify + manual review for borderline.
+>
+> **(c) State DOI pre-brief in week 6-8, NOT after launch**. CA + NY DOI want to see methodology before you ship. Building the relationship is project insurance.
+>
+> Want me to deep-dive citation architecture, state regulatory matrix, or cost optimization?"
+
+---
+
+## Gao Xin 简历专属 reframe
+
+The **ConvFinQA** project is directly relevant — that's where you did **multi-hop QA over financial documents with citation requirement**, exactly the structural problem here:
+
+> "ConvFinQA was the most directly applicable project for this. I built multi-hop QA over financial reports — required structured answers with **citation back to source paragraphs**. The setup is very close to insurance claim summary:
+>
+> - **Multi-paragraph source documents** (financial reports = claim files)
+> - **Multi-fact extraction** (revenue, segment, growth = loss amount, fault, dates)
+> - **Citation required** for defensibility
+> - **Hallucination detection** as core eval metric
+>
+> What I learned that I'd apply here:
+>
+> 1. **Citation must be at sub-paragraph granularity, not document level**. Saying 'this fact comes from doc 47' isn't enough — needs to be 'paragraph 3, sentence 2' so a human can verify in seconds.
+>
+> 2. **Negative-result ablation methodology**: I systematically ablated retrieval quality, prompt format, model size, CoT. For claim summaries I'd do same:
+>    - Retrieval ablation: dense vs sparse vs hybrid; what's the recall@k for finding the loss-amount paragraph?
+>    - Prompt format: structured field extraction vs narrative summary vs hybrid; which gives best actuary agreement rate?
+>    - Model size: 8B vs 70B vs Claude; cost vs accuracy tradeoff per claim
+>    - This is the **measure-then-decide** discipline that turns 'we built a LLM pipeline' into 'we built the right LLM pipeline'.
+>
+> 3. **Bias analysis matters**: ConvFinQA showed me that LLMs systematically miss certain types of facts (e.g., footnotes, parenthetical adjustments). For claims: LLM may systematically under-extract from handwritten adjustor notes, photo captions, or medical record annotations. **Need stratified eval across document type**.
+>
+> Also — my **TikTok PayLater work in Indonesia** taught me to ask 'what does the REGULATOR think about AI processing this data' before any code. Same instinct here for state DOI engagement.
+>
+> The pattern: **don't run 30M through LLM first and ask 'is it useful'. Sample 100K, hand-validate, prove value, THEN batch**. That's the difference between $5K of compute and $5M."
+
+**Other resume hooks**:
+
+- **Internal Agent Platform onboarding** — translated different team needs into a shared platform. Same skill as translating actuarial vs legal vs CS into a shared summary architecture (where it makes sense) vs separate (where it doesn't).
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "What's your cost estimate for batching 5M claims?"
+
+**A**: Order-of-magnitude with assumptions stated:
+
+- Avg claim file: ~10K tokens (mix of structured + notes + reports)
+- Model: Claude 3.5 Sonnet on AWS Bedrock with prompt caching
+- Input tokens: 5M × 10K = 50B; at $3/1M with caching effective rate ~$1.5/1M = **$75K**
+- Output tokens: 5M × 500 = 2.5B; at $15/1M = **$37.5K**
+- Embedding for retrieval: 5M × ~1500 chunks × 384-dim = ~$5K (one-time)
+- Infrastructure (S3, Bedrock, compute, monitoring): ~$10K
+- **Total batch one-time: ~$130K**
+
+This is an order of magnitude smaller than my "$1M-$5M" mention earlier — that's the spread depending on model choice and document size. **For a $X billion insurer, $130K is a rounding error**.
+
+**Caveats**: depends on actual avg document size (could be 50K not 10K), model choice (Claude vs GPT-4 vs Llama hosted), and quality requirements (more re-tries = more cost). Pilot will produce the real number.
+
+**Q2**: "How do you ensure the LLM doesn't introduce bias in summaries that affects actuarial pricing fairness?"
+
+**A**: This is exactly what NAIC and several state DOIs are pushing on (model disparate impact):
+
+- **Stratified evaluation**: validation set has claims from all demographic segments (where claim file contains demographic info). Compare LLM extraction agreement rate per segment.
+- **Bias test**: take same factual claim, vary only the demographic-correlated fields (zip code, name, etc.) → does LLM produce systematically different summaries?
+- **Documentation**: write the bias eval methodology in algorithmic accountability doc. Submit to state DOIs that require (NY DFS 2024 directive).
+- **Human-in-loop**: any claim used in actuarial model with anomalous summary metrics goes to human review.
+
+**Caveat**: claim files contain less directly demographic info than e.g. lending data, so disparate impact risk is lower than other use cases — but not zero. Still need eval.
+
+**Q3**: "Why not just use GPT-4 API directly? Saves all the self-hosting hassle."
+
+**A**: Tradeoff depending on customer's risk tolerance:
+
+**Pro API**: faster ship, better quality, less infra.
+
+**Con API** (per insurance customer):
+- Data movement compliance: must negotiate BAA + DPA + indemnification with OpenAI. Insurance legal teams typically take 3-6 months for these.
+- State DOI exposure: NY DFS will ask "where physically does the data go for processing?" Answering "OpenAI" needs documentation.
+- Audit log access: when you use API, you don't fully control the audit log retention or access.
+- Catastrophic event risk: if OpenAI has a breach, customer claim data is in third-party hands.
+
+**My recommendation**: explicitly raise this with GC + CCO. **If they're OK** with API + BAA, go faster. **If they want self-host**, plan for longer engagement. **Don't make the call unilaterally**.
+
+For a conservative carrier, default is self-host. For a more aggressive carrier (digital-native, established API risk framework), API is acceptable.
+
+**Q4**: "What if we need the summaries to feed into a regulatory rate filing? Does the LLM need to be 'qualified'?"
+
+**A**: This is where state DOI conversations matter:
+
+- **For internal actuarial modeling** (not used in rate filing): use freely with documentation
+- **For rate filing input**: many states (CA, FL especially) require "**actuarially sound and explainable**" inputs. LLM-derived inputs may need:
+  - Disclosure to state DOI that LLM was used
+  - Methodology document (what model, what prompt, what validation)
+  - Sample audit (DOI requests N claims for verification)
+- **For underwriting decisioning**: many states restrict AI in consumer-impact decisions (some require "right to know" disclosures)
+- **For claims handling automated decisions** (denial, etc.): heavily regulated
+
+**My recommendation**: scope v1 to **non-rate-filing use** (actuarial research, claim audit prep) to avoid this. Year 2+ engage state DOIs on rate-filing usage.
+
+**Q5**: "How do you handle the case where adjustor notes contain personal opinions that aren't facts?"
+
+**A**: This is a quality issue specific to insurance. Adjustor notes often have "claimant seems exaggerating" or "vehicle appears modified" — opinion not fact. Approach:
+
+- **Prompt engineering**: instruct LLM to **extract objective facts** with citation, **flag subjective opinions** separately
+- **Schema**: summary has two sections — "Facts (with citations)" and "Subjective notes (with citations)"
+- **Downstream guidance**: actuarial training emphasizes that subjective section is informational only, not for model input
+- **Eval**: include "opinion vs fact" classification in agreement rate metric
+
+**Risk**: LLM may treat opinion as fact (hallucination of confidence). Eval set includes claims with known subjective notes to catch this.
+
+---
+
+## ❌ 死路答法 (top 7)
+
+1. **冲 cost estimate** before use-case scoping
+2. **当 batch ETL system design 题做** (TPS calculation等)
+3. **1 generic summary** for all downstream uses
+4. **Run 30M before validating on 100**
+5. **Skip per-state regulatory matrix**
+6. **Skip citation tracking** (legal exposure)
+7. **Include privileged documents** in LLM pipeline
+
+---
+
+## ✅ 加分项 (top 7)
+
+1. **Scope to 1 LOB + 1 user** for v1 explicitly
+2. **Citation at sub-paragraph granularity** required
+3. **Stratified sampling 100K** before batching 5M
+4. **State DOI pre-brief** in week 6-8
+5. **Privacy classification (privileged / HIPAA / standard)** as first production layer
+6. **Tiered model use** (small for easy, large for complex) for cost
+7. **Quote your ConvFinQA citation + ablation methodology**
+
+---
+
+## 一句话总结
+
+> **保险 30M 理赔 LLM summary = "scope reduction 是核心: 1 LOB + 1 user + 100K pilot 之前不要批量 + citation 不可省 + per-state regulatory matrix"**.
+>
+> 真正的 win 不是处理 30M, 是**让 actuary 用 100K 的 LLM summary 替代 3 hr 手动 review, 同时 GC + CCO + state DOI 全部满意**. 30M batch 是 month 4+ 的事, 不是 90 天.
+
+---
+
+## Cheat Sheet
+
+```
+不要做:
+  - 冲 cost estimate 算 token
+  - 当 batch ETL 题做
+  - 1 generic summary for everyone
+  - Batch 30M 前 validate
+  - 跳过 state regulatory matrix
+  - 跳过 citation tracking
+  - Include privileged 文档
+
+要做 (5 step):
+  1. Clarify (10min): 10 Q, 锁 use case + state + LOB
+  2. Stakeholder: Chief Actuary sponsor, GC + CCO + State DOI veto
+  3. Data: ACORD / adjustor notes / police / medical / litigation
+  4. Decompose: 10 subproblem, privacy classification 第一
+  5. MVP: 4 周, 100 claim, 1 state, manual review
+
+Clarify Q 必问:
+  - 谁用 summary (actuarial / legal / CS / 等)?
+  - 每个 use case 的 value?
+  - State regulatory map?
+  - PII / HIPAA / privilege handling?
+  - 哪个 LOB?
+  - V1 use case 优先?
+  - Latency (batch / real-time)?
+  - 之前 AI 部署?
+  - Document format?
+  - Veto holders?
+
+Veto holders:
+  - Chief Actuary (sponsor)
+  - General Counsel
+  - Chief Compliance Officer
+  - State DOI engagement officer
+  - CISO
+
+Data privacy tiers:
+  - Attorney-client privileged (EXCLUDE from LLM)
+  - HIPAA (separate pipeline)
+  - PII (redact before LLM)
+  - Standard (process normally)
+
+10 subproblems:
+  1. Use case scoping (1 LOB + 1 user)
+  2. Ingestion + privacy classification
+  3. PII redaction
+  4. Stratified sampling 100K pilot
+  5. LLM summarization with citations
+  6. Actuarial validation
+  7. State-by-state regulatory matrix
+  8. Cost optimization
+  9. Batch infra (month 4+)
+  10. Real-time (month 6+)
+
+Walking-skeleton Week 1-4:
+  100 claims, 1 state (Texas easy), manual privacy review,
+  ~$10 compute, show actuarial reviewer
+  Goal: 95%+ agreement on fact extraction
+
+Phase plan:
+  W1-4: 100-claim walking-skeleton
+  W5-8: 100K stratified pilot
+  W9-12: 1000-claim 3-actuary validation, state DOI pre-brief
+  M4-6: batch 5M
+  M7+: real-time + expansion
+
+Citation requirement:
+  - Sub-paragraph granularity (not doc-level)
+  - "para 3, sentence 2" specificity
+  - Human can verify in seconds
+
+State regulatory map:
+  CA + NY = strict (algorithmic accountability)
+  TX + FL = less strict
+  Some require explainable AI documentation
+
+Cost estimate (5M claims):
+  Input tokens (caching): ~$75K
+  Output tokens: ~$37.5K
+  Infrastructure: ~$10K
+  Total batch one-time: ~$130K
+  (small for $X-billion insurer)
+
+Resume quote:
+  "ConvFinQA: multi-hop QA over financial docs
+   with citation, same structure as claim summary.
+   Negative-result ablation methodology applies:
+   retrieval × prompt × model × CoT.
+   100K stratified BEFORE 5M batch."
+
+Key phrases:
+  - "Before cost estimate, who uses the summary..."
+  - "Sample 100K before batching 5M"
+  - "Citation at sub-paragraph granularity"
+  - "Privacy classifier is the first production layer"
+  - "Per-state regulatory matrix, not monolithic"
+  - "State DOI pre-brief in week 6-8"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

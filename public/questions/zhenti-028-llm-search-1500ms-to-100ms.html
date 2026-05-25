@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q28 · [系统设计/架构] 客户要求 LLM 搜索 sub-100ms, 朴素 RAG 要 1.5s, 怎么压到 100ms · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q28 · [系统设计/架构] 客户要求 LLM 搜索 sub-100ms, 朴素 RAG 要 1.5s, 怎么压到 100ms</div>
+  <h1>Q28 · [系统设计/架构] 客户要求 LLM 搜索 sub-100ms, 朴素 RAG 要 1.5s, 怎么压到 100ms</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-028-llm-search-1500ms-to-100ms.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-028-llm-search-1500ms-to-100ms.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q28 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q28 · LLM 搜索从 1.5s 压到 100ms</h3>
+<blockquote><p>"Your LLM-powered semantic search (over 10M documents) is hitting <strong>p50 1500ms</strong>. PM wants <strong>p50 100ms</strong>. Current path: embed query (100ms) → vector search (200ms) → LLM rerank (500ms) → LLM summarize (300ms) → post-process (400ms). <strong>How do you get 15× speed-up?</strong> What can you cut without killing quality?"</p></blockquote>
+<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search <strong>约束</strong>: 10M docs / quality bar (nDCG@10 ≥ baseline, factuality ≥ 95%) / cost can grow modestly (≤ 2×) / no quality regression &gt; 2% / streaming UI allowed</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>不是考你 "更快", 是考你<strong>理解每一个 ms 在哪 + 知道哪些可以 cut</strong>:</p>
+<ol><li><strong>Cascade architecture</strong> — small model first, escalate only when needed</li><li><strong>Caching layers</strong> — embed cache, retrieval cache, reranker cache, generation cache</li><li><strong>Pre-computation</strong> — index time vs query time work split</li><li><strong>Parallelism</strong> — sequential 200+500+300 = 1000, parallel = 500</li><li><strong>Quantization + distillation</strong> — smaller faster model with eval-validated quality</li><li><strong>HNSW tuning</strong> — ef_search, prefilter strategies</li><li><strong>Skip ladders</strong> — high-confidence skip reranker, skip summarize</li><li><strong>Streaming partial</strong> — perceived latency vs actual</li><li><strong>菜鸟答案失败点</strong>: "上更快 GPU" — 没 attack architecture. "缓存" — 没说 invalidation. "去掉 reranker" — 没 quality guard.</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<ol><li><strong>What's "search" UI</strong>: 像 Google 给 top-10 link, 还是 Perplexity 给 answer + citations? 巨大不同</li><li><strong>Quality bar</strong>: nDCG / MRR / human eval, 多少 budget 可降?</li><li><strong>Cost budget</strong>: 1500ms infra cost vs 100ms, willing 2× spending?</li><li><strong>Cache friendliness</strong>: query repeat rate? 高 cache 可以大. (e.g., 70% queries 看过)</li><li><strong>Doc corpus update</strong>: static 还是 hourly inflow? 影响 pre-compute</li><li><strong>Streaming OK?</strong>: 100ms first token + rest stream OK 还是 must be full result 100ms?</li><li><strong>User behavior</strong>: 用户输 query 后 type more 还是 immediate submit? 关系 to debouncing</li><li><strong>Existing infra</strong>: 已经有 vector DB / GPU pool 吗?</li></ol>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify + decompose</td><td>5 min</td><td>拆 1500ms into 5 stages, 哪个最难 cut</td><td>"我先 attribute 每个 stage, 然后选 attack"</td></tr><tr><td>2</td><td>Cascade architecture</td><td>10 min</td><td>大部分 query 走 fast path, hard query 走 full</td><td>"70% query 用 fast path 100ms, 30% 用 full"</td></tr><tr><td>3</td><td>Embed: cache + small model</td><td>7 min</td><td>Query embed cache + distilled embed</td><td>"Embed cache hit 80% → 100ms → 5ms"</td></tr><tr><td>4</td><td>Retrieval: HNSW tune + prefilter</td><td>8 min</td><td>ef_search 调小 + pre-filter ACL</td><td>"HNSW ef 调 + prefilter → 200ms → 30ms"</td></tr><tr><td>5</td><td>Reranker: skip ladder + cascade</td><td>8 min</td><td>High-conf skip + distilled cross-encoder</td><td>"500ms → 0ms or 50ms"</td></tr><tr><td>6</td><td>LLM: distill + speculative + skip</td><td>8 min</td><td>300ms LLM → 50ms with skip-summary</td><td>"Skip summary if user wants link list"</td></tr><tr><td>7</td><td>Post-process: parallelize + async</td><td>4 min</td><td>400ms post → 20ms sync, rest async</td><td>"Audit / analytics push 到 background"</td></tr><tr><td>8</td><td>Trade-offs + close</td><td>5 min</td><td>100ms vs quality matrix, streaming option</td><td>"100ms p50 OK, p99 200ms; streaming for hard queries"</td></tr></tbody></table></div>
+<hr />
+<h3>端到端架构图 (ASCII)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">                                User submits query
+                                       │
+                                       ▼
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  QUERY ROUTER (decide fast vs full path, &lt; 5ms)                             │
+   │   ▸ Cache lookup (Redis): result for (query_hash, user_acl_hash)            │
+   │   ▸ Query classifier: hard query (long, multi-hop)? OR simple?              │
+   │   ▸ Pick path                                                               │
+   └────────────────────────┬───────────────────────┬────────────────────────────┘
+                            │                       │
+                            ▼                       ▼
+   ┌─────────────────────────┐         ┌─────────────────────────────────────────┐
+   │  FAST PATH (target 80ms)│         │  FULL PATH (target 300ms streaming)     │
+   │                         │         │                                         │
+   │  1. Query embed         │         │  1. Query embed (cache or compute)      │
+   │     - 80% cache hit (5ms)         │     - 50ms                              │
+   │     - else BGE-small (30ms)       │  2. Hybrid retrieval (50ms)             │
+   │  2. HNSW search ef=32   │         │     - HNSW + BM25 + RRF                 │
+   │     - return top-10     │         │  3. Cross-encoder rerank (40ms)         │
+   │  3. Cheap rerank (skip) │         │     - distilled, top-100 → top-10       │
+   │  4. Return top-10 links │         │  4. LLM summarize (200ms streaming)     │
+   │     + snippet           │         │     - Claude Haiku 4.6 distill           │
+   │  5. Post-process async  │         │     - First token &lt; 100ms               │
+   │                         │         │  5. Post-process parallel               │
+   │  Total: ~80ms p50       │         │  Total: ~300ms p50 (200ms TTFT)         │
+   └─────────────────────────┘         └─────────────────────────────────────────┘
+                                                  │
+                                                  ▼
+                                       ┌─────────────────────────┐
+                                       │  Stream to user         │
+                                       └─────────────────────────┘
+
+   Background (async, doesn't block):
+   ─ Cache write (Redis SET 1h TTL)
+   ─ Analytics emit (Kafka → DWH)
+   ─ Eval sample (1% queries → human review queue)
+   ─ Telemetry (OTel)
+
+   Periodic (off-line):
+   ─ Distill reranker (weekly, from logs)
+   ─ Index rebuild HNSW (nightly delta + monthly full)
+   ─ Query log embedding for cache pre-warm</code></pre>
+<hr />
+<h3>详细设计 (60-min walkthrough)</h3>
+<h4>Phase 1: Clarify + decompose (5 min)</h4>
+<p>开口:</p>
+<ul><li>"1500ms 是 p50 还是 p99? PM 想 100ms 是 p50 还是 p99?"</li><li>"Search UI: link list (Google-like) 还是 answer (Perplexity-like)? 巨大区别"</li><li>"Cache friendliness: query repeat 率? 70% 重复 vs 5% 重复 完全不同 strategy"</li></ul>
+<p>假设: p50 1500 → 100, UI 是 link list 主 + answer 可选, query repeat ~50%.</p>
+<p>KPI:</p>
+<ul><li><strong>p50 latency</strong>: 100ms (target)</li><li><strong>p99 latency</strong>: 500ms (acceptable)</li><li><strong>TTFB (time to first byte)</strong>: 50ms</li><li><strong>Quality (nDCG@10)</strong>: ≥ 95% of current</li><li><strong>Cost</strong>: ≤ 2× current</li></ul>
+<p>阶段分:</p>
+<ul><li>Embed 100ms</li><li>Vector search 200ms</li><li>LLM rerank 500ms</li><li>LLM summarize 300ms</li><li>Post 400ms</li><li>Total 1500ms</li></ul>
+<p>Attack priority by impact:</p>
+<ol><li>LLM rerank 500ms — biggest, cut to ~0-50ms</li><li>Post-process 400ms — easy to async out</li><li>LLM summarize 300ms — cut to 0 (link list) or 200ms streaming</li><li>Vector search 200ms — tune HNSW</li><li>Embed 100ms — cache aggressive</li></ol>
+<h4>Phase 2: Cascade architecture (10 min)</h4>
+<p><strong>核心 insight</strong>: 不是所有 query 都需要 LLM rerank + summarize. Cascade = cheap path for easy queries, expensive path for hard.</p>
+<p><strong>Query classifier (&lt; 5ms)</strong>:</p>
+<pre class="language-python"><code class="language-python">def classify_query(query, user_context):
+    # Fast features
+    token_count = len(tokenize(query))
+    has_question_words = any(w in query.lower() for w in ['what', 'how', 'why', 'explain'])
+    is_navigational = matches_known_entity(query)  # "facebook login"
+    
+    if is_navigational:
+        return 'navigational'  # cached top-1 result
+    if token_count &lt; 5 and not has_question_words:
+        return 'lookup'  # link list, no LLM
+    if 'compare' in query or 'difference' in query:
+        return 'analytical'  # full path
+    return 'mixed'</code></pre>
+<p><strong>Path routing</strong>:</p>
+<ul><li><code>navigational</code> (10% of traffic): pure cache, ~20ms</li><li><code>lookup</code> (60%): fast path, top-10 link + snippet, no LLM, ~80ms</li><li><code>analytical</code> (20%): full path with LLM summarize, ~300ms streaming</li><li><code>mixed</code> (10%): fast path first, async escalate if needed</li></ul>
+<p><strong>Fast path detail</strong>:</p>
+<ul><li>Cache lookup</li><li>If miss: embed (cache 80% hit) → HNSW search → return links</li><li>No LLM rerank for lookup (use vector similarity as rank)</li><li>No LLM summarize</li></ul>
+<p><strong>Full path detail</strong>:</p>
+<ul><li>Cache lookup (less hit since varied)</li><li>Embed → hybrid retrieve → cross-encoder rerank → LLM summarize streaming</li></ul>
+<p><strong>Why this works</strong>:</p>
+<ul><li>LLM rerank for navigational/lookup is overkill, vector similarity sufficient</li><li>Most users want quick links, only some want answer</li><li>Streaming for analytical means 100ms TTFT acceptable for 300ms total</li></ul>
+<h4>Phase 3: Embed: cache + small model (7 min)</h4>
+<p><strong>Current</strong>: 100ms embed (probably text-embedding-3-large or BGE-large via API call)</p>
+<p><strong>Fix 1: Query cache</strong></p>
+<pre class="language-python"><code class="language-python"># Redis cache, key by normalized query
+key = f"emb:{normalize(query)}"
+cached = await redis.get(key)
+if cached:
+    return numpy.frombuffer(cached, dtype=np.float32)
+
+# Miss: compute
+emb = await embedder.encode(query)
+await redis.setex(key, 3600, emb.tobytes())  # 1h TTL
+return emb</code></pre>
+<p>Hit rate: 80% for popular queries (skewed Zipf distribution).</p>
+<ul><li>Hit: 1ms (Redis GET)</li><li>Miss: 30ms (small embedder)</li><li>Average: 0.8 × 1 + 0.2 × 30 = 6.8ms ≈ 7ms</li></ul>
+<p><strong>Fix 2: Distilled smaller embedder</strong></p>
+<p>OpenAI text-embedding-3-large 100ms-ish (3072 dim). Replace with BGE-small (384 dim) self-host:</p>
+<ul><li>7ms inference on CPU batch, 2ms on T4 GPU</li><li>Quality 90-95% of large (acceptable with reranker)</li></ul>
+<p>If quality drops too much, train smaller embed model:</p>
+<ul><li>Distill from large to small: teacher (large) generates embeddings, student (small) learn to mimic</li><li>1-2% quality drop, 10× speed</li></ul>
+<p><strong>Fix 3: Index size implication</strong></p>
+<p>10M docs × 384 dim × 4 bytes = 15GB raw vs 10M × 3072 × 4B = 120GB raw. Smaller embedding → smaller index → faster HNSW (less memory pressure).</p>
+<p><strong>Result</strong>: 100ms → 7ms average</p>
+<h4>Phase 4: Retrieval: HNSW tune + prefilter (8 min)</h4>
+<p><strong>Current</strong>: 200ms HNSW search, probably default <code>ef_search=128</code></p>
+<p><strong>HNSW parameters trade-off</strong>: | Param | Higher | Lower | |---|---|---| | <code>M</code> (graph degree) | Better recall, slower build, more memory | Faster, lower recall | | <code>ef_construction</code> | Better build quality | Faster build | | <code>ef_search</code> | Better recall, slower query | Faster query, lower recall |</p>
+<p>For 10M docs, common: M=32, ef_construction=200, ef_search=128.</p>
+<p><strong>Fix 1: Reduce ef_search</strong></p>
+<p><code>ef_search=32</code> cuts search time ~4× (200ms → 50ms). Recall@10 drops ~1-2%.</p>
+<p>For lookup path (cascade fast), 1-2% recall drop OK. For analytical path, keep <code>ef_search=128</code>.</p>
+<p><strong>Fix 2: Prefilter ACL</strong></p>
+<p>Pre-filter user accessible doc_ids (e.g., 500 / 10M = 5K docs user can see) → search on small subset.</p>
+<pre class="language-python"><code class="language-python"># Bad: search 10M then filter
+results = hnsw.search(query_emb, k=100)
+filtered = [r for r in results if r.doc_id in user_acl_ids]
+
+# Good: prefilter then search
+hnsw.search(query_emb, k=10, filter_ids=user_acl_ids)  # internal candidate skip</code></pre>
+<p>Most vector DBs (Qdrant, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.</p>
+<p><strong>Fix 3: Hybrid (BM25 + HNSW)</strong></p>
+<p>If query has rare token (e.g., product code "ABC-123"), BM25 wins. HNSW alone misses.</p>
+<pre class="language-python"><code class="language-python"># Parallel
+hnsw_task = asyncio.create_task(hnsw.search(query_emb, k=50))
+bm25_task = asyncio.create_task(bm25.search(query, k=50))
+hnsw_res, bm25_res = await asyncio.gather(hnsw_task, bm25_task)
+
+# Fuse with RRF (rank reciprocal)
+final = rrf_fuse(hnsw_res, bm25_res, k=10)</code></pre>
+<p>Latency: max(hnsw, bm25) = ~50ms (parallel).</p>
+<p><strong>Fix 4: Pre-computed dense + sparse</strong></p>
+<ul><li>HNSW for dense</li><li>BM25 sparse via Lucene/OpenSearch</li><li>ColBERT for late interaction (precompute token embeddings, score at query time)</li></ul>
+<p>Latency: 30-50ms hybrid retrieval.</p>
+<p><strong>Result</strong>: 200ms → 30-50ms</p>
+<h4>Phase 5: Reranker: skip ladder + cascade (8 min)</h4>
+<p><strong>Current</strong>: 500ms LLM rerank (probably GPT-4 or Cohere Rerank API)</p>
+<p>This is the <strong>biggest cut opportunity</strong>.</p>
+<p><strong>Fix 1: Skip reranker on high confidence</strong></p>
+<pre class="language-python"><code class="language-python">def needs_reranker(hnsw_results):
+    # If top-3 results have clear score separation, no need to rerank
+    top_3_scores = [r.score for r in hnsw_results[:3]]
+    if top_3_scores[0] - top_3_scores[2] &gt; 0.15:
+        return False  # confident
+    return True  # ambiguous, need rerank</code></pre>
+<p>~40% queries have confident ranking, skip rerank → 500ms → 0ms.</p>
+<p><strong>Fix 2: Distilled cross-encoder (not LLM)</strong></p>
+<p>LLM rerank is overkill for most cases. Use cross-encoder:</p>
+<ul><li>MS MARCO-trained cross-encoder (e.g., ms-marco-MiniLM-L-12-v2)</li><li>50ms for top-100 candidates</li><li>Quality 95% of LLM rerank on benchmarks</li></ul>
+<pre class="language-python"><code class="language-python"># 100 candidates × cross-encoder → top-10
+scores = cross_encoder.score([(query, c.text) for c in candidates])
+top_10 = sorted(zip(candidates, scores), key=lambda x: -x[1])[:10]</code></pre>
+<p><strong>Fix 3: Cascade rerank</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Level 1: HNSW score → top-100 (free)
+Level 2: Bi-encoder (small) score → top-30 (10ms)
+Level 3: Cross-encoder rerank → top-10 (40ms only on hard queries)
+Level 4: LLM rerank → top-3 (200ms only on very hard / paid)</code></pre>
+<p>Most queries stop at Level 2-3. Level 4 only for analytical / VIP.</p>
+<p><strong>Fix 4: Reranker batch + cache</strong></p>
+<p>Identical (query, doc) pair → cache score. Hit rate ~30% on popular queries.</p>
+<p><strong>Result</strong>: 500ms → average 20ms (60% skip + 40% × 50ms)</p>
+<h4>Phase 6: LLM summarize: distill + speculative + skip (8 min)</h4>
+<p><strong>Current</strong>: 300ms LLM summarize (probably GPT-4 Turbo)</p>
+<p><strong>Fix 1: Skip for lookup path</strong></p>
+<p>60% queries are lookup (just want links). No summary needed. → 0ms for 60% queries.</p>
+<p><strong>Fix 2: Smaller distilled model for summarize</strong></p>
+<p>For analytical queries, use:</p>
+<ul><li>Claude Haiku 4.6 instead of Opus 4.7</li><li>Cost: 5× cheaper, speed: 3× faster</li><li>Quality: 90% of Opus on summary benchmarks</li><li>~100ms instead of 300ms</li></ul>
+<p><strong>Fix 3: Streaming first token</strong></p>
+<p>Even if total 200ms, stream first token at 30ms → user perceives instant.</p>
+<ul><li>Server-Sent Events</li><li>Client buffers and displays incrementally</li></ul>
+<p>UI perception:</p>
+<ul><li>100ms before first character: feels instant</li><li>100ms-1s: noticeable but acceptable</li><li>&gt; 1s: feels slow</li></ul>
+<p>So 300ms total with 30ms first token is OK perceptually.</p>
+<p><strong>Fix 4: Prefill optimization</strong></p>
+<p>Reuse system prompt KV cache (prefix caching in vLLM / Anthropic prompt cache).</p>
+<ul><li>4K system prompt prefill ~50ms saved</li><li>Anthropic cached prompt 90% cheaper</li></ul>
+<p><strong>Fix 5: Limit output</strong></p>
+<p>Summarize in 3 sentences, not 5. Cuts ~30% decode time.</p>
+<p><strong>Result</strong>: 300ms → 30ms (skip 60%) or 150ms (streaming, perceived &lt; 100ms TTFT).</p>
+<h4>Phase 7: Post-process: parallelize + async (4 min)</h4>
+<p><strong>Current</strong>: 400ms post-process (probably synchronous: PII redact, citation parse, audit log, analytics emit)</p>
+<p><strong>Fix 1: Async non-critical</strong></p>
+<p>Critical for response: PII redact, citation parse (~50ms total). Non-critical: audit log, analytics emit, eval sample → async background.</p>
+<pre class="language-python"><code class="language-python"># Sync
+text = redact_pii(text)            # 30ms
+citations = parse_citations(text)  # 20ms
+# Send response
+
+# Async (fire and forget)
+asyncio.create_task(audit_log(query, response, user))
+asyncio.create_task(analytics_emit(query, response, latency))
+asyncio.create_task(maybe_sample_for_eval(query, response))</code></pre>
+<p><strong>Fix 2: Pre-compute heavy work</strong></p>
+<p>PII detector training, citation parser regex compilation → load at startup, not per request.</p>
+<p><strong>Result</strong>: 400ms → 20-50ms sync</p>
+<h4>Phase 8: Trade-offs + alternatives (5 min)</h4>
+<p><strong>Total latency after fixes</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stage</th><th>Before</th><th>Fast path</th><th>Full path</th></tr></thead><tbody><tr><td>Embed</td><td>100ms</td><td>7ms</td><td>7ms</td></tr><tr><td>Retrieval</td><td>200ms</td><td>30ms</td><td>50ms</td></tr><tr><td>Rerank</td><td>500ms</td><td>0ms (skip)</td><td>40ms</td></tr><tr><td>LLM</td><td>300ms</td><td>0ms (skip)</td><td>150ms streaming</td></tr><tr><td>Post</td><td>400ms</td><td>20ms</td><td>30ms</td></tr><tr><td><strong>Total</strong></td><td><strong>1500ms</strong></td><td><strong>57ms p50</strong></td><td><strong>277ms with 100ms TTFT</strong></td></tr></tbody></table></div>
+<p>Fast path: 57ms ✓ &lt; 100ms target</p>
+<p>Full path (20% of traffic): 277ms with streaming → perceived 100ms.</p>
+<p>Weighted avg: 80% × 57 + 20% × 277 = 100ms p50 ✓</p>
+<p><strong>Decision 8.1 — Quality risk</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Fix</th><th>Quality impact</th></tr></thead><tbody><tr><td>Smaller embedder</td><td>-1-2% recall</td></tr><tr><td>Lower ef_search</td><td>-1-2% recall</td></tr><tr><td>Skip reranker on confident</td><td>-0.5% nDCG</td></tr><tr><td>Distilled reranker</td><td>-1% nDCG</td></tr><tr><td>Claude Haiku for summary</td><td>-3% summary quality</td></tr><tr><td>Total</td><td>-5-6% in worst case, OK if measured</td></tr></tbody></table></div>
+<p>Mitigation: A/B test before rollout, measure nDCG@10 + human eval on 1% sample.</p>
+<p><strong>Decision 8.2 — Cost impact</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Item</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>Embedding API</td><td>$5K/m (OpenAI)</td><td>$500/m (self-host BGE-small)</td></tr><tr><td>Vector DB</td><td>$3K/m</td><td>$3K/m (same)</td></tr><tr><td>Reranker</td><td>$4K/m (Cohere API)</td><td>$1K/m (self-host)</td></tr><tr><td>LLM</td><td>$20K/m (GPT-4)</td><td>$5K/m (Claude Haiku)</td></tr><tr><td>Total</td><td>$32K/m</td><td>$9.5K/m</td></tr></tbody></table></div>
+<p>3× cheaper + 15× faster. The "1-2% quality loss" is well worth it.</p>
+<p><strong>Decision 8.3 — When NOT to cascade</strong></p>
+<ul><li>Regulatory: financial / medical search may require full path for all queries (audit defensibility)</li><li>VIP user: paid tier gets full path always</li></ul>
+<hr />
+<h3>关键决策点 (with rationale)</h3>
+<ol><li><strong>Cascade architecture</strong> — 80% queries cheap path, 20% expensive. 一刀切 fast = quality挂.</li></ol>
+<ol><li><strong>Embed cache 80% hit</strong> — Zipf distribution of queries makes cache hugely effective.</li></ol>
+<ol><li><strong>Smaller embedder (BGE-small 384d)</strong> — 10× faster, 90% quality, with downstream reranker compensating.</li></ol>
+<ol><li><strong>HNSW ef_search 调小</strong> for fast path — recall trade-off accepted on lookup queries.</li></ol>
+<ol><li><strong>Skip reranker on confident scores</strong> — 40% queries don't need it.</li></ol>
+<ol><li><strong>Distilled cross-encoder, not LLM rerank</strong> — 10× faster, 95% quality.</li></ol>
+<ol><li><strong>Stream LLM output</strong> — TTFT 50ms perceived instant even with 300ms total.</li></ol>
+<ol><li><strong>Async non-critical post-process</strong> — analytics / audit doesn't block response.</li></ol>
+<ol><li><strong>Anthropic prompt cache</strong> — system prompt prefix shared, 50ms saved per call.</li></ol>
+<ol><li><strong>A/B + nDCG monitoring</strong> — every cut has eval gate.</li></ol>
+<hr />
+<h3>数字 (capacity sizing, cost math)</h3>
+<p><strong>Volumes</strong>:</p>
+<ul><li>1M queries/day, 50 QPS sustained, 200 peak</li></ul>
+<p><strong>Hardware (cascading)</strong>:</p>
+<ul><li>Embedding: 4× T4 GPUs (BGE-small batched) = $300/m</li><li>HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m</li><li>Cross-encoder rerank: 2× T4 = $150/m</li><li>LLM (Claude Haiku via Bedrock): pay per token = $5K/m for 200K queries × analytical path</li></ul>
+<p><strong>Cache</strong>:</p>
+<ul><li>Redis cluster (3× cache.r6g.large): $400/m</li><li>80% embed hit, 50% result hit</li></ul>
+<p><strong>Total</strong>: ~$9.5K/m for 1M queries = $0.0001 per query (cf. $32K/m before)</p>
+<p><strong>Latency budget validation</strong>:</p>
+<ul><li>Fast path (80% traffic): 7+30+0+0+20 = 57ms ✓</li><li>Full path (20%): 7+50+40+(50 TTFT) = 147ms TTFT, 300ms total with stream</li><li>Weighted p50: 100ms ✓</li></ul>
+<p><strong>Quality</strong>:</p>
+<ul><li>nDCG@10 drop: 0-2% on lookup, 1-3% on analytical</li><li>Within &lt; 5% acceptable budget</li></ul>
+<p><strong>Throughput</strong>:</p>
+<ul><li>200 QPS peak, each takes 100ms → 20 concurrent</li><li>Current infra handles 500+ concurrent → headroom</li></ul>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<ol><li><strong>TikTok PayLater BNPL RAG</strong> — 你直接 prod 优化过 LLM 搜索, cache + retrieval + rerank trade-off 你做过.</li></ol>
+<ol><li><strong>TikTok Voice agent latency</strong> — voice 1.5s 已是死刑, 你 push 过 &lt; 800ms, 这道题模式同源.</li></ol>
+<ol><li><strong>ConvFinQA multi-hop</strong> — 你处理过 retrieve + compose latency, 减少 LLM call 数 是优化重点.</li></ol>
+<ol><li><strong>Internal Agent Platform</strong> — 你做过 tool selection cache + RAG over tool catalog, 这道题里 result cache 同思路.</li></ol>
+<ol><li><strong>Indonesia 7 market latency</strong> — region affinity + caching, 你都跑过.</li></ol>
+<p>reframe: "我在字节做 BNPL search 时面对类似 problem: 1.2s p50 压到 300ms, 用了 cascade (60% lookup 不走 LLM) + embed cache + distilled reranker. 这道题 100ms 更激进, 加 stream + skip ladder + parallel hybrid retrieval. 我之前 quality 监控是 nDCG + human eval 1% sample, 这道题直接套."</p>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<ol><li><strong>"smaller embedder quality drop 太多 (nDCG -5%), 怎么 mitigate?"</strong> — 答: (a) Distill larger to smaller, finetune on your data (1-2% recoverable); (b) Multi-vector: keep large embed for offline pre-compute index + small for query (cheaper); (c) Hybrid retrieval (BM25 + small dense) compensates for individual recall loss; (d) ColBERT late interaction expensive but better.</li></ol>
+<ol><li><strong>"cache invalidation? doc 更新了 cached result 仍 stale"</strong> — 答: (a) TTL 1h reasonable for most search (acceptable staleness); (b) Doc-id-aware invalidation: when doc updates, invalidate any cache containing doc_id (maintain reverse index); (c) Versioned doc: cache key include doc_version, automatic miss on update; (d) For critical fresh queries (news, finance), bypass cache with <code>?bypass_cache=true</code> param.</li></ol>
+<ol><li><strong>"如果 query 没 cached + lookup classified wrong, 100ms 装不下, 怎么 fallback?"</strong> — 答: (a) Server-Sent Events streaming: emit partial result early, refine later; (b) Per-request budget enforcement: 100ms hit, return what we have, mark "partial"; (c) Background continue: complete full result, user can refresh (rare); (d) Re-classify on retry: misclassified query reclassify with more context.</li></ol>
+<ol><li><strong>"distilled reranker quality drop 在 long-tail query (rare entities) 比 popular 严重, 怎么办?"</strong> — 答: (a) Cascade rerank: small + medium + large; (b) Tail detect: query rarity score (TF-IDF + entity match) high → route to bigger rerank; (c) Active learning: log low-confidence queries, label, retrain; (d) Hybrid retrieval (BM25) for rare entity catches that distilled embedder misses.</li></ol>
+<ol><li><strong>"if PM 也要 p99 100ms 不只 p50, 怎么 do?"</strong> — 答: 100ms p99 极困难. (a) 杀死 full path (analytical 也走 fast); (b) Aggressive cache (95% hit); (c) Pre-compute popular query result offline; (d) Edge caching (CDN) for popular results; (e) 接受 5-10% queries 触发 fast fail + retry with stream "give me a moment"; (f) 跟 PM 谈 p95 vs p99 trade-off — p95 100ms 可达, p99 200ms 合理.</li></ol>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>"上 H100"</strong> — 没 attack architecture, GPU 加 1.5× speed only.</li><li><strong>"cache everything"</strong> — 不区分 cacheable vs 不可 cacheable, invalidation 灾难.</li><li><strong>"去掉 reranker"</strong> — quality 大跌, 没 eval support.</li><li><strong>"用 GPT-3.5"</strong> — 没 distill strategy, quality 不可控.</li><li><strong>"async 全部"</strong> — critical 也 async 用户看不到完整结果.</li><li><strong>"无 streaming"</strong> — 损失 perceived 优化.</li><li><strong>"prefilter? 慢"</strong> — 真正 prefilter 在 vector DB 内部 fast, 没读懂.</li><li><strong>"semantic cache 用同 query"</strong> — 不一定 same intent, hallucinate.</li><li><strong>"不做 A/B, push 上线"</strong> — quality 跌 5% 没人知道.</li><li><strong>"100ms p50 不可能, 1500 太多"</strong> — defeatist, 没拆解.</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Cascade with query classifier</strong> — 80/20 思维, 不一刀切</li><li><strong>5-stage attribution + targeted cut</strong> — 不空谈, 数字驱动</li><li><strong>Embed cache + distill + HNSW tune + rerank cascade + LLM stream</strong> — 多 angle attack</li><li><strong>Skip reranker on confident scores</strong> — clever trick</li><li><strong>Anthropic prompt cache</strong> — 2026 cost optimization</li><li><strong>Async non-critical post</strong> — production hygiene</li><li><strong>A/B + nDCG monitoring</strong> — quality gate</li><li><strong>Streaming SSE for perceived latency</strong> — UX-aware</li><li><strong>Cost reduction 3× alongside latency 15×</strong> — staff-level</li><li><strong>Numbers 给得出来</strong> (7ms embed cache, ef=32, 100ms TTFT, $9.5K/m)</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>1500ms → 100ms 不是 "GPU 加大", 是 <strong>cascade routing (80% lookup 不走 LLM) + embed cache 80% hit + distill small embedder + HNSW tune + skip-or-distilled reranker + stream LLM with skip on lookup + async non-critical post</strong> 一整套 cost-aware quality-controlled 系统优化.</p>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Architecture: CASCADE
+  Navigational (10%): pure cache, 20ms
+  Lookup (60%):       fast path, 80ms
+  Analytical (20%):   full path, 300ms with 100ms TTFT streaming
+  Mixed (10%):        fast first, async escalate
+
+Per-stage optimization:
+
+Embed (100ms → 7ms):
+  - Query cache Redis 1h TTL, hit 80%
+  - BGE-small (384d) self-host, 30ms miss
+  - Smaller dim = smaller index
+
+Retrieval (200ms → 30ms):
+  - HNSW ef_search 32 for fast, 128 for full
+  - Prefilter ACL via filter-aware HNSW
+  - Hybrid BM25 + HNSW parallel + RRF
+  - Total 50ms for full, 30ms fast
+
+Rerank (500ms → 20ms avg):
+  - Skip on confident score gap &gt; 0.15 (40% queries)
+  - Distilled cross-encoder (ms-marco-MiniLM)
+  - Cascade: small → medium → large
+  - LLM rerank only for VIP / very hard
+
+LLM summarize (300ms → 0-150ms):
+  - Skip for lookup path (60%)
+  - Claude Haiku 4.6 not Opus
+  - Stream SSE, TTFT 30-50ms
+  - Anthropic prompt cache (50ms saved)
+  - Limit output 3 sentences
+
+Post-process (400ms → 30ms):
+  - Sync: redact PII, parse citation (50ms)
+  - Async: audit log, analytics, eval sample
+
+Cost (3× cheaper):
+  - Before: $32K/m (OpenAI embed + Cohere rerank + GPT-4)
+  - After:  $9.5K/m (BGE + distilled rerank + Claude Haiku)
+  - Per query: $0.0001
+
+Quality (≤ 5% drop):
+  - Embedder swap: -1-2% recall
+  - Lower ef: -1-2% recall
+  - Skip rerank: -0.5% nDCG
+  - Distilled rerank: -1% nDCG
+  - Smaller summary: -3% subjective
+  - A/B test + nDCG@10 dashboard + 1% human eval
+
+Latency hit ratio:
+  Fast path:  80% traffic, p50 57ms
+  Full path:  20% traffic, p50 277ms with 100ms TTFT
+  Weighted:   p50 100ms ✓ target
+
+Streaming:
+  Always SSE for analytical
+  TTFT 30-50ms = perceived instant
+  Total ms matters less than TTFT</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-027-unify-sap-salesforce-postgres-for-agent.html">← Q27 · [系统设计/架构] 客户数据散落在 SAP、Salesforce、自建 Postgres 仓库, 如何统一给 AI agent 用</a>
+    <a href="zhenti-029-prompt-version-ab-rollback.html">Q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、A/B 测试、回滚 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q28 · LLM 搜索从 1.5s 压到 100ms
+
+> "Your LLM-powered semantic search (over 10M documents) is hitting **p50 1500ms**. PM wants **p50 100ms**. Current path: embed query (100ms) → vector search (200ms) → LLM rerank (500ms) → LLM summarize (300ms) → post-process (400ms). **How do you get 15× speed-up?** What can you cut without killing quality?"
+
+**Round**: System Design (60 min)
+**出处**: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search
+**约束**: 10M docs / quality bar (nDCG@10 ≥ baseline, factuality ≥ 95%) / cost can grow modestly (≤ 2×) / no quality regression > 2% / streaming UI allowed
+
+---
+
+## 这道题在考什么
+
+不是考你 "更快", 是考你**理解每一个 ms 在哪 + 知道哪些可以 cut**:
+
+1. **Cascade architecture** — small model first, escalate only when needed
+2. **Caching layers** — embed cache, retrieval cache, reranker cache, generation cache
+3. **Pre-computation** — index time vs query time work split
+4. **Parallelism** — sequential 200+500+300 = 1000, parallel = 500
+5. **Quantization + distillation** — smaller faster model with eval-validated quality
+6. **HNSW tuning** — ef_search, prefilter strategies
+7. **Skip ladders** — high-confidence skip reranker, skip summarize
+8. **Streaming partial** — perceived latency vs actual
+9. **菜鸟答案失败点**: "上更快 GPU" — 没 attack architecture. "缓存" — 没说 invalidation. "去掉 reranker" — 没 quality guard.
+
+---
+
+## 必问 clarifying questions
+
+1. **What's "search" UI**: 像 Google 给 top-10 link, 还是 Perplexity 给 answer + citations? 巨大不同
+2. **Quality bar**: nDCG / MRR / human eval, 多少 budget 可降?
+3. **Cost budget**: 1500ms infra cost vs 100ms, willing 2× spending?
+4. **Cache friendliness**: query repeat rate? 高 cache 可以大. (e.g., 70% queries 看过)
+5. **Doc corpus update**: static 还是 hourly inflow? 影响 pre-compute
+6. **Streaming OK?**: 100ms first token + rest stream OK 还是 must be full result 100ms?
+7. **User behavior**: 用户输 query 后 type more 还是 immediate submit? 关系 to debouncing
+8. **Existing infra**: 已经有 vector DB / GPU pool 吗?
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|------|------|------|
+| 1 | Clarify + decompose | 5 min | 拆 1500ms into 5 stages, 哪个最难 cut | "我先 attribute 每个 stage, 然后选 attack" |
+| 2 | Cascade architecture | 10 min | 大部分 query 走 fast path, hard query 走 full | "70% query 用 fast path 100ms, 30% 用 full" |
+| 3 | Embed: cache + small model | 7 min | Query embed cache + distilled embed | "Embed cache hit 80% → 100ms → 5ms" |
+| 4 | Retrieval: HNSW tune + prefilter | 8 min | ef_search 调小 + pre-filter ACL | "HNSW ef 调 + prefilter → 200ms → 30ms" |
+| 5 | Reranker: skip ladder + cascade | 8 min | High-conf skip + distilled cross-encoder | "500ms → 0ms or 50ms" |
+| 6 | LLM: distill + speculative + skip | 8 min | 300ms LLM → 50ms with skip-summary | "Skip summary if user wants link list" |
+| 7 | Post-process: parallelize + async | 4 min | 400ms post → 20ms sync, rest async | "Audit / analytics push 到 background" |
+| 8 | Trade-offs + close | 5 min | 100ms vs quality matrix, streaming option | "100ms p50 OK, p99 200ms; streaming for hard queries" |
+
+---
+
+## 端到端架构图 (ASCII)
+
+```
+                                User submits query
+                                       │
+                                       ▼
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  QUERY ROUTER (decide fast vs full path, < 5ms)                             │
+   │   ▸ Cache lookup (Redis): result for (query_hash, user_acl_hash)            │
+   │   ▸ Query classifier: hard query (long, multi-hop)? OR simple?              │
+   │   ▸ Pick path                                                               │
+   └────────────────────────┬───────────────────────┬────────────────────────────┘
+                            │                       │
+                            ▼                       ▼
+   ┌─────────────────────────┐         ┌─────────────────────────────────────────┐
+   │  FAST PATH (target 80ms)│         │  FULL PATH (target 300ms streaming)     │
+   │                         │         │                                         │
+   │  1. Query embed         │         │  1. Query embed (cache or compute)      │
+   │     - 80% cache hit (5ms)         │     - 50ms                              │
+   │     - else BGE-small (30ms)       │  2. Hybrid retrieval (50ms)             │
+   │  2. HNSW search ef=32   │         │     - HNSW + BM25 + RRF                 │
+   │     - return top-10     │         │  3. Cross-encoder rerank (40ms)         │
+   │  3. Cheap rerank (skip) │         │     - distilled, top-100 → top-10       │
+   │  4. Return top-10 links │         │  4. LLM summarize (200ms streaming)     │
+   │     + snippet           │         │     - Claude Haiku 4.6 distill           │
+   │  5. Post-process async  │         │     - First token < 100ms               │
+   │                         │         │  5. Post-process parallel               │
+   │  Total: ~80ms p50       │         │  Total: ~300ms p50 (200ms TTFT)         │
+   └─────────────────────────┘         └─────────────────────────────────────────┘
+                                                  │
+                                                  ▼
+                                       ┌─────────────────────────┐
+                                       │  Stream to user         │
+                                       └─────────────────────────┘
+
+   Background (async, doesn't block):
+   ─ Cache write (Redis SET 1h TTL)
+   ─ Analytics emit (Kafka → DWH)
+   ─ Eval sample (1% queries → human review queue)
+   ─ Telemetry (OTel)
+
+   Periodic (off-line):
+   ─ Distill reranker (weekly, from logs)
+   ─ Index rebuild HNSW (nightly delta + monthly full)
+   ─ Query log embedding for cache pre-warm
+```
+
+---
+
+## 详细设计 (60-min walkthrough)
+
+### Phase 1: Clarify + decompose (5 min)
+
+开口:
+- "1500ms 是 p50 还是 p99? PM 想 100ms 是 p50 还是 p99?"
+- "Search UI: link list (Google-like) 还是 answer (Perplexity-like)? 巨大区别"
+- "Cache friendliness: query repeat 率? 70% 重复 vs 5% 重复 完全不同 strategy"
+
+假设: p50 1500 → 100, UI 是 link list 主 + answer 可选, query repeat ~50%.
+
+KPI:
+- **p50 latency**: 100ms (target)
+- **p99 latency**: 500ms (acceptable)
+- **TTFB (time to first byte)**: 50ms
+- **Quality (nDCG@10)**: ≥ 95% of current
+- **Cost**: ≤ 2× current
+
+阶段分:
+- Embed 100ms
+- Vector search 200ms
+- LLM rerank 500ms
+- LLM summarize 300ms
+- Post 400ms
+- Total 1500ms
+
+Attack priority by impact:
+1. LLM rerank 500ms — biggest, cut to ~0-50ms
+2. Post-process 400ms — easy to async out
+3. LLM summarize 300ms — cut to 0 (link list) or 200ms streaming
+4. Vector search 200ms — tune HNSW
+5. Embed 100ms — cache aggressive
+
+### Phase 2: Cascade architecture (10 min)
+
+**核心 insight**: 不是所有 query 都需要 LLM rerank + summarize. Cascade = cheap path for easy queries, expensive path for hard.
+
+**Query classifier (< 5ms)**:
+```python
+def classify_query(query, user_context):
+    # Fast features
+    token_count = len(tokenize(query))
+    has_question_words = any(w in query.lower() for w in ['what', 'how', 'why', 'explain'])
+    is_navigational = matches_known_entity(query)  # "facebook login"
+    
+    if is_navigational:
+        return 'navigational'  # cached top-1 result
+    if token_count < 5 and not has_question_words:
+        return 'lookup'  # link list, no LLM
+    if 'compare' in query or 'difference' in query:
+        return 'analytical'  # full path
+    return 'mixed'
+```
+
+**Path routing**:
+- `navigational` (10% of traffic): pure cache, ~20ms
+- `lookup` (60%): fast path, top-10 link + snippet, no LLM, ~80ms
+- `analytical` (20%): full path with LLM summarize, ~300ms streaming
+- `mixed` (10%): fast path first, async escalate if needed
+
+**Fast path detail**:
+- Cache lookup
+- If miss: embed (cache 80% hit) → HNSW search → return links
+- No LLM rerank for lookup (use vector similarity as rank)
+- No LLM summarize
+
+**Full path detail**:
+- Cache lookup (less hit since varied)
+- Embed → hybrid retrieve → cross-encoder rerank → LLM summarize streaming
+
+**Why this works**:
+- LLM rerank for navigational/lookup is overkill, vector similarity sufficient
+- Most users want quick links, only some want answer
+- Streaming for analytical means 100ms TTFT acceptable for 300ms total
+
+### Phase 3: Embed: cache + small model (7 min)
+
+**Current**: 100ms embed (probably text-embedding-3-large or BGE-large via API call)
+
+**Fix 1: Query cache**
+
+```python
+# Redis cache, key by normalized query
+key = f"emb:{normalize(query)}"
+cached = await redis.get(key)
+if cached:
+    return numpy.frombuffer(cached, dtype=np.float32)
+
+# Miss: compute
+emb = await embedder.encode(query)
+await redis.setex(key, 3600, emb.tobytes())  # 1h TTL
+return emb
+```
+
+Hit rate: 80% for popular queries (skewed Zipf distribution).
+- Hit: 1ms (Redis GET)
+- Miss: 30ms (small embedder)
+- Average: 0.8 × 1 + 0.2 × 30 = 6.8ms ≈ 7ms
+
+**Fix 2: Distilled smaller embedder**
+
+OpenAI text-embedding-3-large 100ms-ish (3072 dim).
+Replace with BGE-small (384 dim) self-host:
+- 7ms inference on CPU batch, 2ms on T4 GPU
+- Quality 90-95% of large (acceptable with reranker)
+
+If quality drops too much, train smaller embed model:
+- Distill from large to small: teacher (large) generates embeddings, student (small) learn to mimic
+- 1-2% quality drop, 10× speed
+
+**Fix 3: Index size implication**
+
+10M docs × 384 dim × 4 bytes = 15GB raw vs 10M × 3072 × 4B = 120GB raw.
+Smaller embedding → smaller index → faster HNSW (less memory pressure).
+
+**Result**: 100ms → 7ms average
+
+### Phase 4: Retrieval: HNSW tune + prefilter (8 min)
+
+**Current**: 200ms HNSW search, probably default `ef_search=128`
+
+**HNSW parameters trade-off**:
+| Param | Higher | Lower |
+|---|---|---|
+| `M` (graph degree) | Better recall, slower build, more memory | Faster, lower recall |
+| `ef_construction` | Better build quality | Faster build |
+| `ef_search` | Better recall, slower query | Faster query, lower recall |
+
+For 10M docs, common: M=32, ef_construction=200, ef_search=128.
+
+**Fix 1: Reduce ef_search**
+
+`ef_search=32` cuts search time ~4× (200ms → 50ms). Recall@10 drops ~1-2%.
+
+For lookup path (cascade fast), 1-2% recall drop OK.
+For analytical path, keep `ef_search=128`.
+
+**Fix 2: Prefilter ACL**
+
+Pre-filter user accessible doc_ids (e.g., 500 / 10M = 5K docs user can see) → search on small subset.
+
+```python
+# Bad: search 10M then filter
+results = hnsw.search(query_emb, k=100)
+filtered = [r for r in results if r.doc_id in user_acl_ids]
+
+# Good: prefilter then search
+hnsw.search(query_emb, k=10, filter_ids=user_acl_ids)  # internal candidate skip
+```
+
+Most vector DBs (Qdrant, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.
+
+**Fix 3: Hybrid (BM25 + HNSW)**
+
+If query has rare token (e.g., product code "ABC-123"), BM25 wins. HNSW alone misses.
+
+```python
+# Parallel
+hnsw_task = asyncio.create_task(hnsw.search(query_emb, k=50))
+bm25_task = asyncio.create_task(bm25.search(query, k=50))
+hnsw_res, bm25_res = await asyncio.gather(hnsw_task, bm25_task)
+
+# Fuse with RRF (rank reciprocal)
+final = rrf_fuse(hnsw_res, bm25_res, k=10)
+```
+
+Latency: max(hnsw, bm25) = ~50ms (parallel).
+
+**Fix 4: Pre-computed dense + sparse**
+
+- HNSW for dense
+- BM25 sparse via Lucene/OpenSearch
+- ColBERT for late interaction (precompute token embeddings, score at query time)
+
+Latency: 30-50ms hybrid retrieval.
+
+**Result**: 200ms → 30-50ms
+
+### Phase 5: Reranker: skip ladder + cascade (8 min)
+
+**Current**: 500ms LLM rerank (probably GPT-4 or Cohere Rerank API)
+
+This is the **biggest cut opportunity**.
+
+**Fix 1: Skip reranker on high confidence**
+
+```python
+def needs_reranker(hnsw_results):
+    # If top-3 results have clear score separation, no need to rerank
+    top_3_scores = [r.score for r in hnsw_results[:3]]
+    if top_3_scores[0] - top_3_scores[2] > 0.15:
+        return False  # confident
+    return True  # ambiguous, need rerank
+```
+
+~40% queries have confident ranking, skip rerank → 500ms → 0ms.
+
+**Fix 2: Distilled cross-encoder (not LLM)**
+
+LLM rerank is overkill for most cases. Use cross-encoder:
+- MS MARCO-trained cross-encoder (e.g., ms-marco-MiniLM-L-12-v2)
+- 50ms for top-100 candidates
+- Quality 95% of LLM rerank on benchmarks
+
+```python
+# 100 candidates × cross-encoder → top-10
+scores = cross_encoder.score([(query, c.text) for c in candidates])
+top_10 = sorted(zip(candidates, scores), key=lambda x: -x[1])[:10]
+```
+
+**Fix 3: Cascade rerank**
+
+```
+Level 1: HNSW score → top-100 (free)
+Level 2: Bi-encoder (small) score → top-30 (10ms)
+Level 3: Cross-encoder rerank → top-10 (40ms only on hard queries)
+Level 4: LLM rerank → top-3 (200ms only on very hard / paid)
+```
+
+Most queries stop at Level 2-3. Level 4 only for analytical / VIP.
+
+**Fix 4: Reranker batch + cache**
+
+Identical (query, doc) pair → cache score. Hit rate ~30% on popular queries.
+
+**Result**: 500ms → average 20ms (60% skip + 40% × 50ms)
+
+### Phase 6: LLM summarize: distill + speculative + skip (8 min)
+
+**Current**: 300ms LLM summarize (probably GPT-4 Turbo)
+
+**Fix 1: Skip for lookup path**
+
+60% queries are lookup (just want links). No summary needed.
+→ 0ms for 60% queries.
+
+**Fix 2: Smaller distilled model for summarize**
+
+For analytical queries, use:
+- Claude Haiku 4.6 instead of Opus 4.7
+- Cost: 5× cheaper, speed: 3× faster
+- Quality: 90% of Opus on summary benchmarks
+- ~100ms instead of 300ms
+
+**Fix 3: Streaming first token**
+
+Even if total 200ms, stream first token at 30ms → user perceives instant.
+- Server-Sent Events
+- Client buffers and displays incrementally
+
+UI perception:
+- 100ms before first character: feels instant
+- 100ms-1s: noticeable but acceptable
+- > 1s: feels slow
+
+So 300ms total with 30ms first token is OK perceptually.
+
+**Fix 4: Prefill optimization**
+
+Reuse system prompt KV cache (prefix caching in vLLM / Anthropic prompt cache).
+- 4K system prompt prefill ~50ms saved
+- Anthropic cached prompt 90% cheaper
+
+**Fix 5: Limit output**
+
+Summarize in 3 sentences, not 5. Cuts ~30% decode time.
+
+**Result**: 300ms → 30ms (skip 60%) or 150ms (streaming, perceived < 100ms TTFT).
+
+### Phase 7: Post-process: parallelize + async (4 min)
+
+**Current**: 400ms post-process (probably synchronous: PII redact, citation parse, audit log, analytics emit)
+
+**Fix 1: Async non-critical**
+
+Critical for response: PII redact, citation parse (~50ms total).
+Non-critical: audit log, analytics emit, eval sample → async background.
+
+```python
+# Sync
+text = redact_pii(text)            # 30ms
+citations = parse_citations(text)  # 20ms
+# Send response
+
+# Async (fire and forget)
+asyncio.create_task(audit_log(query, response, user))
+asyncio.create_task(analytics_emit(query, response, latency))
+asyncio.create_task(maybe_sample_for_eval(query, response))
+```
+
+**Fix 2: Pre-compute heavy work**
+
+PII detector training, citation parser regex compilation → load at startup, not per request.
+
+**Result**: 400ms → 20-50ms sync
+
+### Phase 8: Trade-offs + alternatives (5 min)
+
+**Total latency after fixes**:
+
+| Stage | Before | Fast path | Full path |
+|---|---|---|---|
+| Embed | 100ms | 7ms | 7ms |
+| Retrieval | 200ms | 30ms | 50ms |
+| Rerank | 500ms | 0ms (skip) | 40ms |
+| LLM | 300ms | 0ms (skip) | 150ms streaming |
+| Post | 400ms | 20ms | 30ms |
+| **Total** | **1500ms** | **57ms p50** | **277ms with 100ms TTFT** |
+
+Fast path: 57ms ✓ < 100ms target
+
+Full path (20% of traffic): 277ms with streaming → perceived 100ms.
+
+Weighted avg: 80% × 57 + 20% × 277 = 100ms p50 ✓
+
+**Decision 8.1 — Quality risk**
+
+| Fix | Quality impact |
+|---|---|
+| Smaller embedder | -1-2% recall |
+| Lower ef_search | -1-2% recall |
+| Skip reranker on confident | -0.5% nDCG |
+| Distilled reranker | -1% nDCG |
+| Claude Haiku for summary | -3% summary quality |
+| Total | -5-6% in worst case, OK if measured |
+
+Mitigation: A/B test before rollout, measure nDCG@10 + human eval on 1% sample.
+
+**Decision 8.2 — Cost impact**
+
+| Item | Before | After |
+|---|---|---|
+| Embedding API | $5K/m (OpenAI) | $500/m (self-host BGE-small) |
+| Vector DB | $3K/m | $3K/m (same) |
+| Reranker | $4K/m (Cohere API) | $1K/m (self-host) |
+| LLM | $20K/m (GPT-4) | $5K/m (Claude Haiku) |
+| Total | $32K/m | $9.5K/m |
+
+3× cheaper + 15× faster. The "1-2% quality loss" is well worth it.
+
+**Decision 8.3 — When NOT to cascade**
+
+- Regulatory: financial / medical search may require full path for all queries (audit defensibility)
+- VIP user: paid tier gets full path always
+
+---
+
+## 关键决策点 (with rationale)
+
+1. **Cascade architecture** — 80% queries cheap path, 20% expensive. 一刀切 fast = quality挂.
+
+2. **Embed cache 80% hit** — Zipf distribution of queries makes cache hugely effective.
+
+3. **Smaller embedder (BGE-small 384d)** — 10× faster, 90% quality, with downstream reranker compensating.
+
+4. **HNSW ef_search 调小** for fast path — recall trade-off accepted on lookup queries.
+
+5. **Skip reranker on confident scores** — 40% queries don't need it.
+
+6. **Distilled cross-encoder, not LLM rerank** — 10× faster, 95% quality.
+
+7. **Stream LLM output** — TTFT 50ms perceived instant even with 300ms total.
+
+8. **Async non-critical post-process** — analytics / audit doesn't block response.
+
+9. **Anthropic prompt cache** — system prompt prefix shared, 50ms saved per call.
+
+10. **A/B + nDCG monitoring** — every cut has eval gate.
+
+---
+
+## 数字 (capacity sizing, cost math)
+
+**Volumes**:
+- 1M queries/day, 50 QPS sustained, 200 peak
+
+**Hardware (cascading)**:
+- Embedding: 4× T4 GPUs (BGE-small batched) = $300/m
+- HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m
+- Cross-encoder rerank: 2× T4 = $150/m
+- LLM (Claude Haiku via Bedrock): pay per token = $5K/m for 200K queries × analytical path
+
+**Cache**:
+- Redis cluster (3× cache.r6g.large): $400/m
+- 80% embed hit, 50% result hit
+
+**Total**: ~$9.5K/m for 1M queries = $0.0001 per query (cf. $32K/m before)
+
+**Latency budget validation**:
+- Fast path (80% traffic): 7+30+0+0+20 = 57ms ✓
+- Full path (20%): 7+50+40+(50 TTFT) = 147ms TTFT, 300ms total with stream
+- Weighted p50: 100ms ✓
+
+**Quality**:
+- nDCG@10 drop: 0-2% on lookup, 1-3% on analytical
+- Within < 5% acceptable budget
+
+**Throughput**:
+- 200 QPS peak, each takes 100ms → 20 concurrent
+- Current infra handles 500+ concurrent → headroom
+
+---
+
+## Gao Xin 简历专属 reframe
+
+1. **TikTok PayLater BNPL RAG** — 你直接 prod 优化过 LLM 搜索, cache + retrieval + rerank trade-off 你做过.
+
+2. **TikTok Voice agent latency** — voice 1.5s 已是死刑, 你 push 过 < 800ms, 这道题模式同源.
+
+3. **ConvFinQA multi-hop** — 你处理过 retrieve + compose latency, 减少 LLM call 数 是优化重点.
+
+4. **Internal Agent Platform** — 你做过 tool selection cache + RAG over tool catalog, 这道题里 result cache 同思路.
+
+5. **Indonesia 7 market latency** — region affinity + caching, 你都跑过.
+
+reframe: "我在字节做 BNPL search 时面对类似 problem: 1.2s p50 压到 300ms, 用了 cascade (60% lookup 不走 LLM) + embed cache + distilled reranker. 这道题 100ms 更激进, 加 stream + skip ladder + parallel hybrid retrieval. 我之前 quality 监控是 nDCG + human eval 1% sample, 这道题直接套."
+
+---
+
+## 5 个 Follow-ups
+
+1. **"smaller embedder quality drop 太多 (nDCG -5%), 怎么 mitigate?"** — 答: (a) Distill larger to smaller, finetune on your data (1-2% recoverable); (b) Multi-vector: keep large embed for offline pre-compute index + small for query (cheaper); (c) Hybrid retrieval (BM25 + small dense) compensates for individual recall loss; (d) ColBERT late interaction expensive but better.
+
+2. **"cache invalidation? doc 更新了 cached result 仍 stale"** — 答: (a) TTL 1h reasonable for most search (acceptable staleness); (b) Doc-id-aware invalidation: when doc updates, invalidate any cache containing doc_id (maintain reverse index); (c) Versioned doc: cache key include doc_version, automatic miss on update; (d) For critical fresh queries (news, finance), bypass cache with `?bypass_cache=true` param.
+
+3. **"如果 query 没 cached + lookup classified wrong, 100ms 装不下, 怎么 fallback?"** — 答: (a) Server-Sent Events streaming: emit partial result early, refine later; (b) Per-request budget enforcement: 100ms hit, return what we have, mark "partial"; (c) Background continue: complete full result, user can refresh (rare); (d) Re-classify on retry: misclassified query reclassify with more context.
+
+4. **"distilled reranker quality drop 在 long-tail query (rare entities) 比 popular 严重, 怎么办?"** — 答: (a) Cascade rerank: small + medium + large; (b) Tail detect: query rarity score (TF-IDF + entity match) high → route to bigger rerank; (c) Active learning: log low-confidence queries, label, retrain; (d) Hybrid retrieval (BM25) for rare entity catches that distilled embedder misses.
+
+5. **"if PM 也要 p99 100ms 不只 p50, 怎么 do?"** — 答: 100ms p99 极困难. (a) 杀死 full path (analytical 也走 fast); (b) Aggressive cache (95% hit); (c) Pre-compute popular query result offline; (d) Edge caching (CDN) for popular results; (e) 接受 5-10% queries 触发 fast fail + retry with stream "give me a moment"; (f) 跟 PM 谈 p95 vs p99 trade-off — p95 100ms 可达, p99 200ms 合理.
+
+---
+
+## ❌ 死路答法
+
+1. **"上 H100"** — 没 attack architecture, GPU 加 1.5× speed only.
+2. **"cache everything"** — 不区分 cacheable vs 不可 cacheable, invalidation 灾难.
+3. **"去掉 reranker"** — quality 大跌, 没 eval support.
+4. **"用 GPT-3.5"** — 没 distill strategy, quality 不可控.
+5. **"async 全部"** — critical 也 async 用户看不到完整结果.
+6. **"无 streaming"** — 损失 perceived 优化.
+7. **"prefilter? 慢"** — 真正 prefilter 在 vector DB 内部 fast, 没读懂.
+8. **"semantic cache 用同 query"** — 不一定 same intent, hallucinate.
+9. **"不做 A/B, push 上线"** — quality 跌 5% 没人知道.
+10. **"100ms p50 不可能, 1500 太多"** — defeatist, 没拆解.
+
+---
+
+## ✅ 加分项
+
+1. **Cascade with query classifier** — 80/20 思维, 不一刀切
+2. **5-stage attribution + targeted cut** — 不空谈, 数字驱动
+3. **Embed cache + distill + HNSW tune + rerank cascade + LLM stream** — 多 angle attack
+4. **Skip reranker on confident scores** — clever trick
+5. **Anthropic prompt cache** — 2026 cost optimization
+6. **Async non-critical post** — production hygiene
+7. **A/B + nDCG monitoring** — quality gate
+8. **Streaming SSE for perceived latency** — UX-aware
+9. **Cost reduction 3× alongside latency 15×** — staff-level
+10. **Numbers 给得出来** (7ms embed cache, ef=32, 100ms TTFT, $9.5K/m)
+
+---
+
+## 一句话总结
+
+1500ms → 100ms 不是 "GPU 加大", 是 **cascade routing (80% lookup 不走 LLM) + embed cache 80% hit + distill small embedder + HNSW tune + skip-or-distilled reranker + stream LLM with skip on lookup + async non-critical post** 一整套 cost-aware quality-controlled 系统优化.
+
+---
+
+## Cheat Sheet
+
+```
+Architecture: CASCADE
+  Navigational (10%): pure cache, 20ms
+  Lookup (60%):       fast path, 80ms
+  Analytical (20%):   full path, 300ms with 100ms TTFT streaming
+  Mixed (10%):        fast first, async escalate
+
+Per-stage optimization:
+
+Embed (100ms → 7ms):
+  - Query cache Redis 1h TTL, hit 80%
+  - BGE-small (384d) self-host, 30ms miss
+  - Smaller dim = smaller index
+
+Retrieval (200ms → 30ms):
+  - HNSW ef_search 32 for fast, 128 for full
+  - Prefilter ACL via filter-aware HNSW
+  - Hybrid BM25 + HNSW parallel + RRF
+  - Total 50ms for full, 30ms fast
+
+Rerank (500ms → 20ms avg):
+  - Skip on confident score gap > 0.15 (40% queries)
+  - Distilled cross-encoder (ms-marco-MiniLM)
+  - Cascade: small → medium → large
+  - LLM rerank only for VIP / very hard
+
+LLM summarize (300ms → 0-150ms):
+  - Skip for lookup path (60%)
+  - Claude Haiku 4.6 not Opus
+  - Stream SSE, TTFT 30-50ms
+  - Anthropic prompt cache (50ms saved)
+  - Limit output 3 sentences
+
+Post-process (400ms → 30ms):
+  - Sync: redact PII, parse citation (50ms)
+  - Async: audit log, analytics, eval sample
+
+Cost (3× cheaper):
+  - Before: $32K/m (OpenAI embed + Cohere rerank + GPT-4)
+  - After:  $9.5K/m (BGE + distilled rerank + Claude Haiku)
+  - Per query: $0.0001
+
+Quality (≤ 5% drop):
+  - Embedder swap: -1-2% recall
+  - Lower ef: -1-2% recall
+  - Skip rerank: -0.5% nDCG
+  - Distilled rerank: -1% nDCG
+  - Smaller summary: -3% subjective
+  - A/B test + nDCG@10 dashboard + 1% human eval
+
+Latency hit ratio:
+  Fast path:  80% traffic, p50 57ms
+  Full path:  20% traffic, p50 277ms with 100ms TTFT
+  Weighted:   p50 100ms ✓ target
+
+Streaming:
+  Always SSE for analytical
+  TTFT 30-50ms = perceived instant
+  Total ms matters less than TTFT
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

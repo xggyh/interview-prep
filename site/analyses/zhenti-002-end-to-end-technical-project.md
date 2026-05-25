@@ -1,0 +1,418 @@
+## Q02 · 端到端负责过的、技术上最有挑战的项目
+
+> "Tell me about a technically challenging project you owned end-to-end. Walk me through the architecture decisions, what was hardest, and what you'd do differently."
+
+**Round**: Behavioral / Technical Behavioral (30-45 min, 通常是 hiring manager round 中段)
+**出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Databricks / Scale AI 高频. 类似变体: "tell me about a complex system you built" / "what's the hardest engineering problem you've solved"
+
+---
+
+## 这道题在考什么
+
+这是 **FDE 招聘的 highest signal density** 题之一. 表面问技术, 实际在筛:
+
+- **End-to-end 能力** —— 你能不能讲清 scoping → design → implementation → deploy → monitor → iterate 完整闭环. 缺任何一环 = 没 own 过
+- **Technical depth (real)** —— 不是 "我用了 LangChain", 是 "我为什么选 X 不选 Y, trade-off 是什么, 失败的尝试是什么"
+- **Architecture decision rationale** —— 你的架构选择能不能讲出 reversibility, blast radius, cost trade-off
+- **"我" 不是 "我们"** —— 一定要听到你个人的 ownership 边界. "我们设计了 cascade" → "我设计了 cascade 因为 ops 跟我说 silent fail > garbage"
+- **Vulnerability** —— 真实的项目都有失败的 sub-decision. 你能不能讲一个 "我当时这么决定, 后来发现错了, 我改了"
+- **Quantified outcome** —— 数字 specific 到能 cross-check. "70 → 92%" 不是 "improved significantly"
+
+**没说出口的红线**:
+
+- "我们一起做了..." 用 "我们" 而不是 "我" → 个人 ownership 不清
+- "用了 X 框架做了 Y" 只讲 stack 不讲 decision → 缺 architectural thinking
+- "完美执行没遇到问题" → 假的, FDE manager 立刻不信
+- "项目成功因为 [外部因素]" → blame shifting
+- 数字模糊 ("a lot of users", "significantly faster") → 没 metric 即没 outcome
+
+---
+
+## 完美答案架构 (Layered Response)
+
+这道题需要 ~5 分钟 monologue + follow-up. 8 段结构:
+
+| # | 层 | 时间 | 这层该说什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **Context (1 句锁定项目)** | 15s | What, scope, why mattered | "I led the voice agent debt collection system across 7 markets..." |
+| 2 | **Why challenging (specific)** | 30s | 列 3 个具体技术挑战, 不是泛泛 | "Three hard problems: multi-language ASR fallback, financial-figure hallucination, per-market compliance..." |
+| 3 | **My ownership 边界** | 15s | 你 own 什么 vs 团队 own 什么 | "I owned scoping, architecture, modeling pipeline, deployment, on-call. Team supported on ops integration and TTS voice cloning." |
+| 4 | **Architecture decision 1 (deep)** | 60s | 选 1 个 hardest decision, 讲 trade-off | "Hardest decision was ASR fallback architecture. Three options: single vendor / parallel call / cascade..." |
+| 5 | **Architecture decision 2 (deep)** | 60s | 另一个 decision, contrast 不同 type | "Second hard decision was hallucination reduction. Options: prompt-only / RAG / SFT / DPO..." |
+| 6 | **Failure / pivot moment (vulnerability)** | 45s | 一个你 wrong call + 怎么改 | "I initially scoped multi-market as 'translate prompts per language' — turned out wrong because debt communication culture differs..." |
+| 7 | **Outcome (quantified)** | 30s | 数字 + business + technical | "7 markets in 6 months, Indonesia CER 18 → 25%, financial hallucination 4% → 0.3%..." |
+| 8 | **What I'd do differently** | 30s | Forward-looking learning | "I'd front-load cultural review and start with 2-market deep before going wide..." |
+
+Total: ~5 分钟 + interviewer follow up. 严格不超过 6 分钟.
+
+---
+
+## 详细回答 (Sample Monologue) — 可以照背
+
+> "我用 voice agent debt collection 这个项目讲, 因为它跨越 7 个市场、6 种语言、3 年时间, 是我端到端 own 的最复杂项目.
+>
+> **Context**: 字节 TikTok PayLater 在新兴市场放贷, 逾期客户需要催收. 人工催收每个客户每月 cost ~$5, 总 volume 数百万客户, monthly cost 难承受. 我做的是把催收的 **首次接触 + tier 1/2 协商** 自动化, 用 voice agent 跑 outbound call. 首发印尼 (2023), 一年内扩到 7 个市场.
+>
+> **为什么 challenging?** 三个具体技术挑战:
+>
+> **One**: ASR 准确率在小语种 (Urdu, Tagalog, Bahasa) 上不稳, 加 vendor 服务 reliability 不一. 巴基斯坦上线第二周, Azure 在 Urdu 上突然降级, 40 分钟我们的 catch rate 应该掉到 0.
+>
+> **Two**: LLM 在金融数字上 hallucinate. Base Llama 在 'amount due' 这种字段上 hallucination rate 4%. 4% 听起来低, 但每天数十万通话, 意味着每天数千客户被告知错误金额 → 监管投诉.
+>
+> **Three**: 每个市场的 debt communication culture 完全不同. 印尼/越南/泰国 是 politeness-first, 直接说 'please pay' 反而 less effective. 巴西 / 墨西哥 是 directness-first, 礼貌过头 less credible. 这不是技术问题, 是 prompt + persona + escalation 三层都要 per-market.
+>
+> **我 own 什么**: scoping (跟 7 个 ops team 谈), architecture design, modeling pipeline (SFT / DPO / RL), inference 部署 (vLLM/SGLang), per-market rollout (我自己第一周 on-call). 团队支援 ops integration, TTS voice cloning, billing system.
+>
+> **Architecture decision 1 — ASR cascade**: 最难的决策. 选项三个 ——
+> - Option A: single vendor (Azure), 最简单但 vendor 挂等于我们挂
+> - Option B: parallel call 2 个 vendor 取 best, accuracy 高但 cost 2×, latency 看 worst-case
+> - Option C: cascade — primary → fallback → last-resort
+>
+> 我选了 cascade (Azure primary, Google fallback, 本地 Whisper last-resort). **关键 rationale 不是技术直觉**, 是我提前 30 分钟跟印尼 + 巴基斯坦 ops 谈过 'worst case 你要什么', 他们说 'silent fail > garbage response'. Cascade 保证 silent fail 优先. 巴基斯坦 Azure 挂的 40 分钟内, system 自动 switch Google, Urdu accuracy 也降时进一步 switch local Whisper. **0 通话丢失, ops 都没察觉**.
+>
+> 但我也犯了一个 sub-mistake —— cascade fallback chain 我初始版没 **per-language tune**. Whisper 在 Urdu 上 accuracy 比 Google 还差. 后来我加了 per-language fallback order. 这是我 wrong 的 sub-decision, 但 cascade 大方向是对的.
+>
+> **Architecture decision 2 — Hallucination reduction**: 也很难. 选项四个 ——
+> - Option A: prompt-only (cheap, weak)
+> - Option B: RAG with 强 retrieval (要求每次 retrieval correct, brittle)
+> - Option C: SFT 50k human-labeled dialogs (deep, expensive)
+> - Option D: DPO on preference pairs (subtle, 数据贵)
+>
+> 我没选单一方案. **3-layer defense**: prompt 加 strict template + RAG 加金额 verification + SFT 50k dialogs 教模型 'when uncertain, say uncertain'. 后来加 DPO 20k preference pair 进一步 refine. 用 vLLM 部署降低 inference cost.
+>
+> Result: financial figure hallucination **4% → 0.3%**, 跑了 6 个月生产没 1 个 regulator-reportable incident.
+>
+> **Failure / pivot moment**: 第一次失败是 multi-market rollout 我初始 scope 成 'translate prompts per language, reuse persona'. 上线泰国 2 周后, ops team 来反馈 catch rate 比印尼低 8 个百分点. 我去泰国 sit 3 天发现 —— 直接说 'please pay your debt' 在泰语里礼貌 framing 不对, 听起来 rude. 我 redo persona + escalation logic per market, 多花 4 周.
+>
+> **Lesson**: 'localization for AI > translation'. Cultural review 现在是 multi-market scope 的 default item, not optional. 后来扩到巴西 / 墨西哥 / 巴基斯坦 我都先做 1 周 cultural workshop with local ops, 再 design persona.
+>
+> **Quantified outcome**:
+> - 6 个月内覆盖 **7 个市场, 6 种语言**
+> - 印尼 catch rate (CER) **18% → 25%** (+39% relative)
+> - Financial figure hallucination **4% → 0.3%**
+> - 巴基斯坦 Azure outage 40 分钟 **0 通话丢失**
+> - Annual cost saving 几百万美金 (具体 number 我没法对外讲)
+>
+> **What I'd do differently**:
+> 1. 不会一上来扩 7 个市场. 我会先做 2 个 market 深度跑 6 个月, build playbook, 再批量扩.
+> 2. Cultural review 我会 front-load to scoping stage, 不是 launch 后 hot-fix.
+> 3. ASR cascade 我会 day 1 加 per-language fallback order, 不是事故后才加."
+
+---
+
+## Gao Xin 简历专属 STAR 模板
+
+至少 1 个完整 STAR (voice agent 默认 primary), 准备 3 个 alternate.
+
+### ★ STAR 1: Voice Agent 7-Market Debt Collection (★ PRIMARY)
+
+**S** (Situation, ~30s):
+> "字节 TikTok PayLater 在 7 个新兴市场放贷, monthly 数百万逾期客户. 人工催收每客户每月 cost ~$5, total monthly cost 难承受 + 客户 contact rate 只有 25%. 2023 leadership 让我做 voice agent 自动化首次接触 + tier 1/2 协商. 印尼首发, 一年内扩 7 个市场."
+
+**T** (Task, ~20s):
+> "我 own scoping → architecture → modeling pipeline → deployment → on-call. Specifically: 多语言 ASR + LLM 金融数字不 hallucinate + 7 个市场文化差异 + production reliability (vendor 挂时 0 通话丢失). Team 支援 ops integration, TTS 声音克隆, billing 集成."
+
+**A** (Action, ~3 min — 这是核心):
+
+**A.1 ASR Cascade Design**:
+- 选项: single vendor / parallel / cascade
+- 选 cascade (Azure → Google → 本地 Whisper)
+- Rationale: ops 提前告诉我 "silent fail > garbage response"
+- 加 per-language fallback order (sub-decision 改正)
+
+**A.2 Hallucination 3-layer Defense**:
+- Prompt template + RAG verification + SFT 50k dialogs + DPO 20k preference pairs
+- vLLM/SGLang 部署降低 cost (avg latency 600ms → 280ms)
+- 设计 confidence score 让 4% 不 confident 的 query auto-escalate human
+
+**A.3 Per-market Localization**:
+- 初始 wrong scope (translate-only)
+- Pivot: 加 cultural workshop with local ops (1 week per market)
+- Per-market persona + escalation rules + compliance prompt
+
+**A.4 Deployment + On-call**:
+- Phased rollout: pilot 100 customer → 1k → 10k → full
+- 我自己第一周 24/7 on-call, sit with local ops
+- 巴基斯坦 Azure outage 40 分钟实战测试 cascade
+
+**A.5 Cross-market Playbook**:
+- 印尼经验 codify 成 playbook
+- 后续市场用 playbook 减少 onboarding time (印尼 6 个月 → 越南 3 个月 → 巴基斯坦 6 周)
+
+**R** (Result, ~30s):
+- **7 个市场, 6 种语言 in 6 months**
+- **印尼 CER 18% → 25%** (+39% relative)
+- **Financial hallucination 4% → 0.3%**
+- **巴基斯坦 ASR outage 40 分钟 0 通话丢失**
+- Cost saving: 几百万美金/年 (具体 number 不外讲)
+- 监管: **7 个市场 0 reportable incident**
+
+**Vulnerability line**:
+> "我的 wrong call 是初始 multi-market scope. 我以为 'translate prompts' 就够了. 泰国上线后 catch rate 比印尼低 8 pp, 我去 sit 3 天才意识到 debt communication culture 差异是 first-class problem 不是 nice-to-have. 这 4 周 redo 教会我一个原则: localization for AI > translation."
+
+---
+
+### STAR 2: Internal Agent Platform 5 → 14 Teams (Alternate)
+
+**S**: 字节内部 5 个团队各自造 agent infra 轮子, leadership 让我做共享 abstraction.
+
+**T**: 设计共享 abstraction, 同时满足 5 个种子团队 + 未来 N 个团队, 不限死灵活度.
+
+**A**:
+1. **Customer discovery**: 5 个种子团队 1 小时 1v1 访谈, 抽 commonality
+2. **3-layer abstraction**: Workflow (orchestration) / Tool (callable function) / Memory (short/long/shared)
+3. **Escape hatch design**: 每层留 custom override 给特殊 use case
+4. **Onboarding infra**: doc + office hour + pair programming 第一周
+5. **Iterate**: 6 个月后 Risk team 一开始只用 Tool layer, 后来 use case grew 主动要 Workflow layer
+
+**R**:
+- **5 → 14 teams in 6 months** (140% of target)
+- Build time per agent **-65%**
+- 0 P0 incident
+- 成为字节内部 agent infra de facto standard
+
+**Vulnerability**:
+> "我 wrong call 的 sub-decision 是 Memory layer 我初始设计太 opinionated, 强制 long-term memory 用 vector DB. Risk team 说他们的 use case 用 SQL 更合适, 我没让步. 6 周后 Risk team 自己 fork 一个 SQL-backed memory implementation. 我学到: abstraction 要 escape hatch, 不要 prescribe storage backend."
+
+---
+
+### STAR 3: ConvFinQA Multi-hop Financial QA (Alternate, more research-leaning)
+
+**S**: 学术合作项目, 财务报表 multi-hop QA. 团队最初想 'whole pipeline, hope for the best'.
+
+**T**: 设计 systematic ablation, 弄清哪个 component 真正提供 lift.
+
+**A**:
+1. **Pipeline 拆 6 stage**: retrieval / decompose / sub-question / numeric reasoning / aggregation / verification
+2. **9-variant ablation matrix**: 逐个 disable / replace component, 共 9 种组合
+3. **Per-stage metric**: 每个 ablation 独立 metric (不是 end-to-end 一个数)
+4. **Negative result transparency**: 发现 2 个 component (sub-question rephrase, aggregation verification) 是 negative lift
+5. **Publish honesty**: 团队最初想藏 negative, 我坚持 publish
+
+**R**:
+- Paper accepted at top-tier venue
+- Reviewer 评 "honest ablation rare in the field"
+- 团队建立 "evidence-based pipeline design" 习惯
+- 我个人 takeaway: data > intuition 在 pipeline design
+
+**Vulnerability**:
+> "我 wrong sub-decision 是 retrieval stage 我初始用 dense embedding, 假设 financial table 跟 generic text 表现一样. 后来发现 financial 的数字 entity 在 dense embedding 上 confused. 切到 hybrid (dense + sparse BM25) accuracy +6%. 这让我知道 domain-specific retrieval 不能 default to generic stack."
+
+---
+
+## 5 个 Follow-ups (interviewer 追问 + 准备答案)
+
+### Follow-up 1: "什么 part 最让你 stuck?"
+
+**Answer**:
+> "Cascade fallback 的 per-language tuning 那部分让我 stuck 最久. 我以为 fallback chain 顺序 (Azure → Google → Whisper) 全球一致就行, 但每个语言上 vendor accuracy 排名不同. Urdu 上 Whisper 比 Google 差, Tagalog 上 Google 比 Azure 好. 我花了 2 周搞 per-language eval matrix, 才意识到 'fallback order is a hyperparameter not a constant'. 这 2 周是 deceiving stuck —— 看似简单, 实际数据驱动."
+
+### Follow-up 2: "如果给你 unlimited budget 和时间, 你会怎么重做?"
+
+**Answer**:
+> "三件事我会改:
+>
+> 一, **不会一上来 7 个市场**. 我会 2 个市场深度跑 12 个月, 把 playbook 完善, 再批量扩.
+>
+> 二, **Synthetic data + sim-to-real**. 现在我们 SFT 用 50k 真实 human-labeled dialogs, expensive ($30/dialog × 50k). 我会先用 LLM 生成 500k synthetic dialogs + small human eval set 跑 sim-to-real bridge, cost 降 90%.
+>
+> 三, **Online RL**. 我们现在 offline DPO. 我会 build online RL infra, 直接基于 catch rate 这个 business metric optimize. 这是我后续想做的方向, 现实是 production reliability 不允许 online RL on financial domain (regulator concern). 所以 unlimited 时间下我会先 build sandbox env 再 production."
+
+### Follow-up 3: "如果架构决策错了, 你怎么知道? Monitoring 怎么设计?"
+
+**Answer**:
+> "三层 monitoring:
+>
+> **L1 (real-time)**: catch rate, hallucination rate (proxy via classifier), ASR confidence, latency. 5 分钟 alert.
+>
+> **L2 (daily)**: 每天 sample 100 通话 human review, error classification (technical / cultural / regulatory). 这是 catching 'silent regression' 的关键 —— L1 metric 看上去 normal 但客户体验下降, L2 human review 能 catch.
+>
+> **L3 (weekly retrospective)**: 跟 7 个市场 ops team 各 30 分钟 weekly review, 听 anecdotal complaint. 数字看不到的问题在这里发现.
+>
+> 一个具体例子: 巴西上线第 3 周 L1 metric 都 green 但 L3 retrospective ops 跟我说 '客户挂电话比例上升'. 我去查发现 TTS 声音 (一个女声) 在巴西文化下被认为是 telemarketing 信号, 客户直接挂. 我换男声 + 调 pace, 挂断率回正常. 这种 cultural signal **L1 看不到**, 必须 L3 ops conversation."
+
+### Follow-up 4: "Team conflict — 你和 senior 意见不合怎么办?"
+
+**Answer**:
+> "Voice agent ASR cascade 时 senior ML 想 single vendor (简单 + 维护成本低). 他的 framing 是 '99.9% uptime 已经 enough'. 我的 framing 是 'ops 跟我说 silent fail > garbage, single vendor 挂等于 garbage 输出'.
+>
+> 我没 push 立场. 我提议 4 周 pilot: cascade vs single vendor, A/B 在低 volume 市场. 数据出来 cascade 在 simulated vendor outage 下 0 incident, single vendor 在那 40 分钟 simulated outage 下 catch rate 掉到 12% (基线 25%). Senior 看完数据接受 cascade. **数据 + reversible pilot 是 disagreement 的 universal language**, 不是 'who's right'."
+
+### Follow-up 5: "如果让你 mentor junior FDE 做这个项目, 你 transfer 什么 lesson?"
+
+**Answer**:
+> "三个 lesson:
+>
+> 一, **Ops 是 first-class stakeholder 不是 implementation detail**. 我 ASR cascade 设计来自 ops 的 30 分钟 conversation, 不是技术直觉. Junior 经常 ship 完才跟 ops 聊, 然后回头 redo.
+>
+> 二, **Cultural review > translation**. 多 market deployment 默认要 cultural workshop. 我 Thailand wrong call 是这个 lesson 的 hard way.
+>
+> 三, **Reversibility 标签每个 decision**. ASR provider 选择是 two-way (有 abstraction). 监管 prompt 是 one-way (改了之前 prompt 训过的 model 受影响). 标签清楚后 effort 投资才合理.
+>
+> 加分 lesson: **数字 communicate everything**. Ops 不喜欢 push back, 但喜欢 'pilot data 显示 tier 3 wrong rate 8%, monthly liability $X'. 数字是 universal language."
+
+---
+
+## ❌ 死路答法 (碰了就挂)
+
+### 死路 1: 用 "我们" 而不是 "我"
+
+**为什么挂**: FDE manager 要听个人 ownership. 通篇 "我们" → 听完不知道你 specifically 做了什么.
+
+**怎么改**: 显式标 "团队 owned X, 我个人 owned Y". 比如 "team 做 TTS voice cloning, 我 own 整个 LLM pipeline 包括 SFT/DPO/inference".
+
+---
+
+### 死路 2: 罗列 stack 不讲 decision
+
+**为什么挂**: "We used LangChain + Llama + vLLM + Pinecone" → 这是 stack 不是 architecture. Stack 任何人 list 得出, decision rationale 是 unique signal.
+
+**怎么改**: 每个组件讲 "我 considered X, Y, Z, 选 Y 因为 [trade-off]". 比如 "considered Pinecone vs Qdrant vs pgvector, 选 pgvector 因为我们 already use Postgres + scale fits + 1-team operational burden".
+
+---
+
+### 死路 3: "完美执行, 没遇到问题"
+
+**为什么挂**: FDE manager 立刻不信. 真实大项目都有 wrong sub-decision. 不讲失败 = 你没真做过 OR 你不 self-aware.
+
+**怎么改**: 显式准备 1 个 wrong sub-decision + 怎么改. Vulnerability 是 trust signal.
+
+---
+
+### 死路 4: 数字模糊 ("a lot of users, significantly improved")
+
+**为什么挂**: FDE 工作 unit 是 customer outcome, 没数字 = 没 outcome.
+
+**怎么改**: 准备 5+ 数字 (Indonesia CER 18→25%, hallucination 4→0.3%, 40 分钟 0 通话丢失, 6 周 70→92%, 14 teams 0 P0). Cross-check 自己的数字一致性.
+
+---
+
+### 死路 5: 跑 surface area 太宽, 没 deep dive
+
+**为什么挂**: 5 分钟里讲了 20 个 decision, 每个 30 秒. 听完没记住任何一个. FDE manager 要的是 **depth on 2-3 decisions**, 不是 breadth on 20.
+
+**怎么改**: 选 2-3 个 architecture decision deep dive (cascade fallback, hallucination 3-layer), 其他略过. Quality > quantity.
+
+---
+
+### 死路 6: Blame shifting ("vendor 不靠谱所以...")
+
+**为什么挂**: FDE 的工作就是在 imperfect vendor / data / customer 环境下 ship. Blame 外部 = 你 missing FDE 的 core skill.
+
+**怎么改**: Frame 成 "vendor reliability 是 input constraint, 我设计 cascade 应对这个 constraint". 不是 vendor 问题, 是你的设计问题.
+
+---
+
+### 死路 7: 没讲 monitoring / iteration
+
+**为什么挂**: End-to-end 包括 deploy 后. 不讲 monitoring = 你没真的 own 过 production.
+
+**怎么改**: 显式讲 L1/L2/L3 monitoring + 一个 silent regression 故事 (巴西 TTS 声音问题).
+
+---
+
+## ✅ 加分项 (top 5)
+
+### 加分 1: 显式标 reversibility (one-way vs two-way door)
+
+不是说 "我 considered options chose X". 是说 "ASR provider 选择是 **two-way** (abstraction 让 swap 成本低), 但金融 prompt template 是 **one-way** (改了影响已训 model 输出分布)". 立刻显示 senior architectural thinking.
+
+### 加分 2: "Ops 是 first-class stakeholder" pattern
+
+讲 ASR cascade 时显式说 "rationale 不是技术直觉, 是 ops 提前告诉我 silent fail > garbage". 这是 FDE 跟 SWE 的 work shape 区别.
+
+### 加分 3: Vulnerability line 自然嵌入
+
+"我 wrong sub-decision 是 cascade fallback 没 per-language tune, 后来加了 per-language fallback order" —— 这种 self-correction 让 trust signal 拉满.
+
+### 加分 4: 数字 cross-check (5+ 个数字, 各自 specific)
+
+"印尼 CER 18→25%, hallucination 4→0.3%, 巴基斯坦 40 分钟 0 通话丢失, BNPL routing 70→92% 6 周, Internal Platform 5→14 teams" —— 数字 specificity 让故事 cross-verifiable.
+
+### 加分 5: "What I'd do differently" forward-looking
+
+不是 "项目完美", 是 "下次我会 2 market 深度先行 + cultural review front-load + ASR per-language day 1". 显示 reflective + forward-thinking.
+
+---
+
+## 一句话总结
+
+> **"End-to-end 技术挑战项目" 的 winning answer 不是讲 stack, 是用 2-3 个 architecture decision 的 trade-off + 1 个 wrong sub-decision + 5 个具体数字, 证明 "我个人 own scoping → design → deploy → iterate 完整闭环, 我做的每个 decision 都 backed by reversibility analysis 和 stakeholder input"**.
+>
+> 5 分钟讲完, 2-3 个 decision deep, 1 个 vulnerability, 数字 cross-checkable.
+
+---
+
+## Cheat Sheet (面试前 30s 扫一眼)
+
+```
+Question type:
+  Technical Behavioral / End-to-end Ownership (5-min monologue + 3-5 follow-ups)
+Key skill being tested:
+  Individual ownership boundary + architecture decision rationale + vulnerability + quantified outcome
+
+Answer arc (8 段, ~5 min):
+  1. Context (15s)           — what, scope, why mattered
+  2. Why challenging (30s)   — 3 specific technical challenges
+  3. My ownership (15s)      — 你 own 什么 vs team own 什么
+  4. Decision 1 deep (60s)   — ASR cascade with trade-off + ops-driven rationale
+  5. Decision 2 deep (60s)   — Hallucination 3-layer defense (prompt + RAG + SFT + DPO)
+  6. Failure / pivot (45s)   — Cultural review wrong call
+  7. Outcome quantified (30s) — 5+ specific numbers
+  8. What I'd do diff (30s)  — Forward-looking learning
+
+Numbers to drop:
+  Voice agent: 7 markets, 6 languages
+  Indonesia CER: 18 → 25% (+39% relative)
+  Hallucination: 4% → 0.3%
+  Pakistan ASR outage: 40 min, 0 calls lost
+  SFT: 50k human-labeled dialogs
+  DPO: 20k preference pairs
+  vLLM latency: 600ms → 280ms
+  BNPL routing: 70 → 92% in 6 weeks
+  Internal Platform: 5 → 14 teams, -65% build time, 0 P0
+  ConvFinQA: 9-variant ablation including 2 negative results
+  Annual cost saving: 几百万美金/年
+
+Vulnerability:
+  "我 wrong call 是 multi-market 初始 scope as 'translate prompts'.
+   泰国上线后 catch rate 比印尼低 8pp, 我去 sit 3 天才意识到 debt
+   communication culture 差异是 first-class problem. 4 周 redo persona +
+   escalation. Lesson: localization for AI > translation."
+
+Close:
+  "What I'd do differently: 不会一上来 7 个市场, 我会 2 market 深度先行 +
+   cultural review front-load + ASR per-language day 1."
+
+Red lines:
+  - "我们" 替代 "我" (个人 ownership 不清)
+  - 罗列 stack 不讲 decision rationale
+  - "完美执行没问题" (vulnerability 缺失)
+  - 数字模糊 ("a lot", "significantly")
+  - Surface area 太宽 / 单 decision 深度不够
+  - Blame shifting (vendor 不靠谱)
+  - 没讲 monitoring + iteration
+
+3 ready STAR (alternate):
+  STAR 1: Voice Agent 7-market (★ primary, technical depth + cultural pivot)
+  STAR 2: Internal Agent Platform 14 teams (multi-customer abstraction)
+  STAR 3: ConvFinQA 9-variant ablation (research methodology + honesty)
+
+5 follow-ups ready:
+  Q1: 哪里最 stuck? → Cascade per-language tuning, 2 weeks
+  Q2: Unlimited budget redo? → 2-market deep + synthetic + online RL sandbox
+  Q3: Monitoring 设计? → L1 real-time / L2 daily human review / L3 weekly ops retro
+  Q4: Senior 意见不合? → Pilot A/B + data-driven, not "who's right"
+  Q5: Mentor junior 传什么? → Ops first-class + cultural review + reversibility tagging
+
+3 key architectural lessons (verbal sticker):
+  - "Ops is a first-class stakeholder, not an implementation detail"
+  - "Localization for AI > translation"
+  - "Tag every decision with reversibility — one-way invests, two-way ships"
+
+Time budget:
+  Total: 5 min strict
+  Deep on 2-3 decisions, not 20
+  Vulnerability ≥ 30 sec (not throwaway)
+  Outcome metrics ≥ 5 specific numbers
+```

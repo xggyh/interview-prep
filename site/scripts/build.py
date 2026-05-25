@@ -339,6 +339,7 @@ def parse_comments(comments_raw: str):
 def render_index(questions, type_groups, company_groups, recency_sorted):
     """Render index.html with company + type filters."""
     types_meta = [
+        ("真题", "🔥 真题（Exponent 2026 整理的 FDE 52 道高频真题 + 完美答案拆解）"),
         ("Review", "📝 Review（复习速查 — 49 页 Extended Cheat Sheet 抽取）"),
         ("Google FDE", "🎯 Google FDE 专项（HR 提示主题：tool calling / RAG / LLM 工程 / 落地）"),
         ("FDE", "FDE（Forward Deployed Engineer 真题 + reframe）"),

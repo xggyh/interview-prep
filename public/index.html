@@ -6,21 +6,21 @@
 <title>AI Agent Cookbook · Recipes for production agent systems</title>
 <meta name="description" content="Personal study notes on production AI agents — tool calling, RAG, context management, LLM serving, FDE delivery patterns.">
 <script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="stylesheet" href="assets/style.css?v=c5c44b8d">
+<link rel="stylesheet" href="assets/style.css?v=936bd099">
 </head>
 <body>
 <header class="site-header">
   <div class="container">
     <h1><a href="index.html">🍳 AI Agent Cookbook</a></h1>
-    <div class="meta">292 recipes · Tool Calling · RAG · LLM Eng · Delivery</div>
+    <div class="meta">345 recipes · Tool Calling · RAG · LLM Eng · Delivery</div>
     <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
   </div>
 </header>
 <main class="container">
   <div class="intro">
     <h2>Recipes for production agent systems</h2>
-    <p>A personal study log on building real agent systems — gathered from production debugging notes, papers, and post-mortems. Each entry covers the problem, the framework I use, a sample walk-through, common pitfalls, and follow-up directions. Filter by topic / depth, sorted by recency. 292 entries total.</p>
-    <div class="stats"><span class="stat"><strong>49</strong> Review</span> <span class="stat"><strong>27</strong> Google FDE</span> <span class="stat"><strong>24</strong> FDE</span> <span class="stat"><strong>1</strong> Guide</span> <span class="stat"><strong>94</strong> Coding</span> <span class="stat"><strong>56</strong> System Design</span> <span class="stat"><strong>26</strong> Googlyness</span> <span class="stat"><strong>6</strong> People Management</span> <span class="stat"><strong>1</strong> Behavioral</span> <span class="stat"><strong>3</strong> Low Level Design</span> <span class="stat"><strong>2</strong> Product Architecture</span> <span class="stat"><strong>1</strong> Mobile System Design</span> <span class="stat"><strong>1</strong> ML System Design</span> <span class="stat"><strong>1</strong> Technical Project Retrospective</span></div>
+    <p>A personal study log on building real agent systems — gathered from production debugging notes, papers, and post-mortems. Each entry covers the problem, the framework I use, a sample walk-through, common pitfalls, and follow-up directions. Filter by topic / depth, sorted by recency. 345 entries total.</p>
+    <div class="stats"><span class="stat"><strong>53</strong> 真题</span> <span class="stat"><strong>49</strong> Review</span> <span class="stat"><strong>27</strong> Google FDE</span> <span class="stat"><strong>24</strong> FDE</span> <span class="stat"><strong>1</strong> Guide</span> <span class="stat"><strong>94</strong> Coding</span> <span class="stat"><strong>56</strong> System Design</span> <span class="stat"><strong>26</strong> Googlyness</span> <span class="stat"><strong>6</strong> People Management</span> <span class="stat"><strong>1</strong> Behavioral</span> <span class="stat"><strong>3</strong> Low Level Design</span> <span class="stat"><strong>2</strong> Product Architecture</span> <span class="stat"><strong>1</strong> Mobile System Design</span> <span class="stat"><strong>1</strong> ML System Design</span> <span class="stat"><strong>1</strong> Technical Project Retrospective</span></div>
   </div>
 
   <details class="self-intro">
@@ -36,11 +36,11 @@
 
   <div class="filter-bar">
     <span class="filter-label">公司：</span>
-    <button class="active" data-cfilter="all">全部公司 (292)</button><button data-cfilter="Google FDE" style="--c:#1a73e8">Google FDE (27)</button><button data-cfilter="Google L5" style="--c:#0f9d58">Google L5 (13)</button><button data-cfilter="FDE" style="--c:#dc2626">FDE (24)</button><button data-cfilter="OpenAI" style="--c:#10a37f">OpenAI (45)</button><button data-cfilter="Google" style="--c:#4285f4">Google (151)</button>
+    <button class="active" data-cfilter="all">全部公司 (345)</button><button data-cfilter="Google FDE" style="--c:#1a73e8">Google FDE (27)</button><button data-cfilter="Google L5" style="--c:#0f9d58">Google L5 (13)</button><button data-cfilter="FDE" style="--c:#dc2626">FDE (24)</button><button data-cfilter="OpenAI" style="--c:#10a37f">OpenAI (45)</button><button data-cfilter="Google" style="--c:#4285f4">Google (151)</button>
   </div>
   <div class="filter-bar">
     <span class="filter-label">类型：</span>
-    <button class="active" data-tfilter="all">全部类型 (292)</button><button data-tfilter="Review">Review (49)</button><button data-tfilter="Google FDE">Google FDE (27)</button><button data-tfilter="FDE">FDE (24)</button><button data-tfilter="Guide">Guide (1)</button><button data-tfilter="Coding">Coding (94)</button><button data-tfilter="System Design">System Design (56)</button><button data-tfilter="Googlyness">Googlyness (26)</button><button data-tfilter="People Management">People Management (6)</button><button data-tfilter="Behavioral">Behavioral (1)</button><button data-tfilter="Low Level Design">Low Level Design (3)</button><button data-tfilter="Product Architecture">Product Architecture (2)</button><button data-tfilter="Mobile System Design">Mobile System Design (1)</button><button data-tfilter="ML System Design">ML System Design (1)</button><button data-tfilter="Technical Project Retrospective">Technical Project Retrospective (1)</button>
+    <button class="active" data-tfilter="all">全部类型 (345)</button><button data-tfilter="真题">真题 (53)</button><button data-tfilter="Review">Review (49)</button><button data-tfilter="Google FDE">Google FDE (27)</button><button data-tfilter="FDE">FDE (24)</button><button data-tfilter="Guide">Guide (1)</button><button data-tfilter="Coding">Coding (94)</button><button data-tfilter="System Design">System Design (56)</button><button data-tfilter="Googlyness">Googlyness (26)</button><button data-tfilter="People Management">People Management (6)</button><button data-tfilter="Behavioral">Behavioral (1)</button><button data-tfilter="Low Level Design">Low Level Design (3)</button><button data-tfilter="Product Architecture">Product Architecture (2)</button><button data-tfilter="Mobile System Design">Mobile System Design (1)</button><button data-tfilter="ML System Design">ML System Design (1)</button><button data-tfilter="Technical Project Retrospective">Technical Project Retrospective (1)</button>
   </div>
   <div class="filter-bar">
     <span class="filter-label">深度：</span>
@@ -590,6 +590,589 @@
   </div>
   <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
   <div class="q-desc">复习速查页, 抽自原 [customer-clarifying-questions] 的 Extended Cheat Sheet. 10-15 min 通读, 含术语 / framework / decision tree / 5 deep problems / gotchas / quotables / 红线. 用作面试前快速过一遍.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="50" data-recency="2026053" data-title="📚 [index] fde 52 道真题 总目录 + 各公司侧重 + 高频提醒">
+  <a class="q-title" href="questions/zhenti-000-index.html">📚 [Index] FDE 52 道真题 总目录 + 各公司侧重 + 高频提醒</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 50 人报告">真题 50</span>
+  </div>
+  <div class="q-meta">📋 50 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">Exponent 2026 整理的 FDE 52 道真题全清单. 含 7 大类索引、各公司 (Palantir/OpenAI/Anthropic/Databricks/Scale/ElevenLabs) 侧重点速查、贯穿全程的 4 大高频提醒. 入门必读.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q1 · [行为/动机] 为什么选 fde 而不是普通 swe?">
+  <a class="q-title" href="questions/zhenti-001-why-fde-not-swe.html">Q1 · [行为/动机] 为什么选 FDE 而不是普通 SWE?</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q1 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q2 · [行为/动机] 讲一个你端到端负责过的、技术上最有挑战的项目">
+  <a class="q-title" href="questions/zhenti-002-end-to-end-technical-project.html">Q2 · [行为/动机] 讲一个你端到端负责过的、技术上最有挑战的项目</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q2 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q3 · [行为/动机] 讲一次部署失败的经历, 你怎么处理的">
+  <a class="q-title" href="questions/zhenti-003-deployment-failure.html">Q3 · [行为/动机] 讲一次部署失败的经历, 你怎么处理的</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q3 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q4 · [行为/动机] 讲一次你不得不向客户传达坏消息">
+  <a class="q-title" href="questions/zhenti-004-deliver-bad-news.html">Q4 · [行为/动机] 讲一次你不得不向客户传达坏消息</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q4 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q5 · [行为/动机] 讲一次你和客户意见不合并坚持了立场">
+  <a class="q-title" href="questions/zhenti-005-disagreed-stood-firm.html">Q5 · [行为/动机] 讲一次你和客户意见不合并坚持了立场</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q5 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q6 · [行为/动机] 讲一次你发现多个客户的共性、并改变了团队做法">
+  <a class="q-title" href="questions/zhenti-006-common-pain-changed-team.html">Q6 · [行为/动机] 讲一次你发现多个客户的共性、并改变了团队做法</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q6 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q7 · [行为/动机] 讲一次你在一个并不完全理解的环境里工作">
+  <a class="q-title" href="questions/zhenti-007-work-without-full-context.html">Q7 · [行为/动机] 讲一次你在一个并不完全理解的环境里工作</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q7 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q8 · [行为/动机] 你推翻过的一个技术决策, 从中学到了什么">
+  <a class="q-title" href="questions/zhenti-008-overruled-technical-decision.html">Q8 · [行为/动机] 你推翻过的一个技术决策, 从中学到了什么</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q8 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q9 · [行为/动机] 描述你入职新 fde 岗位的前 30/60/90 天计划">
+  <a class="q-title" href="questions/zhenti-009-30-60-90-plan.html">Q9 · [行为/动机] 描述你入职新 FDE 岗位的前 30/60/90 天计划</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q9 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q10 · [行为/动机] 为什么是我们公司? (要引用真实的客户/产品/研究)">
+  <a class="q-title" href="questions/zhenti-010-why-this-company.html">Q10 · [行为/动机] 为什么是我们公司? (要引用真实的客户/产品/研究)</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q10 (行为/动机). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q11 · [编程/工程深度] 写一个支持「单用户限流 + 全局限流」的 rate limiter">
+  <a class="q-title" href="questions/zhenti-011-rate-limiter-user-and-global.html">Q11 · [编程/工程深度] 写一个支持「单用户限流 + 全局限流」的 rate limiter</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q11 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q12 · [编程/工程深度] 解析一个引号格式混乱的脏 csv, 输出干净数据集">
+  <a class="q-title" href="questions/zhenti-012-parse-messy-csv.html">Q12 · [编程/工程深度] 解析一个引号格式混乱的脏 CSV, 输出干净数据集</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q12 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q13 · [编程/工程深度] 写一个 cli 工具, 读取一堆 pdf, 输出带实体抽取的 json 索引">
+  <a class="q-title" href="questions/zhenti-013-cli-pdf-to-json-index.html">Q13 · [编程/工程深度] 写一个 CLI 工具, 读取一堆 PDF, 输出带实体抽取的 JSON 索引</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q13 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q14 · [编程/工程深度] 实现一个处理下游变慢时 backpressure 的流式消费者">
+  <a class="q-title" href="questions/zhenti-014-streaming-consumer-backpressure.html">Q14 · [编程/工程深度] 实现一个处理下游变慢时 backpressure 的流式消费者</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q14 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q15 · [编程/工程深度] 把一段 200 行函数重构成可测试的, 讲清思路">
+  <a class="q-title" href="questions/zhenti-015-refactor-200-line-function.html">Q15 · [编程/工程深度] 把一段 200 行函数重构成可测试的, 讲清思路</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q15 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q16 · [编程/工程深度] 给一个不稳定的外部 api 实现带 jitter 的指数退避">
+  <a class="q-title" href="questions/zhenti-016-exp-backoff-with-jitter.html">Q16 · [编程/工程深度] 给一个不稳定的外部 API 实现带 jitter 的指数退避</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q16 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q17 · [编程/工程深度] 给定一个文档文件夹, 实现小型 rag pipeline, 并为 chunking 策略辩护">
+  <a class="q-title" href="questions/zhenti-017-small-rag-pipeline-defend-chunking.html">Q17 · [编程/工程深度] 给定一个文档文件夹, 实现小型 RAG pipeline, 并为 chunking 策略辩护</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q17 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q18 · [编程/工程深度] 不用托管服务, 在 1000 万向量的索引里找 top-k 最相似项">
+  <a class="q-title" href="questions/zhenti-018-topk-similar-10m-vectors-no-host.html">Q18 · [编程/工程深度] 不用托管服务, 在 1000 万向量的索引里找 top-k 最相似项</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q18 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q19 · [编程/工程深度] 给两张表 (orders, returns), 写 sql 找出上季度退货率超 30% 的客户">
+  <a class="q-title" href="questions/zhenti-019-sql-returns-rate-customers.html">Q19 · [编程/工程深度] 给两张表 (orders, returns), 写 SQL 找出上季度退货率超 30% 的客户</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q19 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q20 · [编程/工程深度] 诊断一条慢 sql (会聊查询计划、索引、分区)">
+  <a class="q-title" href="questions/zhenti-020-diagnose-slow-sql.html">Q20 · [编程/工程深度] 诊断一条慢 SQL (会聊查询计划、索引、分区)</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q20 (编程/工程深度). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q21 · [系统设计/架构] 为有 hipaa 约束、5000 万文档的医疗客户设计一个 vpc 内私有部署的 rag 系统">
+  <a class="q-title" href="questions/zhenti-021-hipaa-vpc-rag-50m-docs.html">Q21 · [系统设计/架构] 为有 HIPAA 约束、5000 万文档的医疗客户设计一个 VPC 内私有部署的 RAG 系统</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q21 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q22 · [系统设计/架构] 设计把 12 个零散零售数据源汇入预测模型的「摄取+转换」pipeline">
+  <a class="q-title" href="questions/zhenti-022-12-source-ingest-pipeline.html">Q22 · [系统设计/架构] 设计把 12 个零散零售数据源汇入预测模型的「摄取+转换」pipeline</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q22 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q23 · [系统设计/架构] f500 在自己 aws vpc 里部署, 用 okta sso、snowflake 做数据源, 讲部署架构">
+  <a class="q-title" href="questions/zhenti-023-fortune-500-aws-vpc-okta-snowflake.html">Q23 · [系统设计/架构] F500 在自己 AWS VPC 里部署, 用 Okta SSO、Snowflake 做数据源, 讲部署架构</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q23 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q24 · [系统设计/架构] 为给 500 个仓库经理重路由货运、目标 99% 送达率的 ai agent 设计评估框架">
+  <a class="q-title" href="questions/zhenti-024-500-warehouses-routing-eval-framework.html">Q24 · [系统设计/架构] 为给 500 个仓库经理重路由货运、目标 99% 送达率的 AI agent 设计评估框架</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q24 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q25 · [系统设计/架构] 如何诊断 llm 推理 pipeline 的高延迟? (tokenization、网络、batch size、kv cache、后处理)">
+  <a class="q-title" href="questions/zhenti-025-llm-inference-latency-diagnosis.html">Q25 · [系统设计/架构] 如何诊断 LLM 推理 pipeline 的高延迟? (tokenization、网络、batch size、KV cache、后处理)</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q25 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q26 · [系统设计/架构] 设计支持优先级、重试、死信处理的分布式任务队列">
+  <a class="q-title" href="questions/zhenti-026-task-queue-priority-retry-dlq.html">Q26 · [系统设计/架构] 设计支持优先级、重试、死信处理的分布式任务队列</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q26 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q27 · [系统设计/架构] 客户数据散落在 sap、salesforce、自建 postgres 仓库, 如何统一给 ai agent 用">
+  <a class="q-title" href="questions/zhenti-027-unify-sap-salesforce-postgres-for-agent.html">Q27 · [系统设计/架构] 客户数据散落在 SAP、Salesforce、自建 Postgres 仓库, 如何统一给 AI agent 用</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q27 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q28 · [系统设计/架构] 客户要求 llm 搜索 sub-100ms, 朴素 rag 要 1.5s, 怎么压到 100ms">
+  <a class="q-title" href="questions/zhenti-028-llm-search-1500ms-to-100ms.html">Q28 · [系统设计/架构] 客户要求 LLM 搜索 sub-100ms, 朴素 RAG 要 1.5s, 怎么压到 100ms</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q28 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、a/b 测试、回滚">
+  <a class="q-title" href="questions/zhenti-029-prompt-version-ab-rollback.html">Q29 · [系统设计/架构] 如何在生产环境给 prompt 做版本管理、A/B 测试、回滚</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q29 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q30 · [系统设计/架构] 为 agent 系统设计可观测性: 记录什么、告警什么、做哪些看板">
+  <a class="q-title" href="questions/zhenti-030-agent-observability-design.html">Q30 · [系统设计/架构] 为 agent 系统设计可观测性: 记录什么、告警什么、做哪些看板</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q30 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q31 · [问题拆解/案例] 某大城市想缩短 911 急救响应时间, 有通话数据、交通数据、救护车 gps, 给你 60 分钟">
+  <a class="q-title" href="questions/zhenti-031-911-emergency-response.html">Q31 · [问题拆解/案例] 某大城市想缩短 911 急救响应时间, 有通话数据、交通数据、救护车 GPS, 给你 60 分钟</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q31 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q32 · [问题拆解/案例] 某地区银行想统一 3 套并购来的、标签不一致的反欺诈系统, 规划前 90 天">
+  <a class="q-title" href="questions/zhenti-032-bank-3-acquired-fraud-systems.html">Q32 · [问题拆解/案例] 某地区银行想统一 3 套并购来的、标签不一致的反欺诈系统, 规划前 90 天</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q32 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q33 · [问题拆解/案例] 某药企想部署 ai 助手让研究员查内部化合物数据, 有法务/ip/合规约束, 怎么起步">
+  <a class="q-title" href="questions/zhenti-033-pharma-ai-with-ip-compliance.html">Q33 · [问题拆解/案例] 某药企想部署 AI 助手让研究员查内部化合物数据, 有法务/IP/合规约束, 怎么起步</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q33 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q34 · [问题拆解/案例] 某物流公司想用 sap、天气 api、500 个仓库经理的输入做自动重路由 agent, 端到端设计">
+  <a class="q-title" href="questions/zhenti-034-logistics-sap-weather-500-managers.html">Q34 · [问题拆解/案例] 某物流公司想用 SAP、天气 API、500 个仓库经理的输入做自动重路由 agent, 端到端设计</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q34 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 llm 摘要, 受各州监管约束, 怎么 scope">
+  <a class="q-title" href="questions/zhenti-035-insurance-3000-claims-llm-summary.html">Q35 · [问题拆解/案例] 某保险公司想对 3000 万条历史理赔做 LLM 摘要, 受各州监管约束, 怎么 scope</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q35 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q36 · [客户模拟/沟通] 部署延期了三周, 客户 cto 在线上, 告诉他">
+  <a class="q-title" href="questions/zhenti-036-deployment-3-weeks-late-cto.html">Q36 · [客户模拟/沟通] 部署延期了三周, 客户 CTO 在线上, 告诉他</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q36 (客户模拟/沟通). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q37 · [客户模拟/沟通] 客户想要一个会破坏数据治理的功能, 在不破坏关系的前提下拒绝">
+  <a class="q-title" href="questions/zhenti-037-decline-feature-data-governance.html">Q37 · [客户模拟/沟通] 客户想要一个会破坏数据治理的功能, 在不破坏关系的前提下拒绝</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q37 (客户模拟/沟通). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q38 · [客户模拟/沟通] 向不懂技术的 vp 解释为什么 rag 系统无法保证 100% 准确">
+  <a class="q-title" href="questions/zhenti-038-explain-rag-no-100-accuracy.html">Q38 · [客户模拟/沟通] 向不懂技术的 VP 解释为什么 RAG 系统无法保证 100% 准确</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q38 (客户模拟/沟通). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q39 · [客户模拟/沟通] 客户安全团队不给你生产凭证, 你怎么解除阻塞">
+  <a class="q-title" href="questions/zhenti-039-unblock-security-credentials.html">Q39 · [客户模拟/沟通] 客户安全团队不给你生产凭证, 你怎么解除阻塞</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q39 (客户模拟/沟通). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q40 · [客户模拟/沟通] 你不认同客户选的架构, 怎么提出来">
+  <a class="q-title" href="questions/zhenti-040-disagree-with-customer-arch.html">Q40 · [客户模拟/沟通] 你不认同客户选的架构, 怎么提出来</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q40 (客户模拟/沟通). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q41 · [ai 专项技术] 什么时候 fine-tune, 什么时候 rag, 什么时候 prompt engineering">
+  <a class="q-title" href="questions/zhenti-041-when-fine-tune-vs-rag-vs-pe.html">Q41 · [AI 专项技术] 什么时候 fine-tune, 什么时候 RAG, 什么时候 prompt engineering</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q41 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q42 · [ai 专项技术] 除了「看起来对」, 怎么评估 llm 系统? (自动指标 + 分层抽样人工评审 + 持续用户反馈, llm-as-judge 配 rubric)">
+  <a class="q-title" href="questions/zhenti-042-eval-llm-beyond-looks-right.html">Q42 · [AI 专项技术] 除了「看起来对」, 怎么评估 LLM 系统? (自动指标 + 分层抽样人工评审 + 持续用户反馈, LLM-as-judge 配 rubric)</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q42 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q43 · [ai 专项技术] 怎么给生产 llm 应用设计 guardrails">
+  <a class="q-title" href="questions/zhenti-043-production-llm-guardrails.html">Q43 · [AI 专项技术] 怎么给生产 LLM 应用设计 guardrails</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q43 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q44 · [ai 专项技术] 你的 rag chunking 策略是什么, 怎么向怀疑的客户解释">
+  <a class="q-title" href="questions/zhenti-044-rag-chunking-strategy-defense.html">Q44 · [AI 专项技术] 你的 RAG chunking 策略是什么, 怎么向怀疑的客户解释</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q44 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q45 · [ai 专项技术] 走一遍带工具调用、记忆、评估的端到端 agent 系统">
+  <a class="q-title" href="questions/zhenti-045-end-to-end-agent-with-tool-memory-eval.html">Q45 · [AI 专项技术] 走一遍带工具调用、记忆、评估的端到端 agent 系统</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q45 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q46 · [ai 专项技术] 面向客户的 agent 怎么处理 prompt injection">
+  <a class="q-title" href="questions/zhenti-046-customer-facing-prompt-injection.html">Q46 · [AI 专项技术] 面向客户的 agent 怎么处理 prompt injection</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q46 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q47 · [ai 专项技术] 企业客户: 托管 (openai/anthropic api) vs 自托管 (客户基础设施上的开放权重) 取舍">
+  <a class="q-title" href="questions/zhenti-047-managed-vs-self-host-tradeoff.html">Q47 · [AI 专项技术] 企业客户: 托管 (OpenAI/Anthropic API) vs 自托管 (客户基础设施上的开放权重) 取舍</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q47 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q48 · [生产/可靠性] 客户依赖的第三方 api 开始间歇性超时, 讲你的排查过程">
+  <a class="q-title" href="questions/zhenti-048-third-party-api-intermittent-timeout.html">Q48 · [生产/可靠性] 客户依赖的第三方 API 开始间歇性超时, 讲你的排查过程</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q48 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q49 · [生产/可靠性] 凌晨 2 点部署宕机, 你的事故响应流程">
+  <a class="q-title" href="questions/zhenti-049-2am-incident-response.html">Q49 · [生产/可靠性] 凌晨 2 点部署宕机, 你的事故响应流程</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q49 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q50 · [生产/可靠性] 紧急 deadline 要上线关键功能, 你会在什么上妥协、什么上绝不妥协">
+  <a class="q-title" href="questions/zhenti-050-emergency-deadline-tradeoffs.html">Q50 · [生产/可靠性] 紧急 deadline 要上线关键功能, 你会在什么上妥协、什么上绝不妥协</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q50 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q51 · [生产/可靠性] p0 事故后在客户环境里怎么做复盘">
+  <a class="q-title" href="questions/zhenti-051-p0-postmortem-customer-env.html">Q51 · [生产/可靠性] P0 事故后在客户环境里怎么做复盘</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q51 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
+</div>
+<div class="q-card" data-type="真题" data-companies="真题" data-deep="0" data-reports="10" data-recency="2026053" data-title="q52 · [生产/可靠性] 客户报告模型「越来越差」, 你怎么排查模型漂移">
+  <a class="q-title" href="questions/zhenti-052-diagnose-model-getting-worse.html">Q52 · [生产/可靠性] 客户报告模型「越来越差」, 你怎么排查模型漂移</a>
+  <div class="q-tags">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    
+    <span class="company-badge" style="--c:#57606a" title="真题: 10 人报告">真题 10</span>
+  </div>
+  <div class="q-meta">📋 10 人报告 · 🕒 最近 Late May, 2026</div>
+  <div class="q-desc">FDE 真题 Q52 (生产/可靠性). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</div>
 </div>
 <div class="q-card is-deep" data-type="System Design" data-companies="OpenAI|Google" data-deep="1" data-reports="59" data-recency="2026052" data-title="design online chess">
   <a class="q-title" href="questions/cm4szywgj003ivszmblm3pmoa.html">Design Online Chess</a>

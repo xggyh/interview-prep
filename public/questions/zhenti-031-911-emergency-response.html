@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q31 · [问题拆解/案例] 某大城市想缩短 911 急救响应时间, 有通话数据、交通数据、救护车 GPS, 给你 60 分钟 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q31 · [问题拆解/案例] 某大城市想缩短 911 急救响应时间, 有通话数据、交通数据、救护车 GPS, 给你 60 分钟</div>
+  <h1>Q31 · [问题拆解/案例] 某大城市想缩短 911 急救响应时间, 有通话数据、交通数据、救护车 GPS, 给你 60 分钟</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-031-911-emergency-response.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-031-911-emergency-response.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q31 (问题拆解/案例). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q31 · 911 急救响应时间优化</h3>
+<blockquote><p>"A major US city wants to <strong>reduce 911 emergency response time</strong>. You have access to <strong>911 call data, real-time traffic data, and ambulance GPS data</strong>. You have <strong>60 minutes</strong>. <strong>Go</strong>."</p></blockquote>
+<p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir FDE 经典题, 后被 OpenAI / Google / Salesforce / Databricks 全部复用 <strong>行业</strong>: Public safety / municipal / healthcare</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 design 一个 911 系统的方案.</p>
+<p><strong>是</strong>: 考你<strong>面对一个 unbounded、safety-critical、多 stakeholder、多 data source 的真实部署问题, 能不能在 60 min 内做出 structured decomposition</strong>.</p>
+<p>具体看 4 个 signal:</p>
+<ol><li><strong>Clarify before solving</strong> — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag"</li><li><strong>Tractable MVP</strong> — 你能从一个 unbounded 问题里切出一个 <strong>2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton</strong></li><li><strong>Surface tradeoffs proactively</strong> — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」</li><li><strong>Safety-critical mindset</strong> — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS</li></ol>
+<hr />
+<h3>❌ 最常见的挂法 (top 3)</h3>
+<p><strong>挂法 #1: 一上来就冲 ML routing 算法</strong></p>
+<blockquote><p>候选人 (5 秒内): "Sure, I'd train a graph neural network on historical traffic + GPS, predict ETA, build a recommendation system, deploy on Kubernetes..."</p></blockquote>
+<p>死. 你<strong>没问</strong>:</p>
+<ul><li>是 call-to-dispatch 慢, 还是 dispatch-to-arrival 慢? (你都不知道 bottleneck 在哪)</li><li>"Response time" 是 P50 还是 P90? Mayor 关心 PR average, EMS director 关心 P99</li><li>哪个 call category? Cardiac 跟 mental health 的优化策略完全不同</li><li>已经有什么 system 在 production? (PSAP / CAD / Motorola / Tyler 等)</li><li>Equity concern (低收入街区 vs 高收入街区响应时间差异) 是 explicit goal 吗?</li></ul>
+<p><strong>挂法 #2: 当 system design 题做</strong></p>
+<p>候选人开始算: 「30K calls/day → 350 calls/sec peak → 5 个 PSAP shards → Redis cache → Kafka topic...」</p>
+<p>死. 这道题<strong>不是 system design</strong>. 60 min 全花在 capacity planning + sharding = miss the point.</p>
+<p><strong>挂法 #3: 把 dispatcher 完全 cut out</strong></p>
+<blockquote><p>"AI will replace dispatchers and pick the optimal unit autonomously."</p></blockquote>
+<p>死. Safety-critical 系统的红旗. PSAP 工会会立刻 kill 你的 project. <strong>永远 recommendation, 不 replace</strong>.</p>
+<hr />
+<h3>完美答案架构 (5 步拆解 + 本题具体应用)</h3>
+<p>下面就是 FDE 在这道题里<strong>完整的 60 分钟脚本</strong>, 严格按 5 步走.</p>
+<hr />
+<h4>Step 1: 澄清问题 (10 min)</h4>
+<blockquote><p>"Before I start designing, I want to ask 8 questions. The reason: '911 response time' is <strong>3 totally different problems</strong> depending on what we mean."</p></blockquote>
+<p><strong>8 个 clarifying questions</strong>:</p>
+<blockquote><p><strong>Q1</strong>: "When you say 'response time', do you mean <strong>call-to-dispatch</strong> (call connect → dispatcher sends unit) or <strong>dispatch-to-arrival</strong> (unit dispatched → on scene)? These are very different bottlenecks. Industry standard NFPA 1710 measures <strong>call-to-arrival</strong> with 90s call processing + 60s turnout + 240s travel = 6.5 min P90."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "What's the <strong>single KPI</strong> you'd put in your annual report — average response time? P90? P99? Response time for cardiac specifically? Equity gap between richest and poorest zip code?"</p></blockquote>
+<blockquote><p><strong>Q3</strong>: "Which <strong>call category</strong> matters most? Cardiac arrest (golden 4 minutes) vs structure fire (6.5 min P90 target) vs mental health crisis (different intervention, often 30+ min OK). The optimization is per-category."</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "What's the <strong>current baseline</strong>? P90 today? And what's the <strong>target</strong> — 10% improvement (statistical noise threshold) or moonshot 50% (would need new dispatch policy)?"</p></blockquote>
+<blockquote><p><strong>Q5</strong>: "What's <strong>already in production</strong>? PSAP using Motorola / Tyler / Hexagon CAD? Are ambulances tracked via vendor (Zoll, ImageTrend) or city-owned GPS? Is there a real-time traffic feed (city DOT, INRIX, Google)?"</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "What's the <strong>integration constraint</strong> — read access to dispatch system, or just batch dumps overnight? Real-time GPS feed from ambulances, or 5-min sampled? On-premise required, or cloud OK?"</p></blockquote>
+<blockquote><p><strong>Q7</strong>: "<strong>Equity concern explicit?</strong> Many cities have 50% longer response times in low-income / minority neighborhoods. If we just optimize 'average', we may <strong>widen</strong> the gap. Is <strong>equity</strong> an explicit success metric?"</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "What's the <strong>stakeholder map</strong> — mayor's office, PSAP director, EMS director, fire chief, police chief, PSAP union (接警员工会), city CTO, city legal (HIPAA / CJIS), citizen advocacy groups? Who has veto?"</p></blockquote>
+<p><strong>为什么这 8 个 Q 重要</strong>: 不问 → 你的 architecture 全错. 问完, 你已经 narrow 到 1 个具体子问题, 而不是 unbounded.</p>
+<p><strong>面试官 likely 回答</strong> (Exponent guide 给的典型 setup):</p>
+<ul><li>KPI: P90 cardiac response time</li><li>Baseline: 8:42 currently, target 7:00</li><li>Current systems: Motorola CAD + Zoll for EMS</li><li>Integration: read-only API, real-time</li><li>Equity: yes, secondary metric (gap between top-quartile and bottom-quartile zip codes)</li><li>Stakeholder veto: PSAP director + PSAP union</li></ul>
+<p>→ 现在你 scope 清晰了. <strong>不是「优化整个 911 系统」, 是「在 90 天内将 cardiac arrest P90 response time 从 8:42 降到 7:00, 同时不让 equity gap 扩大」</strong>.</p>
+<hr />
+<h4>Step 2: 找干系人 + 成功指标 (10 min)</h4>
+<blockquote><p>"Now let me map stakeholders, because <strong>whose buy-in we need determines what we can ship</strong>."</p></blockquote>
+<p><strong>Stakeholder map</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>对项目态度</th><th>我对他们的关键动作</th></tr></thead><tbody><tr><td><strong>Mayor's office</strong></td><td>PR / press release / 选举</td><td>Enthusiastic, 要 quick win</td><td>Quarterly metric review + press kit</td></tr><tr><td><strong>PSAP director</strong></td><td>Daily operations, dispatcher morale</td><td>Cautiously supportive</td><td>Daily standup, ride-along</td></tr><tr><td><strong>EMS director</strong></td><td>Patient outcomes, paramedic safety</td><td>Supportive but skeptical</td><td>Show survival rate impact</td></tr><tr><td><strong>Fire chief</strong></td><td>Cross-jurisdiction coordination</td><td>Skeptical of "AI dispatch"</td><td>Side-car integration, no policy change</td></tr><tr><td><strong>Police chief</strong></td><td>Officer safety, 911 misuse</td><td>Tangential</td><td>Read-only, no police dispatch v1</td></tr><tr><td><strong>PSAP union</strong></td><td>Job security, workload</td><td><strong>Highly skeptical, can veto</strong></td><td>Early engagement, training, "augment not replace"</td></tr><tr><td><strong>City CTO</strong></td><td>Integration, security</td><td>Need approval</td><td>Architecture review, CJIS compliance</td></tr><tr><td><strong>City legal</strong></td><td>HIPAA / CJIS / liability</td><td>Must approve</td><td>Audit log, recommendation-not-decision</td></tr><tr><td><strong>Citizen advocacy</strong></td><td>Equity, transparency</td><td>Watching</td><td>Public dashboard with equity metric</td></tr></tbody></table></div>
+<p><strong>Key insight</strong>: PSAP union 是 highest-risk stakeholder. 美国 911 接警员是工会, 引入 "AI" 触动饭碗会 kill the project. <strong>第一周必须</strong>: PSAP president 在 launch readme 上 co-sign.</p>
+<p><strong>Success metrics (3 层)</strong>:</p>
+<p><strong>Layer 1 — North Star</strong> (mayor will see):</p>
+<ul><li>P90 cardiac arrest call-to-arrival time (target 7:00 from 8:42)</li></ul>
+<p><strong>Layer 2 — Operational</strong> (PSAP director sees daily):</p>
+<ul><li>Override rate of AI recommendations (target 20-30%, NOT &lt; 10%)</li><li>AI uptime (target 99.9%)</li><li>Per-shift recommendation latency P99 (target &lt; 500ms)</li></ul>
+<p><strong>Layer 3 — Outcome</strong> (EMS director, monthly):</p>
+<ul><li>Cardiac arrest survival rate (lags 30-60 days)</li><li>Equity gap: P90 in bottom-quartile zip codes vs top-quartile (must NOT widen)</li><li>Citizen satisfaction (survey)</li></ul>
+<p><strong>Counter-metrics</strong> (must not move negatively):</p>
+<ul><li>Mental health crisis response time (some cities use civilian responders, must not be deprioritized)</li><li>Dispatcher reported workload survey</li><li>Equity gap</li></ul>
+<hr />
+<h4>Step 3: 梳理输入数据 (10 min)</h4>
+<blockquote><p>"Let me inventory the data we have, who owns it, the format, freshness, and the gaps. Half of FDE work is fighting dirty data, so this matters more than the model."</p></blockquote>
+<p><strong>Data inventory</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Dataset</th><th>Owner</th><th>Format</th><th>Freshness</th><th>Quality / Gap</th></tr></thead><tbody><tr><td><strong>911 call records</strong></td><td>PSAP (city)</td><td>CAD export, structured</td><td>Real-time</td><td>Some free-text fields (call notes) need NLP</td></tr><tr><td><strong>Call audio</strong></td><td>PSAP</td><td>mp3 / wav</td><td>Real-time stream</td><td>HIPAA / CJIS, encryption required</td></tr><tr><td><strong>CAD incident events</strong></td><td>Motorola CAD</td><td>API, structured</td><td>Real-time</td><td>12 timestamps per incident (call_received → arrived)</td></tr><tr><td><strong>Ambulance GPS</strong></td><td>Zoll / city fleet</td><td>NMEA stream</td><td>5-30s intervals</td><td><strong>5-15% stale or drift in tunnels / buildings</strong></td></tr><tr><td><strong>Real-time traffic</strong></td><td>City DOT / Google / INRIX</td><td>API</td><td>30s-2min lag</td><td>Some sensors broken, gaps in coverage</td></tr><tr><td><strong>Historical incidents</strong></td><td>CAD archive</td><td>Daily batch</td><td>T+1</td><td>2-5 years available, schema changed 2x</td></tr><tr><td><strong>Weather</strong></td><td>NOAA</td><td>API</td><td>Hourly</td><td>Reliable</td></tr><tr><td><strong>Event calendar</strong></td><td>City permits + sports</td><td>CSV / API</td><td>Daily</td><td>Manual updates, incomplete</td></tr><tr><td><strong>Census / demographics</strong></td><td>US Census</td><td>Static</td><td>Annual</td><td>For equity analysis</td></tr><tr><td><strong>Hospital ED status</strong></td><td>Health system</td><td>HL7</td><td>15-min</td><td>Some hospitals don't share</td></tr></tbody></table></div>
+<p><strong>Key gaps</strong>:</p>
+<ol><li><strong>Stale GPS</strong> is the #1 fight. Tunnels, garages, indoor incidents → 5-15% of pings stale &gt; 60s. <strong>Fallback</strong>: dead reckoning (last known position + heading × elapsed time).</li><li><strong>Schema drift</strong> in historical CAD. Have to write per-period parsers.</li><li><strong>Cross-jurisdiction</strong>: 911 calls from city edge may belong to neighboring county. Boundary disputes 5% of cases.</li><li><strong>Free text in call notes</strong>: dispatcher / call-taker shorthand ("PT C/O CP" = patient complains of chest pain). Need parser.</li></ol>
+<p><strong>Who I'd call in week 1</strong>:</p>
+<ul><li>PSAP IT lead — get me CAD API credentials</li><li>Zoll account manager — confirm GPS data sharing agreement</li><li>City DOT data engineer — traffic feed access</li><li>HIPAA / CJIS officer — encryption + access controls</li></ul>
+<hr />
+<h4>Step 4: 拆成可解子问题 (15 min)</h4>
+<blockquote><p>"Now I have scope + stakeholders + data. Let me decompose the problem into subproblems, ranked by risk × value, so we attack highest-risk-highest-value first."</p></blockquote>
+<p><strong>Decomposition: 7 subproblems</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>子问题</th><th>Risk</th><th>Value</th><th>Pri</th></tr></thead><tbody><tr><td><strong>A</strong></td><td>Funnel diagnose: 12-timestamp dashboard, identify biggest bottleneck</td><td>Low</td><td>Very high</td><td><strong>1</strong></td></tr><tr><td><strong>B</strong></td><td>ETA prediction model (replace dispatcher's intuition for unit selection)</td><td>Med</td><td>High</td><td><strong>2</strong></td></tr><tr><td><strong>C</strong></td><td>Real-time traffic-aware routing for already-dispatched units</td><td>Low</td><td>Medium</td><td>4</td></tr><tr><td><strong>D</strong></td><td>LLM-assisted call processing (extract symptoms while call-taker types)</td><td>Med</td><td>High</td><td><strong>3</strong></td></tr><tr><td><strong>E</strong></td><td>Resource pre-positioning (where to park idle ambulances)</td><td>High</td><td>High</td><td>5</td></tr><tr><td><strong>F</strong></td><td>Cross-jurisdiction handoff optimization</td><td>Low</td><td>Low</td><td>7</td></tr><tr><td><strong>G</strong></td><td>Equity-aware dispatch policy (ensure dispatch doesn't widen gap)</td><td>High</td><td>Critical</td><td><strong>must run alongside everything</strong></td></tr></tbody></table></div>
+<p><strong>Sequencing rationale</strong>:</p>
+<blockquote><p><strong>A first</strong> because: without funnel diagnose, you don't know what to fix. PSAP director's first reaction when I show "Classify takes 180s P90 for non-emergency, that's the biggest leak" will be "<strong>finally someone showed me this</strong>". That builds trust.</p></blockquote>
+<blockquote><p><strong>B second</strong> because: highest single-lever value (dispatcher decision time + selection quality), and tractable with 6 months of historical data. GBDT baseline, MAE target &lt; 60s P90.</p></blockquote>
+<blockquote><p><strong>D third</strong> because: LLM-assisted call processing is the fastest call-to-dispatch saver. ASR + Gemini Flash extract symptoms in real-time → auto-fill CAD fields → call-taker just confirms. Saves 30-60s per call.</p></blockquote>
+<blockquote><p><strong>G runs alongside</strong> because: if I optimize "average" without watching equity, I may widen the gap (model learns "rich zip codes get faster response because there are more units there"). <strong>Equity is a check on every other subproblem</strong>, not a separate phase.</p></blockquote>
+<blockquote><p><strong>E and F deferred</strong> to phase 2/3 because: pre-positioning is high-risk (paramedic union pushback), cross-jurisdiction is low value (5% of cases).</p></blockquote>
+<hr />
+<h4>Step 5: Walking-skeleton MVP (15 min)</h4>
+<blockquote><p>"Now the most important part: what's the <strong>minimum end-to-end thing we can ship in 2 weeks</strong> that proves the architecture, even with mocked logic?"</p></blockquote>
+<p><strong>Walking-skeleton (Week 1-2)</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">[CAD events stream]──┐
+                     ├─→ [Telemetry collector] ──→ [Postgres + S3]
+[Ambulance GPS]──────┘                                    │
+                                                          ▼
+                                              [Funnel Dashboard]
+                                                          │
+                                                          ▼
+                                                 [PSAP director]
+                                                  reviews daily</code></pre>
+<p><strong>Week 1</strong>:</p>
+<ul><li>Day 1-2: Get CAD API credentials, ingest last 30 days of incident events</li><li>Day 3-4: Build 12-timestamp ETL → Postgres</li><li>Day 5: Build first dashboard (P50 / P90 / P99 by call category)</li></ul>
+<p><strong>Week 2</strong>:</p>
+<ul><li>Day 6-7: Ride-along with 1 dispatcher per shift × 3 shifts (morning / evening / night)</li><li>Day 8-9: Show dashboard to PSAP director, get feedback</li><li>Day 10: Identify top 1 bottleneck → that's Phase 2 scope</li></ul>
+<p><strong>What's NOT in Week 1-2 MVP</strong>:</p>
+<ul><li>No ML model. Just descriptive analytics.</li><li>No dispatcher UI change. Just internal dashboard.</li><li>No real-time decisions. Just batch-refreshed metrics.</li></ul>
+<p><strong>Why this works</strong>:</p>
+<ul><li><strong>No risk</strong> to dispatcher workflow (read-only)</li><li><strong>Immediate value</strong> (PSAP director never had this dashboard)</li><li><strong>Foundation for everything</strong> (without this, ML model has nothing to compare to)</li><li><strong>Trust builder</strong>: PSAP director sees you understand his domain in 2 weeks</li></ul>
+<p><strong>Phase 2 (Week 3-12) — ETA Prediction in Shadow Mode</strong>:</p>
+<p>After Funnel says "Dispatcher decision time is 25s P90, that's the biggest fixable bottleneck":</p>
+<pre class="language-plaintext"><code class="language-plaintext">[Incident comes in]
+      │
+      ▼
+[ETA model predicts arrive time for each candidate unit]  ← SHADOW
+      │
+      ▼
+[Dispatcher selects unit manually (current process unchanged)]
+      │
+      ▼
+[Log: AI recommended unit X (ETA Ys), human picked Y (actual ETA Zs)]
+      │
+      ▼
+[Weekly retro: agreement rate, MAE, where AI was wrong]</code></pre>
+<p><strong>Success criteria for Phase 2</strong>:</p>
+<ul><li>ETA MAE &lt; 60s on P90 ground truth</li><li>AI recommendation matches dispatcher's pick &gt; 70% of time</li><li>For mismatches, AI's prediction is within 30s of actual on average</li></ul>
+<p><strong>Phase 3 (Month 4-6) — Opt-in Recommendation Mode</strong>:</p>
+<p>5 self-selected dispatchers see AI recommendation in UI sidebar (not blocking). Override rate tracked. Weekly retro.</p>
+<p><strong>Phase 4 (Month 7-12) — Default-on with Override</strong>:</p>
+<p>All dispatchers see recommendation. Always can override with 1 click. Continuous monitoring.</p>
+<p><strong>Kill switch</strong>: ops can disable AI assist in &lt; 60 seconds. Manual mode is the default fallback.</p>
+<hr />
+<h3>详细回答 (Sample 60-min monologue)</h3>
+<blockquote><p>"Let me make sure I understand what success looks like before I sketch a solution. I want to ask 8 quick questions.</p>
+<p><strong>First</strong>: when you say 'response time', is that call-to-dispatch or dispatch-to-arrival? Industry breaks it into 90s call processing + 60s turnout + 240s travel = 6.5 min P90 standard. The bottlenecks for each are totally different problems — call processing is a UX + LLM problem, travel is a routing + traffic problem.</p>
+<p><strong>Second</strong>: what's the single KPI in the mayor's annual report? Mean response time? P90? Or P90 specifically for cardiac arrest? Because the optimization is per-category.</p>
+<p>... <em>(continues with 6 more clarifying questions)</em> ...</p>
+<p><em>(After answers: P90 cardiac, 8:42 → 7:00 target, 90 days, Motorola CAD, Zoll EMS, equity is secondary metric, PSAP union has veto)</em></p>
+<p>OK so the actual problem is: in 90 days, drop P90 cardiac call-to-arrival from 8:42 to 7:00, without widening the gap between top-quartile and bottom-quartile zip codes, with PSAP union buy-in.</p>
+<p><strong>Stakeholders</strong>: mayor wants press release, PSAP director wants operational stability, PSAP union has veto, EMS director wants survival rate impact, city legal wants HIPAA/CJIS compliance. <strong>Highest risk stakeholder is the PSAP union</strong> — I'd schedule a meeting with their president in week 1 before any tech work.</p>
+<p><strong>Data</strong>: 911 call records + CAD events + Zoll GPS + city traffic. I'd expect 5-15% GPS stale rate (tunnels, garages) — that's the dirty-data fight I'd plan for.</p>
+<p><strong>Decomposition</strong>: 7 subproblems, ranked by risk × value:</p>
+<ol><li><strong>Funnel diagnose</strong> — what's actually slow? Without this, everything else is guessing.</li><li><strong>ETA prediction</strong> — replace dispatcher intuition for unit selection</li><li><strong>LLM-assisted call processing</strong> — save 30-60s on call-taker info gathering</li><li><strong>Real-time routing</strong> — already-dispatched units get traffic-aware route</li><li><strong>Resource pre-positioning</strong> — where to park idle units (high political risk, defer to phase 3)</li><li><strong>Cross-jurisdiction handoff</strong> — only 5% of cases, low value, defer</li><li><strong>Equity-aware dispatch</strong> — runs <strong>alongside</strong> everything as a check, not a phase</li></ol>
+<p><strong>Walking-skeleton MVP for Week 1-2</strong>: just the funnel dashboard. No ML. Read-only. Ingest last 30 days of CAD events, build 12-timestamp ETL, show PSAP director where time is being lost. This is <strong>immediately valuable</strong> to him (he never had this view) and <strong>risk-free</strong> to dispatchers. It builds the credibility I need before I propose anything that touches their UI.</p>
+<p><strong>Phase 2 in Week 3-12</strong> is the ETA model. Critical: <strong>shadow mode</strong>. AI predicts ETA for each candidate unit, dispatcher still picks manually, we log both. Weekly retro. We don't show AI's recommendation to dispatchers until MAE &lt; 60s on real ground truth and agreement rate &gt; 70%.</p>
+<p><strong>Phase 3 in Month 4-6</strong>: 5 self-selected dispatchers see AI recommendation as sidebar, opt-in. Override rate becomes north-star — target 20-30% — not 5% (that means dispatchers rubber-stamp) and not 60% (that means model is wrong).</p>
+<p><strong>Phase 4 in Month 7-12</strong>: default-on, always overridable, kill switch ops can pull in 60 seconds.</p>
+<p><strong>Three things I'd flag proactively before you ask</strong>:</p>
+<p><strong>(a) PSAP union risk</strong>. Project dies politically before it dies technically if I don't pre-engage. I'd want union president co-signing the launch readme.</p>
+<p><strong>(b) Equity is a check, not a phase</strong>. If I optimize aggregate P90 without watching equity, the model learns 'rich zip codes have more idle units, recommend faster response there'. Equity metric on the dashboard from day 1, red-flagged if it widens.</p>
+<p><strong>(c) Eval methodology</strong>. We can't A/B test 911 ethically (can't deny half the city the improvement). Instead, <strong>stepped wedge rollout</strong> by district + <strong>counterfactual replay</strong> (run the AI on historical incidents, compare predicted ETA to actual). Counterfactual is directional, not ground truth — but it gives us early signal before lagging outcomes catch up.</p>
+<p>Want me to deep-dive any of these layers?"</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<p>这道题跟你<strong>TikTok PayLater Indonesia voice agent</strong> 项目<strong>结构上高度同构</strong>, 你直接 quote:</p>
+<blockquote><p>"Actually this is very close to a problem I just shipped. The TikTok PayLater debt collection voice agent serves 7 markets, 6 languages, with strict regulatory constraints (especially OJK in Indonesia). The structure is the same:</p>
+<ul><li><strong>Multi-source data</strong> under time pressure (customer profile + call history + repayment + blacklist + transaction context, just like 911's call + CAD + GPS + traffic)</li><li><strong>Real-time decisions</strong> with sub-second latency requirement (p99 &lt; 800ms for streaming, just like dispatch decision)</li><li><strong>Safety / trust critical</strong> with regulatory exposure (OJK could revoke license, just like 911 union could kill project)</li><li><strong>Hard to A/B</strong> because of fairness concerns (can't subject one market to worse service, same as can't deny half a city of 911 improvement)</li><li><strong>Multi-stakeholder</strong> with veto holders (legal, ops, product, monitor) just like PSAP director + union + EMS + city legal</li></ul>
+<p>The framework I used there was the same 5-step I just walked through:</p>
+<ol><li><strong>Clarified scope</strong>: not 'replace all human collection', but 'first-line for non-disputed accounts where customer hasn't said the magic word "law" or "regulator"'.</li><li><strong>Stakeholders + KPI</strong>: OJK monitor approval (north-star), customer NPS (counter-metric), repayment rate (operational), complaint rate (red line).</li><li><strong>Data inventory</strong>: I spent week 1 listing what was clean vs dirty. The 'customer recent call attempts' field was missing for 8% of accounts and the team treated it as 0 — I caught that.</li><li><strong>Decomposed</strong> into 6 subproblems, attacked highest-risk-highest-value first: <strong>intent classifier first</strong> (so I knew which calls to route to bot vs human), then dialog policy, then RL alignment, then multi-language.</li><li><strong>Walking-skeleton MVP</strong>: I shipped a single-intent (payment reminder) version in 2 weeks with mocked LLM responses (literally <code>if intent == 'paid': return scripted_message</code>). That walked through the entire ASR → intent → dialog → TTS → escalation pipeline end-to-end. Once that was stable, I swapped in real LLM intent classifier, then real dialog policy. <strong>Two weeks to end-to-end, four months to production at the same architecture I sketched in week 1</strong>.</li></ol>
+<p>The pattern that transfers to 911: <strong>don't build the smartest piece first, build the dumbest end-to-end first, then upgrade in shadow mode</strong>."</p></blockquote>
+<p><strong>Other transferable resume hooks</strong>:</p>
+<ul><li><strong>ConvFinQA ablation methodology</strong> — for the "negative result that taught us something" angle when AI underperforms. In ConvFinQA work, I systematically ablated retrieval quality, prompt format, and CoT to find which knob actually mattered. Same systematic ablation would apply to "is ETA error from data freshness, model class, or feature set".</li><li><strong>Internal Agent Platform onboarding multiple teams</strong> — for the "multi-stakeholder ambiguous scope" angle. When 5 different teams want different things from the same platform, you have to do clarification + scope + walking-skeleton on each.</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "What if PSAP union refuses to participate at all?"</p>
+<p><strong>A</strong>: Don't proceed. The political risk to your company &gt; one deal value. But before walking away, escalate: <strong>what's the union's actual fear?</strong> Usually it's "AI will replace my job" — and the union president is wrong to think that's the immediate risk. Real fear: more scrutiny on individual dispatcher decisions (every override now audited).</p>
+<ul><li><strong>Counter-offer</strong>: union gets to design the recommendation UI (they decide what AI shows / how prominent), union gets first 6 months of override data <strong>redacted from individual dispatcher attribution</strong> (only aggregate), union has a seat on the eval steering committee.</li><li>If that fails — politely decline the project. Don't ship into political quicksand.</li></ul>
+<p><strong>Q2</strong>: "What if the city's CAD vendor (Motorola) blocks integration?"</p>
+<p><strong>A</strong>: This is the <strong>actual blocker</strong>, not technical. 3 options:</p>
+<ul><li><strong>Side-car</strong>: read-only access via daily CAD log export → ingest into our system → recommendations shown in <strong>separate dashboard</strong> that dispatcher checks in parallel. Vendor doesn't have to change anything.</li><li><strong>Vendor partnership</strong>: bring Motorola in as joint go-to-market, give them rev share. Slow but durable.</li><li><strong>City RFP leverage</strong>: get city to mandate API access in vendor renewal. Slowest, most political.</li></ul>
+<p>Most FDE situations end up as #1 (side-car) — minimizes vendor politics and gets you shipping in weeks not quarters.</p>
+<p><strong>Q3</strong>: "What if the ETA model performs worse than dispatcher intuition?"</p>
+<p><strong>A</strong>: First — <strong>don't take it personally</strong>. Dispatchers have years of context (this driver is fast, this corner floods, this building's loading dock is on Main not Elm). The right framing is: "<strong>the model is a 90th-percentile assistant for a 95th-percentile expert</strong>" — useful for the 10% of cases where the expert is new / tired / stressed / overloaded, harmful if it overrides the expert in normal cases.</p>
+<p>So: track <strong>override rate vs outcome</strong> carefully. If overrides have better outcomes than non-overrides, the model needs retraining on the dispatcher's decisions, not deployment. If overrides have similar outcomes, model is fine, dispatcher and model agree often. If model has better outcomes than overrides on average <strong>but worse on specific categories</strong> (e.g., model worse on mass casualty events because training data is sparse), gate the model to its strong categories.</p>
+<p><strong>Q4</strong>: "How do you avoid getting the city sued when an ambulance is misrouted?"</p>
+<p><strong>A</strong>: 3 legal-safe defaults:</p>
+<ol><li><strong>Recommendation, not decision</strong> — dispatcher always has final call, audit log shows dispatcher acted.</li><li><strong>Conservative threshold</strong> — recommend only when confidence &gt; 80%, fall back to "show raw distance list, no preference" otherwise.</li><li><strong>Full audit log</strong> — every recommendation + override + outcome logged immutable for legal review.</li></ol>
+<p>Plus: city legal should review the deployment, NOT just sign off on the contract. They need to see the actual recommendation UI and audit log before launch.</p>
+<p><strong>Q5</strong>: "Mayor wants results in 6 weeks for press release, not 90 days."</p>
+<p><strong>A</strong>: Time compression → narrow scope. 6 weeks doesn't do ML routing, but does:</p>
+<ul><li><strong>Funnel dashboard</strong> to PSAP director (week 1-2)</li><li><strong>Manual decision support UI</strong>: "current available units + their current location + current traffic-weighted distance" — no ML, just real-time deterministic display. Saves dispatcher 5-10 seconds per decision because they're not toggling tabs.</li><li><strong>One press-friendly story</strong>: "AI-assisted dispatch saving 8 seconds per cardiac call, saving X lives per year".</li></ul>
+<p>Mayor gets her announcement. PSAP gets a real improvement without rushed ML. <strong>Reverse scoping is FDE's core skill</strong> — anyone can add scope, FDE removes it.</p>
+<hr />
+<h3>❌ 死路答法 (top 7)</h3>
+<ol><li><strong>一上来画 architecture</strong> → 没 clarify, 方案脱离 stakeholder 实际需求</li><li><strong>当 system design 题做</strong> (算 QPS / shard / Kafka topic) → 错位</li><li><strong>承诺 ML routing 6 个月一次性上线</strong> → 没 phasing = 没部署过</li><li><strong>把 dispatcher 完全 cut out</strong> → safety-critical 红旗</li><li><strong>假设 GPS / traffic 数据完美</strong> → FDE 全职在跟脏数据死磕</li><li><strong>A/B test 半个城市</strong> → 伦理灾难, 用 stepped wedge / counterfactual replay</li><li><strong>没考虑 PSAP 工会 / equity</strong> → 政治盲点, 项目死于政治</li></ol>
+<hr />
+<h3>✅ 加分项 (top 7)</h3>
+<ol><li><strong>5 步框架显式讲出来</strong> (clarify → stakeholder → data → decompose → MVP)</li><li><strong>8 个 clarifying questions 一次问完</strong> 而不是 dribble</li><li><strong>Walking-skeleton MVP 2 周端到端</strong>, 而不是 12 个月一次性</li><li><strong>Shadow → opt-in → default-on phasing</strong> 主动提</li><li><strong>Override rate as a North Star metric</strong> — 把「用户信任」量化</li><li><strong>Equity as a check, not a phase</strong> — 显示你 think systemically</li><li><strong>Quote 你的 voice agent 7-market production experience</strong> — 把 candidate 变 "shipped this before"</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>911 response time 优化 = "拆解 funnel 找最大瓶颈 + ML 协助但人最终决策 + shadow → opt-in → default 渐进 + 全程 instrumentation 暴露真相"</strong>.</p>
+<p>真正的 win 不来自一个炫酷 ML 模型, 而是「在 funnel 每段挤秒 + 让 dispatcher 信任 + 让 PSAP 工会同意 + 让 equity 不退步」.</p>
+<p>60 分钟答题节奏: 10 min clarify → 10 min stakeholder + KPI → 10 min data → 15 min decompose → 15 min walking-skeleton MVP. 不省 step.</p></blockquote>
+<hr />
+<h3>Cheat Sheet (面前 5 min 看)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 上来画图 / 算 QPS
+  - 假设 stakeholder / KPI
+  - 一口气讲完整方案
+  - 把 dispatcher cut out
+  - 假设数据 clean
+  - A/B 切一半城市
+
+要做 (5 step):
+  1. Clarify (10min): 8 个 Q, 锁 KPI + 范围
+  2. Stakeholder (10min): 9 角色表 + KPI 3 层
+  3. Data (10min): inventory + gap 列表
+  4. Decompose (15min): 7 subproblem 按 risk × value
+  5. Walking-skeleton MVP (15min): 2 周 funnel dashboard
+
+Step 1 必问 Q:
+  - Call-to-dispatch vs dispatch-to-arrival?
+  - P50 / P90 / P99?
+  - 哪个 call category?
+  - 当前 baseline + target?
+  - 已有什么 system?
+  - 集成约束?
+  - Equity 是 explicit goal 吗?
+  - Stakeholder veto 谁?
+
+Stakeholder veto 候选人:
+  - PSAP union (highest)
+  - PSAP director
+  - City legal
+  - EMS director
+
+Funnel 12 timestamps:
+  call_received → connected → pickup → location
+  → classified → cad_submit → dispatcher_received
+  → unit_selected → notified → ack → enroute → arrived
+
+7 subproblems (ranked):
+  1. Funnel diagnose (risk 低, value 极高)
+  2. ETA prediction (risk 中, value 高)
+  3. LLM call processing (risk 中, value 高)
+  4. Real-time routing (risk 低, value 中)
+  5. Resource pre-position (risk 高, defer phase 2)
+  6. Cross-jurisdiction (defer)
+  7. Equity (alongside everything)
+
+Walking-skeleton (Week 1-2):
+  - 30 天 CAD events ingest
+  - 12-timestamp ETL
+  - Funnel dashboard
+  - 3 dispatcher ride-along
+  - 0 ML, 0 dispatcher UI change
+
+Phasing:
+  Phase 1 (W1-2): Funnel dashboard
+  Phase 2 (W3-12): ETA shadow mode
+  Phase 3 (M4-6): Opt-in for 5 dispatchers
+  Phase 4 (M7-12): Default-on + kill switch
+
+North-star metric: P90 cardiac call-to-arrival
+North-star process metric: override rate 20-30% (NOT &lt; 10%)
+
+Failure modes:
+  - GPS stale → dead reckoning
+  - Traffic stale → no-traffic shortest path
+  - Model low-conf → show raw list
+  - CAD down → manual mode
+  - Override &gt; 50% → auto-pause
+
+Eval:
+  - Stepped wedge by district (NOT A/B half-city)
+  - Counterfactual replay (directional, not ground truth)
+  - Lagging metric: cardiac survival (30-60 day lag)
+  - Equity check on every metric
+
+Resume quote:
+  "TikTok PayLater voice agent 7 markets — same structure:
+   multi-source data, real-time, safety-critical, multi-stakeholder.
+   I used same 5-step. Walking-skeleton in 2 weeks with mocked LLM."
+
+Key phrases:
+  - "Before I sketch, let me ask 8 things..."
+  - "I'd narrow this to..."
+  - "Before being asked, I want to flag..."
+  - "Two-week walking-skeleton would look like..."
+  - "Equity is a check, not a phase"
+  - "Override rate is my north-star process metric"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-030-agent-observability-design.html">← Q30 · [系统设计/架构] 为 agent 系统设计可观测性: 记录什么、告警什么、做哪些看板</a>
+    <a href="zhenti-032-bank-3-acquired-fraud-systems.html">Q32 · [问题拆解/案例] 某地区银行想统一 3 套并购来的、标签不一致的反欺诈系统, 规划前 90 天 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q31 · 911 急救响应时间优化
+
+> "A major US city wants to **reduce 911 emergency response time**. You have access to **911 call data, real-time traffic data, and ambulance GPS data**. You have **60 minutes**. **Go**."
+
+**Round**: Decomposition Case (60 min)
+**出处**: Exponent 2026 FDE · Palantir FDE 经典题, 后被 OpenAI / Google / Salesforce / Databricks 全部复用
+**行业**: Public safety / municipal / healthcare
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 design 一个 911 系统的方案.
+
+**是**: 考你**面对一个 unbounded、safety-critical、多 stakeholder、多 data source 的真实部署问题, 能不能在 60 min 内做出 structured decomposition**.
+
+具体看 4 个 signal:
+
+1. **Clarify before solving** — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag"
+2. **Tractable MVP** — 你能从一个 unbounded 问题里切出一个 **2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton**
+3. **Surface tradeoffs proactively** — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」
+4. **Safety-critical mindset** — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS
+
+---
+
+## ❌ 最常见的挂法 (top 3)
+
+**挂法 #1: 一上来就冲 ML routing 算法**
+
+> 候选人 (5 秒内): "Sure, I'd train a graph neural network on historical traffic + GPS, predict ETA, build a recommendation system, deploy on Kubernetes..."
+
+死. 你**没问**:
+- 是 call-to-dispatch 慢, 还是 dispatch-to-arrival 慢? (你都不知道 bottleneck 在哪)
+- "Response time" 是 P50 还是 P90? Mayor 关心 PR average, EMS director 关心 P99
+- 哪个 call category? Cardiac 跟 mental health 的优化策略完全不同
+- 已经有什么 system 在 production? (PSAP / CAD / Motorola / Tyler 等)
+- Equity concern (低收入街区 vs 高收入街区响应时间差异) 是 explicit goal 吗?
+
+**挂法 #2: 当 system design 题做**
+
+候选人开始算: 「30K calls/day → 350 calls/sec peak → 5 个 PSAP shards → Redis cache → Kafka topic...」
+
+死. 这道题**不是 system design**. 60 min 全花在 capacity planning + sharding = miss the point.
+
+**挂法 #3: 把 dispatcher 完全 cut out**
+
+> "AI will replace dispatchers and pick the optimal unit autonomously."
+
+死. Safety-critical 系统的红旗. PSAP 工会会立刻 kill 你的 project. **永远 recommendation, 不 replace**.
+
+---
+
+## 完美答案架构 (5 步拆解 + 本题具体应用)
+
+下面就是 FDE 在这道题里**完整的 60 分钟脚本**, 严格按 5 步走.
+
+---
+
+### Step 1: 澄清问题 (10 min)
+
+> "Before I start designing, I want to ask 8 questions. The reason: '911 response time' is **3 totally different problems** depending on what we mean."
+
+**8 个 clarifying questions**:
+
+> **Q1**: "When you say 'response time', do you mean **call-to-dispatch** (call connect → dispatcher sends unit) or **dispatch-to-arrival** (unit dispatched → on scene)? These are very different bottlenecks. Industry standard NFPA 1710 measures **call-to-arrival** with 90s call processing + 60s turnout + 240s travel = 6.5 min P90."
+
+> **Q2**: "What's the **single KPI** you'd put in your annual report — average response time? P90? P99? Response time for cardiac specifically? Equity gap between richest and poorest zip code?"
+
+> **Q3**: "Which **call category** matters most? Cardiac arrest (golden 4 minutes) vs structure fire (6.5 min P90 target) vs mental health crisis (different intervention, often 30+ min OK). The optimization is per-category."
+
+> **Q4**: "What's the **current baseline**? P90 today? And what's the **target** — 10% improvement (statistical noise threshold) or moonshot 50% (would need new dispatch policy)?"
+
+> **Q5**: "What's **already in production**? PSAP using Motorola / Tyler / Hexagon CAD? Are ambulances tracked via vendor (Zoll, ImageTrend) or city-owned GPS? Is there a real-time traffic feed (city DOT, INRIX, Google)?"
+
+> **Q6**: "What's the **integration constraint** — read access to dispatch system, or just batch dumps overnight? Real-time GPS feed from ambulances, or 5-min sampled? On-premise required, or cloud OK?"
+
+> **Q7**: "**Equity concern explicit?** Many cities have 50% longer response times in low-income / minority neighborhoods. If we just optimize 'average', we may **widen** the gap. Is **equity** an explicit success metric?"
+
+> **Q8**: "What's the **stakeholder map** — mayor's office, PSAP director, EMS director, fire chief, police chief, PSAP union (接警员工会), city CTO, city legal (HIPAA / CJIS), citizen advocacy groups? Who has veto?"
+
+**为什么这 8 个 Q 重要**: 不问 → 你的 architecture 全错. 问完, 你已经 narrow 到 1 个具体子问题, 而不是 unbounded.
+
+**面试官 likely 回答** (Exponent guide 给的典型 setup):
+- KPI: P90 cardiac response time
+- Baseline: 8:42 currently, target 7:00
+- Current systems: Motorola CAD + Zoll for EMS
+- Integration: read-only API, real-time
+- Equity: yes, secondary metric (gap between top-quartile and bottom-quartile zip codes)
+- Stakeholder veto: PSAP director + PSAP union
+
+→ 现在你 scope 清晰了. **不是「优化整个 911 系统」, 是「在 90 天内将 cardiac arrest P90 response time 从 8:42 降到 7:00, 同时不让 equity gap 扩大」**.
+
+---
+
+### Step 2: 找干系人 + 成功指标 (10 min)
+
+> "Now let me map stakeholders, because **whose buy-in we need determines what we can ship**."
+
+**Stakeholder map**:
+
+| Stakeholder | 在意什么 | 对项目态度 | 我对他们的关键动作 |
+|---|---|---|---|
+| **Mayor's office** | PR / press release / 选举 | Enthusiastic, 要 quick win | Quarterly metric review + press kit |
+| **PSAP director** | Daily operations, dispatcher morale | Cautiously supportive | Daily standup, ride-along |
+| **EMS director** | Patient outcomes, paramedic safety | Supportive but skeptical | Show survival rate impact |
+| **Fire chief** | Cross-jurisdiction coordination | Skeptical of "AI dispatch" | Side-car integration, no policy change |
+| **Police chief** | Officer safety, 911 misuse | Tangential | Read-only, no police dispatch v1 |
+| **PSAP union** | Job security, workload | **Highly skeptical, can veto** | Early engagement, training, "augment not replace" |
+| **City CTO** | Integration, security | Need approval | Architecture review, CJIS compliance |
+| **City legal** | HIPAA / CJIS / liability | Must approve | Audit log, recommendation-not-decision |
+| **Citizen advocacy** | Equity, transparency | Watching | Public dashboard with equity metric |
+
+**Key insight**: PSAP union 是 highest-risk stakeholder. 美国 911 接警员是工会, 引入 "AI" 触动饭碗会 kill the project. **第一周必须**: PSAP president 在 launch readme 上 co-sign.
+
+**Success metrics (3 层)**:
+
+**Layer 1 — North Star** (mayor will see):
+- P90 cardiac arrest call-to-arrival time (target 7:00 from 8:42)
+
+**Layer 2 — Operational** (PSAP director sees daily):
+- Override rate of AI recommendations (target 20-30%, NOT < 10%)
+- AI uptime (target 99.9%)
+- Per-shift recommendation latency P99 (target < 500ms)
+
+**Layer 3 — Outcome** (EMS director, monthly):
+- Cardiac arrest survival rate (lags 30-60 days)
+- Equity gap: P90 in bottom-quartile zip codes vs top-quartile (must NOT widen)
+- Citizen satisfaction (survey)
+
+**Counter-metrics** (must not move negatively):
+- Mental health crisis response time (some cities use civilian responders, must not be deprioritized)
+- Dispatcher reported workload survey
+- Equity gap
+
+---
+
+### Step 3: 梳理输入数据 (10 min)
+
+> "Let me inventory the data we have, who owns it, the format, freshness, and the gaps. Half of FDE work is fighting dirty data, so this matters more than the model."
+
+**Data inventory**:
+
+| Dataset | Owner | Format | Freshness | Quality / Gap |
+|---|---|---|---|---|
+| **911 call records** | PSAP (city) | CAD export, structured | Real-time | Some free-text fields (call notes) need NLP |
+| **Call audio** | PSAP | mp3 / wav | Real-time stream | HIPAA / CJIS, encryption required |
+| **CAD incident events** | Motorola CAD | API, structured | Real-time | 12 timestamps per incident (call_received → arrived) |
+| **Ambulance GPS** | Zoll / city fleet | NMEA stream | 5-30s intervals | **5-15% stale or drift in tunnels / buildings** |
+| **Real-time traffic** | City DOT / Google / INRIX | API | 30s-2min lag | Some sensors broken, gaps in coverage |
+| **Historical incidents** | CAD archive | Daily batch | T+1 | 2-5 years available, schema changed 2x |
+| **Weather** | NOAA | API | Hourly | Reliable |
+| **Event calendar** | City permits + sports | CSV / API | Daily | Manual updates, incomplete |
+| **Census / demographics** | US Census | Static | Annual | For equity analysis |
+| **Hospital ED status** | Health system | HL7 | 15-min | Some hospitals don't share |
+
+**Key gaps**:
+
+1. **Stale GPS** is the #1 fight. Tunnels, garages, indoor incidents → 5-15% of pings stale > 60s. **Fallback**: dead reckoning (last known position + heading × elapsed time).
+2. **Schema drift** in historical CAD. Have to write per-period parsers.
+3. **Cross-jurisdiction**: 911 calls from city edge may belong to neighboring county. Boundary disputes 5% of cases.
+4. **Free text in call notes**: dispatcher / call-taker shorthand ("PT C/O CP" = patient complains of chest pain). Need parser.
+
+**Who I'd call in week 1**:
+- PSAP IT lead — get me CAD API credentials
+- Zoll account manager — confirm GPS data sharing agreement
+- City DOT data engineer — traffic feed access
+- HIPAA / CJIS officer — encryption + access controls
+
+---
+
+### Step 4: 拆成可解子问题 (15 min)
+
+> "Now I have scope + stakeholders + data. Let me decompose the problem into subproblems, ranked by risk × value, so we attack highest-risk-highest-value first."
+
+**Decomposition: 7 subproblems**:
+
+| # | 子问题 | Risk | Value | Pri |
+|---|---|---|---|---|
+| **A** | Funnel diagnose: 12-timestamp dashboard, identify biggest bottleneck | Low | Very high | **1** |
+| **B** | ETA prediction model (replace dispatcher's intuition for unit selection) | Med | High | **2** |
+| **C** | Real-time traffic-aware routing for already-dispatched units | Low | Medium | 4 |
+| **D** | LLM-assisted call processing (extract symptoms while call-taker types) | Med | High | **3** |
+| **E** | Resource pre-positioning (where to park idle ambulances) | High | High | 5 |
+| **F** | Cross-jurisdiction handoff optimization | Low | Low | 7 |
+| **G** | Equity-aware dispatch policy (ensure dispatch doesn't widen gap) | High | Critical | **must run alongside everything** |
+
+**Sequencing rationale**:
+
+> **A first** because: without funnel diagnose, you don't know what to fix. PSAP director's first reaction when I show "Classify takes 180s P90 for non-emergency, that's the biggest leak" will be "**finally someone showed me this**". That builds trust.
+
+> **B second** because: highest single-lever value (dispatcher decision time + selection quality), and tractable with 6 months of historical data. GBDT baseline, MAE target < 60s P90.
+
+> **D third** because: LLM-assisted call processing is the fastest call-to-dispatch saver. ASR + Gemini Flash extract symptoms in real-time → auto-fill CAD fields → call-taker just confirms. Saves 30-60s per call.
+
+> **G runs alongside** because: if I optimize "average" without watching equity, I may widen the gap (model learns "rich zip codes get faster response because there are more units there"). **Equity is a check on every other subproblem**, not a separate phase.
+
+> **E and F deferred** to phase 2/3 because: pre-positioning is high-risk (paramedic union pushback), cross-jurisdiction is low value (5% of cases).
+
+---
+
+### Step 5: Walking-skeleton MVP (15 min)
+
+> "Now the most important part: what's the **minimum end-to-end thing we can ship in 2 weeks** that proves the architecture, even with mocked logic?"
+
+**Walking-skeleton (Week 1-2)**:
+
+```
+[CAD events stream]──┐
+                     ├─→ [Telemetry collector] ──→ [Postgres + S3]
+[Ambulance GPS]──────┘                                    │
+                                                          ▼
+                                              [Funnel Dashboard]
+                                                          │
+                                                          ▼
+                                                 [PSAP director]
+                                                  reviews daily
+```
+
+**Week 1**:
+- Day 1-2: Get CAD API credentials, ingest last 30 days of incident events
+- Day 3-4: Build 12-timestamp ETL → Postgres
+- Day 5: Build first dashboard (P50 / P90 / P99 by call category)
+
+**Week 2**:
+- Day 6-7: Ride-along with 1 dispatcher per shift × 3 shifts (morning / evening / night)
+- Day 8-9: Show dashboard to PSAP director, get feedback
+- Day 10: Identify top 1 bottleneck → that's Phase 2 scope
+
+**What's NOT in Week 1-2 MVP**:
+- No ML model. Just descriptive analytics.
+- No dispatcher UI change. Just internal dashboard.
+- No real-time decisions. Just batch-refreshed metrics.
+
+**Why this works**:
+- **No risk** to dispatcher workflow (read-only)
+- **Immediate value** (PSAP director never had this dashboard)
+- **Foundation for everything** (without this, ML model has nothing to compare to)
+- **Trust builder**: PSAP director sees you understand his domain in 2 weeks
+
+**Phase 2 (Week 3-12) — ETA Prediction in Shadow Mode**:
+
+After Funnel says "Dispatcher decision time is 25s P90, that's the biggest fixable bottleneck":
+
+```
+[Incident comes in]
+      │
+      ▼
+[ETA model predicts arrive time for each candidate unit]  ← SHADOW
+      │
+      ▼
+[Dispatcher selects unit manually (current process unchanged)]
+      │
+      ▼
+[Log: AI recommended unit X (ETA Ys), human picked Y (actual ETA Zs)]
+      │
+      ▼
+[Weekly retro: agreement rate, MAE, where AI was wrong]
+```
+
+**Success criteria for Phase 2**:
+- ETA MAE < 60s on P90 ground truth
+- AI recommendation matches dispatcher's pick > 70% of time
+- For mismatches, AI's prediction is within 30s of actual on average
+
+**Phase 3 (Month 4-6) — Opt-in Recommendation Mode**:
+
+5 self-selected dispatchers see AI recommendation in UI sidebar (not blocking). Override rate tracked. Weekly retro.
+
+**Phase 4 (Month 7-12) — Default-on with Override**:
+
+All dispatchers see recommendation. Always can override with 1 click. Continuous monitoring.
+
+**Kill switch**: ops can disable AI assist in < 60 seconds. Manual mode is the default fallback.
+
+---
+
+## 详细回答 (Sample 60-min monologue)
+
+> "Let me make sure I understand what success looks like before I sketch a solution. I want to ask 8 quick questions.
+>
+> **First**: when you say 'response time', is that call-to-dispatch or dispatch-to-arrival? Industry breaks it into 90s call processing + 60s turnout + 240s travel = 6.5 min P90 standard. The bottlenecks for each are totally different problems — call processing is a UX + LLM problem, travel is a routing + traffic problem.
+>
+> **Second**: what's the single KPI in the mayor's annual report? Mean response time? P90? Or P90 specifically for cardiac arrest? Because the optimization is per-category.
+>
+> ... *(continues with 6 more clarifying questions)* ...
+>
+> *(After answers: P90 cardiac, 8:42 → 7:00 target, 90 days, Motorola CAD, Zoll EMS, equity is secondary metric, PSAP union has veto)*
+>
+> OK so the actual problem is: in 90 days, drop P90 cardiac call-to-arrival from 8:42 to 7:00, without widening the gap between top-quartile and bottom-quartile zip codes, with PSAP union buy-in.
+>
+> **Stakeholders**: mayor wants press release, PSAP director wants operational stability, PSAP union has veto, EMS director wants survival rate impact, city legal wants HIPAA/CJIS compliance. **Highest risk stakeholder is the PSAP union** — I'd schedule a meeting with their president in week 1 before any tech work.
+>
+> **Data**: 911 call records + CAD events + Zoll GPS + city traffic. I'd expect 5-15% GPS stale rate (tunnels, garages) — that's the dirty-data fight I'd plan for.
+>
+> **Decomposition**: 7 subproblems, ranked by risk × value:
+>
+> 1. **Funnel diagnose** — what's actually slow? Without this, everything else is guessing.
+> 2. **ETA prediction** — replace dispatcher intuition for unit selection
+> 3. **LLM-assisted call processing** — save 30-60s on call-taker info gathering
+> 4. **Real-time routing** — already-dispatched units get traffic-aware route
+> 5. **Resource pre-positioning** — where to park idle units (high political risk, defer to phase 3)
+> 6. **Cross-jurisdiction handoff** — only 5% of cases, low value, defer
+> 7. **Equity-aware dispatch** — runs **alongside** everything as a check, not a phase
+>
+> **Walking-skeleton MVP for Week 1-2**: just the funnel dashboard. No ML. Read-only. Ingest last 30 days of CAD events, build 12-timestamp ETL, show PSAP director where time is being lost. This is **immediately valuable** to him (he never had this view) and **risk-free** to dispatchers. It builds the credibility I need before I propose anything that touches their UI.
+>
+> **Phase 2 in Week 3-12** is the ETA model. Critical: **shadow mode**. AI predicts ETA for each candidate unit, dispatcher still picks manually, we log both. Weekly retro. We don't show AI's recommendation to dispatchers until MAE < 60s on real ground truth and agreement rate > 70%.
+>
+> **Phase 3 in Month 4-6**: 5 self-selected dispatchers see AI recommendation as sidebar, opt-in. Override rate becomes north-star — target 20-30% — not 5% (that means dispatchers rubber-stamp) and not 60% (that means model is wrong).
+>
+> **Phase 4 in Month 7-12**: default-on, always overridable, kill switch ops can pull in 60 seconds.
+>
+> **Three things I'd flag proactively before you ask**:
+>
+> **(a) PSAP union risk**. Project dies politically before it dies technically if I don't pre-engage. I'd want union president co-signing the launch readme.
+>
+> **(b) Equity is a check, not a phase**. If I optimize aggregate P90 without watching equity, the model learns 'rich zip codes have more idle units, recommend faster response there'. Equity metric on the dashboard from day 1, red-flagged if it widens.
+>
+> **(c) Eval methodology**. We can't A/B test 911 ethically (can't deny half the city the improvement). Instead, **stepped wedge rollout** by district + **counterfactual replay** (run the AI on historical incidents, compare predicted ETA to actual). Counterfactual is directional, not ground truth — but it gives us early signal before lagging outcomes catch up.
+>
+> Want me to deep-dive any of these layers?"
+
+---
+
+## Gao Xin 简历专属 reframe
+
+这道题跟你**TikTok PayLater Indonesia voice agent** 项目**结构上高度同构**, 你直接 quote:
+
+> "Actually this is very close to a problem I just shipped. The TikTok PayLater debt collection voice agent serves 7 markets, 6 languages, with strict regulatory constraints (especially OJK in Indonesia). The structure is the same:
+>
+> - **Multi-source data** under time pressure (customer profile + call history + repayment + blacklist + transaction context, just like 911's call + CAD + GPS + traffic)
+> - **Real-time decisions** with sub-second latency requirement (p99 < 800ms for streaming, just like dispatch decision)
+> - **Safety / trust critical** with regulatory exposure (OJK could revoke license, just like 911 union could kill project)
+> - **Hard to A/B** because of fairness concerns (can't subject one market to worse service, same as can't deny half a city of 911 improvement)
+> - **Multi-stakeholder** with veto holders (legal, ops, product, monitor) just like PSAP director + union + EMS + city legal
+>
+> The framework I used there was the same 5-step I just walked through:
+>
+> 1. **Clarified scope**: not 'replace all human collection', but 'first-line for non-disputed accounts where customer hasn't said the magic word "law" or "regulator"'.
+> 2. **Stakeholders + KPI**: OJK monitor approval (north-star), customer NPS (counter-metric), repayment rate (operational), complaint rate (red line).
+> 3. **Data inventory**: I spent week 1 listing what was clean vs dirty. The 'customer recent call attempts' field was missing for 8% of accounts and the team treated it as 0 — I caught that.
+> 4. **Decomposed** into 6 subproblems, attacked highest-risk-highest-value first: **intent classifier first** (so I knew which calls to route to bot vs human), then dialog policy, then RL alignment, then multi-language.
+> 5. **Walking-skeleton MVP**: I shipped a single-intent (payment reminder) version in 2 weeks with mocked LLM responses (literally `if intent == 'paid': return scripted_message`). That walked through the entire ASR → intent → dialog → TTS → escalation pipeline end-to-end. Once that was stable, I swapped in real LLM intent classifier, then real dialog policy. **Two weeks to end-to-end, four months to production at the same architecture I sketched in week 1**.
+>
+> The pattern that transfers to 911: **don't build the smartest piece first, build the dumbest end-to-end first, then upgrade in shadow mode**."
+
+**Other transferable resume hooks**:
+
+- **ConvFinQA ablation methodology** — for the "negative result that taught us something" angle when AI underperforms. In ConvFinQA work, I systematically ablated retrieval quality, prompt format, and CoT to find which knob actually mattered. Same systematic ablation would apply to "is ETA error from data freshness, model class, or feature set".
+- **Internal Agent Platform onboarding multiple teams** — for the "multi-stakeholder ambiguous scope" angle. When 5 different teams want different things from the same platform, you have to do clarification + scope + walking-skeleton on each.
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "What if PSAP union refuses to participate at all?"
+
+**A**: Don't proceed. The political risk to your company > one deal value. But before walking away, escalate: **what's the union's actual fear?** Usually it's "AI will replace my job" — and the union president is wrong to think that's the immediate risk. Real fear: more scrutiny on individual dispatcher decisions (every override now audited).
+- **Counter-offer**: union gets to design the recommendation UI (they decide what AI shows / how prominent), union gets first 6 months of override data **redacted from individual dispatcher attribution** (only aggregate), union has a seat on the eval steering committee.
+- If that fails — politely decline the project. Don't ship into political quicksand.
+
+**Q2**: "What if the city's CAD vendor (Motorola) blocks integration?"
+
+**A**: This is the **actual blocker**, not technical. 3 options:
+- **Side-car**: read-only access via daily CAD log export → ingest into our system → recommendations shown in **separate dashboard** that dispatcher checks in parallel. Vendor doesn't have to change anything.
+- **Vendor partnership**: bring Motorola in as joint go-to-market, give them rev share. Slow but durable.
+- **City RFP leverage**: get city to mandate API access in vendor renewal. Slowest, most political.
+
+Most FDE situations end up as #1 (side-car) — minimizes vendor politics and gets you shipping in weeks not quarters.
+
+**Q3**: "What if the ETA model performs worse than dispatcher intuition?"
+
+**A**: First — **don't take it personally**. Dispatchers have years of context (this driver is fast, this corner floods, this building's loading dock is on Main not Elm). The right framing is: "**the model is a 90th-percentile assistant for a 95th-percentile expert**" — useful for the 10% of cases where the expert is new / tired / stressed / overloaded, harmful if it overrides the expert in normal cases.
+
+So: track **override rate vs outcome** carefully. If overrides have better outcomes than non-overrides, the model needs retraining on the dispatcher's decisions, not deployment. If overrides have similar outcomes, model is fine, dispatcher and model agree often. If model has better outcomes than overrides on average **but worse on specific categories** (e.g., model worse on mass casualty events because training data is sparse), gate the model to its strong categories.
+
+**Q4**: "How do you avoid getting the city sued when an ambulance is misrouted?"
+
+**A**: 3 legal-safe defaults:
+
+1. **Recommendation, not decision** — dispatcher always has final call, audit log shows dispatcher acted.
+2. **Conservative threshold** — recommend only when confidence > 80%, fall back to "show raw distance list, no preference" otherwise.
+3. **Full audit log** — every recommendation + override + outcome logged immutable for legal review.
+
+Plus: city legal should review the deployment, NOT just sign off on the contract. They need to see the actual recommendation UI and audit log before launch.
+
+**Q5**: "Mayor wants results in 6 weeks for press release, not 90 days."
+
+**A**: Time compression → narrow scope. 6 weeks doesn't do ML routing, but does:
+- **Funnel dashboard** to PSAP director (week 1-2)
+- **Manual decision support UI**: "current available units + their current location + current traffic-weighted distance" — no ML, just real-time deterministic display. Saves dispatcher 5-10 seconds per decision because they're not toggling tabs.
+- **One press-friendly story**: "AI-assisted dispatch saving 8 seconds per cardiac call, saving X lives per year".
+
+Mayor gets her announcement. PSAP gets a real improvement without rushed ML. **Reverse scoping is FDE's core skill** — anyone can add scope, FDE removes it.
+
+---
+
+## ❌ 死路答法 (top 7)
+
+1. **一上来画 architecture** → 没 clarify, 方案脱离 stakeholder 实际需求
+2. **当 system design 题做** (算 QPS / shard / Kafka topic) → 错位
+3. **承诺 ML routing 6 个月一次性上线** → 没 phasing = 没部署过
+4. **把 dispatcher 完全 cut out** → safety-critical 红旗
+5. **假设 GPS / traffic 数据完美** → FDE 全职在跟脏数据死磕
+6. **A/B test 半个城市** → 伦理灾难, 用 stepped wedge / counterfactual replay
+7. **没考虑 PSAP 工会 / equity** → 政治盲点, 项目死于政治
+
+---
+
+## ✅ 加分项 (top 7)
+
+1. **5 步框架显式讲出来** (clarify → stakeholder → data → decompose → MVP)
+2. **8 个 clarifying questions 一次问完** 而不是 dribble
+3. **Walking-skeleton MVP 2 周端到端**, 而不是 12 个月一次性
+4. **Shadow → opt-in → default-on phasing** 主动提
+5. **Override rate as a North Star metric** — 把「用户信任」量化
+6. **Equity as a check, not a phase** — 显示你 think systemically
+7. **Quote 你的 voice agent 7-market production experience** — 把 candidate 变 "shipped this before"
+
+---
+
+## 一句话总结
+
+> **911 response time 优化 = "拆解 funnel 找最大瓶颈 + ML 协助但人最终决策 + shadow → opt-in → default 渐进 + 全程 instrumentation 暴露真相"**.
+>
+> 真正的 win 不来自一个炫酷 ML 模型, 而是「在 funnel 每段挤秒 + 让 dispatcher 信任 + 让 PSAP 工会同意 + 让 equity 不退步」.
+>
+> 60 分钟答题节奏: 10 min clarify → 10 min stakeholder + KPI → 10 min data → 15 min decompose → 15 min walking-skeleton MVP. 不省 step.
+
+---
+
+## Cheat Sheet (面前 5 min 看)
+
+```
+不要做:
+  - 上来画图 / 算 QPS
+  - 假设 stakeholder / KPI
+  - 一口气讲完整方案
+  - 把 dispatcher cut out
+  - 假设数据 clean
+  - A/B 切一半城市
+
+要做 (5 step):
+  1. Clarify (10min): 8 个 Q, 锁 KPI + 范围
+  2. Stakeholder (10min): 9 角色表 + KPI 3 层
+  3. Data (10min): inventory + gap 列表
+  4. Decompose (15min): 7 subproblem 按 risk × value
+  5. Walking-skeleton MVP (15min): 2 周 funnel dashboard
+
+Step 1 必问 Q:
+  - Call-to-dispatch vs dispatch-to-arrival?
+  - P50 / P90 / P99?
+  - 哪个 call category?
+  - 当前 baseline + target?
+  - 已有什么 system?
+  - 集成约束?
+  - Equity 是 explicit goal 吗?
+  - Stakeholder veto 谁?
+
+Stakeholder veto 候选人:
+  - PSAP union (highest)
+  - PSAP director
+  - City legal
+  - EMS director
+
+Funnel 12 timestamps:
+  call_received → connected → pickup → location
+  → classified → cad_submit → dispatcher_received
+  → unit_selected → notified → ack → enroute → arrived
+
+7 subproblems (ranked):
+  1. Funnel diagnose (risk 低, value 极高)
+  2. ETA prediction (risk 中, value 高)
+  3. LLM call processing (risk 中, value 高)
+  4. Real-time routing (risk 低, value 中)
+  5. Resource pre-position (risk 高, defer phase 2)
+  6. Cross-jurisdiction (defer)
+  7. Equity (alongside everything)
+
+Walking-skeleton (Week 1-2):
+  - 30 天 CAD events ingest
+  - 12-timestamp ETL
+  - Funnel dashboard
+  - 3 dispatcher ride-along
+  - 0 ML, 0 dispatcher UI change
+
+Phasing:
+  Phase 1 (W1-2): Funnel dashboard
+  Phase 2 (W3-12): ETA shadow mode
+  Phase 3 (M4-6): Opt-in for 5 dispatchers
+  Phase 4 (M7-12): Default-on + kill switch
+
+North-star metric: P90 cardiac call-to-arrival
+North-star process metric: override rate 20-30% (NOT < 10%)
+
+Failure modes:
+  - GPS stale → dead reckoning
+  - Traffic stale → no-traffic shortest path
+  - Model low-conf → show raw list
+  - CAD down → manual mode
+  - Override > 50% → auto-pause
+
+Eval:
+  - Stepped wedge by district (NOT A/B half-city)
+  - Counterfactual replay (directional, not ground truth)
+  - Lagging metric: cardiac survival (30-60 day lag)
+  - Equity check on every metric
+
+Resume quote:
+  "TikTok PayLater voice agent 7 markets — same structure:
+   multi-source data, real-time, safety-critical, multi-stakeholder.
+   I used same 5-step. Walking-skeleton in 2 weeks with mocked LLM."
+
+Key phrases:
+  - "Before I sketch, let me ask 8 things..."
+  - "I'd narrow this to..."
+  - "Before being asked, I want to flag..."
+  - "Two-week walking-skeleton would look like..."
+  - "Equity is a check, not a phase"
+  - "Override rate is my north-star process metric"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

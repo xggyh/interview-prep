@@ -1,0 +1,2406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q45 · [AI 专项技术] 走一遍带工具调用、记忆、评估的端到端 agent 系统 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q45 · [AI 专项技术] 走一遍带工具调用、记忆、评估的端到端 agent 系统</div>
+  <h1>Q45 · [AI 专项技术] 走一遍带工具调用、记忆、评估的端到端 agent 系统</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-045-end-to-end-agent-with-tool-memory-eval.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-045-end-to-end-agent-with-tool-memory-eval.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q45 (AI 专项技术). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q45 · End-to-end agent design — tools, memory, evaluation</h3>
+<blockquote><p>"Design an end-to-end production agent for a customer use case. Cover <strong>tool registry, planning, execution, memory (short and long-term), and evaluation</strong>. The agent needs to handle multi-step workflows, recover from tool failures, and you must convince me you can sleep at night when it's running in production."</p></blockquote>
+<p><strong>Round</strong>: AI Specialty (45 min) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / LangChain — agent design 必问</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>表面是 agent 题, 底下藏着 <strong>8 个 FDE evaluation signal</strong>:</p>
+<ol><li><strong>Component awareness</strong> — 知道 production agent 是 tool registry + planner + executor + memory + eval 5 part system</li><li><strong>Tool design discipline</strong> — 不只是 "list tools", 是 input schema + idempotency + retry + observability</li><li><strong>Memory architecture</strong> — short-term context vs long-term vector vs structured KV facts, 何时用哪个</li><li><strong>Planning vs ReAct</strong> — 知道何时 plan-then-execute vs interleave</li><li><strong>Failure handling</strong> — tool timeout / retry / circuit breaker / human escalation</li><li><strong>Eval methodology</strong> — per-step success + end-to-end task completion + cost + latency</li><li><strong>Specific tools (2026)</strong> — LangGraph, MCP, Temporal, Inngest, OpenAI Agents SDK</li><li><strong>Production reality</strong> — durable workflow, idempotency keys, dead letter queue</li></ol>
+<p>不考「agent 是什么」, 考「你设计的 agent half-failed mid-workflow, 怎么 recover」.</p>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Clarify use case</strong></td><td>3 min</td><td>What customer task? volume? latency? failure tolerance?</td><td>"Before I design, what task is this agent automating? what's the failure cost?"</td></tr><tr><td>2</td><td><strong>5-component architecture</strong></td><td>5 min</td><td>Tool registry / Planner / Executor / Memory / Eval</td><td>"5 components — tool registry, planner, executor, memory (3 layers), eval pipeline."</td></tr><tr><td>3</td><td><strong>Tool registry design</strong></td><td>6 min</td><td>Schema, idempotency, retry, observability</td><td>"Each tool needs JSON schema, idempotency contract, retry policy, latency SLO, audit log."</td></tr><tr><td>4</td><td><strong>Planning approach</strong></td><td>5 min</td><td>Plan-then-execute vs ReAct vs LangGraph state machine</td><td>"3 patterns — plan-then-execute (deterministic), ReAct (interleaved), state machine (LangGraph for complex flows)."</td></tr><tr><td>5</td><td><strong>Memory architecture</strong></td><td>5 min</td><td>3 layers (working / structured / vector)</td><td>"Memory has 3 layers — short-term in context, structured KV facts, long-term vector store."</td></tr><tr><td>6</td><td><strong>Failure handling</strong></td><td>5 min</td><td>Timeout, retry with backoff, circuit breaker, human handoff</td><td>"Failure modes: tool timeout, schema fail, infinite loop, partial completion. Each has playbook."</td></tr><tr><td>7</td><td><strong>Eval pipeline</strong></td><td>4 min</td><td>Per-step + end-to-end + cost + latency + safety</td><td>"Eval is multi-layered — per-step success, end-to-end task completion, cost per task, latency p99."</td></tr><tr><td>8</td><td><strong>Specific tools 2026</strong></td><td>3 min</td><td>LangGraph, MCP, Temporal, OpenAI Agents SDK</td><td>"Stack — LangGraph for flow, MCP for tool standard, Temporal/Inngest for durable workflows, custom Pydantic for schemas."</td></tr><tr><td>9</td><td><strong>Quote BNPL chatbot + internal Agent Platform</strong></td><td>4 min</td><td>Real shipped agents</td><td>"BNPL chatbot was a 4-tool agent (FAQ retrieve, policy lookup, escalate, log). Internal Agent Platform supports 12 internal teams."</td></tr><tr><td>10</td><td><strong>Production checklist</strong></td><td>2 min</td><td>What I'd build week 1 / week 4 / month 3</td><td>"Week 1: tool registry + planner + happy path. Week 2-3: failure handling + eval. Month 2: durable workflows + cascading."</td></tr></tbody></table></div>
+<hr />
+<h3>详细回答</h3>
+<h4>Step 1: 5-Component Architecture</h4>
+<pre class="language-plaintext"><code class="language-plaintext">            ┌──────────────────────────────────────────┐
+            │           USER REQUEST                   │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   1. TOOL REGISTRY                       │
+            │   • JSON schema for each tool            │
+            │   • Idempotency contracts                │
+            │   • Auth / ACL                           │
+            │   • Versioning                           │
+            │   • Observability hooks                  │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   2. PLANNER (LLM)                       │
+            │   • Inspects task                        │
+            │   • Selects tools                        │
+            │   • Generates plan / state machine       │
+            │   • Re-plans on failure                  │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   3. EXECUTOR                            │
+            │   • Calls tools per plan                 │
+            │   • Retry with backoff                   │
+            │   • Timeout handling                     │
+            │   • Idempotency tracking                 │
+            │   • Audit log                            │
+            └────────────────────┬─────────────────────┘
+                                 │
+            ┌────────────────────┼───────────────────┐
+            │                    │                   │
+            ▼                    ▼                   ▼
+   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+   │ 4a. WORKING MEM  │  │ 4b. STRUCTURED   │  │ 4c. LONG-TERM    │
+   │ (context window) │  │      KV FACTS    │  │      VECTOR      │
+   │  - current state │  │  - user prefs    │  │  - history       │
+   │  - tool results  │  │  - business data │  │  - knowledge     │
+   │  - reasoning     │  │  - structured    │  │  - examples      │
+   └──────────────────┘  └──────────────────┘  └──────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   5. EVAL PIPELINE                       │
+            │   • Per-step success                     │
+            │   • End-to-end task completion           │
+            │   • Cost per task                        │
+            │   • Latency p99                          │
+            │   • Safety / refusal                     │
+            └──────────────────────────────────────────┘</code></pre>
+<h4>Step 2: Tool Registry (the foundation)</h4>
+<p><strong>Each tool is a contract</strong> — not a Python function. Treat tools like API endpoints.</p>
+<pre class="language-python"><code class="language-python">from pydantic import BaseModel, Field
+from typing import Optional, Literal
+from datetime import datetime
+
+class ToolDefinition(BaseModel):
+    name: str
+    description: str  # critical — LLM uses this to decide when to call
+    input_schema: dict  # JSON schema
+    output_schema: dict
+    
+    # Behavior contracts
+    idempotent: bool  # safe to retry?
+    side_effects: bool  # writes to external system?
+    requires_confirmation: bool  # human-in-loop before execution?
+    
+    # SLOs
+    expected_latency_p99_ms: int
+    timeout_ms: int
+    
+    # Retry policy
+    retry_strategy: Literal['none', 'linear', 'exponential']
+    max_retries: int
+    
+    # Auth
+    required_scopes: list[str]
+    
+    # Versioning
+    version: str
+    deprecated: bool = False
+    deprecation_date: Optional[datetime] = None
+
+# Example tool
+refund_tool = ToolDefinition(
+    name='process_refund',
+    description="""
+    Process a refund for a TikTok PayLater order. 
+    
+    Use this when: customer requests refund AND eligibility verified AND amount &lt; $500.
+    Don't use when: refund &gt; $500 (escalate to human), or order &gt; 90 days (out of policy).
+    """,
+    input_schema={
+        'type': 'object',
+        'properties': {
+            'order_id': {'type': 'string', 'pattern': '^ORDER-[0-9]+$'},
+            'amount_cents': {'type': 'integer', 'minimum': 1, 'maximum': 50000},
+            'reason_code': {'type': 'string', 'enum': ['defect', 'not_received', 'duplicate', 'fraud']},
+            'idempotency_key': {'type': 'string', 'format': 'uuid'}
+        },
+        'required': ['order_id', 'amount_cents', 'reason_code', 'idempotency_key']
+    },
+    output_schema={
+        'type': 'object',
+        'properties': {
+            'refund_id': {'type': 'string'},
+            'status': {'type': 'string', 'enum': ['processed', 'pending_review', 'rejected']},
+            'estimated_completion_date': {'type': 'string', 'format': 'date'},
+        }
+    },
+    idempotent=True,  # via idempotency_key
+    side_effects=True,  # writes to payment system
+    requires_confirmation=True,  # human confirms for &gt;$200
+    expected_latency_p99_ms=2000,
+    timeout_ms=5000,
+    retry_strategy='exponential',
+    max_retries=3,
+    required_scopes=['refund:process'],
+    version='2.1.0',
+)</code></pre>
+<p><strong>Why idempotency matters</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">User asks agent: "Refund my order #123"
+
+Agent calls refund tool. 
+  → Tool times out at 4.9s (just before 5s timeout)
+  → Did refund go through or not?
+  
+Without idempotency key: retry might double-refund (financial loss)
+With idempotency key: retry with same key → tool returns same result</code></pre>
+<p><strong>Tool registry as MCP server (2026 standard)</strong>:</p>
+<pre class="language-python"><code class="language-python"># Model Context Protocol (Anthropic 2024+, OpenAI adopted 2025)
+# Standard tool exposure for any agent framework
+
+@mcp.tool()
+async def process_refund(
+    order_id: str,
+    amount_cents: int,
+    reason_code: Literal['defect', 'not_received', 'duplicate', 'fraud'],
+    idempotency_key: str,
+) -&gt; dict:
+    """Process a refund for a TikTok PayLater order.
+    
+    Use this when: customer requests refund AND eligibility verified AND amount &lt; $500.
+    Don't use when: refund &gt; $500 or order &gt; 90 days.
+    """
+    # Idempotency check
+    existing = await db.refunds.find_one({'idempotency_key': idempotency_key})
+    if existing:
+        return existing
+    
+    # Validate eligibility
+    order = await get_order(order_id)
+    if order.amount_cents &lt; amount_cents:
+        raise InvalidRefundAmountError()
+    
+    # Process
+    refund = await payment_service.refund(order_id, amount_cents, reason_code)
+    
+    # Persist with idempotency key
+    await db.refunds.insert({
+        'idempotency_key': idempotency_key,
+        'refund_id': refund.id,
+        'status': refund.status,
+        'estimated_completion_date': refund.eta,
+    })
+    
+    return refund.dict()</code></pre>
+<h4>Step 3: Planner — 3 patterns</h4>
+<p><strong>Pattern A: Plan-then-Execute (deterministic, auditable)</strong></p>
+<pre class="language-python"><code class="language-python">async def plan_then_execute(task, tools):
+    # 1. Plan
+    plan = await llm.generate_plan(task, tools, structured_output=Plan)
+    # Plan = list of (tool_name, args, depends_on)
+    
+    # 2. Validate plan
+    if not all(t in tools for t in plan.tool_names):
+        raise InvalidPlanError()
+    
+    # 3. Execute (sequential or parallel based on deps)
+    results = {}
+    for step in plan.steps:
+        if step.depends_on:
+            await wait_for(step.depends_on, results)
+        
+        result = await execute_tool(step.tool_name, step.args, results)
+        results[step.id] = result
+    
+    return synthesize(results, task)</code></pre>
+<p><strong>Pros</strong>: Deterministic, auditable, can validate before execution <strong>Cons</strong>: Inflexible, can't adapt mid-execution <strong>Best for</strong>: Well-understood workflows (invoice processing, scheduled jobs)</p>
+<p><strong>Pattern B: ReAct (Reasoning + Acting interleaved)</strong></p>
+<pre class="language-python"><code class="language-python">async def react_loop(task, tools, max_steps=20):
+    history = []
+    
+    for step in range(max_steps):
+        # 1. Reason about next action
+        prompt = build_react_prompt(task, history, tools)
+        thought = await llm.generate(prompt)
+        
+        # 2. Decide: tool call or finish?
+        if thought.action == 'finish':
+            return thought.answer
+        
+        # 3. Execute tool
+        result = await execute_tool(thought.action, thought.args)
+        
+        # 4. Append to history
+        history.append({
+            'thought': thought.text,
+            'action': thought.action,
+            'args': thought.args,
+            'observation': result
+        })
+    
+    return "Max steps reached, escalating"</code></pre>
+<p><strong>Pros</strong>: Flexible, can adapt to surprises mid-task <strong>Cons</strong>: Can loop infinitely, harder to audit, more LLM calls <strong>Best for</strong>: Open-ended tasks, exploration, debugging</p>
+<p><strong>Pattern C: LangGraph state machine (complex flows)</strong></p>
+<pre class="language-python"><code class="language-python">from langgraph.graph import StateGraph
+
+class AgentState(TypedDict):
+    task: str
+    intent: str
+    retrieved: list
+    plan: Plan
+    results: dict
+    failures: list
+    needs_human: bool
+
+def classify_intent(state):
+    state['intent'] = llm.classify_intent(state['task'])
+    return state
+
+def retrieve_context(state):
+    state['retrieved'] = rag.search(state['task'])
+    return state
+
+def make_plan(state):
+    state['plan'] = llm.plan(state['task'], state['retrieved'])
+    return state
+
+def execute_step(state):
+    next_step = state['plan'].next()
+    try:
+        result = execute_tool(next_step.tool, next_step.args)
+        state['results'][next_step.id] = result
+    except ToolFailure as e:
+        state['failures'].append(e)
+        if len(state['failures']) &gt;= 3:
+            state['needs_human'] = True
+    return state
+
+def synthesize(state):
+    return llm.synthesize(state['task'], state['results'])
+
+def route_after_execute(state):
+    if state['needs_human']:
+        return 'human_handoff'
+    if state['plan'].is_complete():
+        return 'synthesize'
+    return 'execute_step'
+
+# Build graph
+workflow = StateGraph(AgentState)
+workflow.add_node('classify', classify_intent)
+workflow.add_node('retrieve', retrieve_context)
+workflow.add_node('plan', make_plan)
+workflow.add_node('execute', execute_step)
+workflow.add_node('synthesize', synthesize)
+workflow.add_node('human_handoff', handoff)
+
+workflow.set_entry_point('classify')
+workflow.add_edge('classify', 'retrieve')
+workflow.add_edge('retrieve', 'plan')
+workflow.add_edge('plan', 'execute')
+workflow.add_conditional_edges('execute', route_after_execute)
+
+agent = workflow.compile()</code></pre>
+<p><strong>Pros</strong>: Explicit state, conditional edges, easy to audit / visualize <strong>Cons</strong>: Verbose, requires upfront design <strong>Best for</strong>: Multi-step workflows with branching, complex production agents</p>
+<h4>Step 4: Memory Architecture (3 layers)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">┌────────────────────────────────────────────────────────────┐
+│ LAYER 1: WORKING MEMORY (current LLM context window)       │
+│  - Current task description                                │
+│  - Recent tool calls + results (last N)                    │
+│  - Reasoning trace                                         │
+│  - Lifetime: single agent invocation                       │
+│  - Storage: in-process / Redis                             │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ LAYER 2: STRUCTURED FACTS (KV store)                       │
+│  - User preferences (language, timezone, tier)             │
+│  - Business data (subscription tier, credit limit)         │
+│  - Last-known state (last interaction, last balance)       │
+│  - Lifetime: across sessions                               │
+│  - Storage: Postgres / DynamoDB / Redis                    │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ LAYER 3: LONG-TERM VECTOR MEMORY                           │
+│  - Past conversations (chunked, embedded)                  │
+│  - Knowledge corpus (FAQ, policy)                          │
+│  - Similar successful task examples                        │
+│  - Lifetime: months-years                                  │
+│  - Storage: Qdrant / Pinecone / Vespa                      │
+└────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>When to use which</strong>:</p>
+<pre class="language-python"><code class="language-python">class MemorySystem:
+    def __init__(self):
+        self.working = WorkingMemory()  # in-context
+        self.structured = StructuredKV(redis_client)
+        self.vector = VectorStore(qdrant_client)
+    
+    async def get_user_context(self, user_id):
+        """Loaded once at agent invocation."""
+        # Structured facts: cheap KV lookup
+        prefs = await self.structured.get(f'user:{user_id}:prefs')
+        
+        # Recent history: vector search on past conversations
+        recent_history = await self.vector.search(
+            query=f'user:{user_id} recent',
+            filter={'user_id': user_id},
+            top_k=5,
+            sort='timestamp_desc'
+        )
+        
+        return {
+            'preferences': prefs,
+            'recent_history_summary': summarize(recent_history)
+        }
+    
+    async def remember(self, fact_type, key, value):
+        """During / after agent execution, persist learnings."""
+        if fact_type == 'structured':
+            await self.structured.set(key, value, ttl=86400 * 365)
+        elif fact_type == 'episodic':
+            embedding = await embed(value['summary'])
+            await self.vector.upsert(
+                id=generate_id(),
+                vector=embedding,
+                payload=value
+            )
+        elif fact_type == 'working':
+            # Already in context, just append
+            self.working.append(value)</code></pre>
+<p><strong>Memory cost</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Working: free (in context)
+Structured KV: $0.0001 per get/set (Redis)
+Vector: $0.001 per search (Qdrant)
+Embed cost: $0.0001 per chunk (text-embedding-3-large)
+
+100k agent invocations/day:
+  Working: $0
+  Structured: $0.10 (very cheap)
+  Vector: $100/day for memory search
+  Embed (on writes): $10/day
+  Total: ~$110/day = $3,300/month</code></pre>
+<h4>Step 5: Failure handling (production grit)</h4>
+<p><strong>Failure modes</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">1. Tool timeout
+2. Tool returns error
+3. Tool returns unexpected schema
+4. Tool partially completes (side effect happened)
+5. LLM hallucinates tool call (wrong tool / args)
+6. LLM gets stuck in infinite loop
+7. Plan fails mid-execution
+8. Downstream service rate-limited
+9. Context window exhausted
+10. Customer aborts mid-conversation</code></pre>
+<p><strong>Per-failure playbook</strong>:</p>
+<pre class="language-python"><code class="language-python">class FailureHandler:
+    async def handle_tool_failure(self, tool_call, error, attempt):
+        if isinstance(error, TimeoutError):
+            # Check tool's retry policy
+            if attempt &lt; tool_call.tool.max_retries:
+                backoff = 2 ** attempt  # exponential
+                await asyncio.sleep(backoff)
+                return RetryAction(backoff=backoff)
+            else:
+                return EscalateAction(reason='timeout_exhausted')
+        
+        elif isinstance(error, SchemaValidationError):
+            # LLM-induced bad args, ask LLM to fix
+            return ReplanAction(
+                feedback=f"Tool call failed validation: {error}. Fix args."
+            )
+        
+        elif isinstance(error, RateLimitedError):
+            # Vendor rate limit
+            await asyncio.sleep(60)
+            return RetryAction()
+        
+        elif isinstance(error, AuthError):
+            # Hard fail, can't recover
+            return EscalateAction(reason='auth_failure', urgency='P1')
+        
+        elif isinstance(error, PartialCompletionError):
+            # Tool may have done side effect — careful!
+            if tool_call.tool.idempotent:
+                return RetryAction(idempotency_key=tool_call.idempotency_key)
+            else:
+                # Don't retry, escalate to human
+                return EscalateAction(
+                    reason='non_idempotent_partial',
+                    context=f"Tool {tool_call.tool.name} may have completed. Verify with audit log."
+                )
+        
+        else:
+            # Unknown error
+            return EscalateAction(reason='unknown_error', urgency='P2')</code></pre>
+<p><strong>Circuit breaker</strong>:</p>
+<pre class="language-python"><code class="language-python">class CircuitBreaker:
+    """Stop calling a failing tool to avoid cascading failures."""
+    def __init__(self, failure_threshold=5, recovery_timeout=60):
+        self.failures = 0
+        self.state = 'closed'  # closed = normal, open = failing, half-open = testing
+        self.last_failure_time = None
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+    
+    async def call(self, tool, *args):
+        if self.state == 'open':
+            if time.time() - self.last_failure_time &gt; self.recovery_timeout:
+                self.state = 'half-open'
+            else:
+                raise CircuitOpenError(f"Circuit open for {tool.name}")
+        
+        try:
+            result = await tool(*args)
+            if self.state == 'half-open':
+                self.state = 'closed'  # recovered
+            self.failures = 0
+            return result
+        except Exception as e:
+            self.failures += 1
+            self.last_failure_time = time.time()
+            if self.failures &gt;= self.failure_threshold:
+                self.state = 'open'
+            raise e</code></pre>
+<p><strong>Loop detection</strong>:</p>
+<pre class="language-python"><code class="language-python">class LoopDetector:
+    def __init__(self, max_repeats=3):
+        self.history = []
+        self.max_repeats = max_repeats
+    
+    def check(self, action, args):
+        key = (action, hash(json.dumps(args, sort_keys=True)))
+        recent = self.history[-10:]
+        repeat_count = sum(1 for k in recent if k == key)
+        
+        self.history.append(key)
+        
+        if repeat_count &gt;= self.max_repeats:
+            raise InfiniteLoopError(
+                f"Agent repeated {action} with same args {self.max_repeats}x"
+            )</code></pre>
+<p><strong>Durable workflows (Temporal / Inngest)</strong>:</p>
+<pre class="language-python"><code class="language-python"># For workflows that must survive process crashes, restarts
+# Temporal / Inngest provide durable execution
+
+@workflow.defn
+class RefundWorkflow:
+    @workflow.run
+    async def run(self, refund_request):
+        # Each step is a checkpoint
+        # If process crashes mid-step, resumes from last checkpoint
+        
+        eligibility = await workflow.execute_activity(
+            check_eligibility,
+            refund_request.order_id,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3)
+        )
+        
+        if not eligibility.eligible:
+            return RefundResult(status='ineligible', reason=eligibility.reason)
+        
+        # Human approval for large refunds
+        if refund_request.amount &gt; 200:
+            approval = await workflow.execute_activity(
+                request_human_approval,
+                refund_request,
+                start_to_close_timeout=timedelta(hours=24),
+            )
+            if not approval.approved:
+                return RefundResult(status='denied')
+        
+        # Process refund
+        refund = await workflow.execute_activity(
+            process_refund,
+            refund_request,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=5)
+        )
+        
+        # Notify customer
+        await workflow.execute_activity(
+            send_notification,
+            refund_request.customer_id, refund,
+        )
+        
+        return refund</code></pre>
+<h4>Step 6: Eval Pipeline (multi-layered)</h4>
+<pre class="language-python"><code class="language-python">class AgentEvalSuite:
+    """Multi-layered eval for production agents."""
+    
+    async def run(self, agent, eval_set):
+        results = {
+            'per_step': [],
+            'end_to_end': [],
+            'cost': [],
+            'latency': [],
+            'safety': [],
+        }
+        
+        for task in eval_set:
+            start = time.time()
+            
+            # Run agent (with detailed tracing)
+            tracer = AgentTracer()
+            output = await agent.run(task.query, tracer=tracer)
+            
+            latency = time.time() - start
+            cost = tracer.total_cost()
+            
+            # 1. End-to-end task completion
+            success = await self.task_succeeded(task, output)
+            results['end_to_end'].append(success)
+            
+            # 2. Per-step success
+            for step in tracer.steps:
+                step_success = await self.step_succeeded(step, task)
+                results['per_step'].append({
+                    'task_id': task.id,
+                    'step': step.tool_name,
+                    'success': step_success,
+                    'latency': step.latency
+                })
+            
+            # 3. Cost
+            results['cost'].append({'task_id': task.id, 'cost_usd': cost})
+            
+            # 4. Latency
+            results['latency'].append({'task_id': task.id, 'latency_s': latency})
+            
+            # 5. Safety
+            safety = await self.safety_check(output)
+            results['safety'].append(safety)
+        
+        return self.aggregate(results)
+    
+    def aggregate(self, results):
+        return {
+            'task_success_rate': mean([r for r in results['end_to_end']]),
+            'per_step_success_rate': mean([s['success'] for s in results['per_step']]),
+            'avg_cost_per_task': mean([c['cost_usd'] for c in results['cost']]),
+            'latency_p99': p99([l['latency_s'] for l in results['latency']]),
+            'safety_pass_rate': mean([s['safe'] for s in results['safety']]),
+        }</code></pre>
+<p><strong>Production metrics dashboard</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Per-step metrics:
+  - Tool call accuracy (right tool selected?)
+  - Tool arg validity (schema valid?)
+  - Tool success rate (no error?)
+  - Step latency p99
+
+End-to-end metrics:
+  - Task completion rate
+  - Average steps per task
+  - Cost per task
+  - Latency p99 per task
+  
+Failure mode breakdown:
+  - % timeouts
+  - % schema fails
+  - % infinite loops (caught)
+  - % human escalations
+
+Business metrics:
+  - User satisfaction
+  - Resolved without escalation
+  - Conversion / retention
+  - Cost savings vs human agents</code></pre>
+<h4>Step 7: Specific tools (2026 stack)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Framework:
+  LangGraph (LangChain) — state machine, most flexible
+  OpenAI Agents SDK — official, integrates with GPT-5
+  Anthropic Claude SDK + custom — bare-bones, max control
+  CrewAI — multi-agent orchestration
+  LlamaIndex Agents — RAG-heavy agents
+
+Tool protocol:
+  MCP (Model Context Protocol) — Anthropic 2024, now industry standard
+    - JSON-RPC over stdio / HTTP
+    - Tools, resources, prompts standardized
+    - OpenAI / Cohere all adopted 2025+
+
+Durable workflows:
+  Temporal — Java/Go/Python/TS, enterprise-grade
+  Inngest — TS-native, serverless
+  Restate — Rust, low-latency
+  Cadence — Uber-spec, older
+
+Observability:
+  LangSmith — LangChain's, traces / playgrounds
+  Phoenix (Arize) — open-source, OTel-based
+  Langfuse — open-source alternative
+  Helicone — proxy-based, easy setup
+
+Vector stores:
+  Qdrant — open-source, fast, mature
+  Pinecone — managed, easy
+  Weaviate — open-source, schema-aware
+  Vespa — Yahoo's, hybrid search
+  Milvus — open-source, scale
+  pgvector — Postgres extension, simpler stack
+
+Memory frameworks:
+  Mem0 — agent memory abstraction
+  LangChain memory — built-in modules
+  Custom (Redis + Qdrant + Postgres) — best control</code></pre>
+<h4>Step 8: Production checklist (week-by-week)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">WEEK 1 — Foundation:
+  ☐ Tool registry with 3-5 critical tools (schema, idempotency)
+  ☐ Plan-then-execute planner (deterministic, simpler than ReAct)
+  ☐ Working memory (in-context)
+  ☐ Happy-path test with 10 golden tasks
+  ☐ Audit log of every tool call
+
+WEEK 2 — Resilience:
+  ☐ Retry with exponential backoff
+  ☐ Timeout handling per tool
+  ☐ Circuit breaker for unreliable tools
+  ☐ Loop detector
+  ☐ Idempotency for non-idempotent tools (idempotency_key pattern)
+  ☐ Human escalation path
+
+WEEK 3 — Memory:
+  ☐ Structured KV (user prefs, business data)
+  ☐ Long-term vector memory (history, examples)
+  ☐ Memory loading at invocation
+  ☐ Memory persistence after task
+
+WEEK 4 — Eval:
+  ☐ 100-task eval set (stratified by complexity)
+  ☐ Per-step success metrics
+  ☐ End-to-end task completion
+  ☐ Cost and latency tracking
+  ☐ Safety check (refusal on disallowed)
+
+MONTH 2 — Production:
+  ☐ Durable workflow (Temporal) for long-running tasks
+  ☐ Cascade routing (small model for simple, big model for complex)
+  ☐ Continuous golden set refresh from production samples
+  ☐ Per-tenant isolation + ACL
+
+MONTH 3 — Scale:
+  ☐ Multi-agent (specialized sub-agents)
+  ☐ Tool versioning + deprecation handling
+  ☐ Cost optimization (prompt caching, smaller models)
+  ☐ A/B testing framework for agent versions</code></pre>
+<hr />
+<h3>关键决策 / 框架</h3>
+<h4>Pattern selection</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Simple, well-defined task → Plan-then-execute
+Open-ended exploration → ReAct
+Complex multi-step with branching → LangGraph state machine
+Multi-agent collaboration → CrewAI or custom orchestrator
+Long-running / durable → Plan + Temporal/Inngest</code></pre>
+<h4>Tool design checklist</h4>
+<pre class="language-plaintext"><code class="language-plaintext">For every tool:
+  ☐ Clear description (LLM uses this to decide when to call)
+  ☐ JSON schema for input
+  ☐ Idempotency contract (idempotent? idempotency_key?)
+  ☐ Side-effect declaration
+  ☐ Retry policy
+  ☐ Timeout (per-tool SLO)
+  ☐ Auth scopes required
+  ☐ Versioning
+  ☐ Audit log emission
+  ☐ Confirmation required? (for irreversible)</code></pre>
+<h4>Memory selection</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Use working memory (context) when:
+  - Single-task duration
+  - &lt; 200k tokens of relevant info
+  - Cheap (no extra round-trip)
+
+Use structured KV when:
+  - Cross-session persistence
+  - Lookup by key (user_id, order_id)
+  - Structured (no semantic search needed)
+  - Small payload
+
+Use vector memory when:
+  - Semantic search needed
+  - Cross-session history
+  - Examples / few-shot from past successes
+  - Large unstructured corpus</code></pre>
+<hr />
+<h3>完整代码 / 架构图</h3>
+<h4>Full agent skeleton</h4>
+<pre class="language-python"><code class="language-python"># agent/main.py
+
+from langgraph.graph import StateGraph
+from typing import TypedDict, Optional
+import asyncio
+
+class AgentState(TypedDict):
+    task: str
+    user_id: str
+    user_context: dict
+    intent: Optional[str]
+    plan: Optional[Plan]
+    completed_steps: list
+    failed_steps: list
+    tool_results: dict
+    needs_human: bool
+    final_response: Optional[str]
+
+class ProductionAgent:
+    def __init__(self, config):
+        self.config = config
+        self.tools = ToolRegistry()
+        self.memory = MemorySystem()
+        self.planner = Planner()
+        self.executor = ToolExecutor(self.tools)
+        self.eval = AgentEvalSuite()
+        
+        self.graph = self._build_graph()
+    
+    def _build_graph(self):
+        workflow = StateGraph(AgentState)
+        
+        workflow.add_node('load_context', self._load_context)
+        workflow.add_node('classify_intent', self._classify_intent)
+        workflow.add_node('plan', self._plan)
+        workflow.add_node('execute_step', self._execute_step)
+        workflow.add_node('synthesize', self._synthesize)
+        workflow.add_node('escalate', self._escalate)
+        
+        workflow.set_entry_point('load_context')
+        workflow.add_edge('load_context', 'classify_intent')
+        workflow.add_edge('classify_intent', 'plan')
+        workflow.add_edge('plan', 'execute_step')
+        workflow.add_conditional_edges(
+            'execute_step',
+            self._route_after_execute,
+            {
+                'continue': 'execute_step',
+                'synthesize': 'synthesize',
+                'escalate': 'escalate',
+            }
+        )
+        workflow.add_edge('synthesize', '__end__')
+        workflow.add_edge('escalate', '__end__')
+        
+        return workflow.compile()
+    
+    async def _load_context(self, state):
+        state['user_context'] = await self.memory.get_user_context(state['user_id'])
+        return state
+    
+    async def _classify_intent(self, state):
+        state['intent'] = await self.planner.classify_intent(
+            state['task'], state['user_context']
+        )
+        return state
+    
+    async def _plan(self, state):
+        applicable_tools = self.tools.filter_by_intent(state['intent'])
+        state['plan'] = await self.planner.plan(
+            state['task'], state['user_context'], applicable_tools
+        )
+        state['completed_steps'] = []
+        state['failed_steps'] = []
+        return state
+    
+    async def _execute_step(self, state):
+        next_step = state['plan'].next_step(state['completed_steps'])
+        if not next_step:
+            return state
+        
+        try:
+            # Idempotency key
+            idempotency_key = generate_idempotency_key(
+                state['user_id'], state['task'], next_step.id
+            )
+            
+            result = await self.executor.execute(
+                next_step.tool_name,
+                next_step.args,
+                idempotency_key=idempotency_key,
+                timeout_ms=next_step.tool.timeout_ms,
+            )
+            
+            state['tool_results'][next_step.id] = result
+            state['completed_steps'].append(next_step.id)
+        
+        except Exception as e:
+            state['failed_steps'].append({'step': next_step.id, 'error': str(e)})
+            
+            if len(state['failed_steps']) &gt;= 3:
+                state['needs_human'] = True
+            elif isinstance(e, RetryableError):
+                # Stay in execute_step, will retry
+                pass
+            else:
+                # Try replanning
+                state['plan'] = await self.planner.replan(
+                    state['task'], state['tool_results'], e
+                )
+        
+        return state
+    
+    def _route_after_execute(self, state):
+        if state['needs_human']:
+            return 'escalate'
+        if state['plan'].is_complete(state['completed_steps']):
+            return 'synthesize'
+        return 'continue'
+    
+    async def _synthesize(self, state):
+        state['final_response'] = await self.planner.synthesize(
+            state['task'], state['tool_results']
+        )
+        
+        # Persist learnings to memory
+        await self.memory.remember('episodic', None, {
+            'task': state['task'],
+            'plan': state['plan'].to_dict(),
+            'results': state['tool_results'],
+            'response': state['final_response'],
+            'summary': await summarize(state),
+        })
+        
+        return state
+    
+    async def _escalate(self, state):
+        state['final_response'] = "I need to escalate this to a human. Context preserved."
+        await handoff_to_human(state)
+        return state
+    
+    async def run(self, task, user_id):
+        initial_state = AgentState(
+            task=task,
+            user_id=user_id,
+            user_context={},
+            intent=None,
+            plan=None,
+            completed_steps=[],
+            failed_steps=[],
+            tool_results={},
+            needs_human=False,
+            final_response=None,
+        )
+        
+        final_state = await self.graph.ainvoke(initial_state)
+        return final_state['final_response']</code></pre>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<h4>BNPL chatbot — 4-tool agent</h4>
+<p><strong>S</strong>: BNPL chatbot needed to handle payment FAQ + refund + payment plan + escalation.</p>
+<p><strong>T</strong>: Design agent that handles 90%+ of inbound without human.</p>
+<p><strong>A</strong>: 4-tool agent:</p>
+<ol><li><code>faq_retrieve</code> (RAG on FAQ corpus)</li><li><code>check_eligibility</code> (rules engine call)</li><li><code>request_refund</code> (idempotent payment system call)</li><li><code>escalate_to_human</code> (creates ticket with context)</li></ol>
+<p>LangGraph state machine, plan-then-execute (deterministic for compliance). Memory: working (in-context) + structured KV (user prefs, last interaction) + vector (FAQ + past success examples).</p>
+<p><strong>R</strong>:</p>
+<ul><li>88% tasks resolved without escalation</li><li>p99 latency 3.2s</li><li>Avg cost $0.04/task</li><li>Pakistan ASR outage handled gracefully (circuit breaker)</li></ul>
+<h4>Internal Agent Platform — 12 internal teams</h4>
+<p><strong>S</strong>: Internal Agent Platform serves 12 teams (engineering, ops, finance, HR, ...). Each team needs domain-specific agent but shared infrastructure.</p>
+<p><strong>T</strong>: Build platform that supports multi-tenant agent customization without forking codebase.</p>
+<p><strong>A</strong>: Platform:</p>
+<ul><li>Shared base components: planner, executor, memory, eval</li><li>Per-team customization: tool registry (their tools), prompts, memory namespace</li><li>MCP standard for tool exposure</li><li>Centralized observability (Phoenix + LangSmith)</li><li>Per-team eval pipeline (their tasks, their metrics)</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>12 teams onboarded</li><li>Avg time to first agent: 2 weeks (vs 2 months bespoke)</li><li>Shared learnings (successful patterns) accelerated newer teams</li></ul>
+<h4>Voice agent multi-step (debt collection workflow)</h4>
+<p><strong>S</strong>: Voice agent handles multi-step debt collection — confirm identity → check balance → negotiate payment plan → process partial payment → schedule follow-up.</p>
+<p><strong>T</strong>: Robust multi-step with handoff to human on edge cases.</p>
+<p><strong>A</strong>:</p>
+<ul><li>Plan-then-execute (compliance audit needs deterministic logic)</li><li>Durable workflow (Temporal) — call may pause for human input, resume later</li><li>Idempotent partial payment tool</li><li>Hard escalation on certain triggers (customer hostile, hardship claim, large balance)</li></ul>
+<p><strong>R</strong>:</p>
+<ul><li>Multi-step success rate 78%</li><li>22% escalated, 0% wrong-action (compliance pass)</li><li>6-language support via FT (covered in Q41)</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<p><strong>Q1</strong>: "Tool selection — how do you make sure agent picks the right tool?"</p>
+<p><strong>A</strong>: Multiple layers:</p>
+<ol><li><strong>Tool description quality</strong> — LLM uses this to decide. Write rich descriptions: "Use this when X. Don't use when Y. Examples: Z."</li><li><strong>Few-shot in system prompt</strong> — 2-3 examples of correct tool selection</li><li><strong>Tool filtering by intent</strong> — pre-classify intent, only expose relevant tools (smaller decision space)</li><li><strong>Validation step</strong> — after LLM picks tool, validate (does this tool actually fit the intent?)</li><li><strong>Eval set</strong> — measure tool selection accuracy on golden tasks, iterate on descriptions</li><li><strong>Fallback to LLM-confirmation</strong> — for high-stakes tools, second LLM call confirms "is this the right tool given context"</li></ol>
+<p>BNPL chatbot lesson: I improved tool selection accuracy by rewriting descriptions, not changing model. 70→92% routing was 60% due to better descriptions.</p>
+<p><strong>Q2</strong>: "Agent goes into infinite loop. What do you do?"</p>
+<p><strong>A</strong>: Multi-layered defense:</p>
+<ol><li><strong>Hard max-step limit</strong> (e.g., 20 steps) — kill after that</li><li><strong>Loop detector</strong> — track recent (action, args) tuples, if same repeated 3x, raise InfiniteLoopError</li><li><strong>Cost limit</strong> — kill if task cost exceeds threshold ($1/task default)</li><li><strong>Latency limit</strong> — kill if task duration &gt; SLO (e.g., 5 min)</li><li><strong>Repeat-call detection</strong> — same tool with same args called consecutively → suspicious</li><li><strong>Escalation</strong> — when loop detected, escalate to human with full trace</li></ol>
+<p>Lesson: don't trust max_steps alone. Loop detection on (action, args_hash) catches subtle loops where args differ trivially.</p>
+<p><strong>Q3</strong>: "How do you test an agent?"</p>
+<p><strong>A</strong>: Multi-level eval:</p>
+<ol><li><strong>Tool unit tests</strong> — each tool's contract, idempotency, schema, error cases</li><li><strong>Plan generation eval</strong> — given task + context, LLM generates correct plan? (LLM-as-judge)</li><li><strong>End-to-end task eval</strong> — golden task set, measure completion rate</li><li><strong>Adversarial eval</strong> — tools fail, network issues, malformed inputs — does agent recover?</li><li><strong>Memory eval</strong> — agent recalls past interactions correctly? cross-session consistency?</li><li><strong>Safety eval</strong> — refusal on disallowed, no PII leak, citation accuracy</li><li><strong>Cost / latency benchmark</strong> — per-task budget, p99 latency</li></ol>
+<p>Tools: LangSmith, Phoenix, Langfuse for tracing. Custom Python for eval pipelines.</p>
+<p><strong>Q4</strong>: "Agent calls a tool that has side effects (e.g., processes refund). Tool times out. What now?"</p>
+<p><strong>A</strong>: This is the <strong>non-idempotent partial completion</strong> problem. Steps:</p>
+<ol><li><strong>Idempotency key</strong> required for all side-effect tools. If timeout, retry with same key → tool returns same result without re-doing.</li><li><strong>Audit log query</strong> — even if no idempotency key, query: "did this refund get processed in last 5 min for this user?" before retrying.</li><li><strong>Verification step</strong> — after suspected partial completion, agent calls a read-only verification tool ("get refund status by idempotency_key").</li><li><strong>Conservative bias</strong> — if uncertain, DON'T retry side-effect tools. Escalate to human with full context.</li><li><strong>Customer notification</strong> — if agent uncertain, notify customer ("We've initiated a refund. You'll receive confirmation within 24h.") and let human confirm.</li></ol>
+<p><strong>Q5</strong>: "How do you decide between single agent vs multi-agent (specialized sub-agents)?"</p>
+<p><strong>A</strong>: Decision factors:</p>
+<ul><li><strong>Single agent</strong> when: task fits in one context window, &lt; 10 tools, single LLM can handle reasoning</li><li><strong>Multi-agent</strong> when: distinct expert domains (research + writing + reviewing), tool sets too large for single planner, parallel sub-tasks possible</li></ul>
+<p><strong>Patterns</strong>:</p>
+<ul><li><strong>Orchestrator + workers</strong>: main agent delegates to specialized agents</li><li><strong>Hierarchical</strong>: high-level planner → mid-level executors → low-level tool callers</li><li><strong>Peer</strong>: equal agents collaborate via shared memory</li></ul>
+<p><strong>Trade-offs</strong>: multi-agent adds 2-5x cost (more LLM calls), latency, coordination overhead. Don't multi-agent prematurely.</p>
+<p>Voice agent example: single agent handled debt collection. We considered splitting (identity verification agent + payment negotiation agent), but single agent with good tools sufficed. Multi-agent only justified when single agent's context / tool list overflowed.</p>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>"Use LangChain agent"</strong> — that's a framework not a design</li><li><strong>No tool schema discipline</strong> — production agents need contracts</li><li><strong>No idempotency story</strong> — non-idempotent tools without keys = disaster</li><li><strong>No memory layering</strong> — vector store for everything = wasteful</li><li><strong>No failure handling</strong> — happy path only = breaks in production</li><li><strong>No loop detection</strong> — agent infinite loops are common</li><li><strong>No eval methodology</strong> — "we test by trying it" = not production-grade</li><li><strong>No durable workflow</strong> — multi-hour tasks need Temporal/Inngest</li><li><strong>No cost / latency budget</strong> — "agent figures it out" = $$$</li><li><strong>Forget human-in-loop</strong> — high-stakes tasks need confirmation</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>5-component architecture</strong> (tool registry / planner / executor / memory / eval)</li><li><strong>Tool registry contracts</strong> (schema, idempotency, retry, SLO)</li><li><strong>3-layer memory</strong> (working / structured / vector) with when to use which</li><li><strong>Failure mode taxonomy</strong> + per-failure playbook</li><li><strong>Specific 2026 tools</strong> (LangGraph, MCP, Temporal, OpenAI Agents SDK)</li><li><strong>Idempotency key pattern</strong> for side-effect tools</li><li><strong>Loop detection</strong> + circuit breaker</li><li><strong>Multi-layered eval</strong> (per-step + end-to-end + cost + latency + safety)</li><li><strong>Quote BNPL 4-tool agent + Internal Platform 12-team + voice agent durable workflow</strong></li><li><strong>Plan-then-execute vs ReAct vs LangGraph</strong> distinction with use case</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>Production agent = tool registry (with contracts) + planner (Plan-then-Execute by default, LangGraph for complex) + executor (retry + circuit breaker + idempotency) + 3-layer memory (working / structured / vector) + multi-layered eval. Failure handling is what separates demo from production. MCP as 2026 tool standard, Temporal for durable workflows.</strong></p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 components:
+  1. Tool registry (contracts + schemas + idempotency)
+  2. Planner (LLM, generates plan or state machine)
+  3. Executor (calls tools, retry, audit)
+  4. Memory (working + structured + vector)
+  5. Eval pipeline (per-step + e2e + cost + latency + safety)
+
+3 planning patterns:
+  Plan-then-Execute: deterministic, auditable, simple flows
+  ReAct: flexible, open-ended exploration
+  LangGraph state machine: complex multi-step with branching
+
+3 memory layers:
+  Working: in-context, single invocation
+  Structured KV: cross-session, lookup by key
+  Vector: cross-session, semantic search
+
+Tool contracts:
+  - Description (rich, LLM uses to decide)
+  - Input schema (JSON / Pydantic)
+  - Idempotent? (idempotency_key required if not)
+  - Side effects?
+  - Retry policy
+  - Timeout (SLO)
+  - Auth scopes
+  - Versioning
+
+10 failure modes:
+  Timeout, error return, schema fail, partial completion,
+  hallucinated tool call, infinite loop, plan fail mid-execution,
+  rate limit, context exhaustion, user abort
+
+Per-failure playbook:
+  Timeout: retry with exponential backoff (max_retries)
+  Schema fail: ReplanAction with feedback
+  Rate limit: backoff 60s, retry
+  Partial completion: idempotency key OR escalate
+  Auth fail: hard escalate
+  Loop: kill + escalate
+  Unknown: escalate P2
+
+Resilience patterns:
+  - Idempotency key for side-effect tools
+  - Circuit breaker per tool
+  - Loop detector ((action, args_hash) repeat)
+  - Max step / cost / latency limits
+  - Durable workflow (Temporal) for long-running
+
+2026 tool stack:
+  Framework: LangGraph, OpenAI Agents SDK, Claude SDK
+  Protocol: MCP (Anthropic standard)
+  Durable: Temporal, Inngest, Restate
+  Observability: LangSmith, Phoenix, Langfuse, Helicone
+  Vector: Qdrant, Pinecone, Weaviate
+  Memory: Mem0, custom
+
+Eval pipeline:
+  - Tool unit tests (contract verification)
+  - Plan generation (LLM-as-judge)
+  - End-to-end task completion
+  - Adversarial (tool fails, network issues)
+  - Memory consistency (cross-session)
+  - Safety (refusal, PII, citation)
+  - Cost / latency benchmarks
+
+Production checklist:
+  Week 1: registry + planner + happy path
+  Week 2: retry, timeout, circuit breaker, loop detect, escalation
+  Week 3: 3-layer memory
+  Week 4: eval (per-step + e2e + cost + latency + safety)
+  Month 2: durable workflow, cascade routing
+  Month 3: multi-agent, tool versioning
+
+Anti-patterns:
+  - "Use LangChain" (framework not design)
+  - No tool schemas
+  - No idempotency
+  - No memory layering
+  - No failure handling (happy path only)
+  - No loop detection
+  - No durable workflow for long tasks
+  - No cost / latency budget
+
+Case studies:
+  - BNPL: 4-tool agent, 88% resolved, LangGraph
+  - Internal Platform: 12 teams, MCP standard, shared infra
+  - Voice agent: Temporal durable workflow, multi-step debt collection
+
+Quotes for interview:
+  - "5 components — registry / planner / executor / memory / eval"
+  - "Tool contracts &gt; tool functions"
+  - "Plan-then-Execute by default, LangGraph for complex, ReAct for exploration"
+  - "Idempotency key is non-negotiable for side-effect tools"
+  - "Loop detection on (action, args) hash catches subtle loops"
+  - "Durable workflows (Temporal) for anything &gt; 5 min"
+  - "Failure handling separates demo from production"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-044-rag-chunking-strategy-defense.html">← Q44 · [AI 专项技术] 你的 RAG chunking 策略是什么, 怎么向怀疑的客户解释</a>
+    <a href="zhenti-046-customer-facing-prompt-injection.html">Q46 · [AI 专项技术] 面向客户的 agent 怎么处理 prompt injection →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q45 · End-to-end agent design — tools, memory, evaluation
+
+> "Design an end-to-end production agent for a customer use case. Cover **tool registry, planning, execution, memory (short and long-term), and evaluation**. The agent needs to handle multi-step workflows, recover from tool failures, and you must convince me you can sleep at night when it's running in production."
+
+**Round**: AI Specialty (45 min)
+**出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / LangChain — agent design 必问
+
+---
+
+## 这道题在考什么
+
+表面是 agent 题, 底下藏着 **8 个 FDE evaluation signal**:
+
+1. **Component awareness** — 知道 production agent 是 tool registry + planner + executor + memory + eval 5 part system
+2. **Tool design discipline** — 不只是 "list tools", 是 input schema + idempotency + retry + observability
+3. **Memory architecture** — short-term context vs long-term vector vs structured KV facts, 何时用哪个
+4. **Planning vs ReAct** — 知道何时 plan-then-execute vs interleave
+5. **Failure handling** — tool timeout / retry / circuit breaker / human escalation
+6. **Eval methodology** — per-step success + end-to-end task completion + cost + latency
+7. **Specific tools (2026)** — LangGraph, MCP, Temporal, Inngest, OpenAI Agents SDK
+8. **Production reality** — durable workflow, idempotency keys, dead letter queue
+
+不考「agent 是什么」, 考「你设计的 agent half-failed mid-workflow, 怎么 recover」.
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|---|---|---|
+| 1 | **Clarify use case** | 3 min | What customer task? volume? latency? failure tolerance? | "Before I design, what task is this agent automating? what's the failure cost?" |
+| 2 | **5-component architecture** | 5 min | Tool registry / Planner / Executor / Memory / Eval | "5 components — tool registry, planner, executor, memory (3 layers), eval pipeline." |
+| 3 | **Tool registry design** | 6 min | Schema, idempotency, retry, observability | "Each tool needs JSON schema, idempotency contract, retry policy, latency SLO, audit log." |
+| 4 | **Planning approach** | 5 min | Plan-then-execute vs ReAct vs LangGraph state machine | "3 patterns — plan-then-execute (deterministic), ReAct (interleaved), state machine (LangGraph for complex flows)." |
+| 5 | **Memory architecture** | 5 min | 3 layers (working / structured / vector) | "Memory has 3 layers — short-term in context, structured KV facts, long-term vector store." |
+| 6 | **Failure handling** | 5 min | Timeout, retry with backoff, circuit breaker, human handoff | "Failure modes: tool timeout, schema fail, infinite loop, partial completion. Each has playbook." |
+| 7 | **Eval pipeline** | 4 min | Per-step + end-to-end + cost + latency + safety | "Eval is multi-layered — per-step success, end-to-end task completion, cost per task, latency p99." |
+| 8 | **Specific tools 2026** | 3 min | LangGraph, MCP, Temporal, OpenAI Agents SDK | "Stack — LangGraph for flow, MCP for tool standard, Temporal/Inngest for durable workflows, custom Pydantic for schemas." |
+| 9 | **Quote BNPL chatbot + internal Agent Platform** | 4 min | Real shipped agents | "BNPL chatbot was a 4-tool agent (FAQ retrieve, policy lookup, escalate, log). Internal Agent Platform supports 12 internal teams." |
+| 10 | **Production checklist** | 2 min | What I'd build week 1 / week 4 / month 3 | "Week 1: tool registry + planner + happy path. Week 2-3: failure handling + eval. Month 2: durable workflows + cascading." |
+
+---
+
+## 详细回答
+
+### Step 1: 5-Component Architecture
+
+```
+            ┌──────────────────────────────────────────┐
+            │           USER REQUEST                   │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   1. TOOL REGISTRY                       │
+            │   • JSON schema for each tool            │
+            │   • Idempotency contracts                │
+            │   • Auth / ACL                           │
+            │   • Versioning                           │
+            │   • Observability hooks                  │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   2. PLANNER (LLM)                       │
+            │   • Inspects task                        │
+            │   • Selects tools                        │
+            │   • Generates plan / state machine       │
+            │   • Re-plans on failure                  │
+            └────────────────────┬─────────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   3. EXECUTOR                            │
+            │   • Calls tools per plan                 │
+            │   • Retry with backoff                   │
+            │   • Timeout handling                     │
+            │   • Idempotency tracking                 │
+            │   • Audit log                            │
+            └────────────────────┬─────────────────────┘
+                                 │
+            ┌────────────────────┼───────────────────┐
+            │                    │                   │
+            ▼                    ▼                   ▼
+   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+   │ 4a. WORKING MEM  │  │ 4b. STRUCTURED   │  │ 4c. LONG-TERM    │
+   │ (context window) │  │      KV FACTS    │  │      VECTOR      │
+   │  - current state │  │  - user prefs    │  │  - history       │
+   │  - tool results  │  │  - business data │  │  - knowledge     │
+   │  - reasoning     │  │  - structured    │  │  - examples      │
+   └──────────────────┘  └──────────────────┘  └──────────────────┘
+                                 │
+                                 ▼
+            ┌──────────────────────────────────────────┐
+            │   5. EVAL PIPELINE                       │
+            │   • Per-step success                     │
+            │   • End-to-end task completion           │
+            │   • Cost per task                        │
+            │   • Latency p99                          │
+            │   • Safety / refusal                     │
+            └──────────────────────────────────────────┘
+```
+
+### Step 2: Tool Registry (the foundation)
+
+**Each tool is a contract** — not a Python function. Treat tools like API endpoints.
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
+from datetime import datetime
+
+class ToolDefinition(BaseModel):
+    name: str
+    description: str  # critical — LLM uses this to decide when to call
+    input_schema: dict  # JSON schema
+    output_schema: dict
+    
+    # Behavior contracts
+    idempotent: bool  # safe to retry?
+    side_effects: bool  # writes to external system?
+    requires_confirmation: bool  # human-in-loop before execution?
+    
+    # SLOs
+    expected_latency_p99_ms: int
+    timeout_ms: int
+    
+    # Retry policy
+    retry_strategy: Literal['none', 'linear', 'exponential']
+    max_retries: int
+    
+    # Auth
+    required_scopes: list[str]
+    
+    # Versioning
+    version: str
+    deprecated: bool = False
+    deprecation_date: Optional[datetime] = None
+
+# Example tool
+refund_tool = ToolDefinition(
+    name='process_refund',
+    description="""
+    Process a refund for a TikTok PayLater order. 
+    
+    Use this when: customer requests refund AND eligibility verified AND amount < $500.
+    Don't use when: refund > $500 (escalate to human), or order > 90 days (out of policy).
+    """,
+    input_schema={
+        'type': 'object',
+        'properties': {
+            'order_id': {'type': 'string', 'pattern': '^ORDER-[0-9]+$'},
+            'amount_cents': {'type': 'integer', 'minimum': 1, 'maximum': 50000},
+            'reason_code': {'type': 'string', 'enum': ['defect', 'not_received', 'duplicate', 'fraud']},
+            'idempotency_key': {'type': 'string', 'format': 'uuid'}
+        },
+        'required': ['order_id', 'amount_cents', 'reason_code', 'idempotency_key']
+    },
+    output_schema={
+        'type': 'object',
+        'properties': {
+            'refund_id': {'type': 'string'},
+            'status': {'type': 'string', 'enum': ['processed', 'pending_review', 'rejected']},
+            'estimated_completion_date': {'type': 'string', 'format': 'date'},
+        }
+    },
+    idempotent=True,  # via idempotency_key
+    side_effects=True,  # writes to payment system
+    requires_confirmation=True,  # human confirms for >$200
+    expected_latency_p99_ms=2000,
+    timeout_ms=5000,
+    retry_strategy='exponential',
+    max_retries=3,
+    required_scopes=['refund:process'],
+    version='2.1.0',
+)
+```
+
+**Why idempotency matters**:
+
+```
+User asks agent: "Refund my order #123"
+
+Agent calls refund tool. 
+  → Tool times out at 4.9s (just before 5s timeout)
+  → Did refund go through or not?
+  
+Without idempotency key: retry might double-refund (financial loss)
+With idempotency key: retry with same key → tool returns same result
+```
+
+**Tool registry as MCP server (2026 standard)**:
+
+```python
+# Model Context Protocol (Anthropic 2024+, OpenAI adopted 2025)
+# Standard tool exposure for any agent framework
+
+@mcp.tool()
+async def process_refund(
+    order_id: str,
+    amount_cents: int,
+    reason_code: Literal['defect', 'not_received', 'duplicate', 'fraud'],
+    idempotency_key: str,
+) -> dict:
+    """Process a refund for a TikTok PayLater order.
+    
+    Use this when: customer requests refund AND eligibility verified AND amount < $500.
+    Don't use when: refund > $500 or order > 90 days.
+    """
+    # Idempotency check
+    existing = await db.refunds.find_one({'idempotency_key': idempotency_key})
+    if existing:
+        return existing
+    
+    # Validate eligibility
+    order = await get_order(order_id)
+    if order.amount_cents < amount_cents:
+        raise InvalidRefundAmountError()
+    
+    # Process
+    refund = await payment_service.refund(order_id, amount_cents, reason_code)
+    
+    # Persist with idempotency key
+    await db.refunds.insert({
+        'idempotency_key': idempotency_key,
+        'refund_id': refund.id,
+        'status': refund.status,
+        'estimated_completion_date': refund.eta,
+    })
+    
+    return refund.dict()
+```
+
+### Step 3: Planner — 3 patterns
+
+**Pattern A: Plan-then-Execute (deterministic, auditable)**
+
+```python
+async def plan_then_execute(task, tools):
+    # 1. Plan
+    plan = await llm.generate_plan(task, tools, structured_output=Plan)
+    # Plan = list of (tool_name, args, depends_on)
+    
+    # 2. Validate plan
+    if not all(t in tools for t in plan.tool_names):
+        raise InvalidPlanError()
+    
+    # 3. Execute (sequential or parallel based on deps)
+    results = {}
+    for step in plan.steps:
+        if step.depends_on:
+            await wait_for(step.depends_on, results)
+        
+        result = await execute_tool(step.tool_name, step.args, results)
+        results[step.id] = result
+    
+    return synthesize(results, task)
+```
+
+**Pros**: Deterministic, auditable, can validate before execution
+**Cons**: Inflexible, can't adapt mid-execution
+**Best for**: Well-understood workflows (invoice processing, scheduled jobs)
+
+**Pattern B: ReAct (Reasoning + Acting interleaved)**
+
+```python
+async def react_loop(task, tools, max_steps=20):
+    history = []
+    
+    for step in range(max_steps):
+        # 1. Reason about next action
+        prompt = build_react_prompt(task, history, tools)
+        thought = await llm.generate(prompt)
+        
+        # 2. Decide: tool call or finish?
+        if thought.action == 'finish':
+            return thought.answer
+        
+        # 3. Execute tool
+        result = await execute_tool(thought.action, thought.args)
+        
+        # 4. Append to history
+        history.append({
+            'thought': thought.text,
+            'action': thought.action,
+            'args': thought.args,
+            'observation': result
+        })
+    
+    return "Max steps reached, escalating"
+```
+
+**Pros**: Flexible, can adapt to surprises mid-task
+**Cons**: Can loop infinitely, harder to audit, more LLM calls
+**Best for**: Open-ended tasks, exploration, debugging
+
+**Pattern C: LangGraph state machine (complex flows)**
+
+```python
+from langgraph.graph import StateGraph
+
+class AgentState(TypedDict):
+    task: str
+    intent: str
+    retrieved: list
+    plan: Plan
+    results: dict
+    failures: list
+    needs_human: bool
+
+def classify_intent(state):
+    state['intent'] = llm.classify_intent(state['task'])
+    return state
+
+def retrieve_context(state):
+    state['retrieved'] = rag.search(state['task'])
+    return state
+
+def make_plan(state):
+    state['plan'] = llm.plan(state['task'], state['retrieved'])
+    return state
+
+def execute_step(state):
+    next_step = state['plan'].next()
+    try:
+        result = execute_tool(next_step.tool, next_step.args)
+        state['results'][next_step.id] = result
+    except ToolFailure as e:
+        state['failures'].append(e)
+        if len(state['failures']) >= 3:
+            state['needs_human'] = True
+    return state
+
+def synthesize(state):
+    return llm.synthesize(state['task'], state['results'])
+
+def route_after_execute(state):
+    if state['needs_human']:
+        return 'human_handoff'
+    if state['plan'].is_complete():
+        return 'synthesize'
+    return 'execute_step'
+
+# Build graph
+workflow = StateGraph(AgentState)
+workflow.add_node('classify', classify_intent)
+workflow.add_node('retrieve', retrieve_context)
+workflow.add_node('plan', make_plan)
+workflow.add_node('execute', execute_step)
+workflow.add_node('synthesize', synthesize)
+workflow.add_node('human_handoff', handoff)
+
+workflow.set_entry_point('classify')
+workflow.add_edge('classify', 'retrieve')
+workflow.add_edge('retrieve', 'plan')
+workflow.add_edge('plan', 'execute')
+workflow.add_conditional_edges('execute', route_after_execute)
+
+agent = workflow.compile()
+```
+
+**Pros**: Explicit state, conditional edges, easy to audit / visualize
+**Cons**: Verbose, requires upfront design
+**Best for**: Multi-step workflows with branching, complex production agents
+
+### Step 4: Memory Architecture (3 layers)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ LAYER 1: WORKING MEMORY (current LLM context window)       │
+│  - Current task description                                │
+│  - Recent tool calls + results (last N)                    │
+│  - Reasoning trace                                         │
+│  - Lifetime: single agent invocation                       │
+│  - Storage: in-process / Redis                             │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ LAYER 2: STRUCTURED FACTS (KV store)                       │
+│  - User preferences (language, timezone, tier)             │
+│  - Business data (subscription tier, credit limit)         │
+│  - Last-known state (last interaction, last balance)       │
+│  - Lifetime: across sessions                               │
+│  - Storage: Postgres / DynamoDB / Redis                    │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ LAYER 3: LONG-TERM VECTOR MEMORY                           │
+│  - Past conversations (chunked, embedded)                  │
+│  - Knowledge corpus (FAQ, policy)                          │
+│  - Similar successful task examples                        │
+│  - Lifetime: months-years                                  │
+│  - Storage: Qdrant / Pinecone / Vespa                      │
+└────────────────────────────────────────────────────────────┘
+```
+
+**When to use which**:
+
+```python
+class MemorySystem:
+    def __init__(self):
+        self.working = WorkingMemory()  # in-context
+        self.structured = StructuredKV(redis_client)
+        self.vector = VectorStore(qdrant_client)
+    
+    async def get_user_context(self, user_id):
+        """Loaded once at agent invocation."""
+        # Structured facts: cheap KV lookup
+        prefs = await self.structured.get(f'user:{user_id}:prefs')
+        
+        # Recent history: vector search on past conversations
+        recent_history = await self.vector.search(
+            query=f'user:{user_id} recent',
+            filter={'user_id': user_id},
+            top_k=5,
+            sort='timestamp_desc'
+        )
+        
+        return {
+            'preferences': prefs,
+            'recent_history_summary': summarize(recent_history)
+        }
+    
+    async def remember(self, fact_type, key, value):
+        """During / after agent execution, persist learnings."""
+        if fact_type == 'structured':
+            await self.structured.set(key, value, ttl=86400 * 365)
+        elif fact_type == 'episodic':
+            embedding = await embed(value['summary'])
+            await self.vector.upsert(
+                id=generate_id(),
+                vector=embedding,
+                payload=value
+            )
+        elif fact_type == 'working':
+            # Already in context, just append
+            self.working.append(value)
+```
+
+**Memory cost**:
+
+```
+Working: free (in context)
+Structured KV: $0.0001 per get/set (Redis)
+Vector: $0.001 per search (Qdrant)
+Embed cost: $0.0001 per chunk (text-embedding-3-large)
+
+100k agent invocations/day:
+  Working: $0
+  Structured: $0.10 (very cheap)
+  Vector: $100/day for memory search
+  Embed (on writes): $10/day
+  Total: ~$110/day = $3,300/month
+```
+
+### Step 5: Failure handling (production grit)
+
+**Failure modes**:
+
+```
+1. Tool timeout
+2. Tool returns error
+3. Tool returns unexpected schema
+4. Tool partially completes (side effect happened)
+5. LLM hallucinates tool call (wrong tool / args)
+6. LLM gets stuck in infinite loop
+7. Plan fails mid-execution
+8. Downstream service rate-limited
+9. Context window exhausted
+10. Customer aborts mid-conversation
+```
+
+**Per-failure playbook**:
+
+```python
+class FailureHandler:
+    async def handle_tool_failure(self, tool_call, error, attempt):
+        if isinstance(error, TimeoutError):
+            # Check tool's retry policy
+            if attempt < tool_call.tool.max_retries:
+                backoff = 2 ** attempt  # exponential
+                await asyncio.sleep(backoff)
+                return RetryAction(backoff=backoff)
+            else:
+                return EscalateAction(reason='timeout_exhausted')
+        
+        elif isinstance(error, SchemaValidationError):
+            # LLM-induced bad args, ask LLM to fix
+            return ReplanAction(
+                feedback=f"Tool call failed validation: {error}. Fix args."
+            )
+        
+        elif isinstance(error, RateLimitedError):
+            # Vendor rate limit
+            await asyncio.sleep(60)
+            return RetryAction()
+        
+        elif isinstance(error, AuthError):
+            # Hard fail, can't recover
+            return EscalateAction(reason='auth_failure', urgency='P1')
+        
+        elif isinstance(error, PartialCompletionError):
+            # Tool may have done side effect — careful!
+            if tool_call.tool.idempotent:
+                return RetryAction(idempotency_key=tool_call.idempotency_key)
+            else:
+                # Don't retry, escalate to human
+                return EscalateAction(
+                    reason='non_idempotent_partial',
+                    context=f"Tool {tool_call.tool.name} may have completed. Verify with audit log."
+                )
+        
+        else:
+            # Unknown error
+            return EscalateAction(reason='unknown_error', urgency='P2')
+```
+
+**Circuit breaker**:
+
+```python
+class CircuitBreaker:
+    """Stop calling a failing tool to avoid cascading failures."""
+    def __init__(self, failure_threshold=5, recovery_timeout=60):
+        self.failures = 0
+        self.state = 'closed'  # closed = normal, open = failing, half-open = testing
+        self.last_failure_time = None
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+    
+    async def call(self, tool, *args):
+        if self.state == 'open':
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = 'half-open'
+            else:
+                raise CircuitOpenError(f"Circuit open for {tool.name}")
+        
+        try:
+            result = await tool(*args)
+            if self.state == 'half-open':
+                self.state = 'closed'  # recovered
+            self.failures = 0
+            return result
+        except Exception as e:
+            self.failures += 1
+            self.last_failure_time = time.time()
+            if self.failures >= self.failure_threshold:
+                self.state = 'open'
+            raise e
+```
+
+**Loop detection**:
+
+```python
+class LoopDetector:
+    def __init__(self, max_repeats=3):
+        self.history = []
+        self.max_repeats = max_repeats
+    
+    def check(self, action, args):
+        key = (action, hash(json.dumps(args, sort_keys=True)))
+        recent = self.history[-10:]
+        repeat_count = sum(1 for k in recent if k == key)
+        
+        self.history.append(key)
+        
+        if repeat_count >= self.max_repeats:
+            raise InfiniteLoopError(
+                f"Agent repeated {action} with same args {self.max_repeats}x"
+            )
+```
+
+**Durable workflows (Temporal / Inngest)**:
+
+```python
+# For workflows that must survive process crashes, restarts
+# Temporal / Inngest provide durable execution
+
+@workflow.defn
+class RefundWorkflow:
+    @workflow.run
+    async def run(self, refund_request):
+        # Each step is a checkpoint
+        # If process crashes mid-step, resumes from last checkpoint
+        
+        eligibility = await workflow.execute_activity(
+            check_eligibility,
+            refund_request.order_id,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3)
+        )
+        
+        if not eligibility.eligible:
+            return RefundResult(status='ineligible', reason=eligibility.reason)
+        
+        # Human approval for large refunds
+        if refund_request.amount > 200:
+            approval = await workflow.execute_activity(
+                request_human_approval,
+                refund_request,
+                start_to_close_timeout=timedelta(hours=24),
+            )
+            if not approval.approved:
+                return RefundResult(status='denied')
+        
+        # Process refund
+        refund = await workflow.execute_activity(
+            process_refund,
+            refund_request,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=5)
+        )
+        
+        # Notify customer
+        await workflow.execute_activity(
+            send_notification,
+            refund_request.customer_id, refund,
+        )
+        
+        return refund
+```
+
+### Step 6: Eval Pipeline (multi-layered)
+
+```python
+class AgentEvalSuite:
+    """Multi-layered eval for production agents."""
+    
+    async def run(self, agent, eval_set):
+        results = {
+            'per_step': [],
+            'end_to_end': [],
+            'cost': [],
+            'latency': [],
+            'safety': [],
+        }
+        
+        for task in eval_set:
+            start = time.time()
+            
+            # Run agent (with detailed tracing)
+            tracer = AgentTracer()
+            output = await agent.run(task.query, tracer=tracer)
+            
+            latency = time.time() - start
+            cost = tracer.total_cost()
+            
+            # 1. End-to-end task completion
+            success = await self.task_succeeded(task, output)
+            results['end_to_end'].append(success)
+            
+            # 2. Per-step success
+            for step in tracer.steps:
+                step_success = await self.step_succeeded(step, task)
+                results['per_step'].append({
+                    'task_id': task.id,
+                    'step': step.tool_name,
+                    'success': step_success,
+                    'latency': step.latency
+                })
+            
+            # 3. Cost
+            results['cost'].append({'task_id': task.id, 'cost_usd': cost})
+            
+            # 4. Latency
+            results['latency'].append({'task_id': task.id, 'latency_s': latency})
+            
+            # 5. Safety
+            safety = await self.safety_check(output)
+            results['safety'].append(safety)
+        
+        return self.aggregate(results)
+    
+    def aggregate(self, results):
+        return {
+            'task_success_rate': mean([r for r in results['end_to_end']]),
+            'per_step_success_rate': mean([s['success'] for s in results['per_step']]),
+            'avg_cost_per_task': mean([c['cost_usd'] for c in results['cost']]),
+            'latency_p99': p99([l['latency_s'] for l in results['latency']]),
+            'safety_pass_rate': mean([s['safe'] for s in results['safety']]),
+        }
+```
+
+**Production metrics dashboard**:
+
+```
+Per-step metrics:
+  - Tool call accuracy (right tool selected?)
+  - Tool arg validity (schema valid?)
+  - Tool success rate (no error?)
+  - Step latency p99
+
+End-to-end metrics:
+  - Task completion rate
+  - Average steps per task
+  - Cost per task
+  - Latency p99 per task
+  
+Failure mode breakdown:
+  - % timeouts
+  - % schema fails
+  - % infinite loops (caught)
+  - % human escalations
+
+Business metrics:
+  - User satisfaction
+  - Resolved without escalation
+  - Conversion / retention
+  - Cost savings vs human agents
+```
+
+### Step 7: Specific tools (2026 stack)
+
+```
+Framework:
+  LangGraph (LangChain) — state machine, most flexible
+  OpenAI Agents SDK — official, integrates with GPT-5
+  Anthropic Claude SDK + custom — bare-bones, max control
+  CrewAI — multi-agent orchestration
+  LlamaIndex Agents — RAG-heavy agents
+
+Tool protocol:
+  MCP (Model Context Protocol) — Anthropic 2024, now industry standard
+    - JSON-RPC over stdio / HTTP
+    - Tools, resources, prompts standardized
+    - OpenAI / Cohere all adopted 2025+
+
+Durable workflows:
+  Temporal — Java/Go/Python/TS, enterprise-grade
+  Inngest — TS-native, serverless
+  Restate — Rust, low-latency
+  Cadence — Uber-spec, older
+
+Observability:
+  LangSmith — LangChain's, traces / playgrounds
+  Phoenix (Arize) — open-source, OTel-based
+  Langfuse — open-source alternative
+  Helicone — proxy-based, easy setup
+
+Vector stores:
+  Qdrant — open-source, fast, mature
+  Pinecone — managed, easy
+  Weaviate — open-source, schema-aware
+  Vespa — Yahoo's, hybrid search
+  Milvus — open-source, scale
+  pgvector — Postgres extension, simpler stack
+
+Memory frameworks:
+  Mem0 — agent memory abstraction
+  LangChain memory — built-in modules
+  Custom (Redis + Qdrant + Postgres) — best control
+```
+
+### Step 8: Production checklist (week-by-week)
+
+```
+WEEK 1 — Foundation:
+  ☐ Tool registry with 3-5 critical tools (schema, idempotency)
+  ☐ Plan-then-execute planner (deterministic, simpler than ReAct)
+  ☐ Working memory (in-context)
+  ☐ Happy-path test with 10 golden tasks
+  ☐ Audit log of every tool call
+
+WEEK 2 — Resilience:
+  ☐ Retry with exponential backoff
+  ☐ Timeout handling per tool
+  ☐ Circuit breaker for unreliable tools
+  ☐ Loop detector
+  ☐ Idempotency for non-idempotent tools (idempotency_key pattern)
+  ☐ Human escalation path
+
+WEEK 3 — Memory:
+  ☐ Structured KV (user prefs, business data)
+  ☐ Long-term vector memory (history, examples)
+  ☐ Memory loading at invocation
+  ☐ Memory persistence after task
+
+WEEK 4 — Eval:
+  ☐ 100-task eval set (stratified by complexity)
+  ☐ Per-step success metrics
+  ☐ End-to-end task completion
+  ☐ Cost and latency tracking
+  ☐ Safety check (refusal on disallowed)
+
+MONTH 2 — Production:
+  ☐ Durable workflow (Temporal) for long-running tasks
+  ☐ Cascade routing (small model for simple, big model for complex)
+  ☐ Continuous golden set refresh from production samples
+  ☐ Per-tenant isolation + ACL
+
+MONTH 3 — Scale:
+  ☐ Multi-agent (specialized sub-agents)
+  ☐ Tool versioning + deprecation handling
+  ☐ Cost optimization (prompt caching, smaller models)
+  ☐ A/B testing framework for agent versions
+```
+
+---
+
+## 关键决策 / 框架
+
+### Pattern selection
+
+```
+Simple, well-defined task → Plan-then-execute
+Open-ended exploration → ReAct
+Complex multi-step with branching → LangGraph state machine
+Multi-agent collaboration → CrewAI or custom orchestrator
+Long-running / durable → Plan + Temporal/Inngest
+```
+
+### Tool design checklist
+
+```
+For every tool:
+  ☐ Clear description (LLM uses this to decide when to call)
+  ☐ JSON schema for input
+  ☐ Idempotency contract (idempotent? idempotency_key?)
+  ☐ Side-effect declaration
+  ☐ Retry policy
+  ☐ Timeout (per-tool SLO)
+  ☐ Auth scopes required
+  ☐ Versioning
+  ☐ Audit log emission
+  ☐ Confirmation required? (for irreversible)
+```
+
+### Memory selection
+
+```
+Use working memory (context) when:
+  - Single-task duration
+  - < 200k tokens of relevant info
+  - Cheap (no extra round-trip)
+
+Use structured KV when:
+  - Cross-session persistence
+  - Lookup by key (user_id, order_id)
+  - Structured (no semantic search needed)
+  - Small payload
+
+Use vector memory when:
+  - Semantic search needed
+  - Cross-session history
+  - Examples / few-shot from past successes
+  - Large unstructured corpus
+```
+
+---
+
+## 完整代码 / 架构图
+
+### Full agent skeleton
+
+```python
+# agent/main.py
+
+from langgraph.graph import StateGraph
+from typing import TypedDict, Optional
+import asyncio
+
+class AgentState(TypedDict):
+    task: str
+    user_id: str
+    user_context: dict
+    intent: Optional[str]
+    plan: Optional[Plan]
+    completed_steps: list
+    failed_steps: list
+    tool_results: dict
+    needs_human: bool
+    final_response: Optional[str]
+
+class ProductionAgent:
+    def __init__(self, config):
+        self.config = config
+        self.tools = ToolRegistry()
+        self.memory = MemorySystem()
+        self.planner = Planner()
+        self.executor = ToolExecutor(self.tools)
+        self.eval = AgentEvalSuite()
+        
+        self.graph = self._build_graph()
+    
+    def _build_graph(self):
+        workflow = StateGraph(AgentState)
+        
+        workflow.add_node('load_context', self._load_context)
+        workflow.add_node('classify_intent', self._classify_intent)
+        workflow.add_node('plan', self._plan)
+        workflow.add_node('execute_step', self._execute_step)
+        workflow.add_node('synthesize', self._synthesize)
+        workflow.add_node('escalate', self._escalate)
+        
+        workflow.set_entry_point('load_context')
+        workflow.add_edge('load_context', 'classify_intent')
+        workflow.add_edge('classify_intent', 'plan')
+        workflow.add_edge('plan', 'execute_step')
+        workflow.add_conditional_edges(
+            'execute_step',
+            self._route_after_execute,
+            {
+                'continue': 'execute_step',
+                'synthesize': 'synthesize',
+                'escalate': 'escalate',
+            }
+        )
+        workflow.add_edge('synthesize', '__end__')
+        workflow.add_edge('escalate', '__end__')
+        
+        return workflow.compile()
+    
+    async def _load_context(self, state):
+        state['user_context'] = await self.memory.get_user_context(state['user_id'])
+        return state
+    
+    async def _classify_intent(self, state):
+        state['intent'] = await self.planner.classify_intent(
+            state['task'], state['user_context']
+        )
+        return state
+    
+    async def _plan(self, state):
+        applicable_tools = self.tools.filter_by_intent(state['intent'])
+        state['plan'] = await self.planner.plan(
+            state['task'], state['user_context'], applicable_tools
+        )
+        state['completed_steps'] = []
+        state['failed_steps'] = []
+        return state
+    
+    async def _execute_step(self, state):
+        next_step = state['plan'].next_step(state['completed_steps'])
+        if not next_step:
+            return state
+        
+        try:
+            # Idempotency key
+            idempotency_key = generate_idempotency_key(
+                state['user_id'], state['task'], next_step.id
+            )
+            
+            result = await self.executor.execute(
+                next_step.tool_name,
+                next_step.args,
+                idempotency_key=idempotency_key,
+                timeout_ms=next_step.tool.timeout_ms,
+            )
+            
+            state['tool_results'][next_step.id] = result
+            state['completed_steps'].append(next_step.id)
+        
+        except Exception as e:
+            state['failed_steps'].append({'step': next_step.id, 'error': str(e)})
+            
+            if len(state['failed_steps']) >= 3:
+                state['needs_human'] = True
+            elif isinstance(e, RetryableError):
+                # Stay in execute_step, will retry
+                pass
+            else:
+                # Try replanning
+                state['plan'] = await self.planner.replan(
+                    state['task'], state['tool_results'], e
+                )
+        
+        return state
+    
+    def _route_after_execute(self, state):
+        if state['needs_human']:
+            return 'escalate'
+        if state['plan'].is_complete(state['completed_steps']):
+            return 'synthesize'
+        return 'continue'
+    
+    async def _synthesize(self, state):
+        state['final_response'] = await self.planner.synthesize(
+            state['task'], state['tool_results']
+        )
+        
+        # Persist learnings to memory
+        await self.memory.remember('episodic', None, {
+            'task': state['task'],
+            'plan': state['plan'].to_dict(),
+            'results': state['tool_results'],
+            'response': state['final_response'],
+            'summary': await summarize(state),
+        })
+        
+        return state
+    
+    async def _escalate(self, state):
+        state['final_response'] = "I need to escalate this to a human. Context preserved."
+        await handoff_to_human(state)
+        return state
+    
+    async def run(self, task, user_id):
+        initial_state = AgentState(
+            task=task,
+            user_id=user_id,
+            user_context={},
+            intent=None,
+            plan=None,
+            completed_steps=[],
+            failed_steps=[],
+            tool_results={},
+            needs_human=False,
+            final_response=None,
+        )
+        
+        final_state = await self.graph.ainvoke(initial_state)
+        return final_state['final_response']
+```
+
+---
+
+## Gao Xin 简历专属 reframe
+
+### BNPL chatbot — 4-tool agent
+
+**S**: BNPL chatbot needed to handle payment FAQ + refund + payment plan + escalation.
+
+**T**: Design agent that handles 90%+ of inbound without human.
+
+**A**: 4-tool agent:
+1. `faq_retrieve` (RAG on FAQ corpus)
+2. `check_eligibility` (rules engine call)
+3. `request_refund` (idempotent payment system call)
+4. `escalate_to_human` (creates ticket with context)
+
+LangGraph state machine, plan-then-execute (deterministic for compliance).
+Memory: working (in-context) + structured KV (user prefs, last interaction) + vector (FAQ + past success examples).
+
+**R**:
+- 88% tasks resolved without escalation
+- p99 latency 3.2s
+- Avg cost $0.04/task
+- Pakistan ASR outage handled gracefully (circuit breaker)
+
+### Internal Agent Platform — 12 internal teams
+
+**S**: Internal Agent Platform serves 12 teams (engineering, ops, finance, HR, ...). Each team needs domain-specific agent but shared infrastructure.
+
+**T**: Build platform that supports multi-tenant agent customization without forking codebase.
+
+**A**: Platform:
+- Shared base components: planner, executor, memory, eval
+- Per-team customization: tool registry (their tools), prompts, memory namespace
+- MCP standard for tool exposure
+- Centralized observability (Phoenix + LangSmith)
+- Per-team eval pipeline (their tasks, their metrics)
+
+**R**:
+- 12 teams onboarded
+- Avg time to first agent: 2 weeks (vs 2 months bespoke)
+- Shared learnings (successful patterns) accelerated newer teams
+
+### Voice agent multi-step (debt collection workflow)
+
+**S**: Voice agent handles multi-step debt collection — confirm identity → check balance → negotiate payment plan → process partial payment → schedule follow-up.
+
+**T**: Robust multi-step with handoff to human on edge cases.
+
+**A**:
+- Plan-then-execute (compliance audit needs deterministic logic)
+- Durable workflow (Temporal) — call may pause for human input, resume later
+- Idempotent partial payment tool
+- Hard escalation on certain triggers (customer hostile, hardship claim, large balance)
+
+**R**:
+- Multi-step success rate 78%
+- 22% escalated, 0% wrong-action (compliance pass)
+- 6-language support via FT (covered in Q41)
+
+---
+
+## 5 个 Follow-ups
+
+**Q1**: "Tool selection — how do you make sure agent picks the right tool?"
+
+**A**: Multiple layers:
+1. **Tool description quality** — LLM uses this to decide. Write rich descriptions: "Use this when X. Don't use when Y. Examples: Z."
+2. **Few-shot in system prompt** — 2-3 examples of correct tool selection
+3. **Tool filtering by intent** — pre-classify intent, only expose relevant tools (smaller decision space)
+4. **Validation step** — after LLM picks tool, validate (does this tool actually fit the intent?)
+5. **Eval set** — measure tool selection accuracy on golden tasks, iterate on descriptions
+6. **Fallback to LLM-confirmation** — for high-stakes tools, second LLM call confirms "is this the right tool given context"
+
+BNPL chatbot lesson: I improved tool selection accuracy by rewriting descriptions, not changing model. 70→92% routing was 60% due to better descriptions.
+
+**Q2**: "Agent goes into infinite loop. What do you do?"
+
+**A**: Multi-layered defense:
+1. **Hard max-step limit** (e.g., 20 steps) — kill after that
+2. **Loop detector** — track recent (action, args) tuples, if same repeated 3x, raise InfiniteLoopError
+3. **Cost limit** — kill if task cost exceeds threshold ($1/task default)
+4. **Latency limit** — kill if task duration > SLO (e.g., 5 min)
+5. **Repeat-call detection** — same tool with same args called consecutively → suspicious
+6. **Escalation** — when loop detected, escalate to human with full trace
+
+Lesson: don't trust max_steps alone. Loop detection on (action, args_hash) catches subtle loops where args differ trivially.
+
+**Q3**: "How do you test an agent?"
+
+**A**: Multi-level eval:
+1. **Tool unit tests** — each tool's contract, idempotency, schema, error cases
+2. **Plan generation eval** — given task + context, LLM generates correct plan? (LLM-as-judge)
+3. **End-to-end task eval** — golden task set, measure completion rate
+4. **Adversarial eval** — tools fail, network issues, malformed inputs — does agent recover?
+5. **Memory eval** — agent recalls past interactions correctly? cross-session consistency?
+6. **Safety eval** — refusal on disallowed, no PII leak, citation accuracy
+7. **Cost / latency benchmark** — per-task budget, p99 latency
+
+Tools: LangSmith, Phoenix, Langfuse for tracing. Custom Python for eval pipelines.
+
+**Q4**: "Agent calls a tool that has side effects (e.g., processes refund). Tool times out. What now?"
+
+**A**: This is the **non-idempotent partial completion** problem. Steps:
+1. **Idempotency key** required for all side-effect tools. If timeout, retry with same key → tool returns same result without re-doing.
+2. **Audit log query** — even if no idempotency key, query: "did this refund get processed in last 5 min for this user?" before retrying.
+3. **Verification step** — after suspected partial completion, agent calls a read-only verification tool ("get refund status by idempotency_key").
+4. **Conservative bias** — if uncertain, DON'T retry side-effect tools. Escalate to human with full context.
+5. **Customer notification** — if agent uncertain, notify customer ("We've initiated a refund. You'll receive confirmation within 24h.") and let human confirm.
+
+**Q5**: "How do you decide between single agent vs multi-agent (specialized sub-agents)?"
+
+**A**: Decision factors:
+- **Single agent** when: task fits in one context window, < 10 tools, single LLM can handle reasoning
+- **Multi-agent** when: distinct expert domains (research + writing + reviewing), tool sets too large for single planner, parallel sub-tasks possible
+
+**Patterns**:
+- **Orchestrator + workers**: main agent delegates to specialized agents
+- **Hierarchical**: high-level planner → mid-level executors → low-level tool callers
+- **Peer**: equal agents collaborate via shared memory
+
+**Trade-offs**: multi-agent adds 2-5x cost (more LLM calls), latency, coordination overhead. Don't multi-agent prematurely.
+
+Voice agent example: single agent handled debt collection. We considered splitting (identity verification agent + payment negotiation agent), but single agent with good tools sufficed. Multi-agent only justified when single agent's context / tool list overflowed.
+
+---
+
+## ❌ 死路答法
+
+1. **"Use LangChain agent"** — that's a framework not a design
+2. **No tool schema discipline** — production agents need contracts
+3. **No idempotency story** — non-idempotent tools without keys = disaster
+4. **No memory layering** — vector store for everything = wasteful
+5. **No failure handling** — happy path only = breaks in production
+6. **No loop detection** — agent infinite loops are common
+7. **No eval methodology** — "we test by trying it" = not production-grade
+8. **No durable workflow** — multi-hour tasks need Temporal/Inngest
+9. **No cost / latency budget** — "agent figures it out" = $$$
+10. **Forget human-in-loop** — high-stakes tasks need confirmation
+
+---
+
+## ✅ 加分项
+
+1. **5-component architecture** (tool registry / planner / executor / memory / eval)
+2. **Tool registry contracts** (schema, idempotency, retry, SLO)
+3. **3-layer memory** (working / structured / vector) with when to use which
+4. **Failure mode taxonomy** + per-failure playbook
+5. **Specific 2026 tools** (LangGraph, MCP, Temporal, OpenAI Agents SDK)
+6. **Idempotency key pattern** for side-effect tools
+7. **Loop detection** + circuit breaker
+8. **Multi-layered eval** (per-step + end-to-end + cost + latency + safety)
+9. **Quote BNPL 4-tool agent + Internal Platform 12-team + voice agent durable workflow**
+10. **Plan-then-execute vs ReAct vs LangGraph** distinction with use case
+
+---
+
+## 一句话总结
+
+> **Production agent = tool registry (with contracts) + planner (Plan-then-Execute by default, LangGraph for complex) + executor (retry + circuit breaker + idempotency) + 3-layer memory (working / structured / vector) + multi-layered eval. Failure handling is what separates demo from production. MCP as 2026 tool standard, Temporal for durable workflows.**
+
+---
+
+## Cheat Sheet
+
+```
+5 components:
+  1. Tool registry (contracts + schemas + idempotency)
+  2. Planner (LLM, generates plan or state machine)
+  3. Executor (calls tools, retry, audit)
+  4. Memory (working + structured + vector)
+  5. Eval pipeline (per-step + e2e + cost + latency + safety)
+
+3 planning patterns:
+  Plan-then-Execute: deterministic, auditable, simple flows
+  ReAct: flexible, open-ended exploration
+  LangGraph state machine: complex multi-step with branching
+
+3 memory layers:
+  Working: in-context, single invocation
+  Structured KV: cross-session, lookup by key
+  Vector: cross-session, semantic search
+
+Tool contracts:
+  - Description (rich, LLM uses to decide)
+  - Input schema (JSON / Pydantic)
+  - Idempotent? (idempotency_key required if not)
+  - Side effects?
+  - Retry policy
+  - Timeout (SLO)
+  - Auth scopes
+  - Versioning
+
+10 failure modes:
+  Timeout, error return, schema fail, partial completion,
+  hallucinated tool call, infinite loop, plan fail mid-execution,
+  rate limit, context exhaustion, user abort
+
+Per-failure playbook:
+  Timeout: retry with exponential backoff (max_retries)
+  Schema fail: ReplanAction with feedback
+  Rate limit: backoff 60s, retry
+  Partial completion: idempotency key OR escalate
+  Auth fail: hard escalate
+  Loop: kill + escalate
+  Unknown: escalate P2
+
+Resilience patterns:
+  - Idempotency key for side-effect tools
+  - Circuit breaker per tool
+  - Loop detector ((action, args_hash) repeat)
+  - Max step / cost / latency limits
+  - Durable workflow (Temporal) for long-running
+
+2026 tool stack:
+  Framework: LangGraph, OpenAI Agents SDK, Claude SDK
+  Protocol: MCP (Anthropic standard)
+  Durable: Temporal, Inngest, Restate
+  Observability: LangSmith, Phoenix, Langfuse, Helicone
+  Vector: Qdrant, Pinecone, Weaviate
+  Memory: Mem0, custom
+
+Eval pipeline:
+  - Tool unit tests (contract verification)
+  - Plan generation (LLM-as-judge)
+  - End-to-end task completion
+  - Adversarial (tool fails, network issues)
+  - Memory consistency (cross-session)
+  - Safety (refusal, PII, citation)
+  - Cost / latency benchmarks
+
+Production checklist:
+  Week 1: registry + planner + happy path
+  Week 2: retry, timeout, circuit breaker, loop detect, escalation
+  Week 3: 3-layer memory
+  Week 4: eval (per-step + e2e + cost + latency + safety)
+  Month 2: durable workflow, cascade routing
+  Month 3: multi-agent, tool versioning
+
+Anti-patterns:
+  - "Use LangChain" (framework not design)
+  - No tool schemas
+  - No idempotency
+  - No memory layering
+  - No failure handling (happy path only)
+  - No loop detection
+  - No durable workflow for long tasks
+  - No cost / latency budget
+
+Case studies:
+  - BNPL: 4-tool agent, 88% resolved, LangGraph
+  - Internal Platform: 12 teams, MCP standard, shared infra
+  - Voice agent: Temporal durable workflow, multi-step debt collection
+
+Quotes for interview:
+  - "5 components — registry / planner / executor / memory / eval"
+  - "Tool contracts > tool functions"
+  - "Plan-then-Execute by default, LangGraph for complex, ReAct for exploration"
+  - "Idempotency key is non-negotiable for side-effect tools"
+  - "Loop detection on (action, args) hash catches subtle loops"
+  - "Durable workflows (Temporal) for anything > 5 min"
+  - "Failure handling separates demo from production"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

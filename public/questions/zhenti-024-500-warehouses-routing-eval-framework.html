@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q24 · [系统设计/架构] 为给 500 个仓库经理重路由货运、目标 99% 送达率的 AI agent 设计评估框架 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / Q24 · [系统设计/架构] 为给 500 个仓库经理重路由货运、目标 99% 送达率的 AI agent 设计评估框架</div>
+  <h1>Q24 · [系统设计/架构] 为给 500 个仓库经理重路由货运、目标 99% 送达率的 AI agent 设计评估框架</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-024-500-warehouses-routing-eval-framework.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-024-500-warehouses-routing-eval-framework.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">FDE 真题 Q24 (系统设计/架构). 含完美答案架构 + 详细回答模板 + Gao Xin 简历专属版 + 5 follow-ups + 死路答法 + 加分项. ~500-700 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q24 · 500 仓库经理 + 99% 送达率 AI agent 评估框架</h3>
+<blockquote><p>"We're deploying an <strong>AI agent that suggests delivery rerouting</strong> to <strong>500 warehouse managers</strong>. Customer's existing rate is <strong>97% on-time, target 99%</strong>. <strong>Design the evaluation framework</strong> — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"</p></blockquote>
+<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain <strong>约束</strong>: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA</p>
+<hr />
+<h3>这道题在考什么</h3>
+<p>不是考你 LLM eval, 是考你<strong>在已经 97% baseline 上证明 agent 有用</strong>, 哪些反直觉:</p>
+<ol><li><strong>Baseline-relative metrics</strong> — 不能只看 absolute 99%, 要 per-warehouse baseline (西雅图 historical 98% vs 拉斯维加斯 92% — 给到 99% 难度天差地远)</li><li><strong>Counterfactual evaluation</strong> — 500 manager 不一定听 agent, 即使送达率涨了, 是 agent 还是 manager 直觉?</li><li><strong>A/B by warehouse, not by request</strong> — 同一 warehouse 用 / 不用 agent 会造成 manager 困惑, 必须 cluster random</li><li><strong>Shadow mode</strong> before live — agent 在背后跑, 不显示 suggestion, 对比 agent 建议 vs manager 实际决定的 outcome</li><li><strong>Engagement signal</strong> — manager 是否接受 agent 建议 是 leading indicator (信不信)</li><li><strong>Drift detection</strong> — 旺季 (Q4 promo) / 异常天气 / staffing crisis 时 agent 表现怎样, 不只看 average</li><li><strong>HITL eval</strong> — manager 最终拍板, 你的 eval 要 attribute 决策, 不能 confound</li><li><strong>菜鸟答案失败点</strong>: "我用 accuracy / F1 score, 跑 holdout test set" — 完全错. 这是 sequential decision-making with delayed outcome, 不是分类问题. 需要 causal inference + A/B + counterfactual simulation.</li></ol>
+<hr />
+<h3>必问 clarifying questions</h3>
+<ol><li><strong>Decision authority</strong>: agent 直接 reroute 还是只建议给 manager? 99% case 是后者 (HITL)</li><li><strong>Outcome definition</strong>: "送达" = on-time? in-condition? customer-rated? 不同 outcome metric 完全不同的 eval</li><li><strong>Time horizon</strong>: rollout 想多久看到 99%? 3 个月 vs 1 年, 影响 sampling power</li><li><strong>Cost dimension</strong>: 是不是单纯 send 更多 driver / 更贵 expedite 就能 99%? agent 必须不增加 cost</li><li><strong>Existing data</strong>: 多少历史 routing decisions + outcomes? 决定 counterfactual 可行性</li><li><strong>Baseline mechanism</strong>: manager 现在用什么决策? 系统 default + 直觉? 是否有 "current manual" 数据</li><li><strong>External shocks</strong>: 旺季 (Q4) / 天气 / labor 是 noise 还是要在 eval 里 stratify</li><li><strong>Approval power</strong>: 升级到 99% 是 board-level 还是 ops-team level? 影响 eval rigor</li></ol>
+<hr />
+<h3>完美答案架构 (Layered Response)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify + outcome def</td><td>5 min</td><td>锁 outcome metric + HITL 程度 + time horizon</td><td>"三件事先锁: outcome 是 on-time only 还是综合 cost? agent 是 advise 还是 act? horizon 3 月 还是 1 年?"</td></tr><tr><td>2</td><td>Metric hierarchy</td><td>8 min</td><td>North star + leading + guardrail</td><td>"North star: per-warehouse outcome rate. Leading: engagement + recommendation quality. Guardrail: cost, driver hours, customer complaint"</td></tr><tr><td>3</td><td>Per-warehouse baseline</td><td>7 min</td><td>Stratify by warehouse, baseline 历史</td><td>"每个 warehouse 自己跟自己比, 不跟 fleet average 比"</td></tr><tr><td>4</td><td>Eval framework stages</td><td>12 min</td><td>Offline → shadow → A/B → full rollout</td><td>"4-stage gate: offline (历史 replay), shadow (在线但不显示), A/B (cluster random), full rollout"</td></tr><tr><td>5</td><td>Counterfactual + causal</td><td>10 min</td><td>Doubly-robust estimation, synthetic control</td><td>"Counterfactual 关键. 我用 doubly-robust + synthetic control 估反事实"</td></tr><tr><td>6</td><td>Engagement / HITL signals</td><td>5 min</td><td>Acceptance rate, override rate, time-to-decide</td><td>"Manager 接受率是 leading indicator, override rate 是 negative signal"</td></tr><tr><td>7</td><td>Drift + monitoring</td><td>7 min</td><td>Concept drift, distribution shift, alert</td><td>"Drift detection: feature drift + outcome drift + per-warehouse cohort"</td></tr><tr><td>8</td><td>Trade-offs + close</td><td>6 min</td><td>学术 rigor vs business speed</td><td>"Doubly-robust 是 gold standard, business 可能接受 difference-in-differences as 80% solution"</td></tr></tbody></table></div>
+<hr />
+<h3>端到端架构图 (ASCII)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Production: 500 warehouses, manager-facing AI agent                                  │
+│                                                                                        │
+│   Manager (Hyperspace UI)                                                              │
+│      ▼                                                                                 │
+│   Agent recommends reroute → Manager accepts / overrides → Execute → Outcome later     │
+│      │                                  │                                              │
+│      │ log: (warehouse, ts,             │ log: (decision, ts, override_reason)        │
+│      │       suggestion, context,       │                                              │
+│      │       confidence)                ▼                                              │
+│      └─────────────────────────────► Decision Log (Kafka → Iceberg)                    │
+│                                                                                        │
+│   Driver dispatch system → Delivery completion → Outcome:                              │
+│   (on_time, in_condition, cost, customer_rating, driver_miles)                         │
+│                                              │                                         │
+│                                              ▼                                         │
+│                                       Outcome Log (Iceberg)                            │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Eval Framework  (Databricks notebooks + airflow scheduled + custom Python)            │
+│                                                                                        │
+│   Stage 1: OFFLINE EVAL (historical replay)                                            │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Replay 6 month historical decisions                                  │             │
+│   │ For each (warehouse, day):                                           │             │
+│   │   ▸ agent_suggestion = agent.predict(historical_context)             │             │
+│   │   ▸ actual_manager_decision = log[warehouse, day]                    │             │
+│   │   ▸ actual_outcome = outcome[warehouse, day]                         │             │
+│   │   ▸ counterfactual_outcome = doubly_robust_estimate(...)             │             │
+│   │ Metric: % of warehouse-days where agent ≥ manager (paired comparison) │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 2: SHADOW MODE (3 weeks)                                                       │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Agent runs LIVE on real context but suggestion NOT shown to manager  │             │
+│   │ Logs: (agent_suggestion, manager_actual_decision, outcome)           │             │
+│   │ Allow comparison: agent ≈ manager (concordance)                      │             │
+│   │ Gate: if agent disagrees badly + outcome would be worse, halt rollout │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 3: A/B BY WAREHOUSE (cluster random)  (8 weeks)                                │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Stratified random:                                                   │             │
+│   │   - Control: 50 warehouses, no agent (manager only)                  │             │
+│   │   - Treat:   50 warehouses, agent suggestion shown                   │             │
+│   │   - Strata: warehouse size, region, baseline ontime                  │             │
+│   │ Outcome: on-time rate diff (treat - control), per-strata             │             │
+│   │ Power: with 50 warehouses × 8 weeks × ~500 deliveries/day            │             │
+│   │   → detect 0.5pp lift with 90% power                                 │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 4: GRADUAL ROLLOUT (4 weeks → 100%)                                            │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Cohort rollout: 100 → 250 → all 500                                  │             │
+│   │ Per-cohort: 2-week observation, regression detection                 │             │
+│   │ Halt criteria: any guardrail breach (cost +5%, complaint +20%)       │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Post-launch monitoring (continuous)                                                  │
+│                                                                                        │
+│   ▸ Per-warehouse outcome dashboard (rolling 30d, 7d, 1d)                              │
+│   ▸ Drift detection:                                                                   │
+│       - Feature drift (PSI on agent inputs)                                            │
+│       - Outcome drift (per-warehouse cohort vs historical)                             │
+│       - Acceptance rate drift (manager 拒绝率 trend)                                   │
+│   ▸ Alert routing:                                                                     │
+│       - Per-warehouse outcome regression &gt; 2pp → PagerDuty (P2)                        │
+│       - Fleet-wide acceptance &lt; 50% sudden → ML team (P3)                              │
+│   ▸ Quarterly causal analysis:                                                         │
+│       - Synthetic control reconstruction                                               │
+│       - Difference-in-differences vs preserved control 10% (10 永远 not get agent)     │
+└────────────────────────────────────────────────────────────────────────────────────────┘</code></pre>
+<hr />
+<h3>详细设计 (60-min walkthrough)</h3>
+<h4>Phase 1: Clarify + outcome definition (5 min)</h4>
+<p>开口锁:</p>
+<ul><li>"Outcome metric: 'on-time' 是 promised window 内吗? 比如 promised 2pm 实际 3pm 算 fail?"</li><li>"Agent advises or acts? 99% case 是 advise + manager 决定. 影响 attribution"</li><li>"Time horizon: 3 个月看到 99% 还是 12 个月? 影响 sample size + 是否能 isolate seasonal"</li><li>"Cost guardrail: 如果送达 99% 但 cost +20%, business 接受吗?"</li></ul>
+<p>我假设: outcome = on-time within promised window AND not-damaged, agent advise (manager decide), horizon = 6 months to reach 99% sustained, cost guardrail &lt; 105% baseline.</p>
+<p>KPI clarity:</p>
+<ul><li><strong>North star</strong>: per-warehouse on-time rate (delivery in window + intact), weighted by delivery volume</li><li><strong>Leading</strong>: manager acceptance rate of agent suggestions</li><li><strong>Guardrail</strong>: cost per delivery, driver hours/delivery, customer complaint rate, manager override reasons</li></ul>
+<h4>Phase 2: Metric hierarchy (8 min)</h4>
+<p>不要只一个 metric, 三层:</p>
+<p><strong>North star (1 个)</strong>:</p>
+<ul><li>Weighted on-time rate (delivery in promised window AND intact AND received) — 衡量真正业务目标 99%</li></ul>
+<p><strong>Leading indicators (3-5 个)</strong> — 早于 outcome 现的信号:</p>
+<ul><li>Manager acceptance rate (% suggestion accepted by manager): leading signal of agent trust</li><li>Recommendation quality (% suggestion that <em>would have</em> improved outcome based on counterfactual)</li><li>Time-to-decide (manager 看 suggestion 后多快做决定): proxy for cognitive load</li><li>Suggestion coverage (% of routing decisions where agent had non-trivial recommendation)</li><li>Override reasons distribution (taxonomy: "agent missed weather", "manager local knowledge", etc.)</li></ul>
+<p><strong>Guardrails (5-7 个)</strong> — 防 agent 拿"作弊"方式刷指标:</p>
+<ul><li>Cost per delivery (US$): agent 不能让人都用 expedite 来 99%</li><li>Driver hours per delivery: 不能压榨 driver</li><li>Customer complaint rate (per 1000 deliveries)</li><li>Customer NPS (sampled survey)</li><li>Damaged-in-transit rate</li><li>Driver attrition rate (per quarter): 不能让 driver 因为不合理 routing 跳槽</li><li>Hub utilization variance: 不能 over-route 某 hub 累瘫</li></ul>
+<p><strong>Counter metrics</strong> — 防 dashboard 偏:</p>
+<ul><li>Bottom-quartile warehouse outcome (不只看 average, 看最差的 25%)</li><li>Worst-day outcome (最差一天)</li></ul>
+<p>为什么三层 + counter:</p>
+<ul><li>North star 滞后: 看 outcome 要 1-3 天 delivery cycle</li><li>Leading 让你早知道 trouble (acceptance 跌等于将来 outcome 跌)</li><li>Guardrail 防 game (不能为 99% 牺牲 cost)</li><li>Counter 防 average-shifting hide variance</li></ul>
+<h4>Phase 3: Per-warehouse baseline (7 min)</h4>
+<p><strong>关键洞察</strong>: 500 warehouse heterogeneity 巨大. 西雅图 hub 处理 5000/day deliveries 经验老到 baseline 98%; 拉斯维加斯小 hub 800/day baseline 92%; 鳳凰城 大 promo season 一时间 85%.</p>
+<p><strong>统一目标 99% 是错的</strong>. 正确:</p>
+<ul><li>每 warehouse 自己 baseline (rolling 6-month pre-agent)</li><li>Target = baseline + Δ, Δ 大小因 warehouse 而异 (低 baseline 提升空间大, 高 baseline 提升难)</li></ul>
+<p><strong>分层 (stratification)</strong>:</p>
+<pre class="language-python"><code class="language-python">warehouse_strata = stratify(warehouses, dims=[
+    'baseline_ontime_quartile',  # Q1/Q2/Q3/Q4
+    'region',                    # 5 region
+    'volume_decile',             # daily delivery volume
+])
+# 500 warehouse → ~20 strata, each ~25 warehouse</code></pre>
+<p><strong>目标 redefinition</strong>:</p>
+<ul><li>不是 "99% by Dec 2026"</li><li>而是 "every warehouse +1pp on baseline by Q4, weighted-average reaches 99% by Q1 2027"</li></ul>
+<p><strong>Per-warehouse leaderboard</strong> (操作意义):</p>
+<ul><li>不公开排名 (避免压力 distort manager 行为)</li><li>内部 leadership see: top mover, bottom mover, agent contribution % to mover</li><li>Bottom-quartile manager 1:1 from regional director</li></ul>
+<h4>Phase 4: 4-stage eval pipeline (12 min)</h4>
+<p><strong>Stage 1: Offline historical replay (week 1-2)</strong></p>
+<pre class="language-python"><code class="language-python">historical_data = load('2024-09 to 2025-08, 500 warehouse, all routing decisions')
+# ~500 warehouse × 365 day × ~50 decisions/day = ~9M decision-rows
+
+for warehouse, day in warehouses × days:
+    context = historical_data[warehouse, day].context  # weather, inventory, demand
+    actual_decision = historical_data[warehouse, day].manager_decision
+    actual_outcome  = historical_data[warehouse, day].outcome
+    
+    agent_decision  = agent.predict(context)
+    
+    # Concordance: does agent agree with manager on 80%+?
+    concordance = (agent_decision == actual_decision)
+    
+    # Counterfactual: what would have happened if agent's decision?
+    counterfactual_outcome = doubly_robust(
+        context=context,
+        treatment=agent_decision,
+        observed_outcome=actual_outcome,
+        observed_decision=actual_decision,
+        propensity_model=...,
+        outcome_model=...,
+    )
+    
+    # Metric: did agent's decision &gt;= manager's decision (paired)?
+    win_loss = compare(counterfactual_outcome, actual_outcome)
+
+# Aggregate
+metrics = {
+    'concordance_rate': mean(concordance),  # 0.78
+    'agent_wins_pct': mean(win_loss == 'win'),  # 0.32
+    'agent_loses_pct': mean(win_loss == 'lose'),  # 0.15
+    'tied_pct': 0.53,
+}</code></pre>
+<p>Gate: agent_wins &gt; agent_loses by 5pp, concordance &gt; 70%, no warehouse has catastrophic counterfactual</p>
+<p><strong>Stage 2: Shadow mode (week 3-5)</strong></p>
+<p>Agent runs live on real-time data. 但 <strong>suggestion 不显示给 manager</strong> (manager 还是按自己经验决定). 我们 log:</p>
+<ul><li>Real-time agent_suggestion</li><li>Actual manager_decision</li><li>Outcome (24-72h delayed)</li></ul>
+<p>为什么 shadow:</p>
+<ul><li>Offline replay 假设 historical context = future context, 但 distribution drift 可能</li><li>Live shadow 验证 in-production data pipeline, model deploy correct</li><li>收集 "if you had shown this suggestion to manager, would they have changed?" — virtual A/B</li></ul>
+<p>3 weeks × 500 warehouse × 50 decisions/day = 5M decisions of shadow data. Stat power 强.</p>
+<p>Gate: shadow vs offline concordance 接近 (&lt; 5pp drift), no live infra issue</p>
+<p><strong>Stage 3: Cluster random A/B (week 6-13)</strong></p>
+<p>不能 per-decision random (同一 warehouse 一时给 agent 一时不给 → manager 困惑 / spillover). <strong>必须 cluster-by-warehouse</strong>.</p>
+<p>设计:</p>
+<pre class="language-python"><code class="language-python"># Stratified random sampling
+strata = stratify(500_warehouses, by=[baseline_quartile, region, volume_decile])
+control = random_sample(strata, n_per_stratum=2)  # ~40 warehouse
+treat   = random_sample(strata, n_per_stratum=2)  # ~40 warehouse
+# Remaining 420 stay on current process
+
+# Run for 8 weeks
+for week in 8_weeks:
+    for w in control: # no agent
+    for w in treat:   # agent suggestion shown
+    for w in rest:    # no change (still part of pre-rollout baseline)
+
+# Analysis
+treat_ontime = ...
+control_ontime = ...
+diff_in_diff = (treat_post - treat_pre) - (control_post - control_pre)</code></pre>
+<p><strong>Power calculation</strong>:</p>
+<ul><li>Baseline 97%, target lift 2pp to 99%</li><li>σ across warehouse-week ≈ 1.5pp (variance)</li><li>40 warehouse × 8 weeks × 500 deliveries = 160K deliveries treat</li><li>Detectable effect (α=0.05, β=0.1): 0.4pp lift detectable</li></ul>
+<p>→ 40 warehouse × 8 weeks 够 detect 0.5pp lift (我们想看 2pp). 富余.</p>
+<p><strong>Spillover risk</strong>: 邻近 warehouse share driver pool, agent reroute 1 个可能影响邻居. Mitigation: cluster random by region (集中 control/treat 在 region 内, 减少 spill).</p>
+<p><strong>Stage 4: Gradual rollout (week 14-17)</strong></p>
+<p>Cohort 1: top 100 + bottom 100 = 200 (mixed performance for diversity) Cohort 2: + middle 250 = 450 Cohort 3: + remaining 50 = 500</p>
+<p>每 cohort 2 weeks observation, regression test 通过才下一 cohort.</p>
+<p>Halt criteria:</p>
+<ul><li>Per-warehouse on-time regression &gt; 2pp (P0)</li><li>Cost +5% (P1)</li><li>Customer complaint +20% (P1)</li><li>Manager acceptance &lt; 30% (P2)</li></ul>
+<h4>Phase 5: Counterfactual + causal inference (10 min)</h4>
+<p>这是 staff-level 的标志. 99% of candidates 不会答这层.</p>
+<p><strong>Why counterfactual is hard here</strong>:</p>
+<ul><li>We observe (decision, outcome). 我们想知道 "如果 agent 决定, outcome 是什么".</li><li>Naive: train regression on (decision, context) → outcome. But manager_decision is itself a function of context, confounded.</li><li>Need to break confound: doubly-robust, IPW, or A/B.</li></ul>
+<p><strong>Methods (in order of rigor)</strong>:</p>
+<p><strong>1. RCT (gold standard)</strong> — Stage 3 A/B 是这个.</p>
+<p><strong>2. Doubly-Robust estimator</strong> — when no A/B:</p>
+<pre class="language-plaintext"><code class="language-plaintext">DR(x) = E[Y | T=t, X=x] (outcome model)
+      + I(T=t)/π(t|x) * (Y - E[Y|T=t, X=x])  (IPW correction)
+
+where π(t|x) = propensity score = P(manager_decision=t | context=x)</code></pre>
+<p>DR is consistent if EITHER outcome model OR propensity model is correct. Robust.</p>
+<p><strong>3. Synthetic control</strong> — for ongoing post-launch eval:</p>
+<ul><li>Pick 50 warehouse 永远 not get agent (preserved control)</li><li>For each treated warehouse, construct synthetic counterfactual = weighted combo of control warehouses</li><li>Diff = treated - synthetic</li></ul>
+<p><strong>4. Difference-in-differences (DiD)</strong> — simpler, business-friendly:</p>
+<pre class="language-plaintext"><code class="language-plaintext">ATE = (treat_post - treat_pre) - (control_post - control_pre)</code></pre>
+<p>Assumes parallel trends. Easier to communicate to business.</p>
+<p><strong>Implementation</strong>: 主用 DR 给 ML team, DiD 给 business stakeholder ("简单减一减").</p>
+<p><strong>Edge cases</strong>:</p>
+<ul><li>Manager rejects agent suggestion → still counts as "treated" (intent-to-treat ITT)</li><li>Warehouse 部分 manager 接受 部分不接受 → cluster-level 仍 random, ITT 仍 valid</li></ul>
+<h4>Phase 6: Engagement + HITL signals (5 min)</h4>
+<p>Agent advises, manager decides. <strong>Engagement is leading indicator</strong>.</p>
+<p><strong>Acceptance rate</strong>:</p>
+<ul><li>100% acceptance: manager 没在思考 (rubber stamp), agent 错了也接受 — bad</li><li>0%: manager 不信任 — bad</li><li>60-80%: healthy disagreement, agent adds value 但 manager 用 local knowledge override 部分</li></ul>
+<p><strong>Override reasons taxonomy</strong>:</p>
+<ul><li>"Agent missed local context" (weather, road closure unknown)</li><li>"Cost too high" (agent picked expedite, manager 用 cheaper)</li><li>"Manager intuition" (5+ year veteran, knows specific customer)</li><li>"Agent error" (real bug, log to ML team)</li></ul>
+<p>每 override 强制要求 manager 选 reason (UI dropdown, &lt; 3 sec interaction).</p>
+<p><strong>Engagement signals dashboard</strong>:</p>
+<ul><li>Per-warehouse acceptance rate trend</li><li>Per-manager acceptance rate (some manager 60%, some 90% — different trust)</li><li>Override reason distribution shifts (mix 偏 "agent error" 意味着真的 quality 下降)</li><li>Time-to-decide (manager 看 suggestion 后多久点接受/拒绝)</li></ul>
+<p><strong>Manager-level segmentation</strong>:</p>
+<ul><li>"Heavy adopter": &gt; 80% accept, &lt; 30s decide → 给他们 advanced features</li><li>"Selective adopter": 50-80% accept, &gt; 60s decide → 健康</li><li>"Rejector": &lt; 30% accept → 1:1 training, understand barrier</li><li>"Rubber stamper": &gt; 95% accept, &lt; 5s decide → concerning, agent 错了也照办, 加 friction (要求注释)</li></ul>
+<h4>Phase 7: Drift detection + monitoring (7 min)</h4>
+<p>Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.</p>
+<p><strong>3 类 drift</strong>:</p>
+<p><strong>(a) Feature drift</strong> — agent input distribution 变</p>
+<ul><li>PSI (Population Stability Index) on key features: order_volume, weather_severity, staff_count, inventory</li><li>PSI &gt; 0.2 = significant shift → alert ML team</li><li>Per-warehouse PSI (locality 重要)</li></ul>
+<p><strong>(b) Outcome drift</strong> — outcome distribution 变 (与 agent 无关 / 与 agent 有关)</p>
+<ul><li>Per-warehouse cohort outcome rolling 7d / 30d</li><li>Pre-launch baseline as reference</li><li>Drift &gt; 1pp → investigate</li></ul>
+<p><strong>(c) Concept drift</strong> — relationship (context → outcome) 变</p>
+<ul><li>Train shadow model on recent 30d, compare predictions to original agent</li><li>High divergence = concept changed (e.g., new last-mile vendor 改了 dynamics)</li></ul>
+<p><strong>Alert routing</strong>: | Signal | Severity | Channel | |---|---|---| | Per-warehouse outcome -2pp 7d trailing | P2 | PagerDuty → ops oncall + regional director | | Fleet outcome -1pp 30d trailing | P2 | PagerDuty → ML team + ops VP | | Acceptance rate -10pp 7d trailing | P3 | Slack → ML team | | Feature PSI &gt; 0.2 | P3 | Slack → ML team | | Cost / driver hour &gt; +5% | P1 | PagerDuty → ops VP | | Customer complaint &gt; +20% | P1 | PagerDuty → CX VP + ops VP |</p>
+<p><strong>Quarterly causal re-eval</strong>:</p>
+<ul><li>Synthetic control reconstruction (using preserved 10% never-treated)</li><li>DiD on rolling quarter</li><li>Per-strata effect heterogeneity (does agent help low-baseline warehouses more? expected yes)</li></ul>
+<h4>Phase 8: Trade-offs + alternatives (6 min)</h4>
+<p><strong>Decision 8.1 — Rigor vs business speed</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>RCT 8 weeks before any rollout</td><td>Causal certainty</td><td>Slow, business 急</td></tr><tr><td>Shadow + DiD only</td><td>Fast</td><td>Causal weaker</td></tr><tr><td>Offline replay only</td><td>Fastest</td><td>Distribution drift risk</td></tr></tbody></table></div>
+<p>我推: 4-stage gate (offline → shadow → A/B → rollout). 8 weeks A/B 不能砍, 这是 99%-target 的 board-defensible.</p>
+<p><strong>Decision 8.2 — Centralized eval team vs federated</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Centralized (我们 ML team 全管)</td><td>Consistency, expertise</td><td>Slow, doesn't scale to 50 customers</td></tr><tr><td>Federated (我们提供 framework, customer ops 跑)</td><td>Scale, customer ownership</td><td>Less rigor</td></tr></tbody></table></div>
+<p>我推: hybrid — 我们提供 eval framework (code + dashboard template) + 培训 customer ops team, 关键 RCT 由我们 ML team operate, ongoing monitoring 给 customer.</p>
+<p><strong>Decision 8.3 — Stratification dimensions</strong></p>
+<p>Pick wisely, 太多 stratum 每 stratum sample 小. 我选 3:</p>
+<ul><li>baseline quartile (Q1/Q2/Q3/Q4) — 关键, 因为效果 heterogeneity</li><li>region (5) — 季节性 + driver pool</li><li>volume decile (D1-D10) — small vs large warehouse 动态不同</li></ul>
+<p>500 / (4×5×10) = 仍只 2.5 warehouse/stratum, 太少. 折中: 4×5×3 = 60 stratum, 8 warehouse 平均. Match 8 weeks × 500 deliveries 够 power.</p>
+<p><strong>Decision 8.4 — Pricing of agent suggestion based on cost</strong></p>
+<p>Agent 可能为 99% 推 expedite (rush delivery, +50% cost). Guardrail 防止. 还可以让 agent 直接 see cost in reward function:</p>
+<pre class="language-plaintext"><code class="language-plaintext">agent.optimize(
+    objective = on_time_rate - λ * cost - μ * driver_hours,
+    λ = $5 per delivery cost,
+    μ = $20 per driver hour,
+)</code></pre>
+<p>让 agent 自带 cost-awareness 而不是只靠 guardrail kill.</p>
+<hr />
+<h3>关键决策点 (with rationale)</h3>
+<ol><li><strong>Per-warehouse baseline 而不是 fleet average target</strong> — 西雅图 vs 拉斯维加斯 起点不同, 一刀切 99% 不可能 / 不公平.</li></ol>
+<ol><li><strong>4-stage gated eval (offline → shadow → A/B → rollout)</strong> — 跳任何 stage 都是 risk. Shadow 验 prod pipeline, A/B 给 causal.</li></ol>
+<ol><li><strong>Cluster random by warehouse, not by request</strong> — 避免 manager 困惑 + 减少 spillover.</li></ol>
+<ol><li><strong>Doubly-robust + DiD parallel</strong> — DR 给 ML rigor, DiD 给 business 简单证据.</li></ol>
+<ol><li><strong>Engagement (acceptance rate) 为 leading indicator</strong> — 早 outcome 14-30 天 看到 trouble.</li></ol>
+<ol><li><strong>Override reason taxonomy 强制</strong> — manager 拒绝时给 reason, 这是 product feedback data, 比任何 ML metric 都 actionable.</li></ol>
+<ol><li><strong>Counter metrics (bottom-quartile, worst-day)</strong> — 防止 average lift hide variance. 99% sustained 比 99% average 难.</li></ol>
+<ol><li><strong>Preserved 10% never-treated control</strong> — quarterly causal re-eval, long-term agent health check.</li></ol>
+<hr />
+<h3>数字 (capacity sizing, cost math)</h3>
+<p><strong>Volumes</strong>:</p>
+<ul><li>500 warehouse × 50 routing decisions/day × 365 = 9.1M decisions/year</li><li>Each decision: context ~5KB JSON → 45GB/year</li><li>Outcome data: ~1KB per delivery × 200M deliveries/year = 200GB/year</li></ul>
+<p><strong>A/B power</strong>:</p>
+<ul><li>Treat 40 warehouse × 8 weeks × ~500 deliveries/warehouse-day = 1.1M deliveries</li><li>Baseline σ across warehouse-week ≈ 1.5pp</li><li>Minimum detectable effect: 0.4pp at α=0.05, β=0.1</li><li>Target lift: 2pp → 5× over MDE → easily detected</li></ul>
+<p><strong>Compute (eval pipeline)</strong>:</p>
+<ul><li>Daily eval batch: ~$50/day (Databricks 4-node 1hr)</li><li>Quarterly causal analysis: ~$2K (Databricks ML cluster 2 days)</li><li>Real-time monitoring (Datadog dashboards, alert engine): ~$1K/month</li><li><strong>Total</strong>: ~$3K/month eval cost</li></ul>
+<p><strong>Timeline</strong>:</p>
+<ul><li>Stage 1 (offline replay): 2 weeks</li><li>Stage 2 (shadow): 3 weeks</li><li>Stage 3 (A/B): 8 weeks</li><li>Stage 4 (rollout): 4 weeks</li><li><strong>Total</strong>: 17 weeks to full rollout (~4 months)</li></ul>
+<p><strong>Quarterly causal eval cost</strong>: 1 ML team-week × 4 quarters = 4 weeks/year = $40K labor cost</p>
+<p><strong>Business value</strong>:</p>
+<ul><li>500 warehouse × 500 deliveries/day × avg $5 cost/delivery × 2pp on-time improvement</li></ul>
+<p>→ 2pp better SLA = ~$50/warehouse/day saved (avoid expedite + customer refund) → 500 × $50 × 365 = $9.1M/year value</p>
+<ul><li>Net: $9M+ vs eval cost ~$50K + agent infra ~$200K = strong ROI</li></ul>
+<hr />
+<h3>Gao Xin 简历专属 reframe</h3>
+<ol><li><strong>TikTok PayLater A/B framework</strong> — 你做过 BNPL approval A/B, 同样 cluster random (by user cohort), counterfactual approval, guardrail (default rate). 直接套.</li></ol>
+<ol><li><strong>Voice agent 7 markets</strong> — 多 market 表现差异巨大, 你做过 per-market baseline + stratified rollout, 跟 500 warehouse heterogeneity 同思路.</li></ol>
+<ol><li><strong>Indonesia refund tier A/B</strong> — 你做过 monitored rollout with regulator-tracked metric, halt criteria 你定过, 跟这道题 99% target 思路同源.</li></ol>
+<ol><li><strong>ConvFinQA eval</strong> — multi-step task eval 经验, agent-decision eval framework 你跑过.</li></ol>
+<ol><li><strong>Risk model drift monitoring</strong> — 你做过 production model drift dashboard, PSI / KS-statistic 监控, 直接用在 agent 监控.</li></ol>
+<p>reframe: "我在字节做 PayLater 时 A/B framework 跟这道题 80% 重叠: cluster random + stratified + guardrail + DiD/DR. 增量是 (1) HITL — manager 在循环里, 我加 engagement signal; (2) 500 warehouse heterogeneity 比 user cohort 更复杂, per-warehouse baseline 而不是 fleet average; (3) outcome 延迟 (delivery 1-3 天) 比 default (30 天) 短, 反馈快."</p>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<ol><li><strong>"如果 RCT 8 weeks 太慢, business 要 4 weeks 就 rollout, 怎么办?"</strong> — 答: 砍 sample size 到 60 warehouse (30+30), power 仍 detect 0.6pp, 但精度降. 跟 business 摆清楚 — 我们 might miss subtle 但 catch big issues. 同时 shadow + offline 已 paid 7 weeks, A/B 4 weeks 是最少 acceptable. Business 想再砍, 我会 push back + 给 risk memo.</li></ol>
+<ol><li><strong>"manager 拒绝 agent 但 outcome 反而好, 怎么解释?"</strong> — 答: manager 有 local knowledge agent 不知 (specific customer relationship, road closure not in feed, driver 出 sick). 这是 healthy disagreement. 把 override 当 product feedback, 把高质量 override 的 case 反向 train agent (RLHF-like). 同时把 manager local knowledge 改成 feature (e.g., let manager flag "VIP customer", agent 输入).</li></ol>
+<ol><li><strong>"如何区分 agent contribution vs 旺季外部因素?"</strong> — 答: synthetic control + DiD. 用 preserved 10% never-treated 作 control, treated vs synthetic control diff 是 net effect, 把 seasonal common shock 滤掉.</li></ol>
+<ol><li><strong>"客户高管问'2 个月内你能给我 99% 数字吗', 你怎么答?"</strong> — 答: 诚实. 4-stage 17 周 sequence, 想 2 个月只能砍到 offline + shadow + 小 A/B. 在 month 2 可以给 directional evidence (shadow data + small A/B 趋势), 但 board-defensible 99% sustained 需要至少 6 个月. Push back: "急可以, 但风险是 false positive — A/B 没 powered to detect cost regression. 我建议 hybrid: month 2 directional sign-off + month 4 full validation".</li></ol>
+<ol><li><strong>"如果 agent 让 99% 仓但坏 bottom-quartile 怎么办?"</strong> — 答: heterogeneous treatment effect 分析. 用 causal forest 或 X-learner 找 subgroup. 可能 agent 适合 large warehouse 不适合 small. 应对: (a) 不给 small warehouse 用 agent; (b) 训 small-specific agent; (c) 给 small manager 不同 UI (advise but never auto-action).</li></ol>
+<hr />
+<h3>❌ 死路答法</h3>
+<ol><li><strong>"用 accuracy / F1"</strong> — 这是 sequential decision, 不是分类. 错.</li><li><strong>"per-decision random A/B"</strong> — manager 困惑 + spillover. 必须 cluster random.</li><li><strong>"全部 500 一起 rollout 看 outcome"</strong> — 没 control, 没 causal, 旺季影响混入.</li><li><strong>"只看 average on-time"</strong> — variance hide, bottom-quartile 仍可能差.</li><li><strong>"agent 直接 act 不要 manager"</strong> — 99% case 是 HITL, 直接 act 业务 + legal 不接受.</li><li><strong>"offline replay 通过就 rollout"</strong> — distribution drift 风险.</li><li><strong>"acceptance rate = engagement = success"</strong> — rubber-stamping 也能 100% acceptance, 需要 nuance.</li><li><strong>"causal? 太复杂, 业务不要"</strong> — staff 答案必须有 causal, 不然 99% claim 不 defensible.</li><li><strong>"agent cost 不管, business 自己看"</strong> — agent 可能 game 指标 (推 expedite), guardrail 必须有.</li><li><strong>"drift detection? 上线后 1 年再说"</strong> — Day 1 dashboard 就要有, agent drift 可能 week 4 就出现.</li></ol>
+<hr />
+<h3>✅ 加分项</h3>
+<ol><li><strong>Per-warehouse baseline 而不是 fleet 99% target</strong> — 立刻 signal 你懂 heterogeneous treatment</li><li><strong>4-stage gate (offline + shadow + A/B + rollout)</strong> — 完整 eval lifecycle, 不跳步</li><li><strong>Cluster random by warehouse + stratification by baseline-quartile/region/volume</strong> — 真懂 A/B 设计</li><li><strong>Doubly-robust + DiD 并行</strong> — rigor + business-friendly</li><li><strong>Engagement signals (acceptance / override reason taxonomy)</strong> — HITL 设计深度</li><li><strong>Counter metrics (bottom-quartile, worst-day)</strong> — 防 average hide</li><li><strong>Preserved 10% never-treated 做 long-term control</strong> — 真懂 causal hygiene</li><li><strong>Halt criteria 明确 + 多级 alert routing</strong> — production sense</li><li><strong>Heterogeneous treatment effect (causal forest 找 subgroup)</strong> — analytics 深度</li><li><strong>Numbers 给得出来</strong> (40 warehouse × 8 weeks 够 0.4pp MDE, $9M business value)</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>99% 目标不是 ML problem, 是 <strong>eval framework problem</strong> — per-warehouse baseline + 4-stage gate (offline replay → shadow → cluster random A/B → cohort rollout) + counterfactual estimation (DR + DiD) + engagement leading indicator + drift monitoring + counter metric, 一整套 causal-rigorous + HITL-aware 评估系统.</p>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Metric Hierarchy:
+  North star (1):     per-warehouse on-time rate, weighted by volume
+  Leading (3-5):      acceptance, recommendation quality, time-to-decide, coverage, override reason
+  Guardrail (5-7):    cost, driver hr, complaint, NPS, damage, attrition, hub variance
+  Counter (2):        bottom-quartile, worst-day
+
+Per-warehouse baseline:
+  Strata: baseline_quartile × region × volume_decile = ~60 stratum
+  Target: baseline + Δ (not uniform 99%)
+  Leaderboard: internal only, not manager-facing
+
+4-stage Eval:
+  Stage 1 (2w):  offline replay, doubly-robust counterfactual, concordance ≥ 70%, agent_wins &gt; losses + 5pp
+  Stage 2 (3w):  shadow, agent live but hidden, validate prod pipeline
+  Stage 3 (8w):  cluster A/B, 40 control + 40 treat, MDE 0.4pp, DiD analysis
+  Stage 4 (4w):  cohort rollout 100 → 250 → 500, halt criteria active
+
+Counterfactual:
+  RCT:           gold standard (Stage 3)
+  Doubly-Robust: outcome model + propensity weight, consistent if either correct
+  Synthetic ctrl:treated vs weighted-control combo, post-launch
+  DiD:           business-friendly, parallel trends assumed
+
+Engagement Signals:
+  Acceptance rate (60-80% healthy)
+  Override reason taxonomy (manager picks dropdown)
+  Time-to-decide (proxy for cognitive load)
+  Manager segmentation: heavy / selective / rejector / rubber-stamper
+
+Drift Detection:
+  Feature drift: PSI per-warehouse, &gt; 0.2 alert
+  Outcome drift: rolling 7d / 30d vs baseline
+  Concept drift: shadow model recent 30d vs original agent
+
+Alert Routing:
+  P0 (page on-call): per-warehouse -2pp, customer complaint +20%, cost +5%
+  P1 (page leader):  fleet outcome -1pp 30d
+  P2 (Slack ML):     acceptance -10pp, feature PSI &gt; 0.2
+
+Preserved Controls:
+  10% warehouse (50) never get agent → quarterly causal re-eval
+
+Numbers:
+  9.1M decisions/year, 200M deliveries
+  Stage 3: 40+40 warehouse × 8 weeks → 1.1M deliveries treat
+  MDE: 0.4pp; target lift 2pp easy detect
+  Total timeline: 17 weeks (4 months) to full rollout
+  Eval cost: ~$3K/month
+  Business value: ~$9M/year on $200K infra + $50K eval</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-023-fortune-500-aws-vpc-okta-snowflake.html">← Q23 · [系统设计/架构] F500 在自己 AWS VPC 里部署, 用 Okta SSO、Snowflake 做数据源, 讲部署架构</a>
+    <a href="zhenti-025-llm-inference-latency-diagnosis.html">Q25 · [系统设计/架构] 如何诊断 LLM 推理 pipeline 的高延迟? (tokenization、网络、batch size、KV cache、后处理) →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q24 · 500 仓库经理 + 99% 送达率 AI agent 评估框架
+
+> "We're deploying an **AI agent that suggests delivery rerouting** to **500 warehouse managers**. Customer's existing rate is **97% on-time, target 99%**. **Design the evaluation framework** — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"
+
+**Round**: System Design (60 min)
+**出处**: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain
+**约束**: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA
+
+---
+
+## 这道题在考什么
+
+不是考你 LLM eval, 是考你**在已经 97% baseline 上证明 agent 有用**, 哪些反直觉:
+
+1. **Baseline-relative metrics** — 不能只看 absolute 99%, 要 per-warehouse baseline (西雅图 historical 98% vs 拉斯维加斯 92% — 给到 99% 难度天差地远)
+2. **Counterfactual evaluation** — 500 manager 不一定听 agent, 即使送达率涨了, 是 agent 还是 manager 直觉?
+3. **A/B by warehouse, not by request** — 同一 warehouse 用 / 不用 agent 会造成 manager 困惑, 必须 cluster random
+4. **Shadow mode** before live — agent 在背后跑, 不显示 suggestion, 对比 agent 建议 vs manager 实际决定的 outcome
+5. **Engagement signal** — manager 是否接受 agent 建议 是 leading indicator (信不信)
+6. **Drift detection** — 旺季 (Q4 promo) / 异常天气 / staffing crisis 时 agent 表现怎样, 不只看 average
+7. **HITL eval** — manager 最终拍板, 你的 eval 要 attribute 决策, 不能 confound
+8. **菜鸟答案失败点**: "我用 accuracy / F1 score, 跑 holdout test set" — 完全错. 这是 sequential decision-making with delayed outcome, 不是分类问题. 需要 causal inference + A/B + counterfactual simulation.
+
+---
+
+## 必问 clarifying questions
+
+1. **Decision authority**: agent 直接 reroute 还是只建议给 manager? 99% case 是后者 (HITL)
+2. **Outcome definition**: "送达" = on-time? in-condition? customer-rated? 不同 outcome metric 完全不同的 eval
+3. **Time horizon**: rollout 想多久看到 99%? 3 个月 vs 1 年, 影响 sampling power
+4. **Cost dimension**: 是不是单纯 send 更多 driver / 更贵 expedite 就能 99%? agent 必须不增加 cost
+5. **Existing data**: 多少历史 routing decisions + outcomes? 决定 counterfactual 可行性
+6. **Baseline mechanism**: manager 现在用什么决策? 系统 default + 直觉? 是否有 "current manual" 数据
+7. **External shocks**: 旺季 (Q4) / 天气 / labor 是 noise 还是要在 eval 里 stratify
+8. **Approval power**: 升级到 99% 是 board-level 还是 ops-team level? 影响 eval rigor
+
+---
+
+## 完美答案架构 (Layered Response)
+
+| # | 层 | 时间 | 干什么 | 开口句 |
+|---|---|------|------|------|
+| 1 | Clarify + outcome def | 5 min | 锁 outcome metric + HITL 程度 + time horizon | "三件事先锁: outcome 是 on-time only 还是综合 cost? agent 是 advise 还是 act? horizon 3 月 还是 1 年?" |
+| 2 | Metric hierarchy | 8 min | North star + leading + guardrail | "North star: per-warehouse outcome rate. Leading: engagement + recommendation quality. Guardrail: cost, driver hours, customer complaint" |
+| 3 | Per-warehouse baseline | 7 min | Stratify by warehouse, baseline 历史 | "每个 warehouse 自己跟自己比, 不跟 fleet average 比" |
+| 4 | Eval framework stages | 12 min | Offline → shadow → A/B → full rollout | "4-stage gate: offline (历史 replay), shadow (在线但不显示), A/B (cluster random), full rollout" |
+| 5 | Counterfactual + causal | 10 min | Doubly-robust estimation, synthetic control | "Counterfactual 关键. 我用 doubly-robust + synthetic control 估反事实" |
+| 6 | Engagement / HITL signals | 5 min | Acceptance rate, override rate, time-to-decide | "Manager 接受率是 leading indicator, override rate 是 negative signal" |
+| 7 | Drift + monitoring | 7 min | Concept drift, distribution shift, alert | "Drift detection: feature drift + outcome drift + per-warehouse cohort" |
+| 8 | Trade-offs + close | 6 min | 学术 rigor vs business speed | "Doubly-robust 是 gold standard, business 可能接受 difference-in-differences as 80% solution" |
+
+---
+
+## 端到端架构图 (ASCII)
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Production: 500 warehouses, manager-facing AI agent                                  │
+│                                                                                        │
+│   Manager (Hyperspace UI)                                                              │
+│      ▼                                                                                 │
+│   Agent recommends reroute → Manager accepts / overrides → Execute → Outcome later     │
+│      │                                  │                                              │
+│      │ log: (warehouse, ts,             │ log: (decision, ts, override_reason)        │
+│      │       suggestion, context,       │                                              │
+│      │       confidence)                ▼                                              │
+│      └─────────────────────────────► Decision Log (Kafka → Iceberg)                    │
+│                                                                                        │
+│   Driver dispatch system → Delivery completion → Outcome:                              │
+│   (on_time, in_condition, cost, customer_rating, driver_miles)                         │
+│                                              │                                         │
+│                                              ▼                                         │
+│                                       Outcome Log (Iceberg)                            │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Eval Framework  (Databricks notebooks + airflow scheduled + custom Python)            │
+│                                                                                        │
+│   Stage 1: OFFLINE EVAL (historical replay)                                            │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Replay 6 month historical decisions                                  │             │
+│   │ For each (warehouse, day):                                           │             │
+│   │   ▸ agent_suggestion = agent.predict(historical_context)             │             │
+│   │   ▸ actual_manager_decision = log[warehouse, day]                    │             │
+│   │   ▸ actual_outcome = outcome[warehouse, day]                         │             │
+│   │   ▸ counterfactual_outcome = doubly_robust_estimate(...)             │             │
+│   │ Metric: % of warehouse-days where agent ≥ manager (paired comparison) │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 2: SHADOW MODE (3 weeks)                                                       │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Agent runs LIVE on real context but suggestion NOT shown to manager  │             │
+│   │ Logs: (agent_suggestion, manager_actual_decision, outcome)           │             │
+│   │ Allow comparison: agent ≈ manager (concordance)                      │             │
+│   │ Gate: if agent disagrees badly + outcome would be worse, halt rollout │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 3: A/B BY WAREHOUSE (cluster random)  (8 weeks)                                │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Stratified random:                                                   │             │
+│   │   - Control: 50 warehouses, no agent (manager only)                  │             │
+│   │   - Treat:   50 warehouses, agent suggestion shown                   │             │
+│   │   - Strata: warehouse size, region, baseline ontime                  │             │
+│   │ Outcome: on-time rate diff (treat - control), per-strata             │             │
+│   │ Power: with 50 warehouses × 8 weeks × ~500 deliveries/day            │             │
+│   │   → detect 0.5pp lift with 90% power                                 │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+│                                                                                        │
+│   Stage 4: GRADUAL ROLLOUT (4 weeks → 100%)                                            │
+│   ┌──────────────────────────────────────────────────────────────────────┐             │
+│   │ Cohort rollout: 100 → 250 → all 500                                  │             │
+│   │ Per-cohort: 2-week observation, regression detection                 │             │
+│   │ Halt criteria: any guardrail breach (cost +5%, complaint +20%)       │             │
+│   └──────────────────────────────────────────────────────────────────────┘             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   Post-launch monitoring (continuous)                                                  │
+│                                                                                        │
+│   ▸ Per-warehouse outcome dashboard (rolling 30d, 7d, 1d)                              │
+│   ▸ Drift detection:                                                                   │
+│       - Feature drift (PSI on agent inputs)                                            │
+│       - Outcome drift (per-warehouse cohort vs historical)                             │
+│       - Acceptance rate drift (manager 拒绝率 trend)                                   │
+│   ▸ Alert routing:                                                                     │
+│       - Per-warehouse outcome regression > 2pp → PagerDuty (P2)                        │
+│       - Fleet-wide acceptance < 50% sudden → ML team (P3)                              │
+│   ▸ Quarterly causal analysis:                                                         │
+│       - Synthetic control reconstruction                                               │
+│       - Difference-in-differences vs preserved control 10% (10 永远 not get agent)     │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 详细设计 (60-min walkthrough)
+
+### Phase 1: Clarify + outcome definition (5 min)
+
+开口锁:
+- "Outcome metric: 'on-time' 是 promised window 内吗? 比如 promised 2pm 实际 3pm 算 fail?"
+- "Agent advises or acts? 99% case 是 advise + manager 决定. 影响 attribution"
+- "Time horizon: 3 个月看到 99% 还是 12 个月? 影响 sample size + 是否能 isolate seasonal"
+- "Cost guardrail: 如果送达 99% 但 cost +20%, business 接受吗?"
+
+我假设: outcome = on-time within promised window AND not-damaged, agent advise (manager decide), horizon = 6 months to reach 99% sustained, cost guardrail < 105% baseline.
+
+KPI clarity:
+- **North star**: per-warehouse on-time rate (delivery in window + intact), weighted by delivery volume
+- **Leading**: manager acceptance rate of agent suggestions
+- **Guardrail**: cost per delivery, driver hours/delivery, customer complaint rate, manager override reasons
+
+### Phase 2: Metric hierarchy (8 min)
+
+不要只一个 metric, 三层:
+
+**North star (1 个)**:
+- Weighted on-time rate (delivery in promised window AND intact AND received) — 衡量真正业务目标 99%
+
+**Leading indicators (3-5 个)** — 早于 outcome 现的信号:
+- Manager acceptance rate (% suggestion accepted by manager): leading signal of agent trust
+- Recommendation quality (% suggestion that *would have* improved outcome based on counterfactual)
+- Time-to-decide (manager 看 suggestion 后多快做决定): proxy for cognitive load
+- Suggestion coverage (% of routing decisions where agent had non-trivial recommendation)
+- Override reasons distribution (taxonomy: "agent missed weather", "manager local knowledge", etc.)
+
+**Guardrails (5-7 个)** — 防 agent 拿"作弊"方式刷指标:
+- Cost per delivery (US$): agent 不能让人都用 expedite 来 99%
+- Driver hours per delivery: 不能压榨 driver
+- Customer complaint rate (per 1000 deliveries)
+- Customer NPS (sampled survey)
+- Damaged-in-transit rate
+- Driver attrition rate (per quarter): 不能让 driver 因为不合理 routing 跳槽
+- Hub utilization variance: 不能 over-route 某 hub 累瘫
+
+**Counter metrics** — 防 dashboard 偏:
+- Bottom-quartile warehouse outcome (不只看 average, 看最差的 25%)
+- Worst-day outcome (最差一天)
+
+为什么三层 + counter:
+- North star 滞后: 看 outcome 要 1-3 天 delivery cycle
+- Leading 让你早知道 trouble (acceptance 跌等于将来 outcome 跌)
+- Guardrail 防 game (不能为 99% 牺牲 cost)
+- Counter 防 average-shifting hide variance
+
+### Phase 3: Per-warehouse baseline (7 min)
+
+**关键洞察**: 500 warehouse heterogeneity 巨大. 西雅图 hub 处理 5000/day deliveries 经验老到 baseline 98%; 拉斯维加斯小 hub 800/day baseline 92%; 鳳凰城 大 promo season 一时间 85%.
+
+**统一目标 99% 是错的**. 正确:
+- 每 warehouse 自己 baseline (rolling 6-month pre-agent)
+- Target = baseline + Δ, Δ 大小因 warehouse 而异 (低 baseline 提升空间大, 高 baseline 提升难)
+
+**分层 (stratification)**:
+```python
+warehouse_strata = stratify(warehouses, dims=[
+    'baseline_ontime_quartile',  # Q1/Q2/Q3/Q4
+    'region',                    # 5 region
+    'volume_decile',             # daily delivery volume
+])
+# 500 warehouse → ~20 strata, each ~25 warehouse
+```
+
+**目标 redefinition**:
+- 不是 "99% by Dec 2026"
+- 而是 "every warehouse +1pp on baseline by Q4, weighted-average reaches 99% by Q1 2027"
+
+**Per-warehouse leaderboard** (操作意义):
+- 不公开排名 (避免压力 distort manager 行为)
+- 内部 leadership see: top mover, bottom mover, agent contribution % to mover
+- Bottom-quartile manager 1:1 from regional director
+
+### Phase 4: 4-stage eval pipeline (12 min)
+
+**Stage 1: Offline historical replay (week 1-2)**
+
+```python
+historical_data = load('2024-09 to 2025-08, 500 warehouse, all routing decisions')
+# ~500 warehouse × 365 day × ~50 decisions/day = ~9M decision-rows
+
+for warehouse, day in warehouses × days:
+    context = historical_data[warehouse, day].context  # weather, inventory, demand
+    actual_decision = historical_data[warehouse, day].manager_decision
+    actual_outcome  = historical_data[warehouse, day].outcome
+    
+    agent_decision  = agent.predict(context)
+    
+    # Concordance: does agent agree with manager on 80%+?
+    concordance = (agent_decision == actual_decision)
+    
+    # Counterfactual: what would have happened if agent's decision?
+    counterfactual_outcome = doubly_robust(
+        context=context,
+        treatment=agent_decision,
+        observed_outcome=actual_outcome,
+        observed_decision=actual_decision,
+        propensity_model=...,
+        outcome_model=...,
+    )
+    
+    # Metric: did agent's decision >= manager's decision (paired)?
+    win_loss = compare(counterfactual_outcome, actual_outcome)
+
+# Aggregate
+metrics = {
+    'concordance_rate': mean(concordance),  # 0.78
+    'agent_wins_pct': mean(win_loss == 'win'),  # 0.32
+    'agent_loses_pct': mean(win_loss == 'lose'),  # 0.15
+    'tied_pct': 0.53,
+}
+```
+
+Gate: agent_wins > agent_loses by 5pp, concordance > 70%, no warehouse has catastrophic counterfactual
+
+**Stage 2: Shadow mode (week 3-5)**
+
+Agent runs live on real-time data. 但 **suggestion 不显示给 manager** (manager 还是按自己经验决定). 我们 log:
+- Real-time agent_suggestion
+- Actual manager_decision
+- Outcome (24-72h delayed)
+
+为什么 shadow:
+- Offline replay 假设 historical context = future context, 但 distribution drift 可能
+- Live shadow 验证 in-production data pipeline, model deploy correct
+- 收集 "if you had shown this suggestion to manager, would they have changed?" — virtual A/B
+
+3 weeks × 500 warehouse × 50 decisions/day = 5M decisions of shadow data. Stat power 强.
+
+Gate: shadow vs offline concordance 接近 (< 5pp drift), no live infra issue
+
+**Stage 3: Cluster random A/B (week 6-13)**
+
+不能 per-decision random (同一 warehouse 一时给 agent 一时不给 → manager 困惑 / spillover). **必须 cluster-by-warehouse**.
+
+设计:
+```python
+# Stratified random sampling
+strata = stratify(500_warehouses, by=[baseline_quartile, region, volume_decile])
+control = random_sample(strata, n_per_stratum=2)  # ~40 warehouse
+treat   = random_sample(strata, n_per_stratum=2)  # ~40 warehouse
+# Remaining 420 stay on current process
+
+# Run for 8 weeks
+for week in 8_weeks:
+    for w in control: # no agent
+    for w in treat:   # agent suggestion shown
+    for w in rest:    # no change (still part of pre-rollout baseline)
+
+# Analysis
+treat_ontime = ...
+control_ontime = ...
+diff_in_diff = (treat_post - treat_pre) - (control_post - control_pre)
+```
+
+**Power calculation**:
+- Baseline 97%, target lift 2pp to 99%
+- σ across warehouse-week ≈ 1.5pp (variance)
+- 40 warehouse × 8 weeks × 500 deliveries = 160K deliveries treat
+- Detectable effect (α=0.05, β=0.1): 0.4pp lift detectable
+
+→ 40 warehouse × 8 weeks 够 detect 0.5pp lift (我们想看 2pp). 富余.
+
+**Spillover risk**: 邻近 warehouse share driver pool, agent reroute 1 个可能影响邻居. Mitigation: cluster random by region (集中 control/treat 在 region 内, 减少 spill).
+
+**Stage 4: Gradual rollout (week 14-17)**
+
+Cohort 1: top 100 + bottom 100 = 200 (mixed performance for diversity)
+Cohort 2: + middle 250 = 450
+Cohort 3: + remaining 50 = 500
+
+每 cohort 2 weeks observation, regression test 通过才下一 cohort.
+
+Halt criteria:
+- Per-warehouse on-time regression > 2pp (P0)
+- Cost +5% (P1)
+- Customer complaint +20% (P1)
+- Manager acceptance < 30% (P2)
+
+### Phase 5: Counterfactual + causal inference (10 min)
+
+这是 staff-level 的标志. 99% of candidates 不会答这层.
+
+**Why counterfactual is hard here**:
+- We observe (decision, outcome). 我们想知道 "如果 agent 决定, outcome 是什么".
+- Naive: train regression on (decision, context) → outcome. But manager_decision is itself a function of context, confounded.
+- Need to break confound: doubly-robust, IPW, or A/B.
+
+**Methods (in order of rigor)**:
+
+**1. RCT (gold standard)** — Stage 3 A/B 是这个.
+
+**2. Doubly-Robust estimator** — when no A/B:
+
+```
+DR(x) = E[Y | T=t, X=x] (outcome model)
+      + I(T=t)/π(t|x) * (Y - E[Y|T=t, X=x])  (IPW correction)
+
+where π(t|x) = propensity score = P(manager_decision=t | context=x)
+```
+
+DR is consistent if EITHER outcome model OR propensity model is correct. Robust.
+
+**3. Synthetic control** — for ongoing post-launch eval:
+- Pick 50 warehouse 永远 not get agent (preserved control)
+- For each treated warehouse, construct synthetic counterfactual = weighted combo of control warehouses
+- Diff = treated - synthetic
+
+**4. Difference-in-differences (DiD)** — simpler, business-friendly:
+```
+ATE = (treat_post - treat_pre) - (control_post - control_pre)
+```
+Assumes parallel trends. Easier to communicate to business.
+
+**Implementation**: 主用 DR 给 ML team, DiD 给 business stakeholder ("简单减一减").
+
+**Edge cases**:
+- Manager rejects agent suggestion → still counts as "treated" (intent-to-treat ITT)
+- Warehouse 部分 manager 接受 部分不接受 → cluster-level 仍 random, ITT 仍 valid
+
+### Phase 6: Engagement + HITL signals (5 min)
+
+Agent advises, manager decides. **Engagement is leading indicator**.
+
+**Acceptance rate**:
+- 100% acceptance: manager 没在思考 (rubber stamp), agent 错了也接受 — bad
+- 0%: manager 不信任 — bad
+- 60-80%: healthy disagreement, agent adds value 但 manager 用 local knowledge override 部分
+
+**Override reasons taxonomy**:
+- "Agent missed local context" (weather, road closure unknown)
+- "Cost too high" (agent picked expedite, manager 用 cheaper)
+- "Manager intuition" (5+ year veteran, knows specific customer)
+- "Agent error" (real bug, log to ML team)
+
+每 override 强制要求 manager 选 reason (UI dropdown, < 3 sec interaction).
+
+**Engagement signals dashboard**:
+- Per-warehouse acceptance rate trend
+- Per-manager acceptance rate (some manager 60%, some 90% — different trust)
+- Override reason distribution shifts (mix 偏 "agent error" 意味着真的 quality 下降)
+- Time-to-decide (manager 看 suggestion 后多久点接受/拒绝)
+
+**Manager-level segmentation**:
+- "Heavy adopter": > 80% accept, < 30s decide → 给他们 advanced features
+- "Selective adopter": 50-80% accept, > 60s decide → 健康
+- "Rejector": < 30% accept → 1:1 training, understand barrier
+- "Rubber stamper": > 95% accept, < 5s decide → concerning, agent 错了也照办, 加 friction (要求注释)
+
+### Phase 7: Drift detection + monitoring (7 min)
+
+Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.
+
+**3 类 drift**:
+
+**(a) Feature drift** — agent input distribution 变
+- PSI (Population Stability Index) on key features: order_volume, weather_severity, staff_count, inventory
+- PSI > 0.2 = significant shift → alert ML team
+- Per-warehouse PSI (locality 重要)
+
+**(b) Outcome drift** — outcome distribution 变 (与 agent 无关 / 与 agent 有关)
+- Per-warehouse cohort outcome rolling 7d / 30d
+- Pre-launch baseline as reference
+- Drift > 1pp → investigate
+
+**(c) Concept drift** — relationship (context → outcome) 变
+- Train shadow model on recent 30d, compare predictions to original agent
+- High divergence = concept changed (e.g., new last-mile vendor 改了 dynamics)
+
+**Alert routing**:
+| Signal | Severity | Channel |
+|---|---|---|
+| Per-warehouse outcome -2pp 7d trailing | P2 | PagerDuty → ops oncall + regional director |
+| Fleet outcome -1pp 30d trailing | P2 | PagerDuty → ML team + ops VP |
+| Acceptance rate -10pp 7d trailing | P3 | Slack → ML team |
+| Feature PSI > 0.2 | P3 | Slack → ML team |
+| Cost / driver hour > +5% | P1 | PagerDuty → ops VP |
+| Customer complaint > +20% | P1 | PagerDuty → CX VP + ops VP |
+
+**Quarterly causal re-eval**:
+- Synthetic control reconstruction (using preserved 10% never-treated)
+- DiD on rolling quarter
+- Per-strata effect heterogeneity (does agent help low-baseline warehouses more? expected yes)
+
+### Phase 8: Trade-offs + alternatives (6 min)
+
+**Decision 8.1 — Rigor vs business speed**
+
+| 选项 | Pros | Cons |
+|---|---|---|
+| RCT 8 weeks before any rollout | Causal certainty | Slow, business 急 |
+| Shadow + DiD only | Fast | Causal weaker |
+| Offline replay only | Fastest | Distribution drift risk |
+
+我推: 4-stage gate (offline → shadow → A/B → rollout). 8 weeks A/B 不能砍, 这是 99%-target 的 board-defensible.
+
+**Decision 8.2 — Centralized eval team vs federated**
+
+| 选项 | Pros | Cons |
+|---|---|---|
+| Centralized (我们 ML team 全管) | Consistency, expertise | Slow, doesn't scale to 50 customers |
+| Federated (我们提供 framework, customer ops 跑) | Scale, customer ownership | Less rigor |
+
+我推: hybrid — 我们提供 eval framework (code + dashboard template) + 培训 customer ops team, 关键 RCT 由我们 ML team operate, ongoing monitoring 给 customer.
+
+**Decision 8.3 — Stratification dimensions**
+
+Pick wisely, 太多 stratum 每 stratum sample 小. 我选 3:
+- baseline quartile (Q1/Q2/Q3/Q4) — 关键, 因为效果 heterogeneity
+- region (5) — 季节性 + driver pool
+- volume decile (D1-D10) — small vs large warehouse 动态不同
+
+500 / (4×5×10) = 仍只 2.5 warehouse/stratum, 太少. 折中: 4×5×3 = 60 stratum, 8 warehouse 平均. Match 8 weeks × 500 deliveries 够 power.
+
+**Decision 8.4 — Pricing of agent suggestion based on cost**
+
+Agent 可能为 99% 推 expedite (rush delivery, +50% cost). Guardrail 防止. 还可以让 agent 直接 see cost in reward function:
+
+```
+agent.optimize(
+    objective = on_time_rate - λ * cost - μ * driver_hours,
+    λ = $5 per delivery cost,
+    μ = $20 per driver hour,
+)
+```
+
+让 agent 自带 cost-awareness 而不是只靠 guardrail kill.
+
+---
+
+## 关键决策点 (with rationale)
+
+1. **Per-warehouse baseline 而不是 fleet average target** — 西雅图 vs 拉斯维加斯 起点不同, 一刀切 99% 不可能 / 不公平.
+
+2. **4-stage gated eval (offline → shadow → A/B → rollout)** — 跳任何 stage 都是 risk. Shadow 验 prod pipeline, A/B 给 causal.
+
+3. **Cluster random by warehouse, not by request** — 避免 manager 困惑 + 减少 spillover.
+
+4. **Doubly-robust + DiD parallel** — DR 给 ML rigor, DiD 给 business 简单证据.
+
+5. **Engagement (acceptance rate) 为 leading indicator** — 早 outcome 14-30 天 看到 trouble.
+
+6. **Override reason taxonomy 强制** — manager 拒绝时给 reason, 这是 product feedback data, 比任何 ML metric 都 actionable.
+
+7. **Counter metrics (bottom-quartile, worst-day)** — 防止 average lift hide variance. 99% sustained 比 99% average 难.
+
+8. **Preserved 10% never-treated control** — quarterly causal re-eval, long-term agent health check.
+
+---
+
+## 数字 (capacity sizing, cost math)
+
+**Volumes**:
+- 500 warehouse × 50 routing decisions/day × 365 = 9.1M decisions/year
+- Each decision: context ~5KB JSON → 45GB/year
+- Outcome data: ~1KB per delivery × 200M deliveries/year = 200GB/year
+
+**A/B power**:
+- Treat 40 warehouse × 8 weeks × ~500 deliveries/warehouse-day = 1.1M deliveries
+- Baseline σ across warehouse-week ≈ 1.5pp
+- Minimum detectable effect: 0.4pp at α=0.05, β=0.1
+- Target lift: 2pp → 5× over MDE → easily detected
+
+**Compute (eval pipeline)**:
+- Daily eval batch: ~$50/day (Databricks 4-node 1hr)
+- Quarterly causal analysis: ~$2K (Databricks ML cluster 2 days)
+- Real-time monitoring (Datadog dashboards, alert engine): ~$1K/month
+- **Total**: ~$3K/month eval cost
+
+**Timeline**:
+- Stage 1 (offline replay): 2 weeks
+- Stage 2 (shadow): 3 weeks
+- Stage 3 (A/B): 8 weeks
+- Stage 4 (rollout): 4 weeks
+- **Total**: 17 weeks to full rollout (~4 months)
+
+**Quarterly causal eval cost**: 1 ML team-week × 4 quarters = 4 weeks/year = $40K labor cost
+
+**Business value**:
+- 500 warehouse × 500 deliveries/day × avg $5 cost/delivery × 2pp on-time improvement
+  → 2pp better SLA = ~$50/warehouse/day saved (avoid expedite + customer refund)
+  → 500 × $50 × 365 = $9.1M/year value
+- Net: $9M+ vs eval cost ~$50K + agent infra ~$200K = strong ROI
+
+---
+
+## Gao Xin 简历专属 reframe
+
+1. **TikTok PayLater A/B framework** — 你做过 BNPL approval A/B, 同样 cluster random (by user cohort), counterfactual approval, guardrail (default rate). 直接套.
+
+2. **Voice agent 7 markets** — 多 market 表现差异巨大, 你做过 per-market baseline + stratified rollout, 跟 500 warehouse heterogeneity 同思路.
+
+3. **Indonesia refund tier A/B** — 你做过 monitored rollout with regulator-tracked metric, halt criteria 你定过, 跟这道题 99% target 思路同源.
+
+4. **ConvFinQA eval** — multi-step task eval 经验, agent-decision eval framework 你跑过.
+
+5. **Risk model drift monitoring** — 你做过 production model drift dashboard, PSI / KS-statistic 监控, 直接用在 agent 监控.
+
+reframe: "我在字节做 PayLater 时 A/B framework 跟这道题 80% 重叠: cluster random + stratified + guardrail + DiD/DR. 增量是 (1) HITL — manager 在循环里, 我加 engagement signal; (2) 500 warehouse heterogeneity 比 user cohort 更复杂, per-warehouse baseline 而不是 fleet average; (3) outcome 延迟 (delivery 1-3 天) 比 default (30 天) 短, 反馈快."
+
+---
+
+## 5 个 Follow-ups
+
+1. **"如果 RCT 8 weeks 太慢, business 要 4 weeks 就 rollout, 怎么办?"** — 答: 砍 sample size 到 60 warehouse (30+30), power 仍 detect 0.6pp, 但精度降. 跟 business 摆清楚 — 我们 might miss subtle 但 catch big issues. 同时 shadow + offline 已 paid 7 weeks, A/B 4 weeks 是最少 acceptable. Business 想再砍, 我会 push back + 给 risk memo.
+
+2. **"manager 拒绝 agent 但 outcome 反而好, 怎么解释?"** — 答: manager 有 local knowledge agent 不知 (specific customer relationship, road closure not in feed, driver 出 sick). 这是 healthy disagreement. 把 override 当 product feedback, 把高质量 override 的 case 反向 train agent (RLHF-like). 同时把 manager local knowledge 改成 feature (e.g., let manager flag "VIP customer", agent 输入).
+
+3. **"如何区分 agent contribution vs 旺季外部因素?"** — 答: synthetic control + DiD. 用 preserved 10% never-treated 作 control, treated vs synthetic control diff 是 net effect, 把 seasonal common shock 滤掉.
+
+4. **"客户高管问'2 个月内你能给我 99% 数字吗', 你怎么答?"** — 答: 诚实. 4-stage 17 周 sequence, 想 2 个月只能砍到 offline + shadow + 小 A/B. 在 month 2 可以给 directional evidence (shadow data + small A/B 趋势), 但 board-defensible 99% sustained 需要至少 6 个月. Push back: "急可以, 但风险是 false positive — A/B 没 powered to detect cost regression. 我建议 hybrid: month 2 directional sign-off + month 4 full validation".
+
+5. **"如果 agent 让 99% 仓但坏 bottom-quartile 怎么办?"** — 答: heterogeneous treatment effect 分析. 用 causal forest 或 X-learner 找 subgroup. 可能 agent 适合 large warehouse 不适合 small. 应对: (a) 不给 small warehouse 用 agent; (b) 训 small-specific agent; (c) 给 small manager 不同 UI (advise but never auto-action).
+
+---
+
+## ❌ 死路答法
+
+1. **"用 accuracy / F1"** — 这是 sequential decision, 不是分类. 错.
+2. **"per-decision random A/B"** — manager 困惑 + spillover. 必须 cluster random.
+3. **"全部 500 一起 rollout 看 outcome"** — 没 control, 没 causal, 旺季影响混入.
+4. **"只看 average on-time"** — variance hide, bottom-quartile 仍可能差.
+5. **"agent 直接 act 不要 manager"** — 99% case 是 HITL, 直接 act 业务 + legal 不接受.
+6. **"offline replay 通过就 rollout"** — distribution drift 风险.
+7. **"acceptance rate = engagement = success"** — rubber-stamping 也能 100% acceptance, 需要 nuance.
+8. **"causal? 太复杂, 业务不要"** — staff 答案必须有 causal, 不然 99% claim 不 defensible.
+9. **"agent cost 不管, business 自己看"** — agent 可能 game 指标 (推 expedite), guardrail 必须有.
+10. **"drift detection? 上线后 1 年再说"** — Day 1 dashboard 就要有, agent drift 可能 week 4 就出现.
+
+---
+
+## ✅ 加分项
+
+1. **Per-warehouse baseline 而不是 fleet 99% target** — 立刻 signal 你懂 heterogeneous treatment
+2. **4-stage gate (offline + shadow + A/B + rollout)** — 完整 eval lifecycle, 不跳步
+3. **Cluster random by warehouse + stratification by baseline-quartile/region/volume** — 真懂 A/B 设计
+4. **Doubly-robust + DiD 并行** — rigor + business-friendly
+5. **Engagement signals (acceptance / override reason taxonomy)** — HITL 设计深度
+6. **Counter metrics (bottom-quartile, worst-day)** — 防 average hide
+7. **Preserved 10% never-treated 做 long-term control** — 真懂 causal hygiene
+8. **Halt criteria 明确 + 多级 alert routing** — production sense
+9. **Heterogeneous treatment effect (causal forest 找 subgroup)** — analytics 深度
+10. **Numbers 给得出来** (40 warehouse × 8 weeks 够 0.4pp MDE, $9M business value)
+
+---
+
+## 一句话总结
+
+99% 目标不是 ML problem, 是 **eval framework problem** — per-warehouse baseline + 4-stage gate (offline replay → shadow → cluster random A/B → cohort rollout) + counterfactual estimation (DR + DiD) + engagement leading indicator + drift monitoring + counter metric, 一整套 causal-rigorous + HITL-aware 评估系统.
+
+---
+
+## Cheat Sheet
+
+```
+Metric Hierarchy:
+  North star (1):     per-warehouse on-time rate, weighted by volume
+  Leading (3-5):      acceptance, recommendation quality, time-to-decide, coverage, override reason
+  Guardrail (5-7):    cost, driver hr, complaint, NPS, damage, attrition, hub variance
+  Counter (2):        bottom-quartile, worst-day
+
+Per-warehouse baseline:
+  Strata: baseline_quartile × region × volume_decile = ~60 stratum
+  Target: baseline + Δ (not uniform 99%)
+  Leaderboard: internal only, not manager-facing
+
+4-stage Eval:
+  Stage 1 (2w):  offline replay, doubly-robust counterfactual, concordance ≥ 70%, agent_wins > losses + 5pp
+  Stage 2 (3w):  shadow, agent live but hidden, validate prod pipeline
+  Stage 3 (8w):  cluster A/B, 40 control + 40 treat, MDE 0.4pp, DiD analysis
+  Stage 4 (4w):  cohort rollout 100 → 250 → 500, halt criteria active
+
+Counterfactual:
+  RCT:           gold standard (Stage 3)
+  Doubly-Robust: outcome model + propensity weight, consistent if either correct
+  Synthetic ctrl:treated vs weighted-control combo, post-launch
+  DiD:           business-friendly, parallel trends assumed
+
+Engagement Signals:
+  Acceptance rate (60-80% healthy)
+  Override reason taxonomy (manager picks dropdown)
+  Time-to-decide (proxy for cognitive load)
+  Manager segmentation: heavy / selective / rejector / rubber-stamper
+
+Drift Detection:
+  Feature drift: PSI per-warehouse, > 0.2 alert
+  Outcome drift: rolling 7d / 30d vs baseline
+  Concept drift: shadow model recent 30d vs original agent
+
+Alert Routing:
+  P0 (page on-call): per-warehouse -2pp, customer complaint +20%, cost +5%
+  P1 (page leader):  fleet outcome -1pp 30d
+  P2 (Slack ML):     acceptance -10pp, feature PSI > 0.2
+
+Preserved Controls:
+  10% warehouse (50) never get agent → quarterly causal re-eval
+
+Numbers:
+  9.1M decisions/year, 200M deliveries
+  Stage 3: 40+40 warehouse × 8 weeks → 1.1M deliveries treat
+  MDE: 0.4pp; target lift 2pp easy detect
+  Total timeline: 17 weeks (4 months) to full rollout
+  Eval cost: ~$3K/month
+  Business value: ~$9M/year on $200K infra + $50K eval
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>
