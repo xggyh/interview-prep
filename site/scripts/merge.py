@@ -28,14 +28,15 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_PATH = ROOT / "site" / "data" / "questions.json"
 
 SOURCES = [
-    ("OpenAI", ROOT / "openai-interview-questions.json"),
+    # OpenAI sources disabled per user request (slimming down, focus on Google FDE prep)
+    # ("OpenAI", ROOT / "openai-interview-questions.json"),
     # Google coding-only pages 1-3 (initial round)
     ("Google", ROOT / "site" / "data" / "google-questions.json"),
     # Google all-types pages 1-5 (expanded round) — overlapping with above is fine,
     # merge dedupes by slug. Both contribute the same "Google" badge.
     ("Google", ROOT / "site" / "data" / "google-all-questions.json"),
     # Hand-written guides / longform articles (not scraped from hellointerview)
-    ("OpenAI", ROOT / "site" / "data" / "guides.json"),
+    # ("OpenAI", ROOT / "site" / "data" / "guides.json"),  # disabled (Tomoro/OpenAI-themed)
     # FDE (Forward Deployed Engineer) curated real interview questions
     # from Palantir / OpenAI / ElevenLabs / Google FDE reports
     ("FDE", ROOT / "site" / "data" / "fde-questions.json"),

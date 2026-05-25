@@ -362,13 +362,9 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         qtype = q["type"]
         companies = q.get("companies", {})
 
-        # Detect "Google L5" — Senior-level Coding at Google (matches the
-        # hellointerview.com filter: company=Google + level=SENIOR + type=CODING).
-        is_google_l5 = False
-        if "Google" in companies and qtype == "Coding":
-            g_level = (companies["Google"].get("level") or "")
-            if "Senior" in g_level and "Junior-Senior" not in g_level:
-                is_google_l5 = True
+        # Detect "Google L5" — ALL Google Coding (algorithm) questions across levels.
+        # User refined the filter: "因为这里都是算法题目" → include all levels, not just Senior.
+        is_google_l5 = ("Google" in companies and qtype == "Coding")
 
         company_list = [c for c in COMPANY_ORDER if c in companies] + \
                        [c for c in companies if c not in COMPANY_ORDER]
@@ -856,11 +852,9 @@ def main():
         type_groups.setdefault(q["type"], []).append(q)
         for c in q.get("companies", {}):
             company_groups.setdefault(c, []).append(q)
-        # Pseudo-company "Google L5" — Senior-level Coding at Google
+        # Pseudo-company "Google L5" — ALL Google Coding questions (all levels)
         if q.get("type") == "Coding" and "Google" in q.get("companies", {}):
-            g_level = (q["companies"]["Google"].get("level") or "")
-            if "Senior" in g_level and "Junior-Senior" not in g_level:
-                company_groups.setdefault("Google L5", []).append(q)
+            company_groups.setdefault("Google L5", []).append(q)
 
     # Recency sort by MAX lastAsked across all companies
     def sk(q):
