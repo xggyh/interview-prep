@@ -35,6 +35,9 @@ SOURCES = [
     # Google all-types pages 1-5 (expanded round) — overlapping with above is fine,
     # merge dedupes by slug. Both contribute the same "Google" badge.
     ("Google", ROOT / "site" / "data" / "google-all-questions.json"),
+    # Google Coding extra — 77 more questions scraped from hellointerview.com 7 pages
+    # (May 2026, complete coverage of Google Coding category for Google L5 tag)
+    ("Google", ROOT / "site" / "data" / "google-coding-extra.json"),
     # Hand-written guides / longform articles (not scraped from hellointerview)
     # ("OpenAI", ROOT / "site" / "data" / "guides.json"),  # disabled (Tomoro/OpenAI-themed)
     # FDE (Forward Deployed Engineer) curated real interview questions
