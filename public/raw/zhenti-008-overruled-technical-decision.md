@@ -2,6 +2,10 @@
 
 > "Tell me about a technical decision you made and later had to overrule yourself on — or one you were overruled on. What did you learn, and how do you make decisions differently now?"
 
+**中文翻译**:
+
+> "讲一个你做过但后来不得不自己推翻的技术决策 — 或者被别人推翻的也行. 你从中学到了什么, 现在做决策的方式有什么不同?"
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Databricks 高频. 变体: "tell me about a technical decision you regret" / "describe a time you changed your mind" / "what's a technical mistake that taught you the most"
 
@@ -126,14 +130,14 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context — the decision** | 20s | What decision, when, who involved | "Voice agent multi-region rollout, my call to scope localization as 'translate prompts per language'..." |
-| 2 | **Why I thought I was right** | 30s | Decision rationale at time | "My reasoning at the time: (1) translation is the standardized localization framework, (2) cost is high to do more, (3) Indonesia worked..." |
-| 3 | **The signal that I was wrong** | 30s | How / when you detected | "Thailand launch week 2, ops told me catch rate 比印尼 low 8 percentage points. Specific: directness in 泰语 felt rude..." |
-| 4 | **First reaction (vulnerability)** | 30s | Did you immediately accept? | "First reaction was 'maybe Thai market less mature, give it 4 weeks'. I almost dismissed signal. 关键 vulnerability admit..." |
-| 5 | **What it took to convince me** | 45s | 2nd / 3rd signal, data confronts you | "Brazil launch same pattern. By 3rd market same issue, I went to Bangkok 3 days sit with ops, watched 47 calls..." |
-| 6 | **The reversal + damage control** | 60s | How you unwound, customer comm | "I told my manager + tech lead: 'I was wrong on scope, need 4 weeks to redo persona + escalation per market'. Customer comm to ops..." |
-| 7 | **The systemic learning** | 30s | What you default to NOW | "Now every multi-market deployment scoping default includes cultural workshop, persona design with local advisor, TTS A/B with local audience..." |
-| 8 | **Meta lesson — process vs outcome** | 30s | Distinguish wrong-process vs wrong-outcome | "Lesson: 'right decision wrong outcome' OK, 'wrong decision regardless of outcome' is real growth opportunity..." |
+| 1 | **Context — the decision (决策本身)** | 20s | What decision, when, who involved | "Voice agent multi-region rollout, my call to scope localization as 'translate prompts per language'..." |
+| 2 | **Why I thought I was right (当时为什么觉得对)** | 30s | Decision rationale at time | "My reasoning at the time: (1) translation is the standardized localization framework, (2) cost is high to do more, (3) Indonesia worked..." |
+| 3 | **The signal that I was wrong (发现错的信号)** | 30s | How / when you detected | "Thailand launch week 2, ops told me catch rate 比印尼 low 8 percentage points. Specific: directness in 泰语 felt rude..." |
+| 4 | **First reaction (第一反应 — 主动认账)** | 30s | Did you immediately accept? | "First reaction was 'maybe Thai market less mature, give it 4 weeks'. I almost dismissed signal. 关键 vulnerability admit..." |
+| 5 | **What it took to convince me (什么让我转过来)** | 45s | 2nd / 3rd signal, data confronts you | "Brazil launch same pattern. By 3rd market same issue, I went to Bangkok 3 days sit with ops, watched 47 calls..." |
+| 6 | **The reversal + damage control (反转 + 损害控制)** | 60s | How you unwound, customer comm | "I told my manager + tech lead: 'I was wrong on scope, need 4 weeks to redo persona + escalation per market'. Customer comm to ops..." |
+| 7 | **The systemic learning (体系化的改变)** | 30s | What you default to NOW | "Now every multi-market deployment scoping default includes cultural workshop, persona design with local advisor, TTS A/B with local audience..." |
+| 8 | **Meta lesson — process vs outcome (元心法 — 区分过程错 vs 结果错)** | 30s | Distinguish wrong-process vs wrong-outcome | "Lesson: 'right decision wrong outcome' OK, 'wrong decision regardless of outcome' is real growth opportunity..." |
 
 Total: ~4-5 min.
 

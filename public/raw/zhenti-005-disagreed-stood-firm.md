@@ -2,6 +2,10 @@
 
 > "Tell me about a time you disagreed with a customer or stakeholder and stood firm. What was the disagreement, how did you navigate it, and what was the outcome?"
 
+**中文翻译**:
+
+> "讲一次你跟客户或干系人意见不合、并坚持了自己立场的经历. 分歧是什么, 你怎么处理的, 最终结果如何?"
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional)
 **出处**: Exponent 2026 FDE Guide · 公司: Anthropic / OpenAI / Palantir / Databricks 高频. 变体: "tell me about a time you pushed back on a customer" / "describe a disagreement where you didn't back down" / "when have you said no to a powerful stakeholder"
 
@@ -123,14 +127,14 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context + relationship** | 20s | 哪个 customer, 我的角色, 信任基线 | "Indonesia ops director, 6 months working together, good trust..." |
-| 2 | **Disagreement essence** | 20s | 具体什么 disagreement, both sides | "They wanted Llama 7B baseline; I wanted Llama 13B with quantization..." |
-| 3 | **Why I stood firm (principle, not ego)** | 30s | 你坚持的 ground 是什么 (data / 监管 / 安全) | "I grounded in 3 things: hallucination rate, regulator exposure, irreversibility..." |
-| 4 | **What I considered before standing firm** | 30s | 你 explicitly 看过 their side 才决定 stand | "I steel-manned their case: cost saving $X, training speed 2×, smaller model is industry default for their bracket..." |
-| 5 | **The actual conversation** | 60s | 具体怎么 push back, dialog | "First meeting I lost — they had VP backing. Second meeting I came with pilot data..." |
-| 6 | **Pivot / escalation moment** | 45s | Stuck 怎么 unstuck, when to escalate | "After 2 meetings stuck, I proposed 2-week A/B pilot, both sides commit to abide by data..." |
-| 7 | **Outcome (incl. partial wins / losses)** | 30s | 结果 + 你对/错 reflection | "Pilot data sided with my position 70%, ops side 30% (their concern on cost was valid)..." |
-| 8 | **What I'd back down on (for balance)** | 20s | 这是关键 — 对比 a time 你 backed down | "Compare: similar dispute on inference framework choice (LangChain vs custom) — there I backed down because reversibility was high..." |
+| 1 | **Context + relationship (背景 + 关系基线)** | 20s | 哪个 customer, 我的角色, 信任基线 | "Indonesia ops director, 6 months working together, good trust..." |
+| 2 | **Disagreement essence (分歧本身)** | 20s | 具体什么 disagreement, both sides | "They wanted Llama 7B baseline; I wanted Llama 13B with quantization..." |
+| 3 | **Why I stood firm (我为什么坚持, 基于原则不基于自我)** | 30s | 你坚持的 ground 是什么 (data / 监管 / 安全) | "I grounded in 3 things: hallucination rate, regulator exposure, irreversibility..." |
+| 4 | **What I considered before standing firm (坚持前我想过什么)** | 30s | 你 explicitly 看过 their side 才决定 stand | "I steel-manned their case: cost saving $X, training speed 2×, smaller model is industry default for their bracket..." |
+| 5 | **The actual conversation (实际对话)** | 60s | 具体怎么 push back, dialog | "First meeting I lost — they had VP backing. Second meeting I came with pilot data..." |
+| 6 | **Pivot / escalation moment (转向 / 升级时刻)** | 45s | Stuck 怎么 unstuck, when to escalate | "After 2 meetings stuck, I proposed 2-week A/B pilot, both sides commit to abide by data..." |
+| 7 | **Outcome (结果, 含部分对错)** | 30s | 结果 + 你对/错 reflection | "Pilot data sided with my position 70%, ops side 30% (their concern on cost was valid)..." |
+| 8 | **What I'd back down on (哪些我会让步, 平衡用)** | 20s | 这是关键 — 对比 a time 你 backed down | "Compare: similar dispute on inference framework choice (LangChain vs custom) — there I backed down because reversibility was high..." |
 
 Total: ~4-5 min. 8 段 必须有 段 8 (back down example), 否则显得 stubborn.
 

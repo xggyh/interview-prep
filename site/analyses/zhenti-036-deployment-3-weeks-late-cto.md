@@ -2,6 +2,10 @@
 
 > "You're on a live video call with the customer's **CTO**. The deployment is **3 weeks behind schedule**. Tell him."
 
+**中文翻译**:
+
+> "你在跟客户的 **CTO (首席技术官)** 开视频会议. 部署 **延期 3 周**. 告诉他."
+
 **Round**: Client Simulation (30 min)
 **出处**: Exponent 2026 FDE · OpenAI / Palantir / Anthropic 高频
 **场景**: 客户 CTO 一对一. 你在 1 分钟内要说完 cause + impact + new date + mitigation, 然后接 5 分钟 grilling.
@@ -89,11 +93,11 @@
 
 具体看 5 个 signal:
 
-1. **Open with the bad news in 60 seconds** — Mealy-mouthed opening = lose CTO immediately. CTO 是技术人, 直接 + 结构化 > 委婉
-2. **Ownership language not blame language** — "I" / "we" 不是 "the team" / "engineering said". 把延期归到自己
-3. **Specific new date with confidence level** — 不是 "soon" 或 "ASAP". 具体日期 + 你为啥相信
-4. **Mitigation already in motion** — "starting today we are doing X" 不是 "we'll figure it out"
-5. **Don't over-promise to make the news softer** — "we'll make it up by adding 5 features" = dig your own hole
+1. **Open with the bad news in 60 seconds** (60 秒内开门见山讲坏消息) — Mealy-mouthed opening = lose CTO immediately. CTO 是技术人, 直接 + 结构化 > 委婉
+2. **Ownership language not blame language** (用主人翁口吻, 不甩锅) — "I" / "we" 不是 "the team" / "engineering said". 把延期归到自己
+3. **Specific new date with confidence level** (具体新日期 + 置信度) — 不是 "soon" 或 "ASAP". 具体日期 + 你为啥相信
+4. **Mitigation already in motion** (缓解措施已经在动了) — "starting today we are doing X" 不是 "we'll figure it out"
+5. **Don't over-promise to make the news softer** (别为了让坏消息好听一点而超额承诺) — "we'll make it up by adding 5 features" = dig your own hole
 
 ---
 
@@ -144,7 +148,9 @@
 >
 > What's your reaction? What questions do you have? I'd rather hear them now than later."
 
-→ **3 minutes flat**. Then shut up.
+**中文意思**: "Mark, 我直说, 因为我知道你时间宝贵. 我打这个电话就是来汇报坏消息的. **部署要延期 3 周. 新目标是 6 月 15 号, 原定是 5 月 25 号**. 两个原因. 第一, 跟你们 Snowflake 集群的数据集成踩到了一个权限问题, 我们花了 9 个工作日才解决 — 我们 2 周时碰到的, 你们团队和我们 48 小时内就对齐了根因, 但 **真正解锁要你们数据治理委员会批准**, 而他们是 biweekly (每两周一次) 开会. 第二, 我们发现在你们具体的 query mix 上 **推理延迟比 spec 高 3 倍**, 我们重写了 prompt 策略 + 加了一个更小的 routing model, 又用了 6 个工作日. **对你们 Q3 产品发布的影响**: 软发布从 5 月 30 → 6 月 22. 硬发布 7 月 15 不变. 我想说实话 — **软发布的滑期是真的, 我不会装作不是大事**. **从今天开始动起来的事**: 1. **我亲自接管跟你们数据治理团队的 daily standup**, 不再是 biweekly 的瓶颈, 这周五已经口头同意了一个加急审批 session. 2. 加了一位 senior engineer (Sarah, 我们 infra lead) 接下来 3 周全职做你这个 account, 昨天已经开始. 3. **每天太平洋时间下午 4 点我会发一份 5 行的 daily status 邮件**, 一直到上线, 你不用问. **我对 6 月 15 号有 80% 把握**. 剩下的风险是数据治理审批 — 如果周五没批下来, 就还要再加 2 周, 我会当天告诉你. **我需要你做两件事**: 1. **周五的数据治理 session** — 你的 sponsor 得帮我们抢这个 slot, 你今天下午能打个电话吗? 2. 如果要往你们组织内部 escalate, 应该找谁? 你的反应是? 有什么问题? 我宁愿现在听, 不要后面听."
+
+→ **3 minutes flat**. Then shut up. (3 分钟讲完, 然后闭嘴.)
 
 ---
 
@@ -153,6 +159,8 @@
 > **Customer (CTO Mark)**: "So basically you missed your commit. Why should I trust the new date?"
 
 > **You**: "Fair question. Two things changed in our process: **(a) I'm now the single owner of escalations to your data governance team — that's the path that lost us the most time, and I won't delegate it again, (b) we added a senior engineer with margin in her quarter.** Plus I'm setting a hard internal checkpoint: if we're not on-track by **June 1st** for the **inference quality eval**, I'll call you and propose a phased launch — not pretend we'll catch up. **You won't be surprised again.**"
+
+**中文意思**: "公平的问题. 我们流程里改了两件事: **(a) 我现在是跟你们数据治理团队的 escalation 唯一对接人 — 那条路损失最多时间, 我不会再委托别人. (b) 我们加了一个本季度有空档的 senior engineer.** 另外我设了一个硬性内部 checkpoint: 如果 **6 月 1 号** 的 **推理质量评估** 不在轨道上, 我会立刻打电话给你, 提议分阶段上线 — 不会假装我们能追上. **你不会再被 surprise (突袭) 一次**."
 
 ---
 
@@ -170,7 +178,9 @@
 >
 > Which framing fits how you've set expectations with them?"
 
-→ Notice you're helping him manage HIS political situation, not yours.
+**中文意思**: "听到了, 我想专门谈一下 board commit (董事会承诺). **7 月 15 的硬发布日期不变**. 如果我理解没错, 那是你给董事会承诺的日期. **滑期的是面向内部用户的软发布** — 那是硬发布前的 ramp-up. **我建议**: 我给你发一份 1-pager, 你可以改改用来更新 board. **两种 framing (口径)**: **Option A (我推荐的)**: board 只看到硬发布日期. 软发布是内部里程碑, **他们从来不知道这个事, board commit 不变**. **Option B**: 如果你已经把软发布告诉过 board 了, 这是我建议的更新: '软发布内部从 5 月 30 → 6 月 22, 硬发布 7 月 15 不变. 原因: 跟我们数据治理的集成.' 哪种 framing 更符合你之前跟他们的期望管理?"
+
+→ Notice you're helping him manage HIS political situation, not yours. (注意, 你在帮他管理他的政治局面, 不是你的.)
 
 ---
 
@@ -184,7 +194,9 @@
 >
 > I won't make excuses for the late notification — that was a judgment error on my part. **I want to earn back the trust.**"
 
-→ Don't dodge. Don't defend. **Own** + **commit to a behavioral change with a measurable threshold**.
+**中文意思**: "**你说得对, 我不会躲这个问题**. 实话: 我们 2 周时撞上权限问题时, 我当时判断是 '几天能解决, 没必要惊动 Mark'. **那个判断是错的**. 当时一旦明确要走治理委员会审批, **我那天就应该打电话给你**. 我又等了 4 个工作日, 想找 workaround. **我要改的事**: 从今天开始的 5 行 daily status 部分就是让你有早期信号. **加一条明确规则: 任何可能 >5 个工作日延期的事, 我 24 小时内打电话给你**. 这是我给自己定的标准. 我不会为延报这事找借口 — 那是我个人判断失误. **我想把信任挣回来**."
+
+→ Don't dodge. Don't defend. **Own** + **commit to a behavioral change with a measurable threshold**. (别躲. 别辩护. **认账** + **承诺一个可量化的行为改变**.)
 
 ---
 
@@ -196,6 +208,8 @@
 >
 > If after the next 2 weeks you don't see daily progress, **you should escalate to my director (cc'd on the daily) — and I'll support that, not block it.**"
 
+**中文意思**: "实话: 我们对数据集成时间可能有点乐观. 我们根据另一个类似项目, 假设你们治理委员会审批 3-5 天 — 最后用了 9 天, 因为委员会的日程没对齐. **那是我看走眼了, 不是你们团队慢**. **关于人力**: 我自己团队是 4 个 engineer + 我做这个 account. 加的 senior engineer 不是从别处借来的 — 她本季度有空档, 你这个 account 现在是她到 7 月的最高优先级. **我们不缺人. 我们缺的是一条干净的跟你们治理对接的路径, 这个由我接管 escalation 来解决**. 如果接下来 2 周你看不到 daily 进展, **你应该 escalate 给我的 director (在 daily 邮件里 cc) — 我会支持, 不会拦**."
+
 ---
 
 > **Mark**: "Are we paying for the 3 weeks? My CFO will ask."
@@ -206,7 +220,9 @@
 >
 > If my recommendation isn't approved internally, I'll come back and tell you that directly, and we'll figure out an alternative. **I'm not promising you a credit before I check, but I'm promising you a written answer by Wednesday.**"
 
-→ Don't make commercial commitments you can't keep. **Promise the process**, not the outcome.
+**中文意思**: "**好问题, 我想透明地处理**. **我的承诺**: 我现在不会在这儿出一个商务提议, 但我会跟我的 account team 推荐 **我们对这 3 周的 professional services 时间做 credit (减免)**, 因为延期在那里. **周三前你会收到书面的东西**, 上面有我 AE 的名字. 如果我的推荐内部没通过, 我会回来直接告诉你, 我们另想办法. **我不在 check 之前承诺你 credit, 但我承诺你周三前一份书面答复**."
+
+→ Don't make commercial commitments you can't keep. **Promise the process**, not the outcome. (别做你不能兑现的商务承诺. **承诺流程, 不承诺结果**.)
 
 ---
 
@@ -224,6 +240,8 @@
 >
 > **I will not unilaterally pick.** I'll bring the data and the options on June 1st and we decide together. **No surprises.**"
 
+**中文意思**: "**我会在 6 月 1 号告诉你, 不会拖到 6 月 14 号**. 6 月 1 号的 checkpoint 是推理质量评估 — 如果那时不在轨道, 我当天下午就打给你, 一起讨论选项. **如果 6 月 15 看着有风险, 选项有**: 1. **分阶段上线**: 6 月 15 先发 20% 用户, 到 6 月 22 ramp 到 100%. **降低风险, 给数据团队消化反馈的时间**. 2. **延到 6 月 22 全量上**: 更干净, 但少了 7 天的 ramp. 3. **砍 scope**: 先上 [某子集功能], 7 月再加 [另一个功能]. **需要我们一起达成什么是真正的 v1 的共识**. **我不会单方面决定**. 6 月 1 号我会带数据和选项过来, 我们一起决定. **不会突袭**."
+
 ---
 
 > **Mark**: "OK. What do you need from me right now?"
@@ -238,11 +256,17 @@
 >
 > I'll send you those daily emails starting today at 4pm Pacific. Friday's session, I'll let you know how it went by 5pm Friday. **Anything else you need from me right now?**"
 
+**中文意思**: "**三件事**: 1. **周五的数据治理 session** — 今天给你的 sponsor 打个电话. 哪怕 2 句话也行: '我想这事周五进议程'. 2. **daily status 的 cc 名单**: 你团队还有谁要进 5 行 daily? 我默认只给你, 但如果有副手或 PM 你想 loop 进来, 告诉我. 3. **escalation 对接人** — 如果我要绕过数据治理委员会往上找, 找谁? 我想提前知道, 不要到时候慌乱. 从今天太平洋时间下午 4 点开始我会发 daily 邮件. 周五的 session, 我周五下午 5 点前告诉你结果. **现在还需要我做什么吗?**"
+
 > **Mark**: "No, that's it. Let's see how Friday goes."
+
+**中文意思**: "没了, 就这些. 看周五怎么样吧."
 
 > **You**: "Thank you. **And Mark — I appreciate you not letting me off the hook on the late notification. I'd rather have this conversation than the comfortable version of it.** Talk Friday."
 
-→ Close with: acknowledge them being a good customer + show you appreciated honest pushback. Don't grovel.
+**中文意思**: "谢谢. **还有 Mark — 我很感谢你在延报这事上没放我一马. 我宁愿要这场对话, 也不要那种 '舒服版' 的对话.** 周五聊."
+
+→ Close with: acknowledge them being a good customer + show you appreciated honest pushback. Don't grovel. (收尾时: 认可对方是个好客户 + 表达你感谢他直率的 pushback. 别卑微.)
 
 ---
 

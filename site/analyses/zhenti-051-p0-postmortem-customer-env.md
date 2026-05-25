@@ -2,6 +2,10 @@
 
 > "A P0 incident happened in a customer's production environment — your system caused customer-visible downtime. **Walk me through how you handle the postmortem with the customer** — 24h initial, 5-day full RCA, blameless tone but specific accountability, long-term reliability commitments. Different from internal postmortem."
 
+**中文翻译**:
+
+> "在客户的 production 环境里出了一个 P0 (最高优先级事故) — 你的系统造成了客户能看见的 downtime (服务中断). **跟我讲讲你怎么跟客户做 postmortem (复盘)** — 24h 内的初步通报, 5 天内的完整 RCA (Root Cause Analysis, 根因分析), blameless (不追责的) tone 但要 specific accountability (具体的负责), 还有长期的 reliability (可靠性) 承诺. 这跟 internal (内部) postmortem 不一样."
+
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — customer-facing IR experience 必问
 

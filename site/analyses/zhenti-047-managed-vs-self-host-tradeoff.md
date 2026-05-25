@@ -2,6 +2,10 @@
 
 > "Your customer is debating between using a managed AI provider (OpenAI / Anthropic / Cohere API) versus self-hosting open-weight models (Llama / Mistral / Qwen on their own GPUs). **Walk me through the tradeoff** — cost, data residency, vendor lock-in, latency, ops burden, quality lag. When do you recommend hybrid? Show me the math."
 
+**中文翻译**:
+
+> "你的客户在纠结 — 到底用 managed AI provider (托管的 AI 服务商, 比如 OpenAI / Anthropic / Cohere 的 API), 还是 self-host (自己部署) open-weight 模型 (开源权重模型, 比如 Llama / Mistral / Qwen 跑在自家 GPU 上). **跟我讲讲这里的取舍** — 成本, 数据驻留, 供应商锁定 (vendor lock-in), 延迟, ops (运维) 负担, 模型质量滞后这些. 你什么时候推荐 hybrid (混合方案)? 把账算给我看."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — enterprise sales / FDE 必问
 

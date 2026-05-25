@@ -2,6 +2,10 @@
 
 > "Design a RAG system over **50 million clinical documents** for a hospital network. Must be **HIPAA compliant**, deployed in customer VPC, integrate with their **Epic / Cerner EHR**. Doctor asks 'what's the latest on this patient's diabetes treatment plan'. Answer must cite sources. **No PHI can leak to public LLM APIs.**"
 
+**中文翻译**:
+
+> "为一个医院网络设计一套覆盖 **5000 万份临床文档**的 RAG (检索增强生成) 系统. 必须满足 **HIPAA 合规** (美国医疗数据隐私法), 部署在客户的 VPC (虚拟私有云) 内, 集成他们的 **Epic / Cerner EHR** (电子病历系统). 医生提问 '这个病人糖尿病治疗方案最新进展是什么'. 答案必须给出 citation (引用出处). **PHI (受保护医疗信息) 一丝都不能泄露到公网 LLM API.**"
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / Palantir Foundry Health / Hippocratic AI · 行业: healthcare (provider network)
 **约束**: HIPAA / BAA / PHI redaction / VPC-only deploy / encrypted at rest + in transit / immutable audit / RBAC tied to hospital IdP / no public LLM API egress
@@ -237,7 +241,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + KPI (5 min)
+### Phase 1: Clarify + KPI (澄清 + 锁 KPI) (5 min)
 
 开口先把红线说出来, 让面试官知道你不会闷头答:
 
@@ -250,7 +254,7 @@ KPI 给三条:
 
 明确说不答的事情: **不是问 "doctor 应该开什么药"** (这是 clinical decision support, regulated as medical device, FDA Class II). 是问 "patient 历史里关于 diabetes 的相关记录是什么", 让 doctor 自己合成判断.
 
-### Phase 2: HIPAA Tech Safeguards 5 条 → 组件映射 (4 min)
+### Phase 2: HIPAA Tech Safeguards (技术保护措施) 5 条 → 组件映射 (4 min)
 
 这一步是 staff-level 的标志. 不要先讲架构, 先讲合规如何 driving 架构:
 
@@ -264,7 +268,7 @@ KPI 给三条:
 
 加一条 Administrative Safeguard 必谈的: **BAA (Business Associate Agreement)** — 你和客户要签, 你和 Anthropic (如果用) 要签. 任何 sub-processor (vector DB / embedding API / monitoring tool) 都要在 BAA chain 里, 否则违规.
 
-### Phase 3: Data path deep dive — Ingestion (10 min)
+### Phase 3: Data path deep dive — Ingestion (数据通路深度剖析 - 摄取阶段) (10 min)
 
 50M docs 不是一次性的, 是 backfill + ongoing. 拆 3 步讲.
 
@@ -329,7 +333,7 @@ Embedding model: **BGE-M3 medical fine-tune** (self-host on g5.xlarge GPU). 不�
 
 Throughput: g5.xlarge × 8 (batch 64) → ~5K embeddings/sec → 50M docs ÷ 5K = 10K sec = 3 hours backfill embedding. 加上 chunking (CPU bound, Ray cluster) 总 ingest 时间 5-7 天 (含 PHI redact 的 GPU).
 
-### Phase 4: Data path deep dive — Retrieval & Generation (15 min)
+### Phase 4: Data path deep dive — Retrieval & Generation (检索 + 生成) (15 min)
 
 **ACL 必须在 retrieval 之前**, 不能 post-filter.
 
@@ -407,7 +411,7 @@ def verify_citations(answer_md, retrieved_chunks):
 
 如果 unfaithful 率 > 10%, 整个回答 fall back 到 "I have these source documents — let me show them to you" + 显示 retrieval chunks 让 doctor 自己判断.
 
-### Phase 5: Control / failure / consistency (15 min)
+### Phase 5: Control / failure / consistency (控制面 / 故障 / 一致性) (15 min)
 
 **5.1 EHR sync consistency**
 
@@ -447,7 +451,7 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 - 撤回某 doc: 软删除 + 30 天 grace (因为 audit 反查), 然后物理 GC
 - 关键: **embedding vector 也要删** — 不能只删 metadata, vector 留着. 实际操作: 在 OpenSearch 里 `_delete_by_query`, async confirm
 
-### Phase 6: Production hardening (10 min)
+### Phase 6: Production hardening (生产硬化) (10 min)
 
 **6.1 Key management**:
 - Per-tenant CMK (Customer Master Key) in KMS
@@ -476,7 +480,7 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 - 外部 pen test (Bishop Fox / NCC Group) 半年一次
 - HIPAA risk assessment by OCR/HHS-aligned consultant 年度
 
-### Phase 7: Trade-offs + alternatives (7 min)
+### Phase 7: Trade-offs + alternatives (权衡 + 备选方案) (7 min)
 
 **Decision 7.1 — Self-host LLM vs BAA cloud LLM**
 

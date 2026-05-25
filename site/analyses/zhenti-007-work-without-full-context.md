@@ -2,6 +2,10 @@
 
 > "Tell me about a time you had to work in an environment you didn't fully understand — unfamiliar domain, codebase, customer industry, or stack. How did you ramp up and deliver?"
 
+**中文翻译**:
+
+> "讲一次你在自己并不完全理解的环境里工作的经历 — 可能是陌生领域、陌生代码库、陌生客户行业, 或者陌生技术栈. 你怎么 ramp up 上手 + 交付的?"
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Scale AI / Databricks 高频. 变体: "tell me about a time you ramped up fast" / "describe working in a new domain" / "how do you handle unfamiliar technical territory" — 对 FDE 几乎 100% 必问 (因为 FDE 每个客户都是 new domain)
 
@@ -122,14 +126,14 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context — unfamiliar what** | 20s | 哪个 domain / stack / customer 不懂 | "I joined the ConvFinQA team — financial reasoning project. I had ML background but zero accounting / SEC filings / multi-hop financial reasoning..." |
-| 2 | **What I didn't know (specific)** | 30s | List 3-4 具体 gap | "Three gaps: (1) accounting concepts (EBITDA, working capital), (2) SEC 10-K filing structure, (3) financial multi-hop reasoning theory..." |
-| 3 | **Why I had to deliver anyway** | 20s | Timeline + constraint | "Paper deadline 4 months, my role was lead engineer + lead methodology designer..." |
-| 4 | **Ramp-up framework** | 60s | 系统化 not ad-hoc | "Three-track parallel ramp: domain learning track, technical implementation track, validation track. Each with timebox + checkpoint..." |
-| 5 | **Asking the right person** | 45s | Source of truth identification | "For accounting I found 2 grad students in finance dept... For SEC filing I found compliance team at TikTok... For multi-hop reasoning I read 3 papers + emailed authors..." |
-| 6 | **First small delivery (ramp + ship parallel)** | 45s | 你 ship 第一个东西 in week 1-2, 不是 month 4 | "Week 2 I shipped a small data preprocessing component — not core, but allowed me to test understanding..." |
-| 7 | **Calibrated confidence** | 30s | 你 know 你 know 什么, 不 know 什么 | "By month 2 I could confidently design retrieval module. But I flagged 'numeric reasoning is unfamiliar, I need senior review'..." |
-| 8 | **Outcome + transferable learning** | 30s | Result + meta lesson | "Project shipped on time. Lesson: 'ramp ≠ master', ramp = enough to deliver first piece + identify gaps you still have..." |
+| 1 | **Context — unfamiliar what (哪里不熟)** | 20s | 哪个 domain / stack / customer 不懂 | "I joined the ConvFinQA team — financial reasoning project. I had ML background but zero accounting / SEC filings / multi-hop financial reasoning..." |
+| 2 | **What I didn't know (具体哪些不会)** | 30s | List 3-4 具体 gap | "Three gaps: (1) accounting concepts (EBITDA, working capital), (2) SEC 10-K filing structure, (3) financial multi-hop reasoning theory..." |
+| 3 | **Why I had to deliver anyway (为什么还得交付)** | 20s | Timeline + constraint | "Paper deadline 4 months, my role was lead engineer + lead methodology designer..." |
+| 4 | **Ramp-up framework (上手框架)** | 60s | 系统化 not ad-hoc | "Three-track parallel ramp: domain learning track, technical implementation track, validation track. Each with timebox + checkpoint..." |
+| 5 | **Asking the right person (问对人)** | 45s | Source of truth identification | "For accounting I found 2 grad students in finance dept... For SEC filing I found compliance team at TikTok... For multi-hop reasoning I read 3 papers + emailed authors..." |
+| 6 | **First small delivery (第二周先 ship 小东西)** | 45s | 你 ship 第一个东西 in week 1-2, 不是 month 4 | "Week 2 I shipped a small data preprocessing component — not core, but allowed me to test understanding..." |
+| 7 | **Calibrated confidence (校准自信)** | 30s | 你 know 你 know 什么, 不 know 什么 | "By month 2 I could confidently design retrieval module. But I flagged 'numeric reasoning is unfamiliar, I need senior review'..." |
+| 8 | **Outcome + transferable learning (结果 + 可迁移心法)** | 30s | Result + meta lesson | "Project shipped on time. Lesson: 'ramp ≠ master', ramp = enough to deliver first piece + identify gaps you still have..." |
 
 Total: ~4-5 min.
 

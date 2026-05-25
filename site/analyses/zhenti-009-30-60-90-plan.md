@@ -2,6 +2,10 @@
 
 > "Walk me through your 30/60/90-day plan for this FDE role. What would you focus on in your first 30 days, then 60, then 90? How would you measure success at each milestone?"
 
+**中文翻译**:
+
+> "讲一下你来这个 FDE 岗位的前 30/60/90 天计划. 头 30 天你打算 focus 什么, 然后 60 天、90 天怎么递进? 每个 milestone 你怎么衡量成败?"
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional, 通常在 round 后期)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Databricks / Scale AI 高频. 变体: "if hired, how would you spend your first 90 days?" / "describe your onboarding plan" / "what would your first project look like"
 
@@ -137,14 +141,14 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Frame — what 30/60/90 should be** | 20s | Set up the mental model | "I think of 30/60/90 as escalating ambition: learn → contribute → own..." |
-| 2 | **Calibration upfront** | 20s | 你 day-1 跟 hiring manager align | "Day 1 I'd schedule 1-hour with hiring manager: what does success look like at each milestone for YOU?..." |
-| 3 | **30-day plan — Learn / Listen** | 60s | Customer + team + product + tech ramp | "Days 1-30: I'd shadow 2-3 existing FDE on customer calls, sit in pod meetings, read 5 deployment docs..." |
-| 4 | **30-day exit criteria** | 20s | 具体 by day 30 you can articulate X | "By day 30: I can articulate top-3 customer pain patterns + team's 2 biggest blockers + 1 'low-hanging fruit' candidate..." |
-| 5 | **60-day plan — Contribute** | 60s | First small ship + relationship build | "Days 31-60: Take a contained 2-week first project — something the pod already wanted but hadn't gotten to..." |
-| 6 | **60-day exit criteria** | 20s | By day 60 ship + relationships | "By day 60: 1 shipped contained project + 3 customer relationships established + 1 cross-team relationship..." |
-| 7 | **90-day plan — Own + propose** | 60s | Bigger ship + own bigger thing + propose | "Days 61-90: Take ownership of a medium customer deployment OR propose a small platform improvement based on patterns I've seen..." |
-| 8 | **90-day exit criteria + how I measure** | 30s | Success metric + Risk-of-over-promise ack | "By day 90: I'd want to have 1 mid-size deliverable, but I'll calibrate with hiring manager — over-promise day-1 is FDE rookie mistake..." |
+| 1 | **Frame — what 30/60/90 should be (心智模型: 30/60/90 应该是什么)** | 20s | Set up the mental model | "I think of 30/60/90 as escalating ambition: learn → contribute → own..." |
+| 2 | **Calibration upfront (先跟 hiring manager 对齐)** | 20s | 你 day-1 跟 hiring manager align | "Day 1 I'd schedule 1-hour with hiring manager: what does success look like at each milestone for YOU?..." |
+| 3 | **30-day plan — Learn / Listen (30 天 — 学习 / 倾听)** | 60s | Customer + team + product + tech ramp | "Days 1-30: I'd shadow 2-3 existing FDE on customer calls, sit in pod meetings, read 5 deployment docs..." |
+| 4 | **30-day exit criteria (30 天退出标准)** | 20s | 具体 by day 30 you can articulate X | "By day 30: I can articulate top-3 customer pain patterns + team's 2 biggest blockers + 1 'low-hanging fruit' candidate..." |
+| 5 | **60-day plan — Contribute (60 天 — 开始贡献)** | 60s | First small ship + relationship build | "Days 31-60: Take a contained 2-week first project — something the pod already wanted but hadn't gotten to..." |
+| 6 | **60-day exit criteria (60 天退出标准)** | 20s | By day 60 ship + relationships | "By day 60: 1 shipped contained project + 3 customer relationships established + 1 cross-team relationship..." |
+| 7 | **90-day plan — Own + propose (90 天 — own + 主动提案)** | 60s | Bigger ship + own bigger thing + propose | "Days 61-90: Take ownership of a medium customer deployment OR propose a small platform improvement based on patterns I've seen..." |
+| 8 | **90-day exit criteria + how I measure (90 天退出标准 + 衡量方式)** | 30s | Success metric + Risk-of-over-promise ack | "By day 90: I'd want to have 1 mid-size deliverable, but I'll calibrate with hiring manager — over-promise day-1 is FDE rookie mistake..." |
 
 Total: ~5 min. 8 段 必须均衡, 60-day + 90-day = real ship, 30-day = setup.
 

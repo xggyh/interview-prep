@@ -2,6 +2,10 @@
 
 > "Customer reports their AI feature 'feels worse' than 2 months ago. **Same model, same prompts, but quality has degraded.** Walk me through your diagnosis methodology — hypotheses with priors, stratified eval, common causes, and how you isolate variables."
 
+**中文翻译**:
+
+> "客户反馈说他们的 AI feature '感觉比 2 个月前差了'. **模型没换, prompt 没改, 但质量明显下降了.** 跟我讲讲你的诊断方法论 — 几个假设各自的 prior (先验概率) 是多少, 怎么做 stratified eval (分层评估), 常见原因, 还有怎么 isolate variables (隔离变量)."
+
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production AI drift 必问
 

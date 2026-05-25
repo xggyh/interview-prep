@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q31 · 911 急救响应时间优化</h3>
 <blockquote><p>"A major US city wants to <strong>reduce 911 emergency response time</strong>. You have access to <strong>911 call data, real-time traffic data, and ambulance GPS data</strong>. You have <strong>60 minutes</strong>. <strong>Go</strong>."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"美国某大城市想 <strong>降低 911 急救响应时间</strong>. 你能拿到 <strong>911 通话数据、实时交通数据、救护车 GPS 数据</strong>. 给你 <strong>60 分钟</strong>. <strong>开始</strong>."</p></blockquote>
 <p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir FDE 经典题, 后被 OpenAI / Google / Salesforce / Databricks 全部复用 <strong>行业</strong>: Public safety / municipal / healthcare</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -60,17 +62,17 @@
 <p><strong>不是</strong>: 考你能不能 design 一个 911 系统的方案.</p>
 <p><strong>是</strong>: 考你<strong>面对一个 unbounded、safety-critical、多 stakeholder、多 data source 的真实部署问题, 能不能在 60 min 内做出 structured decomposition</strong>.</p>
 <p>具体看 4 个 signal:</p>
-<ol><li><strong>Clarify before solving</strong> — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag"</li><li><strong>Tractable MVP</strong> — 你能从一个 unbounded 问题里切出一个 <strong>2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton</strong></li><li><strong>Surface tradeoffs proactively</strong> — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」</li><li><strong>Safety-critical mindset</strong> — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS</li></ol>
+<ol><li><strong>Clarify before solving</strong> (先 clarify 再 solve) — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag" (直接跳到答案 = 立刻 red flag)</li><li><strong>Tractable MVP</strong> (可交付的 MVP) — 你能从一个 unbounded 问题里切出一个 <strong>2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton</strong> (走骨头)</li><li><strong>Surface tradeoffs proactively</strong> (主动暴露 tradeoff) — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」</li><li><strong>Safety-critical mindset</strong> (安全关键思维) — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS</li></ol>
 <hr />
 <h3>❌ 最常见的挂法 (top 3)</h3>
-<p><strong>挂法 #1: 一上来就冲 ML routing 算法</strong></p>
+<p><strong>挂法 #1: 一上来就冲 ML routing 算法</strong> (上来就讲 ML routing 算法)</p>
 <blockquote><p>候选人 (5 秒内): "Sure, I'd train a graph neural network on historical traffic + GPS, predict ETA, build a recommendation system, deploy on Kubernetes..."</p></blockquote>
 <p>死. 你<strong>没问</strong>:</p>
 <ul><li>是 call-to-dispatch 慢, 还是 dispatch-to-arrival 慢? (你都不知道 bottleneck 在哪)</li><li>"Response time" 是 P50 还是 P90? Mayor 关心 PR average, EMS director 关心 P99</li><li>哪个 call category? Cardiac 跟 mental health 的优化策略完全不同</li><li>已经有什么 system 在 production? (PSAP / CAD / Motorola / Tyler 等)</li><li>Equity concern (低收入街区 vs 高收入街区响应时间差异) 是 explicit goal 吗?</li></ul>
-<p><strong>挂法 #2: 当 system design 题做</strong></p>
+<p><strong>挂法 #2: 当 system design 题做</strong> (把它当系统设计题答)</p>
 <p>候选人开始算: 「30K calls/day → 350 calls/sec peak → 5 个 PSAP shards → Redis cache → Kafka topic...」</p>
 <p>死. 这道题<strong>不是 system design</strong>. 60 min 全花在 capacity planning + sharding = miss the point.</p>
-<p><strong>挂法 #3: 把 dispatcher 完全 cut out</strong></p>
+<p><strong>挂法 #3: 把 dispatcher 完全 cut out</strong> (把调度员完全 cut 掉)</p>
 <blockquote><p>"AI will replace dispatchers and pick the optimal unit autonomously."</p></blockquote>
 <p>死. Safety-critical 系统的红旗. PSAP 工会会立刻 kill 你的 project. <strong>永远 recommendation, 不 replace</strong>.</p>
 <hr />
@@ -335,6 +337,10 @@ Key phrases:
 
 > "A major US city wants to **reduce 911 emergency response time**. You have access to **911 call data, real-time traffic data, and ambulance GPS data**. You have **60 minutes**. **Go**."
 
+**中文翻译**:
+
+> "美国某大城市想 **降低 911 急救响应时间**. 你能拿到 **911 通话数据、实时交通数据、救护车 GPS 数据**. 给你 **60 分钟**. **开始**."
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir FDE 经典题, 后被 OpenAI / Google / Salesforce / Databricks 全部复用
 **行业**: Public safety / municipal / healthcare
@@ -417,16 +423,16 @@ Key phrases:
 
 具体看 4 个 signal:
 
-1. **Clarify before solving** — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag"
-2. **Tractable MVP** — 你能从一个 unbounded 问题里切出一个 **2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton**
-3. **Surface tradeoffs proactively** — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」
-4. **Safety-critical mindset** — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS
+1. **Clarify before solving** (先 clarify 再 solve) — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag" (直接跳到答案 = 立刻 red flag)
+2. **Tractable MVP** (可交付的 MVP) — 你能从一个 unbounded 问题里切出一个 **2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton** (走骨头)
+3. **Surface tradeoffs proactively** (主动暴露 tradeoff) — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」
+4. **Safety-critical mindset** (安全关键思维) — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS
 
 ---
 
 ## ❌ 最常见的挂法 (top 3)
 
-**挂法 #1: 一上来就冲 ML routing 算法**
+**挂法 #1: 一上来就冲 ML routing 算法** (上来就讲 ML routing 算法)
 
 > 候选人 (5 秒内): "Sure, I'd train a graph neural network on historical traffic + GPS, predict ETA, build a recommendation system, deploy on Kubernetes..."
 
@@ -437,13 +443,13 @@ Key phrases:
 - 已经有什么 system 在 production? (PSAP / CAD / Motorola / Tyler 等)
 - Equity concern (低收入街区 vs 高收入街区响应时间差异) 是 explicit goal 吗?
 
-**挂法 #2: 当 system design 题做**
+**挂法 #2: 当 system design 题做** (把它当系统设计题答)
 
 候选人开始算: 「30K calls/day → 350 calls/sec peak → 5 个 PSAP shards → Redis cache → Kafka topic...」
 
 死. 这道题**不是 system design**. 60 min 全花在 capacity planning + sharding = miss the point.
 
-**挂法 #3: 把 dispatcher 完全 cut out**
+**挂法 #3: 把 dispatcher 完全 cut out** (把调度员完全 cut 掉)
 
 > "AI will replace dispatchers and pick the optimal unit autonomously."
 

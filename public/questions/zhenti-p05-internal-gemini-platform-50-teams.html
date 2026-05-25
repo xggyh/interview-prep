@@ -1,0 +1,1833 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🔮 Q-P5 · [预测·Google FDE 内部] 在 50 个产品团队中标准化 Gemini 使用 (cost / quality / obs) · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / 🔮 Q-P5 · [预测·Google FDE 内部] 在 50 个产品团队中标准化 Gemini 使用 (cost / quality / obs)</div>
+  <h1>🔮 Q-P5 · [预测·Google FDE 内部] 在 50 个产品团队中标准化 Gemini 使用 (cost / quality / obs)</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-p05-internal-gemini-platform-50-teams.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-p05-internal-gemini-platform-50-teams.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">🔮 Google FDE 预测题 (Internal CE 视角). Paved road vs mandate + SDK wrapper + cost attribution + prompt registry + OTel GenAI obs. 你 TikTok Internal Agent Platform 经验直接 mapping. ~1050 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q-P5 · 内部 Google FDE — 给 50 个产品团队建 Gemini 统一平台</h3>
+<blockquote><p>"You're an internal Google FDE supporting product teams. 50 product teams at Google (Maps, Photos, Workspace, Search, Cloud, Pixel, etc.) are using the Gemini API in their products. Three problems are growing: (1) cost is growing 20% month-over-month with no visibility into why, (2) prompt quality varies wildly — some teams have great prompts, some are spending tokens on bad ones, (3) there's no central observability — when Gemini has an issue, teams find out from customer complaints. Design the platform / governance layer to standardize Gemini usage across these 50 teams. 6-month plan."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你是 Google 内部 FDE, 支持产品团队. Google 内部 <strong>50 个产品团队</strong> (Maps / Photos / Workspace / Search / Cloud / Pixel 等) 都在自己产品里用 Gemini API. 现在三个问题在恶化:</p>
+<p>(1) <strong>成本月环比涨 20%, 没人知道为啥</strong>; (2) <strong>prompt 质量天差地别</strong> — 有的团队 prompt 写得超棒, 有的把 token 砸在烂 prompt 上; (3) <strong>没有中心化的可观测性</strong> — Gemini 出问题, 团队是从用户投诉里知道的.</p>
+<p>设计平台层 / 治理层, 统一这 50 个团队的 Gemini 用法. 6 个月计划."</p></blockquote>
+<p><strong>Round</strong>: Platform Design + Org Strategy (60 min) <strong>出处</strong>: 🔮 预测题 — 针对 Google FDE 主场 (internal platform team 是 Google FDE 经典场景) <strong>行业 / 约束</strong>: Internal platform / 50 teams / governance vs autonomy / 6 个月 / paved road model / no mandate authority / 20% MoM cost growth / observability gap</p>
+<hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题里的平台 / governance / 观测词如果不懂, 后面架构图听不下去. 这张表 5 min 看完.</p></blockquote>
+<h4>平台团队 / 组织模式 ⭐ 这题的关键</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Internal platform team</strong> ⭐</td><td>内部平台团队. 服务的客户是公司内部其他工程团队, 不是外部客户. Google 经典模式 — Search infra / Maps infra / Cloud Spanner platform 都是.</td></tr><tr><td><strong>Paved road (铺好的路)</strong> ⭐</td><td>平台团队最重要的概念. 提供一条"已铺好的路"让用户走更快更容易, 但不强制. 如果他们选 off-road 也行 (自负盈亏). Google / Netflix / Facebook 都用这模式.</td></tr><tr><td><strong>Golden path</strong> ⭐</td><td>铺好的路的具体实现 — 一套标准 SDK + 模板 + 文档让团队 5 min 上手. 关键是 <strong>比裸调 raw API 更容易</strong>, 不是更难.</td></tr><tr><td><strong>Mandate (强推)</strong></td><td>强制要求所有团队必须用平台. 这是 paved road 的反面 — Google 文化里通常失败 (除非高管层强烈背书 + 有意义的 enforcement).</td></tr><tr><td><strong>Build vs adopt (建 vs 推广)</strong> ⭐</td><td>平台团队 anti-pattern: 投 6 个月闭门造车, 上线发现没人用. 正确做法: 早期 MVP 给 2-3 个 lighthouse 团队验证, 再 scale.</td></tr><tr><td><strong>Lighthouse team (灯塔团队)</strong> ⭐</td><td>第一批 early adopter, 通常是高 visibility 团队 (Search / Maps). 他们用了, 别的团队跟着用.</td></tr><tr><td><strong>Anti-pattern: build big then mandate</strong></td><td>反模式 — 闭门造一个庞然大物然后强推. Google 文化下 100% 失败.</td></tr><tr><td><strong>Customer Engineer (CE) / FDE</strong></td><td>在内部场景, FDE = 帮内部团队上手 + 解决 deep technical issue 的人. 不只是 docs / sample code.</td></tr><tr><td><strong>Office Hours / AMAs (Ask Me Anything)</strong></td><td>平台团队的 outreach 形式. 每周 1-2 小时开放 Q&amp;A. 比 documentation 更 effective.</td></tr><tr><td><strong>Internal Slack channel</strong></td><td>Google 内部叫 chat space. 平台团队的"前台". 反映出用户痛点比 GitHub issue 快.</td></tr></tbody></table></div>
+<h4>Gemini / LLM 平台架构</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SDK / wrapper</strong> ⭐</td><td>平台提供的 client library. 用户 import 这个而不是 raw Gemini API. 自动注入 telemetry / cost tagging / retry / cache.</td></tr><tr><td><strong>API gateway</strong></td><td>网关层. 所有 Gemini call 经过它, 加 auth / rate limit / observability.</td></tr><tr><td><strong>Service mesh (gRPC / Stubby)</strong></td><td>Google 内部用 Stubby (gRPC 前身). 服务间通信 mesh 自带 tracing.</td></tr><tr><td><strong>Per-team cost tagging</strong> ⭐</td><td>每个 API call 打 team_id / project_id / use_case tag, 写入 BigQuery, 可分摊到具体团队 / project. <strong>没这个, cost 涨 20% MoM 永远查不清谁的锅</strong>.</td></tr><tr><td><strong>Quota management</strong></td><td>配额管理. 防止单个团队失控烧光全公司 quota. Per-team token budget + 月预算.</td></tr><tr><td><strong>Token budget</strong></td><td>Token 预算. 给每个团队 / project 月级别 token 上限, 超了告警 / 限速 / hard cap.</td></tr><tr><td><strong>Cache layer</strong></td><td>缓存层. 相同 prompt 直接命中. 命中率 20-40% 时省钱 + 加速.</td></tr><tr><td><strong>Prompt registry</strong> ⭐</td><td>Prompt 中心化仓库. 每个 prompt 有 owner / version / eval results / used-by teams. Git-backed 最 sane.</td></tr><tr><td><strong>Prompt versioning</strong></td><td>Prompt 版本管理. v1.0 / v1.1 / v2.0. 不带版本号 = 改了 prompt 别人不知道.</td></tr><tr><td><strong>Prompt eval pipeline</strong></td><td>Prompt 自动评估流水线. 改 prompt → run on golden set → compare metrics → approve/reject.</td></tr><tr><td><strong>Shadow mode</strong></td><td>新 prompt / 新 model 并行跑, response 不返回用户, 只 log. 评估真实流量上的差异.</td></tr><tr><td><strong>Cascade / model routing</strong></td><td>模型级联. Cheap model (Flash) 先答, 不行升级 Pro. 降本利器.</td></tr></tbody></table></div>
+<h4>观测 / OpenTelemetry GenAI</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>OpenTelemetry (OTel)</strong> ⭐</td><td>开源 observability 标准. Trace / metric / log 统一格式. Google Cloud 原生支持.</td></tr><tr><td><strong>OTel GenAI conventions</strong> ⭐</td><td>OTel 2025 出的 GenAI 专用 trace schema — <code>gen_ai.system</code>, <code>gen_ai.request.model</code>, <code>gen_ai.usage.input_tokens</code> 等. 标准化 LLM observability.</td></tr><tr><td><strong>Trace / span</strong></td><td>一个 request 的完整链路 (trace) + 单一操作 (span). LLM 调用是一个 span.</td></tr><tr><td><strong>Per-team dashboard</strong></td><td>每个团队一个 Looker / Looker Studio 仪表盘, 显示自己的 cost / latency / error rate / quality metrics.</td></tr><tr><td><strong>Anomaly detection</strong></td><td>异常检测. Cost / latency / quality 突变 → 自动告警.</td></tr><tr><td><strong>Alert / paging</strong></td><td>告警 + 寻呼. 严重问题 page on-call. Google 内部用 SRE 模式.</td></tr><tr><td><strong>SLI / SLO / SLA</strong></td><td>Service Level Indicator (实际指标) / Objective (内部目标) / Agreement (对外承诺).</td></tr><tr><td><strong>Error budget</strong></td><td>错误预算. SLO 99.9% = 0.1% 错误预算. 烧完了停发布. SRE 经典.</td></tr><tr><td><strong>Cardinality explosion</strong></td><td>高基数爆炸. 给每个 user_id 打 tag → 标签数无限 → 监控系统挂. 设计 tag schema 时要小心.</td></tr></tbody></table></div>
+<h4>Cost / FinOps</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Cost attribution</strong> ⭐</td><td>成本归属. 把 $X 总账单分摊到具体 team / project / use_case. Cloud FinOps 核心.</td></tr><tr><td><strong>Showback / chargeback</strong></td><td>Showback = 显示成本但不真扣钱 (内部 awareness); Chargeback = 真的从团队预算扣. 后者更有约束力.</td></tr><tr><td><strong>Pareto (80/20)</strong> ⭐</td><td>帕累托原则. 80% cost 来自 20% 团队. 这题第一步: 找 top 5 cost team, 优化它们 = 解决 80% 问题.</td></tr><tr><td><strong>Cost per query / per user / per session</strong></td><td>单位成本. 总 cost 没意义, 单位成本是 actionable.</td></tr><tr><td><strong>Unit economics</strong></td><td>单位经济. Cost per user vs revenue per user. 内部产品也要算.</td></tr><tr><td><strong>Forecast</strong></td><td>预测. 基于当前增速预测 6 / 12 月 cost. 用于 capacity planning.</td></tr></tbody></table></div>
+<h4>Google 内部特定</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Critical User Journey (CUJ)</strong></td><td>Google 内部术语 — 用户的关键路径. Maps 的 CUJ = 搜索地点 → 导航. Gemini call 通常嵌在某个 CUJ 里.</td></tr><tr><td><strong>TT (Technical Talk)</strong></td><td>Google 内部技术分享. 平台团队 outreach 标配.</td></tr><tr><td><strong>Eng-wide / Org-wide</strong></td><td>全工程组织级别. 50 团队跨 5+ org, 每个 org VP 是独立 stakeholder.</td></tr><tr><td><strong>TVC / FTE</strong></td><td>Temporary Vendor Contractor / Full-Time Employee. 平台团队规模规划用.</td></tr><tr><td><strong>Design doc</strong></td><td>Google 工程文化核心 — 正式 design doc 要 LGTM (Looks Good To Me approval) from senior eng. 平台 / 大改动必须有.</td></tr><tr><td><strong>PRD (Product Requirements Doc)</strong></td><td>产品需求文档. 平台 launch 也需要.</td></tr><tr><td><strong>Launch readiness review (LRR)</strong></td><td>上线就绪审查. SRE + security + privacy + legal sign-off. Internal launch 也要走.</td></tr><tr><td><strong>Buganizer</strong></td><td>Google 内部 bug tracking 系统. 替代 Jira.</td></tr><tr><td><strong>Critique</strong></td><td>Google 内部 code review 系统.</td></tr><tr><td><strong>Borg / Kubernetes</strong></td><td>Borg = Google 内部容器编排 (K8s 前身). Internal services run on Borg.</td></tr><tr><td><strong>Boq</strong></td><td>Google 内部 microservice 框架.</td></tr><tr><td><strong>Spanner / BigTable / Bigquery</strong></td><td>Google 数据存储栈. Spanner = 全球一致 SQL, BigTable = 大 NoSQL, BigQuery = 数仓.</td></tr><tr><td><strong>Goldfish / Sawmill</strong></td><td>Google 内部 log analysis / observability 工具. (类比开源 Loki / Splunk)</td></tr></tbody></table></div>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 architect 一个 LLM gateway.</p>
+<p><strong>是</strong>: 考你能不能在 <strong>50 个团队跨 5+ org + 无 mandate authority + 6 个月 deadline + cost 失控</strong> 真实约束下做 <strong>平台团队的核心 trade-off — adoption vs control</strong>.</p>
+<p>5 个 signal:</p>
+<ol><li><strong>Diagnose first, build second</strong> (先诊断, 后建) — 不要冲架构. 先做 1-2 周 audit: top 5 cost team 是谁? top 5 worst prompt 是哪些? 这才能决定 paved road 的形状.</li></ol>
+<ol><li><strong>Paved road, not mandate</strong> (铺路而非强推) — Google 文化下 mandate 失败. 平台必须 <strong>比裸调 Gemini API 更容易</strong>. Wins by being easier, not by being required. 这是 staff-level platform thinker 的标志.</li></ol>
+<ol><li><strong>Anti-pattern: build big then mandate</strong> — 闭门造一个庞然大物然后强推. 候选人 50% 会这么答, 立刻挂. 正确答案: 2 周 MVP + 2 个 lighthouse team + iterate.</li></ol>
+<ol><li><strong>Adoption is the metric, not architecture</strong> — 6 个月成功 = 30+/50 团队用了平台, <strong>不是</strong> "我们造了世界上最好的 LLM gateway". 平台没人用 = 失败.</li></ol>
+<ol><li><strong>Resume hook gold mine</strong> — Gao Xin 的 <strong>Internal Agent Platform at TikTok</strong> 是这题的直接 analog. 必须开口 5 分钟内 mention.</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 立刻冲 architecture, 6 个月闭门造 LLM gateway</strong> (闭门造车然后强推)</p>
+<blockquote><p>"I'd design a comprehensive LLM gateway with prompt versioning, cost attribution, observability, caching, A/B testing infrastructure. After 5 months of build, we'd mandate all 50 teams to migrate by month 6."</p></blockquote>
+<p>死. 这是 Google platform team <strong>教科书级反模式</strong>:</p>
+<ul><li>5 个月闭门造, 没人 review 你的设计</li><li>第 6 个月 launch, 团队抵抗 ("我们的用例你没考虑")</li><li>VP 不会强推 (跨 5 个 org 没人有权)</li><li>一年后 5/50 团队"在用", 平台 die, FDE 走人</li></ul>
+<p><strong>挂法 #2: "我会 mandate 所有团队用我的 platform"</strong> (假设有 mandate 权力)</p>
+<blockquote><p>"I'll mandate all 50 teams to migrate by Q2."</p></blockquote>
+<p>死. 你<strong>没问</strong>:</p>
+<ul><li>你的 platform team 在 org chart 哪里? VP 级背书吗?</li><li>50 个团队跨几个 org? 每个 org VP 都 buy in 吗?</li><li>团队不用平台的 penalty 是什么? (Google 文化通常没)</li><li>平台没 ready 之前强推, 团队怎么活?</li></ul>
+<p><strong>挂法 #3: 不做 diagnose, 直接 design 庞大架构</strong></p>
+<blockquote><p>"Here's my 6-month plan: month 1 design, month 2-5 build, month 6 launch."</p></blockquote>
+<p>死. 你不知道:</p>
+<ul><li>top 5 cost team 是谁? (Pareto 80/20, 5 团队 = 80% cost, 解决它们 = 解决主要问题)</li><li>top 5 worst prompt 是哪些? 怎么烂法?</li><li>现有团队各自怎么调 Gemini? (SDK? Direct HTTP? Vertex AI? AI Studio?) 不知道 baseline 没法设计 paved road.</li></ul>
+<p><strong>挂法 #4: 把 platform 当产品做, 但忽略 customer development</strong></p>
+<blockquote><p>"I'd talk to teams every quarter via surveys."</p></blockquote>
+<p>死. 平台的客户是工程师, 你必须 <strong>像 PM 一样做 user research</strong>: shadow 他们一天看怎么用, 每周 office hours, 主动找 top 5 cost team 喝咖啡. 季度调查 = 平台团队失败的早期信号.</p>
+<p><strong>挂法 #5: 忽略 governance vs autonomy 的 trade-off</strong></p>
+<blockquote><p>"Everything goes through the gateway."</p></blockquote>
+<p>死. 50 个团队里, Search 和 Maps 是核心 product, 他们 latency 要求 50ms p99. 你的 gateway 加 20ms latency = 他们 opt-out. 必须 <strong>layered approach</strong>: 核心团队可以直连 Gemini API 但接 SDK 拿 telemetry, 一般团队全走 gateway.</p>
+<hr />
+<h3>完美答案架构 (9-step Response Architecture, 本题定制)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>Step</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify (G·O·O·D-F·T)</td><td>8 min</td><td>锁 team 性质 + authority + cost driver</td><td>"Before architecture, I want to ask 10 things across 6 dimensions. The critical one: what's our authority — paved road or mandate?"</td></tr><tr><td>2</td><td>Reframe: adoption is the metric</td><td>4 min</td><td>平台成功 = 30+/50 团队用, 不是 "我建了 best gateway"</td><td>"Platform success = adoption rate, not feature count."</td></tr><tr><td>3</td><td>Diagnose first (2 weeks)</td><td>6 min</td><td>Audit top 5 cost team + top 5 worst prompt + 现有用法</td><td>"Before building anything, 2 weeks audit. Build informed by data."</td></tr><tr><td>4</td><td>Stakeholder + success metrics</td><td>5 min</td><td>Org-wide stakeholder, 3-layer metrics, anti-mandate</td><td>"Adoption rate, cost saved, quality improved — in that order."</td></tr><tr><td>5</td><td>Paved road SDK design</td><td>10 min</td><td>SDK wraps Gemini, 自动注入 telemetry / cost / cache / retry</td><td>"SDK wins by being EASIER than raw Gemini API."</td></tr><tr><td>6</td><td>Central observability</td><td>7 min</td><td>OTel GenAI + per-team Looker + alert</td><td>"Observability is the killer feature — first thing teams notice."</td></tr><tr><td>7</td><td>Prompt registry + eval pipeline</td><td>6 min</td><td>Git-backed prompt store + auto eval CI</td><td>"Prompt registry is the 'GitHub for prompts'."</td></tr><tr><td>8</td><td>Adoption strategy</td><td>6 min</td><td>Lighthouse teams → office hours → docs → org-wide</td><td>"Adoption is sold one team at a time, not announced."</td></tr><tr><td>9</td><td>Risk + close</td><td>4 min</td><td>Platform anti-patterns + scope cuts</td><td>"Three risks: too big, no adoption, internal politics."</td></tr></tbody></table></div>
+<hr />
+<h3>G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐</h3>
+<blockquote><p><strong>核心理念</strong>: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.</p></blockquote>
+<pre class="language-plaintext"><code class="language-plaintext">┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘</code></pre>
+<blockquote><p>"The critical one upfront: what's our authority — paved road or mandate? It changes everything."</p></blockquote>
+<h4>G — Goal (→ feeds Decompose Step 1: KPI lock)</h4>
+<blockquote><p><strong>Q1</strong>: "When leadership says 'standardize Gemini usage', is the goal (a) <strong>save cost</strong> (the 20% MoM growth is the bleeding), (b) <strong>lift quality</strong> (some teams have great prompts, raise the floor), (c) <strong>avoid incidents</strong> (centralize observability), (d) <strong>enable new capabilities</strong> (e.g. shared prompt library, model routing), or (e) <strong>all of the above ranked by</strong>...? Each scenario changes the 6-month priority."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "What does <strong>success at month 6</strong> look like? Is it (a) X% of teams using the platform, (b) Y% cost reduction, (c) Z incidents prevented, or (d) leadership-credible 'we have a unified Gemini story'? Concrete success metric drives plan."</p></blockquote>
+<p><strong>这层 → 解锁 Decompose Step 1</strong>: 答完 G 问题, 你就知道 KPI 是什么 (e.g., 30/50 teams on SDK + 15% cost reduction on adopters + per-team observability live + 0 platform-caused incidents), 后面 5 步的所有决策按这个 KPI 优化 — 也决定 cost-attribution-first vs prompt-library-first 的顺序.</p>
+<h4>O — Owner (→ feeds Decompose Step 2: Stakeholder map)</h4>
+<blockquote><p><strong>Q3</strong>: "What's the <strong>org structure</strong> of my platform team? Reports to whom? VP-level backing? How many engineers? <strong>Most importantly: do we have mandate authority across these 50 teams (cross 5+ orgs), or paved-road authority only?</strong> This changes the entire approach."</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "Who are the <strong>highest-cost / highest-visibility teams</strong> I should partner with first? Maps and Search are usually anchor lighthouse teams. But which 5 teams <strong>want to talk to me</strong>? — those are my Wave 1. And: any teams <strong>politically off-limits</strong> (e.g. Search runs own infra, won't adopt)? Define out-of-scope upfront."</p></blockquote>
+<p><strong>这层 → 解锁 Step 2</strong>: 答完 O 问题, 你画出 stakeholder map (sponsor = AI Infra VP / champion = top-5 willing teams / blocker = Search-style off-limits orgs / SME = Workspace prompt-eval team / user = 50 team eng leads) — 知道哪 5 个 Wave-1, 哪 10-15 个 Wave-2, 哪几个永远不进 scope.</p>
+<h4>D — Data (→ feeds Step 3: 数据 inventory)</h4>
+<blockquote><p><strong>Q5</strong>: "<strong>Cost data granularity</strong>: do we currently know cost per team? Per app? Per use case? If billing is bulk 'Gemini bill = $5M/month', I need to <strong>add cost attribution as month 1 work</strong> before anything else. If we already have team-level granularity, I skip to optimization."</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "<strong>Quality data + existing surfaces</strong>: any team has eval pipelines and golden sets I can learn from? Some lighthouse teams (Workspace, Search) probably already do this well — I want to <strong>steal their patterns</strong> as platform default. And: what surfaces are teams using today — direct API, Vertex SDK, AI Studio, internal wrappers? 50 surfaces = discoverability problem before architecture."</p></blockquote>
+<p><strong>这层 → 解锁 Step 3</strong>: 答完 D 问题, 你能画 inventory 表 (50 teams × current surface × $/month × eval maturity × prompt-library readiness × politically-onboardable) — 用这张表直接做 Wave 1/2/3 rollout matrix.</p>
+<h4>D — Deadline (→ feeds Step 4: 子问题排序)</h4>
+<blockquote><p><strong>Q7</strong>: "<strong>Why 6 months specifically</strong>? Is it (a) <strong>cost growth crisis</strong> (20% MoM compounding = $5M → $15M in 6 months), (b) <strong>incident</strong> that triggered leadership attention, (c) <strong>budget cycle</strong> (need to lock platform funding for next FY), (d) <strong>competitive pressure</strong>, or (e) arbitrary executive target? <strong>Driver determines what's compromisable.</strong>"</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "<strong>Worst-case + reversibility</strong>: a team migrates to platform, then platform has a bug → their product breaks. Do teams need (a) instant fallback to direct Gemini API, (b) opt-out at any time, (c) blast-radius isolation between teams? <strong>No team adopts a platform they can't escape from in 5 minutes.</strong> What's the leadership tolerance for a Wave-1 lighthouse team failing publicly?"</p></blockquote>
+<p><strong>这层 → 解锁 Step 4</strong>: 答完 Deadline 问题, 你知道<strong>为什么</strong> 6 个月这个数 (e.g., 20% MoM cost growth + VP board commit by H2-end), 才能 push back. Sub-problems 按 (cost-bleed-stop × adoption-momentum × reversibility-risk) 排序 — cost attribution + opt-out path 排最前 (blockers for any adoption), prompt library + model routing 推到 Wave-2.</p>
+<h4>S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)</h4>
+<blockquote><p><strong>Q9</strong>: "In 6 months with paved-road-only authority, would you accept: <strong>(a)</strong> SDK + dashboard adopted by top-10 willing teams (Pareto, ~60% of $-spend covered) + paved-road for the rest, or <strong>(b)</strong> all 50 teams on the platform (probably needs mandate authority you may not have, risk of forcing adoption + backlash)? My instinct: <strong>(a)</strong> — make it irresistible for the top 10, document the paved road for everyone else, measure adoption as a 12-month trajectory not a 6-month gate."</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "What's <strong>explicitly out of scope</strong> for 6-month MVP — (a) Search org (won't adopt anyway), (b) model fine-tuning capability (big project, defer), (c) cross-team prompt-sharing library (needs governance), (d) auto-routing across models (needs more data), (e) any team &lt; $10K/month spend (not worth onboarding effort)? My recommendation: <strong>MVP = SDK + cost attribution + observability + opt-out path + 10 Wave-1 teams</strong>; defer prompt library, model routing, fine-tuning, Search, low-spend tail to v2."</p></blockquote>
+<p><strong>这层 → 解锁 Step 5</strong>: 答完 S 问题, MVP 边界明确. 你知道<strong>哪 80% 砍掉先不做</strong> (Search org, model fine-tuning, cross-team prompt library, auto-routing, low-spend tail, mandate-required adoption), 哪 20% 是 walking skeleton (SDK + per-team cost attribution + dashboard + opt-out env var + 10 lighthouse teams + Workspace-borrowed eval template).</p>
+<p><strong>面试官 likely 回答</strong>:</p>
+<ul><li>(a) cost save + (c) observability are P0; (b) quality + (d) capabilities are P1</li><li>Success = 30/50 teams using SDK by month 6 + 15% cost reduction on those + per-team observability live</li><li>Platform team = 6 engineers + 1 TPM + 1 PM, reports to AI Infra VP. <strong>Paved road authority only, no mandate</strong>.</li><li>Wave 1: Maps, Pixel, Workspace, internal Gemini Studio team, Customer Support bot team — these 5 want to talk</li><li>Currently: 30 teams use Vertex AI SDK direct, 15 use raw HTTP, 5 use AI Studio</li><li>Off-limits: Search has own infra, won't adopt</li><li>Cost data: org-level granularity only (5 orgs, not 50 teams). <strong>Need to add team-level cost attribution as month 1 priority</strong>.</li><li>Workspace has best prompt eval pipeline — borrow it as platform default.</li><li>Reversibility: SDK must allow opt-out via env var. 5-min rollback.</li><li>6 months driven by: 20% MoM cost growth + AI Infra VP committed to board for "unified Gemini platform" by H2 end</li></ul>
+<p>→ <strong>Real scope</strong>: in 6 months, <strong>build paved-road SDK, add team-level cost attribution + observability, onboard 30/50 teams by being easier than raw API</strong>. Search and some politically tough teams stay direct but adopt SDK for telemetry only.</p>
+<hr />
+<h3>详细分析 + 回答 (sample 60-min walkthrough with ASCII diagram)</h3>
+<h4>Phase 1: Clarify (8 min)</h4>
+<p>(执行上面的 G·O·O·D-F·T 10 个问题)</p>
+<h4>Phase 2: Reframe — adoption is the metric (4 min)</h4>
+<blockquote><p>"Most important reframe before I touch architecture: <strong>platform success = adoption rate × value delivered, NOT feature count</strong>.</p>
+<p>Anti-pattern Google has seen 100 times: platform team spends 6 months building world-class infra, mandates teams to migrate, mandate fails because no VP has authority, platform has 5/50 adopters, gets shut down at next reorg.</p>
+<p>Correct framing: <strong>the platform competes with raw Gemini API for developer mindshare</strong>. It must be <strong>easier than raw API</strong>, not "required" or "approved." Wins by being the path of least resistance. This is paved road, not mandate."</p></blockquote>
+<h4>Phase 3: Diagnose first (6 min)</h4>
+<blockquote><p>"Before building anything, 2 weeks of audit. Building uninformed is the second-biggest platform-team failure mode."</p></blockquote>
+<p><strong>Week 1-2 audit work</strong>:</p>
+<p><strong>Audit #1 — Pareto cost analysis</strong>:</p>
+<ul><li>Pull billing data → identify top 5 cost teams (likely 60-80% of $5M/month total)</li><li>For each: interview tech lead, shadow one engineer for 4h</li><li>Find: what's their use case, why is cost growing 20% MoM?</li><li>Hypothesis: 1-2 teams are doing things like "no caching" or "verbose prompts" that are responsible for the growth spike</li></ul>
+<p><strong>Audit #2 — Worst-prompt sweep</strong>:</p>
+<ul><li>Sample 200 prompts across 50 teams (4 per team avg)</li><li>Score on: length, redundancy, model misuse (Pro for trivial task), missing system prompt</li><li>Find: top 5 worst prompts probably consume 30%+ of cost</li><li>This data drives the <strong>prompt registry value prop</strong>: "if you adopt the platform, you can see how other teams write better prompts"</li></ul>
+<p><strong>Audit #3 — Surface mapping</strong>:</p>
+<ul><li>50 team survey: which API are you calling? Vertex AI SDK / Direct HTTP / AI Studio / Wrapper?</li><li>Output: discovery of fragmentation</li><li>Reveals: there's probably already an internal wrapper one team built that some teams copy — that's the platform team's secret weapon (don't compete, absorb).</li></ul>
+<p><strong>Audit #4 — Quality + observability gap</strong>:</p>
+<ul><li>10 team interviews: how do you know if Gemini is working?</li><li>Find: most teams find out from customer complaints or internal QA</li><li>Confirms: observability is the <strong>killer feature</strong> — first thing teams will adopt for</li></ul>
+<p><strong>Output of 2-week audit</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Findings:
+  Cost:
+    Top 3 teams = 65% of total ($3.25M of $5M/month)
+    Customer Support team alone = $1.2M/month, growing 35% MoM
+    Why: 2M context prompts where 200K would suffice (engineer didn't profile)
+  
+  Quality:
+    Workspace team has gold-tier eval pipeline (steal as default)
+    Maps team has 3 prompts that hallucinate 8%+ (need help)
+    20+ teams have 0 eval, 0 golden set
+  
+  Surface fragmentation:
+    30/50 use Vertex AI Python SDK
+    15/50 use raw HTTP (curl-style)
+    5/50 use AI Studio (notebook)
+    
+  Observability:
+    0/50 teams have alerting on Gemini latency/quality
+    20+ teams report incidents via internal Slack</code></pre>
+<p>This 2-week audit <strong>changes the 6-month plan</strong>. Without it, I'd build the wrong thing.</p>
+<h4>Phase 4: Stakeholder + Success Metrics (5 min)</h4>
+<p><strong>Stakeholder map</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>项目态度</th><th>关键动作</th></tr></thead><tbody><tr><td><strong>AI Infra VP (sponsor)</strong></td><td>Board-committed deliverable + cost narrative</td><td>Strong sponsor</td><td>Monthly exec review, give him the 1-slide story</td></tr><tr><td><strong>5 Lighthouse team leads</strong> (Maps, Pixel, Workspace, internal Gemini Studio, Customer Support)</td><td>Their own product velocity + reliability</td><td>Partners (we earn this)</td><td>Weekly co-design, give them platform shape input</td></tr><tr><td><strong>30+ "fence-sitter" teams</strong></td><td>Not breaking their workflow</td><td>Wait-and-see</td><td>Office hours, AMAs, blog posts</td></tr><tr><td><strong>Search team</strong></td><td>Own infra, don't want to be told what to do</td><td>Politically off-limits</td><td>Adopt SDK telemetry only, agree to not touch their stack</td></tr><tr><td><strong>5 Org VPs (Maps, Pixel, Workspace, Search, Cloud)</strong></td><td>Each org's velocity + cost</td><td>Polite but cautious</td><td>Quarterly VP review, ask for <strong>soft endorsement only</strong></td></tr><tr><td><strong>Procurement / Finance</strong></td><td>Cost attribution + chargeback</td><td>Allies (we help them)</td><td>Weekly cost dashboard once attribution lands</td></tr><tr><td><strong>AI Infra peer teams</strong> (Gemini API team, Vertex AI team)</td><td>Coordination, not duplication</td><td>Partners</td><td>Co-design, share infra (e.g. their gateway)</td></tr><tr><td><strong>SRE / Security</strong></td><td>LRR sign-off</td><td>Approval needed</td><td>Standard ldr launch process</td></tr></tbody></table></div>
+<p><strong>Success metrics (3 layer)</strong>:</p>
+<p><strong>Layer 1 — Adoption</strong> (THE primary metric):</p>
+<ul><li>30/50 teams using platform SDK by month 6 (40% of total $5M/month spend through platform)</li><li>5 lighthouse teams in production by month 3</li><li>Net Promoter Score (NPS) from platform users &gt; +30 (positive sentiment)</li></ul>
+<p><strong>Layer 2 — Outcome metrics</strong> (the "why adoption matters"):</p>
+<ul><li>15% cost reduction on platform-using teams (via cache + cascade + better prompts)</li><li>Per-team cost attribution live for 100% of platform users (giving Finance + each team accurate billing)</li><li>0 unattributed Gemini incidents (every issue gets traced to a team / use case)</li><li>Quality improvement: 5+ prompts in registry adopted by multiple teams</li></ul>
+<p><strong>Layer 3 — Platform health</strong> (org-internal):</p>
+<ul><li>Mean adoption time: &lt; 2 days for a new team to integrate SDK (vs raw API setup)</li><li>Office hours attendance: 30+ engineers/week</li><li>Internal Slack channel: 200+ active members</li><li>Documentation NPS: &gt; +20</li></ul>
+<p><strong>Counter-metrics</strong> (must NOT regress):</p>
+<ul><li>No latency regression for lighthouse teams (gateway adds &lt; 10ms p99)</li><li>No platform-caused incident in adopter team prod</li><li>No team forced to adopt against their will (preserve paved-road framing)</li></ul>
+<h4>Phase 5: Paved Road SDK Design (10 min)</h4>
+<blockquote><p>"SDK wins by being EASIER than raw API. Let me show the value prop side-by-side."</p></blockquote>
+<p><strong>Side-by-side comparison</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">WITHOUT platform (current):                   WITH platform SDK:
+─────────────────────────────────             ─────────────────────────────────
+from vertexai import init                     from gemini_platform import Client
+from vertexai.generative_models import (      
+    GenerativeModel)                          client = Client(team="maps",
+                                                              use_case="route_qa")
+init(project="my-project",                    response = client.complete(
+     location="us-central1")                      prompt="..."
+                                              )
+model = GenerativeModel("gemini-3-pro")       
+response = model.generate_content("...")      # That's it.
+                                              # Auto-injected:
+# Now manually:                               #   - cost tagged to team/use_case
+#   - log to BigQuery                         #   - OTel trace
+#   - track cost                              #   - retry with backoff
+#   - handle retries                          #   - cache (24h TTL on identical)
+#   - implement cache                         #   - quota enforcement
+#   - alert on errors                         #   - prompt logged to registry
+#   - eval prompt quality                     #   - cascade to Flash if simple
+#   - choose model                            
+                                              # All of this for free.</code></pre>
+<p><strong>The killer argument</strong>: "Adopt the SDK and you save 1 week of integration work per use case + you get observability + cost attribution + caching for free. <strong>Why would you NOT use it?</strong>"</p>
+<p><strong>SDK feature breakdown</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Feature</th><th>Why teams want it</th><th>Implementation</th></tr></thead><tbody><tr><td><strong>Auto cost tagging</strong></td><td>Finance asks "how much is YOUR team spending?" — you can answer</td><td>Inject <code>team_id</code>, <code>use_case</code>, <code>app_version</code> in every API call → BigQuery</td></tr><tr><td><strong>OTel auto-injection</strong></td><td>When Gemini has a problem, you see it in YOUR dashboard</td><td>Wrap call in OTel span with GenAI conventions</td></tr><tr><td><strong>Retry + circuit breaker</strong></td><td>Don't write retry boilerplate in 50 places</td><td>Exponential backoff + half-open circuit</td></tr><tr><td><strong>Cache layer</strong></td><td>20-40% queries are repeats → 20-40% cost save</td><td>Redis-backed, key = hash(model, prompt, params), 24h TTL</td></tr><tr><td><strong>Cascade helper</strong></td><td>Auto-route easy queries to Flash, hard to Pro</td><td>Confidence-based routing config</td></tr><tr><td><strong>Shadow mode helper</strong></td><td>A/B new prompt without affecting users</td><td>One-line <code>shadow_prompt=</code> argument</td></tr><tr><td><strong>Quota enforcement</strong></td><td>Can't accidentally blow $1M in a day</td><td>Per-team monthly budget, soft warning + hard cap</td></tr><tr><td><strong>Prompt versioning</strong></td><td>Know what prompt is in prod</td><td>Auto-snapshot prompts to git registry</td></tr><tr><td><strong>Prompt suggestion</strong></td><td>Use battle-tested prompt from another team</td><td>Registry search by use_case</td></tr></tbody></table></div>
+<p><strong>SDK architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">                       Application code
+                              │
+                              │ from gemini_platform import Client
+                              │ client = Client(team="maps", use_case="qa")
+                              │ client.complete(prompt="...")
+                              │
+                              ▼
+       ┌────────────────────────────────────────────────────────┐
+       │   gemini_platform SDK (Python + Go)                    │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Auth + team identification                       │ │
+       │   │  (auto from Borg job metadata)                    │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Cache check (Redis cluster)                      │ │
+       │   │   key = hash(model, prompt, params)               │ │
+       │   │   hit → return cached, log "cache_hit=true"       │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Cascade router (optional)                        │ │
+       │   │   if use_case in cascade_config:                  │ │
+       │   │      try Flash → if low confidence → Pro          │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Quota check (Spanner-backed budget)              │ │
+       │   │   if team_token_used &gt; monthly_budget:            │ │
+       │   │     soft_warn or hard_block per config            │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Retry + circuit breaker                          │ │
+       │   │   exponential backoff, 3 attempts, jitter         │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Underlying call → Gemini API (Vertex AI)         │ │
+       │   │   gen_ai.* OTel span around the call              │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Telemetry emit                                   │ │
+       │   │   ─ BigQuery row: team / use_case / cost / lat    │ │
+       │   │   ─ Cloud Monitoring metric                       │ │
+       │   │   ─ Trace to Cloud Trace                          │ │
+       │   │   ─ Prompt version logged to registry             │ │
+       │   └──────────────────────────────────────────────────┘ │
+       └─────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              Gemini API (Vertex AI - Pro / Flash)</code></pre>
+<p><strong>Critical</strong>: SDK is <strong>a thin layer</strong> (&lt; 1000 lines core). Not a microservice. Not a gateway in the network path. <strong>Library, not infrastructure</strong>. This means:</p>
+<ul><li>Adoption cost = <code>pip install</code> + 3-line code change</li><li>No additional latency (sub-millisecond overhead)</li><li>No new SRE oncall (it's library code, runs in user's process)</li><li>No new infra to scale</li></ul>
+<p><strong>For teams that want network-layer gateway</strong> (Search may want this for global rate limit), provide it as optional layer 2.</p>
+<h4>Phase 6: Central Observability (7 min)</h4>
+<blockquote><p>"Observability is the killer feature — first thing teams notice and the reason they'll stay."</p></blockquote>
+<p><strong>Architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">       50 teams' apps (Borg jobs)
+             │ SDK auto-emits
+             ▼
+     ┌────────────────────────────────┐
+     │  Telemetry collection          │
+     │   ─ OTel collector (Borg svc)  │
+     │   ─ BigQuery streaming insert  │
+     │   ─ Cloud Monitoring metrics   │
+     └─────────┬──────────────────────┘
+               │
+               ▼
+     ┌────────────────────────────────┐
+     │  BigQuery: gen_ai_events       │
+     │   schema:                      │
+     │     team_id, use_case, ts,     │
+     │     model, input_tokens,       │
+     │     output_tokens, cost_usd,   │
+     │     latency_ms, success,       │
+     │     prompt_hash, prompt_ver,   │
+     │     cache_hit, error_code,     │
+     │     trace_id                   │
+     │   partitioned by date          │
+     │   clustered by team_id         │
+     └─────────┬──────────────────────┘
+               │
+       ┌───────┼───────┬───────────────┐
+       │       │       │               │
+       ▼       ▼       ▼               ▼
+   ┌──────┐ ┌──────┐ ┌──────────────┐ ┌──────────────┐
+   │Looker│ │Looker│ │Anomaly       │ │Per-team      │
+   │org   │ │team  │ │detection     │ │alerts        │
+   │exec  │ │self  │ │(cost spike,  │ │(SLO breach)  │
+   │view  │ │view  │ │latency drift,│ │              │
+   │      │ │      │ │error rate)   │ │              │
+   └──────┘ └──────┘ └──────────────┘ └──────────────┘</code></pre>
+<p><strong>Per-team dashboard</strong> (Looker Studio template):</p>
+<pre class="language-plaintext"><code class="language-plaintext">┌──────────────────────────────────────────────────────────────┐
+│  Team: Maps   (use_case: route_qa)        Time: last 7 days  │
+├──────────────────────────────────────────────────────────────┤
+│  Cost:    $42K / week  (↑ 8% WoW)                            │
+│  Volume:  2.1M requests                                       │
+│  Cache hit rate: 23% (target: 35%+)                          │
+│  Latency p50/p99: 380ms / 1.2s                               │
+│  Error rate: 0.04%                                            │
+│  Model split: 70% Flash, 30% Pro                              │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  Daily cost trend (line chart)                       │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  Top 5 prompts by cost                               │    │
+│  │   1. route_qa_v3.2     $12K  ⚠ no cache              │    │
+│  │   2. address_parse_v2  $8K                           │    │
+│  │   3. place_summary_v1  $6K                           │    │
+│  │  ...                                                 │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                                │
+│  💡 Suggested actions (auto-generated):                       │
+│   ─ route_qa_v3.2 has 0% cache hit. Enable cache → save $8K/wk│
+│   ─ Verbose prompts: 18% can be cut. Try platform/prompts/auto│
+└──────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Org-wide exec view</strong> (for AI Infra VP):</p>
+<pre class="language-plaintext"><code class="language-plaintext">┌──────────────────────────────────────────────────────────────┐
+│  Org-wide Gemini Platform — H2 view                          │
+├──────────────────────────────────────────────────────────────┤
+│  Adoption: 28 / 50 teams (target month 6: 30)                │
+│  Total spend: $3.8M/month (↓ from $5M baseline, saving 24%)  │
+│  Platform-managed spend: $2.1M (55% of total)                │
+│  Cache hit rate: 31% across platform users                   │
+│  Incidents traced via platform: 12 in last quarter (vs ~50   │
+│    unattributed previously)                                   │
+│                                                                │
+│  Top cost teams (top 10):                                    │
+│    Customer Support  $1.1M  (was $1.2M, ↓ 8% via cascade)    │
+│    Maps              $0.6M  (↓ 12% via caching)              │
+│    ...                                                       │
+└──────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Anomaly detection</strong>:</p>
+<ul><li>Per-team cost &gt; 30% WoW → alert team channel + platform team</li><li>Latency p99 &gt; 2× rolling 7d baseline → page on-call (only for platform-using teams who opt in)</li><li>Error rate &gt; 1% sustained 5 min → automatic GitHub-issue style ticket on platform team</li></ul>
+<h4>Phase 7: Prompt Registry + Eval Pipeline (6 min)</h4>
+<blockquote><p>"Prompt registry = 'GitHub for prompts'. It's the platform feature that lifts quality across 50 teams."</p></blockquote>
+<p><strong>Architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt registry (git-backed, internal Critique)        │
+   │                                                          │
+   │   /prompts/maps/route_qa/v3.2.md                        │
+   │   /prompts/customer_support/triage/v5.0.md              │
+   │   /prompts/workspace/email_draft/v2.1.md                │
+   │   ...                                                   │
+   │                                                          │
+   │   Each prompt file:                                     │
+   │     ─ metadata: owner, last_changed, model, use_case   │
+   │     ─ template (with placeholder slots)                 │
+   │     ─ examples (few-shot)                              │
+   │     ─ golden test cases (10-100)                       │
+   │     ─ eval metrics (win rate vs prev version)          │
+   │     ─ adopted-by (other teams using it)                │
+   └─────────────────────┬───────────────────────────────────┘
+                         │
+                         │ change → trigger CI
+                         ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt CI (auto-run on PR)                             │
+   │                                                          │
+   │   1. Lint: required metadata, golden set min 10        │
+   │   2. Run on golden set with new prompt                 │
+   │   3. Pairwise compare vs prev version (LLM-as-judge)   │
+   │   4. Cost delta (output token length comparison)       │
+   │   5. Report on PR: ✅ +3% win rate, -2% cost           │
+   │   6. Block merge if win rate regression &gt; 2pp          │
+   └─────────────────────┬───────────────────────────────────┘
+                         │
+                         ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt discoverability                                 │
+   │                                                          │
+   │   Web UI: search by use_case → see top prompts         │
+   │   Maps team can see: "Customer Support is doing intent  │
+   │   classification with this prompt — should we adopt?"  │
+   │                                                          │
+   │   Each prompt has:                                      │
+   │     ─ used-by list (other teams)                       │
+   │     ─ adoption arrow ("Workspace 5★ → 12 teams")       │
+   └─────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Prompt eval default methodology</strong> (steal from Workspace, share to all):</p>
+<ul><li>Golden set: minimum 10 examples per prompt, recommend 100</li><li>Pairwise comparison with previous version</li><li>LLM-as-judge: Claude Opus 4.7 (cross-vendor, avoids self-preference)</li><li>Cost delta tracking</li></ul>
+<p><strong>Key benefit for teams</strong>:</p>
+<blockquote><p>"Your prompt automatically gets eval'd in CI. You can't ship a worse prompt without seeing the regression. Other teams can borrow your prompt with confidence because eval results are public."</p></blockquote>
+<h4>Phase 8: Adoption Strategy (6 min)</h4>
+<blockquote><p>"Adoption is sold one team at a time, not announced via mailing list."</p></blockquote>
+<p><strong>6-month adoption arc</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Month 1: Audit + design (Week 1-4)
+  ─ 2 weeks: audit (top 5 cost team, top 5 worst prompts, surface mapping)
+  ─ 2 weeks: SDK prototype, observability schema, design doc LGTM
+
+Month 2: Lighthouse team #1 (Customer Support) — biggest pain
+  ─ They have $1.2M/month spend, 35% MoM growth
+  ─ Co-design SDK with their lead engineer
+  ─ Migration: 1 week
+  ─ Demonstrated 15% cost saving in 2 weeks (cache + Flash cascade)
+  ─ Their lead becomes platform evangelist
+
+Month 3: Lighthouse teams #2-5 (Maps, Pixel, Workspace, Gemini Studio)
+  ─ Each: 1-2 weeks onboarding
+  ─ Per-team observability live, per-team cost attribution live
+  ─ Internal blog post: "How Customer Support cut $200K/month"
+  ─ Office hours 2x/week, attendance 15-30 engineers
+
+Month 4: Open beta (fence-sitters)
+  ─ Tech Talk at AI Infra all-hands
+  ─ Self-service onboarding portal (5-min quickstart)
+  ─ Goal: 5 more teams adopt per week
+  ─ Track adoption funnel: docs visit → SDK install → first call → 100 calls/day
+
+Month 5: Inflection — broadening adoption + harder teams
+  ─ Target 20+ teams using SDK
+  ─ Tackle the politically tough teams: not mandate, offer
+  ─ Search team: SDK telemetry-only mode ("just inject OTel, no cache/cascade")
+  ─ Specialist office hours: "FinOps office hours" for cost-conscious teams
+
+Month 6: Standardization push (the soft mandate)
+  ─ Now that 25+ teams use platform, ask AI Infra VP to send "strongly encouraged" memo
+  ─ Hold-outs left: ~15 teams
+  ─ Half migrate after memo, half stay (and that's OK)
+  ─ Quarter end: 30/50 teams, $1M+/month savings tracked</code></pre>
+<p><strong>Adoption tactics specifically</strong>:</p>
+<ol><li><strong>Co-design with lighthouse teams</strong> — they're not adopters, they're co-designers. Their use case shapes SDK.</li><li><strong>Solve a problem they have, today</strong> — Customer Support has $1.2M cost growth. Solving theirs = "see, platform delivers immediately."</li><li><strong>Self-service onboarding</strong> — <code>gp init</code> command, 3 lines code, &lt; 10 min. Onboarding &gt; doc.</li><li><strong>Office hours weekly</strong> — not optional. Show up, answer questions, write down complaints.</li><li><strong>Internal Slack channel</strong> — <code>#gemini-platform</code>. Be responsive &lt; 1 hour. This is the SLA for adoption.</li><li><strong>Quarterly internal blog posts</strong> — "Maps team saved $X with cascade routing". Social proof.</li><li><strong>No mandate. Ever.</strong> — even when AI Infra VP offers, decline. "Strongly encouraged" is the ceiling. Teams adopting because forced will sabotage you.</li></ol>
+<h4>Phase 9: Risk + Close (4 min)</h4>
+<p><strong>Three risks worth calling out</strong>:</p>
+<p><strong>Risk #1 — Build big then mandate (the platform team graveyard)</strong>:</p>
+<blockquote><p>"Most dangerous. 6 engineers + 6 months + no shipped value = platform dies. Mitigation: ship Month 2 with Customer Support, demonstrate value before building more features."</p></blockquote>
+<p><strong>Risk #2 — Cost attribution accuracy</strong>:</p>
+<blockquote><p>"If team-level cost attribution is wrong by &gt; 5%, teams stop trusting the dashboard. Mitigation: 2-week verification with Finance month 1, sample audits monthly."</p></blockquote>
+<p><strong>Risk #3 — Politically tough teams (Search)</strong>:</p>
+<blockquote><p>"If Search publicly opts out, fence-sitters use it as excuse. Mitigation: get Search to adopt SDK in telemetry-only mode early — minimum 'they're on the platform' for org-wide messaging."</p></blockquote>
+<p><strong>Close</strong>:</p>
+<blockquote><p>"6 months. 50 teams. End state: 30+ teams on platform, $1M+/month savings tracked, <strong>per-team observability live, prompt registry seeded with battle-tested prompts</strong>, platform team is 'easiest path' not 'mandated path'. Want me to dive deeper on SDK design, adoption strategy, or how to handle politically tough teams?"</p></blockquote>
+<hr />
+<h3>端到端架构图 (ASCII)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">                         Google Internal — Gemini Platform
+                         ────────────────────────────────────
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│  50 Product Teams (Maps, Photos, Workspace, Pixel, ...)                    │
+│                                                                              │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ...  ┌──────────┐               │
+│   │ Maps     │  │ Pixel    │  │Workspace │       │ Search   │               │
+│   │ route_qa │  │ on-device│  │ email_   │       │ (tele-   │               │
+│   │          │  │ helper   │  │ draft    │       │  metry   │               │
+│   │          │  │          │  │          │       │  only)   │               │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘               │
+│        │             │             │                  │                     │
+│        │  All use gemini_platform Python SDK          │                     │
+│        ▼             ▼             ▼                  ▼                     │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  gemini_platform SDK (Python + Go, thin client library)          │     │
+│   │   ─ Auto cost tagging (team_id, use_case)                        │     │
+│   │   ─ OTel auto-injection (gen_ai.* span)                          │     │
+│   │   ─ Cache layer (Redis-backed, 24h TTL on identical prompts)     │     │
+│   │   ─ Cascade router (Flash → Pro on low confidence)               │     │
+│   │   ─ Retry + circuit breaker                                      │     │
+│   │   ─ Quota enforcement (per-team monthly budget)                  │     │
+│   │   ─ Prompt version logging to registry                           │     │
+│   └────────────────────────────┬─────────────────────────────────────┘     │
+│                                │                                            │
+│                                ▼                                            │
+│                    Vertex AI (Gemini 3 Pro / Flash)                         │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Telemetry pipeline                                               │     │
+│   │   ─ OTel collector → BigQuery streaming insert                   │     │
+│   │   ─ BigQuery: gen_ai_events table (partitioned by date)          │     │
+│   │   ─ Cloud Monitoring: SLI / SLO metrics                          │     │
+│   │   ─ Cloud Trace: cross-service trace                             │     │
+│   └────────────────────────────┬─────────────────────────────────────┘     │
+│                                │                                            │
+│           ┌────────────────────┼────────────────────┐                       │
+│           ▼                    ▼                    ▼                       │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐              │
+│   │ Per-team     │    │ Org-wide     │    │ Anomaly detect   │              │
+│   │ Looker dash  │    │ exec view    │    │ + alerting       │              │
+│   │ (auto-gen    │    │ (AI Infra    │    │ (cost spike,     │              │
+│   │  for each    │    │  VP review)  │    │  latency drift,  │              │
+│   │  team)       │    │              │    │  error rate)     │              │
+│   └──────────────┘    └──────────────┘    └──────────────────┘              │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Prompt registry (git-backed, Critique-managed)                  │     │
+│   │   ─ /prompts/&lt;team&gt;/&lt;use_case&gt;/&lt;version&gt;.md                      │     │
+│   │   ─ Auto eval on PR (golden set + pairwise vs prev)              │     │
+│   │   ─ Discoverability UI: search / cross-team adoption             │     │
+│   └──────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Adoption surface                                                 │     │
+│   │   ─ Internal Slack #gemini-platform (200+ active)                │     │
+│   │   ─ Weekly office hours (Wed 2pm, Fri 10am)                      │     │
+│   │   ─ Quickstart docs (5-min onboarding)                           │     │
+│   │   ─ Internal blog posts (success stories)                        │     │
+│   └──────────────────────────────────────────────────────────────────┘     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+  Platform team: 6 eng + 1 TPM + 1 PM, reports to AI Infra VP
+  Authority: paved road only, no mandate
+  Goal month 6: 30/50 teams adopt, $1M+/month savings</code></pre>
+<hr />
+<h3>Gao Xin 简历专属 reframe + STAR</h3>
+<p>This problem is <strong>the most direct resume analog</strong> of any FDE question — your Internal Agent Platform at TikTok is literally the same role.</p>
+<h4>Primary STAR: TikTok Internal Agent Platform</h4>
+<blockquote><p><strong>STAR</strong>: At TikTok, I led the design and rollout of the <strong>Internal Agent Platform</strong> that 50+ internal teams used.</p>
+<p><strong>Situation</strong>: Similar to this Google problem — 50+ teams building agentic features, fragmented LLM usage, no observability, cost was exploding (~3x in 6 months).</p>
+<p><strong>Task</strong>: Build platform/governance layer that standardized LLM + agent usage WITHOUT mandate authority. Same paved-road model.</p>
+<p><strong>Action</strong>:</p>
+<ol><li><strong>2-week diagnostic audit</strong> — found top 5 cost teams = 75% of bill, top 5 worst prompts = ~30% wasted spend</li><li><strong>Thin SDK + gateway</strong> — 3-line code change for teams, auto cost tagging, OTel injection</li><li><strong>Lighthouse strategy</strong> — onboarded <strong>payment chatbot team first</strong> (biggest pain), demonstrated 22% cost cut in 3 weeks</li><li><strong>Prompt registry + eval CI</strong> — borrowed from Workspace-equivalent team, made it the platform default</li><li><strong>Adoption tactics</strong> — office hours, Slack channel, internal blog posts. NO mandate.</li></ol>
+<p><strong>Result</strong>: 32 teams adopted in 5 months. $4M/year cost reduction. Per-team observability live. Standard approach now: "If you're building with LLM at TikTok, use IAP." NPS +45.</p>
+<p><strong>Key insight that transfers</strong>: <strong>the most important platform-team principle is "win by being easier"</strong>. The day I started writing the SDK, the design constraint was "if a team can't onboard in 30 minutes of effort, we lose."</p></blockquote>
+<h4>Direct analog 2: Internal Agent Platform observability</h4>
+<blockquote><p>"I built the exact OTel GenAI observability spec at TikTok — per-team cost dashboards in Tableau (their equivalent of Looker Studio), per-team SLI/SLO, anomaly detection on cost spike. The schema in this design is straight from my TikTok IAP."</p></blockquote>
+<h4>Direct analog 3: Voice agent 7 markets — multi-tenant routing</h4>
+<blockquote><p>"The cascade-routing pattern (Flash → Pro on low confidence) I'm proposing here is the same I built for voice agent across 7 markets — local cheap model for routing, escalate to GPT/Gemini for complex. Working code, production-tested."</p></blockquote>
+<h4>Direct analog 4: BNPL chatbot intent routing</h4>
+<blockquote><p>"Cascade routing in the SDK is identical to BNPL chatbot intent routing — cheap model classifies intent, expensive model only for personalized advice. The cost cascade in our customer support pattern is real, tested."</p></blockquote>
+<h4>Direct analog 5: Indonesia refund tier governance</h4>
+<blockquote><p>"Indonesia regulator required audit-grade cost / decision attribution. The cost-attribution-to-team work here is identical pattern. I know what fails (cardinality explosion, late telemetry) because I shipped it."</p></blockquote>
+<p><strong>Pitch to interviewer</strong>:</p>
+<blockquote><p>"This is the most direct overlap of any FDE problem I've seen with my actual experience. Internal Agent Platform at TikTok was <strong>literally this problem at a similar scale (50+ teams, $5M+/year)</strong>. I can show you the SDK design doc, the adoption curve over 6 months, the cost dashboards. <strong>The 20% incremental for Google is Borg / Spanner / Critique specifics — I'd close that in week 1.</strong>"</p></blockquote>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<h4>Q1: "VP 想给你 mandate authority — 强制 50 个团队 6 个月内迁完. 你接吗?"</h4>
+<p><strong>A</strong>: <strong>Decline, but politely</strong>.</p>
+<blockquote><p>"I appreciate the offer, but mandate authority is the worst thing that could happen to this platform. Three reasons:</p>
+<ol><li><strong>Mandate triggers compliance-only adoption</strong>. Teams will integrate the minimum surface area to comply, not actually use the platform. We'd hit 50/50 'adoption' on paper, but 5/50 actually using cost / observability / prompt registry. <strong>Adoption rate without value capture is worse than partial true adoption.</strong></li></ol>
+<ol><li><strong>Mandate destroys the feedback loop</strong>. When teams choose us, they tell us why they chose us (and what we're missing). When they're forced, they don't give feedback — they go around us. We become guessing what they need.</li></ol>
+<ol><li><strong>Mandate exposes us politically</strong>. The day a mandated team has an outage they blame on our platform (even if not our fault), the mandate gets rescinded. Better to have 30/50 evangelists than 50/50 hostage takers.</li></ol>
+<p>What I'd ask for instead: <strong>'strongly encouraged' messaging from VP at all-hands</strong>. Strong enough to signal direction, weak enough to preserve paved-road framing.</p>
+<p>If you really want acceleration, give me <strong>2 more engineers and 1 more PM</strong> instead of authority. Same speed-up, none of the political downside."</p></blockquote>
+<h4>Q2: "如果 Search 团队公开拒绝 platform, 影响其他团队 fence-sitters. 怎么办?"</h4>
+<p><strong>A</strong>: <strong>Pre-empt with a graceful deal</strong>.</p>
+<blockquote><p>"Search is politically off-limits. Don't force adoption. Instead, two paths:</p>
+<p><strong>Path 1 — Sell them a smaller deal</strong>:</p>
+<ul><li>'You don't need our SDK. Just inject our OTel telemetry library in your existing wrapper. We get observability data, you keep your infra. 1 day of work, you remain independent.'</li><li>This is 'compliance-only' but framed politically: <strong>Search 'on the platform' for the org-wide narrative, but they keep autonomy.</strong></li></ul>
+<p><strong>Path 2 — Carve out scope</strong>:</p>
+<ul><li>Publicly redefine 'Search is out of scope for the platform — they have their own infra, intentional.' Owns the narrative.</li><li>Then to fence-sitters: 'Search is a special case (built their own years ago). For new teams + most teams, platform is the path.'</li></ul>
+<p>Worst response: <strong>try to force Search</strong>. Lose the fight publicly, all fence-sitters see they can resist too. <strong>Discretion is power</strong>."</p></blockquote>
+<h4>Q3: "你的 SDK 上线 3 个月后, 一个 lighthouse team 报告 SDK 引入 50ms latency 回归. 他们要 opt out. 怎么处理?"</h4>
+<p><strong>A</strong>: This is the <strong>moment of truth for paved-road framing</strong>. Don't fight, fix.</p>
+<blockquote><p>"Opt-out is allowed by design. But before they leave, three steps:</p>
+<p><strong>Step 1 — Diagnose with them in the room (same day)</strong>:</p>
+<ul><li>50ms regression where? Cache lookup? OTel emit? Quota check? Network hop?</li><li>Likely culprit: cache lookup blocking call (should be async)</li><li>If diagnosed in &lt; 2 hours: 'Here's the fix, give us 1 week, we'll redeploy.'</li></ul>
+<p><strong>Step 2 — Provide bypass while we fix</strong>:</p>
+<ul><li>'Set <code>SDK_MODE=fast</code> env var. Disables cache + cascade but keeps telemetry. You get 0ms regression, we still get observability.'</li><li>This shows we adapt to them.</li></ul>
+<p><strong>Step 3 — Public post-mortem</strong>:</p>
+<ul><li>Internal blog: 'We found a 50ms regression in v2.1. Maps team caught it, we fixed it in 6 days. Here's what we learned.'</li><li>Establishes that <strong>the platform listens and fixes</strong>. More credibility than 50 successful adoptions.</li></ul>
+<p>Never tell a team 'no you can't opt out'. The moment we do, paved road becomes mandate in their eyes."</p></blockquote>
+<h4>Q4: "Cost growth 20% MoM 你说 2 周 audit 能 diagnose. 如果 audit 完发现 cost growth 是 legitimate (新产品上线, 真实用量增长), 你怎么交代?"</h4>
+<p><strong>A</strong>: This is <strong>scope honesty</strong>.</p>
+<blockquote><p>"If audit shows the 20% MoM growth is <strong>legitimate volume growth</strong> (e.g. new product launches drove 2x users), then 'cost optimization' alone can't solve it. The 6-month goal shifts to:</p>
+<ol><li><strong>Make cost growth observable</strong>: was hidden, now visible. VP / Finance can attribute growth to specific teams / products with confidence. <strong>Visibility itself is the deliverable</strong>.</li></ol>
+<ol><li><strong>Reduce cost-per-unit, not absolute cost</strong>: even if total Gemini bill grows from $5M → $10M over 6 months (legitimate user growth), platform can drive <strong>cost-per-query down 30%</strong> (cache + cascade + better prompts). Same business outcome, lower unit cost.</li></ol>
+<ol><li><strong>Forecast accuracy</strong>: with team-level attribution + use-case granularity, Finance can forecast next quarter's spend confidently. <strong>No more 'we don't know why it's growing'</strong>.</li></ol>
+<p>The story to VP changes from 'we cut $X' to 'we made cost visible, attributable, and on a per-unit declining trajectory'. <strong>Both are wins. Honesty about which we're delivering matters</strong>.</p>
+<p>Trap to avoid: promising 'we'll cut absolute cost' if drivers are legitimate growth. Set up for failure."</p></blockquote>
+<h4>Q5: "6 个月 deadline 太短, audit + design + ship 不够. 你 push back 还是接?"</h4>
+<p><strong>A</strong>: <strong>Reverse scope, don't push back deadline</strong>.</p>
+<blockquote><p>"Don't push back the deadline — VP committed to board. Push back on scope.</p>
+<p><strong>Original scope (implied)</strong>: 'standardize Gemini across 50 teams in 6 months'</p>
+<p><strong>Reversed scope (what's actually shippable)</strong>:</p>
+<ul><li>Month 6 deliverable: <strong>30/50 teams adopted SDK</strong> (60% adoption), <strong>per-team cost attribution live</strong> (100% of platform users), <strong>prompt registry seeded with 20+ battle-tested prompts</strong>, <strong>observability dashboards</strong> for all platform users.</li><li><strong>Not in month 6</strong>: full feature SDK (no cascade for all use cases, just lighthouse), no shadow mode helper for all teams, no comprehensive cost forecasting model.</li><li><strong>Phase 2 (month 7-12)</strong>: hit 40/50, add advanced features.</li></ul>
+<p>Story to VP:</p>
+<blockquote><p>'We can hit board-credible milestone at month 6 (60% adoption + observability live + $1M annual save tracked) by being disciplined about scope. Trying to do all of "standardize" in 6 months = ship a half-baked platform that becomes 'that other platform team' instead of 'the one we use'. Phase 1 lands a strong story, Phase 2 finishes the work.'</p></blockquote>
+<p>This is <strong>reverse-scope thinking</strong> — not changing deadline, changing what 'done' means at deadline. Same as the OCC exam pattern in the bank fraud question."</p></blockquote>
+<hr />
+<h3>❌ 死路答法 (top 8)</h3>
+<ol><li><strong>闭门造 6 个月 LLM gateway, 然后 mandate 全部 50 团队</strong></li><li><strong>假设有 mandate authority</strong> (大概率没有)</li><li><strong>不做 2 周 audit, 直接 design 庞大架构</strong></li><li><strong>把 platform 当 infrastructure 而非 library</strong> (SDK 应该薄, 不是 gateway)</li><li><strong>忽略 observability 作为 killer feature</strong> (这是团队最先看见的 ROI)</li><li><strong>不允许 opt-out</strong> (违反 paved-road, 立刻丧失信任)</li><li><strong>季度 surveys 代替 weekly office hours</strong> (脱离用户)</li><li><strong>接受 6 个月内 50/50 adoption 目标</strong> (不现实, reverse 到 30/50)</li></ol>
+<hr />
+<h3>✅ 加分项 (top 10)</h3>
+<ol><li><strong>G·O·O·D-F·T 10 个问题, 强调 "paved road vs mandate"</strong> — 立刻 signal staff-level platform thinking</li><li><strong>2-week audit BEFORE building</strong> — diagnose-first, anti-pattern recognition</li><li><strong>Paved road 概念明确, anti-mandate</strong> — 体现 Google 文化理解</li><li><strong>SDK 是 library 不是 gateway</strong> — 工程细节专业</li><li><strong>OTel GenAI conventions</strong> — 2025-2026 行业标准, 不是自己发明</li><li><strong>Lighthouse team 策略</strong> (Customer Support 第一个) — 适应顺序正确</li><li><strong>Cost attribution + cardinality 风险</strong> — 体现做过真实 telemetry</li><li><strong>Prompt registry + eval CI</strong> — 不只是观测, 还要 lift 质量</li><li><strong>TikTok Internal Agent Platform 直接对照</strong> — 简历转化清晰, 70%+ 重叠</li><li><strong>Reverse scope (60% adoption month 6, not 100%)</strong> — 反时间压力的成熟判断</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>Google 内部 Gemini 平台 50 team = "诊断先于建造" + "paved road 不 mandate" + "SDK 是 library 不是 gateway" + "lighthouse 团队优先, 不是 announcement" + "adoption rate 是 metric, 不是 architecture quality"</strong>.</p>
+<p>真正的 win 不是造一个最强的 LLM gateway, 是让 <strong>30/50 团队主动选择用</strong>, 因为它比裸调 Gemini API 更容易. 6 个月 = 2 周 audit + 1 个 lighthouse team 验证 + 3 个月扩到 5 个 + 后 2 个月 broad adoption. 反 mandate, 反 build-then-mandate, 反 6 个月闭门造车. <strong>Adoption is sold one team at a time</strong>, 不是 mailing list 公告.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 闭门 6 个月造庞大 gateway
+  - 假设有 mandate authority
+  - 跳过 audit 直接 design
+  - 把 SDK 做成 gateway (重)
+  - 忽略 observability 作 killer
+  - 不允许 opt-out
+  - 季度 survey 代替 office hour
+  - 接 50/50 adoption 6 个月目标
+
+要做 (9 step):
+  1. Clarify (G·O·O·D-F·T 10 Q, 强调 authority)
+  2. Reframe: adoption is the metric
+  3. Diagnose 2 weeks (top 5 cost, top 5 prompt, surface)
+  4. Stakeholder + 3-layer metrics
+  5. Paved road SDK (thin library, not gateway)
+  6. Central observability (OTel GenAI + per-team Looker)
+  7. Prompt registry + eval CI (GitHub for prompts)
+  8. Adoption strategy (lighthouse → office hour → blog)
+  9. Risk + close (anti-mandate, reverse scope)
+
+G·O·O·D-F·T 必问:
+  G: success 是 cost / quality / observability / capability?
+  O: paved road or mandate authority?
+  O: 哪些团队政治 off-limits?
+  D: cost attribution 现在多细?
+  F: reversibility (opt-out 5 min?)
+  T: 6 个月 driver?
+
+Diagnose 2 weeks (audit findings):
+  Cost:
+    Top 3 teams = 65% of $5M/month
+    Customer Support $1.2M, +35% MoM
+  Quality:
+    Workspace 有 gold-tier eval (steal as default)
+    20+ teams 0 eval
+  Surface:
+    30/50 Vertex SDK, 15/50 raw HTTP, 5/50 AI Studio
+  Observability:
+    0/50 teams have alerting
+
+Success metrics (3 layer):
+  L1 Adoption: 30/50 teams by month 6
+  L2 Outcome: 15% cost save, attribution live, prompt registry
+  L3 Health: &lt; 2 day onboarding, NPS +30, office hour 30+/week
+
+Counter-metric:
+  - No latency regression (&lt; 10ms p99 SDK overhead)
+  - No platform-caused incident
+  - No forced adoption
+
+Paved road SDK features:
+  - Auto cost tagging (team_id, use_case)
+  - OTel auto-injection (gen_ai.* span)
+  - Cache layer (Redis, 24h TTL)
+  - Cascade router (Flash → Pro)
+  - Retry + circuit breaker
+  - Quota enforcement
+  - Prompt versioning
+  - Shadow mode helper
+
+SDK 是 library, 不是 gateway:
+  - thin Python + Go (&lt; 1000 lines core)
+  - sub-ms overhead
+  - no new SRE oncall
+  - pip install + 3 lines code
+
+Adoption strategy (6 month):
+  M1: audit + design (week 1-4)
+  M2: lighthouse Customer Support
+  M3: lighthouse Maps + Pixel + Workspace + Gemini Studio
+  M4: open beta + tech talk
+  M5: broaden + tackle hard teams (Search telemetry-only)
+  M6: VP "strongly encouraged" memo + 30/50 reached
+
+Adoption tactics:
+  ─ Co-design (not adopt)
+  ─ Solve real problem
+  ─ Self-service onboard 5 min
+  ─ Office hours 2x/week
+  ─ Slack #gemini-platform, &lt; 1h response
+  ─ Quarterly blog posts
+  ─ NO mandate
+
+3 risks:
+  1. Build big then mandate (most dangerous)
+  2. Cost attribution accuracy (sample audit monthly)
+  3. Politically tough teams (graceful telemetry-only)
+
+Search team handling:
+  "Telemetry-only mode": inject OTel, no cache/cascade
+  Frame: on platform for narrative, autonomy preserved
+
+Resume quotes:
+  "TikTok Internal Agent Platform — literally this problem"
+  "32 teams adopted in 5 months, $4M/year saved, NPS +45"
+  "Voice agent 7 markets — cascade routing pattern"
+  "BNPL chatbot — intent routing cascade"
+  "Indonesia refund — audit-grade cost attribution"
+
+Key phrases:
+  - "Paved road, not mandate"
+  - "Adoption is the metric, not architecture"
+  - "SDK is library, not gateway"
+  - "Win by being easier than raw API"
+  - "Build big then mandate = platform graveyard"
+  - "Adoption is sold one team at a time"
+  - "Diagnose first, build second"
+  - "Discretion is power (Search team)"
+  - "Reverse scope, don't push deadline"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-p04-migrate-openai-to-gemini.html">← 🔮 Q-P4 · [预测·Google FDE] 带 F500 从 OpenAI 迁到 Gemini ($2M/year, 12 个生产 app)</a>
+    <a href="cm4szywgj003ivszmblm3pmoa.html">Design Online Chess →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q-P5 · 内部 Google FDE — 给 50 个产品团队建 Gemini 统一平台
+
+> "You're an internal Google FDE supporting product teams. 50 product teams at Google (Maps, Photos, Workspace, Search, Cloud, Pixel, etc.) are using the Gemini API in their products. Three problems are growing: (1) cost is growing 20% month-over-month with no visibility into why, (2) prompt quality varies wildly — some teams have great prompts, some are spending tokens on bad ones, (3) there's no central observability — when Gemini has an issue, teams find out from customer complaints. Design the platform / governance layer to standardize Gemini usage across these 50 teams. 6-month plan."
+
+**中文翻译**:
+
+> "你是 Google 内部 FDE, 支持产品团队. Google 内部 **50 个产品团队** (Maps / Photos / Workspace / Search / Cloud / Pixel 等) 都在自己产品里用 Gemini API. 现在三个问题在恶化:
+>
+> (1) **成本月环比涨 20%, 没人知道为啥**;
+> (2) **prompt 质量天差地别** — 有的团队 prompt 写得超棒, 有的把 token 砸在烂 prompt 上;
+> (3) **没有中心化的可观测性** — Gemini 出问题, 团队是从用户投诉里知道的.
+>
+> 设计平台层 / 治理层, 统一这 50 个团队的 Gemini 用法. 6 个月计划."
+
+**Round**: Platform Design + Org Strategy (60 min)
+**出处**: 🔮 预测题 — 针对 Google FDE 主场 (internal platform team 是 Google FDE 经典场景)
+**行业 / 约束**: Internal platform / 50 teams / governance vs autonomy / 6 个月 / paved road model / no mandate authority / 20% MoM cost growth / observability gap
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题里的平台 / governance / 观测词如果不懂, 后面架构图听不下去. 这张表 5 min 看完.
+
+### 平台团队 / 组织模式 ⭐ 这题的关键
+
+| 术语 | 解释 |
+|---|---|
+| **Internal platform team** ⭐ | 内部平台团队. 服务的客户是公司内部其他工程团队, 不是外部客户. Google 经典模式 — Search infra / Maps infra / Cloud Spanner platform 都是. |
+| **Paved road (铺好的路)** ⭐ | 平台团队最重要的概念. 提供一条"已铺好的路"让用户走更快更容易, 但不强制. 如果他们选 off-road 也行 (自负盈亏). Google / Netflix / Facebook 都用这模式. |
+| **Golden path** ⭐ | 铺好的路的具体实现 — 一套标准 SDK + 模板 + 文档让团队 5 min 上手. 关键是 **比裸调 raw API 更容易**, 不是更难. |
+| **Mandate (强推)** | 强制要求所有团队必须用平台. 这是 paved road 的反面 — Google 文化里通常失败 (除非高管层强烈背书 + 有意义的 enforcement). |
+| **Build vs adopt (建 vs 推广)** ⭐ | 平台团队 anti-pattern: 投 6 个月闭门造车, 上线发现没人用. 正确做法: 早期 MVP 给 2-3 个 lighthouse 团队验证, 再 scale. |
+| **Lighthouse team (灯塔团队)** ⭐ | 第一批 early adopter, 通常是高 visibility 团队 (Search / Maps). 他们用了, 别的团队跟着用. |
+| **Anti-pattern: build big then mandate** | 反模式 — 闭门造一个庞然大物然后强推. Google 文化下 100% 失败. |
+| **Customer Engineer (CE) / FDE** | 在内部场景, FDE = 帮内部团队上手 + 解决 deep technical issue 的人. 不只是 docs / sample code. |
+| **Office Hours / AMAs (Ask Me Anything)** | 平台团队的 outreach 形式. 每周 1-2 小时开放 Q&A. 比 documentation 更 effective. |
+| **Internal Slack channel** | Google 内部叫 chat space. 平台团队的"前台". 反映出用户痛点比 GitHub issue 快. |
+
+### Gemini / LLM 平台架构
+
+| 术语 | 解释 |
+|---|---|
+| **SDK / wrapper** ⭐ | 平台提供的 client library. 用户 import 这个而不是 raw Gemini API. 自动注入 telemetry / cost tagging / retry / cache. |
+| **API gateway** | 网关层. 所有 Gemini call 经过它, 加 auth / rate limit / observability. |
+| **Service mesh (gRPC / Stubby)** | Google 内部用 Stubby (gRPC 前身). 服务间通信 mesh 自带 tracing. |
+| **Per-team cost tagging** ⭐ | 每个 API call 打 team_id / project_id / use_case tag, 写入 BigQuery, 可分摊到具体团队 / project. **没这个, cost 涨 20% MoM 永远查不清谁的锅**. |
+| **Quota management** | 配额管理. 防止单个团队失控烧光全公司 quota. Per-team token budget + 月预算. |
+| **Token budget** | Token 预算. 给每个团队 / project 月级别 token 上限, 超了告警 / 限速 / hard cap. |
+| **Cache layer** | 缓存层. 相同 prompt 直接命中. 命中率 20-40% 时省钱 + 加速. |
+| **Prompt registry** ⭐ | Prompt 中心化仓库. 每个 prompt 有 owner / version / eval results / used-by teams. Git-backed 最 sane. |
+| **Prompt versioning** | Prompt 版本管理. v1.0 / v1.1 / v2.0. 不带版本号 = 改了 prompt 别人不知道. |
+| **Prompt eval pipeline** | Prompt 自动评估流水线. 改 prompt → run on golden set → compare metrics → approve/reject. |
+| **Shadow mode** | 新 prompt / 新 model 并行跑, response 不返回用户, 只 log. 评估真实流量上的差异. |
+| **Cascade / model routing** | 模型级联. Cheap model (Flash) 先答, 不行升级 Pro. 降本利器. |
+
+### 观测 / OpenTelemetry GenAI
+
+| 术语 | 解释 |
+|---|---|
+| **OpenTelemetry (OTel)** ⭐ | 开源 observability 标准. Trace / metric / log 统一格式. Google Cloud 原生支持. |
+| **OTel GenAI conventions** ⭐ | OTel 2025 出的 GenAI 专用 trace schema — `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens` 等. 标准化 LLM observability. |
+| **Trace / span** | 一个 request 的完整链路 (trace) + 单一操作 (span). LLM 调用是一个 span. |
+| **Per-team dashboard** | 每个团队一个 Looker / Looker Studio 仪表盘, 显示自己的 cost / latency / error rate / quality metrics. |
+| **Anomaly detection** | 异常检测. Cost / latency / quality 突变 → 自动告警. |
+| **Alert / paging** | 告警 + 寻呼. 严重问题 page on-call. Google 内部用 SRE 模式. |
+| **SLI / SLO / SLA** | Service Level Indicator (实际指标) / Objective (内部目标) / Agreement (对外承诺). |
+| **Error budget** | 错误预算. SLO 99.9% = 0.1% 错误预算. 烧完了停发布. SRE 经典. |
+| **Cardinality explosion** | 高基数爆炸. 给每个 user_id 打 tag → 标签数无限 → 监控系统挂. 设计 tag schema 时要小心. |
+
+### Cost / FinOps
+
+| 术语 | 解释 |
+|---|---|
+| **Cost attribution** ⭐ | 成本归属. 把 $X 总账单分摊到具体 team / project / use_case. Cloud FinOps 核心. |
+| **Showback / chargeback** | Showback = 显示成本但不真扣钱 (内部 awareness); Chargeback = 真的从团队预算扣. 后者更有约束力. |
+| **Pareto (80/20)** ⭐ | 帕累托原则. 80% cost 来自 20% 团队. 这题第一步: 找 top 5 cost team, 优化它们 = 解决 80% 问题. |
+| **Cost per query / per user / per session** | 单位成本. 总 cost 没意义, 单位成本是 actionable. |
+| **Unit economics** | 单位经济. Cost per user vs revenue per user. 内部产品也要算. |
+| **Forecast** | 预测. 基于当前增速预测 6 / 12 月 cost. 用于 capacity planning. |
+
+### Google 内部特定
+
+| 术语 | 解释 |
+|---|---|
+| **Critical User Journey (CUJ)** | Google 内部术语 — 用户的关键路径. Maps 的 CUJ = 搜索地点 → 导航. Gemini call 通常嵌在某个 CUJ 里. |
+| **TT (Technical Talk)** | Google 内部技术分享. 平台团队 outreach 标配. |
+| **Eng-wide / Org-wide** | 全工程组织级别. 50 团队跨 5+ org, 每个 org VP 是独立 stakeholder. |
+| **TVC / FTE** | Temporary Vendor Contractor / Full-Time Employee. 平台团队规模规划用. |
+| **Design doc** | Google 工程文化核心 — 正式 design doc 要 LGTM (Looks Good To Me approval) from senior eng. 平台 / 大改动必须有. |
+| **PRD (Product Requirements Doc)** | 产品需求文档. 平台 launch 也需要. |
+| **Launch readiness review (LRR)** | 上线就绪审查. SRE + security + privacy + legal sign-off. Internal launch 也要走. |
+| **Buganizer** | Google 内部 bug tracking 系统. 替代 Jira. |
+| **Critique** | Google 内部 code review 系统. |
+| **Borg / Kubernetes** | Borg = Google 内部容器编排 (K8s 前身). Internal services run on Borg. |
+| **Boq** | Google 内部 microservice 框架. |
+| **Spanner / BigTable / Bigquery** | Google 数据存储栈. Spanner = 全球一致 SQL, BigTable = 大 NoSQL, BigQuery = 数仓. |
+| **Goldfish / Sawmill** | Google 内部 log analysis / observability 工具. (类比开源 Loki / Splunk) |
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 architect 一个 LLM gateway.
+
+**是**: 考你能不能在 **50 个团队跨 5+ org + 无 mandate authority + 6 个月 deadline + cost 失控** 真实约束下做 **平台团队的核心 trade-off — adoption vs control**.
+
+5 个 signal:
+
+1. **Diagnose first, build second** (先诊断, 后建) — 不要冲架构. 先做 1-2 周 audit: top 5 cost team 是谁? top 5 worst prompt 是哪些? 这才能决定 paved road 的形状.
+
+2. **Paved road, not mandate** (铺路而非强推) — Google 文化下 mandate 失败. 平台必须 **比裸调 Gemini API 更容易**. Wins by being easier, not by being required. 这是 staff-level platform thinker 的标志.
+
+3. **Anti-pattern: build big then mandate** — 闭门造一个庞然大物然后强推. 候选人 50% 会这么答, 立刻挂. 正确答案: 2 周 MVP + 2 个 lighthouse team + iterate.
+
+4. **Adoption is the metric, not architecture** — 6 个月成功 = 30+/50 团队用了平台, **不是** "我们造了世界上最好的 LLM gateway". 平台没人用 = 失败.
+
+5. **Resume hook gold mine** — Gao Xin 的 **Internal Agent Platform at TikTok** 是这题的直接 analog. 必须开口 5 分钟内 mention.
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 立刻冲 architecture, 6 个月闭门造 LLM gateway** (闭门造车然后强推)
+
+> "I'd design a comprehensive LLM gateway with prompt versioning, cost attribution, observability, caching, A/B testing infrastructure. After 5 months of build, we'd mandate all 50 teams to migrate by month 6."
+
+死. 这是 Google platform team **教科书级反模式**:
+- 5 个月闭门造, 没人 review 你的设计
+- 第 6 个月 launch, 团队抵抗 ("我们的用例你没考虑")
+- VP 不会强推 (跨 5 个 org 没人有权)
+- 一年后 5/50 团队"在用", 平台 die, FDE 走人
+
+**挂法 #2: "我会 mandate 所有团队用我的 platform"** (假设有 mandate 权力)
+
+> "I'll mandate all 50 teams to migrate by Q2."
+
+死. 你**没问**:
+- 你的 platform team 在 org chart 哪里? VP 级背书吗?
+- 50 个团队跨几个 org? 每个 org VP 都 buy in 吗?
+- 团队不用平台的 penalty 是什么? (Google 文化通常没)
+- 平台没 ready 之前强推, 团队怎么活?
+
+**挂法 #3: 不做 diagnose, 直接 design 庞大架构**
+
+> "Here's my 6-month plan: month 1 design, month 2-5 build, month 6 launch."
+
+死. 你不知道:
+- top 5 cost team 是谁? (Pareto 80/20, 5 团队 = 80% cost, 解决它们 = 解决主要问题)
+- top 5 worst prompt 是哪些? 怎么烂法?
+- 现有团队各自怎么调 Gemini? (SDK? Direct HTTP? Vertex AI? AI Studio?) 不知道 baseline 没法设计 paved road.
+
+**挂法 #4: 把 platform 当产品做, 但忽略 customer development**
+
+> "I'd talk to teams every quarter via surveys."
+
+死. 平台的客户是工程师, 你必须 **像 PM 一样做 user research**: shadow 他们一天看怎么用, 每周 office hours, 主动找 top 5 cost team 喝咖啡. 季度调查 = 平台团队失败的早期信号.
+
+**挂法 #5: 忽略 governance vs autonomy 的 trade-off**
+
+> "Everything goes through the gateway."
+
+死. 50 个团队里, Search 和 Maps 是核心 product, 他们 latency 要求 50ms p99. 你的 gateway 加 20ms latency = 他们 opt-out. 必须 **layered approach**: 核心团队可以直连 Gemini API 但接 SDK 拿 telemetry, 一般团队全走 gateway.
+
+---
+
+## 完美答案架构 (9-step Response Architecture, 本题定制)
+
+| # | Step | 时间 | 干什么 | 开口句 |
+|---|---|------|------|------|
+| 1 | Clarify (G·O·O·D-F·T) | 8 min | 锁 team 性质 + authority + cost driver | "Before architecture, I want to ask 10 things across 6 dimensions. The critical one: what's our authority — paved road or mandate?" |
+| 2 | Reframe: adoption is the metric | 4 min | 平台成功 = 30+/50 团队用, 不是 "我建了 best gateway" | "Platform success = adoption rate, not feature count." |
+| 3 | Diagnose first (2 weeks) | 6 min | Audit top 5 cost team + top 5 worst prompt + 现有用法 | "Before building anything, 2 weeks audit. Build informed by data." |
+| 4 | Stakeholder + success metrics | 5 min | Org-wide stakeholder, 3-layer metrics, anti-mandate | "Adoption rate, cost saved, quality improved — in that order." |
+| 5 | Paved road SDK design | 10 min | SDK wraps Gemini, 自动注入 telemetry / cost / cache / retry | "SDK wins by being EASIER than raw Gemini API." |
+| 6 | Central observability | 7 min | OTel GenAI + per-team Looker + alert | "Observability is the killer feature — first thing teams notice." |
+| 7 | Prompt registry + eval pipeline | 6 min | Git-backed prompt store + auto eval CI | "Prompt registry is the 'GitHub for prompts'." |
+| 8 | Adoption strategy | 6 min | Lighthouse teams → office hours → docs → org-wide | "Adoption is sold one team at a time, not announced." |
+| 9 | Risk + close | 4 min | Platform anti-patterns + scope cuts | "Three risks: too big, no adoption, internal politics." |
+
+---
+
+## G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐
+
+> **核心理念**: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.
+
+```
+┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘
+```
+
+> "The critical one upfront: what's our authority — paved road or mandate? It changes everything."
+
+### G — Goal (→ feeds Decompose Step 1: KPI lock)
+
+> **Q1**: "When leadership says 'standardize Gemini usage', is the goal (a) **save cost** (the 20% MoM growth is the bleeding), (b) **lift quality** (some teams have great prompts, raise the floor), (c) **avoid incidents** (centralize observability), (d) **enable new capabilities** (e.g. shared prompt library, model routing), or (e) **all of the above ranked by**...? Each scenario changes the 6-month priority."
+
+> **Q2**: "What does **success at month 6** look like? Is it (a) X% of teams using the platform, (b) Y% cost reduction, (c) Z incidents prevented, or (d) leadership-credible 'we have a unified Gemini story'? Concrete success metric drives plan."
+
+**这层 → 解锁 Decompose Step 1**: 答完 G 问题, 你就知道 KPI 是什么 (e.g., 30/50 teams on SDK + 15% cost reduction on adopters + per-team observability live + 0 platform-caused incidents), 后面 5 步的所有决策按这个 KPI 优化 — 也决定 cost-attribution-first vs prompt-library-first 的顺序.
+
+### O — Owner (→ feeds Decompose Step 2: Stakeholder map)
+
+> **Q3**: "What's the **org structure** of my platform team? Reports to whom? VP-level backing? How many engineers? **Most importantly: do we have mandate authority across these 50 teams (cross 5+ orgs), or paved-road authority only?** This changes the entire approach."
+
+> **Q4**: "Who are the **highest-cost / highest-visibility teams** I should partner with first? Maps and Search are usually anchor lighthouse teams. But which 5 teams **want to talk to me**? — those are my Wave 1. And: any teams **politically off-limits** (e.g. Search runs own infra, won't adopt)? Define out-of-scope upfront."
+
+**这层 → 解锁 Step 2**: 答完 O 问题, 你画出 stakeholder map (sponsor = AI Infra VP / champion = top-5 willing teams / blocker = Search-style off-limits orgs / SME = Workspace prompt-eval team / user = 50 team eng leads) — 知道哪 5 个 Wave-1, 哪 10-15 个 Wave-2, 哪几个永远不进 scope.
+
+### D — Data (→ feeds Step 3: 数据 inventory)
+
+> **Q5**: "**Cost data granularity**: do we currently know cost per team? Per app? Per use case? If billing is bulk 'Gemini bill = $5M/month', I need to **add cost attribution as month 1 work** before anything else. If we already have team-level granularity, I skip to optimization."
+
+> **Q6**: "**Quality data + existing surfaces**: any team has eval pipelines and golden sets I can learn from? Some lighthouse teams (Workspace, Search) probably already do this well — I want to **steal their patterns** as platform default. And: what surfaces are teams using today — direct API, Vertex SDK, AI Studio, internal wrappers? 50 surfaces = discoverability problem before architecture."
+
+**这层 → 解锁 Step 3**: 答完 D 问题, 你能画 inventory 表 (50 teams × current surface × $/month × eval maturity × prompt-library readiness × politically-onboardable) — 用这张表直接做 Wave 1/2/3 rollout matrix.
+
+### D — Deadline (→ feeds Step 4: 子问题排序)
+
+> **Q7**: "**Why 6 months specifically**? Is it (a) **cost growth crisis** (20% MoM compounding = $5M → $15M in 6 months), (b) **incident** that triggered leadership attention, (c) **budget cycle** (need to lock platform funding for next FY), (d) **competitive pressure**, or (e) arbitrary executive target? **Driver determines what's compromisable.**"
+
+> **Q8**: "**Worst-case + reversibility**: a team migrates to platform, then platform has a bug → their product breaks. Do teams need (a) instant fallback to direct Gemini API, (b) opt-out at any time, (c) blast-radius isolation between teams? **No team adopts a platform they can't escape from in 5 minutes.** What's the leadership tolerance for a Wave-1 lighthouse team failing publicly?"
+
+**这层 → 解锁 Step 4**: 答完 Deadline 问题, 你知道**为什么** 6 个月这个数 (e.g., 20% MoM cost growth + VP board commit by H2-end), 才能 push back. Sub-problems 按 (cost-bleed-stop × adoption-momentum × reversibility-risk) 排序 — cost attribution + opt-out path 排最前 (blockers for any adoption), prompt library + model routing 推到 Wave-2.
+
+### S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)
+
+> **Q9**: "In 6 months with paved-road-only authority, would you accept: **(a)** SDK + dashboard adopted by top-10 willing teams (Pareto, ~60% of $-spend covered) + paved-road for the rest, or **(b)** all 50 teams on the platform (probably needs mandate authority you may not have, risk of forcing adoption + backlash)? My instinct: **(a)** — make it irresistible for the top 10, document the paved road for everyone else, measure adoption as a 12-month trajectory not a 6-month gate."
+
+> **Q10**: "What's **explicitly out of scope** for 6-month MVP — (a) Search org (won't adopt anyway), (b) model fine-tuning capability (big project, defer), (c) cross-team prompt-sharing library (needs governance), (d) auto-routing across models (needs more data), (e) any team < $10K/month spend (not worth onboarding effort)? My recommendation: **MVP = SDK + cost attribution + observability + opt-out path + 10 Wave-1 teams**; defer prompt library, model routing, fine-tuning, Search, low-spend tail to v2."
+
+**这层 → 解锁 Step 5**: 答完 S 问题, MVP 边界明确. 你知道**哪 80% 砍掉先不做** (Search org, model fine-tuning, cross-team prompt library, auto-routing, low-spend tail, mandate-required adoption), 哪 20% 是 walking skeleton (SDK + per-team cost attribution + dashboard + opt-out env var + 10 lighthouse teams + Workspace-borrowed eval template).
+
+**面试官 likely 回答**:
+- (a) cost save + (c) observability are P0; (b) quality + (d) capabilities are P1
+- Success = 30/50 teams using SDK by month 6 + 15% cost reduction on those + per-team observability live
+- Platform team = 6 engineers + 1 TPM + 1 PM, reports to AI Infra VP. **Paved road authority only, no mandate**.
+- Wave 1: Maps, Pixel, Workspace, internal Gemini Studio team, Customer Support bot team — these 5 want to talk
+- Currently: 30 teams use Vertex AI SDK direct, 15 use raw HTTP, 5 use AI Studio
+- Off-limits: Search has own infra, won't adopt
+- Cost data: org-level granularity only (5 orgs, not 50 teams). **Need to add team-level cost attribution as month 1 priority**.
+- Workspace has best prompt eval pipeline — borrow it as platform default.
+- Reversibility: SDK must allow opt-out via env var. 5-min rollback.
+- 6 months driven by: 20% MoM cost growth + AI Infra VP committed to board for "unified Gemini platform" by H2 end
+
+→ **Real scope**: in 6 months, **build paved-road SDK, add team-level cost attribution + observability, onboard 30/50 teams by being easier than raw API**. Search and some politically tough teams stay direct but adopt SDK for telemetry only.
+
+---
+
+## 详细分析 + 回答 (sample 60-min walkthrough with ASCII diagram)
+
+### Phase 1: Clarify (8 min)
+
+(执行上面的 G·O·O·D-F·T 10 个问题)
+
+### Phase 2: Reframe — adoption is the metric (4 min)
+
+> "Most important reframe before I touch architecture: **platform success = adoption rate × value delivered, NOT feature count**.
+>
+> Anti-pattern Google has seen 100 times: platform team spends 6 months building world-class infra, mandates teams to migrate, mandate fails because no VP has authority, platform has 5/50 adopters, gets shut down at next reorg.
+>
+> Correct framing: **the platform competes with raw Gemini API for developer mindshare**. It must be **easier than raw API**, not "required" or "approved." Wins by being the path of least resistance. This is paved road, not mandate."
+
+### Phase 3: Diagnose first (6 min)
+
+> "Before building anything, 2 weeks of audit. Building uninformed is the second-biggest platform-team failure mode."
+
+**Week 1-2 audit work**:
+
+**Audit #1 — Pareto cost analysis**:
+- Pull billing data → identify top 5 cost teams (likely 60-80% of $5M/month total)
+- For each: interview tech lead, shadow one engineer for 4h
+- Find: what's their use case, why is cost growing 20% MoM?
+- Hypothesis: 1-2 teams are doing things like "no caching" or "verbose prompts" that are responsible for the growth spike
+
+**Audit #2 — Worst-prompt sweep**:
+- Sample 200 prompts across 50 teams (4 per team avg)
+- Score on: length, redundancy, model misuse (Pro for trivial task), missing system prompt
+- Find: top 5 worst prompts probably consume 30%+ of cost
+- This data drives the **prompt registry value prop**: "if you adopt the platform, you can see how other teams write better prompts"
+
+**Audit #3 — Surface mapping**:
+- 50 team survey: which API are you calling? Vertex AI SDK / Direct HTTP / AI Studio / Wrapper?
+- Output: discovery of fragmentation
+- Reveals: there's probably already an internal wrapper one team built that some teams copy — that's the platform team's secret weapon (don't compete, absorb).
+
+**Audit #4 — Quality + observability gap**:
+- 10 team interviews: how do you know if Gemini is working?
+- Find: most teams find out from customer complaints or internal QA
+- Confirms: observability is the **killer feature** — first thing teams will adopt for
+
+**Output of 2-week audit**:
+
+```
+Findings:
+  Cost:
+    Top 3 teams = 65% of total ($3.25M of $5M/month)
+    Customer Support team alone = $1.2M/month, growing 35% MoM
+    Why: 2M context prompts where 200K would suffice (engineer didn't profile)
+  
+  Quality:
+    Workspace team has gold-tier eval pipeline (steal as default)
+    Maps team has 3 prompts that hallucinate 8%+ (need help)
+    20+ teams have 0 eval, 0 golden set
+  
+  Surface fragmentation:
+    30/50 use Vertex AI Python SDK
+    15/50 use raw HTTP (curl-style)
+    5/50 use AI Studio (notebook)
+    
+  Observability:
+    0/50 teams have alerting on Gemini latency/quality
+    20+ teams report incidents via internal Slack
+```
+
+This 2-week audit **changes the 6-month plan**. Without it, I'd build the wrong thing.
+
+### Phase 4: Stakeholder + Success Metrics (5 min)
+
+**Stakeholder map**:
+
+| Stakeholder | 在意什么 | 项目态度 | 关键动作 |
+|---|---|---|---|
+| **AI Infra VP (sponsor)** | Board-committed deliverable + cost narrative | Strong sponsor | Monthly exec review, give him the 1-slide story |
+| **5 Lighthouse team leads** (Maps, Pixel, Workspace, internal Gemini Studio, Customer Support) | Their own product velocity + reliability | Partners (we earn this) | Weekly co-design, give them platform shape input |
+| **30+ "fence-sitter" teams** | Not breaking their workflow | Wait-and-see | Office hours, AMAs, blog posts |
+| **Search team** | Own infra, don't want to be told what to do | Politically off-limits | Adopt SDK telemetry only, agree to not touch their stack |
+| **5 Org VPs (Maps, Pixel, Workspace, Search, Cloud)** | Each org's velocity + cost | Polite but cautious | Quarterly VP review, ask for **soft endorsement only** |
+| **Procurement / Finance** | Cost attribution + chargeback | Allies (we help them) | Weekly cost dashboard once attribution lands |
+| **AI Infra peer teams** (Gemini API team, Vertex AI team) | Coordination, not duplication | Partners | Co-design, share infra (e.g. their gateway) |
+| **SRE / Security** | LRR sign-off | Approval needed | Standard ldr launch process |
+
+**Success metrics (3 layer)**:
+
+**Layer 1 — Adoption** (THE primary metric):
+- 30/50 teams using platform SDK by month 6 (40% of total $5M/month spend through platform)
+- 5 lighthouse teams in production by month 3
+- Net Promoter Score (NPS) from platform users > +30 (positive sentiment)
+
+**Layer 2 — Outcome metrics** (the "why adoption matters"):
+- 15% cost reduction on platform-using teams (via cache + cascade + better prompts)
+- Per-team cost attribution live for 100% of platform users (giving Finance + each team accurate billing)
+- 0 unattributed Gemini incidents (every issue gets traced to a team / use case)
+- Quality improvement: 5+ prompts in registry adopted by multiple teams
+
+**Layer 3 — Platform health** (org-internal):
+- Mean adoption time: < 2 days for a new team to integrate SDK (vs raw API setup)
+- Office hours attendance: 30+ engineers/week
+- Internal Slack channel: 200+ active members
+- Documentation NPS: > +20
+
+**Counter-metrics** (must NOT regress):
+- No latency regression for lighthouse teams (gateway adds < 10ms p99)
+- No platform-caused incident in adopter team prod
+- No team forced to adopt against their will (preserve paved-road framing)
+
+### Phase 5: Paved Road SDK Design (10 min)
+
+> "SDK wins by being EASIER than raw API. Let me show the value prop side-by-side."
+
+**Side-by-side comparison**:
+
+```
+WITHOUT platform (current):                   WITH platform SDK:
+─────────────────────────────────             ─────────────────────────────────
+from vertexai import init                     from gemini_platform import Client
+from vertexai.generative_models import (      
+    GenerativeModel)                          client = Client(team="maps",
+                                                              use_case="route_qa")
+init(project="my-project",                    response = client.complete(
+     location="us-central1")                      prompt="..."
+                                              )
+model = GenerativeModel("gemini-3-pro")       
+response = model.generate_content("...")      # That's it.
+                                              # Auto-injected:
+# Now manually:                               #   - cost tagged to team/use_case
+#   - log to BigQuery                         #   - OTel trace
+#   - track cost                              #   - retry with backoff
+#   - handle retries                          #   - cache (24h TTL on identical)
+#   - implement cache                         #   - quota enforcement
+#   - alert on errors                         #   - prompt logged to registry
+#   - eval prompt quality                     #   - cascade to Flash if simple
+#   - choose model                            
+                                              # All of this for free.
+```
+
+**The killer argument**: "Adopt the SDK and you save 1 week of integration work per use case + you get observability + cost attribution + caching for free. **Why would you NOT use it?**"
+
+**SDK feature breakdown**:
+
+| Feature | Why teams want it | Implementation |
+|---|---|---|
+| **Auto cost tagging** | Finance asks "how much is YOUR team spending?" — you can answer | Inject `team_id`, `use_case`, `app_version` in every API call → BigQuery |
+| **OTel auto-injection** | When Gemini has a problem, you see it in YOUR dashboard | Wrap call in OTel span with GenAI conventions |
+| **Retry + circuit breaker** | Don't write retry boilerplate in 50 places | Exponential backoff + half-open circuit |
+| **Cache layer** | 20-40% queries are repeats → 20-40% cost save | Redis-backed, key = hash(model, prompt, params), 24h TTL |
+| **Cascade helper** | Auto-route easy queries to Flash, hard to Pro | Confidence-based routing config |
+| **Shadow mode helper** | A/B new prompt without affecting users | One-line `shadow_prompt=` argument |
+| **Quota enforcement** | Can't accidentally blow $1M in a day | Per-team monthly budget, soft warning + hard cap |
+| **Prompt versioning** | Know what prompt is in prod | Auto-snapshot prompts to git registry |
+| **Prompt suggestion** | Use battle-tested prompt from another team | Registry search by use_case |
+
+**SDK architecture**:
+
+```
+                       Application code
+                              │
+                              │ from gemini_platform import Client
+                              │ client = Client(team="maps", use_case="qa")
+                              │ client.complete(prompt="...")
+                              │
+                              ▼
+       ┌────────────────────────────────────────────────────────┐
+       │   gemini_platform SDK (Python + Go)                    │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Auth + team identification                       │ │
+       │   │  (auto from Borg job metadata)                    │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Cache check (Redis cluster)                      │ │
+       │   │   key = hash(model, prompt, params)               │ │
+       │   │   hit → return cached, log "cache_hit=true"       │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Cascade router (optional)                        │ │
+       │   │   if use_case in cascade_config:                  │ │
+       │   │      try Flash → if low confidence → Pro          │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Quota check (Spanner-backed budget)              │ │
+       │   │   if team_token_used > monthly_budget:            │ │
+       │   │     soft_warn or hard_block per config            │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Retry + circuit breaker                          │ │
+       │   │   exponential backoff, 3 attempts, jitter         │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Underlying call → Gemini API (Vertex AI)         │ │
+       │   │   gen_ai.* OTel span around the call              │ │
+       │   └──────────────────────────────────────────────────┘ │
+       │                                                         │
+       │   ┌──────────────────────────────────────────────────┐ │
+       │   │  Telemetry emit                                   │ │
+       │   │   ─ BigQuery row: team / use_case / cost / lat    │ │
+       │   │   ─ Cloud Monitoring metric                       │ │
+       │   │   ─ Trace to Cloud Trace                          │ │
+       │   │   ─ Prompt version logged to registry             │ │
+       │   └──────────────────────────────────────────────────┘ │
+       └─────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              Gemini API (Vertex AI - Pro / Flash)
+```
+
+**Critical**: SDK is **a thin layer** (< 1000 lines core). Not a microservice. Not a gateway in the network path. **Library, not infrastructure**. This means:
+- Adoption cost = `pip install` + 3-line code change
+- No additional latency (sub-millisecond overhead)
+- No new SRE oncall (it's library code, runs in user's process)
+- No new infra to scale
+
+**For teams that want network-layer gateway** (Search may want this for global rate limit), provide it as optional layer 2.
+
+### Phase 6: Central Observability (7 min)
+
+> "Observability is the killer feature — first thing teams notice and the reason they'll stay."
+
+**Architecture**:
+
+```
+       50 teams' apps (Borg jobs)
+             │ SDK auto-emits
+             ▼
+     ┌────────────────────────────────┐
+     │  Telemetry collection          │
+     │   ─ OTel collector (Borg svc)  │
+     │   ─ BigQuery streaming insert  │
+     │   ─ Cloud Monitoring metrics   │
+     └─────────┬──────────────────────┘
+               │
+               ▼
+     ┌────────────────────────────────┐
+     │  BigQuery: gen_ai_events       │
+     │   schema:                      │
+     │     team_id, use_case, ts,     │
+     │     model, input_tokens,       │
+     │     output_tokens, cost_usd,   │
+     │     latency_ms, success,       │
+     │     prompt_hash, prompt_ver,   │
+     │     cache_hit, error_code,     │
+     │     trace_id                   │
+     │   partitioned by date          │
+     │   clustered by team_id         │
+     └─────────┬──────────────────────┘
+               │
+       ┌───────┼───────┬───────────────┐
+       │       │       │               │
+       ▼       ▼       ▼               ▼
+   ┌──────┐ ┌──────┐ ┌──────────────┐ ┌──────────────┐
+   │Looker│ │Looker│ │Anomaly       │ │Per-team      │
+   │org   │ │team  │ │detection     │ │alerts        │
+   │exec  │ │self  │ │(cost spike,  │ │(SLO breach)  │
+   │view  │ │view  │ │latency drift,│ │              │
+   │      │ │      │ │error rate)   │ │              │
+   └──────┘ └──────┘ └──────────────┘ └──────────────┘
+```
+
+**Per-team dashboard** (Looker Studio template):
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Team: Maps   (use_case: route_qa)        Time: last 7 days  │
+├──────────────────────────────────────────────────────────────┤
+│  Cost:    $42K / week  (↑ 8% WoW)                            │
+│  Volume:  2.1M requests                                       │
+│  Cache hit rate: 23% (target: 35%+)                          │
+│  Latency p50/p99: 380ms / 1.2s                               │
+│  Error rate: 0.04%                                            │
+│  Model split: 70% Flash, 30% Pro                              │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  Daily cost trend (line chart)                       │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  Top 5 prompts by cost                               │    │
+│  │   1. route_qa_v3.2     $12K  ⚠ no cache              │    │
+│  │   2. address_parse_v2  $8K                           │    │
+│  │   3. place_summary_v1  $6K                           │    │
+│  │  ...                                                 │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                                │
+│  💡 Suggested actions (auto-generated):                       │
+│   ─ route_qa_v3.2 has 0% cache hit. Enable cache → save $8K/wk│
+│   ─ Verbose prompts: 18% can be cut. Try platform/prompts/auto│
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Org-wide exec view** (for AI Infra VP):
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Org-wide Gemini Platform — H2 view                          │
+├──────────────────────────────────────────────────────────────┤
+│  Adoption: 28 / 50 teams (target month 6: 30)                │
+│  Total spend: $3.8M/month (↓ from $5M baseline, saving 24%)  │
+│  Platform-managed spend: $2.1M (55% of total)                │
+│  Cache hit rate: 31% across platform users                   │
+│  Incidents traced via platform: 12 in last quarter (vs ~50   │
+│    unattributed previously)                                   │
+│                                                                │
+│  Top cost teams (top 10):                                    │
+│    Customer Support  $1.1M  (was $1.2M, ↓ 8% via cascade)    │
+│    Maps              $0.6M  (↓ 12% via caching)              │
+│    ...                                                       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Anomaly detection**:
+- Per-team cost > 30% WoW → alert team channel + platform team
+- Latency p99 > 2× rolling 7d baseline → page on-call (only for platform-using teams who opt in)
+- Error rate > 1% sustained 5 min → automatic GitHub-issue style ticket on platform team
+
+### Phase 7: Prompt Registry + Eval Pipeline (6 min)
+
+> "Prompt registry = 'GitHub for prompts'. It's the platform feature that lifts quality across 50 teams."
+
+**Architecture**:
+
+```
+   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt registry (git-backed, internal Critique)        │
+   │                                                          │
+   │   /prompts/maps/route_qa/v3.2.md                        │
+   │   /prompts/customer_support/triage/v5.0.md              │
+   │   /prompts/workspace/email_draft/v2.1.md                │
+   │   ...                                                   │
+   │                                                          │
+   │   Each prompt file:                                     │
+   │     ─ metadata: owner, last_changed, model, use_case   │
+   │     ─ template (with placeholder slots)                 │
+   │     ─ examples (few-shot)                              │
+   │     ─ golden test cases (10-100)                       │
+   │     ─ eval metrics (win rate vs prev version)          │
+   │     ─ adopted-by (other teams using it)                │
+   └─────────────────────┬───────────────────────────────────┘
+                         │
+                         │ change → trigger CI
+                         ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt CI (auto-run on PR)                             │
+   │                                                          │
+   │   1. Lint: required metadata, golden set min 10        │
+   │   2. Run on golden set with new prompt                 │
+   │   3. Pairwise compare vs prev version (LLM-as-judge)   │
+   │   4. Cost delta (output token length comparison)       │
+   │   5. Report on PR: ✅ +3% win rate, -2% cost           │
+   │   6. Block merge if win rate regression > 2pp          │
+   └─────────────────────┬───────────────────────────────────┘
+                         │
+                         ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  Prompt discoverability                                 │
+   │                                                          │
+   │   Web UI: search by use_case → see top prompts         │
+   │   Maps team can see: "Customer Support is doing intent  │
+   │   classification with this prompt — should we adopt?"  │
+   │                                                          │
+   │   Each prompt has:                                      │
+   │     ─ used-by list (other teams)                       │
+   │     ─ adoption arrow ("Workspace 5★ → 12 teams")       │
+   └─────────────────────────────────────────────────────────┘
+```
+
+**Prompt eval default methodology** (steal from Workspace, share to all):
+- Golden set: minimum 10 examples per prompt, recommend 100
+- Pairwise comparison with previous version
+- LLM-as-judge: Claude Opus 4.7 (cross-vendor, avoids self-preference)
+- Cost delta tracking
+
+**Key benefit for teams**:
+> "Your prompt automatically gets eval'd in CI. You can't ship a worse prompt without seeing the regression. Other teams can borrow your prompt with confidence because eval results are public."
+
+### Phase 8: Adoption Strategy (6 min)
+
+> "Adoption is sold one team at a time, not announced via mailing list."
+
+**6-month adoption arc**:
+
+```
+Month 1: Audit + design (Week 1-4)
+  ─ 2 weeks: audit (top 5 cost team, top 5 worst prompts, surface mapping)
+  ─ 2 weeks: SDK prototype, observability schema, design doc LGTM
+
+Month 2: Lighthouse team #1 (Customer Support) — biggest pain
+  ─ They have $1.2M/month spend, 35% MoM growth
+  ─ Co-design SDK with their lead engineer
+  ─ Migration: 1 week
+  ─ Demonstrated 15% cost saving in 2 weeks (cache + Flash cascade)
+  ─ Their lead becomes platform evangelist
+
+Month 3: Lighthouse teams #2-5 (Maps, Pixel, Workspace, Gemini Studio)
+  ─ Each: 1-2 weeks onboarding
+  ─ Per-team observability live, per-team cost attribution live
+  ─ Internal blog post: "How Customer Support cut $200K/month"
+  ─ Office hours 2x/week, attendance 15-30 engineers
+
+Month 4: Open beta (fence-sitters)
+  ─ Tech Talk at AI Infra all-hands
+  ─ Self-service onboarding portal (5-min quickstart)
+  ─ Goal: 5 more teams adopt per week
+  ─ Track adoption funnel: docs visit → SDK install → first call → 100 calls/day
+
+Month 5: Inflection — broadening adoption + harder teams
+  ─ Target 20+ teams using SDK
+  ─ Tackle the politically tough teams: not mandate, offer
+  ─ Search team: SDK telemetry-only mode ("just inject OTel, no cache/cascade")
+  ─ Specialist office hours: "FinOps office hours" for cost-conscious teams
+
+Month 6: Standardization push (the soft mandate)
+  ─ Now that 25+ teams use platform, ask AI Infra VP to send "strongly encouraged" memo
+  ─ Hold-outs left: ~15 teams
+  ─ Half migrate after memo, half stay (and that's OK)
+  ─ Quarter end: 30/50 teams, $1M+/month savings tracked
+```
+
+**Adoption tactics specifically**:
+
+1. **Co-design with lighthouse teams** — they're not adopters, they're co-designers. Their use case shapes SDK.
+2. **Solve a problem they have, today** — Customer Support has $1.2M cost growth. Solving theirs = "see, platform delivers immediately."
+3. **Self-service onboarding** — `gp init` command, 3 lines code, < 10 min. Onboarding > doc.
+4. **Office hours weekly** — not optional. Show up, answer questions, write down complaints.
+5. **Internal Slack channel** — `#gemini-platform`. Be responsive < 1 hour. This is the SLA for adoption.
+6. **Quarterly internal blog posts** — "Maps team saved $X with cascade routing". Social proof.
+7. **No mandate. Ever.** — even when AI Infra VP offers, decline. "Strongly encouraged" is the ceiling. Teams adopting because forced will sabotage you.
+
+### Phase 9: Risk + Close (4 min)
+
+**Three risks worth calling out**:
+
+**Risk #1 — Build big then mandate (the platform team graveyard)**:
+> "Most dangerous. 6 engineers + 6 months + no shipped value = platform dies. Mitigation: ship Month 2 with Customer Support, demonstrate value before building more features."
+
+**Risk #2 — Cost attribution accuracy**:
+> "If team-level cost attribution is wrong by > 5%, teams stop trusting the dashboard. Mitigation: 2-week verification with Finance month 1, sample audits monthly."
+
+**Risk #3 — Politically tough teams (Search)**:
+> "If Search publicly opts out, fence-sitters use it as excuse. Mitigation: get Search to adopt SDK in telemetry-only mode early — minimum 'they're on the platform' for org-wide messaging."
+
+**Close**:
+
+> "6 months. 50 teams. End state: 30+ teams on platform, $1M+/month savings tracked, **per-team observability live, prompt registry seeded with battle-tested prompts**, platform team is 'easiest path' not 'mandated path'. Want me to dive deeper on SDK design, adoption strategy, or how to handle politically tough teams?"
+
+---
+
+## 端到端架构图 (ASCII)
+
+```
+                         Google Internal — Gemini Platform
+                         ────────────────────────────────────
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│  50 Product Teams (Maps, Photos, Workspace, Pixel, ...)                    │
+│                                                                              │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ...  ┌──────────┐               │
+│   │ Maps     │  │ Pixel    │  │Workspace │       │ Search   │               │
+│   │ route_qa │  │ on-device│  │ email_   │       │ (tele-   │               │
+│   │          │  │ helper   │  │ draft    │       │  metry   │               │
+│   │          │  │          │  │          │       │  only)   │               │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘               │
+│        │             │             │                  │                     │
+│        │  All use gemini_platform Python SDK          │                     │
+│        ▼             ▼             ▼                  ▼                     │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  gemini_platform SDK (Python + Go, thin client library)          │     │
+│   │   ─ Auto cost tagging (team_id, use_case)                        │     │
+│   │   ─ OTel auto-injection (gen_ai.* span)                          │     │
+│   │   ─ Cache layer (Redis-backed, 24h TTL on identical prompts)     │     │
+│   │   ─ Cascade router (Flash → Pro on low confidence)               │     │
+│   │   ─ Retry + circuit breaker                                      │     │
+│   │   ─ Quota enforcement (per-team monthly budget)                  │     │
+│   │   ─ Prompt version logging to registry                           │     │
+│   └────────────────────────────┬─────────────────────────────────────┘     │
+│                                │                                            │
+│                                ▼                                            │
+│                    Vertex AI (Gemini 3 Pro / Flash)                         │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Telemetry pipeline                                               │     │
+│   │   ─ OTel collector → BigQuery streaming insert                   │     │
+│   │   ─ BigQuery: gen_ai_events table (partitioned by date)          │     │
+│   │   ─ Cloud Monitoring: SLI / SLO metrics                          │     │
+│   │   ─ Cloud Trace: cross-service trace                             │     │
+│   └────────────────────────────┬─────────────────────────────────────┘     │
+│                                │                                            │
+│           ┌────────────────────┼────────────────────┐                       │
+│           ▼                    ▼                    ▼                       │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐              │
+│   │ Per-team     │    │ Org-wide     │    │ Anomaly detect   │              │
+│   │ Looker dash  │    │ exec view    │    │ + alerting       │              │
+│   │ (auto-gen    │    │ (AI Infra    │    │ (cost spike,     │              │
+│   │  for each    │    │  VP review)  │    │  latency drift,  │              │
+│   │  team)       │    │              │    │  error rate)     │              │
+│   └──────────────┘    └──────────────┘    └──────────────────┘              │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Prompt registry (git-backed, Critique-managed)                  │     │
+│   │   ─ /prompts/<team>/<use_case>/<version>.md                      │     │
+│   │   ─ Auto eval on PR (golden set + pairwise vs prev)              │     │
+│   │   ─ Discoverability UI: search / cross-team adoption             │     │
+│   └──────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │  Adoption surface                                                 │     │
+│   │   ─ Internal Slack #gemini-platform (200+ active)                │     │
+│   │   ─ Weekly office hours (Wed 2pm, Fri 10am)                      │     │
+│   │   ─ Quickstart docs (5-min onboarding)                           │     │
+│   │   ─ Internal blog posts (success stories)                        │     │
+│   └──────────────────────────────────────────────────────────────────┘     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+  Platform team: 6 eng + 1 TPM + 1 PM, reports to AI Infra VP
+  Authority: paved road only, no mandate
+  Goal month 6: 30/50 teams adopt, $1M+/month savings
+```
+
+---
+
+## Gao Xin 简历专属 reframe + STAR
+
+This problem is **the most direct resume analog** of any FDE question — your Internal Agent Platform at TikTok is literally the same role.
+
+### Primary STAR: TikTok Internal Agent Platform
+
+> **STAR**: At TikTok, I led the design and rollout of the **Internal Agent Platform** that 50+ internal teams used.
+>
+> **Situation**: Similar to this Google problem — 50+ teams building agentic features, fragmented LLM usage, no observability, cost was exploding (~3x in 6 months).
+>
+> **Task**: Build platform/governance layer that standardized LLM + agent usage WITHOUT mandate authority. Same paved-road model.
+>
+> **Action**:
+> 1. **2-week diagnostic audit** — found top 5 cost teams = 75% of bill, top 5 worst prompts = ~30% wasted spend
+> 2. **Thin SDK + gateway** — 3-line code change for teams, auto cost tagging, OTel injection
+> 3. **Lighthouse strategy** — onboarded **payment chatbot team first** (biggest pain), demonstrated 22% cost cut in 3 weeks
+> 4. **Prompt registry + eval CI** — borrowed from Workspace-equivalent team, made it the platform default
+> 5. **Adoption tactics** — office hours, Slack channel, internal blog posts. NO mandate.
+>
+> **Result**: 32 teams adopted in 5 months. $4M/year cost reduction. Per-team observability live. Standard approach now: "If you're building with LLM at TikTok, use IAP." NPS +45.
+>
+> **Key insight that transfers**: **the most important platform-team principle is "win by being easier"**. The day I started writing the SDK, the design constraint was "if a team can't onboard in 30 minutes of effort, we lose."
+
+### Direct analog 2: Internal Agent Platform observability
+
+> "I built the exact OTel GenAI observability spec at TikTok — per-team cost dashboards in Tableau (their equivalent of Looker Studio), per-team SLI/SLO, anomaly detection on cost spike. The schema in this design is straight from my TikTok IAP."
+
+### Direct analog 3: Voice agent 7 markets — multi-tenant routing
+
+> "The cascade-routing pattern (Flash → Pro on low confidence) I'm proposing here is the same I built for voice agent across 7 markets — local cheap model for routing, escalate to GPT/Gemini for complex. Working code, production-tested."
+
+### Direct analog 4: BNPL chatbot intent routing
+
+> "Cascade routing in the SDK is identical to BNPL chatbot intent routing — cheap model classifies intent, expensive model only for personalized advice. The cost cascade in our customer support pattern is real, tested."
+
+### Direct analog 5: Indonesia refund tier governance
+
+> "Indonesia regulator required audit-grade cost / decision attribution. The cost-attribution-to-team work here is identical pattern. I know what fails (cardinality explosion, late telemetry) because I shipped it."
+
+**Pitch to interviewer**:
+
+> "This is the most direct overlap of any FDE problem I've seen with my actual experience. Internal Agent Platform at TikTok was **literally this problem at a similar scale (50+ teams, $5M+/year)**. I can show you the SDK design doc, the adoption curve over 6 months, the cost dashboards. **The 20% incremental for Google is Borg / Spanner / Critique specifics — I'd close that in week 1.**"
+
+---
+
+## 5 个 Follow-ups
+
+### Q1: "VP 想给你 mandate authority — 强制 50 个团队 6 个月内迁完. 你接吗?"
+
+**A**: **Decline, but politely**.
+
+> "I appreciate the offer, but mandate authority is the worst thing that could happen to this platform. Three reasons:
+>
+> 1. **Mandate triggers compliance-only adoption**. Teams will integrate the minimum surface area to comply, not actually use the platform. We'd hit 50/50 'adoption' on paper, but 5/50 actually using cost / observability / prompt registry. **Adoption rate without value capture is worse than partial true adoption.**
+>
+> 2. **Mandate destroys the feedback loop**. When teams choose us, they tell us why they chose us (and what we're missing). When they're forced, they don't give feedback — they go around us. We become guessing what they need.
+>
+> 3. **Mandate exposes us politically**. The day a mandated team has an outage they blame on our platform (even if not our fault), the mandate gets rescinded. Better to have 30/50 evangelists than 50/50 hostage takers.
+>
+> What I'd ask for instead: **'strongly encouraged' messaging from VP at all-hands**. Strong enough to signal direction, weak enough to preserve paved-road framing.
+>
+> If you really want acceleration, give me **2 more engineers and 1 more PM** instead of authority. Same speed-up, none of the political downside."
+
+### Q2: "如果 Search 团队公开拒绝 platform, 影响其他团队 fence-sitters. 怎么办?"
+
+**A**: **Pre-empt with a graceful deal**.
+
+> "Search is politically off-limits. Don't force adoption. Instead, two paths:
+>
+> **Path 1 — Sell them a smaller deal**:
+> - 'You don't need our SDK. Just inject our OTel telemetry library in your existing wrapper. We get observability data, you keep your infra. 1 day of work, you remain independent.'
+> - This is 'compliance-only' but framed politically: **Search 'on the platform' for the org-wide narrative, but they keep autonomy.**
+>
+> **Path 2 — Carve out scope**:
+> - Publicly redefine 'Search is out of scope for the platform — they have their own infra, intentional.' Owns the narrative.
+> - Then to fence-sitters: 'Search is a special case (built their own years ago). For new teams + most teams, platform is the path.'
+>
+> Worst response: **try to force Search**. Lose the fight publicly, all fence-sitters see they can resist too. **Discretion is power**."
+
+### Q3: "你的 SDK 上线 3 个月后, 一个 lighthouse team 报告 SDK 引入 50ms latency 回归. 他们要 opt out. 怎么处理?"
+
+**A**: This is the **moment of truth for paved-road framing**. Don't fight, fix.
+
+> "Opt-out is allowed by design. But before they leave, three steps:
+>
+> **Step 1 — Diagnose with them in the room (same day)**:
+> - 50ms regression where? Cache lookup? OTel emit? Quota check? Network hop?
+> - Likely culprit: cache lookup blocking call (should be async)
+> - If diagnosed in < 2 hours: 'Here's the fix, give us 1 week, we'll redeploy.'
+>
+> **Step 2 — Provide bypass while we fix**:
+> - 'Set `SDK_MODE=fast` env var. Disables cache + cascade but keeps telemetry. You get 0ms regression, we still get observability.'
+> - This shows we adapt to them.
+>
+> **Step 3 — Public post-mortem**:
+> - Internal blog: 'We found a 50ms regression in v2.1. Maps team caught it, we fixed it in 6 days. Here's what we learned.'
+> - Establishes that **the platform listens and fixes**. More credibility than 50 successful adoptions.
+>
+> Never tell a team 'no you can't opt out'. The moment we do, paved road becomes mandate in their eyes."
+
+### Q4: "Cost growth 20% MoM 你说 2 周 audit 能 diagnose. 如果 audit 完发现 cost growth 是 legitimate (新产品上线, 真实用量增长), 你怎么交代?"
+
+**A**: This is **scope honesty**.
+
+> "If audit shows the 20% MoM growth is **legitimate volume growth** (e.g. new product launches drove 2x users), then 'cost optimization' alone can't solve it. The 6-month goal shifts to:
+>
+> 1. **Make cost growth observable**: was hidden, now visible. VP / Finance can attribute growth to specific teams / products with confidence. **Visibility itself is the deliverable**.
+>
+> 2. **Reduce cost-per-unit, not absolute cost**: even if total Gemini bill grows from $5M → $10M over 6 months (legitimate user growth), platform can drive **cost-per-query down 30%** (cache + cascade + better prompts). Same business outcome, lower unit cost.
+>
+> 3. **Forecast accuracy**: with team-level attribution + use-case granularity, Finance can forecast next quarter's spend confidently. **No more 'we don't know why it's growing'**.
+>
+> The story to VP changes from 'we cut $X' to 'we made cost visible, attributable, and on a per-unit declining trajectory'. **Both are wins. Honesty about which we're delivering matters**.
+>
+> Trap to avoid: promising 'we'll cut absolute cost' if drivers are legitimate growth. Set up for failure."
+
+### Q5: "6 个月 deadline 太短, audit + design + ship 不够. 你 push back 还是接?"
+
+**A**: **Reverse scope, don't push back deadline**.
+
+> "Don't push back the deadline — VP committed to board. Push back on scope.
+>
+> **Original scope (implied)**: 'standardize Gemini across 50 teams in 6 months'
+>
+> **Reversed scope (what's actually shippable)**:
+> - Month 6 deliverable: **30/50 teams adopted SDK** (60% adoption), **per-team cost attribution live** (100% of platform users), **prompt registry seeded with 20+ battle-tested prompts**, **observability dashboards** for all platform users.
+> - **Not in month 6**: full feature SDK (no cascade for all use cases, just lighthouse), no shadow mode helper for all teams, no comprehensive cost forecasting model.
+> - **Phase 2 (month 7-12)**: hit 40/50, add advanced features.
+>
+> Story to VP:
+>
+> > 'We can hit board-credible milestone at month 6 (60% adoption + observability live + $1M annual save tracked) by being disciplined about scope. Trying to do all of "standardize" in 6 months = ship a half-baked platform that becomes 'that other platform team' instead of 'the one we use'. Phase 1 lands a strong story, Phase 2 finishes the work.'
+>
+> This is **reverse-scope thinking** — not changing deadline, changing what 'done' means at deadline. Same as the OCC exam pattern in the bank fraud question."
+
+---
+
+## ❌ 死路答法 (top 8)
+
+1. **闭门造 6 个月 LLM gateway, 然后 mandate 全部 50 团队**
+2. **假设有 mandate authority** (大概率没有)
+3. **不做 2 周 audit, 直接 design 庞大架构**
+4. **把 platform 当 infrastructure 而非 library** (SDK 应该薄, 不是 gateway)
+5. **忽略 observability 作为 killer feature** (这是团队最先看见的 ROI)
+6. **不允许 opt-out** (违反 paved-road, 立刻丧失信任)
+7. **季度 surveys 代替 weekly office hours** (脱离用户)
+8. **接受 6 个月内 50/50 adoption 目标** (不现实, reverse 到 30/50)
+
+---
+
+## ✅ 加分项 (top 10)
+
+1. **G·O·O·D-F·T 10 个问题, 强调 "paved road vs mandate"** — 立刻 signal staff-level platform thinking
+2. **2-week audit BEFORE building** — diagnose-first, anti-pattern recognition
+3. **Paved road 概念明确, anti-mandate** — 体现 Google 文化理解
+4. **SDK 是 library 不是 gateway** — 工程细节专业
+5. **OTel GenAI conventions** — 2025-2026 行业标准, 不是自己发明
+6. **Lighthouse team 策略** (Customer Support 第一个) — 适应顺序正确
+7. **Cost attribution + cardinality 风险** — 体现做过真实 telemetry
+8. **Prompt registry + eval CI** — 不只是观测, 还要 lift 质量
+9. **TikTok Internal Agent Platform 直接对照** — 简历转化清晰, 70%+ 重叠
+10. **Reverse scope (60% adoption month 6, not 100%)** — 反时间压力的成熟判断
+
+---
+
+## 一句话总结
+
+> **Google 内部 Gemini 平台 50 team = "诊断先于建造" + "paved road 不 mandate" + "SDK 是 library 不是 gateway" + "lighthouse 团队优先, 不是 announcement" + "adoption rate 是 metric, 不是 architecture quality"**.
+>
+> 真正的 win 不是造一个最强的 LLM gateway, 是让 **30/50 团队主动选择用**, 因为它比裸调 Gemini API 更容易. 6 个月 = 2 周 audit + 1 个 lighthouse team 验证 + 3 个月扩到 5 个 + 后 2 个月 broad adoption. 反 mandate, 反 build-then-mandate, 反 6 个月闭门造车. **Adoption is sold one team at a time**, 不是 mailing list 公告.
+
+---
+
+## Cheat Sheet
+
+```
+不要做:
+  - 闭门 6 个月造庞大 gateway
+  - 假设有 mandate authority
+  - 跳过 audit 直接 design
+  - 把 SDK 做成 gateway (重)
+  - 忽略 observability 作 killer
+  - 不允许 opt-out
+  - 季度 survey 代替 office hour
+  - 接 50/50 adoption 6 个月目标
+
+要做 (9 step):
+  1. Clarify (G·O·O·D-F·T 10 Q, 强调 authority)
+  2. Reframe: adoption is the metric
+  3. Diagnose 2 weeks (top 5 cost, top 5 prompt, surface)
+  4. Stakeholder + 3-layer metrics
+  5. Paved road SDK (thin library, not gateway)
+  6. Central observability (OTel GenAI + per-team Looker)
+  7. Prompt registry + eval CI (GitHub for prompts)
+  8. Adoption strategy (lighthouse → office hour → blog)
+  9. Risk + close (anti-mandate, reverse scope)
+
+G·O·O·D-F·T 必问:
+  G: success 是 cost / quality / observability / capability?
+  O: paved road or mandate authority?
+  O: 哪些团队政治 off-limits?
+  D: cost attribution 现在多细?
+  F: reversibility (opt-out 5 min?)
+  T: 6 个月 driver?
+
+Diagnose 2 weeks (audit findings):
+  Cost:
+    Top 3 teams = 65% of $5M/month
+    Customer Support $1.2M, +35% MoM
+  Quality:
+    Workspace 有 gold-tier eval (steal as default)
+    20+ teams 0 eval
+  Surface:
+    30/50 Vertex SDK, 15/50 raw HTTP, 5/50 AI Studio
+  Observability:
+    0/50 teams have alerting
+
+Success metrics (3 layer):
+  L1 Adoption: 30/50 teams by month 6
+  L2 Outcome: 15% cost save, attribution live, prompt registry
+  L3 Health: < 2 day onboarding, NPS +30, office hour 30+/week
+
+Counter-metric:
+  - No latency regression (< 10ms p99 SDK overhead)
+  - No platform-caused incident
+  - No forced adoption
+
+Paved road SDK features:
+  - Auto cost tagging (team_id, use_case)
+  - OTel auto-injection (gen_ai.* span)
+  - Cache layer (Redis, 24h TTL)
+  - Cascade router (Flash → Pro)
+  - Retry + circuit breaker
+  - Quota enforcement
+  - Prompt versioning
+  - Shadow mode helper
+
+SDK 是 library, 不是 gateway:
+  - thin Python + Go (< 1000 lines core)
+  - sub-ms overhead
+  - no new SRE oncall
+  - pip install + 3 lines code
+
+Adoption strategy (6 month):
+  M1: audit + design (week 1-4)
+  M2: lighthouse Customer Support
+  M3: lighthouse Maps + Pixel + Workspace + Gemini Studio
+  M4: open beta + tech talk
+  M5: broaden + tackle hard teams (Search telemetry-only)
+  M6: VP "strongly encouraged" memo + 30/50 reached
+
+Adoption tactics:
+  ─ Co-design (not adopt)
+  ─ Solve real problem
+  ─ Self-service onboard 5 min
+  ─ Office hours 2x/week
+  ─ Slack #gemini-platform, < 1h response
+  ─ Quarterly blog posts
+  ─ NO mandate
+
+3 risks:
+  1. Build big then mandate (most dangerous)
+  2. Cost attribution accuracy (sample audit monthly)
+  3. Politically tough teams (graceful telemetry-only)
+
+Search team handling:
+  "Telemetry-only mode": inject OTel, no cache/cascade
+  Frame: on platform for narrative, autonomy preserved
+
+Resume quotes:
+  "TikTok Internal Agent Platform — literally this problem"
+  "32 teams adopted in 5 months, $4M/year saved, NPS +45"
+  "Voice agent 7 markets — cascade routing pattern"
+  "BNPL chatbot — intent routing cascade"
+  "Indonesia refund — audit-grade cost attribution"
+
+Key phrases:
+  - "Paved road, not mandate"
+  - "Adoption is the metric, not architecture"
+  - "SDK is library, not gateway"
+  - "Win by being easier than raw API"
+  - "Build big then mandate = platform graveyard"
+  - "Adoption is sold one team at a time"
+  - "Diagnose first, build second"
+  - "Discretion is power (Search team)"
+  - "Reverse scope, don't push deadline"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

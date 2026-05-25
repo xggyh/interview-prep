@@ -2,6 +2,10 @@
 
 > "A Fortune 500 customer wants us deployed **inside their AWS VPC** (no SaaS), using their **Okta SSO**, reading data from their **Snowflake** instance. They have a security review process that takes 6 weeks. **Design the deployment + ongoing operations**. How do you push code updates without re-running the security review?"
 
+**中文翻译**:
+
+> "一个 Fortune 500 客户想让我们部署在**他们的 AWS VPC (虚拟私有云) 里面** (不是 SaaS), 用他们的 **Okta SSO (单点登录)**, 从他们的 **Snowflake (云数据仓库)** 实例读数据. 他们的安全审 (security review) 流程要 6 周. **设计部署 + 日常运维**. 你怎么 push 代码更新但不重跑安全审?"
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir / Databricks / Snowflake / Anthropic Enterprise · 行业: cross-industry F500 (bank, insurance, retail)
 **约束**: customer VPC isolation / Okta SSO / Snowflake-as-source-of-truth / no public internet egress (or scoped allowlist) / 6-week security review process / customer compliance team gates every change / BYOK encryption
@@ -275,7 +279,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + KPI (5 min)
+### Phase 1: Clarify + KPI (澄清 + 锁 KPI) (5 min)
 
 锁:
 - "Customer 是 dedicated AWS account 在他们 org 下还是 our-account-peered? 大 F500 99% 是前者"
@@ -292,7 +296,7 @@ KPI:
 - **Telemetry coverage**: 100% production via OTel, 0% raw data egress
 - **Compliance**: SOC 2 + customer-specific (FedRAMP / PCI / HITRUST depending)
 
-### Phase 2: Deployment model (8 min)
+### Phase 2: Deployment model (部署模型) (8 min)
 
 **2.1 谁 owns the AWS account**
 
@@ -322,7 +326,7 @@ Two-stage:
 - 即使我们 SRE 失误, customer 仍能 rollback (image 在他们 ECR)
 - 所有 image signed with Cosign, customer Argo 配 admission controller (Kyverno) 验签
 
-### Phase 3: Okta SSO + Snowflake (10 min)
+### Phase 3: Okta SSO + Snowflake (单点登录 + 数据仓库集成) (10 min)
 
 **3.1 Okta as IdP**
 
@@ -389,7 +393,7 @@ ALTER USER AGENT_PLATFORM_SVC SET NETWORK_POLICY = AGENT_PLATFORM_NP;
 - Service queries (agent tool calling Snowflake): use key-pair, role = AGENT_PLATFORM_READER, scope by role grants
 - User-attributed queries (audit who asked what): use External OAuth, Okta JWT 传递, Snowflake recognize user, query log 自带 user_id
 
-### Phase 4: Update mechanism (10 min)
+### Phase 4: Update mechanism (更新机制) (10 min)
 
 这是面试官最爱深挖的题. 6 周 security review 不能每 release 都过, 否则一年 release 8 次. 设计:
 
@@ -465,7 +469,7 @@ Critical CVE (CVSS ≥ 9.0) — 标准 5-day flow 太慢. Pre-arranged emergency
 - Customer ops 跑 pre-approved `helm rollback` 或 `helm upgrade --version=hotfix-X`
 - 24h SLA from CVE disclosure to deployed fix
 
-### Phase 5: Minimizing security review surface (8 min)
+### Phase 5: Minimizing security review surface (减少触发安全审的面) (8 min)
 
 **5.1 Architecture stability statement**
 
@@ -503,7 +507,7 @@ Customer security 不需要 re-审, 因为证据齐.
 
 如果偶尔需要新 infra (e.g., 加个 EKS node group for GPU workload), 我们维护 "pre-approved patterns" library. Customer security 一次审 pattern, 之后类似 change 走 expedited review (1 week 而不是 6 周).
 
-### Phase 6: Telemetry / observability (7 min)
+### Phase 6: Telemetry / observability (遥测 / 可观测性) (7 min)
 
 **6.1 Customer 让看什么**
 
@@ -560,7 +564,7 @@ service:
 
 Incident: customer 主动 page 我们, 我们 SRE 通过 break-glass cross-account role 进 customer EKS (限时 4h, 自动 revoke), 看 kubectl logs, audit-recorded session.
 
-### Phase 7: Multi-customer fleet ops (7 min)
+### Phase 7: Multi-customer fleet ops (多客户机群运维) (7 min)
 
 50 个 F500 怎么管?
 
@@ -609,7 +613,7 @@ T+0 to T+8 weeks:
 
 T+8+: ongoing updates per release channel.
 
-### Phase 8: Trade-offs + alternatives (5 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (5 min)
 
 **Decision 8.1 — EKS vs ECS vs Lambda**
 

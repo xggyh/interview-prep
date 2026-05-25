@@ -2,6 +2,10 @@
 
 > "Customer escalation. **Major customer says they need feature X live by Friday or they cancel** (it's Tuesday). You estimated 2 weeks. Walk me through what you compromise on — and crucially, what you **NEVER** compromise on. Show me you've actually shipped under pressure."
 
+**中文翻译**:
+
+> "客户升级事件. **一个重要客户说他们需要 feature X 周五就上线, 否则就取消合同** (现在是周二). 你估算这个 feature 要 2 周. 跟我讲讲你会在哪些地方 compromise (妥协) — 还有最关键的, 哪些是你 **绝对不会** compromise 的. 让我看你真的在 production 压力下 ship 过东西."
+
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — judgment under pressure 必问
 

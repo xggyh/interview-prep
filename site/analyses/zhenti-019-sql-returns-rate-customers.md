@@ -2,6 +2,10 @@
 
 > "Write SQL to find **all customers whose return rate exceeded 30% in the previous quarter**. Schema: `orders(order_id, customer_id, order_ts, total_amount, status)` and `returns(return_id, order_id, return_ts, return_amount)`. **Walk through edge cases** — what if customer had 0 orders? What if return is partial? Quarterly cut-off?"
 
+**中文翻译**:
+
+> "写一条 SQL 找出**上季度退货率 (return rate) 超过 30% 的所有客户**. Schema: `orders(order_id, customer_id, order_ts, total_amount, status)` 和 `returns(return_id, order_id, return_ts, return_amount)`. **把边界情况讲一遍** — 客户 0 个订单怎么办? 部分退货怎么办? 季度切换 (quarterly cut-off) 怎么处理?"
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Palantir**, Scale AI, Anyscale
 **难度**: Medium (但 edge cases 决定 differentiation)
@@ -182,7 +186,7 @@ Why: 通常要 columns 让 analyst follow up.
 
 ## 详细解题流程
 
-### Step 1: Sketch decomposition (5 min)
+### Step 1: Sketch decomposition (分解思路, 5 min)
 
 ```
 Goal: customers where in [last quarter] return_rate > 0.3
@@ -195,7 +199,7 @@ Steps:
   5. Filter return_rate > 0.3 AND orders_total >= 5
 ```
 
-### Step 2: SQL v1 (basic but solid) — 15-20 min
+### Step 2: SQL v1 (basic but solid) (第一版 SQL — 基础但靠谱) — 15-20 min
 
 ```sql
 -- PostgreSQL (most common in interviews; ANSI-compatible)
@@ -265,7 +269,7 @@ ORDER BY return_rate DESC, orders_total DESC;
 - **`ROUND(..., 4)`** — output readable.
 - **`ORDER BY`** — highest-risk customers first; BI dashboard friendly.
 
-### Step 3: Edge case discussion (10-15 min)
+### Step 3: Edge case discussion (边界情况讨论, 10-15 min)
 
 #### Edge case 1: Customer with 0 orders in quarter
 
@@ -397,7 +401,7 @@ WITH quarter_bounds AS (
 -- Or maintain a fiscal_calendar table for clarity (recommended).
 ```
 
-### Step 4: Performance + indexes (10 min)
+### Step 4: Performance + indexes (性能与索引, 10 min)
 
 **Schema:**
 ```
@@ -470,7 +474,7 @@ WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
   AND orders_returned::numeric / orders_total > 0.30;
 ```
 
-### Step 5: Window function variant (advanced)
+### Step 5: Window function variant (window function 进阶版本)
 
 For ranking / quarter-over-quarter trend:
 
@@ -515,7 +519,7 @@ WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
 ORDER BY rate DESC;
 ```
 
-### Step 6: Sample data + test (5-10 min)
+### Step 6: Sample data + test (样本数据与测试, 5-10 min)
 
 ```sql
 -- Setup test data

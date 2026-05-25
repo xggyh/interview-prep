@@ -2,6 +2,10 @@
 
 > "A **top-10 pharma company** wants to deploy an **AI assistant for researchers** to query **internal compound libraries, assay data, and patent claims**. Their **legal, IP, and compliance teams** have strong concerns. Walk me through how you'd **scope** this in the first 90 days."
 
+**中文翻译**:
+
+> "一家 **全球前十大药企** 想给科研人员部署一个 **AI 助手**, 让他们查询 **内部化合物库 (compound library)、实验数据 (assay data)、专利权利要求 (patent claims)**. 他们的 **法务、IP (知识产权)、合规团队都有很强的担忧**. 跟我讲讲你前 90 天怎么 **scope** (定范围) 这个项目."
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir / Anthropic (life sciences) · OpenAI Enterprise
 **行业**: Pharma / life sciences / IP-sensitive
@@ -96,16 +100,16 @@
 
 4 个 signal:
 
-1. **Stop and ask before architecting** — 90% 候选人开始讲 RAG / vector DB. 实际 90 天里 60-70% 时间是法务 / IP / 合规审批, 不是技术
-2. **Data classification first** — 化合物结构 + 临床试验 + 专利说明书 + assay data 各自 IP / 合规等级不同, 不能一刀切
-3. **Pilot scope discipline** — pilot 不是 "全公司 5000 研究员", 是 "1 个 therapeutic area 的 30 人 team 用 6 个月"
-4. **Self-host vs API as a decision, not a default** — IP 暴露容忍度决定 architecture, FDE 必须帮客户做这个 tradeoff
+1. **Stop and ask before architecting** (先停下来问问题, 别急着画架构) — 90% 候选人开始讲 RAG / vector DB. 实际 90 天里 60-70% 时间是法务 / IP / 合规审批, 不是技术
+2. **Data classification first** (数据分类优先) — 化合物结构 + 临床试验 + 专利说明书 + assay data 各自 IP / 合规等级不同, 不能一刀切
+3. **Pilot scope discipline** (pilot 范围要克制) — pilot 不是 "全公司 5000 研究员", 是 "1 个 therapeutic area (治疗领域) 的 30 人 team 用 6 个月"
+4. **Self-host vs API as a decision, not a default** (自托管 vs API 是个决策, 不是默认值) — IP 暴露容忍度决定 architecture, FDE 必须帮客户做这个 tradeoff (权衡)
 
 ---
 
 ## ❌ 最常见的挂法
 
-**挂法 #1: 立刻冲 RAG architecture**
+**挂法 #1: 立刻冲 RAG architecture** (立刻冲去讲 RAG 架构)
 
 > "Sure, I'd ingest compound data + assays + patents into a vector DB, use Anthropic Claude API with prompt caching, add reranker, build a Slack bot..."
 
@@ -116,13 +120,13 @@
 - 用户是 medicinal chemist / biologist / regulatory / IP attorney? 各自需求完全不同
 - 跨国 (欧盟 GDPR + 中国 PIPL + 美国) 是否要求 data residency?
 
-**挂法 #2: 假设 self-host vs API 是技术选择**
+**挂法 #2: 假设 self-host vs API 是技术选择** (以为自托管 vs API 是个纯技术选择)
 
 > "We can use OpenAI API, it's the most cost-effective."
 
 死. 在大药企**这是 legal + IP 决策, 不是技术决策**. 候选人没意识到 → 整个 architecture 假设破产.
 
-**挂法 #3: 把 IP attorney 当 "blocker" 而不是 partner**
+**挂法 #3: 把 IP attorney 当 "blocker" 而不是 partner** (把专利律师当"拦路虎"而不是合作伙伴)
 
 > "We'll work around legal."
 

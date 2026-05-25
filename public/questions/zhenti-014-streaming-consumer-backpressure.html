@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q14 · 处理下游变慢时 backpressure 的流式消费者</h3>
 <blockquote><p>"You're consuming messages from a stream (e.g. Kafka / Redis Streams). For each message you call a <strong>slow downstream API</strong> (e.g. an LLM). If the downstream gets even slower or errors, you must <strong>apply backpressure</strong> rather than blow up memory. Code it in asyncio. Explain how backpressure propagates."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你在消费一个 stream (流) 里的消息 (比如 Kafka / Redis Streams). 对每条消息, 你要 call 一个<strong>慢的下游 API</strong> (比如一个 LLM). 如果下游变得更慢或者报错, 你必须<strong>施加 backpressure (背压)</strong>, 不能让内存炸. 用 asyncio 写出来. 解释 backpressure 是怎么传播的."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Anthropic</strong>, OpenAI, Scale AI, Anyscale <strong>难度</strong>: Hard <strong>主要技能</strong>: asyncio, queue, concurrency, latency budget, robustness</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -90,7 +92,7 @@
 <p>Why: queue size × msg size = memory; 必算清楚.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions (5-10 min)</h4>
+<h4>Step 1: Design decisions (设计决策, 5-10 min)</h4>
 <p><strong>Architecture</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">┌──────────┐     ┌──────────────┐     ┌────────────┐
 │ Producer │ →→  │ asyncio.Queue│ →→  │ N workers  │
@@ -123,7 +125,7 @@ Plus:
             return
         sleep = min(BASE * 2 ** attempt + random_jitter, MAX_BACKOFF)
         await asyncio.sleep(sleep)</code></pre>
-<h4>Step 2: Initial implementation (15-20 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-20 min)</h4>
 <pre class="language-python"><code class="language-python">"""
 Streaming consumer with backpressure.
 - asyncio.Queue maxsize: hard memory cap
@@ -392,7 +394,7 @@ class StreamingConsumer:
         self.shutdown_event.set()</code></pre>
 <p><strong>讲给面试官的关键点</strong>:</p>
 <ol><li><strong><code>maxsize=K</code> on Queue → 满了 <code>await q.put()</code> block → producer 停 pull → 自然 backpressure</strong></li><li><strong><code>task_done()</code> + <code>q.join()</code></strong>: 让 graceful shutdown 等所有 in-flight 完成</li><li><strong><code>asyncio.Event</code> for shutdown signal</strong>: 多个 task 协调干净</li><li><strong>Worker timeout in <code>q.get</code></strong>: 避免 worker stuck wait queue 而不响应 shutdown</li><li><strong>Circuit breaker</strong>: 上游告诉 producer "pause", 防 cascade</li><li><strong>DLQ + ack</strong>: 哪怕 fail 也 ack, 避免 source 永远重投 poison</li></ol>
-<h4>Step 3: Edge cases + tests (5-10 min)</h4>
+<h4>Step 3: Edge cases + tests (边界情况和测试, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python">import asyncio
 import time
 import unittest
@@ -562,7 +564,7 @@ if __name__ == '__main__':
     unittest.main()</code></pre>
 <p><strong>Edge cases (说给面试官)</strong>:</p>
 <ol><li><strong>Source exhausted</strong> — producer ends, workers drain queue, graceful exit</li><li><strong>Source slow / empty for a while</strong> — workers idle on <code>q.get()</code> with timeout</li><li><strong>Sink burst slow</strong> — queue 满, <code>q.put()</code> block, source 停 pull — <strong>核心 case</strong></li><li><strong>One message poison</strong> (always throws fatal) — DLQ + ack 不影响 others</li><li><strong>Transient downstream errors (5xx, timeout)</strong> — retry with exponential + jitter</li><li><strong>Persistent downstream outage</strong> — circuit breaker opens, producer pauses</li><li><strong>SIGTERM mid-flight</strong> — set shutdown event, stop pulling, drain in-flight, ack each, exit clean</li><li><strong>Memory cap respected</strong> — <code>qsize() &lt;= queue_size</code> always (assert in test)</li><li><strong>Same msg redelivered (at-least-once)</strong> — sink must be idempotent (我们 caller responsibility)</li><li><strong>Worker crash on bug</strong> — <code>worker_task</code> has try/except; one worker death does not kill others</li><li><strong>Out-of-order processing</strong> — multi-worker 会乱序; doc 注明; 需 order 时 single worker / partition</li><li><strong>Backoff explosion</strong> — <code>max_backoff_s</code> cap, 不会 retry 1000 秒</li><li><strong>DLQ itself fails</strong> — wrap in try/except + log; 不要因 DLQ 挂导致 main loop 死</li></ol>
-<h4>Step 4: Trade-offs + extensions (5-10 min)</h4>
+<h4>Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)</h4>
 <p><strong>Scale + tune</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Little's Law: throughput × latency = in_flight
   E.g., 100 msg/s × 200ms latency = 20 concurrent
@@ -759,6 +761,10 @@ async def worker():
 
 > "You're consuming messages from a stream (e.g. Kafka / Redis Streams). For each message you call a **slow downstream API** (e.g. an LLM). If the downstream gets even slower or errors, you must **apply backpressure** rather than blow up memory. Code it in asyncio. Explain how backpressure propagates."
 
+**中文翻译**:
+
+> "你在消费一个 stream (流) 里的消息 (比如 Kafka / Redis Streams). 对每条消息, 你要 call 一个**慢的下游 API** (比如一个 LLM). 如果下游变得更慢或者报错, 你必须**施加 backpressure (背压)**, 不能让内存炸. 用 asyncio 写出来. 解释 backpressure 是怎么传播的."
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic**, OpenAI, Scale AI, Anyscale
 **难度**: Hard
@@ -926,7 +932,7 @@ Why: queue size × msg size = memory; 必算清楚.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -973,7 +979,7 @@ for attempt in range(MAX_RETRIES + 1):
         await asyncio.sleep(sleep)
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -1253,7 +1259,7 @@ class StreamingConsumer:
 5. **Circuit breaker**: 上游告诉 producer "pause", 防 cascade
 6. **DLQ + ack**: 哪怕 fail 也 ack, 避免 source 永远重投 poison
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 import asyncio
@@ -1441,7 +1447,7 @@ if __name__ == '__main__':
 12. **Backoff explosion** — `max_backoff_s` cap, 不会 retry 1000 秒
 13. **DLQ itself fails** — wrap in try/except + log; 不要因 DLQ 挂导致 main loop 死
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Scale + tune**:
 

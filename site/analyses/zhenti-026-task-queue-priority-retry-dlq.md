@@ -2,6 +2,10 @@
 
 > "Design a **distributed task queue** that supports: **priority** (paid > free), **retry** with exponential backoff, **dead-letter** after N failures, **per-tenant fair scheduling** (one big customer can't starve others), and **idempotency**. Throughput **10K tasks/sec**, task duration ranges 100ms - 10min. Talk through Kafka vs Redis Streams vs Postgres SKIP LOCKED vs Temporal."
 
+**中文翻译**:
+
+> "设计一个**分布式任务队列**, 支持: **优先级** (付费 > 免费), 带指数退避的**重试**, N 次失败后进**死信队列**, **多租户公平调度** (一个大客户不能饿死别人), 还有**幂等性**. 吞吐量 **10K tasks/sec (每秒 1 万任务)**, 任务时长 100ms 到 10 分钟不等. 讲一下 Kafka vs Redis Streams (Redis 流) vs Postgres SKIP LOCKED (PG 跳过已锁行) vs Temporal (工作流引擎) 你怎么选."
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / Stripe / Cloudflare / Temporal · 行业: infra / fintech
 **约束**: 10K TPS / multi-tenant fairness / wide duration variance (100ms - 10min) / per-tenant priority / exactly-once semantics where possible / observability for debugging stuck jobs
@@ -259,7 +263,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + KPI (5 min)
+### Phase 1: Clarify + KPI (澄清 + 锁 KPI) (5 min)
 
 锁:
 - "Duration spectrum: 100ms - 10min. 95% < 1s 还是 30% > 1min? 影响选型 — 长 task 不适合 Kafka (commit lag), 适合 leased model"
@@ -276,7 +280,7 @@ KPI:
 - **DLQ rate**: < 0.1% of total
 - **Worker crash recovery**: < 60s re-lease
 
-### Phase 2: Requirements + KPI (4 min)
+### Phase 2: Requirements + KPI (能力清单 + KPI) (4 min)
 
 8 个 capability:
 1. **Priority** (paid > free, but free not starved)
@@ -294,7 +298,7 @@ Non-functional:
 - Backpressure: enqueue rejects with 429 if backing store > 90% capacity
 - Audit: state transition log for forensics
 
-### Phase 3: Backend selection (8 min)
+### Phase 3: Backend selection (后端存储选型) (8 min)
 
 **Decision matrix**:
 
@@ -337,7 +341,7 @@ Non-functional:
 - 但纯 queue (single-step task), Temporal overkill
 - 推荐 combo: queue 做 short / stateless task, Temporal 做 workflow
 
-### Phase 4: Architecture deep dive (12 min)
+### Phase 4: Architecture deep dive (架构深度剖析) (12 min)
 
 **4.1 Schema (Postgres)**
 
@@ -505,7 +509,7 @@ while True:
 
 Workers stateless, can scale horizontally. Autoscale by Kubernetes HPA on queue_depth metric.
 
-### Phase 5: Retry + DLQ (10 min)
+### Phase 5: Retry + DLQ (重试 + 死信队列) (10 min)
 
 **5.1 Stripe-style backoff**
 
@@ -633,7 +637,7 @@ async def replay(task_id, modifications=None):
 - Per-error-class spike: timeout suddenly 10× → P2 PagerDuty
 - Per-tenant spike: 1 tenant 占 DLQ > 50% → P3 + customer success notification
 
-### Phase 6: Idempotency + visibility timeout + heartbeat (8 min)
+### Phase 6: Idempotency + visibility timeout + heartbeat (幂等 + 可见性超时 + 心跳) (8 min)
 
 **6.1 Idempotency**
 
@@ -687,7 +691,7 @@ Heartbeat 每 1 min 续 5 min. Worker crashes → 4 分钟内 timeout expires �
 - 太短: heartbeat overhead + spurious retry
 - 太长: stuck task slow recovery
 
-### Phase 7: Multi-tenant fairness (6 min)
+### Phase 7: Multi-tenant fairness (多租户公平调度) (6 min)
 
 **7.1 Per-tenant quota**
 
@@ -733,7 +737,7 @@ VIP 客户可能要 dedicated worker pool:
 
 但 hardware cost up, 通常只 top-3 customer 用.
 
-### Phase 8: Trade-offs + alternatives (7 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)
 
 **Decision 8.1 — Backing store**
 

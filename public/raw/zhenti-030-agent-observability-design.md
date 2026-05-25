@@ -2,6 +2,10 @@
 
 > "You're running a production multi-step **AI agent** (LLM + tools + RAG + multi-turn). Customer reports 'sometimes the agent gives wrong answer or hangs'. **Design the observability**: what to log, what to alert on, what dashboards to build. Cover **traces, metrics, logs, evals, costs**."
 
+**中文翻译**:
+
+> "你在 production 跑一个多步 **AI agent** (LLM + 工具 + RAG (检索增强生成) + 多轮). 客户反馈 '有时候 agent 答案错或者挂住'. **设计可观测性 (observability)**: 记录什么, 告警什么, 看板 (dashboard) 怎么搭. 覆盖 **traces (链路追踪), metrics (指标), logs (日志), evals (评估), costs (成本)**."
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Sierra / Glean / LangChain · 行业: AI infra / agent platform
 **约束**: multi-step agent with tool calls / multi-tenant / PII redaction / cost tracking / debugging stuck or wrong runs / SLO tracking / per-customer view
@@ -286,7 +290,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + 5 pillars (5 min)
+### Phase 1: Clarify + 5 pillars (澄清 + 五大支柱) (5 min)
 
 开口:
 - "Agent multi-step? 我假设 plan-act-reflect with 5-10 step avg"
@@ -307,7 +311,7 @@ KPI:
 - **MTTD (mean time to detect)**: < 5 min for P1
 - **MTTR**: < 30 min with traces in hand
 
-### Phase 2: Trace per agent run (10 min)
+### Phase 2: Trace per agent run (每次 agent 运行的 trace) (10 min)
 
 **2.1 OpenTelemetry semantic conventions for LLM (2026 spec)**
 
@@ -375,7 +379,7 @@ Result: 单一 trace view 跨整个 agent + 所有 tool + LLM call.
 
 **Why keep 1% even baseline**: production bug 多 surface in 1% sample. Tail issue 不在 average.
 
-### Phase 3: Metrics + SLO (8 min)
+### Phase 3: Metrics + SLO (指标 + 服务等级目标) (8 min)
 
 **3.1 RED for service**:
 - **Rate**: agent runs/sec
@@ -427,7 +431,7 @@ Error budgets:
 - 99.5% availability = 36h downtime / month allowed
 - > 10% budget burn in 1 day → freeze deploys
 
-### Phase 4: Logs + PII redact (6 min)
+### Phase 4: Logs + PII redact (日志 + PII 脱敏) (6 min)
 
 **4.1 Structured JSON logging**
 
@@ -489,7 +493,7 @@ If real PII / raw needed for debugging:
 - Raw stored encrypted in separate "debug vault" (only senior eng access, 24h auto-delete, audit access)
 - Lookup process: request access → manager approval → time-bound access
 
-### Phase 5: Eval in loop (10 min)
+### Phase 5: Eval in loop (循环中的评估) (10 min)
 
 Eval 不只 offline, production 持续 eval:
 
@@ -566,7 +570,7 @@ Agent run no span emit for 60s but trace still "running" → stuck. Causes:
 
 Detection: trace 60s no progress → mark as 'stuck', kill, alert.
 
-### Phase 6: Cost tracking (6 min)
+### Phase 6: Cost tracking (成本跟踪) (6 min)
 
 **6.1 Per-request cost breakdown**
 
@@ -626,7 +630,7 @@ Per-tenant p95 cost per run baseline. > 2× alert. Catches:
 - Bad customer query (extremely long context)
 - Bug in prompt (token waste)
 
-### Phase 7: Dashboards + alerts (8 min)
+### Phase 7: Dashboards + alerts (看板 + 告警) (8 min)
 
 **7.1 Dashboard hierarchy**
 
@@ -680,7 +684,7 @@ Glean-like: customer logs in, sees their agent dashboard. Need:
 - Trace drill-down with PII redacted (they see their own data anyway, but our raw redacted)
 - Export: CSV download for their report
 
-### Phase 8: Trade-offs + alternatives (7 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)
 
 **Decision 8.1 — Build vs buy**
 

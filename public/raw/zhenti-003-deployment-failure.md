@@ -2,6 +2,10 @@
 
 > "Tell me about a time a deployment failed. Walk me through what happened, how you handled it, and what you learned. I want to hear the technical details and the customer-facing communication."
 
+**中文翻译**:
+
+> "讲一次你部署翻车的经历. 过一遍当时怎么了、你怎么处理的、学到了什么. 技术细节和你怎么跟客户沟通的, 我都想听."
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional round)
 **出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a production incident" / "describe a time something broke after you shipped"
 
@@ -108,13 +112,13 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context** | 20s | 项目 + scope + 我的角色 | "Last year I shipped a voice agent update in Indonesia..." |
-| 2 | **What broke (specific)** | 30s | 具体什么坏了, 不要 vague | "On Tuesday morning, calls started routing to wrong tier — tier 2 calls got tier 1 prompt, 14% of traffic in 90 minutes..." |
-| 3 | **Detect → Triage (mins)** | 45s | 你怎么知道 + 多快 + 第一反应 | "Detection: customer satisfaction dashboard dropped 8pp in 30 min, alerts fired. Triage: I called ops lead, paused new sessions, kept existing alive..." |
-| 4 | **Customer comm (critical)** | 45s | 你怎么 communicate 给 stakeholder | "I drafted a 3-line status: 'we detected at 9:42, paused new at 9:55, ETA mitigation 11:00'. Sent to ops + compliance + product VP simultaneously..." |
-| 5 | **Root cause (technical)** | 60s | 真正什么导致, 不是 superficial | "Root cause: I changed embedding model 2 weeks earlier, didn't realize routing prompt was tuned to old embedding distribution..." |
-| 6 | **Permanent fix + safety nets** | 45s | 不只是 fix bug, 是 build defense | "Fix: pinned embedding version + 加 routing eval to CI. Safety nets: shadow mode for routing model swap..." |
-| 7 | **What I default now (transferable)** | 30s | 你现在 by default 做什么 | "Now every deployment touching routing has: shadow mode + eval gate + rollback runbook + ops Slack 提前 ping..." |
+| 1 | **Context (背景)** | 20s | 项目 + scope + 我的角色 | "Last year I shipped a voice agent update in Indonesia..." |
+| 2 | **What broke (具体什么坏了)** | 30s | 具体什么坏了, 不要 vague | "On Tuesday morning, calls started routing to wrong tier — tier 2 calls got tier 1 prompt, 14% of traffic in 90 minutes..." |
+| 3 | **Detect → Triage (检测 → 分诊, 分钟级)** | 45s | 你怎么知道 + 多快 + 第一反应 | "Detection: customer satisfaction dashboard dropped 8pp in 30 min, alerts fired. Triage: I called ops lead, paused new sessions, kept existing alive..." |
+| 4 | **Customer comm (客户沟通, 关键)** | 45s | 你怎么 communicate 给 stakeholder | "I drafted a 3-line status: 'we detected at 9:42, paused new at 9:55, ETA mitigation 11:00'. Sent to ops + compliance + product VP simultaneously..." |
+| 5 | **Root cause (技术根因)** | 60s | 真正什么导致, 不是 superficial | "Root cause: I changed embedding model 2 weeks earlier, didn't realize routing prompt was tuned to old embedding distribution..." |
+| 6 | **Permanent fix + safety nets (永久修复 + 安全网)** | 45s | 不只是 fix bug, 是 build defense | "Fix: pinned embedding version + 加 routing eval to CI. Safety nets: shadow mode for routing model swap..." |
+| 7 | **What I default now (现在默认怎么做)** | 30s | 你现在 by default 做什么 | "Now every deployment touching routing has: shadow mode + eval gate + rollback runbook + ops Slack 提前 ping..." |
 
 Total: ~4-5 min. 留 buffer 给 follow-up.
 

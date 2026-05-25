@@ -2,6 +2,10 @@
 
 > "The customer's **VP of Analytics** wants a feature that **breaks your platform's data-governance rules** (e.g., bypassing audit logs, exposing PII to a Slack channel, removing access controls for 'speed'). You're on a 30-min call. **Decline without damaging the relationship.**"
 
+**中文翻译**:
+
+> "客户的 **分析副总 (VP of Analytics)** 想要一个功能, 这个功能 **会破坏你平台的数据治理规则** (比如绕过审计日志、把 PII 暴露到 Slack 频道、为了 '速度' 砍掉访问控制). 你跟他/她有 30 分钟的电话. **拒绝, 但不能搞砸关系**."
+
 **Round**: Client Simulation (30 min)
 **出处**: Exponent 2026 FDE · OpenAI / Palantir / Anthropic
 **场景**: VP Analytics 想要 a feature that violates compliance / governance. You're the FDE. You must decline, but they have budget authority.
@@ -84,11 +88,11 @@
 
 5 个 signal:
 
-1. **Don't say "no" up front** — Skip "we can't do that". Start with "I want to understand what you're trying to achieve"
-2. **Reframe as protecting THEIR interest** — Not "our policy says no". Yes "if we ship this, here's what happens to you in 6 months"
-3. **Bring future audit scenarios** — Concrete: "in 12 months when [regulator / your internal audit / press] asks, you'd be on the hook for..."
-4. **Offer 2-3 alternative paths** — Show you'd worked on it, not "no full stop"
-5. **Leave VP with a win to take back to their team** — Even after declining the original ask
+1. **Don't say "no" up front** (别一上来就说 "no") — Skip "we can't do that". Start with "I want to understand what you're trying to achieve" (我想先理解你想达成什么)
+2. **Reframe as protecting THEIR interest** (重新 framing 成 "保护你的利益") — Not "our policy says no". Yes "if we ship this, here's what happens to you in 6 months" (如果我们 ship 了, 6 个月后会发生什么)
+3. **Bring future audit scenarios** (端出未来审计场景) — Concrete: "in 12 months when [regulator / your internal audit / press] asks, you'd be on the hook for..." (12 个月后 [监管 / 内审 / 媒体] 来问, 你要背的锅是...)
+4. **Offer 2-3 alternative paths** (给 2-3 个替代路径) — Show you'd worked on it, not "no full stop" (不是 "拒绝, 没了")
+5. **Leave VP with a win to take back to their team** (让 VP 带个 "成果" 回去给团队) — Even after declining the original ask
 
 ---
 
@@ -124,7 +128,9 @@
 >
 > Walk me through a specific example — when did this come up most recently?"
 
-→ **You don't say "no". You ask "why". The whole script depends on knowing the actual pain.**
+**中文意思**: "Sarah, 在我正面回应 audit log 这件事之前 — 我想先理解你想达成什么. 根本目标是什么? 是分析师觉得被监视、思维变慢? 还是看到 audit log 图标的认知摩擦? 还是 audit log 生成的报告你团队要响应? 还是别的? 我问这个是因为我想解决真正的问题, 不只是你提的那个功能. **有时候对的解法就是你要的功能, 有时候是我们还没聊到的东西**. 给我讲个具体例子 — 最近一次是什么时候发生的?"
+
+→ **You don't say "no". You ask "why". The whole script depends on knowing the actual pain.** (**你不说 "no", 你问 "为什么". 整个脚本依赖于知道真正的痛点**.)
 
 ---
 
@@ -144,6 +150,8 @@
 >
 > Forgive the questions — I'm trying to figure out if this is a UX problem, a policy problem, or a culture problem."
 
+**中文意思**: "了解了. 那根本痛点是 **分析师在思考时自我审查**, audit log 是表面成因. 几个澄清问题, 因为我想找到对的解法: **(a)** 问题是 **他们知道被记录**, 还是 **有人真的因为 log 被复查过**? 如果从没人被复查过, 是心理摩擦. 如果有, 是另一码事. **(b)** 有没有 **特定话题** 他们想自由讨论 — 探索性假设、有争议的发现、对业务决策的批评? 这跟 '什么都想' 是不同问题. **(c)** 你们的 **首席合规官 (CCO) 或法务团队** 知道这个 request 吗? 还是这是分析团队层面的 workaround? 见谅这么多问题 — 我在判断这是 UX 问题、政策问题, 还是文化问题."
+
 ---
 
 > **Sarah**: "No one's actually been reviewed. They just feel like they would be. And yes, it's specifically exploratory analysis — they don't want to put 'I think marketing data is wrong' in a logged channel."
@@ -160,7 +168,9 @@
 >
 > **So I'm not declining out of a policy quote. I'm declining because I want your job safe in 18 months.**"
 
-→ **Reframe**: "I'm declining because I want to protect you, not because of policy."
+**中文意思**: "OK, 这非常有帮助. 那这是 **心理摩擦**, 不是对实际复查事件的反应. 话题是 **对其他团队数据的探索性假设**. **你说得对, 这是真问题**. 我在其他 3 个客户也见过 — 当分析文化感到被监视, 你会得到 **稀释过的分析** — 分析师对冲、软化、不说有争议的事. 这伤组织. 你想修这个的直觉是对的. **不过我会专门 push back '关掉 audit log' 这件事, 原因是**: 12 个月后, 如果你们 **内审** 问 '关键业务决策记录在哪', 而分析团队的讨论没记录, **你个人** 要解释为什么分析是唯一一个没有记录的部门. 或者被并购 / IPO / 监管查 — discovery (取证请求) 会包括这个频道, **'我们关了 logging' 比 '我们记录了你来查' 更难解释**. Audit log 是 **你作为 VP 的保险**, 不只是我们的合规功能. 如果它消失, **暴露的是你**, 不是你的分析师. **所以我拒绝不是因为引政策条款. 我拒绝是因为我想让你 18 个月后还安全**."
+
+→ **Reframe**: "I'm declining because I want to protect you, not because of policy." (**重新 framing**: "我拒绝是因为想保护你, 不是因为政策".)
 
 ---
 
@@ -176,6 +186,8 @@
 >
 > Which of these gets at your actual problem?"
 
+**中文意思**: "对, 那才是真实的诉求. 让我提 **三个替代方案**, 都能解决摩擦但不删 audit log: **Option A — 带保留的私密 thread**: 我们加一个功能, 分析师 channel 里的 thread 可以 **标记为 'exploratory'**. 这些 thread 仍然被记录 (用于审计), 但 **从默认搜索 UI 过滤掉**, **从常规 dashboard 隐藏**. 分析师感觉私密, 你有审计轨迹. **4 周可上**. **Option B — 审计日志改流向, 不是删除**: Audit log 仍然记录, 但 **只有你和 CCO 能访问, team lead 看不到**. 分析师当下的担忧是 '我经理可能翻我 Slack' — Option B 去掉这个但保留正式记录. **Option C — 独立的分析专属 workspace**: Audit log 仍然跑 (这个去不掉), 但分析团队拿到 **独立品牌的 workspace**, 配 **更明确的规范文档** — '这里用于探索、任何观点表达受保护、鼓励对其他团队的批评'. **文化解法多于技术解法**. 哪个最贴你的真实问题?"
+
 ---
 
 > **Sarah**: "Option B sounds good but my CCO doesn't know about this request."
@@ -185,6 +197,8 @@
 > If your CCO says no to all 3, we keep current setup and address the cultural friction differently — maybe just the **norms documentation** in Option C, plus a meeting where your CCO explicitly tells analysts 'no one is reviewing this channel without my approval'. That last sentence alone might solve 80% of the friction.
 >
 > **Want me to schedule the 3-way?**"
+
+**中文意思**: "了解了. 那 **我的建议**: 让我安排一个 30 分钟的会议, 你和你的 CCO 一起参加. 我会展示这 3 个选项, 让她在符合她风险框架的那个上点头. **她会感谢被提前 loop 进来, 而不是事后才发现**. 如果你 CCO 对 3 个都说不, 我们保持现状, 用别的方法处理文化摩擦 — 也许就用 Option C 里的 **规范文档**, 再加一次会议, CCO 明确告诉分析师 '没我批准没人会复查这个频道'. 光那一句话可能就解决 80% 的摩擦. **要我安排三方会议吗?**"
 
 ---
 
@@ -200,7 +214,9 @@
 >
 > **Does that work?**"
 
-→ **Don't trade compliance for relationship**. **Offer to bear the political weight** so the customer doesn't have to.
+**中文意思**: "这里我得直说. **不行, 不告诉你 CCO 我不会 ship Option A**. 两个原因: **(a)** Option A 仍然有 audit log, 但创造了一个 '从默认搜索过滤掉' 的行为. 如果你 CCO 后面发现我们没告诉她就做了, 在她看来是流程违规. **真正让人丢工作的是流程违规, 不是技术决策本身**. **(b)** 如果你们 **下次审计** 发现审计员不知道有 'exploratory threads' 的存在, **你和我都要背锅**. 我不想把我们俩放到那个位置. **我的提议**: **我来给你 CCO 写邮件, 申请一个三方会议**. 我会 framing 成 '我们团队在探索分析工作流改进的选项, 想提前请你参与'. 我来扛这场对话的政治压力. **你不用做出头那个人**. **这样行吗?**"
+
+→ **Don't trade compliance for relationship**. **Offer to bear the political weight** so the customer doesn't have to. (**别用合规换关系**. **主动扛政治压力**, 让客户不用自己扛.)
 
 ---
 
@@ -216,6 +232,8 @@
 >
 > But let's not jump ahead. **Let me email your CCO this afternoon, get the 3-way scheduled. By next Friday we'll know what's possible.** Sound good?"
 
+**中文意思**: "那我们是文化问题, 不是技术问题. **如果你 CCO 对这 3 个技术选项都说不**, 我建议开一个 **20 分钟的分析团队 all-hands**, 你 CCO 直接说: '只有我一个人能在没有明确原因的情况下复查这个频道. 没有 manager, 没有 team lead, 没有 auditor 除非法律要求. **我不会做 fishing expedition (钓鱼式调查)**.' 她讲的这段话, **不用任何技术改动**, 在我见过的大多数 case 里能修文化问题. 如果连这都不管用, **根本问题是你 CCO 不信任你的分析团队**, 那是 HR / 领导层对话, 不是我能用功能修的. 不过别跳太远. **让我今天下午给你 CCO 发邮件, 把三方会议约上. 下周五前我们就知道可能是什么了**. 行吗?"
+
 ---
 
 > **Sarah**: "OK. What do you need from me?"
@@ -228,11 +246,17 @@
 >
 > I'll send the email this afternoon by 3pm Pacific. Want me to cc anyone else?"
 
+**中文意思**: "**两件事**: **(a)** 今天下午在我发给你和你 CCO 的邮件里回一句话: 'Sarah 团队发现了一个真实的工作流摩擦, 我想我们一起探索选项.' 这给你 CCO 一个信号: 这是真 ask, 不是我突然冒出来. **(b)** 接下来 2 周内我们三个人 **30 分钟的 slot**. 我今天下午太平洋时间 3 点前发邮件. 还要 cc 别人吗?"
+
 > **Sarah**: "No, just us three."
+
+**中文意思**: "不用, 就我们三个."
 
 > **You**: "Done. Sarah — thanks for raising this rather than building a workaround unilaterally. **The fact that you asked us instead of just removing logging on your side is what makes me want to find a solution for you.** That's the right way to do this."
 
-→ Close with appreciation for them doing it the right way.
+**中文意思**: "搞定. Sarah — 谢谢你提出来, 而不是单方面搞 workaround. **正是因为你来问我们而不是直接关 logging, 才让我想给你找解决方案**. 这就是对的做法."
+
+→ Close with appreciation for them doing it the right way. (收尾感谢对方用对的方式做这件事.)
 
 ---
 

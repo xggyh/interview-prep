@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q17 · 小型 RAG pipeline + 为 chunking 策略辩护</h3>
 <blockquote><p>"Given a folder of documents (mixed PDF / markdown / HTML), build a <strong>small RAG pipeline</strong> end-to-end: chunk → embed → index → retrieve → format → LLM. <strong>Code it.</strong> Then <strong>defend your chunking strategy</strong> — why this chunk size? Why this overlap? How would you evaluate it?"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"给你一个文档目录 (混合 PDF / markdown / HTML), 端到端搭一个<strong>小型 RAG pipeline</strong>: chunk → embed → index → retrieve → format → LLM. <strong>写代码.</strong> 然后<strong>为你的 chunking 策略辩护</strong> — 为什么选这个 chunk size? 为什么这个 overlap? 你怎么 evaluate (评估)?"</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Anthropic</strong>, OpenAI, Scale AI, Cohere <strong>难度</strong>: Hard <strong>主要技能</strong>: end-to-end RAG, chunking decisions, eval methodology, vector DB</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -94,7 +96,7 @@
 <p>Why: 1M docs × 1k token × <code>text-embedding-3-small</code> $0.02/1M ≈ $20 一次 embed. LLM $0.01/query × 100k query = $1k/day.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions (5-10 min)</h4>
+<h4>Step 1: Design decisions (设计决策, 5-10 min)</h4>
 <p><strong>Architecture</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Offline ingest (one-time / nightly):
 ┌─────────┐  ┌──────┐  ┌────────┐  ┌───────┐  ┌───────┐
@@ -119,7 +121,7 @@ Online query:
                                   └────────────┘</code></pre>
 <p><strong>关键 choices</strong> (开口讲):</p>
 <ul><li><strong>Chunker</strong>: heading-aware (markdown headers → sections); fixed-size 800 token + 100 overlap; never split mid-sentence</li><li><strong>Embedder</strong>: <code>text-embedding-3-small</code> (OpenAI, 1536-dim, $0.02/1M tokens) — fast cheap good quality. Self-hosted alt: <code>BAAI/bge-base-en-v1.5</code> 768-dim.</li><li><strong>Index</strong>: <code>FAISS IndexFlatIP</code> for &lt;100k chunks (brute force fine); <code>IndexHNSWFlat</code> for 100k-10M; pgvector + IVF for &gt;10M (本题用 FAISS Flat)</li><li><strong>Retrieval</strong>: top 20 by cosine, rerank top 5 by MMR diversity</li><li><strong>Prompt</strong>: explicit instructions "use only context", citation markers <code>[1] [2]</code>, "I don't know" on insufficient context</li></ul>
-<h4>Step 2: Initial implementation (15-25 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-25 min)</h4>
 <pre class="language-python"><code class="language-python">"""
 Small RAG pipeline: ingest folder, query against it.
 
@@ -559,7 +561,7 @@ class RAGPipeline:
             ],
         }</code></pre>
 <p><strong>讲给面试官</strong>: "I've kept it modular: Loader, Chunker, Embedder, Index, Retriever, PromptBuilder, LLM. Each is swappable — local embedder vs OpenAI, FAISS vs Chroma, gpt-4o-mini vs Claude — and I can run unit tests on each piece independently."</p>
-<h4>Step 3: Eval (5-10 min)</h4>
+<h4>Step 3: Eval (评估, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python"># eval.py
 @dataclass
 class GoldExample:
@@ -623,7 +625,7 @@ Return JSON: {{"faithfulness": N, "completeness": N, "citation": N}}"""
         'citation': sum(j['citation'] for j in judged) / len(judged),
         'n': len(judged),
     }</code></pre>
-<h4>Step 4: Defend chunking strategy (10 min)</h4>
+<h4>Step 4: Defend chunking strategy (为 chunking 策略辩护, 10 min)</h4>
 <p><strong>Why heading-aware + 800 token + 100 overlap?</strong> (这一段是面试 critical):</p>
 <pre class="language-plaintext"><code class="language-plaintext">4 Strategies Compared:
 
@@ -669,7 +671,7 @@ Sample table:
   late chunking              0.83   0.66   4.5   ← marginal gain, 4x latency
 
 Defense: heading-aware + 800/100 is on Pareto frontier — best quality at acceptable cost.</code></pre>
-<h4>Step 5: Test (skipped real-LLM, here's structure)</h4>
+<h4>Step 5: Test (测试 — 跳过真 LLM, 给结构, skipped real-LLM, here's structure)</h4>
 <pre class="language-python"><code class="language-python"># Mock embedder + LLM for tests
 class FakeEmbedder:
     dim = 4
@@ -708,7 +710,7 @@ def test_chunk_overlap():
 def test_mmr_diverse():
     # If 5 candidates are near-duplicates, MMR picks the most diverse subset
     pass  # detailed test omitted; structure shown</code></pre>
-<h4>Step 6: Production discussion (5 min)</h4>
+<h4>Step 6: Production discussion (生产讨论, 5 min)</h4>
 <p><strong>Upgrades a real prod RAG ships with</strong>:</p>
 <ol><li><strong>Hybrid retrieval</strong>: BM25 + vector. Vector gets semantic match; BM25 catches exact keyword (product codes, names). <code>λ × bm25 + (1-λ) × cosine</code>.</li><li><strong>Reranker</strong>: After top-100 from vector, rerank with cross-encoder <code>BAAI/bge-reranker-large</code>. 10x precision boost on top-5.</li><li><strong>Query rewriting</strong>: LLM-rewrite user's question into 3 search-friendly variants, retrieve each, union.</li><li><strong>HyDE</strong>: Hypothetical Document Embedding — LLM answers question (hypothetically), embed the answer, retrieve docs similar to it.</li><li><strong>Multi-vector / ColBERT</strong>: per-token embedding for finer-grained match. Slower but more recall.</li><li><strong>Late chunking</strong>: as Strategy D above.</li><li><strong>Citations</strong>: inline <code>[1]</code> matching numbered context — UI clickable.</li><li><strong>"I don't know" detection</strong>: if top-1 score &lt; threshold, return "I don't know" without LLM call.</li><li><strong>Cache</strong>: query embedding cache (5-min TTL) + answer cache for popular queries.</li><li><strong>Incremental ingest</strong>: doc hash + diff — only re-embed changed sections.</li></ol>
 <hr />
@@ -821,6 +823,10 @@ llm.chat(prompt) -&gt; answer
 <script id="md-source" type="text/markdown">## Q17 · 小型 RAG pipeline + 为 chunking 策略辩护
 
 > "Given a folder of documents (mixed PDF / markdown / HTML), build a **small RAG pipeline** end-to-end: chunk → embed → index → retrieve → format → LLM. **Code it.** Then **defend your chunking strategy** — why this chunk size? Why this overlap? How would you evaluate it?"
+
+**中文翻译**:
+
+> "给你一个文档目录 (混合 PDF / markdown / HTML), 端到端搭一个**小型 RAG pipeline**: chunk → embed → index → retrieve → format → LLM. **写代码.** 然后**为你的 chunking 策略辩护** — 为什么选这个 chunk size? 为什么这个 overlap? 你怎么 evaluate (评估)?"
 
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic**, OpenAI, Scale AI, Cohere
@@ -1011,7 +1017,7 @@ Why: 1M docs × 1k token × `text-embedding-3-small` $0.02/1M ≈ $20 一次 emb
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -1047,7 +1053,7 @@ Online query:
 - **Retrieval**: top 20 by cosine, rerank top 5 by MMR diversity
 - **Prompt**: explicit instructions "use only context", citation markers `[1] [2]`, "I don't know" on insufficient context
 
-### Step 2: Initial implementation (15-25 min)
+### Step 2: Initial implementation (初始实现, 15-25 min)
 
 ```python
 """
@@ -1492,7 +1498,7 @@ class RAGPipeline:
 
 **讲给面试官**: "I've kept it modular: Loader, Chunker, Embedder, Index, Retriever, PromptBuilder, LLM. Each is swappable — local embedder vs OpenAI, FAISS vs Chroma, gpt-4o-mini vs Claude — and I can run unit tests on each piece independently."
 
-### Step 3: Eval (5-10 min)
+### Step 3: Eval (评估, 5-10 min)
 
 ```python
 # eval.py
@@ -1560,7 +1566,7 @@ Return JSON: {{"faithfulness": N, "completeness": N, "citation": N}}"""
     }
 ```
 
-### Step 4: Defend chunking strategy (10 min)
+### Step 4: Defend chunking strategy (为 chunking 策略辩护, 10 min)
 
 **Why heading-aware + 800 token + 100 overlap?** (这一段是面试 critical):
 
@@ -1628,7 +1634,7 @@ Sample table:
 Defense: heading-aware + 800/100 is on Pareto frontier — best quality at acceptable cost.
 ```
 
-### Step 5: Test (skipped real-LLM, here's structure)
+### Step 5: Test (测试 — 跳过真 LLM, 给结构, skipped real-LLM, here's structure)
 
 ```python
 # Mock embedder + LLM for tests
@@ -1671,7 +1677,7 @@ def test_mmr_diverse():
     pass  # detailed test omitted; structure shown
 ```
 
-### Step 6: Production discussion (5 min)
+### Step 6: Production discussion (生产讨论, 5 min)
 
 **Upgrades a real prod RAG ships with**:
 

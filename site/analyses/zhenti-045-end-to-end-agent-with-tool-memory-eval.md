@@ -2,6 +2,10 @@
 
 > "Design an end-to-end production agent for a customer use case. Cover **tool registry, planning, execution, memory (short and long-term), and evaluation**. The agent needs to handle multi-step workflows, recover from tool failures, and you must convince me you can sleep at night when it's running in production."
 
+**中文翻译**:
+
+> "给一个客户的 use case 设计一个端到端的 production agent (生产环境的智能体). 要覆盖 **tool registry (工具注册表), planning (规划), execution (执行), memory (记忆 — 短期和长期都要), 还有 evaluation (评估)**. 这个 agent 要能 handle 多步骤 workflow, 还要能从 tool failure 中恢复, 并且你得说服我 — 它在 production 跑的时候我能睡得着觉."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / LangChain — agent design 必问
 

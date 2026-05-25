@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q29 · 生产环境 prompt 版本管理 / A/B / 回滚</h3>
 <blockquote><p>"Your team manages <strong>200+ prompts</strong> in production across 30 LLM features. PM wants to A/B test a new system prompt for the customer support bot. Eng wants to <strong>safely roll it out</strong>, and ops wants to <strong>rollback in 5 minutes</strong> if metrics regress. <strong>Design the prompt lifecycle system</strong> — versioning, eval, A/B, rollout, rollback, audit."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你的团队在 production 跑 <strong>200+ 个 prompt</strong>, 跨 30 个 LLM 功能. PM 想给客服 bot 的 system prompt (系统提示词) 跑一个 A/B test. Eng 想<strong>安全上线</strong>, ops 想在指标回归时 <strong>5 分钟内回滚</strong>. <strong>设计 prompt 生命周期系统</strong> — 版本管理, 评估 (eval), A/B, 灰度上线, 回滚, 审计 (audit)."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops <strong>约束</strong>: 200+ prompts / 30 features / per-tenant variants / non-eng (PM) authors / pre-deploy eval / canary rollout / auto-rollback / audit trail</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -175,7 +177,7 @@
 └─────────────────────────────────────────────────────────────────────────────────────────┘</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + framing (5 min)</h4>
+<h4>Phase 1: Clarify + framing (澄清 + 框架) (5 min)</h4>
 <p>开口:</p>
 <ul><li>"Prompt 200+ 中, active production 大约多少? Tier-1 重要 vs tier-3 实验性 mix"</li><li>"Per-tenant variants 需要吗? customer A 想 'be more formal' 类 customization?"</li><li>"Auto-rollback metric: latency / error / refund rate / NPS, 哪个主?"</li></ul>
 <p>假设: 150 production active + 50 dev/archive, 30 feature, 60% tier-2+, per-tenant customization 给 paid only (10 tenants), auto-rollback 主用 error rate + 业务 metric.</p>
@@ -183,7 +185,7 @@
 <ul><li><strong>Time to promote (new version → 100% prod)</strong>: 1 day for tier-3, 1 week for tier-1</li><li><strong>Time to rollback</strong>: &lt; 5 min</li><li><strong>Eval coverage</strong>: 100% prod prompts have golden set</li><li><strong>Audit</strong>: 100% changes logged with actor + reason</li></ul>
 <p>Framing: prompt 不是 code. Treat as <strong>product config managed via versioned data store</strong>.</p>
 <ul><li>Code: PR review, CI, deploy</li><li>Prompt: edit in UI, eval gate, traffic split, runtime fetch</li><li>共同: version control, audit, rollback. But mechanism different.</li></ul>
-<h4>Phase 2: Prompt as data (8 min)</h4>
+<h4>Phase 2: Prompt as data (Prompt 当数据来管) (8 min)</h4>
 <p><strong>2.1 Schema design</strong></p>
 <pre class="language-sql"><code class="language-sql">CREATE TABLE prompts (
     id UUID PRIMARY KEY,
@@ -255,7 +257,7 @@ Their issue: {{ issue }}</code></pre>
   "issue": {"type": "string"}
 }</code></pre>
 <p>Renderer (Jinja2) validates at compile time. Missing variable → error fast, not runtime.</p>
-<h4>Phase 3: Eval pipeline (10 min)</h4>
+<h4>Phase 3: Eval pipeline (评估流水线) (10 min)</h4>
 <p><strong>Multi-layer gate</strong> before promote to prod:</p>
 <p><strong>Layer 1: Lint (1 sec)</strong></p>
 <pre class="language-python"><code class="language-python">def lint(prompt_version):
@@ -363,7 +365,7 @@ new_win_rate = sum(j['winner'] == 'a' for j in results) / len(results)
         'flag': new_avg_cost &gt; baseline['cost'] * 1.1  # &gt;10% increase
     }</code></pre>
 <p>Flag for review if cost +10% or latency +20%.</p>
-<h4>Phase 4: A/B + canary rollout (10 min)</h4>
+<h4>Phase 4: A/B + canary rollout (A/B + 灰度上线) (10 min)</h4>
 <p><strong>4.1 Traffic split implementation</strong></p>
 <pre class="language-python"><code class="language-python">class PromptSDK:
     def get_prompt(self, name, user_id, tenant_id) -&gt; PromptVersion:
@@ -406,7 +408,7 @@ VALUES ('customer_support', NULL, 'v1.2.0', 100);
 INSERT INTO prompt_assignments (prompt_id, tenant_id, version_id, traffic_pct)
 VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);</code></pre>
 <p>Tenant ACME 总 hit <code>v1.2.0-acme-formal</code>, 其他 tenant hit <code>v1.2.0</code>.</p>
-<h4>Phase 5: Auto-rollback (8 min)</h4>
+<h4>Phase 5: Auto-rollback (自动回滚) (8 min)</h4>
 <p><strong>5.1 Trigger metrics</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Metric</th><th>Trigger</th><th>Notes</th></tr></thead><tbody><tr><td>Error rate</td><td>&gt; 2× baseline 5 min</td><td>LLM refuse / timeout / 5xx</td></tr><tr><td>p99 latency</td><td>&gt; 1.5× baseline 10 min</td><td>UX degradation</td></tr><tr><td>Quality score</td><td>&lt; baseline -5% 1 hour</td><td>LLM-judge sample</td></tr><tr><td>Refund rate</td><td>&gt; 1.2× baseline 1 hour</td><td>Business signal</td></tr><tr><td>Cost</td><td>&gt; 2× baseline 30 min</td><td>runaway token usage</td></tr><tr><td>CSAT</td><td>&lt; baseline -5pp 24 hour</td><td>slow signal</td></tr></tbody></table></div>
 <p>Per-prompt baseline computed from last 7 days. Sliding window comparison.</p>
@@ -457,7 +459,7 @@ VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);</code></pre>
 <ul><li>Click "rollback" → confirm → 30s effect</li><li>Same flow as auto, just human-triggered</li></ul>
 <p><strong>5.5 Avoid rollback loop</strong></p>
 <p>After rollback, freeze new version 24h (can't re-promote without team review). Avoid: rollback → re-promote → rollback flap.</p>
-<h4>Phase 6: Per-tenant variants (6 min)</h4>
+<h4>Phase 6: Per-tenant variants (按租户的变体) (6 min)</h4>
 <p><strong>6.1 Inheritance model</strong></p>
 <pre class="language-plaintext"><code class="language-plaintext">Base prompt: customer_support@1.2.0 (default for all)
   └─ Variant: customer_support@1.2.0-acme-formal (ACME inherits + override sections)
@@ -475,7 +477,7 @@ VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);</code></pre>
 <p>10 tenants × 200 prompts = potentially 2000 variants. Reality:</p>
 <ul><li>80% of customer requests are minor (tone, language)</li><li>90% can be handled by parametrized base prompt (variables: tone="formal", language="es")</li><li>Hard custom = 1-2 per tier-1 prompt per top customer = ~50 actual variants</li></ul>
 <p>Manage via "variant pool": each tier-1 prompt has 3-5 named variants (default, formal, casual, multilingual), tenant picks one.</p>
-<h4>Phase 7: Audit + observability (7 min)</h4>
+<h4>Phase 7: Audit + observability (审计 + 可观测性) (7 min)</h4>
 <p><strong>7.1 Audit trail</strong></p>
 <p>Every change → immutable log:</p>
 <pre class="language-json"><code class="language-json">{
@@ -506,7 +508,7 @@ VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);</code></pre>
 └── 1.3.0-rc1 (canary, 10%)</code></pre>
 <p><strong>7.4 Alerts</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Alert</th><th>Channel</th><th>Severity</th></tr></thead><tbody><tr><td>Auto-rollback triggered</td><td>PagerDuty</td><td>P1</td></tr><tr><td>Quality drop &gt; 5% on canary</td><td>Slack</td><td>P3</td></tr><tr><td>Eval gate failing</td><td>Slack to prompt owner</td><td>P3</td></tr><tr><td>Cost spike &gt; 50% per prompt</td><td>Slack</td><td>P2</td></tr><tr><td>Manual rollback by team</td><td>Slack (no page)</td><td>Info</td></tr></tbody></table></div>
-<h4>Phase 8: Trade-offs + alternatives (6 min)</h4>
+<h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)</h4>
 <p><strong>Decision 8.1 — DB vs Git for prompt storage</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Git repo</td><td>Familiar to eng, code review pattern</td><td>PM can't edit, slow, conflict-prone</td></tr><tr><td>DB (我推)</td><td>Fast read, runtime lookup, per-tenant, audit native</td><td>Need build UI, not just <code>git log</code></td></tr><tr><td>Hybrid (DB + git sync)</td><td>Versioned audit</td><td>Complex sync</td></tr></tbody></table></div>
 <p>我推 DB. Add git backup nightly for DR.</p>
@@ -651,6 +653,10 @@ SLO:
 <script id="md-source" type="text/markdown">## Q29 · 生产环境 prompt 版本管理 / A/B / 回滚
 
 > "Your team manages **200+ prompts** in production across 30 LLM features. PM wants to A/B test a new system prompt for the customer support bot. Eng wants to **safely roll it out**, and ops wants to **rollback in 5 minutes** if metrics regress. **Design the prompt lifecycle system** — versioning, eval, A/B, rollout, rollback, audit."
+
+**中文翻译**:
+
+> "你的团队在 production 跑 **200+ 个 prompt**, 跨 30 个 LLM 功能. PM 想给客服 bot 的 system prompt (系统提示词) 跑一个 A/B test. Eng 想**安全上线**, ops 想在指标回归时 **5 分钟内回滚**. **设计 prompt 生命周期系统** — 版本管理, 评估 (eval), A/B, 灰度上线, 回滚, 审计 (audit)."
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Cohere / Vertex AI · 行业: AI infra / LLM ops
@@ -933,7 +939,7 @@ SLO:
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + framing (5 min)
+### Phase 1: Clarify + framing (澄清 + 框架) (5 min)
 
 开口:
 - "Prompt 200+ 中, active production 大约多少? Tier-1 重要 vs tier-3 实验性 mix"
@@ -953,7 +959,7 @@ Framing: prompt 不是 code. Treat as **product config managed via versioned dat
 - Prompt: edit in UI, eval gate, traffic split, runtime fetch
 - 共同: version control, audit, rollback. But mechanism different.
 
-### Phase 2: Prompt as data (8 min)
+### Phase 2: Prompt as data (Prompt 当数据来管) (8 min)
 
 **2.1 Schema design**
 
@@ -1047,7 +1053,7 @@ Variables declared in schema:
 
 Renderer (Jinja2) validates at compile time. Missing variable → error fast, not runtime.
 
-### Phase 3: Eval pipeline (10 min)
+### Phase 3: Eval pipeline (评估流水线) (10 min)
 
 **Multi-layer gate** before promote to prod:
 
@@ -1182,7 +1188,7 @@ def cost_latency_check(new_version, samples):
 
 Flag for review if cost +10% or latency +20%.
 
-### Phase 4: A/B + canary rollout (10 min)
+### Phase 4: A/B + canary rollout (A/B + 灰度上线) (10 min)
 
 **4.1 Traffic split implementation**
 
@@ -1250,7 +1256,7 @@ VALUES ('customer_support', 'acme', 'v1.2.0-acme-formal', 100);
 
 Tenant ACME 总 hit `v1.2.0-acme-formal`, 其他 tenant hit `v1.2.0`.
 
-### Phase 5: Auto-rollback (8 min)
+### Phase 5: Auto-rollback (自动回滚) (8 min)
 
 **5.1 Trigger metrics**
 
@@ -1325,7 +1331,7 @@ PM / on-call can rollback via UI:
 
 After rollback, freeze new version 24h (can't re-promote without team review). Avoid: rollback → re-promote → rollback flap.
 
-### Phase 6: Per-tenant variants (6 min)
+### Phase 6: Per-tenant variants (按租户的变体) (6 min)
 
 **6.1 Inheritance model**
 
@@ -1364,7 +1370,7 @@ Approval flow:
 
 Manage via "variant pool": each tier-1 prompt has 3-5 named variants (default, formal, casual, multilingual), tenant picks one.
 
-### Phase 7: Audit + observability (7 min)
+### Phase 7: Audit + observability (审计 + 可观测性) (7 min)
 
 **7.1 Audit trail**
 
@@ -1422,7 +1428,7 @@ customer_support
 | Cost spike > 50% per prompt | Slack | P2 |
 | Manual rollback by team | Slack (no page) | Info |
 
-### Phase 8: Trade-offs + alternatives (6 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)
 
 **Decision 8.1 — DB vs Git for prompt storage**
 

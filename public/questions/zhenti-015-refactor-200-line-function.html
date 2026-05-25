@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q15 · 把 200 行函数重构成可测试的, 讲清思路</h3>
 <blockquote><p>"Here's a 200-line function from our codebase. <strong>Refactor it</strong> so it's testable, readable, and maintainable. <strong>Walk us through your reasoning</strong> as you go. We care more about your process than the final code."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"这是我们 codebase 里一个 200 行的函数. <strong>重构它</strong>, 让它 testable (可测试), readable (易读), maintainable (易维护). 边做边<strong>讲你的思路</strong>. 我们更在乎你的 process (过程), 而不是最终代码."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min, shared screen) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Palantir</strong> (经典), Anthropic, Anyscale <strong>难度</strong>: Medium (但 process 是关键, 不是 algo) <strong>主要技能</strong>: 工程素养, 单一职责, 依赖反转, communication</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -90,7 +92,7 @@
 <p>Why: production refactor 多次小 PR &gt; 一个大 PR (review 友好, easy revert).</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Sample "bad" 200-line function</h4>
+<h4>Step 1: Sample "bad" 200-line function (示例 — 待重构的烂函数)</h4>
 <p>为了 concrete, 我们假设面试官 paste 进来这么个函数 (real-feel BNPL refund handler):</p>
 <pre class="language-python"><code class="language-python"># refund_handler.py (BEFORE — 200 LoC, 0 tests)
 import datetime
@@ -215,10 +217,10 @@ def process_refund(refund_id, user_id, amount, currency, reason, region):
         "tier": tier,
         "net_amount": amount - fee
     }</code></pre>
-<h4>Step 2: Read + verbalize smells (10 min)</h4>
+<h4>Step 2: Read + verbalize smells (通读并出声指出代码坏味道, 10 min)</h4>
 <p><strong>Smells to call out (out loud)</strong>:</p>
 <ol><li><strong>One function, multiple responsibilities</strong> — validates + queries DB + computes fee + calls fraud svc + writes DB + sends notification. 6 个 reason to change.</li><li><strong>Region-specific limits hardcoded</strong> — <code>if region == "ID": ...</code> 重复 3 次, 改一个限额要改 3 处.</li><li><strong>Magic numbers</strong> — <code>100000</code>, <code>5000000</code>, <code>1000</code>, <code>0.8</code>, <code>0.95</code>, <code>90</code> 全无名字.</li><li><strong>Tuple positional access</strong> — <code>user[1]</code>, <code>tx[3]</code> — 看不出意思.</li><li><strong>DB / HTTP 硬编码全局</strong> — <code>db_conn</code>, <code>requests.post(...)</code> 不能 mock, 不能注入.</li><li><strong>Mixed return shapes</strong> — error returns vs success returns不同 dict shape.</li><li><strong>Side effects 散落</strong> — INSERT, requests.post, notify 全在 control flow 里.</li><li><strong>Error swallow</strong> — fraud svc 挂 silently log + 继续, behavior 隐藏.</li><li><strong>Nested if</strong> — region check 3 层嵌套, hard to test corner.</li><li><strong>No tests</strong> — 函数 200 行 0 unit test.</li></ol>
-<h4>Step 3: Characterization tests (10 min)</h4>
+<h4>Step 3: Characterization tests (锁住现行行为的测试, 10 min)</h4>
 <p><strong>Before touching code, lock current behavior</strong>:</p>
 <pre class="language-python"><code class="language-python"># tests/test_refund_handler_characterization.py
 """
@@ -326,7 +328,7 @@ def test_first_refund_is_manual(fake_db, fake_requests):
     assert result['tier'] == 'MANUAL'</code></pre>
 <p><strong>讲给面试官</strong>:</p>
 <ul><li>"Characterization tests — locking current behavior. <strong>If a test would fail with a known existing bug, I lock the bug</strong> (write the test asserting the bug, refactor without changing behavior, then fix bug in a SEPARATE PR)."</li><li>"I'm intentionally using mocks for <code>db_conn</code> and <code>requests</code> — even before refactor — so I can run these in 0.1s, not flake on network."</li><li>"Coverage isn't 100%, but I have one test per branch + happy path. That's the safety net."</li></ul>
-<h4>Step 4: Refactor step by step (25 min)</h4>
+<h4>Step 4: Refactor step by step (一步步重构, 25 min)</h4>
 <p><strong>Each step: change → run tests → commit (mental commit)</strong>.</p>
 <h5>Step 4a: Extract pure validation functions</h5>
 <pre class="language-python"><code class="language-python"># refund/validators.py
@@ -624,7 +626,7 @@ class RefundHandler:
             tier=tier,
             net_amount=req.amount - fee,
         )</code></pre>
-<h4>Step 5: Now write unit tests trivially (5 min)</h4>
+<h4>Step 5: Now write unit tests trivially (轻松写 unit tests, 5 min)</h4>
 <pre class="language-python"><code class="language-python"># tests/test_handler.py
 import pytest
 import datetime
@@ -728,7 +730,7 @@ def test_notify_not_called_on_auto():
     h.process(make_req())
     assert len(h.notifier.sent) == 0</code></pre>
 <p><strong>讲</strong>: "现在 9 个 unit test, no mocks (only fake adapters), 全部 in-memory, 跑 &lt;0.05s. 之前要 mock requests + db_conn 一堆 patch, 现在 zero patch."</p>
-<h4>Step 6: Diff before/after (5 min)</h4>
+<h4>Step 6: Diff before/after (前后对比, 5 min)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Metric</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>Lines (1 file)</td><td>200</td><td>6 files × ~30-60 lines each</td></tr><tr><td>Functions</td><td>1</td><td>1 orchestrator + 4 pure + 6 adapters</td></tr><tr><td>Imports</td><td><code>db_conn</code> global, <code>requests</code> direct</td><td>None at top-level handler — DI only</td></tr><tr><td>Unit tests</td><td>0</td><td>9 unit + 5 pure-function tests</td></tr><tr><td>Test runtime</td><td>~30s (real DB)</td><td>~0.05s (all in-memory)</td></tr><tr><td>Cyclomatic complexity (handler)</td><td>~25</td><td>~10 (orchestrator) + 1-3 each</td></tr><tr><td>Coverage</td><td>est. 15%</td><td>95%+</td></tr></tbody></table></div>
 <p><strong>讲</strong>: "Single Responsibility per file: validators / fees / tier / ports / adapters / handler. <strong>Pure / I/O 分离</strong>. <strong>DI via Protocol</strong>. <strong>In-memory tests</strong>."</p>
 <hr />
@@ -832,6 +834,10 @@ Things NOT to do:
 <script id="md-source" type="text/markdown">## Q15 · 把 200 行函数重构成可测试的, 讲清思路
 
 > "Here's a 200-line function from our codebase. **Refactor it** so it's testable, readable, and maintainable. **Walk us through your reasoning** as you go. We care more about your process than the final code."
+
+**中文翻译**:
+
+> "这是我们 codebase 里一个 200 行的函数. **重构它**, 让它 testable (可测试), readable (易读), maintainable (易维护). 边做边**讲你的思路**. 我们更在乎你的 process (过程), 而不是最终代码."
 
 **Round**: Coding (60 min, shared screen)
 **出处**: Exponent 2026 FDE · 公司: **Palantir** (经典), Anthropic, Anyscale
@@ -998,7 +1004,7 @@ Why: production refactor 多次小 PR > 一个大 PR (review 友好, easy revert
 
 ## 详细解题流程
 
-### Step 1: Sample "bad" 200-line function
+### Step 1: Sample "bad" 200-line function (示例 — 待重构的烂函数)
 
 为了 concrete, 我们假设面试官 paste 进来这么个函数 (real-feel BNPL refund handler):
 
@@ -1128,7 +1134,7 @@ def process_refund(refund_id, user_id, amount, currency, reason, region):
     }
 ```
 
-### Step 2: Read + verbalize smells (10 min)
+### Step 2: Read + verbalize smells (通读并出声指出代码坏味道, 10 min)
 
 **Smells to call out (out loud)**:
 
@@ -1143,7 +1149,7 @@ def process_refund(refund_id, user_id, amount, currency, reason, region):
 9. **Nested if** — region check 3 层嵌套, hard to test corner.
 10. **No tests** — 函数 200 行 0 unit test.
 
-### Step 3: Characterization tests (10 min)
+### Step 3: Characterization tests (锁住现行行为的测试, 10 min)
 
 **Before touching code, lock current behavior**:
 
@@ -1260,7 +1266,7 @@ def test_first_refund_is_manual(fake_db, fake_requests):
 - "I'm intentionally using mocks for `db_conn` and `requests` — even before refactor — so I can run these in 0.1s, not flake on network."
 - "Coverage isn't 100%, but I have one test per branch + happy path. That's the safety net."
 
-### Step 4: Refactor step by step (25 min)
+### Step 4: Refactor step by step (一步步重构, 25 min)
 
 **Each step: change → run tests → commit (mental commit)**.
 
@@ -1597,7 +1603,7 @@ class RefundHandler:
         )
 ```
 
-### Step 5: Now write unit tests trivially (5 min)
+### Step 5: Now write unit tests trivially (轻松写 unit tests, 5 min)
 
 ```python
 # tests/test_handler.py
@@ -1706,7 +1712,7 @@ def test_notify_not_called_on_auto():
 
 **讲**: "现在 9 个 unit test, no mocks (only fake adapters), 全部 in-memory, 跑 <0.05s. 之前要 mock requests + db_conn 一堆 patch, 现在 zero patch."
 
-### Step 6: Diff before/after (5 min)
+### Step 6: Diff before/after (前后对比, 5 min)
 
 | Metric | Before | After |
 |--------|--------|-------|

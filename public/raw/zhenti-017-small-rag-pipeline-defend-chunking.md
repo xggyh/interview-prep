@@ -2,6 +2,10 @@
 
 > "Given a folder of documents (mixed PDF / markdown / HTML), build a **small RAG pipeline** end-to-end: chunk → embed → index → retrieve → format → LLM. **Code it.** Then **defend your chunking strategy** — why this chunk size? Why this overlap? How would you evaluate it?"
 
+**中文翻译**:
+
+> "给你一个文档目录 (混合 PDF / markdown / HTML), 端到端搭一个**小型 RAG pipeline**: chunk → embed → index → retrieve → format → LLM. **写代码.** 然后**为你的 chunking 策略辩护** — 为什么选这个 chunk size? 为什么这个 overlap? 你怎么 evaluate (评估)?"
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic**, OpenAI, Scale AI, Cohere
 **难度**: Hard
@@ -191,7 +195,7 @@ Why: 1M docs × 1k token × `text-embedding-3-small` $0.02/1M ≈ $20 一次 emb
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -227,7 +231,7 @@ Online query:
 - **Retrieval**: top 20 by cosine, rerank top 5 by MMR diversity
 - **Prompt**: explicit instructions "use only context", citation markers `[1] [2]`, "I don't know" on insufficient context
 
-### Step 2: Initial implementation (15-25 min)
+### Step 2: Initial implementation (初始实现, 15-25 min)
 
 ```python
 """
@@ -672,7 +676,7 @@ class RAGPipeline:
 
 **讲给面试官**: "I've kept it modular: Loader, Chunker, Embedder, Index, Retriever, PromptBuilder, LLM. Each is swappable — local embedder vs OpenAI, FAISS vs Chroma, gpt-4o-mini vs Claude — and I can run unit tests on each piece independently."
 
-### Step 3: Eval (5-10 min)
+### Step 3: Eval (评估, 5-10 min)
 
 ```python
 # eval.py
@@ -740,7 +744,7 @@ Return JSON: {{"faithfulness": N, "completeness": N, "citation": N}}"""
     }
 ```
 
-### Step 4: Defend chunking strategy (10 min)
+### Step 4: Defend chunking strategy (为 chunking 策略辩护, 10 min)
 
 **Why heading-aware + 800 token + 100 overlap?** (这一段是面试 critical):
 
@@ -808,7 +812,7 @@ Sample table:
 Defense: heading-aware + 800/100 is on Pareto frontier — best quality at acceptable cost.
 ```
 
-### Step 5: Test (skipped real-LLM, here's structure)
+### Step 5: Test (测试 — 跳过真 LLM, 给结构, skipped real-LLM, here's structure)
 
 ```python
 # Mock embedder + LLM for tests
@@ -851,7 +855,7 @@ def test_mmr_diverse():
     pass  # detailed test omitted; structure shown
 ```
 
-### Step 6: Production discussion (5 min)
+### Step 6: Production discussion (生产讨论, 5 min)
 
 **Upgrades a real prod RAG ships with**:
 

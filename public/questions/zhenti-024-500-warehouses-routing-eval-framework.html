@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q24 · 500 仓库经理 + 99% 送达率 AI agent 评估框架</h3>
 <blockquote><p>"We're deploying an <strong>AI agent that suggests delivery rerouting</strong> to <strong>500 warehouse managers</strong>. Customer's existing rate is <strong>97% on-time, target 99%</strong>. <strong>Design the evaluation framework</strong> — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"我们要部署一个 <strong>AI agent, 给 500 个仓库经理建议送货改派</strong>. 客户现在 <strong>on-time 送达率 97%, 目标 99%</strong>. <strong>设计评估 (evaluation) 框架</strong> — 上线前 / 中 / 后, 你怎么知道 agent 真的有用? 你的 North Star (北极星) 指标是什么?"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain <strong>约束</strong>: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -150,13 +152,13 @@
 └────────────────────────────────────────────────────────────────────────────────────────┘</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + outcome definition (5 min)</h4>
+<h4>Phase 1: Clarify + outcome definition (澄清 + 结果定义) (5 min)</h4>
 <p>开口锁:</p>
 <ul><li>"Outcome metric: 'on-time' 是 promised window 内吗? 比如 promised 2pm 实际 3pm 算 fail?"</li><li>"Agent advises or acts? 99% case 是 advise + manager 决定. 影响 attribution"</li><li>"Time horizon: 3 个月看到 99% 还是 12 个月? 影响 sample size + 是否能 isolate seasonal"</li><li>"Cost guardrail: 如果送达 99% 但 cost +20%, business 接受吗?"</li></ul>
 <p>我假设: outcome = on-time within promised window AND not-damaged, agent advise (manager decide), horizon = 6 months to reach 99% sustained, cost guardrail &lt; 105% baseline.</p>
 <p>KPI clarity:</p>
 <ul><li><strong>North star</strong>: per-warehouse on-time rate (delivery in window + intact), weighted by delivery volume</li><li><strong>Leading</strong>: manager acceptance rate of agent suggestions</li><li><strong>Guardrail</strong>: cost per delivery, driver hours/delivery, customer complaint rate, manager override reasons</li></ul>
-<h4>Phase 2: Metric hierarchy (8 min)</h4>
+<h4>Phase 2: Metric hierarchy (指标层级) (8 min)</h4>
 <p>不要只一个 metric, 三层:</p>
 <p><strong>North star (1 个)</strong>:</p>
 <ul><li>Weighted on-time rate (delivery in promised window AND intact AND received) — 衡量真正业务目标 99%</li></ul>
@@ -168,7 +170,7 @@
 <ul><li>Bottom-quartile warehouse outcome (不只看 average, 看最差的 25%)</li><li>Worst-day outcome (最差一天)</li></ul>
 <p>为什么三层 + counter:</p>
 <ul><li>North star 滞后: 看 outcome 要 1-3 天 delivery cycle</li><li>Leading 让你早知道 trouble (acceptance 跌等于将来 outcome 跌)</li><li>Guardrail 防 game (不能为 99% 牺牲 cost)</li><li>Counter 防 average-shifting hide variance</li></ul>
-<h4>Phase 3: Per-warehouse baseline (7 min)</h4>
+<h4>Phase 3: Per-warehouse baseline (按仓库定基线) (7 min)</h4>
 <p><strong>关键洞察</strong>: 500 warehouse heterogeneity 巨大. 西雅图 hub 处理 5000/day deliveries 经验老到 baseline 98%; 拉斯维加斯小 hub 800/day baseline 92%; 鳳凰城 大 promo season 一时间 85%.</p>
 <p><strong>统一目标 99% 是错的</strong>. 正确:</p>
 <ul><li>每 warehouse 自己 baseline (rolling 6-month pre-agent)</li><li>Target = baseline + Δ, Δ 大小因 warehouse 而异 (低 baseline 提升空间大, 高 baseline 提升难)</li></ul>
@@ -183,7 +185,7 @@
 <ul><li>不是 "99% by Dec 2026"</li><li>而是 "every warehouse +1pp on baseline by Q4, weighted-average reaches 99% by Q1 2027"</li></ul>
 <p><strong>Per-warehouse leaderboard</strong> (操作意义):</p>
 <ul><li>不公开排名 (避免压力 distort manager 行为)</li><li>内部 leadership see: top mover, bottom mover, agent contribution % to mover</li><li>Bottom-quartile manager 1:1 from regional director</li></ul>
-<h4>Phase 4: 4-stage eval pipeline (12 min)</h4>
+<h4>Phase 4: 4-stage eval pipeline (四阶段评估流水线) (12 min)</h4>
 <p><strong>Stage 1: Offline historical replay (week 1-2)</strong></p>
 <pre class="language-python"><code class="language-python">historical_data = load('2024-09 to 2025-08, 500 warehouse, all routing decisions')
 # ~500 warehouse × 365 day × ~50 decisions/day = ~9M decision-rows
@@ -254,7 +256,7 @@ diff_in_diff = (treat_post - treat_pre) - (control_post - control_pre)</code></p
 <p>每 cohort 2 weeks observation, regression test 通过才下一 cohort.</p>
 <p>Halt criteria:</p>
 <ul><li>Per-warehouse on-time regression &gt; 2pp (P0)</li><li>Cost +5% (P1)</li><li>Customer complaint +20% (P1)</li><li>Manager acceptance &lt; 30% (P2)</li></ul>
-<h4>Phase 5: Counterfactual + causal inference (10 min)</h4>
+<h4>Phase 5: Counterfactual + causal inference (反事实 + 因果推断) (10 min)</h4>
 <p>这是 staff-level 的标志. 99% of candidates 不会答这层.</p>
 <p><strong>Why counterfactual is hard here</strong>:</p>
 <ul><li>We observe (decision, outcome). 我们想知道 "如果 agent 决定, outcome 是什么".</li><li>Naive: train regression on (decision, context) → outcome. But manager_decision is itself a function of context, confounded.</li><li>Need to break confound: doubly-robust, IPW, or A/B.</li></ul>
@@ -274,7 +276,7 @@ where π(t|x) = propensity score = P(manager_decision=t | context=x)</code></pre
 <p><strong>Implementation</strong>: 主用 DR 给 ML team, DiD 给 business stakeholder ("简单减一减").</p>
 <p><strong>Edge cases</strong>:</p>
 <ul><li>Manager rejects agent suggestion → still counts as "treated" (intent-to-treat ITT)</li><li>Warehouse 部分 manager 接受 部分不接受 → cluster-level 仍 random, ITT 仍 valid</li></ul>
-<h4>Phase 6: Engagement + HITL signals (5 min)</h4>
+<h4>Phase 6: Engagement + HITL signals (参与度 + 人在循环信号) (5 min)</h4>
 <p>Agent advises, manager decides. <strong>Engagement is leading indicator</strong>.</p>
 <p><strong>Acceptance rate</strong>:</p>
 <ul><li>100% acceptance: manager 没在思考 (rubber stamp), agent 错了也接受 — bad</li><li>0%: manager 不信任 — bad</li><li>60-80%: healthy disagreement, agent adds value 但 manager 用 local knowledge override 部分</li></ul>
@@ -285,7 +287,7 @@ where π(t|x) = propensity score = P(manager_decision=t | context=x)</code></pre
 <ul><li>Per-warehouse acceptance rate trend</li><li>Per-manager acceptance rate (some manager 60%, some 90% — different trust)</li><li>Override reason distribution shifts (mix 偏 "agent error" 意味着真的 quality 下降)</li><li>Time-to-decide (manager 看 suggestion 后多久点接受/拒绝)</li></ul>
 <p><strong>Manager-level segmentation</strong>:</p>
 <ul><li>"Heavy adopter": &gt; 80% accept, &lt; 30s decide → 给他们 advanced features</li><li>"Selective adopter": 50-80% accept, &gt; 60s decide → 健康</li><li>"Rejector": &lt; 30% accept → 1:1 training, understand barrier</li><li>"Rubber stamper": &gt; 95% accept, &lt; 5s decide → concerning, agent 错了也照办, 加 friction (要求注释)</li></ul>
-<h4>Phase 7: Drift detection + monitoring (7 min)</h4>
+<h4>Phase 7: Drift detection + monitoring (漂移检测 + 监控) (7 min)</h4>
 <p>Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.</p>
 <p><strong>3 类 drift</strong>:</p>
 <p><strong>(a) Feature drift</strong> — agent input distribution 变</p>
@@ -297,7 +299,7 @@ where π(t|x) = propensity score = P(manager_decision=t | context=x)</code></pre
 <p><strong>Alert routing</strong>: | Signal | Severity | Channel | |---|---|---| | Per-warehouse outcome -2pp 7d trailing | P2 | PagerDuty → ops oncall + regional director | | Fleet outcome -1pp 30d trailing | P2 | PagerDuty → ML team + ops VP | | Acceptance rate -10pp 7d trailing | P3 | Slack → ML team | | Feature PSI &gt; 0.2 | P3 | Slack → ML team | | Cost / driver hour &gt; +5% | P1 | PagerDuty → ops VP | | Customer complaint &gt; +20% | P1 | PagerDuty → CX VP + ops VP |</p>
 <p><strong>Quarterly causal re-eval</strong>:</p>
 <ul><li>Synthetic control reconstruction (using preserved 10% never-treated)</li><li>DiD on rolling quarter</li><li>Per-strata effect heterogeneity (does agent help low-baseline warehouses more? expected yes)</li></ul>
-<h4>Phase 8: Trade-offs + alternatives (6 min)</h4>
+<h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)</h4>
 <p><strong>Decision 8.1 — Rigor vs business speed</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>RCT 8 weeks before any rollout</td><td>Causal certainty</td><td>Slow, business 急</td></tr><tr><td>Shadow + DiD only</td><td>Fast</td><td>Causal weaker</td></tr><tr><td>Offline replay only</td><td>Fastest</td><td>Distribution drift risk</td></tr></tbody></table></div>
 <p>我推: 4-stage gate (offline → shadow → A/B → rollout). 8 weeks A/B 不能砍, 这是 99%-target 的 board-defensible.</p>
@@ -430,6 +432,10 @@ Numbers:
 <script id="md-source" type="text/markdown">## Q24 · 500 仓库经理 + 99% 送达率 AI agent 评估框架
 
 > "We're deploying an **AI agent that suggests delivery rerouting** to **500 warehouse managers**. Customer's existing rate is **97% on-time, target 99%**. **Design the evaluation framework** — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"
+
+**中文翻译**:
+
+> "我们要部署一个 **AI agent, 给 500 个仓库经理建议送货改派**. 客户现在 **on-time 送达率 97%, 目标 99%**. **设计评估 (evaluation) 框架** — 上线前 / 中 / 后, 你怎么知道 agent 真的有用? 你的 North Star (北极星) 指标是什么?"
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain
@@ -665,7 +671,7 @@ Numbers:
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + outcome definition (5 min)
+### Phase 1: Clarify + outcome definition (澄清 + 结果定义) (5 min)
 
 开口锁:
 - "Outcome metric: 'on-time' 是 promised window 内吗? 比如 promised 2pm 实际 3pm 算 fail?"
@@ -680,7 +686,7 @@ KPI clarity:
 - **Leading**: manager acceptance rate of agent suggestions
 - **Guardrail**: cost per delivery, driver hours/delivery, customer complaint rate, manager override reasons
 
-### Phase 2: Metric hierarchy (8 min)
+### Phase 2: Metric hierarchy (指标层级) (8 min)
 
 不要只一个 metric, 三层:
 
@@ -713,7 +719,7 @@ KPI clarity:
 - Guardrail 防 game (不能为 99% 牺牲 cost)
 - Counter 防 average-shifting hide variance
 
-### Phase 3: Per-warehouse baseline (7 min)
+### Phase 3: Per-warehouse baseline (按仓库定基线) (7 min)
 
 **关键洞察**: 500 warehouse heterogeneity 巨大. 西雅图 hub 处理 5000/day deliveries 经验老到 baseline 98%; 拉斯维加斯小 hub 800/day baseline 92%; 鳳凰城 大 promo season 一时间 85%.
 
@@ -740,7 +746,7 @@ warehouse_strata = stratify(warehouses, dims=[
 - 内部 leadership see: top mover, bottom mover, agent contribution % to mover
 - Bottom-quartile manager 1:1 from regional director
 
-### Phase 4: 4-stage eval pipeline (12 min)
+### Phase 4: 4-stage eval pipeline (四阶段评估流水线) (12 min)
 
 **Stage 1: Offline historical replay (week 1-2)**
 
@@ -846,7 +852,7 @@ Halt criteria:
 - Customer complaint +20% (P1)
 - Manager acceptance < 30% (P2)
 
-### Phase 5: Counterfactual + causal inference (10 min)
+### Phase 5: Counterfactual + causal inference (反事实 + 因果推断) (10 min)
 
 这是 staff-level 的标志. 99% of candidates 不会答这层.
 
@@ -887,7 +893,7 @@ Assumes parallel trends. Easier to communicate to business.
 - Manager rejects agent suggestion → still counts as "treated" (intent-to-treat ITT)
 - Warehouse 部分 manager 接受 部分不接受 → cluster-level 仍 random, ITT 仍 valid
 
-### Phase 6: Engagement + HITL signals (5 min)
+### Phase 6: Engagement + HITL signals (参与度 + 人在循环信号) (5 min)
 
 Agent advises, manager decides. **Engagement is leading indicator**.
 
@@ -916,7 +922,7 @@ Agent advises, manager decides. **Engagement is leading indicator**.
 - "Rejector": < 30% accept → 1:1 training, understand barrier
 - "Rubber stamper": > 95% accept, < 5s decide → concerning, agent 错了也照办, 加 friction (要求注释)
 
-### Phase 7: Drift detection + monitoring (7 min)
+### Phase 7: Drift detection + monitoring (漂移检测 + 监控) (7 min)
 
 Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.
 
@@ -951,7 +957,7 @@ Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.
 - DiD on rolling quarter
 - Per-strata effect heterogeneity (does agent help low-baseline warehouses more? expected yes)
 
-### Phase 8: Trade-offs + alternatives (6 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)
 
 **Decision 8.1 — Rigor vs business speed**
 

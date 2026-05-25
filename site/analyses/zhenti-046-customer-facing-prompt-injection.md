@@ -2,6 +2,10 @@
 
 > "Your agent is customer-facing. **Walk me through how you'd defend against prompt injection** — direct (user input), indirect (retrieved doc, tool output), and output exploitation. Include attack vectors you've seen, defense layers, eval methodology (Gandalf-style red team), and how you'd handle a successful breach."
 
+**中文翻译**:
+
+> "你的 agent 是直接面对客户的. **跟我讲讲你怎么防御 prompt injection (提示注入)** — direct (用户直接输入的攻击), indirect (间接提示注入 — 通过 RAG / tool output 等渠道渗透), 还有 output exploitation (输出被下游系统当 SQL/shell 执行那种). 要包括你见过的攻击向量, 防御的几层, eval 方法论 (Gandalf 那种 red team 红队测试), 还有当 breach (突破) 真的发生时你怎么 handle."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — security specialty 必问
 

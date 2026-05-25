@@ -2,6 +2,10 @@
 
 > "You're meeting with the customer's **VP of Customer Operations** (non-technical, ex-MBA, never coded). They want a guarantee that the **RAG-powered AI assistant will be 100% accurate** before they roll it out to their 2,000-person support team. Explain why **no AI system can give that guarantee**, without losing the deal."
 
+**中文翻译**:
+
+> "你跟客户的 **客户运营副总 (VP of Customer Operations)** 开会 (非技术背景, MBA 出身, 从没写过代码). 在把这套 **基于 RAG (检索增强生成) 的 AI 助手** 上线给 2000 人的客服团队之前, 他/她想要 **100% 准确率的保证**. 解释为什么 **没有 AI 系统能给这个保证**, 同时不能丢单."
+
 **Round**: Client Simulation (30 min)
 **出处**: Exponent 2026 FDE · OpenAI Enterprise / Anthropic enterprise sales · 每次 GenAI 企业级部署必踩
 **场景**: VP wants 100% guarantee. You can't give it. You must redirect without rejection.
@@ -98,11 +102,11 @@
 
 5 个 signal:
 
-1. **No tech jargon** — "embedding", "vector", "chunking", "temperature" — banned
-2. **Analogies from VP's world** — call center, customer service, escalation processes
-3. **Show what you DO offer** — citation, confidence, eval, escalation. Not just "we can't guarantee"
-4. **Reframe variance as feature** — human agents aren't 100% either. Variance vs human baseline matters.
-5. **Don't patronize** — VP is smart, just not in this domain. Concrete numbers + business analogies, not baby talk
+1. **No tech jargon** (不要技术行话) — "embedding", "vector", "chunking", "temperature" — banned (禁用)
+2. **Analogies from VP's world** (用 VP 世界里的类比) — call center, customer service, escalation processes
+3. **Show what you DO offer** (展示你确实提供的东西) — citation, confidence, eval, escalation. Not just "we can't guarantee"
+4. **Reframe variance as feature** (把方差重新 framing 成 feature) — human agents aren't 100% either. Variance vs human baseline matters.
+5. **Don't patronize** (别居高临下) — VP is smart, just not in this domain. Concrete numbers + business analogies, not baby talk (不要哄小孩式语气)
 
 ---
 
@@ -131,7 +135,9 @@
 >
 > Sound good? Walk me through what success looks like to you on day 30 of rollout."
 
-→ Note: you don't say "we can't guarantee 100%" up front. You **reframe the question**.
+**中文意思**: "Janet — 你问的是对的问题, 我想给你一个真实的答案. 我们 30 分钟里我会这样做: 我会 **重新 framing '100% 准确' 是什么意思**, 因为实话是 **你业务里没有任何决策系统是 100%** — 不是你的客服, 不是你的核保员, 甚至不是你的账单系统. 所以我们要找到 **适合你的 use case 的对的标准**. 然后我会告诉你 **我们实际保证什么**、**针对你的数据我们测出来的具体数字**、**当系统出错时会发生什么** (因为它会错, 就像你的人也会错)、以及 **当 CEO 问起时你怎么 framing**. 行吗? 跟我讲讲你认为上线后第 30 天的成功是什么样的."
+
+→ Note: you don't say "we can't guarantee 100%" up front. You **reframe the question**. (注意: 你不一上来说 "我们没法保证 100%". 你 **重新 framing 问题**.)
 
 ---
 
@@ -153,7 +159,9 @@
 >
 > **The frame your CEO probably wants** isn't '100% accuracy' — it's '**measurably better than today + a way to catch the mistakes we do make**'. Want me to show you the guards we have?"
 
-→ The reframe: **your current state isn't 100% either**. LLM vs **realistic human baseline**, not LLM vs **fantasy 100% baseline**.
+**中文意思**: "听到了. **每天 20 个客户拿到错信息是个真实的数字** — 我们确保不会制造这个. 但我想问: **你们现在的准确率是多少?** 你的客服团队今天处理那 2000 张 ticket. 其中多少 % 给客户的是 **完全正确的信息**? 不是 'helpful' — 而是事实正确、引用了 policy? *(听. 大多数 VP 会说 '我猜 90%')* 那么 **每天大约 200 个客户** 从你的客服那里拿到的不是完全准确的信息. 不是因为你 agent 不行 — 因为 **行业数据里客服中心首次响应准确率是 85-92%**. 那是 baseline (基线). **我们 ship 的系统在你数据上测出来是 95-99%**. 所以你其实是从一天 200 个错回答变成 **一天 20-100 个错回答**. 这是比现状 **改进 50-90%**. **你 CEO 大概想要的 framing** 不是 '100% 准确' — 是 '**可量化地比今天好 + 一个能抓住我们犯的错的机制**'. 要我展示我们的几道 guard (防线) 吗?"
+
+→ The reframe: **your current state isn't 100% either**. LLM vs **realistic human baseline**, not LLM vs **fantasy 100% baseline**. (重新 framing: **你的现状也不是 100%**. LLM 对比 **现实的人类基线**, 不是 LLM 对比 **想象中的 100% 基线**.)
 
 ---
 
@@ -179,6 +187,8 @@
 >
 > **Combined**: citation makes wrong answers obvious, confidence routes uncertain cases to humans, eval catches systemic drift, audit log catches what slipped through. **No single guarantee — but a system of layered guards**, exactly like how your current support quality process works."
 
+**中文意思**: "**4 层防护**. 我用类比走一遍. **Layer 1 — Citation (引用)**. AI 每个回答都 **引用它依据的源文档**. 就像一个好客服会说 '根据 policy 4.2, 这是答案'. 面向客户的 agent 能看到引用, 发出去前可以验证. 想象一下: 你问 **你的助理** 一个问题, 你想要她说 '我查了 policy doc 第 47 页, 这是上面写的'. **不是 '我大概确定'**. 我们的系统自动做这件事. **Layer 2 — Confidence (置信度)**. AI **报告它有多确定**. 如果 95%+ confident, 你 agent 可以轻审一下发出去. 如果 70-95%, agent 应该先验证再发. **低于 70%, 它根本不显示答案** — agent 直接走人工 escalation. 想象一下: **一个有自我意识的新人**. 新人说 '这个我确定, 发出去吧' 还是 '我不确定, 我问一下 senior'. 我们的系统内置了这种自我意识. **Layer 3 — Eval set (评估集)**. 我们 **持续测试系统**, 用 5000 道我们知道正确答案的客户样题. **每周重跑并报告**. 如果准确率掉到你同意的阈值以下, 我们会被 alert, 立刻修. 想象一下: **每月的客户满意度调查**, 但专门针对 AI 准确率, 而且是每周不是每月. **Layer 4 — Audit log + retroactive review (审计日志 + 事后复查)**. **每个 AI 答案都被记录**: 问题、引用、置信度、用它的 agent. 如果错答案漏出去, **你的团队后面能找出来, 联系客户纠正, 我们把这反馈回系统**. 想象一下: **法务复查用的通话录音**. 你有记录, 你能找问题, 你能修系统. **合在一起**: citation 让错答案显眼, confidence 把不确定的 case 转人工, eval 抓系统性漂移, audit log 抓漏掉的. **没有单一保证 — 是一个分层防护系统**, 跟你现在的客服质量流程一样."
+
 ---
 
 > **Janet**: "What if even with all that, a customer gets bad info and goes to social media?"
@@ -200,7 +210,9 @@
 >
 > **Want me to draft the playbook update for you?**"
 
-→ Show you've thought about THEIR operations, not just the tech.
+**中文意思**: "这是真实场景, **人工客服团队也会发生**. 问题是: **你们的事件响应流程 (incident response) 是什么样的?** 今天, 一个客户拿着人工 agent 给的错答案上社交媒体, 你有 playbook: **升级、客户关怀直接联系、必要时退款、对 agent 培训**. 对吧? 我们的系统进同一个 playbook, 多一步: **AI 回答带引用记录**. 所以调查时, 你能看到具体: - **AI 说了什么** - **它从哪个文档拉的** - **agent 发出去前 review 了什么** - **当时的置信度分** 这经常让解决 **比纯人工更快**, 因为你有完整轨迹. 纯人工只有模糊的 'agent 说了 X', 还得挖. **我对你事件响应的建议**: 加一个新步骤 — '**如果涉及 AI, 先拉 audit log, 看是内容问题、置信度问题、还是 agent override 问题**'. 然后你就知道是孤立事件还是系统性的. **要我帮你起草这个 playbook 更新吗?**"
+
+→ Show you've thought about THEIR operations, not just the tech. (展示你想过 **他们的** 运营, 不只是技术.)
 
 ---
 
@@ -218,7 +230,9 @@
 >
 > Your current human-only support — **5 per million** is probably better than your current baseline, but I want to be honest: it's not zero. **If your CEO needs absolute zero, no system gives that. But layered guards reduce it to a level where your incident response handles each case.**"
 
-→ Honest specificity beats vague reassurance. Don't hide the worst case.
+**中文意思**: "实话: 我在 ship 过的部署里见过 3 类问题. **Category 1 — 简单的漏**: AI 给了一个文档里对的 policy 答案, 但文档过期了. 修法: **文档新鲜度 pipeline + 给 agent 显示 '这个答案出自上次更新 X 天前的文档'**. 24 小时抓到. **Category 2 — 置信度失校准**: AI 对一个需要交叉引用 2 个 policy 的问题给了 95% 置信. **修法: 更好的 retrieval + '多文档答案要更高的置信阈值'**. 一周内抓到. **Category 3 — 新问题**: 客户问了 AI 没好数据的东西. **修法: 置信阈值 + escalation 起作用, AI 没给答案, 转人工. 没客户影响**. 我见过的最差变成真实客户面问题的 case: 大概 **每百万 query 5 个 case**, 在我们 guard 抓住前. Guard 上了之后: **每百万少于 1**. 你现在纯人工的客服 — **每百万 5 个** 大概比你现在的基线好, 但我想说实话: 它不是 0. **如果你 CEO 要绝对 0, 没系统能给. 但分层 guard 把它降到你事件响应能处理每个 case 的水平**."
+
+→ Honest specificity beats vague reassurance. Don't hide the worst case. (诚实具体胜过模糊安慰. 别藏最差 case.)
 
 ---
 
@@ -242,7 +256,9 @@
 >
 > **I'll send you a 1-pager with this framing by Monday.** You can edit and send to your CEO. **Want me to do that?**"
 
-→ Help VP sell internally. Don't just deliver to them, **arm them**.
+→ Help VP sell internally. Don't just deliver to them, **arm them**. (帮 VP 内部销售. 不只是交付给他们, **要给他们弹药**.)
+
+**中文意思**: "**这是我给她的脚本**, 你可以改: *'我们在 [3000 个历史客服语料问题] 上评估了这个 AI 系统. 达到 [97%] 准确率, 配 [4] 层独立 guard: 显示来源的 citation、置信度路由、每周 eval、audit log 复查. 我们目前的人工团队在同样问题上是 [88%] 准确率. 我们先 rollout 给 [200] 个 agent 用 [30 天], 测 [这 5 个 KPI], 每周复查. 如果 eval 显示退化, 我们 [1 小时内可 rollback]. 全量 rollout 取决于 phase-1 结果.'* **这个 CEO 脚本做了三件事**: 1. **给她具体数字** (97%、88%、200、30、5) 2. **展示分阶段部署**, 不是 big bang 3. **展示 rollback 能力**, 万一出事你能控场. **CEO 真正会想问的** (预判她的问题): - *'那 3% 错的怎么办?'* → 'Audit log + 事后客户纠正 + 系统改进' - *'你怎么知道它不会随时间变差?'* → '每周 eval + 阈值以下报警' - *'紧急情况能关吗?'* → '能, 1 小时, 不用 agent 重培训' **我周一前会给你一份带这个 framing 的 1-pager**. 你可以改了再发给 CEO. **要我这么做吗?**"
 
 ---
 
@@ -264,9 +280,15 @@
 >
 > **Sound good?**"
 
+**中文意思**: "**两件事我想诚实地提**: **(a) 头 30 天会有意外**. 哪怕 eval 再强, 真实生产流量会暴露我们没预料的 edge case. **预计第一个月有 3-5 个事件需要我们学习**. 规划好, 不要 surprise. **(b) 你的 agent 一开始会怀疑**. 他们会感到被监视, 即使 AI 是对的他们也会 override, 第一周 override 率高. **这是健康的** — 但到第 4 周, 随着他们信任 AI, override 应该降. 我们追踪这个. **我需要你做**: 1. **Phase-1 签字**: [日期] 上 200 agent, 测 30 天 2. **事件升级对接人**: 万一出事 30 分钟内能找谁? 3. **Eval 阈值审批**: 我会发给你我推荐的阈值 (比如 '准确率每周不掉到 94% 以下'), 你批准或改. **周一前**: 给你 CEO 的 1-pager. **周五前**: phase-1 上线计划 + 5 个 KPI. **上线 30 天后**: eval 复查. **行吗?**"
+
 > **Janet**: "Yeah. Thank you for not just saying 'AI is fine'."
 
+**中文意思**: "好. 谢谢你没只说 'AI 没事'."
+
 > **You**: "I appreciate you not letting me get away with that. **Your job is to protect customers; mine is to ship something you can defend. That's the goal.**"
+
+**中文意思**: "我感谢你没让我糊弄过去. **你的工作是保护客户; 我的工作是 ship 一个你能 defend (替它辩护) 的东西. 这就是目标**."
 
 ---
 

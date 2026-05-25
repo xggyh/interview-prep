@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q12 · 解析引号格式混乱的脏 CSV</h3>
 <blockquote><p>"Parse a messy CSV with <strong>inconsistent quoting</strong>. Some fields are quoted, some aren't. Some have embedded commas, some have embedded newlines, some have escaped quotes. <strong>Don't use the <code>csv</code> module</strong> — implement it yourself with a state machine. Walk us through edge cases."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"解析一个 quoting (引号) 规则乱七八糟的 CSV. 有些字段加引号, 有些没加. 有的字段里嵌着逗号, 有的嵌着换行, 有的还有 escape 的引号. <strong>不许用 <code>csv</code> 模块</strong> — 用 state machine (状态机) 自己手写. 把边界情况讲一遍."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Palantir</strong> (经典), Scale AI, OpenAI <strong>难度</strong>: Medium <strong>主要技能</strong>: State machine, edge case 思维, RFC 4180 understanding, robust parsing</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -88,7 +90,7 @@
 <p>Why: 1 MB ok 直接 <code>read()</code>; 30GB 必须 yield row by row.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions (5-10 min)</h4>
+<h4>Step 1: Design decisions (设计决策, 5-10 min)</h4>
 <p><strong>State machine 5 个 state</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">START_OF_FIELD     — 在一个 field 开头, 还没看到 char
 UNQUOTED_FIELD     — 看到了非 quote 的内容, 在 plain 模式累积
@@ -129,7 +131,7 @@ class CSVOptions:
     escape: Optional[str] = None    # None = double-quote escape; '\\' for backslash
     strict: bool = False             # raise on malformed?
     skip_blank_lines: bool = True</code></pre>
-<h4>Step 2: Initial implementation (15-20 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-20 min)</h4>
 <pre class="language-python"><code class="language-python">from dataclasses import dataclass
 from typing import Iterator, Iterable, Optional, TextIO
 
@@ -396,7 +398,7 @@ def parse_csv_stream(reader: Iterable[str], options: Optional[CSVOptions] = None
         yield row</code></pre>
 <p><strong>讲给面试官的点</strong>:</p>
 <ul><li><strong>char-by-char loop</strong> + <strong>list[str] accumulator</strong> + <strong><code>.join()</code> at field-end</strong> — Python idiom, 比每次 <code>+=</code> 字符串 O(N²) 快</li><li><strong>state 用 int</strong> (<code>_START=0</code> 等) — <code>dict</code> lookup 慢; 当然 enum 也行可读性更好</li><li><strong>CRLF peek-ahead</strong> — 看到 <code>\r</code> 就 peek <code>text[i+1]</code>, 是 <code>\n</code> 就 <code>i += 1</code> 跳过</li><li><strong>strict vs lenient</strong> 通过 <code>opts.strict</code> 切换 — production 给客户选, 默认 lenient + log</li><li><strong>BOM 在第一行就 strip</strong> — 客户 Excel export 80% 带 BOM</li></ul>
-<h4>Step 3: Edge cases + tests (5-10 min)</h4>
+<h4>Step 3: Edge cases + tests (边界情况和测试, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python">def test_basic():
     rows = list(parse_csv('a,b,c\n1,2,3\n4,5,6'))
     assert rows == [['a','b','c'], ['1','2','3'], ['4','5','6']], rows
@@ -509,7 +511,7 @@ if __name__ == '__main__':
     print('All 16 tests passed.')</code></pre>
 <p><strong>Edge case 清单 (说给面试官)</strong>:</p>
 <ol><li><strong>Empty file</strong> → 空 generator, 不 throw</li><li><strong>No newline at EOF</strong> → 最后一行也要 emit</li><li><strong>Only blank lines</strong> → skip_blank_lines 控制</li><li><strong>CRLF, LF, CR</strong> 三种行尾混用 — 罕见但 1970s mainframe export 见过</li><li><strong>BOM 在 file 开头</strong> → strip</li><li><strong>Field with embedded delimiter</strong> → <code>"a,b"</code> parse 成 <code>['a,b']</code> not <code>['a', 'b']</code></li><li><strong>Field with embedded newline</strong> → <code>"line1\nline2"</code> 一个 field</li><li><strong>Doubled-quote escape</strong> → <code>""</code> → <code>"</code></li><li><strong>Backslash escape</strong> (Unix flavor, opt-in)</li><li><strong>Quote in unquoted field</strong> → strict error / lenient pass-through</li><li><strong>Unterminated quoted field at EOF</strong> → strict error / lenient emit</li><li><strong>Ragged rows</strong> (与 header 列数不一) → pad / truncate / log</li><li><strong>Trailing comma</strong> → 末尾空字段</li><li><strong>Unicode</strong> — UTF-8 multi-byte, surrogate pair (emoji 等)</li><li><strong>Quoted field 跨 chunk 边界</strong> — streaming 时要 carry state across</li></ol>
-<h4>Step 4: Trade-offs + extensions (5-10 min)</h4>
+<h4>Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)</h4>
 <p><strong>vs stdlib <code>csv</code></strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>自己写</th><th><code>csv.reader</code></th></tr></thead><tbody><tr><td>Speed</td><td>Python char loop ~3MB/s</td><td>C-implemented ~30MB/s</td></tr><tr><td>Configurability</td><td>任意 dialect / escape</td><td>Dialect class, 有限</td></tr><tr><td>Error reporting</td><td>自定义 row/col</td><td><code>csv.Error</code>, less specific</td></tr><tr><td>Streaming</td><td>yield row by row</td><td>同样支持</td></tr><tr><td>Memory</td><td>O(1) per row</td><td>O(1) per row</td></tr></tbody></table></div>
 <p><strong>生产建议</strong>:</p>
@@ -633,6 +635,10 @@ Don't:
 <script id="md-source" type="text/markdown">## Q12 · 解析引号格式混乱的脏 CSV
 
 > "Parse a messy CSV with **inconsistent quoting**. Some fields are quoted, some aren't. Some have embedded commas, some have embedded newlines, some have escaped quotes. **Don't use the `csv` module** — implement it yourself with a state machine. Walk us through edge cases."
+
+**中文翻译**:
+
+> "解析一个 quoting (引号) 规则乱七八糟的 CSV. 有些字段加引号, 有些没加. 有的字段里嵌着逗号, 有的嵌着换行, 有的还有 escape 的引号. **不许用 `csv` 模块** — 用 state machine (状态机) 自己手写. 把边界情况讲一遍."
 
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Palantir** (经典), Scale AI, OpenAI
@@ -778,7 +784,7 @@ Why: 1 MB ok 直接 `read()`; 30GB 必须 yield row by row.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **State machine 5 个 state**:
 
@@ -832,7 +838,7 @@ class CSVOptions:
     skip_blank_lines: bool = True
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 from dataclasses import dataclass
@@ -1109,7 +1115,7 @@ def parse_csv_stream(reader: Iterable[str], options: Optional[CSVOptions] = None
 - **strict vs lenient** 通过 `opts.strict` 切换 — production 给客户选, 默认 lenient + log
 - **BOM 在第一行就 strip** — 客户 Excel export 80% 带 BOM
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 def test_basic():
@@ -1242,7 +1248,7 @@ if __name__ == '__main__':
 14. **Unicode** — UTF-8 multi-byte, surrogate pair (emoji 等)
 15. **Quoted field 跨 chunk 边界** — streaming 时要 carry state across
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **vs stdlib `csv`**:
 

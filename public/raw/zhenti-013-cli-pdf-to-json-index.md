@@ -2,6 +2,10 @@
 
 > "Build a **CLI tool** that takes a directory of PDFs and produces a **searchable JSON index** with **extracted entities** (people, organizations, dates, monetary values). Code it. Then we'll discuss productionization."
 
+**中文翻译**:
+
+> "写一个 **CLI 工具** (命令行工具), 输入是一个 PDF 目录, 输出是一个**可搜索的 JSON 索引**, 里面带**抽取出来的实体** (人名, 组织, 日期, 金额). 写代码. 然后我们聊一下 productionization (产品化上线)."
+
 **Round**: Coding (60 min, shared screen + IDE)
 **出处**: Exponent 2026 FDE · 公司: **Scale AI**, OpenAI, Anthropic
 **难度**: Medium-Hard
@@ -159,7 +163,7 @@ Why: 1M PDF 跑 8 小时挂了, 必须能 resume.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -189,7 +193,7 @@ Master index:  ./out/index.json — { doc_id → { path, mtime, entity_counts } 
 - **`--use-llm`** flag for LLM-based extraction (OpenAI / Anthropic) — 更准, 但要 chunk + budget
 - **JSON output** — per-doc + master index, idempotent
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -719,7 +723,7 @@ if __name__ == '__main__':
     sys.exit(main())
 ```
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 # tests/test_pdfindex.py
@@ -826,7 +830,7 @@ if __name__ == '__main__':
 14. **Long filename / special chars** → 落盘安全字符化
 15. **Concurrent writes to master index** → 用 `tmp + os.replace` atomic rename
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Production hardening**:
 

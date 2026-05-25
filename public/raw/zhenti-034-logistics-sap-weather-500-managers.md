@@ -2,6 +2,10 @@
 
 > "A **large logistics company** wants to build an **AI agent** that can **automatically re-route shipments** based on **SAP data, weather API, and input from 500 warehouse managers**. Design the **end-to-end architecture**. **You have 60 minutes**."
 
+**中文翻译**:
+
+> "一家 **大型物流公司** 想搭一个 **AI agent**, 能根据 **SAP 数据、天气 API、500 个仓库经理 (warehouse manager) 的输入** **自动重路由 (re-route) 货运**. 设计 **端到端架构**. **给你 60 分钟**."
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir Foundry-style + OpenAI Enterprise Agents
 **行业**: Logistics / supply chain
@@ -85,16 +89,16 @@
 
 4 个 signal:
 
-1. **Don't build autonomous agent from day 1** — 90% 候选人冲去讲 LangGraph / multi-agent / tool use. 真实部署是 **shadow mode 12 周 + opt-in 12 周 + 渐进 autonomy**
-2. **500 managers are users, not data sources** — 候选人把 "500 manager input" 当训练数据. 实际他们是 **决策权持有者**, agent 要赢得他们信任, 不是 fit 他们历史
-3. **Define trust thresholds explicitly** — 哪个时机系统可 auto-decide vs 必须 ask manager? 哪些 case 永远 ask?
-4. **Per-manager calibration matters** — 一个 manager 是 10-yr veteran, 另一个是 6-month junior. Agent's confidence threshold per manager 不同
+1. **Don't build autonomous agent from day 1** (别第一天就上全自动 agent) — 90% 候选人冲去讲 LangGraph / multi-agent / tool use. 真实部署是 **shadow mode 12 周 + opt-in 12 周 + 渐进 autonomy** (影子模式 12 周 + opt-in 12 周 + 渐进式 autonomy)
+2. **500 managers are users, not data sources** (500 个经理是用户, 不是数据源) — 候选人把 "500 manager input" 当训练数据. 实际他们是 **决策权持有者**, agent 要赢得他们信任, 不是 fit 他们历史
+3. **Define trust thresholds explicitly** (显式定义信任阈值) — 哪个时机系统可 auto-decide (自动决策) vs 必须 ask manager? 哪些 case 永远 ask?
+4. **Per-manager calibration matters** (按 manager 分别 calibration 很重要) — 一个 manager 是 10-yr veteran (10 年老兵), 另一个是 6-month junior (新人). Agent's confidence threshold per manager 不同
 
 ---
 
 ## ❌ 最常见的挂法
 
-**挂法 #1: 立刻 build autonomous multi-agent system**
+**挂法 #1: 立刻 build autonomous multi-agent system** (立刻搭一个全自动 multi-agent 系统)
 
 > "I'd use LangGraph with a planner agent, weather agent, SAP agent, routing agent, with tool use to talk to the warehouse system..."
 
@@ -105,13 +109,13 @@
 - 500 个 manager 各自的 trust level?
 - 工会 / 司机协议是否限制 algorithmic dispatch?
 
-**挂法 #2: 把 manager 当数据源**
+**挂法 #2: 把 manager 当数据源** (把仓库经理当成训练数据来源)
 
 > "We'd ingest manager inputs as training data and have the agent learn their patterns."
 
 死. Manager 们正在做决策. 你 ingest 他们 = 把活的决策者当死数据. 反应: managers 不输入了, 因为他们觉得自己在 train replace themselves.
 
-**挂法 #3: 一步到 fully autonomous**
+**挂法 #3: 一步到 fully autonomous** (一步跳到全自动)
 
 > "Phase 1 we'll launch shadow mode for 2 weeks, then go autonomous in week 3."
 

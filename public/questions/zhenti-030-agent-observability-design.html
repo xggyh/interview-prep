@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q30 · Agent 系统可观测性 — 记录什么, 告警什么, 看板</h3>
 <blockquote><p>"You're running a production multi-step <strong>AI agent</strong> (LLM + tools + RAG + multi-turn). Customer reports 'sometimes the agent gives wrong answer or hangs'. <strong>Design the observability</strong>: what to log, what to alert on, what dashboards to build. Cover <strong>traces, metrics, logs, evals, costs</strong>."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你在 production 跑一个多步 <strong>AI agent</strong> (LLM + 工具 + RAG (检索增强生成) + 多轮). 客户反馈 '有时候 agent 答案错或者挂住'. <strong>设计可观测性 (observability)</strong>: 记录什么, 告警什么, 看板 (dashboard) 怎么搭. 覆盖 <strong>traces (链路追踪), metrics (指标), logs (日志), evals (评估), costs (成本)</strong>."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Sierra / Glean / LangChain · 行业: AI infra / agent platform <strong>约束</strong>: multi-step agent with tool calls / multi-tenant / PII redaction / cost tracking / debugging stuck or wrong runs / SLO tracking / per-customer view</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -163,14 +165,14 @@
    └────────────────────────────────────────────────────────────────────────────────┘</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + 5 pillars (5 min)</h4>
+<h4>Phase 1: Clarify + 5 pillars (澄清 + 五大支柱) (5 min)</h4>
 <p>开口:</p>
 <ul><li>"Agent multi-step? 我假设 plan-act-reflect with 5-10 step avg"</li><li>"Per-tenant view yes? 我假设 customer 看自己的, 不看 fleet"</li><li>"PII tier: redact at telemetry, 不能 raw log"</li></ul>
 <p>5 pillars (4 + cost):</p>
 <ol><li><strong>Traces</strong> — request flow, where time goes, what tools called</li><li><strong>Metrics</strong> — quantitative SLO, RED + USE + agent-specific</li><li><strong>Logs</strong> — text events, debugging</li><li><strong>Evals</strong> — quality, hallucination, correctness</li><li><strong>Costs</strong> — $ per request, per tenant, per model</li></ol>
 <p>KPI:</p>
 <ul><li><strong>Trace coverage</strong>: 100% production runs, no untraced execution</li><li><strong>Sampling</strong>: 1% baseline, 100% on flags (error/slow/expensive)</li><li><strong>Alert false positive rate</strong>: &lt; 5%</li><li><strong>MTTD (mean time to detect)</strong>: &lt; 5 min for P1</li><li><strong>MTTR</strong>: &lt; 30 min with traces in hand</li></ul>
-<h4>Phase 2: Trace per agent run (10 min)</h4>
+<h4>Phase 2: Trace per agent run (每次 agent 运行的 trace) (10 min)</h4>
 <p><strong>2.1 OpenTelemetry semantic conventions for LLM (2026 spec)</strong></p>
 <p>OTel has GenAI semantic conventions standardizing LLM trace attributes:</p>
 <ul><li><code>gen_ai.system</code>: "openai" | "anthropic" | "gemini"</li><li><code>gen_ai.request.model</code>: "claude-sonnet-4.6"</li><li><code>gen_ai.request.temperature</code></li><li><code>gen_ai.request.max_tokens</code></li><li><code>gen_ai.response.id</code></li><li><code>gen_ai.usage.input_tokens</code></li><li><code>gen_ai.usage.output_tokens</code></li><li><code>gen_ai.usage.cost_usd</code></li></ul>
@@ -203,7 +205,7 @@
 <ul><li><strong>100% on tier-1 events</strong>: error / cost &gt; threshold / latency &gt; p99</li><li><strong>10% on tier-2</strong>: paid customer</li><li><strong>1% on tier-3</strong>: free tier baseline</li></ul>
 <p>但 1% baseline 仍存所有 trace 30 day (cold storage, Iceberg).</p>
 <p><strong>Why keep 1% even baseline</strong>: production bug 多 surface in 1% sample. Tail issue 不在 average.</p>
-<h4>Phase 3: Metrics + SLO (8 min)</h4>
+<h4>Phase 3: Metrics + SLO (指标 + 服务等级目标) (8 min)</h4>
 <p><strong>3.1 RED for service</strong>:</p>
 <ul><li><strong>Rate</strong>: agent runs/sec</li><li><strong>Error</strong>: % failed runs</li><li><strong>Duration</strong>: p50/p95/p99 e2e latency</li></ul>
 <p><strong>3.2 USE for infra</strong>:</p>
@@ -217,7 +219,7 @@
 <div class="table-wrap"><table class="md-table"><thead><tr><th>SLO</th><th>Target</th><th>Window</th></tr></thead><tbody><tr><td>Availability (success rate)</td><td>99.5%</td><td>30d rolling</td></tr><tr><td>p99 latency</td><td>&lt; 10s</td><td>30d rolling</td></tr><tr><td>Hallucination rate (tier-1 flow)</td><td>&lt; 2%</td><td>7d rolling</td></tr><tr><td>Cost per run (p95)</td><td>&lt; $0.20</td><td>7d rolling</td></tr><tr><td>Tool error rate (per tool)</td><td>&lt; 1%</td><td>7d rolling</td></tr></tbody></table></div>
 <p>Error budgets:</p>
 <ul><li>99.5% availability = 36h downtime / month allowed</li><li>&gt; 10% budget burn in 1 day → freeze deploys</li></ul>
-<h4>Phase 4: Logs + PII redact (6 min)</h4>
+<h4>Phase 4: Logs + PII redact (日志 + PII 脱敏) (6 min)</h4>
 <p><strong>4.1 Structured JSON logging</strong></p>
 <pre class="language-python"><code class="language-python">logger.info("agent.tool_call", extra={
     "trace_id": ctx.trace_id,
@@ -254,7 +256,7 @@
 <p><strong>4.4 Debug hash → raw via separate secure store</strong></p>
 <p>If real PII / raw needed for debugging:</p>
 <ul><li>Hash stored in log/trace</li><li>Raw stored encrypted in separate "debug vault" (only senior eng access, 24h auto-delete, audit access)</li><li>Lookup process: request access → manager approval → time-bound access</li></ul>
-<h4>Phase 5: Eval in loop (10 min)</h4>
+<h4>Phase 5: Eval in loop (循环中的评估) (10 min)</h4>
 <p>Eval 不只 offline, production 持续 eval:</p>
 <p><strong>5.1 Sampling strategy</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Type</th><th>Frequency</th><th>Cost</th></tr></thead><tbody><tr><td>LLM-as-judge automated</td><td>1% baseline, 100% errors, 100% tier-1 critical flow</td><td>$0.01/judge call</td></tr><tr><td>Human review</td><td>0.1% sampled, 100% escalated</td><td>$5/review</td></tr><tr><td>Synthetic eval</td><td>Hourly golden set replay</td><td>$1/run</td></tr></tbody></table></div>
@@ -304,7 +306,7 @@ Tool distribution Week 4: {sap_get_customer: 50%, sfdc_get_account: 10%, ...}
 <p>Agent run no span emit for 60s but trace still "running" → stuck. Causes:</p>
 <ul><li>LLM API hang (rare)</li><li>Tool API timeout but not handled</li><li>Deadlock in agent state machine</li></ul>
 <p>Detection: trace 60s no progress → mark as 'stuck', kill, alert.</p>
-<h4>Phase 6: Cost tracking (6 min)</h4>
+<h4>Phase 6: Cost tracking (成本跟踪) (6 min)</h4>
 <p><strong>6.1 Per-request cost breakdown</strong></p>
 <pre class="language-json"><code class="language-json">{
   "run_id": "...",
@@ -346,7 +348,7 @@ Tool distribution Week 4: {sap_get_customer: 50%, sfdc_get_account: 10%, ...}
 <p><strong>6.4 Cost anomaly detection</strong></p>
 <p>Per-tenant p95 cost per run baseline. &gt; 2× alert. Catches:</p>
 <ul><li>Bug in agent loop (multiple LLM calls)</li><li>Bad customer query (extremely long context)</li><li>Bug in prompt (token waste)</li></ul>
-<h4>Phase 7: Dashboards + alerts (8 min)</h4>
+<h4>Phase 7: Dashboards + alerts (看板 + 告警) (8 min)</h4>
 <p><strong>7.1 Dashboard hierarchy</strong></p>
 <p><strong>Level 1: Fleet (us ops view)</strong></p>
 <ul><li>Total runs/sec, errors, latency</li><li>Cost burn rate ($/hour)</li><li>Top failing customers</li><li>Top error classes</li><li>Model usage distribution</li><li>Trend: 24h, 7d, 30d</li></ul>
@@ -361,7 +363,7 @@ Tool distribution Week 4: {sap_get_customer: 50%, sfdc_get_account: 10%, ...}
 <p><strong>7.3 Customer-facing dashboard</strong></p>
 <p>Glean-like: customer logs in, sees their agent dashboard. Need:</p>
 <ul><li>Per-tenant data isolation (RBAC)</li><li>Only their data (no fleet)</li><li>Trace drill-down with PII redacted (they see their own data anyway, but our raw redacted)</li><li>Export: CSV download for their report</li></ul>
-<h4>Phase 8: Trade-offs + alternatives (7 min)</h4>
+<h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)</h4>
 <p><strong>Decision 8.1 — Build vs buy</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Capability</th><th>Build</th><th>Buy</th></tr></thead><tbody><tr><td>Traces</td><td>OTel SDK + Tempo (self-host)</td><td>Datadog APM, LangSmith</td></tr><tr><td>Metrics</td><td>Prometheus</td><td>Datadog, Grafana Cloud</td></tr><tr><td>Logs</td><td>Loki / ELK</td><td>Datadog Logs, Splunk</td></tr><tr><td>Evals</td><td>Custom (Python + LLM-judge)</td><td>LangSmith, Arize, Helicone</td></tr><tr><td>Costs</td><td>DB + Iceberg</td><td>DD custom dashboard, LangSmith</td></tr></tbody></table></div>
 <p>I推 hybrid:</p>
@@ -526,6 +528,10 @@ SLO:
 <script id="md-source" type="text/markdown">## Q30 · Agent 系统可观测性 — 记录什么, 告警什么, 看板
 
 > "You're running a production multi-step **AI agent** (LLM + tools + RAG + multi-turn). Customer reports 'sometimes the agent gives wrong answer or hangs'. **Design the observability**: what to log, what to alert on, what dashboards to build. Cover **traces, metrics, logs, evals, costs**."
+
+**中文翻译**:
+
+> "你在 production 跑一个多步 **AI agent** (LLM + 工具 + RAG (检索增强生成) + 多轮). 客户反馈 '有时候 agent 答案错或者挂住'. **设计可观测性 (observability)**: 记录什么, 告警什么, 看板 (dashboard) 怎么搭. 覆盖 **traces (链路追踪), metrics (指标), logs (日志), evals (评估), costs (成本)**."
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic / OpenAI / Sierra / Glean / LangChain · 行业: AI infra / agent platform
@@ -811,7 +817,7 @@ SLO:
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + 5 pillars (5 min)
+### Phase 1: Clarify + 5 pillars (澄清 + 五大支柱) (5 min)
 
 开口:
 - "Agent multi-step? 我假设 plan-act-reflect with 5-10 step avg"
@@ -832,7 +838,7 @@ KPI:
 - **MTTD (mean time to detect)**: < 5 min for P1
 - **MTTR**: < 30 min with traces in hand
 
-### Phase 2: Trace per agent run (10 min)
+### Phase 2: Trace per agent run (每次 agent 运行的 trace) (10 min)
 
 **2.1 OpenTelemetry semantic conventions for LLM (2026 spec)**
 
@@ -900,7 +906,7 @@ Result: 单一 trace view 跨整个 agent + 所有 tool + LLM call.
 
 **Why keep 1% even baseline**: production bug 多 surface in 1% sample. Tail issue 不在 average.
 
-### Phase 3: Metrics + SLO (8 min)
+### Phase 3: Metrics + SLO (指标 + 服务等级目标) (8 min)
 
 **3.1 RED for service**:
 - **Rate**: agent runs/sec
@@ -952,7 +958,7 @@ Error budgets:
 - 99.5% availability = 36h downtime / month allowed
 - > 10% budget burn in 1 day → freeze deploys
 
-### Phase 4: Logs + PII redact (6 min)
+### Phase 4: Logs + PII redact (日志 + PII 脱敏) (6 min)
 
 **4.1 Structured JSON logging**
 
@@ -1014,7 +1020,7 @@ If real PII / raw needed for debugging:
 - Raw stored encrypted in separate "debug vault" (only senior eng access, 24h auto-delete, audit access)
 - Lookup process: request access → manager approval → time-bound access
 
-### Phase 5: Eval in loop (10 min)
+### Phase 5: Eval in loop (循环中的评估) (10 min)
 
 Eval 不只 offline, production 持续 eval:
 
@@ -1091,7 +1097,7 @@ Agent run no span emit for 60s but trace still "running" → stuck. Causes:
 
 Detection: trace 60s no progress → mark as 'stuck', kill, alert.
 
-### Phase 6: Cost tracking (6 min)
+### Phase 6: Cost tracking (成本跟踪) (6 min)
 
 **6.1 Per-request cost breakdown**
 
@@ -1151,7 +1157,7 @@ Per-tenant p95 cost per run baseline. > 2× alert. Catches:
 - Bad customer query (extremely long context)
 - Bug in prompt (token waste)
 
-### Phase 7: Dashboards + alerts (8 min)
+### Phase 7: Dashboards + alerts (看板 + 告警) (8 min)
 
 **7.1 Dashboard hierarchy**
 
@@ -1205,7 +1211,7 @@ Glean-like: customer logs in, sees their agent dashboard. Need:
 - Trace drill-down with PII redacted (they see their own data anyway, but our raw redacted)
 - Export: CSV download for their report
 
-### Phase 8: Trade-offs + alternatives (7 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)
 
 **Decision 8.1 — Build vs buy**
 

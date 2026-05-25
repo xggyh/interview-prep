@@ -2,6 +2,10 @@
 
 > "You're consuming messages from a stream (e.g. Kafka / Redis Streams). For each message you call a **slow downstream API** (e.g. an LLM). If the downstream gets even slower or errors, you must **apply backpressure** rather than blow up memory. Code it in asyncio. Explain how backpressure propagates."
 
+**中文翻译**:
+
+> "你在消费一个 stream (流) 里的消息 (比如 Kafka / Redis Streams). 对每条消息, 你要 call 一个**慢的下游 API** (比如一个 LLM). 如果下游变得更慢或者报错, 你必须**施加 backpressure (背压)**, 不能让内存炸. 用 asyncio 写出来. 解释 backpressure 是怎么传播的."
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic**, OpenAI, Scale AI, Anyscale
 **难度**: Hard
@@ -169,7 +173,7 @@ Why: queue size × msg size = memory; 必算清楚.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -216,7 +220,7 @@ for attempt in range(MAX_RETRIES + 1):
         await asyncio.sleep(sleep)
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -496,7 +500,7 @@ class StreamingConsumer:
 5. **Circuit breaker**: 上游告诉 producer "pause", 防 cascade
 6. **DLQ + ack**: 哪怕 fail 也 ack, 避免 source 永远重投 poison
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 import asyncio
@@ -684,7 +688,7 @@ if __name__ == '__main__':
 12. **Backoff explosion** — `max_backoff_s` cap, 不会 retry 1000 秒
 13. **DLQ itself fails** — wrap in try/except + log; 不要因 DLQ 挂导致 main loop 死
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Scale + tune**:
 

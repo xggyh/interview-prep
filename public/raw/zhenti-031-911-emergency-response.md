@@ -2,6 +2,10 @@
 
 > "A major US city wants to **reduce 911 emergency response time**. You have access to **911 call data, real-time traffic data, and ambulance GPS data**. You have **60 minutes**. **Go**."
 
+**中文翻译**:
+
+> "美国某大城市想 **降低 911 急救响应时间**. 你能拿到 **911 通话数据、实时交通数据、救护车 GPS 数据**. 给你 **60 分钟**. **开始**."
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir FDE 经典题, 后被 OpenAI / Google / Salesforce / Databricks 全部复用
 **行业**: Public safety / municipal / healthcare
@@ -84,16 +88,16 @@
 
 具体看 4 个 signal:
 
-1. **Clarify before solving** — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag"
-2. **Tractable MVP** — 你能从一个 unbounded 问题里切出一个 **2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton**
-3. **Surface tradeoffs proactively** — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」
-4. **Safety-critical mindset** — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS
+1. **Clarify before solving** (先 clarify 再 solve) — 一上来就画 architecture / 算 QPS = 失分. FDE 圈共识: "Jumping to answers is an immediate red flag" (直接跳到答案 = 立刻 red flag)
+2. **Tractable MVP** (可交付的 MVP) — 你能从一个 unbounded 问题里切出一个 **2-3 周交付 + 测得到 KPI 的最薄 walking-skeleton** (走骨头)
+3. **Surface tradeoffs proactively** (主动暴露 tradeoff) — 在面试官追问前主动说「这个方案的失败模式是 X / Y / Z」
+4. **Safety-critical mindset** (安全关键思维) — 911 是生死线. 你必须表现「一条命就是一条命」, 不是把它当 normal SaaS
 
 ---
 
 ## ❌ 最常见的挂法 (top 3)
 
-**挂法 #1: 一上来就冲 ML routing 算法**
+**挂法 #1: 一上来就冲 ML routing 算法** (上来就讲 ML routing 算法)
 
 > 候选人 (5 秒内): "Sure, I'd train a graph neural network on historical traffic + GPS, predict ETA, build a recommendation system, deploy on Kubernetes..."
 
@@ -104,13 +108,13 @@
 - 已经有什么 system 在 production? (PSAP / CAD / Motorola / Tyler 等)
 - Equity concern (低收入街区 vs 高收入街区响应时间差异) 是 explicit goal 吗?
 
-**挂法 #2: 当 system design 题做**
+**挂法 #2: 当 system design 题做** (把它当系统设计题答)
 
 候选人开始算: 「30K calls/day → 350 calls/sec peak → 5 个 PSAP shards → Redis cache → Kafka topic...」
 
 死. 这道题**不是 system design**. 60 min 全花在 capacity planning + sharding = miss the point.
 
-**挂法 #3: 把 dispatcher 完全 cut out**
+**挂法 #3: 把 dispatcher 完全 cut out** (把调度员完全 cut 掉)
 
 > "AI will replace dispatchers and pick the optimal unit autonomously."
 

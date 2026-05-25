@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q11 · 单用户限流 + 全局限流 Rate Limiter</h3>
 <blockquote><p>"Design and implement a rate limiter that supports <strong>per-user limits</strong> (e.g. 100 req/min per API key) <strong>AND</strong> a <strong>global limit</strong> (e.g. 10,000 req/min total across all users). Walk us through it, then code it. We may ask you to evolve it for a distributed setup."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"设计并实现一个 rate limiter (限流器), 支持<strong>单用户限流</strong> (e.g., 每个 API key 每分钟 100 个请求) <strong>加上</strong>一个<strong>全局限流</strong> (e.g., 所有用户加起来每分钟 10,000 个请求). 先讲思路再写代码. 我们可能让你演进到分布式版本."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min, shared IDE or Google Doc) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Anthropic</strong> (高频出题), OpenAI, Scale AI <strong>难度</strong>: Medium-Hard <strong>主要技能</strong>: 分布式协调, atomic ops, algorithm trade-offs, production robustness</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -88,7 +90,7 @@
 <p>Why: 分布式 token bucket 用本地时间会因 clock skew 导致 burst leak.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions (5-10 min)</h4>
+<h4>Step 1: Design decisions (设计决策, 5-10 min)</h4>
 <p><strong>算法 4 选 1</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>算法</th><th>思想</th><th>Burst?</th><th>内存</th><th>Atomic?</th><th>适合</th></tr></thead><tbody><tr><td><strong>Token bucket</strong></td><td>桶里有 token, 每次消耗 1, 按 rate 补</td><td>✓ allow burst up to capacity</td><td>O(1) per key</td><td>✓ easy</td><td>默认选这个</td></tr><tr><td><strong>Leaky bucket</strong></td><td>请求进队列, 按固定速率漏出</td><td>✗ strict shaping</td><td>O(queue)</td><td>中</td><td>traffic shaping</td></tr><tr><td><strong>Fixed window counter</strong></td><td>每个固定窗口 count</td><td>在窗口边界 burst</td><td>O(1)</td><td>✓ 最简单</td><td>简单粗暴</td></tr><tr><td><strong>Sliding window log</strong></td><td>存所有 timestamp, 查最近 N 秒数量</td><td>平滑</td><td>O(N)</td><td>复杂</td><td>精确但贵</td></tr><tr><td><strong>Sliding window counter</strong></td><td>固定窗口 + 当前窗口线性插值</td><td>平滑</td><td>O(1)</td><td>简单</td><td>中间方案</td></tr></tbody></table></div>
 <p><strong>我选 Token bucket</strong>, 原因:</p>
@@ -102,7 +104,7 @@
         user_bucket.tokens -= 1
         global_bucket.tokens -= 1
         return True</code></pre>
-<h4>Step 2: Initial implementation (15-20 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-20 min)</h4>
 <pre class="language-python"><code class="language-python">import time
 import threading
 from dataclasses import dataclass, field
@@ -211,7 +213,7 @@ class RateLimiter:
             return max(user_wait, global_wait)</code></pre>
 <p><strong>关键设计点 (开口讲给面试官听)</strong>:</p>
 <ul><li><code>time.monotonic()</code> 而不是 <code>time.time()</code> — monotonic 不会被 NTP 回拨, 但是 process-local</li><li><code>float</code> tokens 而不是 int — 因为 elapsed × rate 通常是小数, 用 float 不丢精度</li><li><code>_refill</code> lazy: 不用后台 thread tick, 来一个 request 才算到现在 — O(1) per call, 不会跑 worker</li><li><code>_lock</code> 整个 <code>allow()</code> — 单机 fine; 分布式要用 Lua</li></ul>
-<h4>Step 3: Edge cases + tests (5-10 min)</h4>
+<h4>Step 3: Edge cases + tests (边界情况和测试, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python">def test_single_user_burst():
     """Burst then drained."""
     rl = RateLimiter(
@@ -305,7 +307,7 @@ if __name__ == '__main__':
     print('All tests passed.')</code></pre>
 <p><strong>关键 edge cases 列出来 (说给面试官)</strong>:</p>
 <ol><li><strong>First request 立即 burst</strong> — 新 user 桶要初始 full, 不能让人冷启动等 100 秒</li><li><strong>Clock backwards</strong> — <code>time.monotonic()</code> 保证不回拨; 但分布式得用 Redis time</li><li><strong>Atomic double-debit</strong> — global 空时不能扣 user (易踩)</li><li><strong>High cost per call</strong> — 一个 request 算 5 tokens (e.g., 大文档生成), 要支持 <code>cost</code> param</li><li><strong>Idle user 内存累积</strong> — <code>user_buckets</code> 长期不清, 1M user 后内存膨胀 — LRU 或定期 GC</li><li><strong>Refill cap</strong> — 长时间没用过, tokens 不能无限累积超过 capacity</li><li><strong><code>rate=0</code> 或 <code>capacity=0</code></strong> — 全 deny</li><li><strong>Same user 并发</strong> — single lock 串行; 分布式靠 Redis Lua atomic</li></ol>
-<h4>Step 4: Trade-offs + extensions (5-10 min)</h4>
+<h4>Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)</h4>
 <p><strong>Scale up: 分布式 Redis + Lua</strong></p>
 <pre class="language-lua"><code class="language-lua">-- rate_limit.lua
 -- KEYS[1] = user bucket key  (e.g. "rl:user:alice")
@@ -631,6 +633,10 @@ def allow(api_key, cost):
 
 > "Design and implement a rate limiter that supports **per-user limits** (e.g. 100 req/min per API key) **AND** a **global limit** (e.g. 10,000 req/min total across all users). Walk us through it, then code it. We may ask you to evolve it for a distributed setup."
 
+**中文翻译**:
+
+> "设计并实现一个 rate limiter (限流器), 支持**单用户限流** (e.g., 每个 API key 每分钟 100 个请求) **加上**一个**全局限流** (e.g., 所有用户加起来每分钟 10,000 个请求). 先讲思路再写代码. 我们可能让你演进到分布式版本."
+
 **Round**: Coding (60 min, shared IDE or Google Doc)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic** (高频出题), OpenAI, Scale AI
 **难度**: Medium-Hard
@@ -780,7 +786,7 @@ Why: 分布式 token bucket 用本地时间会因 clock skew 导致 burst leak.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **算法 4 选 1**:
 
@@ -813,7 +819,7 @@ def allow():
         return True
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 import time
@@ -931,7 +937,7 @@ class RateLimiter:
 - `_refill` lazy: 不用后台 thread tick, 来一个 request 才算到现在 — O(1) per call, 不会跑 worker
 - `_lock` 整个 `allow()` — 单机 fine; 分布式要用 Lua
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 def test_single_user_burst():
@@ -1038,7 +1044,7 @@ if __name__ == '__main__':
 7. **`rate=0` 或 `capacity=0`** — 全 deny
 8. **Same user 并发** — single lock 串行; 分布式靠 Redis Lua atomic
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Scale up: 分布式 Redis + Lua**
 

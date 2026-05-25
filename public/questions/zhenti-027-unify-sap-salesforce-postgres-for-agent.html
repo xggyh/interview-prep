@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q27 · SAP + Salesforce + Postgres 统一给 AI agent 用</h3>
 <blockquote><p>"Customer has data scattered in <strong>SAP S/4HANA</strong> (orders + inventory), <strong>Salesforce</strong> (CRM, customer 360), and <strong>internal Postgres DB</strong> (operational data, custom). They want an <strong>AI agent</strong> that can answer questions like 'show me the top 10 customers with overdue invoices and their last interaction'. <strong>How do you make this data accessible to the agent?</strong> Don't try to merge into one DB."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"客户数据散落在 <strong>SAP S/4HANA</strong> (订单 + 库存, ERP 系统), <strong>Salesforce</strong> (CRM, 客户 360 全景), 还有<strong>内部 Postgres DB</strong> (运营数据 + 自建表). 他们想要一个 <strong>AI agent</strong>, 能回答类似 '给我看 top 10 过期账单的客户和他们最近一次互动' 的问题. <strong>怎么把这些数据开放给 agent?</strong> 不要尝试合并到一个 DB."</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Palantir / Anthropic / Glean / Sierra · 行业: cross-industry (B2B SaaS) <strong>约束</strong>: heterogeneous data sources (SAP / SFDC / PG) / different auth models / different latency / no ETL into single warehouse / per-user permission preserved / agent must compose queries across sources</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -138,13 +140,13 @@
    ─ Eval suite: golden questions × expected tool sequence, daily run</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + reject ETL (5 min)</h4>
+<h4>Phase 1: Clarify + reject ETL (澄清 + 拒绝 ETL 死路) (5 min)</h4>
 <p>开口:</p>
 <ul><li>"Agent read-only or read+write? 我假设 99% read, 偶尔 write (SFDC update lead, SAP create order)"</li><li>"Real-time: 1 min latency OK? 我假设是, SAP 1min cache OK, SFDC 30s, PG 5s"</li><li>"Per-user permission preserved? — 假设是, agent run as user, OBO 流"</li></ul>
 <p>明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 Snowflake, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."</p>
 <p>KPI:</p>
 <ul><li><strong>Latency p99</strong>: &lt; 5s for single-source query, &lt; 15s for cross-source (3 source compose)</li><li><strong>Permission accuracy</strong>: 100% (user 不应通过 agent 看到他在 source 里看不到的)</li><li><strong>Tool call success rate</strong>: &gt; 95% (not network / API error)</li><li><strong>Cache hit rate</strong>: &gt; 60% (cost saving)</li></ul>
-<h4>Phase 2: Anti-pattern critique (5 min)</h4>
+<h4>Phase 2: Anti-pattern critique (反模式批评) (5 min)</h4>
 <p>3 个常见 wrong way:</p>
 <p><strong>Wrong 1: ETL 到 single warehouse</strong></p>
 <ul><li>30min - 6h staleness, agent 答不上 "5 min前我更新的 lead"</li><li>Permission collapse: SAP / SFDC RLS 不易 reproduce in SQL warehouse</li><li>维护翻倍: schema 改 SAP / SFDC, 还要改 ETL</li><li>Cost: 复制全部数据 + warehouse compute</li><li>只适合 BI / analytics, 不适合 transactional agent</li></ul>
@@ -155,7 +157,7 @@
 <p><strong>Right: tool-per-source MCP</strong></p>
 <p>3 个理由:</p>
 <ul><li>Real-time: 每 source 直查, latency 1-2s</li><li>Permission: OBO 让 user 自身权限 enforced by source</li><li>Modular: schema 变只动一个 MCP server, 不动 agent</li></ul>
-<h4>Phase 3: Tool-per-source pattern (10 min)</h4>
+<h4>Phase 3: Tool-per-source pattern (每个数据源一个 tool 模式) (10 min)</h4>
 <p><strong>3.1 MCP server per source</strong></p>
 <p>每 source 一个 MCP server. 每 server 输出一组 domain tool (不是 raw SQL/API).</p>
 <pre class="language-python"><code class="language-python"># SAP MCP Server
@@ -233,7 +235,7 @@ async def list_relevant_tools(query: str, user: User):
     
     return ranked[:20]  # only top 20 to LLM</code></pre>
 <p>Tool descriptions 在 vector DB, query relevance + 用户偏好 → top 20 给 LLM, prompt 不爆.</p>
-<h4>Phase 4: Schema discovery + tool design (10 min)</h4>
+<h4>Phase 4: Schema discovery + tool design (Schema 发现 + 工具设计) (10 min)</h4>
 <p><strong>4.1 Tool design principle</strong></p>
 <p>每 tool 要回答 4 个问题:</p>
 <ol><li><strong>What can I do</strong> (single sentence)</li><li><strong>When should LLM call me</strong> (use case examples in description)</li><li><strong>What input</strong> (clear schema, types, examples)</li><li><strong>What output</strong> (sample JSON, structure)</li></ol>
@@ -287,7 +289,7 @@ async def run_safe_query(sql: str, user: User):
         
         return rows_to_json(result)</code></pre>
 <p>SAP / SFDC 不开 <code>run_safe_query</code> — 那些只能用 vendor API, 没 SQL access.</p>
-<h4>Phase 5: Permission preservation (OBO) (8 min)</h4>
+<h4>Phase 5: Permission preservation (OBO) (权限传递 - On-Behalf-Of) (8 min)</h4>
 <p><strong>5.1 OAuth On-Behalf-Of</strong></p>
 <p>Agent runs as user 身份. 流程:</p>
 <pre class="language-plaintext"><code class="language-plaintext">1. User → Okta → Agent receives id_token + access_token (user-bound)
@@ -331,7 +333,7 @@ async def get_sfdc_token(user_jwt):
 <ul><li>User has SAP access but not SFDC: agent answers only SAP, says "you don't have access to Salesforce data — please request from admin"</li><li>User permissions change mid-session: cache TTL 5 min for permissions, re-check on critical operations</li><li>Service account fallback: ONLY when user permission doesn't apply (e.g., background sync), explicit elevation with audit</li></ul>
 <p><strong>5.4 Audit trail</strong></p>
 <p>Every tool call logged: <code>{user_id, tool, args_redacted, source, latency, status, ts}</code> to immutable store. Auditable for: did user X really access customer Y's data?</p>
-<h4>Phase 6: Caching + governor limits (7 min)</h4>
+<h4>Phase 6: Caching + governor limits (缓存 + API 调用配额) (7 min)</h4>
 <p><strong>6.1 Salesforce governor limits (real constraint)</strong></p>
 <p>Salesforce hard limits per 24h:</p>
 <ul><li>API calls: 100K per org (free) - 1M (premium edition)</li><li>Concurrent requests: 25 (free)</li><li>Bulk API records: 150M per 24h</li></ul>
@@ -351,7 +353,7 @@ async def get_sfdc_token(user_jwt):
 <p>但 risk: 不同意图 same embed → wrong cached answer. 限于 read-only + idempotent tool.</p>
 <p><strong>6.5 Negative cache</strong></p>
 <p>Tool fail with permission error → cache the fail for 5min (避免 flood retry). User permission change → invalidate.</p>
-<h4>Phase 7: Cross-source composition (8 min)</h4>
+<h4>Phase 7: Cross-source composition (跨数据源组合查询) (8 min)</h4>
 <p>Question: "show top 10 customers with overdue invoices and their last interaction"</p>
 <p>Agent plan:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Step 1: SAP.get_overdue_invoices(limit=10) → list of (invoice_id, customer_sap_id, amount)
@@ -367,7 +369,7 @@ Step 4: Compose: zip SAP invoice + SFDC interaction by customer_id, format</code
 <ul><li>SAP get_overdue_invoices: 800ms (10 invoices)</li><li>Mapping 10 ids in PG: 50ms (1 query)</li><li>10 × SFDC get_last_activity: 10 × 300ms parallel = 300ms (with cache hits, 50ms)</li><li>Compose + LLM response: 1500ms</li><li>Total: ~2.7s — OK with parallel + cache</li></ul>
 <p>Without parallel + cache: 800 + 50 + 3000 + 1500 = 5.4s — slow.</p>
 <p>Parallel execution is key. Agent framework (LangGraph) supports parallel tool calls.</p>
-<h4>Phase 8: Trade-offs + alternatives (7 min)</h4>
+<h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)</h4>
 <p><strong>Decision 8.1 — Tool-per-source vs federated query vs cached ETL</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Latency</th><th>Real-time</th><th>Complexity</th><th>Permission</th><th>When to use</th></tr></thead><tbody><tr><td>Tool-per-source (我推)</td><td>1-5s</td><td>Yes</td><td>Medium</td><td>Preserved (OBO)</td><td>Most cases</td></tr><tr><td>Federated query (Trino + connectors)</td><td>5-30s</td><td>Yes</td><td>High</td><td>Hard</td><td>Heavy analytics</td></tr><tr><td>Cached ETL (Snowflake + sync)</td><td>&lt;1s</td><td>No (30min stale)</td><td>High</td><td>Often flatten</td><td>BI dashboards only</td></tr><tr><td>Hybrid (cache common queries)</td><td>0.5-3s</td><td>Mixed</td><td>High</td><td>Mixed</td><td>High volume</td></tr></tbody></table></div>
 <p>Hybrid 是 staff-level — cache 常 queries 答案 in Redis (e.g., daily revenue), 不常 queries 现查. 但 cache invalidation 复杂.</p>
@@ -516,6 +518,10 @@ Write operations:
 <script id="md-source" type="text/markdown">## Q27 · SAP + Salesforce + Postgres 统一给 AI agent 用
 
 > "Customer has data scattered in **SAP S/4HANA** (orders + inventory), **Salesforce** (CRM, customer 360), and **internal Postgres DB** (operational data, custom). They want an **AI agent** that can answer questions like 'show me the top 10 customers with overdue invoices and their last interaction'. **How do you make this data accessible to the agent?** Don't try to merge into one DB."
+
+**中文翻译**:
+
+> "客户数据散落在 **SAP S/4HANA** (订单 + 库存, ERP 系统), **Salesforce** (CRM, 客户 360 全景), 还有**内部 Postgres DB** (运营数据 + 自建表). 他们想要一个 **AI agent**, 能回答类似 '给我看 top 10 过期账单的客户和他们最近一次互动' 的问题. **怎么把这些数据开放给 agent?** 不要尝试合并到一个 DB."
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir / Anthropic / Glean / Sierra · 行业: cross-industry (B2B SaaS)
@@ -756,7 +762,7 @@ Write operations:
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + reject ETL (5 min)
+### Phase 1: Clarify + reject ETL (澄清 + 拒绝 ETL 死路) (5 min)
 
 开口:
 - "Agent read-only or read+write? 我假设 99% read, 偶尔 write (SFDC update lead, SAP create order)"
@@ -771,7 +777,7 @@ KPI:
 - **Tool call success rate**: > 95% (not network / API error)
 - **Cache hit rate**: > 60% (cost saving)
 
-### Phase 2: Anti-pattern critique (5 min)
+### Phase 2: Anti-pattern critique (反模式批评) (5 min)
 
 3 个常见 wrong way:
 
@@ -800,7 +806,7 @@ KPI:
 - Permission: OBO 让 user 自身权限 enforced by source
 - Modular: schema 变只动一个 MCP server, 不动 agent
 
-### Phase 3: Tool-per-source pattern (10 min)
+### Phase 3: Tool-per-source pattern (每个数据源一个 tool 模式) (10 min)
 
 **3.1 MCP server per source**
 
@@ -900,7 +906,7 @@ async def list_relevant_tools(query: str, user: User):
 
 Tool descriptions 在 vector DB, query relevance + 用户偏好 → top 20 给 LLM, prompt 不爆.
 
-### Phase 4: Schema discovery + tool design (10 min)
+### Phase 4: Schema discovery + tool design (Schema 发现 + 工具设计) (10 min)
 
 **4.1 Tool design principle**
 
@@ -978,7 +984,7 @@ async def run_safe_query(sql: str, user: User):
 
 SAP / SFDC 不开 `run_safe_query` — 那些只能用 vendor API, 没 SQL access.
 
-### Phase 5: Permission preservation (OBO) (8 min)
+### Phase 5: Permission preservation (OBO) (权限传递 - On-Behalf-Of) (8 min)
 
 **5.1 OAuth On-Behalf-Of**
 
@@ -1040,7 +1046,7 @@ Cache tokens (Redis) by user, refresh before expiry.
 
 Every tool call logged: `{user_id, tool, args_redacted, source, latency, status, ts}` to immutable store. Auditable for: did user X really access customer Y's data?
 
-### Phase 6: Caching + governor limits (7 min)
+### Phase 6: Caching + governor limits (缓存 + API 调用配额) (7 min)
 
 **6.1 Salesforce governor limits (real constraint)**
 
@@ -1089,7 +1095,7 @@ Similar queries → same answer:
 
 Tool fail with permission error → cache the fail for 5min (避免 flood retry). User permission change → invalidate.
 
-### Phase 7: Cross-source composition (8 min)
+### Phase 7: Cross-source composition (跨数据源组合查询) (8 min)
 
 Question: "show top 10 customers with overdue invoices and their last interaction"
 
@@ -1125,7 +1131,7 @@ Without parallel + cache: 800 + 50 + 3000 + 1500 = 5.4s — slow.
 
 Parallel execution is key. Agent framework (LangGraph) supports parallel tool calls.
 
-### Phase 8: Trade-offs + alternatives (7 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)
 
 **Decision 8.1 — Tool-per-source vs federated query vs cached ETL**
 

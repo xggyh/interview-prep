@@ -2,6 +2,10 @@
 
 > "Design and implement a rate limiter that supports **per-user limits** (e.g. 100 req/min per API key) **AND** a **global limit** (e.g. 10,000 req/min total across all users). Walk us through it, then code it. We may ask you to evolve it for a distributed setup."
 
+**中文翻译**:
+
+> "设计并实现一个 rate limiter (限流器), 支持**单用户限流** (e.g., 每个 API key 每分钟 100 个请求) **加上**一个**全局限流** (e.g., 所有用户加起来每分钟 10,000 个请求). 先讲思路再写代码. 我们可能让你演进到分布式版本."
+
 **Round**: Coding (60 min, shared IDE or Google Doc)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic** (高频出题), OpenAI, Scale AI
 **难度**: Medium-Hard
@@ -151,7 +155,7 @@ Why: 分布式 token bucket 用本地时间会因 clock skew 导致 burst leak.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **算法 4 选 1**:
 
@@ -184,7 +188,7 @@ def allow():
         return True
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 import time
@@ -302,7 +306,7 @@ class RateLimiter:
 - `_refill` lazy: 不用后台 thread tick, 来一个 request 才算到现在 — O(1) per call, 不会跑 worker
 - `_lock` 整个 `allow()` — 单机 fine; 分布式要用 Lua
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 def test_single_user_burst():
@@ -409,7 +413,7 @@ if __name__ == '__main__':
 7. **`rate=0` 或 `capacity=0`** — 全 deny
 8. **Same user 并发** — single lock 串行; 分布式靠 Redis Lua atomic
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Scale up: 分布式 Redis + Lua**
 

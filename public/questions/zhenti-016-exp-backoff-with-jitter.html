@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q16 · 给不稳定 API 实现带 jitter 的指数退避</h3>
 <blockquote><p>"Implement an <strong>exponential backoff with jitter</strong> retry mechanism for an unstable HTTP API. <strong>Explain the jitter math</strong>, what errors to retry vs not, and how it interacts with <strong>circuit breaking</strong> and <strong>rate limiting</strong>."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"为一个不稳定的 HTTP API 实现一套<strong>带 jitter (抖动) 的指数退避</strong>重试机制. <strong>讲清楚 jitter 数学</strong>, 哪些错误该 retry 哪些不该, 以及它怎么跟 <strong>circuit breaking (熔断)</strong> 和 <strong>rate limiting (限流)</strong> 协同."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Anthropic</strong> (high frequency), OpenAI, Stripe, Anyscale <strong>难度</strong>: Medium <strong>主要技能</strong>: distributed reliability fundamentals, math, classification, production-aware</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -94,7 +96,7 @@
 <p>Why: 总是要的, 但有时面试官只想看代码不要 telemetry.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions + math (8-10 min)</h4>
+<h4>Step 1: Design decisions + math (设计决策与数学, 8-10 min)</h4>
 <p><strong>4 种 jitter 公式 (写在白板上)</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">attempt n (0-indexed), base = 100ms, cap = 30s
 
@@ -122,7 +124,7 @@
 <p><strong>写出来后讲</strong>: "Default I pick <strong>full jitter</strong> because it's the simplest and AWS empirically shows it minimizes both completion time and server load. Decorrelated is slightly better at large fleets (&gt;1000 clients) per AWS blog."</p>
 <p><strong>Error classification table</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Code / 类型</th><th>Retry?</th><th>怎么 retry</th><th>备注</th></tr></thead><tbody><tr><td>Network error (DNS, refused, reset)</td><td>Yes</td><td>exp backoff</td><td>多见于 transient</td></tr><tr><td>Timeout (deadline exceeded)</td><td>Maybe</td><td>only if idempotent</td><td>non-idempotent POST 不 retry</td></tr><tr><td>408 Request Timeout</td><td>Yes</td><td>exp backoff</td><td>server 自己说 retry</td></tr><tr><td>429 Too Many Requests</td><td>Yes</td><td><strong>respect Retry-After header</strong></td><td>否则 exp backoff</td></tr><tr><td>500 Internal Server Error</td><td>Yes</td><td>exp backoff</td><td>maybe deploy in progress</td></tr><tr><td>502 Bad Gateway</td><td>Yes</td><td>exp backoff</td><td>LB / proxy 问题</td></tr><tr><td>503 Service Unavailable</td><td>Yes</td><td>Retry-After 或 exp backoff</td><td>overloaded</td></tr><tr><td>504 Gateway Timeout</td><td>Maybe</td><td>only idempotent</td><td>non-idempotent: 不知道 server 跑没跑</td></tr><tr><td>400 Bad Request</td><td>No</td><td>—</td><td>bug, 重试无意义</td></tr><tr><td>401 Unauthorized</td><td>Once after token refresh</td><td>not infinite</td><td></td></tr><tr><td>403 Forbidden</td><td>No</td><td>—</td><td>permission, 重试无意义</td></tr><tr><td>404 Not Found</td><td>No</td><td>—</td><td>(unless eventual consistency 已知)</td></tr><tr><td>409 Conflict</td><td>No (default)</td><td>—</td><td>sometimes retry on optimistic lock</td></tr><tr><td>410 Gone</td><td>No</td><td>—</td><td>resource gone, permanent</td></tr><tr><td>422 Unprocessable</td><td>No</td><td>—</td><td>client bug</td></tr></tbody></table></div>
-<h4>Step 2: Initial implementation (15-20 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-20 min)</h4>
 <pre class="language-python"><code class="language-python">"""
 Exponential backoff with jitter + retry framework.
 
@@ -433,7 +435,7 @@ def call_api_with_retry(method: str, url: str, *, payload=None,
 
     cfg = config or RetryConfig(classifier=http_classifier_for_requests)
     return retry_sync(call, config=cfg)</code></pre>
-<h4>Step 3: Tests with mock clock (5-10 min)</h4>
+<h4>Step 3: Tests with mock clock (用 mock clock 测试, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python">import unittest
 from unittest.mock import patch, MagicMock
 import time
@@ -566,7 +568,7 @@ class TestRetryAsync(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()</code></pre>
-<h4>Step 4: Edge cases + production discussion (10 min)</h4>
+<h4>Step 4: Edge cases + production discussion (边界情况与生产讨论, 10 min)</h4>
 <p><strong>Edge cases</strong>:</p>
 <ol><li><strong>First attempt success</strong> — no retry, no log spam, no delay</li><li><strong>Deadline already passed</strong> — raise immediately, don't sleep</li><li><strong>Retry-After header in seconds</strong> — <code>Retry-After: 30</code> → sleep 30s exactly</li><li><strong>Retry-After in HTTP-date</strong> — <code>Retry-After: Wed, 21 Oct 2026 07:28:00 GMT</code> → parse + diff with now</li><li><strong>Connection reset mid-stream</strong> — depends on idempotency</li><li><strong>Token expired (401) mid-retry</strong> — refresh once, retry once, fail</li><li><strong>Two attempts return different errors</strong> — log all, raise last</li><li><strong>Caller cancels</strong> (asyncio.CancelledError) — re-raise immediately, don't retry</li><li><strong>OOM / KeyboardInterrupt</strong> — don't retry, propagate</li><li><strong>Retry storm</strong> — budget caps total retry rate</li><li><strong>Clock skew</strong> in deadline math — use monotonic</li><li><strong>Reentrant</strong> — same function retrying inside another retry; budget should cover both</li></ol>
 <p><strong>Thundering herd discussion</strong>:</p>
@@ -691,6 +693,10 @@ delay = random.uniform(0, min(cap, base * 2**attempt))
 <script id="md-source" type="text/markdown">## Q16 · 给不稳定 API 实现带 jitter 的指数退避
 
 > "Implement an **exponential backoff with jitter** retry mechanism for an unstable HTTP API. **Explain the jitter math**, what errors to retry vs not, and how it interacts with **circuit breaking** and **rate limiting**."
+
+**中文翻译**:
+
+> "为一个不稳定的 HTTP API 实现一套**带 jitter (抖动) 的指数退避**重试机制. **讲清楚 jitter 数学**, 哪些错误该 retry 哪些不该, 以及它怎么跟 **circuit breaking (熔断)** 和 **rate limiting (限流)** 协同."
 
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic** (high frequency), OpenAI, Stripe, Anyscale
@@ -870,7 +876,7 @@ Why: 总是要的, 但有时面试官只想看代码不要 telemetry.
 
 ## 详细解题流程
 
-### Step 1: Design decisions + math (8-10 min)
+### Step 1: Design decisions + math (设计决策与数学, 8-10 min)
 
 **4 种 jitter 公式 (写在白板上)**:
 
@@ -922,7 +928,7 @@ attempt n (0-indexed), base = 100ms, cap = 30s
 | 410 Gone | No | — | resource gone, permanent |
 | 422 Unprocessable | No | — | client bug |
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -1237,7 +1243,7 @@ def call_api_with_retry(method: str, url: str, *, payload=None,
     return retry_sync(call, config=cfg)
 ```
 
-### Step 3: Tests with mock clock (5-10 min)
+### Step 3: Tests with mock clock (用 mock clock 测试, 5-10 min)
 
 ```python
 import unittest
@@ -1374,7 +1380,7 @@ if __name__ == '__main__':
     unittest.main()
 ```
 
-### Step 4: Edge cases + production discussion (10 min)
+### Step 4: Edge cases + production discussion (边界情况与生产讨论, 10 min)
 
 **Edge cases**:
 

@@ -2,6 +2,10 @@
 
 > "You're 4 weeks into a deployment. The customer's Lead Architect has chosen a specific **architecture** (let's say: **microservices + Kafka + on-prem K8s** for what could be a simple monolith + Postgres + AWS managed service). **You believe it's the wrong choice for their actual needs and timeline.** **You're on a 30-min call with the Lead Architect. Tell them.**"
 
+**中文翻译**:
+
+> "你部署进行了 4 周. 客户的首席架构师 (Lead Architect) 选了一个特定 **架构** (比如说: **微服务 + Kafka + 本地 K8s**, 但实际上可能一个简单的 monolith + Postgres + AWS 托管服务就够了). **你认为这个选择对他们实际需求和时间线来说是错的**. **你跟 Lead Architect 有 30 分钟的电话. 告诉他/她**."
+
 **Round**: Client Simulation (30 min)
 **出处**: Exponent 2026 FDE · Palantir / OpenAI Enterprise · 经典必踩
 **场景**: 客户 Lead Architect 已经做了架构决定. 你认为错了. 你必须 disagree 但又不羞辱他们.
@@ -101,11 +105,11 @@
 
 5 个 signal:
 
-1. **Don't open with "I disagree"** — burn bridge. **Open with "what they're right about"**
-2. **Pre-mortem framing** — "have you considered…" not "you're wrong"
-3. **Acknowledge what you don't know** — they have context you don't (regulatory, org chart, past projects)
-4. **Frame as their decision, not yours** — they're the architect, you're the FDE. **Their org, their call**
-5. **Offer reversibility plan** — "if 6 months from now this doesn't work, here's the migration path"
+1. **Don't open with "I disagree"** (别上来就说 "我不同意") — burn bridge (烧桥). **Open with "what they're right about"** (开场讲对方对的那部分)
+2. **Pre-mortem framing** (事前预演口吻) — "have you considered…" not "you're wrong" (用 "你考虑过…" 不用 "你错了")
+3. **Acknowledge what you don't know** (承认你不知道的) — they have context you don't (regulatory, org chart, past projects)
+4. **Frame as their decision, not yours** (定性为他们的决定, 不是你的) — they're the architect, you're the FDE. **Their org, their call** (他们的组织, 他们决定)
+5. **Offer reversibility plan** (给一个可逆方案) — "if 6 months from now this doesn't work, here's the migration path" (6 个月后如果不行, 这是迁移路径)
 
 ---
 
@@ -138,7 +142,9 @@
 >
 > So — walk me through the reasoning. What problems is this architecture solving for you? What alternatives did you evaluate? What's the team's familiarity with the stack? **I want to understand before I push back.**"
 
-→ Open with **humility + curiosity + recognition of their longer context**. Don't open with your disagreement.
+**中文意思**: "Priya, 在我分享我看法不同的地方之前 — 我想诚实地说, 因为我觉得这重要 — **我想请你给我讲讲你和你团队是怎么走到这个架构的**. 我才上这个项目 4 周. 你和你团队已经想这事更久. 有些 context 你有 — 关于你的组织、你过去的项目、你的平台限制、你团队的技能 — 我还没完全吸收. **我接下来要提的可能是错的**. 即使有些事我对了, **你也可能已经评估过, 决定这条路还是对的**. 所以 — 给我讲讲你的推理. 这个架构在帮你解决什么问题? 你评估过哪些备选? 团队对这个 stack 的熟悉度? **我想先理解再 push back**."
+
+→ Open with **humility + curiosity + recognition of their longer context**. Don't open with your disagreement. (开场用 **谦虚 + 好奇 + 承认对方更长的 context**. 别一上来就反对.)
 
 ---
 
@@ -177,7 +183,9 @@
 >
 > **Help me understand each of these — I might be missing context.**"
 
-→ **Three concerns framed as questions**, not statements. Each one ends "help me understand".
+**中文意思**: "OK. 三个扎实的理由: 1. **复用现有 Kafka 基础设施** (成本 + 运维效率) 2. **匹配团队 K8s 专长** (不引入新技术) 3. **为 10x scale 未雨绸缪** (避免重写) 4. 加上 InfoSec 偏好 on-prem (受监管数据) 这些都是真的. **没有一个是错的**. 三件事我想跟你 check — 因为如果有 gap, 我宁愿现在 flag 不要 6 个月后. **Concern 1 — 当前 scale 下的初始复杂度**: 根据你分享的量, 今天流量大约 50 TPS. Microservices + Kafka + K8s 部署 v1 大约 6 个服务. 对 50 TPS, **monolith + Postgres + 一个 worker queue 4 周能上. Microservices + Kafka 要 12-16 周** — 大部分复杂度是为你还没有的 scale 买单. **问题**: 18 个月 10x 我们确定吗? 如果是 — 我懂. 如果是 '也许', 现在的复杂度可能把你锁进不付回报的运维负担. **Concern 2 — on-prem K8s 的运维负担**: K8s 上 6 个服务 = 6 个部署 pipeline、6 套告警、6 套依赖升级. 你 platform team 有 K8s 专长 — 但 **对 6 个微服务来说, 那是大量运维时间**. **这会消耗你 platform team 每月多少带宽?** **问题**: 如果是 platform team 时间的 30%+ 在运维, 那是这部分产能的最高价值用途吗? **Concern 3 — InfoSec on-prem 偏好 vs managed service 合规**: AWS managed services 比如 RDS / MSK 实际上 **合规认证比大多数 on-prem 设置更强** (SOC2, FedRAMP, HIPAA), 而且它们自动处理 patching + backup + DR. **你 InfoSec team 显式评估过 AWS managed services, 还是 on-prem 偏好是基于假设?** 经常 InfoSec 偏好来自 5 年前, 那时候 AWS managed services 没这么成熟. 值得重新 check. **每条都帮我理解一下 — 我可能漏了 context**."
+
+→ **Three concerns framed as questions**, not statements. Each one ends "help me understand". (**三条顾虑都用问句, 不是陈述句**. 每条以 "帮我理解" 结尾.)
 
 ---
 
@@ -203,7 +211,9 @@
 >
 > **But — your call. You have context I don't.**"
 
-→ Specific concerns + alternative offered. **Then immediately re-assert their authority**.
+**中文意思**: "**不是 '应该' — 那是你的决定**. 但让我分享我会考虑的: **关于 10x scale**: 50 TPS 的 10x 是 500 TPS. **如果 workload 跟今天类似, Postgres + 一个 worker queue 轻松扛 500 TPS**. **Kafka + microservices** 通常在 **5000+ TPS** 才合理. **你 10x 的目标可能不需要 microservices**. 除非 10x 同时伴随 **本质形态变化** (新模式、新数据类型、不同延迟目标), 配合 read replicas 和 partitioning, monolith 能 scale 到几千 TPS. **关于 40% platform 带宽**: 那是巨大的成本. 4 个 engineer 的 40% = 永远 1.6 个 engineer 在做运维. 如果我们 ship monolith + managed services, 那 1.6 个 engineer 做 feature. **18 个月下来, 那是大约 24 个 engineer-month 的 feature 工作**. **关于 2 年前的 InfoSec review**: 我会让他们重新评估. AWS managed services 变化很大. 决策应该基于当前能力, 不是 2 年前的 context. **如果他们重评后还是偏好 on-prem, 那是有效答案**. 但 review 值得做. **我会考虑的替代**: **Phase 1 (现在)**: Monolith + Postgres + managed worker queue (SQS / managed Kafka). 4 周能上. 轻松扛 50 TPS, scale 到 500 TPS. **Phase 2 (scale 需要时)**: 如果 5000+ TPS 真的来了, 把热点服务抽成 microservices. **monolith → microservices 的迁移工具成熟、可预测**. 不是 0 成本, 但 **把复杂度推迟到你需要时再付**. **我不在主张的**: microservices 是错的. **对 5000+ TPS 系统它是对的**. 我主张的是 **复杂度是为未来买的, 不是为今天, 你可以延迟这笔付款**. **但 — 你的决定. 你有我没有的 context**."
+
+→ Specific concerns + alternative offered. **Then immediately re-assert their authority**. (具体顾虑 + 替代方案. **然后立刻把决定权交回他们**.)
 
 ---
 
@@ -236,7 +246,9 @@
 >
 > **Want me to write the migration plan as part of this engagement**, so you have it in the drawer for when (or if) you need it?"
 
-→ Quantify migration cost. **Offer to write the contingency plan upfront**. Reduces fear of "what if monolith fails".
+**中文意思**: "**对, 迁移有成本**. 让我量化一下. **我们见过的 monolith → microservices 迁移模式**: - **抽出第一个服务**: 4-6 周 - **后续抽**: 每个 2-3 周 - **6 个服务总共**: 大约 3-4 个月 **对比 day 1 就上 microservices**: 现在 12-16 周 + 持续 1.6 engineer 运维. **算账**: - **现在 monolith**: 4 周构建 + 4 个月未来迁移 (如果需要) = 5 个月 - **现在 microservices**: 16 周构建 + 持续运维 = 4 个月前期, 没省下 如果迁移概率 100% (你肯定会需要 microservices): 总成本大致相同. 如果迁移概率 60%: monolith 省 1.6 个月前期 + 运维. 如果迁移概率 30%: monolith 省 4 个月 + 永远的运维成本. **问题是: 你 18 个月内真的撞到需要 microservices 的 5000+ TPS 的概率有多大?** **可逆方案**: 如果我们走 monolith 然后真的撞到 scale, **我承诺现在就写迁移计划**, 这样你需要时, 路径是已知的. 不会突然来一次架构重写 — 预先规划好的抽取顺序. **要我把迁移计划作为这次 engagement 的一部分写出来吗?** 这样你有备份在抽屉里, 万一需要时拿出来用."
+
+→ Quantify migration cost. **Offer to write the contingency plan upfront**. Reduces fear of "what if monolith fails". (量化迁移成本. **主动提议前期就写应急方案**. 降低 "万一 monolith 不行" 的恐惧.)
 
 ---
 
@@ -264,6 +276,8 @@
 >
 > I'll wait. **Whatever you and your team decide, we'll execute on it well**."
 
+**中文意思**: "**我的建议**: 1. **让 InfoSec 重新评估 managed services**: 1 周. 如果他们还说 on-prem, 那就约束了答案. 2. **跟你 business team 压力测试 10x 假设**: 真的是 500 TPS 的 10x, 还是 5000+ TPS 的 10x? 确保你对 shape 清晰. 3. **如果 InfoSec 接受 managed services + scale 目标在 500 TPS 左右**: v1 用 monolith + Postgres + SQS. 真的 scale 来了再迁 microservices. 4. **如果 InfoSec 强制 on-prem 或者 scale 真的是 5000+ TPS**: 维持你当前架构, 但 **我会主张一开始 microservices 数量少一些** — 也许 2-3 个服务而不是 6 个. 运维更容易, 后面可以再拆. **我不在做的**: 告诉你我的架构对、你的错. **你的业务、团队、过去项目、政治 context 都比我了解**. **你和团队决定哪个**, 我的工作就是把它 ship 好. **我在做的**: 确保你有完整信息做决定. **如果你已经评估过我的 3 个顾虑, 答案还是 microservices on-prem, 那是个好答案 — 我只想确认我们一起评估过**. **我需要你做**: 1. **下周二前**: InfoSec 重评决定 (yes/no) 2. **下周五前**: scale 目标确认 (500 TPS 还是 5000+) 3. **再下周二前**: 最终架构决定 我会等. **不管你和团队决定什么, 我们都会执行得好**."
+
 ---
 
 > **Priya**: "OK. I'll loop in my team this week. Thanks for raising this honestly."
@@ -272,7 +286,9 @@
 >
 > **One more thing**: even if you decide to stay with microservices on-prem after re-evaluation, **I'll have learned a lot from this conversation**. I'd rather we have it than I sit silently and ship something I worry about. **So thank you for the conversation.**"
 
-→ Close with **genuine appreciation for their willingness to engage**. Show you respect them more, not less, after the disagreement.
+**中文意思**: "**谢谢你 4 周后还愿意重新看这事**. 那不总是容易的 — 一旦架构定了, 惯性是真的. 你团队能没有自我地重新评估, 是个信号: 不管你选哪条路你们都会建出好东西. **再一件事**: 即使重评后你决定坚持 microservices on-prem, **我从这次对话学到很多**. 我宁愿我们这样谈一次, 也不要我沉默地 ship 一个我担心的东西. **所以谢谢这次对话**."
+
+→ Close with **genuine appreciation for their willingness to engage**. Show you respect them more, not less, after the disagreement. (收尾用 **真诚感谢对方愿意 engage**. 表达你对他们的尊重在分歧后更多, 不是更少.)
 
 ---
 

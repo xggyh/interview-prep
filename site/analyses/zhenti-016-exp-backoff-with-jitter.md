@@ -2,6 +2,10 @@
 
 > "Implement an **exponential backoff with jitter** retry mechanism for an unstable HTTP API. **Explain the jitter math**, what errors to retry vs not, and how it interacts with **circuit breaking** and **rate limiting**."
 
+**中文翻译**:
+
+> "为一个不稳定的 HTTP API 实现一套**带 jitter (抖动) 的指数退避**重试机制. **讲清楚 jitter 数学**, 哪些错误该 retry 哪些不该, 以及它怎么跟 **circuit breaking (熔断)** 和 **rate limiting (限流)** 协同."
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Anthropic** (high frequency), OpenAI, Stripe, Anyscale
 **难度**: Medium
@@ -180,7 +184,7 @@ Why: 总是要的, 但有时面试官只想看代码不要 telemetry.
 
 ## 详细解题流程
 
-### Step 1: Design decisions + math (8-10 min)
+### Step 1: Design decisions + math (设计决策与数学, 8-10 min)
 
 **4 种 jitter 公式 (写在白板上)**:
 
@@ -232,7 +236,7 @@ attempt n (0-indexed), base = 100ms, cap = 30s
 | 410 Gone | No | — | resource gone, permanent |
 | 422 Unprocessable | No | — | client bug |
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -547,7 +551,7 @@ def call_api_with_retry(method: str, url: str, *, payload=None,
     return retry_sync(call, config=cfg)
 ```
 
-### Step 3: Tests with mock clock (5-10 min)
+### Step 3: Tests with mock clock (用 mock clock 测试, 5-10 min)
 
 ```python
 import unittest
@@ -684,7 +688,7 @@ if __name__ == '__main__':
     unittest.main()
 ```
 
-### Step 4: Edge cases + production discussion (10 min)
+### Step 4: Edge cases + production discussion (边界情况与生产讨论, 10 min)
 
 **Edge cases**:
 

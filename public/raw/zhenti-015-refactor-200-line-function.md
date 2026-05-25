@@ -2,6 +2,10 @@
 
 > "Here's a 200-line function from our codebase. **Refactor it** so it's testable, readable, and maintainable. **Walk us through your reasoning** as you go. We care more about your process than the final code."
 
+**中文翻译**:
+
+> "这是我们 codebase 里一个 200 行的函数. **重构它**, 让它 testable (可测试), readable (易读), maintainable (易维护). 边做边**讲你的思路**. 我们更在乎你的 process (过程), 而不是最终代码."
+
 **Round**: Coding (60 min, shared screen)
 **出处**: Exponent 2026 FDE · 公司: **Palantir** (经典), Anthropic, Anyscale
 **难度**: Medium (但 process 是关键, 不是 algo)
@@ -167,7 +171,7 @@ Why: production refactor 多次小 PR > 一个大 PR (review 友好, easy revert
 
 ## 详细解题流程
 
-### Step 1: Sample "bad" 200-line function
+### Step 1: Sample "bad" 200-line function (示例 — 待重构的烂函数)
 
 为了 concrete, 我们假设面试官 paste 进来这么个函数 (real-feel BNPL refund handler):
 
@@ -297,7 +301,7 @@ def process_refund(refund_id, user_id, amount, currency, reason, region):
     }
 ```
 
-### Step 2: Read + verbalize smells (10 min)
+### Step 2: Read + verbalize smells (通读并出声指出代码坏味道, 10 min)
 
 **Smells to call out (out loud)**:
 
@@ -312,7 +316,7 @@ def process_refund(refund_id, user_id, amount, currency, reason, region):
 9. **Nested if** — region check 3 层嵌套, hard to test corner.
 10. **No tests** — 函数 200 行 0 unit test.
 
-### Step 3: Characterization tests (10 min)
+### Step 3: Characterization tests (锁住现行行为的测试, 10 min)
 
 **Before touching code, lock current behavior**:
 
@@ -429,7 +433,7 @@ def test_first_refund_is_manual(fake_db, fake_requests):
 - "I'm intentionally using mocks for `db_conn` and `requests` — even before refactor — so I can run these in 0.1s, not flake on network."
 - "Coverage isn't 100%, but I have one test per branch + happy path. That's the safety net."
 
-### Step 4: Refactor step by step (25 min)
+### Step 4: Refactor step by step (一步步重构, 25 min)
 
 **Each step: change → run tests → commit (mental commit)**.
 
@@ -766,7 +770,7 @@ class RefundHandler:
         )
 ```
 
-### Step 5: Now write unit tests trivially (5 min)
+### Step 5: Now write unit tests trivially (轻松写 unit tests, 5 min)
 
 ```python
 # tests/test_handler.py
@@ -875,7 +879,7 @@ def test_notify_not_called_on_auto():
 
 **讲**: "现在 9 个 unit test, no mocks (only fake adapters), 全部 in-memory, 跑 <0.05s. 之前要 mock requests + db_conn 一堆 patch, 现在 zero patch."
 
-### Step 6: Diff before/after (5 min)
+### Step 6: Diff before/after (前后对比, 5 min)
 
 | Metric | Before | After |
 |--------|--------|-------|

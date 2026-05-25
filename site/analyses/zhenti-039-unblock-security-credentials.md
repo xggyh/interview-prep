@@ -2,6 +2,10 @@
 
 > "The customer's **security team is refusing to give your deployment team production credentials** to the systems you need to integrate with. You have a **30-min call with the head of their Security & IT team**. Your project is **stalled on this for 2 weeks already**. **Unblock it.**"
 
+**中文翻译**:
+
+> "客户的 **安全团队拒绝给你的部署团队生产凭证 (production credentials)** — 是你需要集成的系统的凭证. 你跟他们的 **安全 & IT 负责人有 30 分钟的电话**. 你的项目 **已经卡这事 2 周了**. **解锁这件事**."
+
 **Round**: Client Simulation (30 min)
 **出处**: Exponent 2026 FDE · Palantir / OpenAI / Anthropic deployment 必踩
 **场景**: Security blocks production credentials. Project stalled. You need to unblock without escalation war.
@@ -113,11 +117,11 @@
 
 5 个 signal:
 
-1. **Don't lead with frustration** — "we've been blocked 2 weeks" = win the wrong fight
-2. **Diagnose THEIR actual fear** — data exfiltration, audit trail, breach surface, compliance exposure
-3. **Offer narrow scope** — read-only, time-bounded, IP-allowlisted, vault-managed
-4. **Use THEIR preferred tools** — HashiCorp Vault, Okta, AWS IAM Identity Center, their existing JIT pattern
-5. **Give them the win** — they're protecting the company. You're enabling that, not bypassing
+1. **Don't lead with frustration** (别带着挫败感开场) — "we've been blocked 2 weeks" = win the wrong fight (打错了仗)
+2. **Diagnose THEIR actual fear** (诊断他们真正的恐惧) — data exfiltration, audit trail, breach surface, compliance exposure
+3. **Offer narrow scope** (给一个窄范围方案) — read-only, time-bounded, IP-allowlisted, vault-managed
+4. **Use THEIR preferred tools** (用他们偏好的工具) — HashiCorp Vault, Okta, AWS IAM Identity Center, their existing JIT pattern
+5. **Give them the win** (让他们赢) — they're protecting the company. You're enabling that, not bypassing
 
 ---
 
@@ -150,7 +154,9 @@
 >
 > Walk me through what your team is worried about. I want to know the real reasons, not the polite-no version."
 
-→ Open with **respect for their role** + **ask what they actually fear**. Don't lead with frustration.
+**中文意思**: "James, 在我提 ask 之前 — **我想认可你的团队正在做你们被雇来做的事**. 一个 vendor (供应商) 进来要生产凭证, 就应该被 push back. **我也会怀疑**. 所以我不是来绕开你顾虑的. 我是来 **理解它们**、**重新 scope 我们的诉求**、**带上你已经信任的工具**、**留下你需要的审计轨迹**. 无论最后对的答案是什么 — read-only、限时、JIT (即时) 发放、Vault 管理 — **那是我想和你一起落到的答案**. 所以让我从一个问题开始: **是什么具体的担忧让这事卡了 2 周?** 跟我讲讲你团队担心什么. 我想听真实原因, 不是 '客气的拒绝' 版本."
+
+→ Open with **respect for their role** + **ask what they actually fear**. Don't lead with frustration. (开场用 **尊重对方职责** + **问他们真正怕什么**. 别带着挫败感开场.)
 
 ---
 
@@ -178,6 +184,8 @@
 >
 > **Does this match your tooling**? You use Vault and Splunk, right?"
 
+**中文意思**: "了解了. 三个真实顾虑: **(a)** 我们查询的范围, **(b)** 我们握的凭证的权力大小, **(c)** 我们被攻破的 blast radius (爆炸半径). 让我 **针对每个顾虑** 重新 scope 我们的诉求, 因为我觉得我们实际需要的 **比一开始问的窄得多**. **针对 (a) — 查询范围**: 我们要查 **3 个特定的表**: `customers`、`transactions`、`support_tickets`. 其他都 **不需要**. 不需要写权限. 不需要查 PII 字段 (只要 ID). 提议: **定义一个 read-only 的 DB role**, 限制到这 3 个表. 不是 `SELECT *` — 显式列出可访问列. **role 里没有原始 SSN / 驾照 / email**. 刚够我们部署工作. **针对 (b) — 凭证权力**: 不用 static credential (静态凭证), **走你们 HashiCorp Vault, JIT 发放**. 凭证 **15 分钟会话有效**. 自动 rotate. 我们这边任何地方都不存长期 secret. **即使我们团队泄露凭证, 15 分钟就死了**. **针对 (c) — 爆炸半径**: 我们所有 query 走 **特定 IP 白名单** (我们专属子网, 不是公网). **另外**: 每条 query 实时进 **你们 SIEM**, 你团队看到我们在做什么. 如果不喜欢某个查询模式, **kill switch (一键禁用)** — 你撤掉 role binding, 我们几秒内丢访问权. **这跟你的工具栈对得上吗?** 你们用 Vault 和 Splunk 对吧?"
+
 ---
 
 > **James**: "Yes Vault + Splunk. OK that's better. But what about non-prod testing? You're going to need to develop against something."
@@ -189,6 +197,8 @@
 > **Option B — Synthetic data**: If sanitized replica isn't available, we generate synthetic data matching your schema. **Schema only — no real values, no PII.** Slower to set up, but fully isolated.
 >
 > **My preference**: Option A if your replica exists. Faster, more realistic. **Want to check with your team if your QA replica is suitable for our use case?**"
+
+**中文意思**: "**好问题**. 两个选项: **Option A — 脱敏的生产副本 (sanitized prod replica)**: 你们团队已经给 QA 做脱敏副本了对吧? 我们开发 + staging 用那个. **开发期间 0 生产凭证**. 生产凭证只在真正的 production sync 跑的时候用. **Option B — 合成数据 (synthetic data)**: 如果脱敏副本不可用, 我们按你 schema 生成合成数据. **只有 schema — 没真实值、没 PII**. 搭建慢一点, 但完全隔离. **我的偏好**: 如果你副本存在, 选 A. 更快、更真实. **要不要跟你团队确认 QA 副本是否适合我们的 use case?**"
 
 ---
 
@@ -209,7 +219,9 @@
 >
 > **For your CISO meeting**, I'll send a 1-page diagram showing this. **Want me to draft it for you?**"
 
-→ Help them sell to their CISO. **Hand them a defensible artifact.**
+**中文意思**: "**给 CISO 的审计故事**: 1. **访问范围**: 3 个表 read-only, 列白名单. **没法 dump 客户表**. 2. **凭证生命周期**: 走 Vault JIT 发, 15 分钟 TTL, vendor 这边任何地方都没 static credential. 3. **身份**: vendor 团队走你们 Okta SSO. 实名个人, 要 MFA. **每条 query 可归属到一个具名的人**. 4. **网络**: 专属子网 IP 白名单. **没法从任意 internet 连**. 5. **日志**: 每条 query 流式进你们 Splunk + SIEM. **你实时看到我们 query 什么**. 6. **告警**: 异常 query 模式 (e.g. 全表扫描、营业时间外的 query) 触发你们已有的安全事件响应. 7. **Kill switch**: 你能在 Vault 撤掉我们 role binding, **我们访问几秒内死**. 不需要 vendor 配合. 8. **季度复查**: 跟你团队一起复查 audit log. **有不对的地方我们调整**. **合规 framing**: **最小权限 + JIT + 审计 + 可撤销**. 命中 5 项 NIST 800-53 访问控制中的 4 项. **你 CISO 一看就认这个模式**. **CISO 会议上**, 我会发一张 1-page 图. **要我帮你起草吗?**"
+
+→ Help them sell to their CISO. **Hand them a defensible artifact.** (帮他们卖给他们的 CISO. **递给他们一个可上推的文档**.)
 
 ---
 
@@ -224,6 +236,8 @@
 > **My recommendation**: Path A with clear scope criteria — '**any additional table must be read-only, must be allowlisted at column level, must include identity + PII columns hashed, must update SIEM logging**'. Pre-defined criteria, so adding doesn't require re-review **as long as it fits**.
 >
 > **If we ever ask for write access or for PII columns, that's a separate conversation**, not in this scope."
+
+**中文意思**: "**两条路**: **Path A — 现在预定义扩展标准**: 我们签约时约定 **read-only role 可以按相同 scope 规则扩展到额外的表**, 需要 **你按表批准**, Vault 配置改动 **1 个工作日**. 不重新谈访问模式. **Path B — 每次扩展当新 ask**: 每张新表都要走完整的 security review. 慢一点, 但你控制更强. **我的建议**: Path A + 清晰的 scope 标准 — '**任何新增表必须 read-only、必须列级白名单、必须含身份 + PII 列哈希、必须更新 SIEM 日志**'. 预定义标准, 这样新增 **只要符合就不用重新 review**. **如果我们要写权限或 PII 列, 那是另一次对话**, 不在这个 scope 里."
 
 ---
 
@@ -252,6 +266,8 @@
 >
 > Anything missing in this story?"
 
+**中文意思**: "**走一遍 breach 场景**: **Step 1**: 你们 SIEM 告警 (我们子网的异常 query 模式 OR 来自我们子网外的 query 尝试) **Step 2**: 你团队撤掉我们 Vault role binding. **几秒内访问死掉**. **Step 3**: 我们这边有 **24/7 security 联系人** (我会给你名字 + on-call 轮班). 你团队能立刻打电话. **Step 4**: **取证**: 你 SIEM 有过去 6 个月我们每条 query. **你能精确重建我们访问过什么**. 如果有具体客户被影响, 你有数据做客户关怀直接联系. **Step 5**: **重新发放访问**: 只有在你团队对事件做完安全 review 之后. 不会自动 re-grant. **你 *不* 用担心的**: - 凭证躺在泄露的笔记本上 (没 static cred) - vendor 团队 going rogue (几秒可撤) - 大规模 dump (列白名单防住) - 未知 query (SIEM 有每条) **仍然是 *你* 的责任**: SIEM 监控规则、事件响应 runbook、vendor 安全 review 节奏. 这个故事还缺什么吗?"
+
 ---
 
 > **James**: "Looks comprehensive. Send me the 1-pager + the proposed Vault config + the dedicated subnet IP range by Friday. I'll review with my CISO next Monday. If she greenlights, we issue you JIT credentials by Wednesday."
@@ -274,7 +290,9 @@
 >
 > James — **thank you for spending the 30 minutes here**. **Your team is the reason this rollout will be clean in 12 months**, not the reason it's slow this month. **I'd rather we get this right.**"
 
-→ Close with **genuine appreciation for them protecting the company**. Don't grovel; acknowledge.
+**中文意思**: "**搞定. 具体来说**: **周五下班前**: 1. 给你 CISO 的 1-page 审计故事 2. 提议的 Vault role 配置 (如果用 Terraform 我也会分享) 3. 专属子网 IP 段 (我们 infra 团队本周在 provisioning) 4. Splunk 集成样本 (我们计划记录的 query) **你的动作**: - 周一跟 CISO review - 批准的话, 周三发第一个 JIT 凭证 **拿到第一个凭证后**, 我团队会先跑 **合成数据 smoke test** (验证连通性 + logging 工作) **再跑任何生产 query**. **我会告诉你时间**. James — **谢谢你花这 30 分钟**. **12 个月后这个 rollout 干净, 是因为你团队这个月把关**, 不是因为它慢. **我宁愿我们做对**."
+
+→ Close with **genuine appreciation for them protecting the company**. Don't grovel; acknowledge. (收尾用 **真诚地感谢对方保护公司**. 别卑微; 是认可.)
 
 ---
 

@@ -2,6 +2,10 @@
 
 > "You've built a RAG system for a customer. **Defend your chunking strategy.** Why these chunk sizes? Why this overlap? Why this method (recursive / semantic / heading-aware / fixed)? Walk me through the ablation that justifies your choice — including what you tried and rejected. The customer's data is mostly PDFs with sections, tables, code blocks, and inline figures."
 
+**中文翻译**:
+
+> "你给一个客户搭了一个 RAG (检索增强生成) 系统. **请你来 defend 你的 chunking (切块) strategy.** 为什么用这个 chunk 大小? 为什么用这个 overlap (重叠)? 为什么用这个方法 (recursive 递归 / semantic 语义 / heading-aware 按标题 / fixed 固定大小)? 跟我讲讲你用什么 ablation (消融实验) 来证明你的选择是对的 — 包括你试了什么, 又否决了什么. 客户的数据主要是 PDF, 里面有 sections, tables, code blocks, 还有内嵌的 figures."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: Cohere / Anthropic / OpenAI / Databricks — RAG specialty 必问
 

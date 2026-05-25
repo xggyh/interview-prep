@@ -2,6 +2,10 @@
 
 > "It's 2 AM. PagerDuty wakes you up. **Walk me through the next 30 minutes.** Not generic 'I look at metrics' — show me you've actually been on-call. Be specific: what dashboards, what commands, what comms, how you decide P0 vs P1, when you wake someone up."
 
+**中文翻译**:
+
+> "凌晨 2 点. PagerDuty 把你叫醒了. **跟我讲讲接下来 30 分钟你做什么.** 别给我那种 '我看一下 metrics' 的泛泛回答 — 让我看你真的 on-call 过. 要具体: 看哪些 dashboard, 跑什么命令, 怎么沟通, 怎么判断这是 P0 还是 P1, 什么时候叫醒同事."
+
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — on-call experience 必问
 

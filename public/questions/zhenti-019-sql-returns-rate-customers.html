@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q19 · SQL 找上季度退货率 &gt; 30% 的客户</h3>
 <blockquote><p>"Write SQL to find <strong>all customers whose return rate exceeded 30% in the previous quarter</strong>. Schema: <code>orders(order_id, customer_id, order_ts, total_amount, status)</code> and <code>returns(return_id, order_id, return_ts, return_amount)</code>. <strong>Walk through edge cases</strong> — what if customer had 0 orders? What if return is partial? Quarterly cut-off?"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"写一条 SQL 找出<strong>上季度退货率 (return rate) 超过 30% 的所有客户</strong>. Schema: <code>orders(order_id, customer_id, order_ts, total_amount, status)</code> 和 <code>returns(return_id, order_id, return_ts, return_amount)</code>. <strong>把边界情况讲一遍</strong> — 客户 0 个订单怎么办? 部分退货怎么办? 季度切换 (quarterly cut-off) 怎么处理?"</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Palantir</strong>, Scale AI, Anyscale <strong>难度</strong>: Medium (但 edge cases 决定 differentiation) <strong>主要技能</strong>: SQL aggregation, date functions, edge case awareness, business semantics</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -94,7 +96,7 @@
 <p>Why: 通常要 columns 让 analyst follow up.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Sketch decomposition (5 min)</h4>
+<h4>Step 1: Sketch decomposition (分解思路, 5 min)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">Goal: customers where in [last quarter] return_rate &gt; 0.3
 
 Steps:
@@ -103,7 +105,7 @@ Steps:
   3. Per customer count: orders_total, orders_with_return
   4. return_rate = orders_with_return / orders_total  
   5. Filter return_rate &gt; 0.3 AND orders_total &gt;= 5</code></pre>
-<h4>Step 2: SQL v1 (basic but solid) — 15-20 min</h4>
+<h4>Step 2: SQL v1 (basic but solid) (第一版 SQL — 基础但靠谱) — 15-20 min</h4>
 <pre class="language-sql"><code class="language-sql">-- PostgreSQL (most common in interviews; ANSI-compatible)
 -- Assumption clarified:
 --   "Last quarter" = the most recently completed calendar quarter
@@ -160,7 +162,7 @@ WHERE orders_total &gt;= 5
 ORDER BY return_rate DESC, orders_total DESC;</code></pre>
 <p><strong>讲给面试官每一步</strong>:</p>
 <ul><li><strong><code>DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'</code></strong> — 截断到本季度初, 减 3 个月 = 上季度初. End = 本季度初 (exclusive).</li><li><strong><code>status IN (...)</code></strong> — explicit list of 算"购买"的 status; 反例: <code>status != 'CANCELLED'</code> 会漏未来出现的 status (e.g., 'REFUNDED').</li><li><strong><code>COUNT(DISTINCT oiq.order_id)</code></strong> — denominator is unique orders, not unique customers, not row count.</li><li><strong><code>LEFT JOIN ... USING</code></strong> — 无 return 的 customer 也保留, count = 0.</li><li><strong><code>NULLIF(..., 0)</code></strong> — divide by zero protection. <code>0 / 0 = NULL</code>, ratio = NULL, filtered out by <code>&gt; 0.30</code>.</li><li><strong><code>orders_total &gt;= 5</code></strong> — sample size guard.</li><li><strong><code>ROUND(..., 4)</code></strong> — output readable.</li><li><strong><code>ORDER BY</code></strong> — highest-risk customers first; BI dashboard friendly.</li></ul>
-<h4>Step 3: Edge case discussion (10-15 min)</h4>
+<h4>Step 3: Edge case discussion (边界情况讨论, 10-15 min)</h4>
 <h5>Edge case 1: Customer with 0 orders in quarter</h5>
 <pre class="language-sql"><code class="language-sql">-- They simply don't appear in orders_in_q, so they're not in the result.
 -- We do NOT want to flag "0 orders → infinite return rate" (NULL handled by NULLIF).</code></pre>
@@ -251,7 +253,7 @@ WITH quarter_bounds AS (
         DATE_TRUNC('quarter', NOW() - INTERVAL '1 month') + INTERVAL '1 month' AS q_end
 )
 -- Or maintain a fiscal_calendar table for clarity (recommended).</code></pre>
-<h4>Step 4: Performance + indexes (10 min)</h4>
+<h4>Step 4: Performance + indexes (性能与索引, 10 min)</h4>
 <p><strong>Schema:</strong></p>
 <pre class="language-plaintext"><code class="language-plaintext">orders   (order_id PK, customer_id FK, order_ts, total_amount, status)
 returns  (return_id PK, order_id FK, return_ts, return_amount)</code></pre>
@@ -304,7 +306,7 @@ FROM customer_return_rate_quarterly
 WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
   AND orders_total &gt;= 5
   AND orders_returned::numeric / orders_total &gt; 0.30;</code></pre>
-<h4>Step 5: Window function variant (advanced)</h4>
+<h4>Step 5: Window function variant (window function 进阶版本)</h4>
 <p>For ranking / quarter-over-quarter trend:</p>
 <pre class="language-sql"><code class="language-sql">-- Compare each customer's return rate over the past 4 quarters
 WITH per_customer_quarter AS (
@@ -344,7 +346,7 @@ WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
   AND orders &gt;= 5
   AND rate &gt; 0.30
 ORDER BY rate DESC;</code></pre>
-<h4>Step 6: Sample data + test (5-10 min)</h4>
+<h4>Step 6: Sample data + test (样本数据与测试, 5-10 min)</h4>
 <pre class="language-sql"><code class="language-sql">-- Setup test data
 CREATE TEMP TABLE orders (
     order_id INT PRIMARY KEY,
@@ -619,6 +621,10 @@ orders (customer_id) [for grouping]      — sort/hash aggregate</code></pre>
 
 > "Write SQL to find **all customers whose return rate exceeded 30% in the previous quarter**. Schema: `orders(order_id, customer_id, order_ts, total_amount, status)` and `returns(return_id, order_id, return_ts, return_amount)`. **Walk through edge cases** — what if customer had 0 orders? What if return is partial? Quarterly cut-off?"
 
+**中文翻译**:
+
+> "写一条 SQL 找出**上季度退货率 (return rate) 超过 30% 的所有客户**. Schema: `orders(order_id, customer_id, order_ts, total_amount, status)` 和 `returns(return_id, order_id, return_ts, return_amount)`. **把边界情况讲一遍** — 客户 0 个订单怎么办? 部分退货怎么办? 季度切换 (quarterly cut-off) 怎么处理?"
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Palantir**, Scale AI, Anyscale
 **难度**: Medium (但 edge cases 决定 differentiation)
@@ -799,7 +805,7 @@ Why: 通常要 columns 让 analyst follow up.
 
 ## 详细解题流程
 
-### Step 1: Sketch decomposition (5 min)
+### Step 1: Sketch decomposition (分解思路, 5 min)
 
 ```
 Goal: customers where in [last quarter] return_rate > 0.3
@@ -812,7 +818,7 @@ Steps:
   5. Filter return_rate > 0.3 AND orders_total >= 5
 ```
 
-### Step 2: SQL v1 (basic but solid) — 15-20 min
+### Step 2: SQL v1 (basic but solid) (第一版 SQL — 基础但靠谱) — 15-20 min
 
 ```sql
 -- PostgreSQL (most common in interviews; ANSI-compatible)
@@ -882,7 +888,7 @@ ORDER BY return_rate DESC, orders_total DESC;
 - **`ROUND(..., 4)`** — output readable.
 - **`ORDER BY`** — highest-risk customers first; BI dashboard friendly.
 
-### Step 3: Edge case discussion (10-15 min)
+### Step 3: Edge case discussion (边界情况讨论, 10-15 min)
 
 #### Edge case 1: Customer with 0 orders in quarter
 
@@ -1014,7 +1020,7 @@ WITH quarter_bounds AS (
 -- Or maintain a fiscal_calendar table for clarity (recommended).
 ```
 
-### Step 4: Performance + indexes (10 min)
+### Step 4: Performance + indexes (性能与索引, 10 min)
 
 **Schema:**
 ```
@@ -1087,7 +1093,7 @@ WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
   AND orders_returned::numeric / orders_total > 0.30;
 ```
 
-### Step 5: Window function variant (advanced)
+### Step 5: Window function variant (window function 进阶版本)
 
 For ranking / quarter-over-quarter trend:
 
@@ -1132,7 +1138,7 @@ WHERE quarter = DATE_TRUNC('quarter', NOW()) - INTERVAL '3 months'
 ORDER BY rate DESC;
 ```
 
-### Step 6: Sample data + test (5-10 min)
+### Step 6: Sample data + test (样本数据与测试, 5-10 min)
 
 ```sql
 -- Setup test data

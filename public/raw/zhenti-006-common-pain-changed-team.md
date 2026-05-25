@@ -2,6 +2,10 @@
 
 > "Tell me about a time you noticed a pattern across multiple customers and influenced your team to change how you work. How did you spot the pattern, what did you propose, and how did the team adopt it?"
 
+**中文翻译**:
+
+> "讲一次你跨多个客户发现了某种共性 (pattern), 然后影响团队改变了做法的经历. 你怎么识别出这个 pattern 的, 你提了什么方案, 团队怎么 adopt 的?"
+
 **Round**: Behavioral (30-45 min, hiring manager round)
 **出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks 高频. 变体: "tell me about a time you identified a systemic issue" / "describe a time you influenced team processes" / "when did your customer insights change a product"
 
@@ -126,14 +130,14 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context — 我服务多少 customer** | 20s | Setup 多 customer 视角 | "I was rolling out voice agent across 7 markets serving 7 ops teams..." |
-| 2 | **Pattern detection (specific signal)** | 30s | 什么信号让你 spot pattern | "After Vietnam, Thailand launches, I noticed both ops teams complained about same thing: 4-week delay between scoping and pilot..." |
-| 3 | **Why I trusted it (validation)** | 30s | 1 个 customer 是 noise, 你怎么 confirm pattern | "I went back to Indonesia logs — same pattern. Checked Philippines (in scoping) — also same. 3/3 markets..." |
-| 4 | **Root cause analysis** | 45s | Pattern 背后 systemic reason | "Root cause was 'spec doc' phase — 4 weeks of doc round-trip, but actual implementation 1 week. Doc was wrong abstraction..." |
-| 5 | **The proposal (specific)** | 60s | 你 propose 什么具体 change | "I proposed: replace spec doc with 1-week 'workshop + skeleton commit'. Workshop = stakeholder in room, skeleton = working code on day 5..." |
-| 6 | **Adoption challenge + how I navigated** | 60s | 团队 resistance, 你怎么 onboard | "Tech lead pushed back: 'workshops don't scale'. I proposed pilot on Philippines + Pakistan. Data after 2 markets prove pattern..." |
-| 7 | **Outcome (quantified for team)** | 30s | Team metric change after adoption | "Per-market onboarding time: 6 months Indonesia → 3 months Vietnam → 6 weeks Pakistan. Pattern adopted by 3 other internal teams..." |
-| 8 | **What I learned about influencing** | 30s | Meta lesson about change management | "Lesson: pattern by itself doesn't change practice. Pattern + pilot + data + champion = change..." |
+| 1 | **Context — 我服务多少 customer (背景, 我服务几个客户)** | 20s | Setup 多 customer 视角 | "I was rolling out voice agent across 7 markets serving 7 ops teams..." |
+| 2 | **Pattern detection (识别 pattern 的具体信号)** | 30s | 什么信号让你 spot pattern | "After Vietnam, Thailand launches, I noticed both ops teams complained about same thing: 4-week delay between scoping and pilot..." |
+| 3 | **Why I trusted it (我为什么相信这是 pattern)** | 30s | 1 个 customer 是 noise, 你怎么 confirm pattern | "I went back to Indonesia logs — same pattern. Checked Philippines (in scoping) — also same. 3/3 markets..." |
+| 4 | **Root cause analysis (根因分析)** | 45s | Pattern 背后 systemic reason | "Root cause was 'spec doc' phase — 4 weeks of doc round-trip, but actual implementation 1 week. Doc was wrong abstraction..." |
+| 5 | **The proposal (具体方案)** | 60s | 你 propose 什么具体 change | "I proposed: replace spec doc with 1-week 'workshop + skeleton commit'. Workshop = stakeholder in room, skeleton = working code on day 5..." |
+| 6 | **Adoption challenge + how I navigated (落地阻力 + 我怎么破局)** | 60s | 团队 resistance, 你怎么 onboard | "Tech lead pushed back: 'workshops don't scale'. I proposed pilot on Philippines + Pakistan. Data after 2 markets prove pattern..." |
+| 7 | **Outcome (量化结果)** | 30s | Team metric change after adoption | "Per-market onboarding time: 6 months Indonesia → 3 months Vietnam → 6 weeks Pakistan. Pattern adopted by 3 other internal teams..." |
+| 8 | **What I learned about influencing (我学到的影响力心法)** | 30s | Meta lesson about change management | "Lesson: pattern by itself doesn't change practice. Pattern + pilot + data + champion = change..." |
 
 Total: ~4-5 min. 8 段都重要, 段 6 (adoption challenge) 是 senior signal.
 

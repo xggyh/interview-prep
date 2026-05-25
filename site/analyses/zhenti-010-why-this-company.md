@@ -2,6 +2,10 @@
 
 > "Why us specifically? Why are you applying to [our company] for FDE, not [other AI labs / cloud providers]? Cite specific products, customers, or research that drew you in."
 
+**中文翻译**:
+
+> "为什么专门选我们? 为什么投我们家 [公司名] 的 FDE, 而不是其他 AI 实验室 / 云厂商? 说几个让你心动的具体产品、客户或者研究."
+
 **Round**: Behavioral / Motivation (30 min, hiring manager 或 recruiter screen)
 **出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Databricks / Scale AI / ElevenLabs 全部必问. 几乎是 FDE 面试 closing question.
 
@@ -181,11 +185,11 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Specific product / research hook (concrete)** | 20s | Cite specific product / paper / customer | "[OpenAI's Operator paper] / [Anthropic's Claude Code] / [Palantir's Foundry ontology with [customer]]..." |
-| 2 | **Why it specifically fits my background** | 20s | 你的具体经历对应 | "I built [voice agent agent platform] which directly maps to [Operator's agent stack]..." |
-| 3 | **Differentiator vs other AI labs** | 20s | 不 bash, 但 explicit contrast | "Compared to [other company], [this company] specifically does [X] which is what attracts me..." |
-| 4 | **Trade-off acknowledgment** | 10s | 你 explicit know what you give up | "I know [this company] doesn't [Y], I accept because [Z]..." |
-| 5 | **Long-term commit signal** | 10s | 你想 long-term 不是 stepping stone | "I want [this company] long-term, not as fishing offer or stepping stone..." |
+| 1 | **Specific product / research hook (具体产品 / 研究钩子)** | 20s | Cite specific product / paper / customer | "[OpenAI's Operator paper] / [Anthropic's Claude Code] / [Palantir's Foundry ontology with [customer]]..." |
+| 2 | **Why it specifically fits my background (为什么跟我背景特别契合)** | 20s | 你的具体经历对应 | "I built [voice agent agent platform] which directly maps to [Operator's agent stack]..." |
+| 3 | **Differentiator vs other AI labs (跟其他 AI 实验室的差异)** | 20s | 不 bash, 但 explicit contrast | "Compared to [other company], [this company] specifically does [X] which is what attracts me..." |
+| 4 | **Trade-off acknowledgment (主动认账)** | 10s | 你 explicit know what you give up | "I know [this company] doesn't [Y], I accept because [Z]..." |
+| 5 | **Long-term commit signal (长期 commit 信号)** | 10s | 你想 long-term 不是 stepping stone | "I want [this company] long-term, not as fishing offer or stepping stone..." |
 
 Total: ~90 秒.
 
@@ -208,6 +212,8 @@ Total: ~90 秒.
 > **Trade-off ack**: OpenAI 不是 pure-research mission lab (vs Anthropic 偏 safety + research-led). 我 explicitly 喜欢 product-driven + enterprise-shipping 而不是 paper-first. OpenAI 现在是 'frontier research delivering as products to enterprise', 这正是我想要的 phase of company.
 >
 > **Long-term commit**: 我不是 fishing — Anthropic / Google FDE / Palantir 我也 interview, 但 OpenAI 是我 prefer 因为 agent stack + frontier proximity + enterprise deployment 三个 vector 同时 align 我的 resume."
+
+**中文意思**: 三点把我拉到 OpenAI: (1) Operator + GPT-5 agent stack 是行业标杆, 我做 voice / chatbot agent, 现在想去做"会执行"的 agent (不只是"会建议"). (2) 公开企业客户 Stripe / Klarna / Morgan Stanley 都是我 BNPL + 跨境监管经验直接对口的 case. (3) FDE 物理上挨着 research, 客户 use case 撞到模型边界我能直接 escalate, 不用排季度规划. Trade-off 是 OpenAI 不是纯研究 lab — 我恰好喜欢 product-driven 的阶段. Long-term commit 不是 fishing, 三个 vector 同时对齐我简历的就是 OpenAI.
 
 **OpenAI-specific Cheat Sheet**:
 
@@ -271,6 +277,8 @@ Tomoro acquisition fact (recent):
 > **Trade-off ack**: Anthropic 节奏比 OpenAI 慢 (safety review + research-led culture). 我 explicit 接受 — 因为 high-stakes 行业 trust > speed. 一个 wrong refund 在印尼 = OJK audit, 几个 monthly = regulator action. 'Safety review' 我 already operate in this mode in 字节, Anthropic 这是公开 emphasis 让我感觉 natural home.
 >
 > **Long-term commit**: Anthropic 跟 my 'high-stakes deployment + constitutional confirm' thinking 是 deep alignment, 不是 fishing offer. 我 5-10 年 commit 在 enterprise AI safety + deployment 是 long-term path."
+
+**中文意思**: 三点拉我来 Anthropic: (1) Constitutional AI 的"agent 可以提议但不能自己执行"框架, 跟我在印尼做的 tier 1/2/3 refund automation 本质同源 — 我从生产倒推出来, Anthropic 从研究原则推出来, 思路一致. (2) 公开客户 Lex/Mintlify/Notion 这些 high-trust 企业, 跟我做 PayLater 在印尼 OJK / 巴西 BACEN 跨境合规的经验直接对口. (3) Claude Code + tool use API 是行业领先的工具调用设计, 我想从内部学他们的 tool engineering. Trade-off: Anthropic 节奏比 OpenAI 慢, 但 high-stakes 行业里 trust > speed, 我本来就在这种节奏里工作. Long-term 5-10 年 commit 不是 fishing.
 
 **Anthropic-specific Cheat Sheet**:
 
@@ -338,6 +346,8 @@ AS (Applied Solutions) team note:
 >
 > **Long-term commit**: 我 specifically apply Palantir 因为 long-tenure + regulated industry + customer-embedded model. 5-10 年 commit 不是 lip service."
 
+**中文意思**: 关键 framing — Palantir 不是 frontier model lab, 我的 angle 是 "ops + 数据 + 集成", 不是 "LLM 专家". 三个点: (1) Foundry ontology 就是把我做 7 个市场 stakeholder mapping (ad-hoc 干的事) 平台化的版本, 我想从平台视角学. (2) Airbus / Anduril / JPMorgan / UnitedHealth 这种 high-stakes / regulated / ops-driven 客户, 跟我 PayLater 在 OJK / BACEN 监管下的深度 ops 整合直接对口. (3) Palantir FDE 5+ 年任期 + embedded on-site, 是我想要的 — 我不想 12-18 个月跳一次, 我想在 regulated 行业 compound 5-10 年. Trade-off: LLM 在 Palantir 是工具不是产品, 我 explicit 接受.
+
 **Palantir-specific Cheat Sheet**:
 
 ```
@@ -404,6 +414,8 @@ Anti-LLM-only framing critical:
 > **Trade-off ack**: Databricks frontier model (DBRX) 不是 SOTA leader (vs GPT-5 / Claude / Gemini). 我 explicit 接受 — 我 focus 不是 frontier benchmark, 是 'production serving + customer-tuning + data integration'. Databricks 是这个 thesis right place.
 >
 > **Long-term commit**: Databricks 公开 IPO trajectory + 11 year 历史 = stable platform 我可以 5-10 年 compound 在 data + ML deployment 上. 不是 fishing offer."
+
+**中文意思**: 三点拉我来 Databricks: (1) Mosaic AI + DBRX + MLflow 把 "data + ML lifecycle + LLM" 一体化, 跟我做 ConvFinQA (9-variant ablation) + BNPL chatbot (data-driven routing 70 → 92%) 的核心信念一致 — data 工程和 model 工程不能分开. (2) Block / Mastercard / Comcast / AT&T / Shell / Walgreens 这类 data-heavy 企业客户, 跟我做 PayLater + ConvFinQA "data 驱动 + ML serving + 业务结果" 的经验直接对口. (3) Mosaic 收购 + DBRX 开源 MoE 模型, 跟我做 vLLM/SGLang 部署 + SFT/DPO 后训练直接 align, 我想做 "serving + customer-tuning", 不是只 frontier research. Trade-off: DBRX 不是 SOTA, 我接受 — 我 focus 在 serving + customer-tuning + 数据集成. Long-term 5-10 年 compound.
 
 **Databricks-specific Cheat Sheet**:
 
@@ -473,6 +485,8 @@ Acquisition context:
 >
 > **Long-term commit**: Scale IPO trajectory + 多 vertical platform = stable 5-10 年 compound 在 data + eval + RLHF 上."
 
+**中文意思**: 三点拉我来 Scale: (1) 数据标注 + RLHF + 评估是 Scale 的核心, 跟我做 voice agent SFT 50k 人工标注 dialog + DPO 20k preference pair + ConvFinQA 9-variant ablation 直接 align — 我深知"高质量标注数据是生产 AI 的 80% 工作". (2) Scale 客户跨 OpenAI / Anthropic / Meta (frontier lab 数据)、DoD (国防)、GM / Toyota (自动驾驶), 我跨 7 个市场 + voice agent / BNPL / Internal Platform 3 个 product 的多领域经验对得上 Scale FDE 跨多 customer 多 vertical 的工作形态. (3) Scale Donovan (国防 / 联邦平台) 角度独特, 我在 印尼 OJK + 巴西 BACEN 做的"政府相邻的受监管部署"思路可迁移. Trade-off: Scale 不创造 frontier model, 我接受 — 我认为 frontier model 真正的瓶颈是 "高质量标注 + 评估方法论", 不是架构本身.
+
 **Scale AI-specific Cheat Sheet**:
 
 ```
@@ -540,6 +554,8 @@ Recent Scale news (2025-2026):
 > **Trade-off ack**: ElevenLabs 不是 generalist AI lab (vs OpenAI / Anthropic). 我 explicit 接受 — 我 specifically 喜欢 voice modality specialization. Voice 是 underrated modality, conversational AI 是 next major surface area. 我 want to specialize.
 >
 > **Long-term commit**: Voice AI 5-10 年 industry build-out 长 horizon. ElevenLabs IPO trajectory + voice-first thesis = stable 长期 platform."
+
+**中文意思**: 三点拉我来 ElevenLabs: (1) Voice AI 跟我 TikTok 字节 voice agent 跨 7 个市场 6 种语言的 production 经验直接对口 — 我从巴西女声听起来像 telemarketing 这种 painful production lesson 里学过 TTS 选型, 想去 voice-first 的 platform 工作. (2) ElevenLabs 的 enterprise voice 客户 (媒体 / 游戏 NPC / 教育 / 企业 voice assistant), 跟我做 enterprise voice agent (B2C 催收 / 字节内部部署) 的 latency / jitter buffer / 多 vendor 级联 / per-language tuning / cultural voice selection 经验直接对口. (3) Conversational AI + voice cloning + multilingual TTS 是行业领先的, 我自己做 voice agent 时评估过 ElevenLabs, 想从内部看怎么 build voice agent as platform 给万千开发者用. Trade-off: ElevenLabs 不是 generalist lab, 我 explicit 接受 — 我想做 voice modality specialization.
 
 **ElevenLabs-specific Cheat Sheet**:
 

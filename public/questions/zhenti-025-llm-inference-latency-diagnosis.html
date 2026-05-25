@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q25 · 诊断 LLM 推理 pipeline 高延迟 (OpenAI 最爱)</h3>
 <blockquote><p>"Your LLM-powered customer support assistant is hitting <strong>p99 latency of 8 seconds</strong>, target is <strong>2.5 seconds</strong>. You have access to the full stack — client SDK, API gateway, tokenizer service, request queue, batch scheduler, GPU inference (Llama-70B on 8x H100 via vLLM), detokenizer, post-process. <strong>Walk me through how you diagnose and fix this.</strong>"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你的 LLM 客服助手 <strong>p99 (99 分位) 延迟到了 8 秒</strong>, 目标是 <strong>2.5 秒</strong>. 你能看到全栈 — client SDK, API gateway (网关), tokenizer service (分词服务), request queue (请求队列), batch scheduler (批处理调度器), GPU 推理 (Llama-70B 用 vLLM 跑在 8 张 H100 上), detokenizer (反分词), 后处理. <strong>走我一遍你怎么诊断 + 修.</strong>"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: OpenAI (almost always) · Anthropic Inference team · 行业: AI infra <strong>约束</strong>: vLLM / SGLang / TensorRT-LLM / continuous batching / KV cache / FP8 quant / tensor parallel / dynamic batching trade-off</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -171,14 +173,14 @@
    └────────────────────────────────────────────────────────────────────────────┘</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + decompose (5 min)</h4>
+<h4>Phase 1: Clarify + decompose (澄清 + 拆解延迟) (5 min)</h4>
 <p>开口必须先拆 metric, 不要直接 dive 解决:</p>
 <p>"8s 是什么? Streaming TTFT? End-to-end 全部 token? 这影响诊断重心. 我假设是 e2e p99, 输入 4K input + 500 output, streaming on. 那 TTFT 应在 1s, decode 1.5s, 共 2.5s budget."</p>
 <p>Token shape 关键:</p>
 <ul><li><strong>4K in, 500 out</strong>: prefill 70ms (8x H100 FP16), decode 主要</li><li><strong>32K in, 100 out</strong>: prefill 280ms+ 主要, decode 短</li><li><strong>500 in, 2000 out</strong>: decode 极长, 主要</li></ul>
 <p>KPI:</p>
 <ul><li><strong>p50 &lt; 1.5s, p99 &lt; 2.5s</strong></li><li><strong>TTFT &lt; 800ms</strong></li><li><strong>ITL (per token) &lt; 30ms streaming</strong></li><li><strong>Throughput</strong>: maintain or improve QPS</li></ul>
-<h4>Phase 2: Telemetry first (5 min)</h4>
+<h4>Phase 2: Telemetry first (先埋点, 后修) (5 min)</h4>
 <p>"在诊断前我先 instrument 每个 stage, 不然在猜":</p>
 <pre class="language-python"><code class="language-python"># Add OpenTelemetry spans per stage
 @tracer.start_as_current_span("llm.request")
@@ -198,7 +200,7 @@ async def handle(req):
 <p>也要 USE (Utilization / Saturation / Errors):</p>
 <ul><li>GPU utilization (<code>nvidia-smi dmon</code>): 应该 ≥ 90% 才说明 compute-bound</li><li>GPU memory: 看 KV cache 占多少, 接近 80% 说明 KV pressure</li><li>Queue depth / wait time</li></ul>
 <p>3 hours instrumentation, 数据出来再 talk solutions.</p>
-<h4>Phase 3: Stage-by-stage diagnosis (12 min)</h4>
+<h4>Phase 3: Stage-by-stage diagnosis (逐阶段诊断) (12 min)</h4>
 <p>假设 instrument 后看到 p99 breakdown:</p>
 <pre class="language-plaintext"><code class="language-plaintext">| Stage          | p50    | p99    | Notes                             |
 |----------------|--------|--------|-----------------------------------|
@@ -227,7 +229,7 @@ async def handle(req):
 <p><strong>Fix 3: Network 800ms TLS</strong></p>
 <ul><li>HTTP/2 keepalive + connection pool — first call 50ms, subsequent 5ms</li><li>Cross-region routing: client routes to nearest API region</li><li>gRPC over HTTP/2 instead of HTTP/1.1 multipart</li></ul>
 <p>After fixes: 200ms (queue) + 80ms (prefill) + 1500ms (decode) + 200ms (overhead) = ~2.0s p99 ✓</p>
-<h4>Phase 4: Batching deep dive (10 min)</h4>
+<h4>Phase 4: Batching deep dive (批处理深度剖析) (10 min)</h4>
 <p>vLLM Continuous Batching 是关键概念, 多数人不懂:</p>
 <p><strong>Static batching (旧)</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">T0: receive 8 requests → batch them → run forward 8 sequence in parallel
@@ -249,7 +251,7 @@ T4: req1 keeps decoding while req3 prefilling (chunked prefill)</code></pre>
 <ul><li>Long input 32K 一次性 prefill 占 GPU 1000ms → 其他 decode 停</li><li>Chunked: 32K 分 4 个 8K chunk, 跟 decode 交错执行</li><li>牺牲 5-10% throughput, gain stable latency</li></ul>
 <p><strong>Priority + preemption</strong>:</p>
 <ul><li>高优先 user 可 preempt 低优先, 把 KV cache evict 到 CPU</li><li>我推: paid &gt; free, 但 free 不 starve (max wait 5s)</li></ul>
-<h4>Phase 5: KV cache + prefix sharing (8 min)</h4>
+<h4>Phase 5: KV cache + prefix sharing (KV 缓存 + 前缀共享) (8 min)</h4>
 <p>KV cache 在 70B 上巨大, 占 GPU memory 主要部分.</p>
 <p><strong>KV size calculation</strong>:</p>
 <ul><li>Llama-70B: 80 layers × 64 heads × 128 head_dim × 2 (K, V) × 4 bytes (FP16) = ~5 MB per token</li><li>Wait, that's wrong. Actually:</li><li>Layers × heads × head_dim × 2 (KV) × 2 bytes (FP16) per token</li><li>80 × 8 (GQA, not 64) × 128 × 2 × 2 = ~328 KB per token</li></ul>
@@ -263,7 +265,7 @@ T4: req1 keeps decoding while req3 prefilling (chunked prefill)</code></pre>
 <ul><li>LRU per-sequence eviction</li><li>Swap to CPU memory (DRAM), 50× slower 但 fallback</li><li>Better: kick low-priority requests out, fail fast with retry</li></ul>
 <p><strong>KV cache compression</strong>:</p>
 <ul><li>H2O (Heavy Hitter Oracle): keep only important KV slots</li><li>FastGen / KIVI: 4-bit KV cache, 4× more capacity</li><li>Trade-off: quality drop on long context (&gt;16K)</li></ul>
-<h4>Phase 6: Quantization + decode tuning (6 min)</h4>
+<h4>Phase 6: Quantization + decode tuning (量化 + 解码调优) (6 min)</h4>
 <p><strong>Quantization options</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Method</th><th>Speed-up</th><th>Quality</th><th>Tool</th></tr></thead><tbody><tr><td>FP16 (baseline)</td><td>1×</td><td>baseline</td><td>vLLM default</td></tr><tr><td>FP8 (E4M3)</td><td>1.5-1.8×</td><td>-0.5%</td><td>vLLM, TRT-LLM (Hopper required)</td></tr><tr><td>INT8 (SmoothQuant)</td><td>1.4×</td><td>-1-2%</td><td>vLLM, TGI</td></tr><tr><td>INT4 (AWQ / GPTQ)</td><td>1.8-2.2×</td><td>-2-5%</td><td>vLLM, AutoAWQ</td></tr><tr><td>INT4 + KV INT8</td><td>2.5×</td><td>-3-7%</td><td>TRT-LLM Best Effort</td></tr></tbody></table></div>
 <p>我推 <strong>FP8 first</strong> — Hopper H100 native, &lt; 1% quality drop, 1.5× decode speedup.</p>
@@ -274,7 +276,7 @@ T4: req1 keeps decoding while req3 prefilling (chunked prefill)</code></pre>
 <ul><li><strong>Lookahead decoding</strong>: parallel n-gram generation</li><li><strong>Medusa / EAGLE</strong>: multi-head spec decoding</li><li><strong>PagedAttention</strong> (vLLM): KV cache in pages, no fragmentation</li></ul>
 <p><strong>Quality eval after quantize</strong>:</p>
 <ul><li>Don't just trust benchmarks. Run on your real eval set.</li><li>Llama-70B FP8 vs FP16 on customer support: &lt; 0.5% accuracy diff, 1.5× speed</li><li>Llama-70B INT4 vs FP16: 1-2% accuracy diff, sometimes hallucination ↑</li></ul>
-<h4>Phase 7: Network + topology fixes (5 min)</h4>
+<h4>Phase 7: Network + topology fixes (网络 + 拓扑修复) (5 min)</h4>
 <p><strong>TLS overhead</strong>:</p>
 <ul><li>Cold connection: 100ms TCP + 50ms TLS handshake = 150ms</li><li>Warm pool: 5-10ms reuse</li><li>Fix: client SDK pool connections (<code>max_keepalive_connections=100</code>)</li></ul>
 <p><strong>Region affinity</strong>:</p>
@@ -285,7 +287,7 @@ T4: req1 keeps decoding while req3 prefilling (chunked prefill)</code></pre>
 <ul><li>HTTP/1.1: head-of-line blocking</li><li>HTTP/2 multiplex: ok</li><li>gRPC: ~10% lower overhead for high-frequency calls (internal service-to-service)</li></ul>
 <p><strong>Compression</strong>:</p>
 <ul><li>gzip for response (if streaming, use per-chunk gzip)</li><li>Cuts wire bytes 3-5× for text</li></ul>
-<h4>Phase 8: Trade-offs + close (5 min)</h4>
+<h4>Phase 8: Trade-offs + close (权衡 + 收尾) (5 min)</h4>
 <p><strong>Decision 8.1 — Quality vs latency</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Quality</th><th>Latency</th><th>Cost</th></tr></thead><tbody><tr><td>Llama-70B FP16 baseline</td><td>100%</td><td>8s ❌</td><td>8× H100</td></tr><tr><td>Llama-70B FP8 + spec decode + batch tune</td><td>99%</td><td>2.5s ✓</td><td>8× H100 (same)</td></tr><tr><td>Llama-30B FP8</td><td>92%</td><td>1.5s ✓✓</td><td>4× H100</td></tr><tr><td>Llama-70B FP16 + smaller batch + more replicas</td><td>100%</td><td>3s</td><td>16× H100 ($$$)</td></tr><tr><td>Dual-model routing (8B for simple, 70B for hard)</td><td>95% avg</td><td>1.8s</td><td>mixed cost</td></tr></tbody></table></div>
 <p>我推 <strong>dual-model routing</strong> — 70% queries 用 8B (latency 0.5s), 30% complex 用 70B FP8 (2.5s). Average 1.1s, p99 2.5s, quality avg 95%.</p>
@@ -418,6 +420,10 @@ Halt criteria:
 <script id="md-source" type="text/markdown">## Q25 · 诊断 LLM 推理 pipeline 高延迟 (OpenAI 最爱)
 
 > "Your LLM-powered customer support assistant is hitting **p99 latency of 8 seconds**, target is **2.5 seconds**. You have access to the full stack — client SDK, API gateway, tokenizer service, request queue, batch scheduler, GPU inference (Llama-70B on 8x H100 via vLLM), detokenizer, post-process. **Walk me through how you diagnose and fix this.**"
+
+**中文翻译**:
+
+> "你的 LLM 客服助手 **p99 (99 分位) 延迟到了 8 秒**, 目标是 **2.5 秒**. 你能看到全栈 — client SDK, API gateway (网关), tokenizer service (分词服务), request queue (请求队列), batch scheduler (批处理调度器), GPU 推理 (Llama-70B 用 vLLM 跑在 8 张 H100 上), detokenizer (反分词), 后处理. **走我一遍你怎么诊断 + 修.**"
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: OpenAI (almost always) · Anthropic Inference team · 行业: AI infra
@@ -710,7 +716,7 @@ OpenAI / Anthropic FDE 最爱这道题, 因为它**测你是否真懂 inference 
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + decompose (5 min)
+### Phase 1: Clarify + decompose (澄清 + 拆解延迟) (5 min)
 
 开口必须先拆 metric, 不要直接 dive 解决:
 
@@ -727,7 +733,7 @@ KPI:
 - **ITL (per token) < 30ms streaming**
 - **Throughput**: maintain or improve QPS
 
-### Phase 2: Telemetry first (5 min)
+### Phase 2: Telemetry first (先埋点, 后修) (5 min)
 
 "在诊断前我先 instrument 每个 stage, 不然在猜":
 
@@ -759,7 +765,7 @@ Dashboards:
 
 3 hours instrumentation, 数据出来再 talk solutions.
 
-### Phase 3: Stage-by-stage diagnosis (12 min)
+### Phase 3: Stage-by-stage diagnosis (逐阶段诊断) (12 min)
 
 假设 instrument 后看到 p99 breakdown:
 
@@ -821,7 +827,7 @@ Or: prompt engineer to reduce output to 200 tokens average → 200 × 12 = 2.4s 
 
 After fixes: 200ms (queue) + 80ms (prefill) + 1500ms (decode) + 200ms (overhead) = ~2.0s p99 ✓
 
-### Phase 4: Batching deep dive (10 min)
+### Phase 4: Batching deep dive (批处理深度剖析) (10 min)
 
 vLLM Continuous Batching 是关键概念, 多数人不懂:
 
@@ -863,7 +869,7 @@ T4: req1 keeps decoding while req3 prefilling (chunked prefill)
 - 高优先 user 可 preempt 低优先, 把 KV cache evict 到 CPU
 - 我推: paid > free, 但 free 不 starve (max wait 5s)
 
-### Phase 5: KV cache + prefix sharing (8 min)
+### Phase 5: KV cache + prefix sharing (KV 缓存 + 前缀共享) (8 min)
 
 KV cache 在 70B 上巨大, 占 GPU memory 主要部分.
 
@@ -899,7 +905,7 @@ vLLM has prefix caching, SGLang has RadixAttention (more aggressive tree-based s
 - FastGen / KIVI: 4-bit KV cache, 4× more capacity
 - Trade-off: quality drop on long context (>16K)
 
-### Phase 6: Quantization + decode tuning (6 min)
+### Phase 6: Quantization + decode tuning (量化 + 解码调优) (6 min)
 
 **Quantization options**:
 
@@ -931,7 +937,7 @@ If quality OK, **INT4 AWQ** for 2× speedup.
 - Llama-70B FP8 vs FP16 on customer support: < 0.5% accuracy diff, 1.5× speed
 - Llama-70B INT4 vs FP16: 1-2% accuracy diff, sometimes hallucination ↑
 
-### Phase 7: Network + topology fixes (5 min)
+### Phase 7: Network + topology fixes (网络 + 拓扑修复) (5 min)
 
 **TLS overhead**:
 - Cold connection: 100ms TCP + 50ms TLS handshake = 150ms
@@ -957,7 +963,7 @@ If quality OK, **INT4 AWQ** for 2× speedup.
 - gzip for response (if streaming, use per-chunk gzip)
 - Cuts wire bytes 3-5× for text
 
-### Phase 8: Trade-offs + close (5 min)
+### Phase 8: Trade-offs + close (权衡 + 收尾) (5 min)
 
 **Decision 8.1 — Quality vs latency**
 

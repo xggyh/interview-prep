@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q35 · 保险公司 3000 万历史理赔 LLM 摘要 (多州监管约束)</h3>
 <blockquote><p>"An insurance company wants to use <strong>LLM to summarize 30 million historical claims</strong> for downstream actuarial / legal / customer-service use. They operate across <strong>all 50 US states</strong>, each with its own insurance regulator. <strong>How would you scope this in 60 minutes?</strong>"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"一家保险公司想用 <strong>LLM 把 3000 万条历史理赔 (claim) 做 summary (摘要)</strong>, 给下游精算 (actuarial) / 法务 / 客服用. 他们业务覆盖 <strong>全美 50 个州</strong>, 每个州有自己的保险监管. <strong>你怎么在 60 分钟内 scope (定范围) 这个项目?</strong>"</p></blockquote>
 <p><strong>Round</strong>: Decomposition Case (60 min) <strong>出处</strong>: Exponent 2026 FDE · Palantir + OpenAI Enterprise + Anthropic insurance vertical <strong>行业</strong>: Insurance / regulated data / large-scale ETL</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -64,17 +66,17 @@
 <p><strong>不是</strong>: 考你能不能 estimate LLM cost.</p>
 <p><strong>是</strong>: 考你能不能克制 <strong>"30M × $0.05 = $1.5M for LLM cost"</strong> 的反射性回答, 先去问 <strong>"为什么要 summary? 谁用? 哪种 use case?"</strong></p>
 <p>4 个 signal:</p>
-<ol><li><strong>Don't estimate cost first</strong> — 90% candidates 立刻算 token cost. Real win: ask <strong>what downstream use needs summary</strong>? Actuarial wants different summary than legal vs CS.</li><li><strong>Per-state regulatory variance is HUGE</strong> — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic</li><li><strong>Sample for pilot, NOT batch everything</strong> — running 30M through LLM = $1M-5M of compute. Sample 100K stratified, prove value, batch later</li><li><strong>Citation-required output</strong> — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination = legal exposure</li></ol>
+<ol><li><strong>Don't estimate cost first</strong> (别一上来估成本) — 90% candidates 立刻算 token cost. Real win: ask <strong>what downstream use needs summary</strong>? (下游谁要用 summary?) Actuarial wants different summary than legal vs CS.</li><li><strong>Per-state regulatory variance is HUGE</strong> (按州监管差异极大) — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic (不能当成铁板一块)</li><li><strong>Sample for pilot, NOT batch everything</strong> (先抽样做 pilot, 不要一次全 batch) — running 30M through LLM = $1M-5M of compute. Sample 100K stratified (分层抽样 100K), prove value, batch later</li><li><strong>Citation-required output</strong> (输出必带引用) — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination (幻觉) = legal exposure</li></ol>
 <hr />
 <h3>❌ 最常见的挂法</h3>
-<p><strong>挂法 #1: 立刻冲 LLM cost estimate</strong></p>
+<p><strong>挂法 #1: 立刻冲 LLM cost estimate</strong> (立刻冲去估 LLM 成本)</p>
 <blockquote><p>"30M claims × ~500 tokens × $0.005/1K = $750K, plus storage and indexing..."</p></blockquote>
 <p>死. 你<strong>没问</strong>:</p>
 <ul><li>Summary 给谁用 (actuarial 模型输入? Legal e-discovery? CS deflection?)</li><li>每个 use case 需要什么粒度的 summary (1-line vs 500-word)</li><li>不同 use case 是否可共用同一个 summary</li><li>哪些 claim 类型最有价值 (auto &gt; life &gt; homeowners &gt; workers comp 等)</li><li>50 个州对 AI processing claim 数据的合规要求</li></ul>
-<p><strong>挂法 #2: 把它当 batch ETL 题做</strong></p>
+<p><strong>挂法 #2: 把它当 batch ETL 题做</strong> (把它当批量 ETL 系统设计题答)</p>
 <blockquote><p>"30M claims, peak 50 TPS to LLM, distribute across 100 workers, total time 5 days..."</p></blockquote>
 <p>死. 当 system design 题做 = miss the point. 这道题考的是 scope discipline.</p>
-<p><strong>挂法 #3: 假设 1 个 universal summary 适合所有 use case</strong></p>
+<p><strong>挂法 #3: 假设 1 个 universal summary 适合所有 use case</strong> (以为一个万能 summary 能满足所有用户)</p>
 <blockquote><p>"We'd generate a 200-word summary per claim, store, and query."</p></blockquote>
 <p>死. Actuarial 用结构化 fields, 不是 narrative. Legal 需要 timeline + key facts + parties. CS 需要 status + next action. 你 generate 1 个 generic 等于没 generate.</p>
 <hr />
@@ -343,6 +345,10 @@ Key phrases:
 
 > "An insurance company wants to use **LLM to summarize 30 million historical claims** for downstream actuarial / legal / customer-service use. They operate across **all 50 US states**, each with its own insurance regulator. **How would you scope this in 60 minutes?**"
 
+**中文翻译**:
+
+> "一家保险公司想用 **LLM 把 3000 万条历史理赔 (claim) 做 summary (摘要)**, 给下游精算 (actuarial) / 法务 / 客服用. 他们业务覆盖 **全美 50 个州**, 每个州有自己的保险监管. **你怎么在 60 分钟内 scope (定范围) 这个项目?**"
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir + OpenAI Enterprise + Anthropic insurance vertical
 **行业**: Insurance / regulated data / large-scale ETL
@@ -453,16 +459,16 @@ Key phrases:
 
 4 个 signal:
 
-1. **Don't estimate cost first** — 90% candidates 立刻算 token cost. Real win: ask **what downstream use needs summary**? Actuarial wants different summary than legal vs CS.
-2. **Per-state regulatory variance is HUGE** — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic
-3. **Sample for pilot, NOT batch everything** — running 30M through LLM = $1M-5M of compute. Sample 100K stratified, prove value, batch later
-4. **Citation-required output** — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination = legal exposure
+1. **Don't estimate cost first** (别一上来估成本) — 90% candidates 立刻算 token cost. Real win: ask **what downstream use needs summary**? (下游谁要用 summary?) Actuarial wants different summary than legal vs CS.
+2. **Per-state regulatory variance is HUGE** (按州监管差异极大) — California ≠ Texas ≠ NY. NAIC model law + state amendments + state DOI directives. Can't treat as monolithic (不能当成铁板一块)
+3. **Sample for pilot, NOT batch everything** (先抽样做 pilot, 不要一次全 batch) — running 30M through LLM = $1M-5M of compute. Sample 100K stratified (分层抽样 100K), prove value, batch later
+4. **Citation-required output** (输出必带引用) — claims = legal evidence. Every summary must cite source claim file paragraphs, hallucination (幻觉) = legal exposure
 
 ---
 
 ## ❌ 最常见的挂法
 
-**挂法 #1: 立刻冲 LLM cost estimate**
+**挂法 #1: 立刻冲 LLM cost estimate** (立刻冲去估 LLM 成本)
 
 > "30M claims × ~500 tokens × $0.005/1K = $750K, plus storage and indexing..."
 
@@ -473,13 +479,13 @@ Key phrases:
 - 哪些 claim 类型最有价值 (auto > life > homeowners > workers comp 等)
 - 50 个州对 AI processing claim 数据的合规要求
 
-**挂法 #2: 把它当 batch ETL 题做**
+**挂法 #2: 把它当 batch ETL 题做** (把它当批量 ETL 系统设计题答)
 
 > "30M claims, peak 50 TPS to LLM, distribute across 100 workers, total time 5 days..."
 
 死. 当 system design 题做 = miss the point. 这道题考的是 scope discipline.
 
-**挂法 #3: 假设 1 个 universal summary 适合所有 use case**
+**挂法 #3: 假设 1 个 universal summary 适合所有 use case** (以为一个万能 summary 能满足所有用户)
 
 > "We'd generate a 200-word summary per claim, store, and query."
 

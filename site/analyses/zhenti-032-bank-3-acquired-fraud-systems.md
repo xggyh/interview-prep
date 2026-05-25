@@ -2,6 +2,10 @@
 
 > "A regional bank has **grown via acquisitions**. They now have **3 fraud detection systems** — one from each acquired entity — with **inconsistent labels, conflicting thresholds, and 3 different vendor stacks**. They want a **unified fraud platform in 90 days**. Walk me through your approach."
 
+**中文翻译**:
+
+> "一家地区性银行靠 **不断收购** 长大. 现在他们手里有 **3 套反欺诈系统** — 每个被收购的子公司一套 — **标签 (label) 定义不一致、阈值 (threshold) 互相冲突、3 家不同的厂商技术栈**. 他们想 **90 天内统一成一个反欺诈平台**. 跟我讲讲你怎么做."
+
 **Round**: Decomposition Case (60 min)
 **出处**: Exponent 2026 FDE · Palantir / Databricks 高频
 **行业**: Fintech / banking / fraud / risk
@@ -82,16 +86,16 @@
 
 4 个 signal:
 
-1. **Don't start with ML** — 90% 的候选人冲去讲 model. 真正的 win 是 **ontology + label unification** + **baseline-per-system** 在做 model 之前
-2. **Push back on the 90 days** — 90 天 unify 3 个 acquired stack 是 fantasy. 你必须 reverse scope 到一个 90 天能交付且测得到的 milestone
-3. **Treat 3 systems as 3 customers** — 每个 acquired entity 都有 fraud SME, 他们的 expertise 是 asset 不是 debt. 不能 "throw away their model"
-4. **Compliance + audit first** — 反欺诈错判会被 monitor 罚. 不能 "improve overall recall" 同时 increase false positive rate 在某 region
+1. **Don't start with ML** (别一上来讲 ML) — 90% 的候选人冲去讲 model. 真正的 win 是 **ontology + label unification** (本体 + 标签统一) + **baseline-per-system** (每个 system 的基准数字) 在做 model 之前
+2. **Push back on the 90 days** (push back 那个 90 天 deadline) — 90 天 unify 3 个 acquired stack 是 fantasy (痴人说梦). 你必须 reverse scope (反向缩范围) 到一个 90 天能交付且测得到的 milestone
+3. **Treat 3 systems as 3 customers** (把 3 个 system 当 3 个客户对待) — 每个 acquired entity 都有 fraud SME (领域专家), 他们的 expertise 是 asset 不是 debt (资产不是包袱). 不能 "throw away their model" (扔掉他们的 model)
+4. **Compliance + audit first** (合规和审计优先) — 反欺诈错判会被 monitor 罚. 不能 "improve overall recall" (提总召回率) 同时 increase false positive rate (拉高误抓率) 在某 region
 
 ---
 
 ## ❌ 最常见的挂法
 
-**挂法 #1: 立刻冲 "trained one unified XGBoost on combined data"**
+**挂法 #1: 立刻冲 "trained one unified XGBoost on combined data"** (立刻冲去讲 "在合并数据上训一个统一的 XGBoost")
 
 > "I'd merge all 3 datasets, train a unified XGBoost on labeled fraud examples, ensemble it with the 3 legacy models, and gradually deprecate them."
 
@@ -102,13 +106,13 @@
 - 监管要求 (OCC / Fed / 各州) 是 entity-level 还是 holding-co level ?
 - 已有的 false positive rate / false negative rate 各自是多少?
 
-**挂法 #2: 接受 90 天 deadline 不 push back**
+**挂法 #2: 接受 90 天 deadline 不 push back** (闷头接下 90 天 deadline 不反推)
 
 > "Yes, 90 days is doable. Week 1 we'll do data integration, week 2 model training..."
 
 死. 90 天 unify 3 stack + clean labels + train model + compliance approval + go-live = impossible. 你必须 reverse scope.
 
-**挂法 #3: 把 acquired team 当 "legacy debt"**
+**挂法 #3: 把 acquired team 当 "legacy debt"** (把被收购的团队当"历史包袱")
 
 > "We'll deprecate the old systems and migrate to the unified platform."
 

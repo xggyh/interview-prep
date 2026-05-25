@@ -2,6 +2,10 @@
 
 > "Parse a messy CSV with **inconsistent quoting**. Some fields are quoted, some aren't. Some have embedded commas, some have embedded newlines, some have escaped quotes. **Don't use the `csv` module** — implement it yourself with a state machine. Walk us through edge cases."
 
+**中文翻译**:
+
+> "解析一个 quoting (引号) 规则乱七八糟的 CSV. 有些字段加引号, 有些没加. 有的字段里嵌着逗号, 有的嵌着换行, 有的还有 escape 的引号. **不许用 `csv` 模块** — 用 state machine (状态机) 自己手写. 把边界情况讲一遍."
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Palantir** (经典), Scale AI, OpenAI
 **难度**: Medium
@@ -146,7 +150,7 @@ Why: 1 MB ok 直接 `read()`; 30GB 必须 yield row by row.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **State machine 5 个 state**:
 
@@ -200,7 +204,7 @@ class CSVOptions:
     skip_blank_lines: bool = True
 ```
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 from dataclasses import dataclass
@@ -477,7 +481,7 @@ def parse_csv_stream(reader: Iterable[str], options: Optional[CSVOptions] = None
 - **strict vs lenient** 通过 `opts.strict` 切换 — production 给客户选, 默认 lenient + log
 - **BOM 在第一行就 strip** — 客户 Excel export 80% 带 BOM
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 def test_basic():
@@ -610,7 +614,7 @@ if __name__ == '__main__':
 14. **Unicode** — UTF-8 multi-byte, surrogate pair (emoji 等)
 15. **Quoted field 跨 chunk 边界** — streaming 时要 carry state across
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **vs stdlib `csv`**:
 

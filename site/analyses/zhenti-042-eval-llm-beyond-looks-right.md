@@ -2,6 +2,10 @@
 
 > "Your model 'looks right' in dev. **How do you actually know it works** when you ship it to a customer's production environment? Walk me through your eval methodology — automated metrics, LLM-as-judge, human review, business KPI. Be specific about what you'd build in week 1 vs month 3."
 
+**中文翻译**:
+
+> "你的模型在开发环境里 '看起来对'. **你到底怎么知道它真的能 work** — 当你把它 ship 到客户的 production 环境之后? 跟我讲讲你的 eval (评估) 方法论 — automated metrics (自动化指标), LLM-as-judge (用大模型当评审), 人工 review, 业务 KPI 这些. 要具体说清楚第 1 周做什么 vs 第 3 个月做什么."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — 分水岭 question. "你怎么知道它真的 работает"
 

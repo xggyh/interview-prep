@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q13 · CLI 工具 — 读 PDF 输出带实体抽取的 JSON 索引</h3>
 <blockquote><p>"Build a <strong>CLI tool</strong> that takes a directory of PDFs and produces a <strong>searchable JSON index</strong> with <strong>extracted entities</strong> (people, organizations, dates, monetary values). Code it. Then we'll discuss productionization."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"写一个 <strong>CLI 工具</strong> (命令行工具), 输入是一个 PDF 目录, 输出是一个<strong>可搜索的 JSON 索引</strong>, 里面带<strong>抽取出来的实体</strong> (人名, 组织, 日期, 金额). 写代码. 然后我们聊一下 productionization (产品化上线)."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min, shared screen + IDE) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Scale AI</strong>, OpenAI, Anthropic <strong>难度</strong>: Medium-Hard <strong>主要技能</strong>: 真实 production tooling, LLM 集成成本控制, CLI UX, error handling</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -88,7 +90,7 @@
 <p>Why: 1M PDF 跑 8 小时挂了, 必须能 resume.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Design decisions (5-10 min)</h4>
+<h4>Step 1: Design decisions (设计决策, 5-10 min)</h4>
 <p><strong>Architecture</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">$ pdfindex extract /docs/*.pdf --output index.json [--use-llm] [--workers 8]
 
@@ -107,7 +109,7 @@ Per-doc JSON:  ./out/{doc_id}.json
 Master index:  ./out/index.json — { doc_id → { path, mtime, entity_counts } }</code></pre>
 <p><strong>关键选择</strong>:</p>
 <ul><li><strong><code>pdfplumber</code></strong> for direct text — Python pure, mature, 不需要 native binding</li><li><strong>OCR fallback</strong>: 若 pdfplumber 抽出 &lt; 20 chars/page, 走 <code>pytesseract</code> (or skip if <code>--no-ocr</code>)</li><li><strong><code>spaCy</code></strong> for default NER — <code>en_core_web_sm</code> 50MB 模型 fast — Person/Org/Date/Money/GPE 都有</li><li><strong><code>--use-llm</code></strong> flag for LLM-based extraction (OpenAI / Anthropic) — 更准, 但要 chunk + budget</li><li><strong>JSON output</strong> — per-doc + master index, idempotent</li></ul>
-<h4>Step 2: Initial implementation (15-20 min)</h4>
+<h4>Step 2: Initial implementation (初始实现, 15-20 min)</h4>
 <pre class="language-python"><code class="language-python">"""
 pdfindex - extract text + entities from PDFs into JSON.
 
@@ -633,7 +635,7 @@ def main(argv=None) -&gt; int:
 
 if __name__ == '__main__':
     sys.exit(main())</code></pre>
-<h4>Step 3: Edge cases + tests (5-10 min)</h4>
+<h4>Step 3: Edge cases + tests (边界情况和测试, 5-10 min)</h4>
 <pre class="language-python"><code class="language-python"># tests/test_pdfindex.py
 import json
 import tempfile
@@ -720,7 +722,7 @@ if __name__ == '__main__':
     unittest.main()</code></pre>
 <p><strong>Edge cases (说给面试官)</strong>:</p>
 <ol><li><strong>Empty PDF</strong> (0 pages) → emit DocIndex with <code>page_count=0</code>, <code>error='empty'</code></li><li><strong>Encrypted PDF</strong> → pdfplumber 抛 PDFPasswordIncorrect, catch, mark <code>error</code></li><li><strong>Corrupted PDF</strong> → catch + log, 不 abort 整个 batch</li><li><strong>Scanned image PDF</strong> → pdfplumber 返回空, OCR fallback (if enabled)</li><li><strong>Mixed scanned + text</strong> (常见: 封面扫描, 正文 text) → per-page fallback</li><li><strong>Non-English</strong> (中文 / 阿拉伯) → spaCy <code>en_core_web_sm</code> 不识别 — 切 <code>zh_core_web_sm</code>/<code>xx_ent_wiki_sm</code></li><li><strong>Big PDF</strong> (500 pages) → text 可能 5MB, spaCy 截断 1M chars; LLM 必 chunk</li><li><strong>Duplicate PDF</strong> (同样 bytes 不同 path) → 用 <code>file_hash</code> dedupe</li><li><strong>LLM 返回 non-JSON</strong> → catch JSONDecodeError, log, skip chunk</li><li><strong>LLM 超 budget</strong> → 停止追加 chunk, 但 emit 已经抽出的</li><li><strong>Interrupted run</strong> → master index 已有的 doc_id 跳过 (resume)</li><li><strong>Permission denied / file not exist</strong> → log + counter</li><li><strong>Multi-file with same stem</strong> → doc_id 加 hash 后缀避免冲突</li><li><strong>Long filename / special chars</strong> → 落盘安全字符化</li><li><strong>Concurrent writes to master index</strong> → 用 <code>tmp + os.replace</code> atomic rename</li></ol>
-<h4>Step 4: Trade-offs + extensions (5-10 min)</h4>
+<h4>Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)</h4>
 <p><strong>Production hardening</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>问题</th><th>解法</th></tr></thead><tbody><tr><td>1M PDFs, 单机跑不完</td><td>Queue (SQS / Redis) + worker fleet; 每个 worker 处理一个</td></tr><tr><td>中途崩了</td><td>resume via <code>file_hash in master</code> (本地) — 分布式用 status row</td></tr><tr><td>Cost runaway</td><td>per-doc budget + per-batch budget + Slack alert at 80%</td></tr><tr><td>LLM 不稳定</td><td>spaCy 默认 + <code>--use-llm-only-if-confidence-low</code></td></tr><tr><td>Schema 演进</td><td>output JSON 加 <code>schema_version</code> field, downstream migrate</td></tr><tr><td>Search 性能</td><td>dump JSON 后, 灌进 Elasticsearch / Tantivy</td></tr><tr><td>Multilingual</td><td>detect 语言 → pick correct spaCy 模型 / LLM prompt</td></tr><tr><td>OCR 慢</td><td>gpu OCR (<code>easyocr</code>) 或 <code>paddleocr</code> 比 tesseract 快 5x</td></tr><tr><td>Privacy / PII</td><td>LLM 前先 redact SSN/credit card patterns; on-prem LLM (vLLM)</td></tr><tr><td>Costing accuracy</td><td>用 real-time pricing table, 不 hardcode</td></tr></tbody></table></div>
 <p><strong>Architecture upgrade</strong>:</p>
@@ -841,6 +843,10 @@ python pdfindex.py search ./out --query "Anthropic"</code></pre>
 <script id="md-source" type="text/markdown">## Q13 · CLI 工具 — 读 PDF 输出带实体抽取的 JSON 索引
 
 > "Build a **CLI tool** that takes a directory of PDFs and produces a **searchable JSON index** with **extracted entities** (people, organizations, dates, monetary values). Code it. Then we'll discuss productionization."
+
+**中文翻译**:
+
+> "写一个 **CLI 工具** (命令行工具), 输入是一个 PDF 目录, 输出是一个**可搜索的 JSON 索引**, 里面带**抽取出来的实体** (人名, 组织, 日期, 金额). 写代码. 然后我们聊一下 productionization (产品化上线)."
 
 **Round**: Coding (60 min, shared screen + IDE)
 **出处**: Exponent 2026 FDE · 公司: **Scale AI**, OpenAI, Anthropic
@@ -999,7 +1005,7 @@ Why: 1M PDF 跑 8 小时挂了, 必须能 resume.
 
 ## 详细解题流程
 
-### Step 1: Design decisions (5-10 min)
+### Step 1: Design decisions (设计决策, 5-10 min)
 
 **Architecture**:
 
@@ -1029,7 +1035,7 @@ Master index:  ./out/index.json — { doc_id → { path, mtime, entity_counts } 
 - **`--use-llm`** flag for LLM-based extraction (OpenAI / Anthropic) — 更准, 但要 chunk + budget
 - **JSON output** — per-doc + master index, idempotent
 
-### Step 2: Initial implementation (15-20 min)
+### Step 2: Initial implementation (初始实现, 15-20 min)
 
 ```python
 """
@@ -1559,7 +1565,7 @@ if __name__ == '__main__':
     sys.exit(main())
 ```
 
-### Step 3: Edge cases + tests (5-10 min)
+### Step 3: Edge cases + tests (边界情况和测试, 5-10 min)
 
 ```python
 # tests/test_pdfindex.py
@@ -1666,7 +1672,7 @@ if __name__ == '__main__':
 14. **Long filename / special chars** → 落盘安全字符化
 15. **Concurrent writes to master index** → 用 `tmp + os.replace` atomic rename
 
-### Step 4: Trade-offs + extensions (5-10 min)
+### Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)
 
 **Production hardening**:
 

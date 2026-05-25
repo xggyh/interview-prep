@@ -2,6 +2,10 @@
 
 > "A customer dashboard query is **taking 45 seconds** to run, was previously sub-second. They blame us. **Walk through how you'd diagnose it** — query plan, indexes, partitioning, statistics. They send you the query and `EXPLAIN ANALYZE` output. Find the bottleneck."
 
+**中文翻译**:
+
+> "一个客户的 dashboard query (报表查询) 现在跑 **45 秒**, 之前是亚秒级. 客户怪我们. **讲一遍你怎么诊断** — query plan (查询计划), indexes (索引), partitioning (分区), statistics (统计信息). 他们把 query 和 `EXPLAIN ANALYZE` 输出发给你. 找到瓶颈."
+
 **Round**: Coding (60 min, may be partly diagnostic-style)
 **出处**: Exponent 2026 FDE · 公司: **Palantir**, Anyscale, Scale AI
 **难度**: Medium-Hard
@@ -204,7 +208,7 @@ Why: Saturation = throw money at problem first, then optimize.
 
 ## 详细解题流程
 
-### Step 1: Triage — three suspects
+### Step 1: Triage — three suspects (分诊 — 三个嫌疑人)
 
 ```
 SUSPECT 1: Query / Plan
@@ -229,7 +233,7 @@ SUSPECT 3: Infra / Concurrency
   - Connection pool exhausted, query queued
 ```
 
-### Step 2: EXPLAIN ANALYZE — what to read
+### Step 2: EXPLAIN ANALYZE — what to read (EXPLAIN ANALYZE 怎么读)
 
 ```sql
 EXPLAIN (ANALYZE, BUFFERS, COSTS, VERBOSE) <your query>;
@@ -285,7 +289,7 @@ HashAggregate  (cost=5012345.45..5012345.67 rows=22 width=24)
 
 7. **`loops=N`** with `N > 1` on nested loop inner = repeated execution; multiply costs
 
-### Step 3: 5 hypotheses (in order of likelihood)
+### Step 3: 5 hypotheses (in order of likelihood) (5 个假设 — 按可能性排序)
 
 #### H1: Stats are stale (very common after large load)
 
@@ -395,7 +399,7 @@ VACUUM FULL orders;       -- aggressive (locks table — only off-hours)
 - **Disk IOPS saturated**: `iostat -x 1` on host
 - **Wrong work_mem**: sort/hash spilled
 
-### Step 4: Working example walkthrough
+### Step 4: Working example walkthrough (示例走一遍)
 
 **Customer query** (typical dashboard):
 
@@ -461,7 +465,7 @@ Execution Time: 870 ms                                 ← 50x faster
 
 Done — 45s → 0.87s.
 
-### Step 5: Diagnostic script
+### Step 5: Diagnostic script (诊断脚本)
 
 ```sql
 -- Step 0: confirm slow
@@ -508,7 +512,7 @@ FROM pg_statio_user_tables;
 -- <95% might mean buffer pool too small
 ```
 
-### Step 6: Partitioning when appropriate
+### Step 6: Partitioning when appropriate (合适时上分区)
 
 **When**: tables > 100M rows, queries filtered by a clear range column (date).
 
@@ -552,7 +556,7 @@ Append
 - More indexes to manage
 - ALTER TABLE complex
 
-### Step 7: Communication to customer (the FDE part!)
+### Step 7: Communication to customer (the FDE part!) (跟客户沟通 — FDE 的关键)
 
 ```
 Dear customer,

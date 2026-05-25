@@ -2,6 +2,10 @@
 
 > "A customer comes to you and says they want to 'inject their domain knowledge into the model.' They've heard about fine-tuning and want a quote. **Walk me through your decision framework — when do you fine-tune, when do you RAG, when do you prompt-engineer, and when do you combine?** Be specific about cost, latency, freshness, and governance tradeoffs."
 
+**中文翻译**:
+
+> "客户来找你, 说想把他们的领域知识 '注入到模型里'. 他们听过 fine-tune (微调) 这词, 想让你报个价. **跟我讲讲你的决策框架 — 什么时候 fine-tune, 什么时候用 RAG (检索增强生成), 什么时候 prompt engineering (提示工程), 什么时候组合用?** 在成本、延迟、数据新鲜度、合规这些维度上要给出具体的取舍."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI / Databricks — 100% 必问的「分水岭」decision-framework 题
 

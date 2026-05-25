@@ -1,0 +1,1487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🔮 Q-P4 · [预测·Google FDE] 带 F500 从 OpenAI 迁到 Gemini ($2M/year, 12 个生产 app) · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / 🔮 Q-P4 · [预测·Google FDE] 带 F500 从 OpenAI 迁到 Gemini ($2M/year, 12 个生产 app)</div>
+  <h1>🔮 Q-P4 · [预测·Google FDE] 带 F500 从 OpenAI 迁到 Gemini ($2M/year, 12 个生产 app)</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-p04-migrate-openai-to-gemini.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-p04-migrate-openai-to-gemini.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">🔮 Google FDE 预测题. 经典 FDE 客户迁移. Per-app golden dataset + A/B eval + LLM-as-judge + LiteLLM abstraction + 厂商谈判. 即使 0 迁移也省 $400K. ~870 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q-P4 · F500 客户从 OpenAI 迁移到 Gemini 3 Pro</h3>
+<blockquote><p>"A Fortune 500 customer is currently running 12 production applications on OpenAI GPT-5 (~$2M / year LLM spend). Their contract is up for renewal. The CTO is exploring Gemini 3 Pro as an alternative — it's 30% cheaper in input/output, has 2M context vs OpenAI's 400K, and they're already on Google Cloud. But the team is nervous about quality regression on their specific workloads (legal contract review, customer support, internal search). You're the FDE assigned to lead the evaluation + potential migration in Q3 (3 months). Walk through your plan."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"一家 F500 客户现在在 <strong>OpenAI GPT-5</strong> 上跑了 <strong>12 个生产应用</strong> (LLM 一年花约 $2M). 他们的合同快续了. CTO 在考虑把这些迁移到 <strong>Gemini 3 Pro</strong> — 比 OpenAI 便宜 30%, 上下文 2M (OpenAI 才 400K), 而且他们本来就在 Google Cloud 上. 但团队担心 <strong>质量回退</strong> (quality regression) — 特别是在他们的具体场景里 (legal 合同审查 / 客户支持 / 内部搜索). 你作为 FDE, 要在 <strong>Q3 (3 个月)</strong> 内负责这次评估 + 可能的迁移. 跟我讲讲你怎么做."</p></blockquote>
+<p><strong>Round</strong>: Delivery Case (60 min) <strong>出处</strong>: 🔮 预测题 — 针对 Google FDE 主场 (vendor migration is the classic Google FDE delivery scenario) <strong>行业 / 约束</strong>: Enterprise LLM migration / per-app evaluation / vendor negotiation / 12 apps × 3 use case 类型 / 3 月 deadline / 已在 GCP 上 / OpenAI 合同到期 / CTO is the sponsor / nervous engineering team</p>
+<hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这题里的迁移 / eval / 商务词如果不懂, 听都听不下去. 这张表 5 min 看完, 后面就跟得上.</p></blockquote>
+<h4>业务 / 商务</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>F500 (Fortune 500)</strong></td><td>美国营收前 500 大公司. 通常意味着 multi-cloud / multi-vendor / 复杂采购流程 / legal review 6+ 周 / Procurement 团队是 vetoer.</td></tr><tr><td><strong>CTO sponsor</strong></td><td>项目出资 + 政治支持人. 一旦 CTO 拍板, 团队反对没用. 但 CTO 也会"换风向"(政治压力下放弃迁移).</td></tr><tr><td><strong>TCO (Total Cost of Ownership)</strong> ⭐</td><td>总拥有成本 = LLM API token cost + 工程迁移成本 + 风险成本 + opportunity cost (机会成本). 不是单纯 API price 比价.</td></tr><tr><td><strong>Contract renewal</strong></td><td>合同到期续约. 这是 <strong>最强 leverage</strong> 时刻 — 即使最终不迁移, 用 Gemini quote 也能从 OpenAI 砍价 20-30%.</td></tr><tr><td><strong>Committed-use discount (CUD)</strong></td><td>承诺消费折扣. 一年 $1M 承诺消费, OpenAI/Google 给 20-30% discount. 这题 $2M/year = 大客户.</td></tr><tr><td><strong>Volume tier pricing</strong></td><td>量阶折扣. &gt; $500K/year 一档, &gt; $2M/year 一档. F500 通常在最高档.</td></tr><tr><td><strong>Support tier</strong></td><td>厂商支持等级. Enterprise = 24/7 + 专属 TAM + SLA. 比 token price 还重要 — bug 找不到人 = 项目卡死.</td></tr><tr><td><strong>TAM (Technical Account Manager)</strong></td><td>厂商分配的技术客户经理. 不是 sales, 是 customer-facing 工程师. 好 TAM 可以加速 6 周, 烂 TAM 拖 6 个月.</td></tr><tr><td><strong>Vendor lock-in</strong></td><td>厂商绑定. 用 OpenAI 专属 feature (function calling format / Assistants API / batch) 越深, 迁移成本越高.</td></tr><tr><td><strong>Multi-vendor / multi-model strategy</strong></td><td>多厂商策略. 不押单一供应商, 用 abstraction layer (e.g. LiteLLM) 同时跑 GPT + Gemini + Claude.</td></tr></tbody></table></div>
+<h4>Eval 方法论 ⭐ 这题的关键</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Golden dataset</strong> ⭐</td><td>黄金评估集. 100-1000 个人工标注的高质量 (query, ideal_answer) 对. 每个 application 必须有自己的 golden set — generic benchmark 不算.</td></tr><tr><td><strong>Per-app evaluation</strong> ⭐</td><td>按应用单独 eval. 这题 12 个 app 不是 1 个模型适配 12 个场景, 是 <strong>12 套独立 eval + 独立决策</strong>. 这是核心 framing.</td></tr><tr><td><strong>Pairwise comparison</strong> ⭐</td><td>成对比较. 同一 query 喂给 GPT-5 和 Gemini 3 Pro, 拿到两个 response, 判断哪个更好. 比单独打分准.</td></tr><tr><td><strong>LLM-as-judge</strong> ⭐</td><td>用 LLM (e.g. Claude Opus 4.7) 当评委. 比人工快 100×, 但要 <strong>disagreement rate 控制 + 人工抽样</strong> (5-10% 人工 review 验证 judge 的偏见).</td></tr><tr><td><strong>Win rate</strong></td><td>在 pairwise 比较里, 模型 A 胜过 B 的比例. &gt; 55% 算显著优, 45-55% 算 tie, &lt; 45% 算显著劣.</td></tr><tr><td><strong>Tie rate</strong></td><td>平局比例. 如果 tie rate &gt; 40%, 说明用例对 model 区分度低 — 可能两个都行, 选便宜的.</td></tr><tr><td><strong>Regression test</strong> ⭐</td><td>回归测试. 现有 GPT-5 答案是 baseline, Gemini 3 Pro 答案对比. 任何 quality drop &gt; X% 触发 alarm.</td></tr><tr><td><strong>Shadow mode (影子模式)</strong> ⭐</td><td>新模型并行接收线上 query, 但回答 <strong>不返回用户</strong>, 只 log. 用真实流量评估新模型, 0 用户感知风险.</td></tr><tr><td><strong>Stratified eval</strong></td><td>分层评估. 按 app 类型 / 客户细分 / query 难度分桶, 每桶单独算 win rate. 避免"平均分掩盖具体场景滑铁卢".</td></tr><tr><td><strong>Disagreement review</strong> ⭐</td><td>模型分歧人工 review. GPT 和 Gemini 答案差异大的样本 (~5%) 重点人工看, 找出系统性差异.</td></tr><tr><td><strong>Benchmark contamination</strong></td><td>评估集泄漏. 公开 benchmark 数据可能在 model 训练集里. Golden set 必须 <strong>自建 + 私有</strong>.</td></tr><tr><td><strong>MMLU / GPQA / SWE-bench</strong></td><td>公开 benchmark. 不能作为 production decision 的依据 — 太通用.</td></tr></tbody></table></div>
+<h4>厂商 / 模型 (2026 现状)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>GPT-5</strong></td><td>OpenAI 2026 旗舰模型. 400K 上下文. $5/$30 per 1M tokens (in/out).</td></tr><tr><td><strong>GPT-5.5</strong></td><td>OpenAI 2026 中期升级. Function calling 改善, structured output JSON mode 强化. $5/$30 同价.</td></tr><tr><td><strong>Gemini 3 Pro</strong> ⭐</td><td>Google 2026 旗舰. <strong>2M context</strong> (全行业最大), $2/$12 per 1M tokens, native multimodal, grounding via Google Search 原生支持.</td></tr><tr><td><strong>Gemini 3 Flash</strong></td><td>Google 中端模型. $0.50/$3 per 1M tokens. 用于 high-volume / latency-sensitive / 简单 routing 场景.</td></tr><tr><td><strong>Vertex AI</strong> ⭐</td><td>Google Cloud 上的 model serving 平台. 提供 Gemini API + 第三方 (Claude / Llama) 托管. Enterprise BAA, VPC-SC, CMEK.</td></tr><tr><td><strong>Claude Opus 4.7</strong></td><td>Anthropic 2026 旗舰. $15/$75. 复杂推理强但贵, 大客户也常作为 3rd 备选.</td></tr><tr><td><strong>Function calling</strong></td><td>LLM 调用工具的 schema. OpenAI 和 Google 的 schema <strong>不完全兼容</strong> (parameter format 差异).</td></tr><tr><td><strong>Structured output / JSON mode</strong></td><td>强制 JSON 输出. OpenAI 通过 <code>response_format</code>, Google 通过 <code>response_schema</code>. 不兼容.</td></tr><tr><td><strong>Grounding</strong></td><td>让模型回答基于外部 source (e.g. Google Search / 客户文档) 而非记忆. 减少幻觉. Gemini 原生支持 Google Search grounding.</td></tr></tbody></table></div>
+<h4>Abstraction layer / 工程</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>LiteLLM</strong> ⭐</td><td>开源 LLM 路由层 (BerriAI/LiteLLM). 统一 OpenAI 格式 API, 后端可路由到 OpenAI / Gemini / Claude / Bedrock / 100+ models. <strong>不是迁移工具, 是长期 abstraction</strong>.</td></tr><tr><td><strong>OpenRouter</strong></td><td>商业 LLM 路由 SaaS. 类似 LiteLLM 但托管. 适合不想 self-host gateway 的客户.</td></tr><tr><td><strong>Abstraction layer</strong></td><td>抽象层. 应用代码不直接调 OpenAI SDK, 而是调内部 gateway, 由 gateway 决定走哪个模型. 一次写, 多 vendor 跑.</td></tr><tr><td><strong>Kill switch</strong> ⭐</td><td>一键回滚. 新模型出问题, 30s 内全流量切回 OpenAI. 这是 enterprise migration 的标配, 没 kill switch 没人敢上.</td></tr><tr><td><strong>Prompt portability</strong> ⭐</td><td>Prompt 跨模型可移植性. 一个 GPT-5 的 prompt 直接喂 Gemini 3 Pro <strong>大概率效果差</strong> — system prompt format 不同, few-shot 例子需要重选, 输出格式约束句子要重写.</td></tr><tr><td><strong>Prompt drift</strong></td><td>同 prompt 在不同模型上的输出差异. 跨模型时所有 prompt 都需要 <strong>重新调</strong> (prompt re-engineering).</td></tr><tr><td><strong>Cost telemetry / per-app billing</strong></td><td>按应用统计 token 消耗 + 成本. Migration 后要能 attribute 每个 app 实际省了多少 — 否则 CFO 问 "省了多少" 答不出.</td></tr><tr><td><strong>Cascade / model routing</strong></td><td>模型级联. Cheap model (Flash) 先答, confidence 低 fallback 到 expensive model (Pro). 进一步降本.</td></tr><tr><td><strong>Caching layer</strong></td><td>缓存层. 相同 prompt + same context 直接返回 cached response. 命中率 20-40% 时省钱 + 加速.</td></tr></tbody></table></div>
+<h4>风险 / 失败模式</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Quality regression</strong> ⭐</td><td>质量回退. 迁移后某个 app 答案变差. 这是工程团队最怕的事.</td></tr><tr><td><strong>Latency regression</strong></td><td>延迟回退. Gemini 在大上下文上 p99 可能比 GPT 慢 — chatbot 场景敏感.</td></tr><tr><td><strong>Hallucination delta</strong></td><td>幻觉率差异. Legal 合同审查场景, 幻觉 +1pp 都不能接受.</td></tr><tr><td><strong>Edge case failure</strong></td><td>长尾失败. Eval set 100-1000 个 sample 看不全, prod 流量上跑才暴露.</td></tr><tr><td><strong>Vendor model drift</strong> ⭐</td><td>厂商悄悄改模型. OpenAI / Google 都偶尔在不改版本号情况下 fine-tune model — 测试时通过, 一个月后退化. 防御: 持续 monitoring + 季度 re-eval.</td></tr><tr><td><strong>Procurement veto</strong></td><td>采购否决. 即使 CTO 拍板, Procurement (法务 / 供应商管理) 可能因 contract clause 拒绝.</td></tr><tr><td><strong>Data residency</strong></td><td>数据驻留. F500 可能要求数据存某特定 region (EU GDPR / 美国本土). Vertex AI 和 OpenAI 的 region coverage 不同.</td></tr><tr><td><strong>BAA / DPA</strong></td><td>Business Associate Agreement (HIPAA) / Data Processing Agreement (GDPR). 不同厂商法务条款不同, F500 法务通常要 6 周 review.</td></tr></tbody></table></div>
+<h4>Google 产品 (这题主场)</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vertex AI</strong></td><td>Google Cloud 的 ML / LLM 平台. 这题主战场.</td></tr><tr><td><strong>Vertex AI Eval Service</strong></td><td>Vertex 自带的 LLM eval 工具. 内置 pairwise + LLM-as-judge.</td></tr><tr><td><strong>BigQuery</strong> ⭐</td><td>Google Cloud 数据仓库. 用于存 eval log + 流量分析. F500 大概率已在用.</td></tr><tr><td><strong>Looker Studio</strong></td><td>Google 可视化工具. 给 CTO 看的 dashboard 用这个.</td></tr><tr><td><strong>Cloud Audit Logs</strong></td><td>Google Cloud 审计日志. Migration 期间所有 model call 必须 audit.</td></tr><tr><td><strong>Cloud Run</strong></td><td>Google Cloud serverless container. 用于跑 abstraction layer / eval pipeline.</td></tr><tr><td><strong>GKE (Google Kubernetes Engine)</strong></td><td>Google 托管 K8s. F500 通常已经在用.</td></tr><tr><td><strong>VPC-SC (VPC Service Controls)</strong></td><td>VPC 边界控制. F500 enterprise 必备.</td></tr><tr><td><strong>CMEK (Customer-Managed Encryption Keys)</strong></td><td>客户自管加密密钥. Enterprise 合规需要.</td></tr></tbody></table></div>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 setup Vertex AI 和写迁移代码.</p>
+<p><strong>是</strong>: 考你能不能在 <strong>12 个不同 app + 3 个月 deadline + 工程团队不安 + 商务谈判 leverage</strong> 真实约束下做 <strong>结构化迁移</strong> + <strong>不迁也算赢</strong> 的双轨思维.</p>
+<p>5 个 signal:</p>
+<ol><li><strong>Don't migrate everything</strong> (别说全迁) — 答案大概率是 <strong>8 个迁 / 2 个留 / 2 个 hybrid</strong>. 一刀切迁=政治灾难 + 质量回退. 真正的 FDE 答案是 <strong>per-app decision</strong>.</li></ol>
+<ol><li><strong>Eval methodology &gt; migration code</strong> (评估方法论比迁移代码重要) — 没 eval, 迁移就是赌博. Golden dataset + pairwise + LLM-as-judge + 人工 review 是核心 IP, 写代码是 6 周工作.</li></ol>
+<ol><li><strong>Even partial migration = leverage</strong> (哪怕部分迁移也是商务筹码) — Gemini 报价拿到手 → OpenAI 砍价 20-30% → 客户即使一个 app 都不迁, 一年省 $400K. <strong>"不迁也算赢"</strong> 是 FDE 的 second-order thinking.</li></ol>
+<ol><li><strong>Abstraction layer matters more than this migration</strong> (抽象层比这次迁移本身更重要) — 这次迁完, 下次 Claude 4.8 出来还要再迁吗? <strong>建一次性的 abstraction 一次, 之后 multi-vendor 永久受益</strong>. LiteLLM 是答案.</li></ol>
+<ol><li><strong>Manage CTO + engineering team political tension</strong> (管 CTO 和工程团队的政治张力) — CTO 想省钱迁, 工程团队怕回退抵抗. FDE 必须 <strong>let evidence decide, not opinion</strong>. 通过 eval 数据让两边都不能拍脑袋.</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 立刻冲 "I'd swap OpenAI SDK calls with Vertex AI SDK calls"</strong> (立刻冲去讲怎么换 API)</p>
+<blockquote><p>"I'd write a migration script that replaces <code>openai.chat.completions.create</code> with <code>vertex_ai.GenerativeModel</code>, run it through their 12 apps, and we'd be done in 6 weeks."</p></blockquote>
+<p>死. 你没问:</p>
+<ul><li>12 个 app 都是什么场景? (Legal 合同 vs 客服 vs 内部搜索 — eval 完全不同标准)</li><li>每个 app 当前 P0 metric 是什么? (Accuracy / latency / cost / customer satisfaction?)</li><li>已有 eval pipeline 吗? Golden dataset 在哪?</li><li>工程团队是哪几个? 他们的 concern 是什么? (技术问题 vs 政治问题)</li><li>Function calling 用得深吗? Structured output 用得深吗? (Vendor lock-in 越深迁移越贵)</li><li>客户在 GCP 上, 但 OpenAI 调用走哪? (Azure OpenAI? OpenAI direct? Each has different egress cost)</li></ul>
+<p><strong>挂法 #2: "全迁 Gemini 省 30%"</strong> (一刀切迁全部)</p>
+<blockquote><p>"Since Gemini is 30% cheaper, we'd save $600K/year. Migrate everything in Q3."</p></blockquote>
+<p>死. 12 个 app 里:</p>
+<ul><li>Legal 合同审查 (high stakes, accuracy critical) — Gemini 在某些 legal 场景可能不如 GPT-5</li><li>客服 (high volume, latency critical) — Gemini Flash 可能更适合, Gemini Pro 反而过 spec</li><li>内部搜索 (RAG, 上下文长) — Gemini 2M context 优势爆炸, 应该迁</li><li>12 个 app 大概率是 <strong>8 个迁 + 2 个留 + 2 个混合用</strong>. 一刀切的人 fail FDE 面试.</li></ul>
+<p><strong>挂法 #3: 忽略商务谈判 leverage</strong> (只讲技术不讲商务)</p>
+<blockquote><p>"I'll lead the technical migration, the contract is separate."</p></blockquote>
+<p>死. FDE 的 second-order play 是: <strong>拿 Gemini 评估结果回去和 OpenAI 谈判</strong>. 即使最后 0 个 app 迁移, "我们做了认真 Gemini eval, OpenAI 看到威胁就降价" = 客户省 $400K-$600K/year. 这是 FDE 给客户的 hidden value.</p>
+<p><strong>挂法 #4: 接受 3 个月 deadline 闷头做</strong></p>
+<blockquote><p>"3 months is enough for 12 apps if we parallelize."</p></blockquote>
+<p>死. 12 个 app 各有自己的 golden dataset 要建 (每个 100-1000 例 × 人工标注 = 2-4 周/app), 加上 prompt re-engineering, eval, shadow mode, 真正能在 3 个月落地的是 <strong>4-6 个 app</strong>, 而且只能上 2-3 个低风险的. 必须 reverse scope.</p>
+<p><strong>挂法 #5: 不建 abstraction layer, 直接换 SDK</strong></p>
+<blockquote><p>"Just <code>pip install google-genai</code> and replace imports."</p></blockquote>
+<p>死. 现在不建 LiteLLM 之类的 abstraction, 6 个月后 Claude 4.8 出来又要再做一次, 18 个月后 GPT-6 出来再做一次. <strong>一次工程, 多次受益</strong>. 这是 staff-level 思维.</p>
+<hr />
+<h3>完美答案架构 (9-step Response Architecture, 本题定制)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>Step</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify (G·O·O·D-F·T)</td><td>8 min</td><td>锁 12 app 性质 + eval 现状 + 商务背景</td><td>"Before I sketch a plan, I want to ask about 10 things across 6 dimensions — Goal, Owners, Obstacles, Data, Failure, Timeline."</td></tr><tr><td>2</td><td>Reframe — per-app, not bulk</td><td>4 min</td><td>把 "迁 12 个" reframe 成 "12 个独立决策"</td><td>"12 apps is not one migration. It's 12 evaluations + 12 decisions. Some migrate, some don't, some hybrid."</td></tr><tr><td>3</td><td>Stakeholder + success metrics</td><td>5 min</td><td>CTO sponsor, 工程团队 partner, Procurement gatekeeper</td><td>"Three layers of metrics: per-app quality / cost / latency, portfolio TCO, and 'walking-away leverage'."</td></tr><tr><td>4</td><td>Eval methodology design</td><td>10 min</td><td>Golden set + pairwise + LLM-as-judge + human review</td><td>"Eval is 60% of the work. Let me spec the methodology, then run it on 12 apps."</td></tr><tr><td>5</td><td>Per-app decision framework</td><td>8 min</td><td>4 outcomes per app: migrate / stay / hybrid / defer</td><td>"Each app falls into 4 buckets based on quality delta × cost delta × risk."</td></tr><tr><td>6</td><td>Abstraction layer architecture</td><td>7 min</td><td>LiteLLM gateway + kill switch + per-app routing</td><td>"Whether we migrate or not, an abstraction layer is the lasting deliverable."</td></tr><tr><td>7</td><td>Migration phasing + shadow mode</td><td>6 min</td><td>Wave 1/2/3 + shadow → canary → full + kill switch</td><td>"Migration order: easiest 2 first as confidence builders, hardest last."</td></tr><tr><td>8</td><td>Commercial negotiation arc</td><td>7 min</td><td>用 Gemini eval 回 OpenAI 砍价 + Google 拿大单折扣</td><td>"Whether we migrate 0 or 12 apps, customer saves money. Here's how."</td></tr><tr><td>9</td><td>Risk + close</td><td>5 min</td><td>Vendor drift / prompt re-engineering / kill switch ready</td><td>"Three biggest risks: vendor drift, prompt re-engineering scope, and team politics."</td></tr></tbody></table></div>
+<hr />
+<h3>G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐</h3>
+<blockquote><p><strong>核心理念</strong>: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.</p></blockquote>
+<pre class="language-plaintext"><code class="language-plaintext">┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘</code></pre>
+<blockquote><p>"12 apps is NOT one migration project — it's 12 independent evaluations with potentially 4 different outcomes."</p></blockquote>
+<h4>G — Goal (→ feeds Decompose Step 1: KPI lock)</h4>
+<blockquote><p><strong>Q1</strong>: "When the CTO says 'explore Gemini', what's the <strong>success metric for him</strong>? Is it (a) <strong>save $X on LLM spend</strong> (a financial number), (b) <strong>demonstrate multi-vendor capability</strong> (avoid OpenAI lock-in), (c) <strong>unblock features requiring 2M context</strong> (long-context use cases stuck on 400K), (d) <strong>respond to a board mandate</strong> (CEO wants Google partnership story), or (e) <strong>all of the above</strong>? Each scenario changes scope dramatically."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "Out of 12 apps, are there <strong>clear winners I should prioritize</strong> (e.g. internal search where 2M context = obvious huge win), or is the CTO expecting a portfolio-wide migration regardless of app fit?"</p></blockquote>
+<p><strong>这层 → 解锁 Decompose Step 1</strong>: 答完 G 问题, 你就知道这道题的 KPI 是什么 (e.g., $400-600K/year save + 2 apps unblocked on long-context + Gemini partial commit signed by Q3), 后面 5 步的所有决策按这个 KPI 优化 — 也决定 "migrate all 12" 还是 "evaluate all + migrate Pareto winners".</p>
+<h4>O — Owner (→ feeds Decompose Step 2: Stakeholder map)</h4>
+<blockquote><p><strong>Q3</strong>: "Who's the <strong>engineering counterpart</strong> I'd work with? Is it one platform team that owns LLM infra across 12 apps, or are 12 apps owned by 12 different teams each with their own concerns? If the latter, my plan changes — need 12 partnerships, not 1."</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "<strong>Veto power + sentiment</strong>: who can kill this migration? Procurement (OpenAI contract clauses)? Legal (Google DPA review)? Security (new vendor data handling)? CISO (model data residency)? Any of the 12 app owners? And: when you say 'team is nervous', is it <strong>technical</strong> (Gemini quality fears), <strong>operational</strong> (no Vertex experience), or <strong>political</strong> (CTO pushing w/o eng input)?"</p></blockquote>
+<p><strong>这层 → 解锁 Step 2</strong>: 答完 O 问题, 你画出 stakeholder map (sponsor = CTO / counterpart = AI Platform tech lead / blocker = Procurement + Security + legal-app skeptic / SME = each app owner) — 知道 12-apps × 3-personas matrix 怎么 align, 哪几个 app owner 需要被特别 win-over.</p>
+<h4>D — Data (→ feeds Step 3: 数据 inventory)</h4>
+<blockquote><p><strong>Q5</strong>: "<strong>What eval assets exist already?</strong> Per-app golden datasets? Production query logs? Customer feedback labels? Without baseline eval data, the first 4 weeks is building eval infrastructure, not evaluating. <strong>Do any apps have human-graded gold sets &gt; 100 samples?</strong>"</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "<strong>Per-app token / cost / compliance breakdown</strong>: of the $2M/year spend, what's the distribution across 12 apps? Pareto suggests 2-3 apps probably consume 60-80%. And: any apps subject to <strong>HIPAA / GDPR / SOC2</strong> that constrain region/vendor choice? Vertex and OpenAI have different region + BAA coverage."</p></blockquote>
+<p><strong>这层 → 解锁 Step 3</strong>: 答完 D 问题, 你能画 12-app inventory 表 (app × token volume × $/month × eval gold set size × compliance class × rollback difficulty × current Assistants-API depth) — 用这张表直接做 prioritization matrix.</p>
+<h4>D — Deadline (→ feeds Step 4: 子问题排序)</h4>
+<blockquote><p><strong>Q7</strong>: "<strong>Why Q3 (3 months)</strong> specifically? Is it driven by (a) OpenAI <strong>contract expiry date</strong> (hard deadline), (b) <strong>board demo / earnings call</strong> (soft but political), (c) <strong>Google fiscal year / CUD commit</strong> signing deadline, (d) <strong>engineering capacity window</strong>, or (e) arbitrary CTO target? <strong>Driver determines what's compromisable</strong>."</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "<strong>Worst-case appetite + rollback</strong>: if we migrate app X and customer satisfaction drops 5pp, can we <strong>roll back in 30 minutes</strong> (abstraction layer ready) or are we <strong>stuck for a quarter</strong> (deep API integration like legal app on Assistants API)? Reversibility per app changes risk tolerance and migration order."</p></blockquote>
+<p><strong>这层 → 解锁 Step 4</strong>: 答完 Deadline 问题, 你知道<strong>为什么</strong> Q3 这个数 (e.g., Aug 31 OpenAI renewal — but soft, can extend 90 days), 才能 push back. 12 apps 按 (deadline-pressure × $-savings × rollback-ease × eval-readiness) 排序: 内部搜索 + 客服 (Pareto + reversible) 排最前, legal Assistants-API app 排最后 (high lock-in).</p>
+<h4>S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)</h4>
+<blockquote><p><strong>Q9</strong>: "In 3 months, would you accept: <strong>(a)</strong> eval-complete + 0 apps migrated (data-driven decision, no risk), <strong>(b)</strong> 2-3 lowest-risk Pareto apps fully migrated + Gemini commit signed for procurement leverage, or <strong>(c)</strong> all 12 partially migrated (any failures = embarrassing demo)? My instinct: <strong>(a) for first 6 weeks → (b) for last 6 weeks</strong> — finish eval first, ship the safest wins, leave hard apps (legal Assistants API) for Q4."</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "Which apps are <strong>explicitly out of Q3 scope</strong> — (a) any HIPAA app (BAA setup is 4-6 weeks alone), (b) any app &lt; $50K/year spend (not worth the eng), (c) the legal app on Assistants API (deep rewrite needed), (d) any app &lt; 100 sample gold set (eval not trustworthy)? My recommendation: <strong>MVP = 4-6 apps: top-spend × eval-ready × reversible × no-compliance-blocker</strong>; everything else gets a 'recommendation report' but no migration."</p></blockquote>
+<p><strong>这层 → 解锁 Step 5</strong>: 答完 S 问题, MVP 边界明确. 你知道<strong>哪 80% 砍掉先不做</strong> (HIPAA apps, low-spend apps, deep-lock-in Assistants-API apps, no-gold-set apps, EU-residency-blocked apps), 哪 20% 是 walking skeleton (eval harness up in week 1 + 4-6 Pareto apps migrated with vendor abstraction layer + Gemini partial CUD as procurement leverage + Q4 plan for the rest).</p>
+<p><strong>面试官 likely 回答</strong>:</p>
+<ul><li>(a) Save $400-600K/year + (c) unblock 2M context features for internal search</li><li>8 of 12 apps owned by central AI Platform team, 4 owned by product teams</li><li>Procurement is gatekeeper (renewal date Aug 31), Security needs to approve Vertex DPA (2 weeks)</li><li>2 apps process EU customer data (GDPR), 0 HIPAA, 1 app has SOC2 evidence dependency on OpenAI</li><li>Engineering concern = mostly technical (legal team experienced Gemini 2 quality issues 18 months ago)</li><li>3 apps have human-graded gold sets (legal contract review has 500 samples, others 0)</li><li>Top 3 apps = 70% of spend (customer support 35%, internal search 25%, legal review 10%)</li><li>Most apps can roll back in &lt; 1 hour via env var swap. 1 legal app has deep OpenAI Assistants API usage = harder to rollback.</li><li>Q3 deadline driven by Aug 31 OpenAI renewal — but <strong>soft</strong>: customer can extend OpenAI 90 days while we finish eval</li></ul>
+<p>→ <strong>Real scope</strong>: in 3 months, <strong>evaluate all 12 apps, migrate the obviously winning 4-6, leave hard ones for Q4, get Gemini partial commit to use as OpenAI renewal leverage</strong>. NOT migrate 12 apps in 3 months.</p>
+<hr />
+<h3>详细分析 + 回答 (sample 60-min walkthrough with ASCII diagram)</h3>
+<h4>Phase 1: Clarify (8 min)</h4>
+<p>(执行上面的 G·O·O·D-F·T 10 个问题)</p>
+<h4>Phase 2: Reframe — 12 apps = 12 decisions (4 min)</h4>
+<blockquote><p>"OK so based on the answers — most important reframe: <strong>12 apps is not one migration project</strong>. It's <strong>12 independent evaluations leading to 4 possible outcomes per app</strong>:</p>
+<ol><li><strong>Migrate to Gemini</strong> (Gemini quality ≥ GPT, big cost win, low risk)</li><li><strong>Stay on OpenAI</strong> (Gemini quality &lt; GPT in this domain, accept higher cost)</li><li><strong>Hybrid</strong> (use cheap Gemini Flash for easy queries, fall back to GPT-5 for hard — model cascade)</li><li><strong>Defer</strong> (signal unclear in 3 months, evaluate again in 6)</li></ol>
+<p>My prediction: <strong>8 migrate, 2 stay, 2 hybrid</strong>. The deliverable is per-app evidence, not bulk migration."</p></blockquote>
+<h4>Phase 3: Stakeholders + Success Metrics (5 min)</h4>
+<p><strong>Stakeholder map</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stakeholder</th><th>在意什么</th><th>项目态度</th><th>关键动作</th></tr></thead><tbody><tr><td><strong>CTO (sponsor)</strong></td><td>$400-600K save + Google partnership story</td><td>Pushing</td><td>Weekly exec review with per-app status</td></tr><tr><td><strong>AI Platform team head</strong></td><td>工程团队不挂掉, 不背锅</td><td>Cautious partner</td><td>Daily standup, co-design eval methodology</td></tr><tr><td><strong>12 App owners</strong> (8 central + 4 product)</td><td>自己 app 不出事 + 不被迫迁</td><td>8 cooperative, 4 defensive</td><td>Per-app champion, evidence-based decisions</td></tr><tr><td><strong>Procurement</strong></td><td>Aug 31 OpenAI renewal + Vertex AI contract terms</td><td>Gatekeeper</td><td>Brief weekly, give them Gemini quotes by week 4</td></tr><tr><td><strong>Legal</strong></td><td>DPA review (2 weeks for Vertex), GDPR</td><td>Time-sensitive</td><td>Trigger DPA review week 1</td></tr><tr><td><strong>Security / CISO</strong></td><td>Model data residency, audit logs</td><td>Approval needed</td><td>VPC-SC + CMEK setup demo</td></tr><tr><td><strong>Finance / FP&amp;A</strong></td><td>TCO calculation, CUD signing</td><td>Needs numbers</td><td>Per-app cost projection by week 6</td></tr><tr><td><strong>Legal Review team</strong> (app user)</td><td>"Gemini hurt us 18 months ago" trauma</td><td>Most resistant</td><td>Personal eval workshop, show their golden set results</td></tr></tbody></table></div>
+<p><strong>Success metrics (3 layer)</strong>:</p>
+<p><strong>Layer 1 — Per-app decision quality</strong> (must achieve):</p>
+<ul><li>12 apps each have <strong>evidence-based decision</strong> with &gt; 200-sample evaluation</li><li>Quality delta documented (win rate / tie rate / loss rate per app)</li><li>Cost delta projected with confidence interval</li><li>Risk delta (rollback time, edge cases) documented</li></ul>
+<p><strong>Layer 2 — Portfolio TCO</strong> (CFO view):</p>
+<ul><li>Total LLM spend projected delta (Year 1 + Year 2)</li><li>Engineering migration cost (eng-weeks × $rate)</li><li>Net savings after migration cost</li></ul>
+<p><strong>Layer 3 — "Walking-away leverage"</strong> (hidden FDE deliverable):</p>
+<ul><li>Negotiation package for OpenAI renewal (Gemini quote in hand, partial migration credible)</li><li>Multi-vendor flexibility (LiteLLM abstraction live, future migrations cheaper)</li><li>Internal capability built (eval pipeline + golden sets are permanent assets)</li></ul>
+<p><strong>Counter-metrics</strong> (must not regress):</p>
+<ul><li>Customer-facing accuracy on any app must not drop &gt; 1pp without explicit approval</li><li>Latency p99 must not regress &gt; 20% on any user-facing app</li><li>No new security finding from migration</li></ul>
+<h4>Phase 4: Eval methodology design (10 min)</h4>
+<blockquote><p>"60% of the 3-month effort is eval, not migration. Migration is 6 weeks of engineering — eval is what tells us which 6 weeks to spend."</p></blockquote>
+<p><strong>4 eval pillars</strong>:</p>
+<p><strong>Pillar 1 — Per-app golden dataset</strong>:</p>
+<ul><li>100-1000 examples per app (12 apps → up to 12,000 samples)</li><li>Source: production query logs (sampled), customer-reported issues, edge cases</li><li>Labeling: human SME from app team, 2-rater agreement &gt; 0.7 (Cohen's kappa)</li><li>For apps with existing gold set (3 of 12): augment to 500 samples</li><li>For apps with 0 gold set (9 of 12): build from scratch — <strong>this is week 1-4 main work</strong></li></ul>
+<p><strong>Pillar 2 — Pairwise comparison via LLM-as-judge</strong>:</p>
+<ul><li>Same query → GPT-5, Gemini 3 Pro → 2 responses</li><li>Judge: Claude Opus 4.7 (third-party, avoids self-preference bias)</li><li>Output: A wins / B wins / Tie + reasoning</li><li>Volume: 1000-5000 pairwise per app</li><li>Cost: ~$2-5 per app of judge tokens × 12 apps = ~$50</li></ul>
+<p><strong>Pillar 3 — Human review on disagreements</strong>:</p>
+<ul><li>Sample 5-10% of LLM judge results for human review</li><li>Focus on: ties, low-confidence judgments, high-impact apps (legal review)</li><li>Calibration: 200 human-judged samples to validate LLM judge accuracy</li><li>If LLM judge ≠ human &gt; 15%, recalibrate judge prompt or use Claude + GPT ensemble judge</li></ul>
+<p><strong>Pillar 4 — Stratified eval per app</strong>:</p>
+<p>For each app, slice by:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Slice dimension</th><th>Why</th></tr></thead><tbody><tr><td>Query length (short / medium / long &gt; 100K tokens)</td><td>Gemini 2M context advantage shows in long</td></tr><tr><td>Query complexity (low / medium / high reasoning)</td><td>GPT-5 strength in high reasoning</td></tr><tr><td>Language (English / non-English)</td><td>Gemini multilingual usually stronger</td></tr><tr><td>User segment (free / paid / enterprise)</td><td>Different acceptable quality bar</td></tr><tr><td>Domain edge cases (legal jargon / medical / financial)</td><td>Per-domain regression possible</td></tr></tbody></table></div>
+<p><strong>Eval pipeline architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">   Production logs (BigQuery)            Customer issue tickets
+   ──┬─────────────────────              ──┬─────────────
+     │                                       │
+     ▼                                       ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Sample selector (per-app stratified, 1000/app)     │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Golden set storage (BigQuery)                      │
+   │   query, app_id, ideal_answer, label_metadata       │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Pairwise runner (Cloud Run jobs)                   │
+   │   for each (query, app): call GPT-5 + Gemini 3 Pro  │
+   │   store both responses                              │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  LLM-as-judge (Claude Opus 4.7 via Bedrock)         │
+   │   for each pair: A wins / B wins / Tie + reasoning  │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Stratified aggregator (BigQuery SQL)               │
+   │   win_rate per app × slice                          │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Looker Studio dashboard (12 app × 4 outcomes)      │
+   │  + Human review queue (10% sample → labelers)       │
+   └─────────────────────────────────────────────────────┘</code></pre>
+<h4>Phase 5: Per-app decision framework (8 min)</h4>
+<p><strong>4-quadrant decision</strong> based on (quality delta, cost delta):</p>
+<pre class="language-plaintext"><code class="language-plaintext">                    Cost ↓ (Gemini much cheaper)
+                              │
+                              │
+    Stay on OpenAI ←─────────┼─────────→ MIGRATE  ★
+    (quality clearly worse,    │     (quality similar or better,
+     even cheap not worth)     │      and cheaper)
+                              │
+    Quality drop ──────────────┼────────── Quality similar/up
+                              │
+    Defer (re-eval Q4)         │     Hybrid (cascade Flash + GPT)
+    (signal unclear,           │     (Gemini Flash good enough on
+     not enough evidence)      │      easy queries, GPT on hard)
+                              │
+                    Cost ≈ (Gemini and GPT similar in this slice)</code></pre>
+<p><strong>Per-app likely outcomes (面试官 confirmed data)</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>App</th><th>Spend $/yr</th><th>类型</th><th>Likely outcome</th><th>Rationale</th></tr></thead><tbody><tr><td><strong>Customer Support (chatbot)</strong></td><td>$700K</td><td>High volume, easy intent</td><td><strong>Hybrid</strong> (Gemini Flash 70% + GPT-5 30%)</td><td>Flash adequate for routing + simple FAQ, GPT for complex</td></tr><tr><td><strong>Internal Search (RAG)</strong></td><td>$500K</td><td>Long-context, semantic</td><td><strong>Migrate Gemini Pro</strong></td><td>2M context kills 400K, semantic search Gemini ≥ GPT</td></tr><tr><td><strong>Legal Contract Review</strong></td><td>$200K</td><td>Critical accuracy, jargon</td><td><strong>Stay on GPT-5</strong> (or migrate cautiously)</td><td>Legal team trauma + high stakes, Gemini may catch up but not Q3</td></tr><tr><td><strong>Code Review Bot</strong></td><td>$150K</td><td>Reasoning-heavy</td><td><strong>Stay or migrate</strong> based on eval</td><td>Borderline, both models strong here</td></tr><tr><td><strong>Sales Lead Scoring</strong></td><td>$120K</td><td>Structured output</td><td><strong>Migrate Gemini Pro</strong></td><td>Cheaper + good enough for classification</td></tr><tr><td><strong>Marketing Copywriting</strong></td><td>$100K</td><td>Creative</td><td><strong>Hybrid or migrate</strong></td><td>Subjective, win rate close, cost wins</td></tr><tr><td><strong>HR FAQ Bot</strong></td><td>$80K</td><td>Easy QA</td><td><strong>Migrate Gemini Flash</strong></td><td>Tiny, cheap model fine</td></tr><tr><td><strong>Internal Translation</strong></td><td>$60K</td><td>Multilingual</td><td><strong>Migrate Gemini Pro</strong></td><td>Gemini multilingual stronger</td></tr><tr><td><strong>Document Summarization</strong></td><td>$50K</td><td>Long-context</td><td><strong>Migrate Gemini Pro</strong></td><td>2M context wins</td></tr><tr><td><strong>Email Triage</strong></td><td>$30K</td><td>Classification</td><td><strong>Migrate Gemini Flash</strong></td><td>Trivially easy, cheapest model</td></tr><tr><td><strong>Analytics Q&amp;A</strong></td><td>$10K</td><td>SQL gen + reasoning</td><td><strong>Stay or hybrid</strong></td><td>Small spend, not worth the risk</td></tr><tr><td><strong>Prototype / Experimentation</strong></td><td>$5K</td><td>Various</td><td><strong>Defer</strong></td><td>Too small to bother, kept on OpenAI</td></tr></tbody></table></div>
+<p><strong>My prediction</strong>: 6 migrate, 2 stay, 3 hybrid, 1 defer → 70% of $2M spend migrates → ~$420K/year save before negotiation.</p>
+<h4>Phase 6: Abstraction layer architecture (7 min)</h4>
+<blockquote><p>"Whether we migrate 12 apps or 0 apps, the lasting deliverable for the customer is the abstraction layer. Let me describe it."</p></blockquote>
+<p><strong>Architecture</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">┌─────────────────────────────────────────────────────────────────────────┐
+│  Customer GCP Project (existing)                                        │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  12 Production Applications                                       │   │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐  ...  ┌─────────┐           │   │
+│  │  │ Cust.   │ │ Legal   │ │Internal │       │ HR FAQ  │           │   │
+│  │  │Support  │ │Review   │ │Search   │       │ Bot     │           │   │
+│  │  └────┬────┘ └────┬────┘ └────┬────┘       └────┬────┘           │   │
+│  │       └───────────┴───────────┴─────────────────┘                 │   │
+│  │                       │                                            │   │
+│  │                       │  (OpenAI-compatible API format)            │   │
+│  │                       ▼                                            │   │
+│  │  ┌──────────────────────────────────────────────────────────┐    │   │
+│  │  │  LLM Gateway (LiteLLM on Cloud Run, multi-region)        │    │   │
+│  │  │   ─ Per-app routing config (YAML)                        │    │   │
+│  │  │   ─ Cost tagging (BigQuery export)                       │    │   │
+│  │  │   ─ Kill switch (env var SWITCH_TO_OPENAI=true → 30s)   │    │   │
+│  │  │   ─ Shadow mode helper (send to both, return one)        │    │   │
+│  │  │   ─ Cache layer (Redis, 24h TTL on identical prompts)    │    │   │
+│  │  │   ─ Per-app prompt registry (Git-backed YAML)            │    │   │
+│  │  └──────────────────────┬───────────────────────────────────┘    │   │
+│  │                          │                                        │   │
+│  │       ┌──────────────────┼──────────────────┐                    │   │
+│  │       ▼                  ▼                  ▼                     │   │
+│  │  ┌──────────┐      ┌──────────────┐    ┌──────────────┐          │   │
+│  │  │ OpenAI   │      │  Vertex AI   │    │  Anthropic   │          │   │
+│  │  │ GPT-5    │      │  Gemini      │    │  Claude      │          │   │
+│  │  │ (Azure   │      │  3 Pro/Flash │    │  (Vertex     │          │   │
+│  │  │  OpenAI) │      │              │    │   AI MaaS)   │          │   │
+│  │  └──────────┘      └──────────────┘    └──────────────┘          │   │
+│  │                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │  Observability                                              │  │   │
+│  │  │   ─ BigQuery: every call (latency, tokens, cost, app_id)    │  │   │
+│  │  │   ─ Looker Studio: per-app dashboards                       │  │   │
+│  │  │   ─ Cloud Audit Logs: who called what                       │  │   │
+│  │  │   ─ Alerting: cost spike / latency spike / error rate       │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Why LiteLLM specifically</strong>:</p>
+<ul><li>Open source, no vendor lock-in for the gateway itself</li><li>OpenAI-format API → existing app code doesn't change much</li><li>Built-in cost tagging, retry, fallback, multi-model routing</li><li>Supports 100+ models — futureproof for Claude 4.8 / GPT-6 / open source</li></ul>
+<p><strong>Per-app routing config</strong>:</p>
+<pre class="language-yaml"><code class="language-yaml"># Per-app routing in LiteLLM YAML
+apps:
+  customer_support:
+    primary: vertex_ai/gemini-3-flash
+    fallback_on_failure: openai/gpt-5
+    cascade_on_low_confidence:
+      threshold: 0.7
+      escalate_to: openai/gpt-5
+    cache_enabled: true
+    cache_ttl_hours: 24
+
+  internal_search:
+    primary: vertex_ai/gemini-3-pro
+    fallback_on_failure: openai/gpt-5
+    cache_enabled: false  # personalized
+
+  legal_review:
+    primary: openai/gpt-5
+    shadow: vertex_ai/gemini-3-pro  # collect data but don't return
+    cache_enabled: false
+
+  hr_faq:
+    primary: vertex_ai/gemini-3-flash
+    fallback_on_failure: vertex_ai/gemini-3-pro
+    cache_enabled: true
+    cache_ttl_hours: 168  # 1 week</code></pre>
+<p><strong>Kill switch</strong> (the most important feature):</p>
+<pre class="language-python"><code class="language-python"># 30-second rollback if any app goes wrong
+if os.getenv("KILL_SWITCH_APP_X") == "true":
+    return openai_gpt5_response(prompt)
+# Operator sets env var, Cloud Run rolling restart in 30s</code></pre>
+<h4>Phase 7: Migration phasing (6 min)</h4>
+<p><strong>Wave-based rollout</strong> (12 weeks total):</p>
+<pre class="language-plaintext"><code class="language-plaintext">Week 1-4: Foundation
+  ─ Build eval pipeline + golden datasets for top 5 apps
+  ─ Deploy LiteLLM abstraction layer (no behavior change yet, OpenAI 100%)
+  ─ Vertex AI account setup + DPA + security review
+  ─ Train customer team on Vertex / Gemini API
+
+Week 5-8: Wave 1 — Confidence Builders (2 easiest apps)
+  ─ HR FAQ Bot → Gemini Flash (shadow → 10% → 50% → 100% over 1 week)
+  ─ Email Triage → Gemini Flash (same)
+  ─ Demonstrate kill switch works (drill: pretend issue, roll back)
+  ─ Save metrics: per-app cost down, latency same, quality same
+
+Week 9-10: Wave 2 — High-Value Migrations (3 apps)
+  ─ Internal Search → Gemini Pro (the 2M context unlock)
+  ─ Document Summarization → Gemini Pro
+  ─ Internal Translation → Gemini Pro
+  ─ Shadow 1 week, canary 10% 3 days, ramp to 100%
+
+Week 11-12: Wave 3 — Hybrid + Final Eval (3 apps)
+  ─ Customer Support → Gemini Flash + GPT-5 cascade (hardest)
+  ─ Sales Lead Scoring → Gemini Pro
+  ─ Marketing Copywriting → Gemini Pro
+  ─ Stay on OpenAI: Legal Review, Code Review, Analytics, Prototype
+
+Week 13 (buffer): Cleanup + Handoff
+  ─ Documentation, runbooks, oncall handover
+  ─ Quarterly re-eval calendar (catch vendor drift)
+  ─ Procurement signs new contracts: Vertex CUD + OpenAI reduced</code></pre>
+<p><strong>Why this order</strong>:</p>
+<ul><li>Wave 1 = build trust. 2 trivial apps with low risk demonstrate the <strong>abstraction + kill switch + Vertex contract</strong> all work.</li><li>Wave 2 = capture obvious wins (long context, multilingual) — these have biggest cost saves with low risk.</li><li>Wave 3 = hardest. Customer Support is high-volume so the cascade design must be right.</li><li><strong>Legal Review NOT migrated in Q3</strong> — that's the "stays on OpenAI" sign of mature judgment. Re-eval in 6 months when Gemini may have caught up.</li></ul>
+<h4>Phase 8: Commercial negotiation arc (7 min)</h4>
+<blockquote><p>"Now the part most candidates miss: even if we migrate 0 apps, customer saves money via negotiation leverage. Here's the playbook."</p></blockquote>
+<p><strong>Negotiation timeline</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Week</th><th>OpenAI conversation</th><th>Google conversation</th></tr></thead><tbody><tr><td>Week 0</td><td>Tell OpenAI "we're exploring alternatives"</td><td>Tell Google "we're evaluating Gemini for 12 apps"</td></tr><tr><td>Week 2</td><td>Request OpenAI roadmap briefing</td><td>Request Vertex AI architecture review</td></tr><tr><td>Week 4</td><td>Share preliminary eval methodology (not results)</td><td>Same</td></tr><tr><td>Week 6</td><td>Tell OpenAI: "early results show some apps may move"</td><td>Tell Google: "we see early wins in 6 apps"</td></tr><tr><td>Week 8</td><td>OpenAI proactively offers discount</td><td>Google offers CUD terms</td></tr><tr><td>Week 10</td><td>"Here are our findings: 6 apps migrating, 2 staying" — request 25-30% off remaining $600K</td><td>"Committing $1.4M annual to Vertex" — request 25% CUD</td></tr><tr><td>Week 12</td><td>Sign reduced OpenAI contract</td><td>Sign Vertex commitment</td></tr></tbody></table></div>
+<p><strong>Math</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">Before migration:
+  OpenAI spend: $2M/year (12 apps on GPT-5)
+
+After migration + negotiation:
+  Apps staying on OpenAI: $600K (legal review, code review, analytics, prototype)
+    × 0.75 (25% renewal discount) = $450K
+  Apps migrating to Gemini: $1.4M of GPT spend → ~$700K Gemini spend (50% saving)
+    × 0.75 (25% CUD) = $525K
+  
+  Total new spend: $975K/year
+  Savings: $1.025M/year (51%)
+
+Worst case (no migration, just negotiation leverage):
+  $2M × 0.80 (20% renewal discount because we walked OpenAI close to the edge) = $1.6M
+  Savings: $400K/year (still positive)
+
+Engineering migration cost (one-time):
+  4 eng × 12 weeks × $4K/week ≈ $200K
+  Net first-year benefit: $825K
+  Steady state: $1M+/year save</code></pre>
+<p><strong>Key insight</strong>: even <strong>0 apps migrated</strong> = $400K save. Migration is upside, not floor. <strong>This is the FDE deliverable CTOs don't realize they want until you show them.</strong></p>
+<h4>Phase 9: Risk + Close (5 min)</h4>
+<p><strong>Three risks worth calling out</strong>:</p>
+<p><strong>Risk #1 — Vendor model drift</strong>:</p>
+<blockquote><p>"Both OpenAI and Google occasionally fine-tune production models without version bump. Eval results in week 8 may not hold in month 6. Mitigation: quarterly automated re-eval against golden set, with alarms on regression &gt; 5pp win rate change."</p></blockquote>
+<p><strong>Risk #2 — Prompt re-engineering scope</strong>:</p>
+<blockquote><p>"Every migrated app needs prompts re-tuned for Gemini. A GPT-5 system prompt directly fed to Gemini often loses 5-10pp win rate. Budget 1 eng-week per migrated app for prompt re-engineering. This is a hidden 8 eng-weeks across the project."</p></blockquote>
+<p><strong>Risk #3 — Legal team political resistance</strong>:</p>
+<blockquote><p>"Legal had a bad Gemini experience 18 months ago — that's a real wound. Even if Gemini 3 Pro evals well, I'd recommend NOT migrating legal in Q3 regardless of evidence. Build trust on easier apps first, re-evaluate legal in Q1 next year with their full participation in eval design."</p></blockquote>
+<p><strong>Close</strong>:</p>
+<blockquote><p>"Three months. 12 apps. End state: 6 migrated, 2-3 hybrid, 2-3 staying, <strong>abstraction layer is the permanent asset</strong>, customer saves $800K-$1M/year, <strong>and we have a multi-vendor capability they didn't have before</strong>. Want me to dive deeper on eval methodology, abstraction architecture, or the commercial negotiation playbook?"</p></blockquote>
+<hr />
+<h3>Gao Xin 简历专属 reframe + STAR</h3>
+<p>This problem <strong>directly parallels</strong> multiple projects on your resume.</p>
+<h4>Direct analog 1: TikTok PayLater Indonesia → multi-market rollout</h4>
+<blockquote><p><strong>STAR</strong>: At TikTok PayLater, I led the rollout from Indonesia to 7 markets. Each market had a <strong>different LLM provider preference</strong> — Indonesia required local data residency (we used a local provider), Brazil could use international, Mexico had specific compliance. The pattern is identical: <strong>per-market (here per-app) evaluation, decision framework, abstraction layer, phased rollout</strong>.</p>
+<p><strong>Situation</strong>: 7 markets, 3 different vendor options per market. <strong>Task</strong>: Decide per-market vendor + build abstraction layer. <strong>Action</strong>: Built golden eval set per market (locale-specific queries), pairwise comparison with human review, decision matrix per market. <strong>Result</strong>: 4 markets on Vendor A, 2 on Vendor B, 1 on hybrid. Total cost down 35%. Abstraction layer means switching vendor in any market is 1 week of work.</p></blockquote>
+<h4>Direct analog 2: Internal Agent Platform vendor abstraction</h4>
+<blockquote><p>"When I built the Internal Agent Platform at TikTok, I had to integrate <strong>5+ LLM providers</strong> because different teams had different preferences (some wanted OpenAI for quality, some wanted Anthropic for safety, some wanted self-hosted for cost). I built exactly this kind of <strong>abstraction layer with per-team routing config</strong>. The LiteLLM-style gateway is something I've shipped at production scale."</p></blockquote>
+<h4>Direct analog 3: ConvFinQA ablation methodology</h4>
+<blockquote><p>"ConvFinQA work taught me <strong>structured ablation</strong> — when comparing models on complex multi-hop reasoning, you must stratify by sub-skill (single-step vs multi-step vs numerical-only). I'd apply the same stratification here: each app's eval slices by query type, not just aggregate win rate."</p></blockquote>
+<h4>Direct analog 4: BNPL chatbot intent routing</h4>
+<blockquote><p>"The BNPL chatbot I built uses <strong>intent classification → route to cheap model for FAQ vs expensive model for personalized advice</strong>. That's exactly the Customer Support cascade design I'm proposing here for the F500 customer. I have working code for this pattern."</p></blockquote>
+<p><strong>Pitch to interviewer</strong>:</p>
+<blockquote><p>"This problem is 80% overlap with what I've done at TikTok — multi-market voice agent rollout, internal agent platform with 5 LLM providers, BNPL cascade routing. The 20% incremental is <strong>Google-side: Vertex AI specifics + Gemini 3 Pro pricing + LiteLLM at this scale</strong>. I'd close that gap in week 1 by hands-on with Vertex AI tutorials + Gemini API docs."</p></blockquote>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<h4>Q1: "客户的 CTO 听到你说 '只迁 6 个 app', 不满意. 他要求 12 个全迁. 怎么办?"</h4>
+<p><strong>A</strong>: This is <strong>the</strong> make-or-break moment. Don't capitulate.</p>
+<blockquote><p>"I understand the desire for a clean story to the board. Let me explain what happens if we migrate all 12:</p>
+<ol><li><strong>Legal Review app</strong>: Gemini eval shows 12pp lower accuracy on contract clause extraction in week 4. If I migrate anyway, in month 4 we have a customer-facing incident where Gemini mis-extracted a non-compete clause, customer's contract review team escalates, you have <strong>a board crisis instead of board win</strong>.</li></ol>
+<ol><li><strong>Code Review Bot</strong>: Borderline eval. Migrating costs 4 eng-weeks of prompt re-engineering for marginal cost save. Net negative ROI on this app.</li></ol>
+<ol><li><strong>Analytics Q&amp;A</strong> and <strong>Prototype</strong>: combined $15K spend. Migration eng cost $30K. <strong>We'd lose money</strong> migrating these.</li></ol>
+<p><strong>The win story is the right story</strong>: 'F500 customer migrated 6 of 12 apps to Gemini for $800K annual savings, retained OpenAI for 2 mission-critical workflows where it leads, built multi-vendor capability that future-proofs us against any single vendor'. That's a stronger board story than 'migrated 12, retracted 2'.</p>
+<p>If you still want me to migrate all 12, I'll need you to sign off on the legal-review risk in writing, because I won't put my name on something likely to fail QA."</p></blockquote>
+<h4>Q2: "Gemini eval 显示 Customer Support 上 win rate 是 52% — 算 tie. 你迁不迁?"</h4>
+<p><strong>A</strong>: 52% pairwise win rate sounds like tie, but <strong>decision needs the cost dimension</strong>.</p>
+<blockquote><p>"52% pairwise win rate alone says 'tie'. But this is Customer Support — 35% of total spend ($700K/year). Cost delta is 70% (Gemini Flash + GPT-5 cascade vs all GPT-5). The right framework:</p>
+<ul><li>Quality: tie (52%)</li><li>Cost: huge win (~$490K save)</li><li>Risk: medium (high volume = high blast radius if wrong)</li><li><strong>Decision: hybrid cascade</strong>. Use Gemini Flash for routing + 70% of queries (the easy ones), GPT-5 for hard 30%. Even if Flash is slightly worse on average, <strong>cascade captures cost win without quality loss</strong>.</li></ul>
+<p>The eval slice matters here: I'd bet pairwise on <strong>easy intent classification queries</strong>, Flash wins or ties 65%+. On <strong>complex multi-turn troubleshooting</strong>, GPT-5 wins. So cascade by query difficulty.</p>
+<p>Implementation: Flash answers first, if confidence &lt; 0.7 escalates to GPT-5. Net: ~70% Flash, 30% GPT-5, ~$300K save with no quality regression."</p></blockquote>
+<h4>Q3: "Gemini 3 Pro 的 2M context 你说能解锁 internal search 的新场景. 具体怎么 prove?"</h4>
+<p><strong>A</strong>: This is a <strong>proof-by-feature</strong> moment.</p>
+<blockquote><p>"Internal Search currently uses RAG with retrieval over 50 top chunks, fed to GPT-5 with 400K context. The constraint shows up in two scenarios:</p>
+<ol><li><strong>'Show me all our customer contract clauses about indemnification'</strong> — currently retrieves top 50 results, often misses long-tail. With Gemini 2M, we can feed <strong>all 500 contracts at once</strong>, ask for indemnification clauses across all. <strong>Recall goes from ~75% to ~98%</strong>.</li></ol>
+<ol><li><strong>'Summarize all our Q1 customer support tickets about feature X'</strong> — currently summarizes via map-reduce (chunk → summarize → re-summarize). With 2M, single-pass summarization with full context preserves nuance.</li></ol>
+<p><strong>Proof methodology</strong>:</p>
+<ul><li>Build golden set of 100 'long-context' queries that current RAG fails on</li><li>Run both: current 400K + Gemini 2M</li><li>Have human SME judge: did Gemini's answer find what was missed?</li><li>If Gemini answers 60+ of 100 previously-missed queries, the 2M context is a unique unlock — <strong>migrate regardless of cost</strong>.</li></ul>
+<p>This is the kind of capability win that <strong>can't be replicated by negotiating OpenAI down</strong>. It's a product unlock."</p></blockquote>
+<h4>Q4: "如果 6 周后 Gemini 突然出现 model drift, 答案质量回退. 你怎么发现?"</h4>
+<p><strong>A</strong>: This is a <strong>continuous eval</strong> question — you must have a system.</p>
+<blockquote><p>"Vendor drift is real. OpenAI and Google have both shipped silent updates. Defense in depth:</p>
+<ol><li><strong>Continuous shadow eval</strong>: 1% of production traffic always goes to <strong>both</strong> models (current + alternative). LLM-as-judge on the shadow sample weekly. Alarm if win rate shifts &gt; 5pp.</li></ol>
+<ol><li><strong>Quarterly full re-eval</strong>: Re-run all 12 apps' golden sets quarterly against current vendor. Compare to baseline at migration time. Regression &gt; 3pp triggers review.</li></ol>
+<ol><li><strong>Customer feedback loop</strong>: every app has thumbs-up/down feedback. Time-series anomaly on negative feedback rate per app → automatic alarm.</li></ol>
+<ol><li><strong>Cost telemetry</strong>: token usage per query may drift (model verbose) — alarm on cost per query &gt; 20% increase week-over-week.</li></ol>
+<ol><li><strong>Kill switch ready</strong>: if drift confirmed, rollback to OpenAI in 30s. Customer didn't break. Then we eval whether to re-migrate later.</li></ol>
+<p>The systemic answer: <strong>eval is not a one-time gate, it's a continuous control loop</strong>. The eval pipeline I'm building is permanent infrastructure, not project work."</p></blockquote>
+<h4>Q5: "如果客户 legal team 完全不接受 Gemini, 即使 eval 好, 政治上 block 这个 app, 你怎么处理?"</h4>
+<p><strong>A</strong>: This is <strong>political, not technical</strong>. FDE skill = navigating, not fighting.</p>
+<blockquote><p>"Two-layered approach:</p>
+<p><strong>Layer 1 — Don't fight, defer</strong>:</p>
+<ul><li>Take the legal app off the Q3 migration plan. Document why ('legal team has Gemini 2 trauma, prefers to wait')</li><li>Show CTO: '11 of 12 apps eval done, 6 migrate, legal review deferred to Q1 with legal team participation in eval design'</li><li>CTO gets ~95% of the cost win without the political battle</li></ul>
+<p><strong>Layer 2 — Earn trust over time</strong>:</p>
+<ul><li>Invite legal team head to design the golden set for legal review eval. <strong>Their criteria, their samples</strong>.</li><li>Run eval together with them in the room. If Gemini wins, they own the result. If GPT wins, decision is data-backed.</li><li>In Q4 / Q1, re-eval with them as partners, not adversaries.</li></ul>
+<p><strong>Layer 3 — Frame the political win</strong>:</p>
+<ul><li>Tell legal team: 'You drove the decision. Your golden set is what we'll use industry-wide for legal AI eval.' Make them the experts, not the blockers.</li></ul>
+<p>The mistake is fighting them in Q3. The win is letting them own the legal app's vendor choice <strong>whichever way the data points</strong>. FDE skill = enabling customer to make decisions, not making decisions for them."</p></blockquote>
+<hr />
+<h3>❌ 死路答法 (top 8)</h3>
+<ol><li><strong>"全部 12 个迁 Gemini, 因为便宜 30%"</strong> — 不分场景一刀切, 法律审查直接出事故</li><li><strong>"我先 swap API SDK, 6 周搞定"</strong> — 跳过 eval, 直接赌博</li><li><strong>"用 MMLU / GPQA benchmark 决定迁不迁"</strong> — public benchmark 不能代替 production eval</li><li><strong>"不需要 abstraction layer, 直接换 SDK"</strong> — 6 个月后下个模型出来又要再做一遍</li><li><strong>"接受 3 个月 deadline 迁 12 个"</strong> — 时间不够, 不 reverse scope</li><li><strong>"只做技术不参与商务"</strong> — 错过 $400K-$600K 的谈判 leverage</li><li><strong>"忽略工程团队 nervous, 用 CTO authority 强推"</strong> — 后续 oncall 时团队 sabotage</li><li><strong>"不做 shadow mode, 直接 canary"</strong> — 没有 production traffic 上的真实质量数据就上 canary 是赌博</li></ol>
+<hr />
+<h3>✅ 加分项 (top 10)</h3>
+<ol><li><strong>G·O·O·D-F·T 10 个问题</strong> — 立刻 signal staff-level clarifying</li><li><strong>Reframe "12 apps = 12 decisions"</strong> — 反一刀切, 体现成熟判断</li><li><strong>Eval methodology 占 60% 工作量</strong> — eval-first thinking</li><li><strong>Per-app stratified decision matrix</strong> — 不是平均分, 是切片</li><li><strong>Abstraction layer (LiteLLM) 作为长期资产</strong> — 这次迁完, 下次更便宜</li><li><strong>Shadow → canary → full + kill switch</strong> — production safety culture</li><li><strong>"Even 0 migration = $400K save via negotiation"</strong> — second-order thinking, 客户也许没意识到</li><li><strong>Legal team trauma management (defer, not force)</strong> — 政治成熟度</li><li><strong>Quarterly re-eval + vendor drift defense</strong> — 不是 one-shot</li><li><strong>TikTok 简历 reframe (7 markets, Internal Agent Platform, BNPL cascade)</strong> — 直接 transfer experience</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>F500 OpenAI → Gemini 迁移 = "12 apps = 12 decisions, not 1 migration" + "eval methodology &gt; migration code" + "abstraction layer 是长期资产" + "即使 0 迁移也能省 $400K 通过谈判 leverage" + "let evidence decide, not CTO opinion"</strong>.</p>
+<p>真正的 FDE win 不是迁 12 个 app, 是给客户搭一个 <strong>多厂商灵活架构 + 系统化 eval 能力 + 商务谈判杠杆</strong>, 之后 Claude 4.8 / GPT-6 出来都 1 周内切换. Per-app evidence-based 决策, 6 迁 / 2-3 hybrid / 2-3 留, 比 12 全迁 更专业更可信.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">不要做:
+  - 12 个全迁 Gemini
+  - 跳过 eval, swap SDK 就上
+  - 用 MMLU 当决策依据
+  - 不建 abstraction layer
+  - 接受 3 月迁 12 个
+  - 只做技术不谈商务
+  - 强推法律团队接受 Gemini
+  - 不 shadow 直接 canary
+
+要做 (9 step):
+  1. Clarify (G·O·O·D-F·T 10 Q)
+  2. Reframe: 12 apps = 12 decisions
+  3. Stakeholder + 3-layer metrics
+  4. Eval methodology (golden + pairwise + LLM judge + human review)
+  5. Per-app 4-quadrant decision (migrate / stay / hybrid / defer)
+  6. Abstraction layer (LiteLLM + kill switch + observability)
+  7. Wave-based migration (易→难, shadow→canary→full)
+  8. 商务谈判 (Gemini eval = OpenAI 砍价 leverage)
+  9. Risk + close (vendor drift / prompt re-eng / political)
+
+G·O·O·D-F·T 必问:
+  G: CTO 真实目标? 哪些 app 优先?
+  O: 工程对接谁? 谁能 veto?
+  O: GDPR / HIPAA / data residency?
+  D: 现有 eval 资产? Per-app 花费?
+  F: Per-app 回滚能力? 不可逆度?
+  T: 3 月由谁驱动? OpenAI 合同?
+
+Stakeholder veto:
+  - CTO (sponsor) — 政治支持
+  - Procurement (gatekeeper) — 合同
+  - Legal (DPA 2 周)
+  - Security (Vertex 审批)
+  - 12 app owners (每个 app 一个 partner)
+  - Legal Review team (trauma)
+
+Eval 4 柱:
+  1. Per-app golden set (100-1000 samples)
+  2. Pairwise (GPT vs Gemini, 1000-5000 pairs)
+  3. LLM-as-judge (Claude Opus 4.7)
+  4. Stratified (length / complexity / language / segment)
+  + 5-10% 人工 review on 分歧
+
+4 outcomes per app:
+  - Migrate (quality ≥ + cost ↓)
+  - Stay (quality ↓, accept higher cost)
+  - Hybrid (cascade Flash + Pro)
+  - Defer (signal unclear)
+
+预测 12 app outcome:
+  6 migrate, 3 hybrid, 2-3 stay, 1 defer
+  70% spend migrates
+  Save $420K before negotiation, $800K-$1M after
+
+LiteLLM abstraction:
+  ─ Per-app YAML routing config
+  ─ Kill switch (30s rollback via env var)
+  ─ Cost tagging → BigQuery
+  ─ Cache layer (Redis, 24h TTL)
+  ─ Shadow mode helper
+  ─ Multi-vendor (OpenAI + Vertex + Anthropic)
+
+Migration wave:
+  W1-4: Foundation (eval + abstraction + DPA)
+  W5-8: Wave 1 (HR FAQ + Email — 易 + 小)
+  W9-10: Wave 2 (Internal Search + Summary — 2M context win)
+  W11-12: Wave 3 (Customer Support cascade + 其他)
+  W13: Buffer + handoff
+
+商务谈判 timeline:
+  W4: 早期 eval 露给两方
+  W8: 双方主动报价
+  W10: Bring evidence, ask 25-30% off remaining
+  W12: 签 Vertex CUD + OpenAI 降价合同
+  
+  Math:
+    Before: $2M
+    After: $975K (51% save)
+    Worst case (0 migration + neg only): $1.6M (20% save)
+
+3 risks:
+  1. Vendor drift (quarterly re-eval)
+  2. Prompt re-engineering (1 eng-week/app hidden cost)
+  3. Legal team political (defer, don't force)
+
+Resume quotes:
+  "TikTok PayLater 7 markets — same per-market eval framework"
+  "Internal Agent Platform — built LiteLLM-style gateway with 5 providers"
+  "ConvFinQA — same stratified ablation methodology"
+  "BNPL chatbot — same cheap+expensive cascade pattern"
+
+Key phrases:
+  - "12 apps is not one migration — it's 12 decisions"
+  - "Eval is 60% of the work, migration is 40%"
+  - "Per-app golden set is the lasting IP"
+  - "Even 0 migration = $400K via negotiation leverage"
+  - "Abstraction layer is the permanent asset"
+  - "Let evidence decide, not CTO opinion"
+  - "Legal team trauma — defer, don't fight"
+  - "Quarterly re-eval — vendor drift is real"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-p03-2m-context-gemini-legal.html">← 🔮 Q-P3 · [预测·Google FDE] 2M long-context Gemini 给律所做 10 万份合同分析</a>
+    <a href="zhenti-p05-internal-gemini-platform-50-teams.html">🔮 Q-P5 · [预测·Google FDE 内部] 在 50 个产品团队中标准化 Gemini 使用 (cost / quality / obs) →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q-P4 · F500 客户从 OpenAI 迁移到 Gemini 3 Pro
+
+> "A Fortune 500 customer is currently running 12 production applications on OpenAI GPT-5 (~$2M / year LLM spend). Their contract is up for renewal. The CTO is exploring Gemini 3 Pro as an alternative — it's 30% cheaper in input/output, has 2M context vs OpenAI's 400K, and they're already on Google Cloud. But the team is nervous about quality regression on their specific workloads (legal contract review, customer support, internal search). You're the FDE assigned to lead the evaluation + potential migration in Q3 (3 months). Walk through your plan."
+
+**中文翻译**:
+
+> "一家 F500 客户现在在 **OpenAI GPT-5** 上跑了 **12 个生产应用** (LLM 一年花约 $2M). 他们的合同快续了. CTO 在考虑把这些迁移到 **Gemini 3 Pro** — 比 OpenAI 便宜 30%, 上下文 2M (OpenAI 才 400K), 而且他们本来就在 Google Cloud 上. 但团队担心 **质量回退** (quality regression) — 特别是在他们的具体场景里 (legal 合同审查 / 客户支持 / 内部搜索). 你作为 FDE, 要在 **Q3 (3 个月)** 内负责这次评估 + 可能的迁移. 跟我讲讲你怎么做."
+
+**Round**: Delivery Case (60 min)
+**出处**: 🔮 预测题 — 针对 Google FDE 主场 (vendor migration is the classic Google FDE delivery scenario)
+**行业 / 约束**: Enterprise LLM migration / per-app evaluation / vendor negotiation / 12 apps × 3 use case 类型 / 3 月 deadline / 已在 GCP 上 / OpenAI 合同到期 / CTO is the sponsor / nervous engineering team
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这题里的迁移 / eval / 商务词如果不懂, 听都听不下去. 这张表 5 min 看完, 后面就跟得上.
+
+### 业务 / 商务
+
+| 术语 | 解释 |
+|---|---|
+| **F500 (Fortune 500)** | 美国营收前 500 大公司. 通常意味着 multi-cloud / multi-vendor / 复杂采购流程 / legal review 6+ 周 / Procurement 团队是 vetoer. |
+| **CTO sponsor** | 项目出资 + 政治支持人. 一旦 CTO 拍板, 团队反对没用. 但 CTO 也会"换风向"(政治压力下放弃迁移). |
+| **TCO (Total Cost of Ownership)** ⭐ | 总拥有成本 = LLM API token cost + 工程迁移成本 + 风险成本 + opportunity cost (机会成本). 不是单纯 API price 比价. |
+| **Contract renewal** | 合同到期续约. 这是 **最强 leverage** 时刻 — 即使最终不迁移, 用 Gemini quote 也能从 OpenAI 砍价 20-30%. |
+| **Committed-use discount (CUD)** | 承诺消费折扣. 一年 $1M 承诺消费, OpenAI/Google 给 20-30% discount. 这题 $2M/year = 大客户. |
+| **Volume tier pricing** | 量阶折扣. > $500K/year 一档, > $2M/year 一档. F500 通常在最高档. |
+| **Support tier** | 厂商支持等级. Enterprise = 24/7 + 专属 TAM + SLA. 比 token price 还重要 — bug 找不到人 = 项目卡死. |
+| **TAM (Technical Account Manager)** | 厂商分配的技术客户经理. 不是 sales, 是 customer-facing 工程师. 好 TAM 可以加速 6 周, 烂 TAM 拖 6 个月. |
+| **Vendor lock-in** | 厂商绑定. 用 OpenAI 专属 feature (function calling format / Assistants API / batch) 越深, 迁移成本越高. |
+| **Multi-vendor / multi-model strategy** | 多厂商策略. 不押单一供应商, 用 abstraction layer (e.g. LiteLLM) 同时跑 GPT + Gemini + Claude. |
+
+### Eval 方法论 ⭐ 这题的关键
+
+| 术语 | 解释 |
+|---|---|
+| **Golden dataset** ⭐ | 黄金评估集. 100-1000 个人工标注的高质量 (query, ideal_answer) 对. 每个 application 必须有自己的 golden set — generic benchmark 不算. |
+| **Per-app evaluation** ⭐ | 按应用单独 eval. 这题 12 个 app 不是 1 个模型适配 12 个场景, 是 **12 套独立 eval + 独立决策**. 这是核心 framing. |
+| **Pairwise comparison** ⭐ | 成对比较. 同一 query 喂给 GPT-5 和 Gemini 3 Pro, 拿到两个 response, 判断哪个更好. 比单独打分准. |
+| **LLM-as-judge** ⭐ | 用 LLM (e.g. Claude Opus 4.7) 当评委. 比人工快 100×, 但要 **disagreement rate 控制 + 人工抽样** (5-10% 人工 review 验证 judge 的偏见). |
+| **Win rate** | 在 pairwise 比较里, 模型 A 胜过 B 的比例. > 55% 算显著优, 45-55% 算 tie, < 45% 算显著劣. |
+| **Tie rate** | 平局比例. 如果 tie rate > 40%, 说明用例对 model 区分度低 — 可能两个都行, 选便宜的. |
+| **Regression test** ⭐ | 回归测试. 现有 GPT-5 答案是 baseline, Gemini 3 Pro 答案对比. 任何 quality drop > X% 触发 alarm. |
+| **Shadow mode (影子模式)** ⭐ | 新模型并行接收线上 query, 但回答 **不返回用户**, 只 log. 用真实流量评估新模型, 0 用户感知风险. |
+| **Stratified eval** | 分层评估. 按 app 类型 / 客户细分 / query 难度分桶, 每桶单独算 win rate. 避免"平均分掩盖具体场景滑铁卢". |
+| **Disagreement review** ⭐ | 模型分歧人工 review. GPT 和 Gemini 答案差异大的样本 (~5%) 重点人工看, 找出系统性差异. |
+| **Benchmark contamination** | 评估集泄漏. 公开 benchmark 数据可能在 model 训练集里. Golden set 必须 **自建 + 私有**. |
+| **MMLU / GPQA / SWE-bench** | 公开 benchmark. 不能作为 production decision 的依据 — 太通用. |
+
+### 厂商 / 模型 (2026 现状)
+
+| 术语 | 解释 |
+|---|---|
+| **GPT-5** | OpenAI 2026 旗舰模型. 400K 上下文. $5/$30 per 1M tokens (in/out). |
+| **GPT-5.5** | OpenAI 2026 中期升级. Function calling 改善, structured output JSON mode 强化. $5/$30 同价. |
+| **Gemini 3 Pro** ⭐ | Google 2026 旗舰. **2M context** (全行业最大), $2/$12 per 1M tokens, native multimodal, grounding via Google Search 原生支持. |
+| **Gemini 3 Flash** | Google 中端模型. $0.50/$3 per 1M tokens. 用于 high-volume / latency-sensitive / 简单 routing 场景. |
+| **Vertex AI** ⭐ | Google Cloud 上的 model serving 平台. 提供 Gemini API + 第三方 (Claude / Llama) 托管. Enterprise BAA, VPC-SC, CMEK. |
+| **Claude Opus 4.7** | Anthropic 2026 旗舰. $15/$75. 复杂推理强但贵, 大客户也常作为 3rd 备选. |
+| **Function calling** | LLM 调用工具的 schema. OpenAI 和 Google 的 schema **不完全兼容** (parameter format 差异). |
+| **Structured output / JSON mode** | 强制 JSON 输出. OpenAI 通过 `response_format`, Google 通过 `response_schema`. 不兼容. |
+| **Grounding** | 让模型回答基于外部 source (e.g. Google Search / 客户文档) 而非记忆. 减少幻觉. Gemini 原生支持 Google Search grounding. |
+
+### Abstraction layer / 工程
+
+| 术语 | 解释 |
+|---|---|
+| **LiteLLM** ⭐ | 开源 LLM 路由层 (BerriAI/LiteLLM). 统一 OpenAI 格式 API, 后端可路由到 OpenAI / Gemini / Claude / Bedrock / 100+ models. **不是迁移工具, 是长期 abstraction**. |
+| **OpenRouter** | 商业 LLM 路由 SaaS. 类似 LiteLLM 但托管. 适合不想 self-host gateway 的客户. |
+| **Abstraction layer** | 抽象层. 应用代码不直接调 OpenAI SDK, 而是调内部 gateway, 由 gateway 决定走哪个模型. 一次写, 多 vendor 跑. |
+| **Kill switch** ⭐ | 一键回滚. 新模型出问题, 30s 内全流量切回 OpenAI. 这是 enterprise migration 的标配, 没 kill switch 没人敢上. |
+| **Prompt portability** ⭐ | Prompt 跨模型可移植性. 一个 GPT-5 的 prompt 直接喂 Gemini 3 Pro **大概率效果差** — system prompt format 不同, few-shot 例子需要重选, 输出格式约束句子要重写. |
+| **Prompt drift** | 同 prompt 在不同模型上的输出差异. 跨模型时所有 prompt 都需要 **重新调** (prompt re-engineering). |
+| **Cost telemetry / per-app billing** | 按应用统计 token 消耗 + 成本. Migration 后要能 attribute 每个 app 实际省了多少 — 否则 CFO 问 "省了多少" 答不出. |
+| **Cascade / model routing** | 模型级联. Cheap model (Flash) 先答, confidence 低 fallback 到 expensive model (Pro). 进一步降本. |
+| **Caching layer** | 缓存层. 相同 prompt + same context 直接返回 cached response. 命中率 20-40% 时省钱 + 加速. |
+
+### 风险 / 失败模式
+
+| 术语 | 解释 |
+|---|---|
+| **Quality regression** ⭐ | 质量回退. 迁移后某个 app 答案变差. 这是工程团队最怕的事. |
+| **Latency regression** | 延迟回退. Gemini 在大上下文上 p99 可能比 GPT 慢 — chatbot 场景敏感. |
+| **Hallucination delta** | 幻觉率差异. Legal 合同审查场景, 幻觉 +1pp 都不能接受. |
+| **Edge case failure** | 长尾失败. Eval set 100-1000 个 sample 看不全, prod 流量上跑才暴露. |
+| **Vendor model drift** ⭐ | 厂商悄悄改模型. OpenAI / Google 都偶尔在不改版本号情况下 fine-tune model — 测试时通过, 一个月后退化. 防御: 持续 monitoring + 季度 re-eval. |
+| **Procurement veto** | 采购否决. 即使 CTO 拍板, Procurement (法务 / 供应商管理) 可能因 contract clause 拒绝. |
+| **Data residency** | 数据驻留. F500 可能要求数据存某特定 region (EU GDPR / 美国本土). Vertex AI 和 OpenAI 的 region coverage 不同. |
+| **BAA / DPA** | Business Associate Agreement (HIPAA) / Data Processing Agreement (GDPR). 不同厂商法务条款不同, F500 法务通常要 6 周 review. |
+
+### Google 产品 (这题主场)
+
+| 术语 | 解释 |
+|---|---|
+| **Vertex AI** | Google Cloud 的 ML / LLM 平台. 这题主战场. |
+| **Vertex AI Eval Service** | Vertex 自带的 LLM eval 工具. 内置 pairwise + LLM-as-judge. |
+| **BigQuery** ⭐ | Google Cloud 数据仓库. 用于存 eval log + 流量分析. F500 大概率已在用. |
+| **Looker Studio** | Google 可视化工具. 给 CTO 看的 dashboard 用这个. |
+| **Cloud Audit Logs** | Google Cloud 审计日志. Migration 期间所有 model call 必须 audit. |
+| **Cloud Run** | Google Cloud serverless container. 用于跑 abstraction layer / eval pipeline. |
+| **GKE (Google Kubernetes Engine)** | Google 托管 K8s. F500 通常已经在用. |
+| **VPC-SC (VPC Service Controls)** | VPC 边界控制. F500 enterprise 必备. |
+| **CMEK (Customer-Managed Encryption Keys)** | 客户自管加密密钥. Enterprise 合规需要. |
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 setup Vertex AI 和写迁移代码.
+
+**是**: 考你能不能在 **12 个不同 app + 3 个月 deadline + 工程团队不安 + 商务谈判 leverage** 真实约束下做 **结构化迁移** + **不迁也算赢** 的双轨思维.
+
+5 个 signal:
+
+1. **Don't migrate everything** (别说全迁) — 答案大概率是 **8 个迁 / 2 个留 / 2 个 hybrid**. 一刀切迁=政治灾难 + 质量回退. 真正的 FDE 答案是 **per-app decision**.
+
+2. **Eval methodology > migration code** (评估方法论比迁移代码重要) — 没 eval, 迁移就是赌博. Golden dataset + pairwise + LLM-as-judge + 人工 review 是核心 IP, 写代码是 6 周工作.
+
+3. **Even partial migration = leverage** (哪怕部分迁移也是商务筹码) — Gemini 报价拿到手 → OpenAI 砍价 20-30% → 客户即使一个 app 都不迁, 一年省 $400K. **"不迁也算赢"** 是 FDE 的 second-order thinking.
+
+4. **Abstraction layer matters more than this migration** (抽象层比这次迁移本身更重要) — 这次迁完, 下次 Claude 4.8 出来还要再迁吗? **建一次性的 abstraction 一次, 之后 multi-vendor 永久受益**. LiteLLM 是答案.
+
+5. **Manage CTO + engineering team political tension** (管 CTO 和工程团队的政治张力) — CTO 想省钱迁, 工程团队怕回退抵抗. FDE 必须 **let evidence decide, not opinion**. 通过 eval 数据让两边都不能拍脑袋.
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 立刻冲 "I'd swap OpenAI SDK calls with Vertex AI SDK calls"** (立刻冲去讲怎么换 API)
+
+> "I'd write a migration script that replaces `openai.chat.completions.create` with `vertex_ai.GenerativeModel`, run it through their 12 apps, and we'd be done in 6 weeks."
+
+死. 你没问:
+- 12 个 app 都是什么场景? (Legal 合同 vs 客服 vs 内部搜索 — eval 完全不同标准)
+- 每个 app 当前 P0 metric 是什么? (Accuracy / latency / cost / customer satisfaction?)
+- 已有 eval pipeline 吗? Golden dataset 在哪?
+- 工程团队是哪几个? 他们的 concern 是什么? (技术问题 vs 政治问题)
+- Function calling 用得深吗? Structured output 用得深吗? (Vendor lock-in 越深迁移越贵)
+- 客户在 GCP 上, 但 OpenAI 调用走哪? (Azure OpenAI? OpenAI direct? Each has different egress cost)
+
+**挂法 #2: "全迁 Gemini 省 30%"** (一刀切迁全部)
+
+> "Since Gemini is 30% cheaper, we'd save $600K/year. Migrate everything in Q3."
+
+死. 12 个 app 里:
+- Legal 合同审查 (high stakes, accuracy critical) — Gemini 在某些 legal 场景可能不如 GPT-5
+- 客服 (high volume, latency critical) — Gemini Flash 可能更适合, Gemini Pro 反而过 spec
+- 内部搜索 (RAG, 上下文长) — Gemini 2M context 优势爆炸, 应该迁
+- 12 个 app 大概率是 **8 个迁 + 2 个留 + 2 个混合用**. 一刀切的人 fail FDE 面试.
+
+**挂法 #3: 忽略商务谈判 leverage** (只讲技术不讲商务)
+
+> "I'll lead the technical migration, the contract is separate."
+
+死. FDE 的 second-order play 是: **拿 Gemini 评估结果回去和 OpenAI 谈判**. 即使最后 0 个 app 迁移, "我们做了认真 Gemini eval, OpenAI 看到威胁就降价" = 客户省 $400K-$600K/year. 这是 FDE 给客户的 hidden value.
+
+**挂法 #4: 接受 3 个月 deadline 闷头做**
+
+> "3 months is enough for 12 apps if we parallelize."
+
+死. 12 个 app 各有自己的 golden dataset 要建 (每个 100-1000 例 × 人工标注 = 2-4 周/app), 加上 prompt re-engineering, eval, shadow mode, 真正能在 3 个月落地的是 **4-6 个 app**, 而且只能上 2-3 个低风险的. 必须 reverse scope.
+
+**挂法 #5: 不建 abstraction layer, 直接换 SDK**
+
+> "Just `pip install google-genai` and replace imports."
+
+死. 现在不建 LiteLLM 之类的 abstraction, 6 个月后 Claude 4.8 出来又要再做一次, 18 个月后 GPT-6 出来再做一次. **一次工程, 多次受益**. 这是 staff-level 思维.
+
+---
+
+## 完美答案架构 (9-step Response Architecture, 本题定制)
+
+| # | Step | 时间 | 干什么 | 开口句 |
+|---|---|------|------|------|
+| 1 | Clarify (G·O·O·D-F·T) | 8 min | 锁 12 app 性质 + eval 现状 + 商务背景 | "Before I sketch a plan, I want to ask about 10 things across 6 dimensions — Goal, Owners, Obstacles, Data, Failure, Timeline." |
+| 2 | Reframe — per-app, not bulk | 4 min | 把 "迁 12 个" reframe 成 "12 个独立决策" | "12 apps is not one migration. It's 12 evaluations + 12 decisions. Some migrate, some don't, some hybrid." |
+| 3 | Stakeholder + success metrics | 5 min | CTO sponsor, 工程团队 partner, Procurement gatekeeper | "Three layers of metrics: per-app quality / cost / latency, portfolio TCO, and 'walking-away leverage'." |
+| 4 | Eval methodology design | 10 min | Golden set + pairwise + LLM-as-judge + human review | "Eval is 60% of the work. Let me spec the methodology, then run it on 12 apps." |
+| 5 | Per-app decision framework | 8 min | 4 outcomes per app: migrate / stay / hybrid / defer | "Each app falls into 4 buckets based on quality delta × cost delta × risk." |
+| 6 | Abstraction layer architecture | 7 min | LiteLLM gateway + kill switch + per-app routing | "Whether we migrate or not, an abstraction layer is the lasting deliverable." |
+| 7 | Migration phasing + shadow mode | 6 min | Wave 1/2/3 + shadow → canary → full + kill switch | "Migration order: easiest 2 first as confidence builders, hardest last." |
+| 8 | Commercial negotiation arc | 7 min | 用 Gemini eval 回 OpenAI 砍价 + Google 拿大单折扣 | "Whether we migrate 0 or 12 apps, customer saves money. Here's how." |
+| 9 | Risk + close | 5 min | Vendor drift / prompt re-engineering / kill switch ready | "Three biggest risks: vendor drift, prompt re-engineering scope, and team politics." |
+
+---
+
+## G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐
+
+> **核心理念**: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.
+
+```
+┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘
+```
+
+> "12 apps is NOT one migration project — it's 12 independent evaluations with potentially 4 different outcomes."
+
+### G — Goal (→ feeds Decompose Step 1: KPI lock)
+
+> **Q1**: "When the CTO says 'explore Gemini', what's the **success metric for him**? Is it (a) **save $X on LLM spend** (a financial number), (b) **demonstrate multi-vendor capability** (avoid OpenAI lock-in), (c) **unblock features requiring 2M context** (long-context use cases stuck on 400K), (d) **respond to a board mandate** (CEO wants Google partnership story), or (e) **all of the above**? Each scenario changes scope dramatically."
+
+> **Q2**: "Out of 12 apps, are there **clear winners I should prioritize** (e.g. internal search where 2M context = obvious huge win), or is the CTO expecting a portfolio-wide migration regardless of app fit?"
+
+**这层 → 解锁 Decompose Step 1**: 答完 G 问题, 你就知道这道题的 KPI 是什么 (e.g., $400-600K/year save + 2 apps unblocked on long-context + Gemini partial commit signed by Q3), 后面 5 步的所有决策按这个 KPI 优化 — 也决定 "migrate all 12" 还是 "evaluate all + migrate Pareto winners".
+
+### O — Owner (→ feeds Decompose Step 2: Stakeholder map)
+
+> **Q3**: "Who's the **engineering counterpart** I'd work with? Is it one platform team that owns LLM infra across 12 apps, or are 12 apps owned by 12 different teams each with their own concerns? If the latter, my plan changes — need 12 partnerships, not 1."
+
+> **Q4**: "**Veto power + sentiment**: who can kill this migration? Procurement (OpenAI contract clauses)? Legal (Google DPA review)? Security (new vendor data handling)? CISO (model data residency)? Any of the 12 app owners? And: when you say 'team is nervous', is it **technical** (Gemini quality fears), **operational** (no Vertex experience), or **political** (CTO pushing w/o eng input)?"
+
+**这层 → 解锁 Step 2**: 答完 O 问题, 你画出 stakeholder map (sponsor = CTO / counterpart = AI Platform tech lead / blocker = Procurement + Security + legal-app skeptic / SME = each app owner) — 知道 12-apps × 3-personas matrix 怎么 align, 哪几个 app owner 需要被特别 win-over.
+
+### D — Data (→ feeds Step 3: 数据 inventory)
+
+> **Q5**: "**What eval assets exist already?** Per-app golden datasets? Production query logs? Customer feedback labels? Without baseline eval data, the first 4 weeks is building eval infrastructure, not evaluating. **Do any apps have human-graded gold sets > 100 samples?**"
+
+> **Q6**: "**Per-app token / cost / compliance breakdown**: of the $2M/year spend, what's the distribution across 12 apps? Pareto suggests 2-3 apps probably consume 60-80%. And: any apps subject to **HIPAA / GDPR / SOC2** that constrain region/vendor choice? Vertex and OpenAI have different region + BAA coverage."
+
+**这层 → 解锁 Step 3**: 答完 D 问题, 你能画 12-app inventory 表 (app × token volume × $/month × eval gold set size × compliance class × rollback difficulty × current Assistants-API depth) — 用这张表直接做 prioritization matrix.
+
+### D — Deadline (→ feeds Step 4: 子问题排序)
+
+> **Q7**: "**Why Q3 (3 months)** specifically? Is it driven by (a) OpenAI **contract expiry date** (hard deadline), (b) **board demo / earnings call** (soft but political), (c) **Google fiscal year / CUD commit** signing deadline, (d) **engineering capacity window**, or (e) arbitrary CTO target? **Driver determines what's compromisable**."
+
+> **Q8**: "**Worst-case appetite + rollback**: if we migrate app X and customer satisfaction drops 5pp, can we **roll back in 30 minutes** (abstraction layer ready) or are we **stuck for a quarter** (deep API integration like legal app on Assistants API)? Reversibility per app changes risk tolerance and migration order."
+
+**这层 → 解锁 Step 4**: 答完 Deadline 问题, 你知道**为什么** Q3 这个数 (e.g., Aug 31 OpenAI renewal — but soft, can extend 90 days), 才能 push back. 12 apps 按 (deadline-pressure × $-savings × rollback-ease × eval-readiness) 排序: 内部搜索 + 客服 (Pareto + reversible) 排最前, legal Assistants-API app 排最后 (high lock-in).
+
+### S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)
+
+> **Q9**: "In 3 months, would you accept: **(a)** eval-complete + 0 apps migrated (data-driven decision, no risk), **(b)** 2-3 lowest-risk Pareto apps fully migrated + Gemini commit signed for procurement leverage, or **(c)** all 12 partially migrated (any failures = embarrassing demo)? My instinct: **(a) for first 6 weeks → (b) for last 6 weeks** — finish eval first, ship the safest wins, leave hard apps (legal Assistants API) for Q4."
+
+> **Q10**: "Which apps are **explicitly out of Q3 scope** — (a) any HIPAA app (BAA setup is 4-6 weeks alone), (b) any app < $50K/year spend (not worth the eng), (c) the legal app on Assistants API (deep rewrite needed), (d) any app < 100 sample gold set (eval not trustworthy)? My recommendation: **MVP = 4-6 apps: top-spend × eval-ready × reversible × no-compliance-blocker**; everything else gets a 'recommendation report' but no migration."
+
+**这层 → 解锁 Step 5**: 答完 S 问题, MVP 边界明确. 你知道**哪 80% 砍掉先不做** (HIPAA apps, low-spend apps, deep-lock-in Assistants-API apps, no-gold-set apps, EU-residency-blocked apps), 哪 20% 是 walking skeleton (eval harness up in week 1 + 4-6 Pareto apps migrated with vendor abstraction layer + Gemini partial CUD as procurement leverage + Q4 plan for the rest).
+
+**面试官 likely 回答**:
+- (a) Save $400-600K/year + (c) unblock 2M context features for internal search
+- 8 of 12 apps owned by central AI Platform team, 4 owned by product teams
+- Procurement is gatekeeper (renewal date Aug 31), Security needs to approve Vertex DPA (2 weeks)
+- 2 apps process EU customer data (GDPR), 0 HIPAA, 1 app has SOC2 evidence dependency on OpenAI
+- Engineering concern = mostly technical (legal team experienced Gemini 2 quality issues 18 months ago)
+- 3 apps have human-graded gold sets (legal contract review has 500 samples, others 0)
+- Top 3 apps = 70% of spend (customer support 35%, internal search 25%, legal review 10%)
+- Most apps can roll back in < 1 hour via env var swap. 1 legal app has deep OpenAI Assistants API usage = harder to rollback.
+- Q3 deadline driven by Aug 31 OpenAI renewal — but **soft**: customer can extend OpenAI 90 days while we finish eval
+
+→ **Real scope**: in 3 months, **evaluate all 12 apps, migrate the obviously winning 4-6, leave hard ones for Q4, get Gemini partial commit to use as OpenAI renewal leverage**. NOT migrate 12 apps in 3 months.
+
+---
+
+## 详细分析 + 回答 (sample 60-min walkthrough with ASCII diagram)
+
+### Phase 1: Clarify (8 min)
+
+(执行上面的 G·O·O·D-F·T 10 个问题)
+
+### Phase 2: Reframe — 12 apps = 12 decisions (4 min)
+
+> "OK so based on the answers — most important reframe: **12 apps is not one migration project**. It's **12 independent evaluations leading to 4 possible outcomes per app**:
+>
+> 1. **Migrate to Gemini** (Gemini quality ≥ GPT, big cost win, low risk)
+> 2. **Stay on OpenAI** (Gemini quality < GPT in this domain, accept higher cost)
+> 3. **Hybrid** (use cheap Gemini Flash for easy queries, fall back to GPT-5 for hard — model cascade)
+> 4. **Defer** (signal unclear in 3 months, evaluate again in 6)
+>
+> My prediction: **8 migrate, 2 stay, 2 hybrid**. The deliverable is per-app evidence, not bulk migration."
+
+### Phase 3: Stakeholders + Success Metrics (5 min)
+
+**Stakeholder map**:
+
+| Stakeholder | 在意什么 | 项目态度 | 关键动作 |
+|---|---|---|---|
+| **CTO (sponsor)** | $400-600K save + Google partnership story | Pushing | Weekly exec review with per-app status |
+| **AI Platform team head** | 工程团队不挂掉, 不背锅 | Cautious partner | Daily standup, co-design eval methodology |
+| **12 App owners** (8 central + 4 product) | 自己 app 不出事 + 不被迫迁 | 8 cooperative, 4 defensive | Per-app champion, evidence-based decisions |
+| **Procurement** | Aug 31 OpenAI renewal + Vertex AI contract terms | Gatekeeper | Brief weekly, give them Gemini quotes by week 4 |
+| **Legal** | DPA review (2 weeks for Vertex), GDPR | Time-sensitive | Trigger DPA review week 1 |
+| **Security / CISO** | Model data residency, audit logs | Approval needed | VPC-SC + CMEK setup demo |
+| **Finance / FP&A** | TCO calculation, CUD signing | Needs numbers | Per-app cost projection by week 6 |
+| **Legal Review team** (app user) | "Gemini hurt us 18 months ago" trauma | Most resistant | Personal eval workshop, show their golden set results |
+
+**Success metrics (3 layer)**:
+
+**Layer 1 — Per-app decision quality** (must achieve):
+- 12 apps each have **evidence-based decision** with > 200-sample evaluation
+- Quality delta documented (win rate / tie rate / loss rate per app)
+- Cost delta projected with confidence interval
+- Risk delta (rollback time, edge cases) documented
+
+**Layer 2 — Portfolio TCO** (CFO view):
+- Total LLM spend projected delta (Year 1 + Year 2)
+- Engineering migration cost (eng-weeks × $rate)
+- Net savings after migration cost
+
+**Layer 3 — "Walking-away leverage"** (hidden FDE deliverable):
+- Negotiation package for OpenAI renewal (Gemini quote in hand, partial migration credible)
+- Multi-vendor flexibility (LiteLLM abstraction live, future migrations cheaper)
+- Internal capability built (eval pipeline + golden sets are permanent assets)
+
+**Counter-metrics** (must not regress):
+- Customer-facing accuracy on any app must not drop > 1pp without explicit approval
+- Latency p99 must not regress > 20% on any user-facing app
+- No new security finding from migration
+
+### Phase 4: Eval methodology design (10 min)
+
+> "60% of the 3-month effort is eval, not migration. Migration is 6 weeks of engineering — eval is what tells us which 6 weeks to spend."
+
+**4 eval pillars**:
+
+**Pillar 1 — Per-app golden dataset**:
+- 100-1000 examples per app (12 apps → up to 12,000 samples)
+- Source: production query logs (sampled), customer-reported issues, edge cases
+- Labeling: human SME from app team, 2-rater agreement > 0.7 (Cohen's kappa)
+- For apps with existing gold set (3 of 12): augment to 500 samples
+- For apps with 0 gold set (9 of 12): build from scratch — **this is week 1-4 main work**
+
+**Pillar 2 — Pairwise comparison via LLM-as-judge**:
+- Same query → GPT-5, Gemini 3 Pro → 2 responses
+- Judge: Claude Opus 4.7 (third-party, avoids self-preference bias)
+- Output: A wins / B wins / Tie + reasoning
+- Volume: 1000-5000 pairwise per app
+- Cost: ~$2-5 per app of judge tokens × 12 apps = ~$50
+
+**Pillar 3 — Human review on disagreements**:
+- Sample 5-10% of LLM judge results for human review
+- Focus on: ties, low-confidence judgments, high-impact apps (legal review)
+- Calibration: 200 human-judged samples to validate LLM judge accuracy
+- If LLM judge ≠ human > 15%, recalibrate judge prompt or use Claude + GPT ensemble judge
+
+**Pillar 4 — Stratified eval per app**:
+
+For each app, slice by:
+
+| Slice dimension | Why |
+|---|---|
+| Query length (short / medium / long > 100K tokens) | Gemini 2M context advantage shows in long |
+| Query complexity (low / medium / high reasoning) | GPT-5 strength in high reasoning |
+| Language (English / non-English) | Gemini multilingual usually stronger |
+| User segment (free / paid / enterprise) | Different acceptable quality bar |
+| Domain edge cases (legal jargon / medical / financial) | Per-domain regression possible |
+
+**Eval pipeline architecture**:
+
+```
+   Production logs (BigQuery)            Customer issue tickets
+   ──┬─────────────────────              ──┬─────────────
+     │                                       │
+     ▼                                       ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Sample selector (per-app stratified, 1000/app)     │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Golden set storage (BigQuery)                      │
+   │   query, app_id, ideal_answer, label_metadata       │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Pairwise runner (Cloud Run jobs)                   │
+   │   for each (query, app): call GPT-5 + Gemini 3 Pro  │
+   │   store both responses                              │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  LLM-as-judge (Claude Opus 4.7 via Bedrock)         │
+   │   for each pair: A wins / B wins / Tie + reasoning  │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Stratified aggregator (BigQuery SQL)               │
+   │   win_rate per app × slice                          │
+   └────────────────────┬────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Looker Studio dashboard (12 app × 4 outcomes)      │
+   │  + Human review queue (10% sample → labelers)       │
+   └─────────────────────────────────────────────────────┘
+```
+
+### Phase 5: Per-app decision framework (8 min)
+
+**4-quadrant decision** based on (quality delta, cost delta):
+
+```
+                    Cost ↓ (Gemini much cheaper)
+                              │
+                              │
+    Stay on OpenAI ←─────────┼─────────→ MIGRATE  ★
+    (quality clearly worse,    │     (quality similar or better,
+     even cheap not worth)     │      and cheaper)
+                              │
+    Quality drop ──────────────┼────────── Quality similar/up
+                              │
+    Defer (re-eval Q4)         │     Hybrid (cascade Flash + GPT)
+    (signal unclear,           │     (Gemini Flash good enough on
+     not enough evidence)      │      easy queries, GPT on hard)
+                              │
+                    Cost ≈ (Gemini and GPT similar in this slice)
+```
+
+**Per-app likely outcomes (面试官 confirmed data)**:
+
+| App | Spend $/yr | 类型 | Likely outcome | Rationale |
+|---|---|---|---|---|
+| **Customer Support (chatbot)** | $700K | High volume, easy intent | **Hybrid** (Gemini Flash 70% + GPT-5 30%) | Flash adequate for routing + simple FAQ, GPT for complex |
+| **Internal Search (RAG)** | $500K | Long-context, semantic | **Migrate Gemini Pro** | 2M context kills 400K, semantic search Gemini ≥ GPT |
+| **Legal Contract Review** | $200K | Critical accuracy, jargon | **Stay on GPT-5** (or migrate cautiously) | Legal team trauma + high stakes, Gemini may catch up but not Q3 |
+| **Code Review Bot** | $150K | Reasoning-heavy | **Stay or migrate** based on eval | Borderline, both models strong here |
+| **Sales Lead Scoring** | $120K | Structured output | **Migrate Gemini Pro** | Cheaper + good enough for classification |
+| **Marketing Copywriting** | $100K | Creative | **Hybrid or migrate** | Subjective, win rate close, cost wins |
+| **HR FAQ Bot** | $80K | Easy QA | **Migrate Gemini Flash** | Tiny, cheap model fine |
+| **Internal Translation** | $60K | Multilingual | **Migrate Gemini Pro** | Gemini multilingual stronger |
+| **Document Summarization** | $50K | Long-context | **Migrate Gemini Pro** | 2M context wins |
+| **Email Triage** | $30K | Classification | **Migrate Gemini Flash** | Trivially easy, cheapest model |
+| **Analytics Q&A** | $10K | SQL gen + reasoning | **Stay or hybrid** | Small spend, not worth the risk |
+| **Prototype / Experimentation** | $5K | Various | **Defer** | Too small to bother, kept on OpenAI |
+
+**My prediction**: 6 migrate, 2 stay, 3 hybrid, 1 defer → 70% of $2M spend migrates → ~$420K/year save before negotiation.
+
+### Phase 6: Abstraction layer architecture (7 min)
+
+> "Whether we migrate 12 apps or 0 apps, the lasting deliverable for the customer is the abstraction layer. Let me describe it."
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Customer GCP Project (existing)                                        │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  12 Production Applications                                       │   │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐  ...  ┌─────────┐           │   │
+│  │  │ Cust.   │ │ Legal   │ │Internal │       │ HR FAQ  │           │   │
+│  │  │Support  │ │Review   │ │Search   │       │ Bot     │           │   │
+│  │  └────┬────┘ └────┬────┘ └────┬────┘       └────┬────┘           │   │
+│  │       └───────────┴───────────┴─────────────────┘                 │   │
+│  │                       │                                            │   │
+│  │                       │  (OpenAI-compatible API format)            │   │
+│  │                       ▼                                            │   │
+│  │  ┌──────────────────────────────────────────────────────────┐    │   │
+│  │  │  LLM Gateway (LiteLLM on Cloud Run, multi-region)        │    │   │
+│  │  │   ─ Per-app routing config (YAML)                        │    │   │
+│  │  │   ─ Cost tagging (BigQuery export)                       │    │   │
+│  │  │   ─ Kill switch (env var SWITCH_TO_OPENAI=true → 30s)   │    │   │
+│  │  │   ─ Shadow mode helper (send to both, return one)        │    │   │
+│  │  │   ─ Cache layer (Redis, 24h TTL on identical prompts)    │    │   │
+│  │  │   ─ Per-app prompt registry (Git-backed YAML)            │    │   │
+│  │  └──────────────────────┬───────────────────────────────────┘    │   │
+│  │                          │                                        │   │
+│  │       ┌──────────────────┼──────────────────┐                    │   │
+│  │       ▼                  ▼                  ▼                     │   │
+│  │  ┌──────────┐      ┌──────────────┐    ┌──────────────┐          │   │
+│  │  │ OpenAI   │      │  Vertex AI   │    │  Anthropic   │          │   │
+│  │  │ GPT-5    │      │  Gemini      │    │  Claude      │          │   │
+│  │  │ (Azure   │      │  3 Pro/Flash │    │  (Vertex     │          │   │
+│  │  │  OpenAI) │      │              │    │   AI MaaS)   │          │   │
+│  │  └──────────┘      └──────────────┘    └──────────────┘          │   │
+│  │                                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │  Observability                                              │  │   │
+│  │  │   ─ BigQuery: every call (latency, tokens, cost, app_id)    │  │   │
+│  │  │   ─ Looker Studio: per-app dashboards                       │  │   │
+│  │  │   ─ Cloud Audit Logs: who called what                       │  │   │
+│  │  │   ─ Alerting: cost spike / latency spike / error rate       │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why LiteLLM specifically**:
+- Open source, no vendor lock-in for the gateway itself
+- OpenAI-format API → existing app code doesn't change much
+- Built-in cost tagging, retry, fallback, multi-model routing
+- Supports 100+ models — futureproof for Claude 4.8 / GPT-6 / open source
+
+**Per-app routing config**:
+
+```yaml
+# Per-app routing in LiteLLM YAML
+apps:
+  customer_support:
+    primary: vertex_ai/gemini-3-flash
+    fallback_on_failure: openai/gpt-5
+    cascade_on_low_confidence:
+      threshold: 0.7
+      escalate_to: openai/gpt-5
+    cache_enabled: true
+    cache_ttl_hours: 24
+
+  internal_search:
+    primary: vertex_ai/gemini-3-pro
+    fallback_on_failure: openai/gpt-5
+    cache_enabled: false  # personalized
+
+  legal_review:
+    primary: openai/gpt-5
+    shadow: vertex_ai/gemini-3-pro  # collect data but don't return
+    cache_enabled: false
+
+  hr_faq:
+    primary: vertex_ai/gemini-3-flash
+    fallback_on_failure: vertex_ai/gemini-3-pro
+    cache_enabled: true
+    cache_ttl_hours: 168  # 1 week
+```
+
+**Kill switch** (the most important feature):
+
+```python
+# 30-second rollback if any app goes wrong
+if os.getenv("KILL_SWITCH_APP_X") == "true":
+    return openai_gpt5_response(prompt)
+# Operator sets env var, Cloud Run rolling restart in 30s
+```
+
+### Phase 7: Migration phasing (6 min)
+
+**Wave-based rollout** (12 weeks total):
+
+```
+Week 1-4: Foundation
+  ─ Build eval pipeline + golden datasets for top 5 apps
+  ─ Deploy LiteLLM abstraction layer (no behavior change yet, OpenAI 100%)
+  ─ Vertex AI account setup + DPA + security review
+  ─ Train customer team on Vertex / Gemini API
+
+Week 5-8: Wave 1 — Confidence Builders (2 easiest apps)
+  ─ HR FAQ Bot → Gemini Flash (shadow → 10% → 50% → 100% over 1 week)
+  ─ Email Triage → Gemini Flash (same)
+  ─ Demonstrate kill switch works (drill: pretend issue, roll back)
+  ─ Save metrics: per-app cost down, latency same, quality same
+
+Week 9-10: Wave 2 — High-Value Migrations (3 apps)
+  ─ Internal Search → Gemini Pro (the 2M context unlock)
+  ─ Document Summarization → Gemini Pro
+  ─ Internal Translation → Gemini Pro
+  ─ Shadow 1 week, canary 10% 3 days, ramp to 100%
+
+Week 11-12: Wave 3 — Hybrid + Final Eval (3 apps)
+  ─ Customer Support → Gemini Flash + GPT-5 cascade (hardest)
+  ─ Sales Lead Scoring → Gemini Pro
+  ─ Marketing Copywriting → Gemini Pro
+  ─ Stay on OpenAI: Legal Review, Code Review, Analytics, Prototype
+
+Week 13 (buffer): Cleanup + Handoff
+  ─ Documentation, runbooks, oncall handover
+  ─ Quarterly re-eval calendar (catch vendor drift)
+  ─ Procurement signs new contracts: Vertex CUD + OpenAI reduced
+```
+
+**Why this order**:
+- Wave 1 = build trust. 2 trivial apps with low risk demonstrate the **abstraction + kill switch + Vertex contract** all work.
+- Wave 2 = capture obvious wins (long context, multilingual) — these have biggest cost saves with low risk.
+- Wave 3 = hardest. Customer Support is high-volume so the cascade design must be right.
+- **Legal Review NOT migrated in Q3** — that's the "stays on OpenAI" sign of mature judgment. Re-eval in 6 months when Gemini may have caught up.
+
+### Phase 8: Commercial negotiation arc (7 min)
+
+> "Now the part most candidates miss: even if we migrate 0 apps, customer saves money via negotiation leverage. Here's the playbook."
+
+**Negotiation timeline**:
+
+| Week | OpenAI conversation | Google conversation |
+|---|---|---|
+| Week 0 | Tell OpenAI "we're exploring alternatives" | Tell Google "we're evaluating Gemini for 12 apps" |
+| Week 2 | Request OpenAI roadmap briefing | Request Vertex AI architecture review |
+| Week 4 | Share preliminary eval methodology (not results) | Same |
+| Week 6 | Tell OpenAI: "early results show some apps may move" | Tell Google: "we see early wins in 6 apps" |
+| Week 8 | OpenAI proactively offers discount | Google offers CUD terms |
+| Week 10 | "Here are our findings: 6 apps migrating, 2 staying" — request 25-30% off remaining $600K | "Committing $1.4M annual to Vertex" — request 25% CUD |
+| Week 12 | Sign reduced OpenAI contract | Sign Vertex commitment |
+
+**Math**:
+
+```
+Before migration:
+  OpenAI spend: $2M/year (12 apps on GPT-5)
+
+After migration + negotiation:
+  Apps staying on OpenAI: $600K (legal review, code review, analytics, prototype)
+    × 0.75 (25% renewal discount) = $450K
+  Apps migrating to Gemini: $1.4M of GPT spend → ~$700K Gemini spend (50% saving)
+    × 0.75 (25% CUD) = $525K
+  
+  Total new spend: $975K/year
+  Savings: $1.025M/year (51%)
+
+Worst case (no migration, just negotiation leverage):
+  $2M × 0.80 (20% renewal discount because we walked OpenAI close to the edge) = $1.6M
+  Savings: $400K/year (still positive)
+
+Engineering migration cost (one-time):
+  4 eng × 12 weeks × $4K/week ≈ $200K
+  Net first-year benefit: $825K
+  Steady state: $1M+/year save
+```
+
+**Key insight**: even **0 apps migrated** = $400K save. Migration is upside, not floor. **This is the FDE deliverable CTOs don't realize they want until you show them.**
+
+### Phase 9: Risk + Close (5 min)
+
+**Three risks worth calling out**:
+
+**Risk #1 — Vendor model drift**:
+> "Both OpenAI and Google occasionally fine-tune production models without version bump. Eval results in week 8 may not hold in month 6. Mitigation: quarterly automated re-eval against golden set, with alarms on regression > 5pp win rate change."
+
+**Risk #2 — Prompt re-engineering scope**:
+> "Every migrated app needs prompts re-tuned for Gemini. A GPT-5 system prompt directly fed to Gemini often loses 5-10pp win rate. Budget 1 eng-week per migrated app for prompt re-engineering. This is a hidden 8 eng-weeks across the project."
+
+**Risk #3 — Legal team political resistance**:
+> "Legal had a bad Gemini experience 18 months ago — that's a real wound. Even if Gemini 3 Pro evals well, I'd recommend NOT migrating legal in Q3 regardless of evidence. Build trust on easier apps first, re-evaluate legal in Q1 next year with their full participation in eval design."
+
+**Close**:
+
+> "Three months. 12 apps. End state: 6 migrated, 2-3 hybrid, 2-3 staying, **abstraction layer is the permanent asset**, customer saves $800K-$1M/year, **and we have a multi-vendor capability they didn't have before**. Want me to dive deeper on eval methodology, abstraction architecture, or the commercial negotiation playbook?"
+
+---
+
+## Gao Xin 简历专属 reframe + STAR
+
+This problem **directly parallels** multiple projects on your resume.
+
+### Direct analog 1: TikTok PayLater Indonesia → multi-market rollout
+
+> **STAR**: At TikTok PayLater, I led the rollout from Indonesia to 7 markets. Each market had a **different LLM provider preference** — Indonesia required local data residency (we used a local provider), Brazil could use international, Mexico had specific compliance. The pattern is identical: **per-market (here per-app) evaluation, decision framework, abstraction layer, phased rollout**.
+>
+> **Situation**: 7 markets, 3 different vendor options per market.
+> **Task**: Decide per-market vendor + build abstraction layer.
+> **Action**: Built golden eval set per market (locale-specific queries), pairwise comparison with human review, decision matrix per market.
+> **Result**: 4 markets on Vendor A, 2 on Vendor B, 1 on hybrid. Total cost down 35%. Abstraction layer means switching vendor in any market is 1 week of work.
+
+### Direct analog 2: Internal Agent Platform vendor abstraction
+
+> "When I built the Internal Agent Platform at TikTok, I had to integrate **5+ LLM providers** because different teams had different preferences (some wanted OpenAI for quality, some wanted Anthropic for safety, some wanted self-hosted for cost). I built exactly this kind of **abstraction layer with per-team routing config**. The LiteLLM-style gateway is something I've shipped at production scale."
+
+### Direct analog 3: ConvFinQA ablation methodology
+
+> "ConvFinQA work taught me **structured ablation** — when comparing models on complex multi-hop reasoning, you must stratify by sub-skill (single-step vs multi-step vs numerical-only). I'd apply the same stratification here: each app's eval slices by query type, not just aggregate win rate."
+
+### Direct analog 4: BNPL chatbot intent routing
+
+> "The BNPL chatbot I built uses **intent classification → route to cheap model for FAQ vs expensive model for personalized advice**. That's exactly the Customer Support cascade design I'm proposing here for the F500 customer. I have working code for this pattern."
+
+**Pitch to interviewer**:
+
+> "This problem is 80% overlap with what I've done at TikTok — multi-market voice agent rollout, internal agent platform with 5 LLM providers, BNPL cascade routing. The 20% incremental is **Google-side: Vertex AI specifics + Gemini 3 Pro pricing + LiteLLM at this scale**. I'd close that gap in week 1 by hands-on with Vertex AI tutorials + Gemini API docs."
+
+---
+
+## 5 个 Follow-ups
+
+### Q1: "客户的 CTO 听到你说 '只迁 6 个 app', 不满意. 他要求 12 个全迁. 怎么办?"
+
+**A**: This is **the** make-or-break moment. Don't capitulate.
+
+> "I understand the desire for a clean story to the board. Let me explain what happens if we migrate all 12:
+>
+> 1. **Legal Review app**: Gemini eval shows 12pp lower accuracy on contract clause extraction in week 4. If I migrate anyway, in month 4 we have a customer-facing incident where Gemini mis-extracted a non-compete clause, customer's contract review team escalates, you have **a board crisis instead of board win**.
+>
+> 2. **Code Review Bot**: Borderline eval. Migrating costs 4 eng-weeks of prompt re-engineering for marginal cost save. Net negative ROI on this app.
+>
+> 3. **Analytics Q&A** and **Prototype**: combined $15K spend. Migration eng cost $30K. **We'd lose money** migrating these.
+>
+> **The win story is the right story**: 'F500 customer migrated 6 of 12 apps to Gemini for $800K annual savings, retained OpenAI for 2 mission-critical workflows where it leads, built multi-vendor capability that future-proofs us against any single vendor'. That's a stronger board story than 'migrated 12, retracted 2'.
+>
+> If you still want me to migrate all 12, I'll need you to sign off on the legal-review risk in writing, because I won't put my name on something likely to fail QA."
+
+### Q2: "Gemini eval 显示 Customer Support 上 win rate 是 52% — 算 tie. 你迁不迁?"
+
+**A**: 52% pairwise win rate sounds like tie, but **decision needs the cost dimension**.
+
+> "52% pairwise win rate alone says 'tie'. But this is Customer Support — 35% of total spend ($700K/year). Cost delta is 70% (Gemini Flash + GPT-5 cascade vs all GPT-5). The right framework:
+>
+> - Quality: tie (52%)
+> - Cost: huge win (~$490K save)
+> - Risk: medium (high volume = high blast radius if wrong)
+> - **Decision: hybrid cascade**. Use Gemini Flash for routing + 70% of queries (the easy ones), GPT-5 for hard 30%. Even if Flash is slightly worse on average, **cascade captures cost win without quality loss**.
+>
+> The eval slice matters here: I'd bet pairwise on **easy intent classification queries**, Flash wins or ties 65%+. On **complex multi-turn troubleshooting**, GPT-5 wins. So cascade by query difficulty.
+>
+> Implementation: Flash answers first, if confidence < 0.7 escalates to GPT-5. Net: ~70% Flash, 30% GPT-5, ~$300K save with no quality regression."
+
+### Q3: "Gemini 3 Pro 的 2M context 你说能解锁 internal search 的新场景. 具体怎么 prove?"
+
+**A**: This is a **proof-by-feature** moment.
+
+> "Internal Search currently uses RAG with retrieval over 50 top chunks, fed to GPT-5 with 400K context. The constraint shows up in two scenarios:
+>
+> 1. **'Show me all our customer contract clauses about indemnification'** — currently retrieves top 50 results, often misses long-tail. With Gemini 2M, we can feed **all 500 contracts at once**, ask for indemnification clauses across all. **Recall goes from ~75% to ~98%**.
+>
+> 2. **'Summarize all our Q1 customer support tickets about feature X'** — currently summarizes via map-reduce (chunk → summarize → re-summarize). With 2M, single-pass summarization with full context preserves nuance.
+>
+> **Proof methodology**:
+> - Build golden set of 100 'long-context' queries that current RAG fails on
+> - Run both: current 400K + Gemini 2M
+> - Have human SME judge: did Gemini's answer find what was missed?
+> - If Gemini answers 60+ of 100 previously-missed queries, the 2M context is a unique unlock — **migrate regardless of cost**.
+>
+> This is the kind of capability win that **can't be replicated by negotiating OpenAI down**. It's a product unlock."
+
+### Q4: "如果 6 周后 Gemini 突然出现 model drift, 答案质量回退. 你怎么发现?"
+
+**A**: This is a **continuous eval** question — you must have a system.
+
+> "Vendor drift is real. OpenAI and Google have both shipped silent updates. Defense in depth:
+>
+> 1. **Continuous shadow eval**: 1% of production traffic always goes to **both** models (current + alternative). LLM-as-judge on the shadow sample weekly. Alarm if win rate shifts > 5pp.
+>
+> 2. **Quarterly full re-eval**: Re-run all 12 apps' golden sets quarterly against current vendor. Compare to baseline at migration time. Regression > 3pp triggers review.
+>
+> 3. **Customer feedback loop**: every app has thumbs-up/down feedback. Time-series anomaly on negative feedback rate per app → automatic alarm.
+>
+> 4. **Cost telemetry**: token usage per query may drift (model verbose) — alarm on cost per query > 20% increase week-over-week.
+>
+> 5. **Kill switch ready**: if drift confirmed, rollback to OpenAI in 30s. Customer didn't break. Then we eval whether to re-migrate later.
+>
+> The systemic answer: **eval is not a one-time gate, it's a continuous control loop**. The eval pipeline I'm building is permanent infrastructure, not project work."
+
+### Q5: "如果客户 legal team 完全不接受 Gemini, 即使 eval 好, 政治上 block 这个 app, 你怎么处理?"
+
+**A**: This is **political, not technical**. FDE skill = navigating, not fighting.
+
+> "Two-layered approach:
+>
+> **Layer 1 — Don't fight, defer**:
+> - Take the legal app off the Q3 migration plan. Document why ('legal team has Gemini 2 trauma, prefers to wait')
+> - Show CTO: '11 of 12 apps eval done, 6 migrate, legal review deferred to Q1 with legal team participation in eval design'
+> - CTO gets ~95% of the cost win without the political battle
+>
+> **Layer 2 — Earn trust over time**:
+> - Invite legal team head to design the golden set for legal review eval. **Their criteria, their samples**.
+> - Run eval together with them in the room. If Gemini wins, they own the result. If GPT wins, decision is data-backed.
+> - In Q4 / Q1, re-eval with them as partners, not adversaries.
+>
+> **Layer 3 — Frame the political win**:
+> - Tell legal team: 'You drove the decision. Your golden set is what we'll use industry-wide for legal AI eval.' Make them the experts, not the blockers.
+>
+> The mistake is fighting them in Q3. The win is letting them own the legal app's vendor choice **whichever way the data points**. FDE skill = enabling customer to make decisions, not making decisions for them."
+
+---
+
+## ❌ 死路答法 (top 8)
+
+1. **"全部 12 个迁 Gemini, 因为便宜 30%"** — 不分场景一刀切, 法律审查直接出事故
+2. **"我先 swap API SDK, 6 周搞定"** — 跳过 eval, 直接赌博
+3. **"用 MMLU / GPQA benchmark 决定迁不迁"** — public benchmark 不能代替 production eval
+4. **"不需要 abstraction layer, 直接换 SDK"** — 6 个月后下个模型出来又要再做一遍
+5. **"接受 3 个月 deadline 迁 12 个"** — 时间不够, 不 reverse scope
+6. **"只做技术不参与商务"** — 错过 $400K-$600K 的谈判 leverage
+7. **"忽略工程团队 nervous, 用 CTO authority 强推"** — 后续 oncall 时团队 sabotage
+8. **"不做 shadow mode, 直接 canary"** — 没有 production traffic 上的真实质量数据就上 canary 是赌博
+
+---
+
+## ✅ 加分项 (top 10)
+
+1. **G·O·O·D-F·T 10 个问题** — 立刻 signal staff-level clarifying
+2. **Reframe "12 apps = 12 decisions"** — 反一刀切, 体现成熟判断
+3. **Eval methodology 占 60% 工作量** — eval-first thinking
+4. **Per-app stratified decision matrix** — 不是平均分, 是切片
+5. **Abstraction layer (LiteLLM) 作为长期资产** — 这次迁完, 下次更便宜
+6. **Shadow → canary → full + kill switch** — production safety culture
+7. **"Even 0 migration = $400K save via negotiation"** — second-order thinking, 客户也许没意识到
+8. **Legal team trauma management (defer, not force)** — 政治成熟度
+9. **Quarterly re-eval + vendor drift defense** — 不是 one-shot
+10. **TikTok 简历 reframe (7 markets, Internal Agent Platform, BNPL cascade)** — 直接 transfer experience
+
+---
+
+## 一句话总结
+
+> **F500 OpenAI → Gemini 迁移 = "12 apps = 12 decisions, not 1 migration" + "eval methodology > migration code" + "abstraction layer 是长期资产" + "即使 0 迁移也能省 $400K 通过谈判 leverage" + "let evidence decide, not CTO opinion"**.
+>
+> 真正的 FDE win 不是迁 12 个 app, 是给客户搭一个 **多厂商灵活架构 + 系统化 eval 能力 + 商务谈判杠杆**, 之后 Claude 4.8 / GPT-6 出来都 1 周内切换. Per-app evidence-based 决策, 6 迁 / 2-3 hybrid / 2-3 留, 比 12 全迁 更专业更可信.
+
+---
+
+## Cheat Sheet
+
+```
+不要做:
+  - 12 个全迁 Gemini
+  - 跳过 eval, swap SDK 就上
+  - 用 MMLU 当决策依据
+  - 不建 abstraction layer
+  - 接受 3 月迁 12 个
+  - 只做技术不谈商务
+  - 强推法律团队接受 Gemini
+  - 不 shadow 直接 canary
+
+要做 (9 step):
+  1. Clarify (G·O·O·D-F·T 10 Q)
+  2. Reframe: 12 apps = 12 decisions
+  3. Stakeholder + 3-layer metrics
+  4. Eval methodology (golden + pairwise + LLM judge + human review)
+  5. Per-app 4-quadrant decision (migrate / stay / hybrid / defer)
+  6. Abstraction layer (LiteLLM + kill switch + observability)
+  7. Wave-based migration (易→难, shadow→canary→full)
+  8. 商务谈判 (Gemini eval = OpenAI 砍价 leverage)
+  9. Risk + close (vendor drift / prompt re-eng / political)
+
+G·O·O·D-F·T 必问:
+  G: CTO 真实目标? 哪些 app 优先?
+  O: 工程对接谁? 谁能 veto?
+  O: GDPR / HIPAA / data residency?
+  D: 现有 eval 资产? Per-app 花费?
+  F: Per-app 回滚能力? 不可逆度?
+  T: 3 月由谁驱动? OpenAI 合同?
+
+Stakeholder veto:
+  - CTO (sponsor) — 政治支持
+  - Procurement (gatekeeper) — 合同
+  - Legal (DPA 2 周)
+  - Security (Vertex 审批)
+  - 12 app owners (每个 app 一个 partner)
+  - Legal Review team (trauma)
+
+Eval 4 柱:
+  1. Per-app golden set (100-1000 samples)
+  2. Pairwise (GPT vs Gemini, 1000-5000 pairs)
+  3. LLM-as-judge (Claude Opus 4.7)
+  4. Stratified (length / complexity / language / segment)
+  + 5-10% 人工 review on 分歧
+
+4 outcomes per app:
+  - Migrate (quality ≥ + cost ↓)
+  - Stay (quality ↓, accept higher cost)
+  - Hybrid (cascade Flash + Pro)
+  - Defer (signal unclear)
+
+预测 12 app outcome:
+  6 migrate, 3 hybrid, 2-3 stay, 1 defer
+  70% spend migrates
+  Save $420K before negotiation, $800K-$1M after
+
+LiteLLM abstraction:
+  ─ Per-app YAML routing config
+  ─ Kill switch (30s rollback via env var)
+  ─ Cost tagging → BigQuery
+  ─ Cache layer (Redis, 24h TTL)
+  ─ Shadow mode helper
+  ─ Multi-vendor (OpenAI + Vertex + Anthropic)
+
+Migration wave:
+  W1-4: Foundation (eval + abstraction + DPA)
+  W5-8: Wave 1 (HR FAQ + Email — 易 + 小)
+  W9-10: Wave 2 (Internal Search + Summary — 2M context win)
+  W11-12: Wave 3 (Customer Support cascade + 其他)
+  W13: Buffer + handoff
+
+商务谈判 timeline:
+  W4: 早期 eval 露给两方
+  W8: 双方主动报价
+  W10: Bring evidence, ask 25-30% off remaining
+  W12: 签 Vertex CUD + OpenAI 降价合同
+  
+  Math:
+    Before: $2M
+    After: $975K (51% save)
+    Worst case (0 migration + neg only): $1.6M (20% save)
+
+3 risks:
+  1. Vendor drift (quarterly re-eval)
+  2. Prompt re-engineering (1 eng-week/app hidden cost)
+  3. Legal team political (defer, don't force)
+
+Resume quotes:
+  "TikTok PayLater 7 markets — same per-market eval framework"
+  "Internal Agent Platform — built LiteLLM-style gateway with 5 providers"
+  "ConvFinQA — same stratified ablation methodology"
+  "BNPL chatbot — same cheap+expensive cascade pattern"
+
+Key phrases:
+  - "12 apps is not one migration — it's 12 decisions"
+  - "Eval is 60% of the work, migration is 40%"
+  - "Per-app golden set is the lasting IP"
+  - "Even 0 migration = $400K via negotiation leverage"
+  - "Abstraction layer is the permanent asset"
+  - "Let evidence decide, not CTO opinion"
+  - "Legal team trauma — defer, don't fight"
+  - "Quarterly re-eval — vendor drift is real"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

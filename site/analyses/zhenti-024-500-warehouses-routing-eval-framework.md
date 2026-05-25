@@ -2,6 +2,10 @@
 
 > "We're deploying an **AI agent that suggests delivery rerouting** to **500 warehouse managers**. Customer's existing rate is **97% on-time, target 99%**. **Design the evaluation framework** — how do you know the agent actually helps before / during / after rollout? What's your North Star metric?"
 
+**中文翻译**:
+
+> "我们要部署一个 **AI agent, 给 500 个仓库经理建议送货改派**. 客户现在 **on-time 送达率 97%, 目标 99%**. **设计评估 (evaluation) 框架** — 上线前 / 中 / 后, 你怎么知道 agent 真的有用? 你的 North Star (北极星) 指标是什么?"
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir Foundry / Anduril / o9 / Anthropic Enterprise · 行业: logistics / supply chain
 **约束**: 500 warehouse heterogeneity (西雅图 vs 拉斯维加斯) / 97% baseline 已经高, 边际收益难证明 / agent suggests, manager decides (HITL) / counterfactual hard (反事实评估) / drift over time (天气/促销/staff turnover) / regulatory none but operational SLA
@@ -236,7 +240,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + outcome definition (5 min)
+### Phase 1: Clarify + outcome definition (澄清 + 结果定义) (5 min)
 
 开口锁:
 - "Outcome metric: 'on-time' 是 promised window 内吗? 比如 promised 2pm 实际 3pm 算 fail?"
@@ -251,7 +255,7 @@ KPI clarity:
 - **Leading**: manager acceptance rate of agent suggestions
 - **Guardrail**: cost per delivery, driver hours/delivery, customer complaint rate, manager override reasons
 
-### Phase 2: Metric hierarchy (8 min)
+### Phase 2: Metric hierarchy (指标层级) (8 min)
 
 不要只一个 metric, 三层:
 
@@ -284,7 +288,7 @@ KPI clarity:
 - Guardrail 防 game (不能为 99% 牺牲 cost)
 - Counter 防 average-shifting hide variance
 
-### Phase 3: Per-warehouse baseline (7 min)
+### Phase 3: Per-warehouse baseline (按仓库定基线) (7 min)
 
 **关键洞察**: 500 warehouse heterogeneity 巨大. 西雅图 hub 处理 5000/day deliveries 经验老到 baseline 98%; 拉斯维加斯小 hub 800/day baseline 92%; 鳳凰城 大 promo season 一时间 85%.
 
@@ -311,7 +315,7 @@ warehouse_strata = stratify(warehouses, dims=[
 - 内部 leadership see: top mover, bottom mover, agent contribution % to mover
 - Bottom-quartile manager 1:1 from regional director
 
-### Phase 4: 4-stage eval pipeline (12 min)
+### Phase 4: 4-stage eval pipeline (四阶段评估流水线) (12 min)
 
 **Stage 1: Offline historical replay (week 1-2)**
 
@@ -417,7 +421,7 @@ Halt criteria:
 - Customer complaint +20% (P1)
 - Manager acceptance < 30% (P2)
 
-### Phase 5: Counterfactual + causal inference (10 min)
+### Phase 5: Counterfactual + causal inference (反事实 + 因果推断) (10 min)
 
 这是 staff-level 的标志. 99% of candidates 不会答这层.
 
@@ -458,7 +462,7 @@ Assumes parallel trends. Easier to communicate to business.
 - Manager rejects agent suggestion → still counts as "treated" (intent-to-treat ITT)
 - Warehouse 部分 manager 接受 部分不接受 → cluster-level 仍 random, ITT 仍 valid
 
-### Phase 6: Engagement + HITL signals (5 min)
+### Phase 6: Engagement + HITL signals (参与度 + 人在循环信号) (5 min)
 
 Agent advises, manager decides. **Engagement is leading indicator**.
 
@@ -487,7 +491,7 @@ Agent advises, manager decides. **Engagement is leading indicator**.
 - "Rejector": < 30% accept → 1:1 training, understand barrier
 - "Rubber stamper": > 95% accept, < 5s decide → concerning, agent 错了也照办, 加 friction (要求注释)
 
-### Phase 7: Drift detection + monitoring (7 min)
+### Phase 7: Drift detection + monitoring (漂移检测 + 监控) (7 min)
 
 Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.
 
@@ -522,7 +526,7 @@ Long-tail problem: agent 在 Q3 表现好, Q4 promo + winter weather 不一定.
 - DiD on rolling quarter
 - Per-strata effect heterogeneity (does agent help low-baseline warehouses more? expected yes)
 
-### Phase 8: Trade-offs + alternatives (6 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)
 
 **Decision 8.1 — Rigor vs business speed**
 

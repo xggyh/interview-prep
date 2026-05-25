@@ -2,6 +2,10 @@
 
 > "Retail customer has **12 data sources** — POS systems (Oracle Retail + NCR), e-commerce (Shopify + Magento), inventory (SAP S/4HANA), warehouse (Manhattan WMS), supplier feeds (EDI 850/856/810), weather API, promo calendar (Smartsheet), foot traffic (Placer.ai), social signals (Brandwatch). They want to feed a demand forecasting model. **Design the ingest + transform pipeline.**"
 
+**中文翻译**:
+
+> "零售客户有 **12 个数据源** — POS 系统 (收银台, Oracle Retail + NCR), 电商 (Shopify + Magento), 库存 (SAP S/4HANA 是 ERP 系统), 仓库 (Manhattan WMS 是仓储管理系统), 供应商 feed (EDI 850/856/810 是零售 B2B 标准电子单据), 天气 API, 促销日历 (Smartsheet), 客流量 (Placer.ai), 社交信号 (Brandwatch). 他们要喂一个 demand forecasting model (需求预测模型). **设计这个摄取 (ingest) + 转换 (transform) pipeline.**"
+
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Palantir / Databricks / o9 Solutions · 行业: retail / CPG
 **约束**: 12 heterogeneous sources / multiple SLAs (real-time POS vs daily EDI) / schema drift / data quality / late-arriving data / forecasting freshness (daily forecast horizon 90 days)
@@ -239,7 +243,7 @@
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + KPI (5 min)
+### Phase 1: Clarify + KPI (澄清 + 锁 KPI) (5 min)
 
 开口锁:
 - "Forecasting model retrain 频率: daily? hourly? 不同答案设计差别巨大"
@@ -255,7 +259,7 @@ KPI:
 - **DLQ size**: < 0.1% of daily volume
 - **Lineage coverage**: 100% production assets in OpenLineage graph
 
-### Phase 2: Source matrix (5 min)
+### Phase 2: Source matrix (数据源矩阵分类) (5 min)
 
 不要 12 个 source 一个一个讲, 画个矩阵让面试官看到你的分类思维:
 
@@ -280,7 +284,7 @@ KPI:
 - **API poll**: Weather, Smartsheet, Brandwatch (REST, rate-limited)
 - **File drop**: EDI (AS2), Placer.ai (SFTP)
 
-### Phase 3: Medallion Architecture (10 min)
+### Phase 3: Medallion Architecture (Bronze/Silver/Gold 三层架构) (10 min)
 
 为什么 medallion (Bronze/Silver/Gold) 是工业标准:
 
@@ -304,7 +308,7 @@ KPI:
 
 为什么不是 ETL (用 Spark transform): 现代 stack 趋势 ELT — load raw to warehouse, transform with SQL. Snowflake compute 比 EMR Spark 更便宜 + 不用维护集群. Spark 留给 ML training / large file processing (parquet conversion).
 
-### Phase 4: Per-source ingestion deep dive (10 min)
+### Phase 4: Per-source ingestion deep dive (每个数据源的摄取细节) (10 min)
 
 选 3 个最难的讲, 不要 12 个都讲完.
 
@@ -366,7 +370,7 @@ Shopify Order Created webhook
 - **Webhook 不保证顺序**: order_updated 可能先于 order_created 到. 写时不依赖 ordering, silver 层用 max(updated_at) merge.
 - **Webhook 丢失**: 1% 概率丢 webhook. backup: 每天跑一次 Shopify REST API reconcile, diff webhook 来的 vs API 查到的.
 
-### Phase 5: Transform layer (dbt) (10 min)
+### Phase 5: Transform layer (dbt 转换层) (10 min)
 
 为什么 dbt > Spark / Airflow PythonOperator:
 - 团队 SQL 比 Python 普及
@@ -409,7 +413,7 @@ dbt run cadence:
 - Marts: nightly 1am
 - Forecasting features: 1am (依赖 marts), 4am cutoff for 6am SLA
 
-### Phase 6: Data quality + DLQ + alerting (8 min)
+### Phase 6: Data quality + DLQ + alerting (数据质量 + 死信队列 + 告警) (8 min)
 
 **Great Expectations checkpoints**:
 
@@ -450,7 +454,7 @@ Daily DLQ review at 9am: data engineer on-call 看每个 source 的 DLQ size, de
 - Volume anomaly: row count today vs yesterday |Δ| > 30% → alert (POS 周末高峰 / 节日 全部要在白名单里)
 - Quality anomaly: dbt test failure rate 上升
 
-### Phase 7: Late-arriving + idempotency (6 min)
+### Phase 7: Late-arriving + idempotency (晚到数据 + 幂等性) (6 min)
 
 **Watermark + reprocess**:
 
@@ -482,7 +486,7 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 **Dedup at silver**:
 - POS POS 跨 Oracle / NCR 偶尔会同一笔 ring 两次 (人为操作错误). dbt model `int_orders_dedup` 按 (store_id, terminal_id, ring_ts ±5 sec, total_amount) 模糊去重, 取 last_modified 最新一笔.
 
-### Phase 8: Trade-offs + alternatives (6 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (6 min)
 
 **Decision 8.1 — Orchestrator: Airflow vs Dagster vs Prefect**
 

@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q28 · LLM 搜索从 1.5s 压到 100ms</h3>
 <blockquote><p>"Your LLM-powered semantic search (over 10M documents) is hitting <strong>p50 1500ms</strong>. PM wants <strong>p50 100ms</strong>. Current path: embed query (100ms) → vector search (200ms) → LLM rerank (500ms) → LLM summarize (300ms) → post-process (400ms). <strong>How do you get 15× speed-up?</strong> What can you cut without killing quality?"</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"你的 LLM 语义搜索 (覆盖 1000 万文档) 现在 <strong>p50 (50 分位) 1500ms</strong>. PM 要 <strong>p50 100ms</strong>. 现在的路径: embed query (查询嵌入, 100ms) → vector search (向量搜索, 200ms) → LLM rerank (大模型重排, 500ms) → LLM summarize (摘要, 300ms) → post-process (后处理, 400ms). <strong>你怎么搞到 15 倍提速?</strong> 砍掉什么但不杀死质量?"</p></blockquote>
 <p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search <strong>约束</strong>: 10M docs / quality bar (nDCG@10 ≥ baseline, factuality ≥ 95%) / cost can grow modestly (≤ 2×) / no quality regression &gt; 2% / streaming UI allowed</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -119,7 +121,7 @@
    ─ Query log embedding for cache pre-warm</code></pre>
 <hr />
 <h3>详细设计 (60-min walkthrough)</h3>
-<h4>Phase 1: Clarify + decompose (5 min)</h4>
+<h4>Phase 1: Clarify + decompose (澄清 + 拆解延迟) (5 min)</h4>
 <p>开口:</p>
 <ul><li>"1500ms 是 p50 还是 p99? PM 想 100ms 是 p50 还是 p99?"</li><li>"Search UI: link list (Google-like) 还是 answer (Perplexity-like)? 巨大区别"</li><li>"Cache friendliness: query repeat 率? 70% 重复 vs 5% 重复 完全不同 strategy"</li></ul>
 <p>假设: p50 1500 → 100, UI 是 link list 主 + answer 可选, query repeat ~50%.</p>
@@ -129,7 +131,7 @@
 <ul><li>Embed 100ms</li><li>Vector search 200ms</li><li>LLM rerank 500ms</li><li>LLM summarize 300ms</li><li>Post 400ms</li><li>Total 1500ms</li></ul>
 <p>Attack priority by impact:</p>
 <ol><li>LLM rerank 500ms — biggest, cut to ~0-50ms</li><li>Post-process 400ms — easy to async out</li><li>LLM summarize 300ms — cut to 0 (link list) or 200ms streaming</li><li>Vector search 200ms — tune HNSW</li><li>Embed 100ms — cache aggressive</li></ol>
-<h4>Phase 2: Cascade architecture (10 min)</h4>
+<h4>Phase 2: Cascade architecture (级联架构) (10 min)</h4>
 <p><strong>核心 insight</strong>: 不是所有 query 都需要 LLM rerank + summarize. Cascade = cheap path for easy queries, expensive path for hard.</p>
 <p><strong>Query classifier (&lt; 5ms)</strong>:</p>
 <pre class="language-python"><code class="language-python">def classify_query(query, user_context):
@@ -153,7 +155,7 @@
 <ul><li>Cache lookup (less hit since varied)</li><li>Embed → hybrid retrieve → cross-encoder rerank → LLM summarize streaming</li></ul>
 <p><strong>Why this works</strong>:</p>
 <ul><li>LLM rerank for navigational/lookup is overkill, vector similarity sufficient</li><li>Most users want quick links, only some want answer</li><li>Streaming for analytical means 100ms TTFT acceptable for 300ms total</li></ul>
-<h4>Phase 3: Embed: cache + small model (7 min)</h4>
+<h4>Phase 3: Embed: cache + small model (嵌入: 缓存 + 小模型) (7 min)</h4>
 <p><strong>Current</strong>: 100ms embed (probably text-embedding-3-large or BGE-large via API call)</p>
 <p><strong>Fix 1: Query cache</strong></p>
 <pre class="language-python"><code class="language-python"># Redis cache, key by normalized query
@@ -176,7 +178,7 @@ return emb</code></pre>
 <p><strong>Fix 3: Index size implication</strong></p>
 <p>10M docs × 384 dim × 4 bytes = 15GB raw vs 10M × 3072 × 4B = 120GB raw. Smaller embedding → smaller index → faster HNSW (less memory pressure).</p>
 <p><strong>Result</strong>: 100ms → 7ms average</p>
-<h4>Phase 4: Retrieval: HNSW tune + prefilter (8 min)</h4>
+<h4>Phase 4: Retrieval: HNSW tune + prefilter (检索: HNSW 调优 + 预过滤) (8 min)</h4>
 <p><strong>Current</strong>: 200ms HNSW search, probably default <code>ef_search=128</code></p>
 <p><strong>HNSW parameters trade-off</strong>: | Param | Higher | Lower | |---|---|---| | <code>M</code> (graph degree) | Better recall, slower build, more memory | Faster, lower recall | | <code>ef_construction</code> | Better build quality | Faster build | | <code>ef_search</code> | Better recall, slower query | Faster query, lower recall |</p>
 <p>For 10M docs, common: M=32, ef_construction=200, ef_search=128.</p>
@@ -206,7 +208,7 @@ final = rrf_fuse(hnsw_res, bm25_res, k=10)</code></pre>
 <ul><li>HNSW for dense</li><li>BM25 sparse via Lucene/OpenSearch</li><li>ColBERT for late interaction (precompute token embeddings, score at query time)</li></ul>
 <p>Latency: 30-50ms hybrid retrieval.</p>
 <p><strong>Result</strong>: 200ms → 30-50ms</p>
-<h4>Phase 5: Reranker: skip ladder + cascade (8 min)</h4>
+<h4>Phase 5: Reranker: skip ladder + cascade (重排器: 阶梯跳过 + 级联) (8 min)</h4>
 <p><strong>Current</strong>: 500ms LLM rerank (probably GPT-4 or Cohere Rerank API)</p>
 <p>This is the <strong>biggest cut opportunity</strong>.</p>
 <p><strong>Fix 1: Skip reranker on high confidence</strong></p>
@@ -232,7 +234,7 @@ Level 4: LLM rerank → top-3 (200ms only on very hard / paid)</code></pre>
 <p><strong>Fix 4: Reranker batch + cache</strong></p>
 <p>Identical (query, doc) pair → cache score. Hit rate ~30% on popular queries.</p>
 <p><strong>Result</strong>: 500ms → average 20ms (60% skip + 40% × 50ms)</p>
-<h4>Phase 6: LLM summarize: distill + speculative + skip (8 min)</h4>
+<h4>Phase 6: LLM summarize: distill + speculative + skip (摘要: 蒸馏 + 推测 + 跳过) (8 min)</h4>
 <p><strong>Current</strong>: 300ms LLM summarize (probably GPT-4 Turbo)</p>
 <p><strong>Fix 1: Skip for lookup path</strong></p>
 <p>60% queries are lookup (just want links). No summary needed. → 0ms for 60% queries.</p>
@@ -251,7 +253,7 @@ Level 4: LLM rerank → top-3 (200ms only on very hard / paid)</code></pre>
 <p><strong>Fix 5: Limit output</strong></p>
 <p>Summarize in 3 sentences, not 5. Cuts ~30% decode time.</p>
 <p><strong>Result</strong>: 300ms → 30ms (skip 60%) or 150ms (streaming, perceived &lt; 100ms TTFT).</p>
-<h4>Phase 7: Post-process: parallelize + async (4 min)</h4>
+<h4>Phase 7: Post-process: parallelize + async (后处理: 并行 + 异步) (4 min)</h4>
 <p><strong>Current</strong>: 400ms post-process (probably synchronous: PII redact, citation parse, audit log, analytics emit)</p>
 <p><strong>Fix 1: Async non-critical</strong></p>
 <p>Critical for response: PII redact, citation parse (~50ms total). Non-critical: audit log, analytics emit, eval sample → async background.</p>
@@ -267,7 +269,7 @@ asyncio.create_task(maybe_sample_for_eval(query, response))</code></pre>
 <p><strong>Fix 2: Pre-compute heavy work</strong></p>
 <p>PII detector training, citation parser regex compilation → load at startup, not per request.</p>
 <p><strong>Result</strong>: 400ms → 20-50ms sync</p>
-<h4>Phase 8: Trade-offs + alternatives (5 min)</h4>
+<h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (5 min)</h4>
 <p><strong>Total latency after fixes</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Stage</th><th>Before</th><th>Fast path</th><th>Full path</th></tr></thead><tbody><tr><td>Embed</td><td>100ms</td><td>7ms</td><td>7ms</td></tr><tr><td>Retrieval</td><td>200ms</td><td>30ms</td><td>50ms</td></tr><tr><td>Rerank</td><td>500ms</td><td>0ms (skip)</td><td>40ms</td></tr><tr><td>LLM</td><td>300ms</td><td>0ms (skip)</td><td>150ms streaming</td></tr><tr><td>Post</td><td>400ms</td><td>20ms</td><td>30ms</td></tr><tr><td><strong>Total</strong></td><td><strong>1500ms</strong></td><td><strong>57ms p50</strong></td><td><strong>277ms with 100ms TTFT</strong></td></tr></tbody></table></div>
 <p>Fast path: 57ms ✓ &lt; 100ms target</p>
@@ -406,6 +408,10 @@ Streaming:
 <script id="md-source" type="text/markdown">## Q28 · LLM 搜索从 1.5s 压到 100ms
 
 > "Your LLM-powered semantic search (over 10M documents) is hitting **p50 1500ms**. PM wants **p50 100ms**. Current path: embed query (100ms) → vector search (200ms) → LLM rerank (500ms) → LLM summarize (300ms) → post-process (400ms). **How do you get 15× speed-up?** What can you cut without killing quality?"
+
+**中文翻译**:
+
+> "你的 LLM 语义搜索 (覆盖 1000 万文档) 现在 **p50 (50 分位) 1500ms**. PM 要 **p50 100ms**. 现在的路径: embed query (查询嵌入, 100ms) → vector search (向量搜索, 200ms) → LLM rerank (大模型重排, 500ms) → LLM summarize (摘要, 300ms) → post-process (后处理, 400ms). **你怎么搞到 15 倍提速?** 砍掉什么但不杀死质量?"
 
 **Round**: System Design (60 min)
 **出处**: Exponent 2026 FDE · 公司: Anthropic Search / Perplexity / Cohere / Glean · 行业: AI search / enterprise search
@@ -631,7 +637,7 @@ Streaming:
 
 ## 详细设计 (60-min walkthrough)
 
-### Phase 1: Clarify + decompose (5 min)
+### Phase 1: Clarify + decompose (澄清 + 拆解延迟) (5 min)
 
 开口:
 - "1500ms 是 p50 还是 p99? PM 想 100ms 是 p50 还是 p99?"
@@ -662,7 +668,7 @@ Attack priority by impact:
 4. Vector search 200ms — tune HNSW
 5. Embed 100ms — cache aggressive
 
-### Phase 2: Cascade architecture (10 min)
+### Phase 2: Cascade architecture (级联架构) (10 min)
 
 **核心 insight**: 不是所有 query 都需要 LLM rerank + summarize. Cascade = cheap path for easy queries, expensive path for hard.
 
@@ -704,7 +710,7 @@ def classify_query(query, user_context):
 - Most users want quick links, only some want answer
 - Streaming for analytical means 100ms TTFT acceptable for 300ms total
 
-### Phase 3: Embed: cache + small model (7 min)
+### Phase 3: Embed: cache + small model (嵌入: 缓存 + 小模型) (7 min)
 
 **Current**: 100ms embed (probably text-embedding-3-large or BGE-large via API call)
 
@@ -746,7 +752,7 @@ Smaller embedding → smaller index → faster HNSW (less memory pressure).
 
 **Result**: 100ms → 7ms average
 
-### Phase 4: Retrieval: HNSW tune + prefilter (8 min)
+### Phase 4: Retrieval: HNSW tune + prefilter (检索: HNSW 调优 + 预过滤) (8 min)
 
 **Current**: 200ms HNSW search, probably default `ef_search=128`
 
@@ -807,7 +813,7 @@ Latency: 30-50ms hybrid retrieval.
 
 **Result**: 200ms → 30-50ms
 
-### Phase 5: Reranker: skip ladder + cascade (8 min)
+### Phase 5: Reranker: skip ladder + cascade (重排器: 阶梯跳过 + 级联) (8 min)
 
 **Current**: 500ms LLM rerank (probably GPT-4 or Cohere Rerank API)
 
@@ -856,7 +862,7 @@ Identical (query, doc) pair → cache score. Hit rate ~30% on popular queries.
 
 **Result**: 500ms → average 20ms (60% skip + 40% × 50ms)
 
-### Phase 6: LLM summarize: distill + speculative + skip (8 min)
+### Phase 6: LLM summarize: distill + speculative + skip (摘要: 蒸馏 + 推测 + 跳过) (8 min)
 
 **Current**: 300ms LLM summarize (probably GPT-4 Turbo)
 
@@ -898,7 +904,7 @@ Summarize in 3 sentences, not 5. Cuts ~30% decode time.
 
 **Result**: 300ms → 30ms (skip 60%) or 150ms (streaming, perceived < 100ms TTFT).
 
-### Phase 7: Post-process: parallelize + async (4 min)
+### Phase 7: Post-process: parallelize + async (后处理: 并行 + 异步) (4 min)
 
 **Current**: 400ms post-process (probably synchronous: PII redact, citation parse, audit log, analytics emit)
 
@@ -925,7 +931,7 @@ PII detector training, citation parser regex compilation → load at startup, no
 
 **Result**: 400ms → 20-50ms sync
 
-### Phase 8: Trade-offs + alternatives (5 min)
+### Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (5 min)
 
 **Total latency after fixes**:
 

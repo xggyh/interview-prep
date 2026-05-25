@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q20 · 诊断慢 SQL — 查询计划, 索引, 分区</h3>
 <blockquote><p>"A customer dashboard query is <strong>taking 45 seconds</strong> to run, was previously sub-second. They blame us. <strong>Walk through how you'd diagnose it</strong> — query plan, indexes, partitioning, statistics. They send you the query and <code>EXPLAIN ANALYZE</code> output. Find the bottleneck."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"一个客户的 dashboard query (报表查询) 现在跑 <strong>45 秒</strong>, 之前是亚秒级. 客户怪我们. <strong>讲一遍你怎么诊断</strong> — query plan (查询计划), indexes (索引), partitioning (分区), statistics (统计信息). 他们把 query 和 <code>EXPLAIN ANALYZE</code> 输出发给你. 找到瓶颈."</p></blockquote>
 <p><strong>Round</strong>: Coding (60 min, may be partly diagnostic-style) <strong>出处</strong>: Exponent 2026 FDE · 公司: <strong>Palantir</strong>, Anyscale, Scale AI <strong>难度</strong>: Medium-Hard <strong>主要技能</strong>: DB internals, query plan reading, index strategy, customer empathy</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -96,7 +98,7 @@
 <p>Why: Saturation = throw money at problem first, then optimize.</p>
 <hr />
 <h3>详细解题流程</h3>
-<h4>Step 1: Triage — three suspects</h4>
+<h4>Step 1: Triage — three suspects (分诊 — 三个嫌疑人)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">SUSPECT 1: Query / Plan
   - Plan changed (no longer using index)
   - Bad cardinality estimate → wrong join order / wrong join type
@@ -117,7 +119,7 @@ SUSPECT 3: Infra / Concurrency
   - Buffer pool too small → cache miss
   - Disk failing / EBS slowing
   - Connection pool exhausted, query queued</code></pre>
-<h4>Step 2: EXPLAIN ANALYZE — what to read</h4>
+<h4>Step 2: EXPLAIN ANALYZE — what to read (EXPLAIN ANALYZE 怎么读)</h4>
 <pre class="language-sql"><code class="language-sql">EXPLAIN (ANALYZE, BUFFERS, COSTS, VERBOSE) &lt;your query&gt;;</code></pre>
 <p><strong>Sample output</strong> (with annotated read):</p>
 <pre class="language-plaintext"><code class="language-plaintext">HashAggregate  (cost=5012345.45..5012345.67 rows=22 width=24)
@@ -149,7 +151,7 @@ SUSPECT 3: Infra / Concurrency
 <ol><li><strong><code>Sort</code> with <code>external merge Disk: N kB</code></strong> = sort spilled to disk; bump <code>work_mem</code></li></ol>
 <ol><li><strong><code>-&gt; Hash</code> with high mem and <code>Buckets: 1024 Batches: 8</code></strong> = hash join spilled; bump <code>work_mem</code></li></ol>
 <ol><li><strong><code>loops=N</code></strong> with <code>N &gt; 1</code> on nested loop inner = repeated execution; multiply costs</li></ol>
-<h4>Step 3: 5 hypotheses (in order of likelihood)</h4>
+<h4>Step 3: 5 hypotheses (in order of likelihood) (5 个假设 — 按可能性排序)</h4>
 <h5>H1: Stats are stale (very common after large load)</h5>
 <pre class="language-sql"><code class="language-sql">-- Check last analyze
 SELECT relname, n_live_tup, n_dead_tup, last_analyze, last_autoanalyze
@@ -231,7 +233,7 @@ VACUUM FULL orders;       -- aggressive (locks table — only off-hours)
 -- Better: pg_repack (online compaction, no lock)</code></pre>
 <h5>Additional candidates</h5>
 <ul><li><strong>Lock wait</strong>: <code>pg_stat_activity</code> show queries waiting on lock</li><li><strong>Connection pool exhausted</strong>: app log shows queue</li><li><strong>Backfill job running</strong>: <code>pg_stat_activity</code> 看 long-running other queries</li><li><strong>Disk IOPS saturated</strong>: <code>iostat -x 1</code> on host</li><li><strong>Wrong work_mem</strong>: sort/hash spilled</li></ul>
-<h4>Step 4: Working example walkthrough</h4>
+<h4>Step 4: Working example walkthrough (示例走一遍)</h4>
 <p><strong>Customer query</strong> (typical dashboard):</p>
 <pre class="language-sql"><code class="language-sql">SELECT
     c.region,
@@ -278,7 +280,7 @@ ANALYZE orders;</code></pre>
 Planning Time: 0.7 ms
 Execution Time: 870 ms                                 ← 50x faster</code></pre>
 <p>Done — 45s → 0.87s.</p>
-<h4>Step 5: Diagnostic script</h4>
+<h4>Step 5: Diagnostic script (诊断脚本)</h4>
 <pre class="language-sql"><code class="language-sql">-- Step 0: confirm slow
 EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) &lt;query&gt;;
 
@@ -321,7 +323,7 @@ SELECT relname,
        round(100.0 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) AS hit_ratio
 FROM pg_statio_user_tables;
 -- &lt;95% might mean buffer pool too small</code></pre>
-<h4>Step 6: Partitioning when appropriate</h4>
+<h4>Step 6: Partitioning when appropriate (合适时上分区)</h4>
 <p><strong>When</strong>: tables &gt; 100M rows, queries filtered by a clear range column (date).</p>
 <pre class="language-sql"><code class="language-sql">-- Partitioned by month
 CREATE TABLE orders (
@@ -349,7 +351,7 @@ CREATE INDEX idx_orders_2026_05_cust ON orders_2026_05 (customer_id);</code></pr
 <ul><li>Query touches only relevant partition (smaller index → less I/O)</li><li>Drop old partitions in O(1): <code>DROP TABLE orders_2024_01;</code> instant</li><li>VACUUM per partition independently</li><li>Different storage class possible (hot partitions on SSD, cold on HDD)</li></ul>
 <p><strong>Pitfalls</strong>:</p>
 <ul><li>All queries must include partition key in WHERE (else scans all)</li><li>More indexes to manage</li><li>ALTER TABLE complex</li></ul>
-<h4>Step 7: Communication to customer (the FDE part!)</h4>
+<h4>Step 7: Communication to customer (the FDE part!) (跟客户沟通 — FDE 的关键)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">Dear customer,
 
 I diagnosed the slow dashboard query — it was running 45s.
@@ -536,6 +538,10 @@ FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;</code></pre>
 <script id="md-source" type="text/markdown">## Q20 · 诊断慢 SQL — 查询计划, 索引, 分区
 
 > "A customer dashboard query is **taking 45 seconds** to run, was previously sub-second. They blame us. **Walk through how you'd diagnose it** — query plan, indexes, partitioning, statistics. They send you the query and `EXPLAIN ANALYZE` output. Find the bottleneck."
+
+**中文翻译**:
+
+> "一个客户的 dashboard query (报表查询) 现在跑 **45 秒**, 之前是亚秒级. 客户怪我们. **讲一遍你怎么诊断** — query plan (查询计划), indexes (索引), partitioning (分区), statistics (统计信息). 他们把 query 和 `EXPLAIN ANALYZE` 输出发给你. 找到瓶颈."
 
 **Round**: Coding (60 min, may be partly diagnostic-style)
 **出处**: Exponent 2026 FDE · 公司: **Palantir**, Anyscale, Scale AI
@@ -739,7 +745,7 @@ Why: Saturation = throw money at problem first, then optimize.
 
 ## 详细解题流程
 
-### Step 1: Triage — three suspects
+### Step 1: Triage — three suspects (分诊 — 三个嫌疑人)
 
 ```
 SUSPECT 1: Query / Plan
@@ -764,7 +770,7 @@ SUSPECT 3: Infra / Concurrency
   - Connection pool exhausted, query queued
 ```
 
-### Step 2: EXPLAIN ANALYZE — what to read
+### Step 2: EXPLAIN ANALYZE — what to read (EXPLAIN ANALYZE 怎么读)
 
 ```sql
 EXPLAIN (ANALYZE, BUFFERS, COSTS, VERBOSE) <your query>;
@@ -820,7 +826,7 @@ HashAggregate  (cost=5012345.45..5012345.67 rows=22 width=24)
 
 7. **`loops=N`** with `N > 1` on nested loop inner = repeated execution; multiply costs
 
-### Step 3: 5 hypotheses (in order of likelihood)
+### Step 3: 5 hypotheses (in order of likelihood) (5 个假设 — 按可能性排序)
 
 #### H1: Stats are stale (very common after large load)
 
@@ -930,7 +936,7 @@ VACUUM FULL orders;       -- aggressive (locks table — only off-hours)
 - **Disk IOPS saturated**: `iostat -x 1` on host
 - **Wrong work_mem**: sort/hash spilled
 
-### Step 4: Working example walkthrough
+### Step 4: Working example walkthrough (示例走一遍)
 
 **Customer query** (typical dashboard):
 
@@ -996,7 +1002,7 @@ Execution Time: 870 ms                                 ← 50x faster
 
 Done — 45s → 0.87s.
 
-### Step 5: Diagnostic script
+### Step 5: Diagnostic script (诊断脚本)
 
 ```sql
 -- Step 0: confirm slow
@@ -1043,7 +1049,7 @@ FROM pg_statio_user_tables;
 -- <95% might mean buffer pool too small
 ```
 
-### Step 6: Partitioning when appropriate
+### Step 6: Partitioning when appropriate (合适时上分区)
 
 **When**: tables > 100M rows, queries filtered by a clear range column (date).
 
@@ -1087,7 +1093,7 @@ Append
 - More indexes to manage
 - ALTER TABLE complex
 
-### Step 7: Communication to customer (the FDE part!)
+### Step 7: Communication to customer (the FDE part!) (跟客户沟通 — FDE 的关键)
 
 ```
 Dear customer,

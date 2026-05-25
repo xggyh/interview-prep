@@ -2,6 +2,10 @@
 
 > "You're deploying an LLM into a customer's production environment — could be a regulated industry (finance, healthcare, legal). **Walk me through the guardrails you'd build.** Cover input filtering, output validation, escalation, prompt injection defense, observability, and incident response. Be specific about tools and what fails first."
 
+**中文翻译**:
+
+> "你要把一个 LLM 部署到客户的 production 环境 — 可能是受监管的行业 (金融, 医疗, 法律). **跟我讲讲你会怎么搭 guardrails (护栏).** 要覆盖 input filtering (输入过滤), output validation (输出验证), escalation (升级到人工), prompt injection (提示注入) 的防御, observability (可观测性), 还有 incident response (事故响应). 要具体说用什么工具, 哪一层先垮."
+
 **Round**: AI Specialty (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere — high-stakes deployment 必问. Also tested on Scale AI, Cohere.
 

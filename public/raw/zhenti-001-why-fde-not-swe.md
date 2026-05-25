@@ -2,6 +2,10 @@
 
 > "Why are you applying for Forward Deployed Engineer specifically, rather than a regular Software Engineer or MLE position? What attracts you to FDE work over building features for an internal product team?"
 
+**中文翻译**:
+
+> "为什么你专门投 Forward Deployed Engineer (前线部署工程师), 而不是普通的 SWE (软件工程师) 或 MLE (机器学习工程师)? FDE 这种活, 跟给内部产品团队做 feature, 哪一点更吸引你?"
+
 **Round**: Behavioral / Motivation (30 min, recruiter screen or hiring manager opener)
 **出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic / Google FDE / Databricks / Scale AI 几乎 100% 必问
 
@@ -97,12 +101,12 @@
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Anchor (身份)** | 10s | 你是谁, 做什么 | "I'm an expert algo engineer at TikTok Global Payment, building production GenAI for 3 years..." |
-| 2 | **Underlying motivation** | 20s | 是 FDE 的哪个核心特质吸引你 (要 specific) | "What energizes me is the gap between research capability and a specific customer constraint..." |
-| 3 | **Right-fit proof (already doing it)** | 25s | 你**已经**在做 FDE-shaped 工作 | "I've effectively been doing FDE work without the title — 7 markets, 6 languages, 4 stakeholder types..." |
-| 4 | **Trade-off vs SWE** | 15s | 主动 contrast SWE / MLE / SE | "SWE workflow is missing one critical layer — direct dialog with the requirement source..." |
-| 5 | **Aligned target** | 10s | Why **this** company | "At [Company], FDE specifically means [X] — that fits because [Y from my resume]" |
-| 6 | **Trade-off ack (收尾)** | 10s | 你 give up 了什么, 显示成熟 | "I'm explicitly not pure research, because my happiness function is customer outcome, not papers..." |
+| 1 | **Anchor (身份锚点)** | 10s | 你是谁, 做什么 | "I'm an expert algo engineer at TikTok Global Payment, building production GenAI for 3 years..." |
+| 2 | **Underlying motivation (底层动机)** | 20s | 是 FDE 的哪个核心特质吸引你 (要 specific) | "What energizes me is the gap between research capability and a specific customer constraint..." |
+| 3 | **Right-fit proof (已经在做了)** | 25s | 你**已经**在做 FDE-shaped 工作 | "I've effectively been doing FDE work without the title — 7 markets, 6 languages, 4 stakeholder types..." |
+| 4 | **Trade-off vs SWE (跟 SWE 对比)** | 15s | 主动 contrast SWE / MLE / SE | "SWE workflow is missing one critical layer — direct dialog with the requirement source..." |
+| 5 | **Aligned target (锁定目标公司)** | 10s | Why **this** company | "At [Company], FDE specifically means [X] — that fits because [Y from my resume]" |
+| 6 | **Trade-off ack (主动认账)** | 10s | 你 give up 了什么, 显示成熟 | "I'm explicitly not pure research, because my happiness function is customer outcome, not papers..." |
 
 Total: ~90 秒. 别超过 110, 别短于 60.
 

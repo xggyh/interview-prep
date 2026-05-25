@@ -2,6 +2,10 @@
 
 > "Tell me about a time you had to deliver bad news to a customer or stakeholder. What was the news, how did you prepare, and how did they react?"
 
+**中文翻译**:
+
+> "讲一次你不得不向客户或干系人传达坏消息的经历. 是什么坏消息, 你怎么准备的, 对方什么反应?"
+
 **Round**: Behavioral (30-45 min, hiring manager 或 cross-functional)
 **出处**: Exponent 2026 FDE Guide · 公司: Palantir / OpenAI / Anthropic 高频. 变体: "tell me about a time you had to push back" / "describe a difficult customer conversation" / "when did you have to say no"
 
@@ -116,12 +120,12 @@
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
 | 1 | **Context + 关系基线** | 20s | 这是哪个 customer, 关系状态 | "Indonesia ops team — I'd been working with them 6 months, trust was good but they had a Q-end deadline..." |
-| 2 | **The bad news itself** | 20s | 具体是什么坏消息, 影响 | "Tier 3 refund automation — 2-week pilot showed 8% wrong-call rate, projected $80k/month liability + OJK exposure..." |
-| 3 | **Why I had to deliver (urgency)** | 20s | 为什么不能 delay, 为什么 first-person | "I owned the scoping commitment. Delivering this Friday vs Monday meant deadline impact was minimal vs catastrophic..." |
-| 4 | **Preparation (critical)** | 60s | 你怎么准备这个 conversation | "Three things I prepared: data 包装, alternative path, anticipated 反驳..." |
-| 5 | **Delivery — actual conversation** | 60s | Dialog script: 你怎么开口 | "I started: 'I have data I want to walk through. Two-week pilot delivered surprising findings.'..." |
-| 6 | **Their reaction + my response** | 45s | Customer 第一反应 + 你怎么 navigate | "Ops lead's first reaction was 'this is going to delay my Q-end'. I acknowledged + reframed with cost-of-wrong-call data..." |
-| 7 | **Outcome + learning** | 30s | Result + transferable lesson | "Result: scope pivoted to phased. Ops told manager 'Gao push back 还能让我感谢的 vendor'. Lesson..." |
+| 2 | **The bad news itself (坏消息本身)** | 20s | 具体是什么坏消息, 影响 | "Tier 3 refund automation — 2-week pilot showed 8% wrong-call rate, projected $80k/month liability + OJK exposure..." |
+| 3 | **Why I had to deliver (为什么必须我讲)** | 20s | 为什么不能 delay, 为什么 first-person | "I owned the scoping commitment. Delivering this Friday vs Monday meant deadline impact was minimal vs catastrophic..." |
+| 4 | **Preparation (准备工作, 关键)** | 60s | 你怎么准备这个 conversation | "Three things I prepared: data 包装, alternative path, anticipated 反驳..." |
+| 5 | **Delivery — actual conversation (实际对话)** | 60s | Dialog script: 你怎么开口 | "I started: 'I have data I want to walk through. Two-week pilot delivered surprising findings.'..." |
+| 6 | **Their reaction + my response (对方反应 + 我的回应)** | 45s | Customer 第一反应 + 你怎么 navigate | "Ops lead's first reaction was 'this is going to delay my Q-end'. I acknowledged + reframed with cost-of-wrong-call data..." |
+| 7 | **Outcome + learning (结果 + 学到的)** | 30s | Result + transferable lesson | "Result: scope pivoted to phased. Ops told manager 'Gao push back 还能让我感谢的 vendor'. Lesson..." |
 
 Total: ~4-5 min. 留 buffer 给 follow-up.
 

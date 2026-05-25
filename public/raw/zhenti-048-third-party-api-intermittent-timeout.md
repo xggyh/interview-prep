@@ -2,6 +2,10 @@
 
 > "Your production system depends on a third-party API (LLM provider, payment processor, ASR service). **You're seeing intermittent timeouts — some requests succeed, some hit 30-second timeout.** Walk me through your diagnosis methodology and response. Not just 'check status page' — show me you've actually owned this before."
 
+**中文翻译**:
+
+> "你的 production 系统依赖一个第三方 API (LLM 服务商, 支付处理商, 或 ASR 语音识别服务). **你看到间歇性的 timeouts — 有的 request 成功, 有的卡 30 秒超时.** 跟我讲讲你怎么诊断, 怎么响应. 别给我 '看 status page' 这种敷衍答案 — 让我看你是真的在 production 里 own 过这种事."
+
 **Round**: Production / Reliability (45 min)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Cohere / Scale AI — production reality 必问
 

@@ -2,6 +2,10 @@
 
 > "You have **10 million 768-dim vectors** and need to find the **top-k most similar** to a query vector in **under 50ms p99**. **No managed service** (no Pinecone, Weaviate). You can use libraries. **Walk through the algorithms, pick one, implement it, justify**."
 
+**中文翻译**:
+
+> "你有 **1000 万个 768 维向量**, 要在 **p99 50ms 之内**找到跟 query 向量**最相似的 top-k 个**. **不能用托管服务** (no Pinecone, Weaviate 这种). 可以用库. **过一遍算法, 选一个, 实现, 给出理由**."
+
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Scale AI**, OpenAI, Anthropic
 **难度**: Hard
@@ -180,7 +184,7 @@ Why: 决定能不能用 cuVS / faiss-gpu.
 
 ## 详细解题流程
 
-### Step 1: Numbers first (5-10 min) — 现场算给面试官看
+### Step 1: Numbers first (先算数, 5-10 min) — 现场算给面试官看
 
 ```
 N = 10_000_000
@@ -205,7 +209,7 @@ Brute force per query:
 
 **讲**: "Brute force ruled out. We need ANN. Let me compare 5 algorithms..."
 
-### Step 2: Algorithm survey (8-10 min)
+### Step 2: Algorithm survey (算法对比, 8-10 min)
 
 ```
 === LSH (Locality Sensitive Hashing) ===
@@ -271,7 +275,7 @@ Brute force per query:
 | **HNSW** | **0.98** | **2-5ms** | **50GB** | **2hr** | **yes** |
 | ScaNN | 0.97 | 2ms | varies | 2hr | partial |
 
-### Step 3: Pick HNSW + parameter rationale (5 min)
+### Step 3: Pick HNSW + parameter rationale (选 HNSW 并讲参数理由, 5 min)
 
 **Choice**: HNSW. Why:
 
@@ -312,7 +316,7 @@ Index size estimate:
   Total: ~37-50 GB depending on impl
 ```
 
-### Step 4: Implementation (15-20 min)
+### Step 4: Implementation (实现, 15-20 min)
 
 ```python
 """
@@ -569,7 +573,7 @@ def compute_ground_truth_brute(vectors: np.ndarray, ids: list[str],
     return [[ids[i] for i in row] for row in top_idx]
 ```
 
-### Step 5: Tests (5 min)
+### Step 5: Tests (测试, 5 min)
 
 ```python
 import unittest
@@ -640,7 +644,7 @@ if __name__ == '__main__':
     unittest.main()
 ```
 
-### Step 6: Production considerations (5 min)
+### Step 6: Production considerations (生产考虑, 5 min)
 
 ```
 1. Sharding for >50M vectors:

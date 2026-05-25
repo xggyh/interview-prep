@@ -1,0 +1,1879 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🔮 Q-P1 · [预测·Google FDE] Vertex AI + Gemini RAG 给医院 (HIPAA, 2000 万病历) · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=936bd099">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / 真题 / 🔮 Q-P1 · [预测·Google FDE] Vertex AI + Gemini RAG 给医院 (HIPAA, 2000 万病历)</div>
+  <h1>🔮 Q-P1 · [预测·Google FDE] Vertex AI + Gemini RAG 给医院 (HIPAA, 2000 万病历)</h1>
+  <div class="header-meta">
+    <span class="tag tag-">真题</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#57606a"><strong>真题</strong> · Senior+ · 📋 10 · 🕒 Late May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/zhenti-p01-vertex-ai-gemini-clinical-qa.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/zhenti-p01-vertex-ai-gemini-clinical-qa.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">🔮 Google FDE 预测题. 用 Vertex AI Search + Gemini 3 Pro grounding + BigQuery 给医院做 clinical Q&amp;A assistant. 含 G·O·D·D·S 5-维度澄清框架 + 9-step 答题骨架 + HIPAA 合规架构. ~1100 行 deep-dive.</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h3>Q-P1 · Vertex AI + Gemini 临床 Q&amp;A (HIPAA · 20M clinical notes)</h3>
+<blockquote><p>"A regional hospital network uses <strong>Google Workspace</strong> and has <strong>20 million clinical notes in BigQuery</strong>. They want a <strong>'clinical Q&amp;A assistant' for doctors</strong> that can answer questions like 'What's this patient's medication history?' or 'Have any of my patients shown drug interactions with their current prescriptions?' with <strong>HIPAA compliance</strong>. You have <strong>Gemini 3 Pro, Vertex AI Search, and BigQuery</strong> available. Design the system. <strong>90-day MVP</strong>."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"一个区域性医疗集团已经在用 <strong>Google Workspace</strong>, 而且他们 <strong>2000 万份临床笔记</strong> 都已经躺在 <strong>BigQuery</strong> 里了. 他们想做一个 <strong>'临床 Q&amp;A 助手'</strong> 给医生用, 能回答类似 '这个病人的用药史是什么?' 或者 '我手上有没有哪些病人现有处方里出现了药物相互作用?' 这种问题, 必须 <strong>HIPAA 合规</strong>. 你手上能用的是 <strong>Gemini 3 Pro / Vertex AI Search / BigQuery</strong> 这套 Google 全家桶. 把这个系统设计出来. <strong>90 天 MVP</strong>."</p></blockquote>
+<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合) <strong>行业 / 约束</strong>: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX <strong>Distinguishing</strong>: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 <strong>Google primitives + 整合 + HIPAA</strong>, 标准 FDE "pick right Google product" 题. 不能再答 OpenSearch / pgvector — 客户要求 Google-native.</p>
+<hr />
+<h3>📖 术语速查 (本题用到的)</h3>
+<blockquote><p>这道题 4 类术语必须先过, 否则跟面试官来回讲 Vertex AI 和 grounding 都接不上.</p></blockquote>
+<h4>Google Cloud / Vertex AI 体系</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vertex AI</strong> ⭐</td><td>Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场.</td></tr><tr><td><strong>Vertex AI Search</strong> ⭐</td><td>Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. <strong>不需要你自己装 OpenSearch / pgvector</strong>. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高.</td></tr><tr><td><strong>Vertex AI Agent Builder</strong></td><td>上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage.</td></tr><tr><td><strong>Gemini 3 Pro</strong> ⭐</td><td>Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens.</td></tr><tr><td><strong>Gemini 3 Flash</strong> ⭐</td><td>轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro.</td></tr><tr><td><strong>Grounding</strong> ⭐</td><td>Gemini 的内置功能 — 让回答<strong>强制溯源</strong>到 Vertex AI Search 检索到的 docs, 自动加 citation. <strong>比 prompt-engineered citation 可靠</strong>, FDE 必提.</td></tr><tr><td><strong>Function calling</strong></td><td>Gemini 内置 tool use 协议. 这道题用于查 FHIR / BigQuery / Drug interaction API.</td></tr><tr><td><strong>BigQuery</strong> ⭐</td><td>Google 托管的 PB 级 columnar 数仓. 20M clinical notes 已经在这里 = 数据已经 ready. 关键: BigQuery 有 <strong>native HIPAA 合规承诺 + BAA</strong>.</td></tr><tr><td><strong>BigQuery ML</strong></td><td>在 BigQuery 内直接跑 SQL 训模型. 这题用于 medication history 聚合查询.</td></tr><tr><td><strong>Document AI</strong></td><td>Google 的 OCR / 文档解析服务. 如果 clinical notes 里有 scan 件 (~20%) 必用.</td></tr><tr><td><strong>Cloud DLP (Data Loss Prevention)</strong> ⭐</td><td>Google 的 PHI/PII 检测 + 脱敏服务. <strong>2026 已经 HIPAA-aligned</strong>, 替代 Presidio. 内置 medical infoTypes (US_HEALTHCARE_NPI, US_MEDICAL_RECORD_NUMBER, US_DEA_NUMBER 等).</td></tr><tr><td><strong>Cloud KMS / Cloud HSM</strong></td><td>Google KMS = AWS KMS 对应物. CMEK = Customer-Managed Encryption Key. 医疗强制 CMEK.</td></tr><tr><td><strong>VPC-SC (VPC Service Controls)</strong> ⭐</td><td>Google 特有 — 在 GCP API 周围画 perimeter, 防止 data exfiltration. 比 VPC endpoint 更高一层. HIPAA 部署必开.</td></tr><tr><td><strong>Cloud Audit Logs</strong> ⭐</td><td>Admin Activity + Data Access + System Event 三类自动日志. <strong>Data Access logs 必须显式开</strong> (默认关), 这是 HIPAA audit 命门.</td></tr><tr><td><strong>Workspace (Gmail/Calendar/Drive/Docs)</strong></td><td>这家医院已经在用 = doctor 入口是 Gmail/Docs 侧栏, 不是新 web app.</td></tr></tbody></table></div>
+<h4>HIPAA / 临床领域</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>HIPAA</strong></td><td>Health Insurance Portability and Accountability Act. 违反 = OCR 罚款 + 客户走人.</td></tr><tr><td><strong>PHI</strong> ⭐</td><td>Protected Health Information. 18 类直接标识符 (name, MRN, SSN, DOB, address...). 准标识符组合 (rare diagnosis + zip + DOB) 也算.</td></tr><tr><td><strong>BAA</strong> ⭐</td><td>Business Associate Agreement. <strong>Google Cloud 已经默认提供 BAA</strong> 给 covered service (BigQuery, Vertex AI, GCS, KMS). 但 Workspace 默认 BAA 范围有限制, 需要 Workspace Enterprise + HIPAA addendum.</td></tr><tr><td><strong>HIPAA Safe Harbor de-identification</strong> ⭐</td><td>HIPAA 提供的去识别方法 — 移除 18 类标识符 → 数据可以"非 PHI" 化使用. 这题用于 cross-patient 分析的合规通道.</td></tr><tr><td><strong>EHR / EMR</strong></td><td>Electronic Health Record. Epic 是市占率最高的 (~40% 大医院). 决定数据怎么进 BigQuery.</td></tr><tr><td><strong>FHIR (R4)</strong></td><td>现代医疗数据标准 (JSON / RESTful). Google Cloud 有 <strong>Cloud Healthcare API</strong> 原生支持 FHIR store.</td></tr><tr><td><strong>Cloud Healthcare API</strong> ⭐</td><td>Google 的 FHIR / HL7v2 / DICOM 托管存储 + 转换服务. 这道题可直接当 EHR-to-BigQuery 中间层.</td></tr><tr><td><strong>Clinical note</strong></td><td>医生写的自由文本笔记 (SOAP 格式: Subjective / Objective / Assessment / Plan). 20M = ~5 年医生输出量 (一家 5K-doctor 网络).</td></tr><tr><td><strong>ICD-10 / SNOMED CT</strong></td><td>国际疾病分类 / 临床术语本体. retrieval 必用 keyword.</td></tr><tr><td><strong>Drug interaction</strong> ⭐</td><td>药物相互作用. 临床痛点 — 一个病人 5 个 specialist 各开 1 个药, 互相冲突. 这是题目特意点出的 "cross-patient + cross-note" 复杂 query.</td></tr><tr><td><strong>Doctor-in-the-loop</strong></td><td>医生在回路 — AI 给建议但医生确认, 不是 autonomous decision. 临床 AI 标配, 避免 FDA Class II medical device 监管.</td></tr><tr><td><strong>Hallucination (medical)</strong></td><td>LLM 幻觉在医疗 = patient harm. citation 必须 token-span 级别可溯源.</td></tr><tr><td><strong>k-anonymity</strong></td><td>去识别度量 — 准标识符组合在数据集中至少 k 个相似. k&lt;5 = 仍可识别.</td></tr></tbody></table></div>
+<h4>LLM / RAG / Grounding</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation. 先检索后生成.</td></tr><tr><td><strong>Grounded generation</strong> ⭐</td><td>Gemini 的 grounding 模式 — 把 retrieval docs 作为 hard context, <strong>每个 claim 强制带 source attribution</strong>. Google 把它做成 API-level feature, 不需要 prompt engineering.</td></tr><tr><td><strong>Embedding</strong></td><td>文本 → 向量. Vertex AI 提供 <code>text-embedding-005</code> (Google 内部) 和 <code>textembedding-gecko@003</code>.</td></tr><tr><td><strong>Hybrid search</strong></td><td>Vertex AI Search 默认 hybrid (semantic + keyword). 不需要你手动配 BM25.</td></tr><tr><td><strong>Reranker</strong></td><td>Vertex AI Search 内置 cross-encoder reranker. 不需要你 self-host BGE-reranker.</td></tr><tr><td><strong>Citation faithfulness</strong></td><td>引用忠实度 — 每个 claim 真的来自引用 source. Gemini grounding 内置 confidence score.</td></tr><tr><td><strong>NLI (Natural Language Inference)</strong></td><td>蕴含判断 — 验 claim 是否被 cited span 蕴含. Gemini grounding 已经内含 entailment.</td></tr><tr><td><strong>Token cost (2026)</strong></td><td>Gemini 3 Pro $2/$12 per 1M</td><td>Flash $0.50/$3</td><td>Claude Opus 4.7 $5/$25</td><td>GPT-5.5 $5/$30.</td></tr></tbody></table></div>
+<h4>集成 / 部署</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Workspace Add-on</strong> ⭐</td><td>在 Gmail / Docs 侧栏装的扩展 — 医生不离开 Gmail 就能问问题. 这是这道题的核心 UX.</td></tr><tr><td><strong>AppSheet / Apps Script</strong></td><td>Workspace 自带的低代码工具, 快速做 doctor-facing UI 原型.</td></tr><tr><td><strong>OAuth 2.0 (Google)</strong></td><td>用户授权第三方 app 访问 Workspace data 的协议. doctor 登录 = 已经 SSO 过.</td></tr><tr><td><strong>IAM (Identity Access Management)</strong></td><td>Google Cloud 的权限模型. principal × role × resource.</td></tr><tr><td><strong>Service Account</strong></td><td>Google Cloud 服务身份, 非人类. agent 后端用 service account 调 Vertex AI / BigQuery.</td></tr><tr><td><strong>CMEK</strong></td><td>Customer-Managed Encryption Key. HIPAA 强制.</td></tr><tr><td><strong>Private Service Connect</strong></td><td>Google 的 VPC peering 替代品, 私网调 Google API.</td></tr><tr><td><strong>GKE (Google Kubernetes Engine)</strong></td><td>Google 托管 K8s. 自定义后端跑在这上面.</td></tr><tr><td><strong>Cloud Run</strong></td><td>Google 托管 serverless container. 90-day MVP 适合, 不要 over-engineer K8s.</td></tr></tbody></table></div>
+<hr />
+<h3>这道题在考什么</h3>
+<p><strong>不是</strong>: 考你能不能 design 一个 RAG.</p>
+<p><strong>是</strong>: 考你能不能 <strong>(a) 选对 Google primitives</strong> (b) <strong>整合 BigQuery + Vertex AI Search + Gemini grounding + Workspace</strong> (c) <strong>在 HIPAA 红线下面做 90-day MVP</strong>.</p>
+<p>4 个 signal:</p>
+<ol><li><strong>Don't re-invent what Vertex AI Search already does</strong> (不要重复造轮子) — 90% 候选人答 "我自己装 OpenSearch + 自训 embedding". 错. Google FDE 面试 = 用 <strong>Vertex AI Search managed retrieval</strong>. 自己装 = 显示你不懂 Google ecosystem.</li></ol>
+<ol><li><strong>Grounding ≠ prompt-engineered citation</strong> (Gemini grounding 是 native API feature) — 这是 Google 跟 OpenAI/Anthropic 最大的差异化能力. 必须提到 grounding API + grounding confidence score. 否则你"不像懂 Gemini".</li></ol>
+<ol><li><strong>Workspace integration is the UX win</strong> (Workspace 整合是 UX 的关键加分) — doctor 已经在 Gmail / Docs 里. 不要再做一个 web app, 做 Workspace Add-on. 这是 "FDE 理解 customer ecosystem" 的标志.</li></ol>
+<ol><li><strong>HIPAA in Google Cloud has different controls than AWS</strong> (HIPAA 在 GCP 上是不同的控件) — 不能 copy/paste AWS HIPAA 答案. Google 特有: VPC-SC perimeter, Cloud DLP, Cloud Healthcare API, BigQuery column-level security, Org Policy constraints. 提这些 = signal "我真的用过 GCP".</li></ol>
+<hr />
+<h3>❌ 最常见的挂法</h3>
+<p><strong>挂法 #1: 自己装 vector DB + embedding pipeline, 不用 Vertex AI Search</strong></p>
+<blockquote><p>"I'd extract notes from BigQuery, chunk them, run embeddings via Vertex AI embedding API, store in pgvector on Cloud SQL, then call Gemini 3 Pro for generation."</p></blockquote>
+<p>死. 你<strong>忽略了</strong>:</p>
+<ul><li>Vertex AI Search 是 Google 给 FDE 的官方 RAG building block — 你不用 = signal 你不懂 Google stack</li><li>pgvector 在 20M docs scale 性能崩 (latency 2s+)</li><li>自己装意味着你要自己做 chunking, reranking, hybrid search, grounding — 全部 90 天做不完</li><li>Vertex AI Search 已经过 HIPAA BAA, pgvector 在 Cloud SQL 也 ok 但 hospital legal 还得再 review</li></ul>
+<p><strong>挂法 #2: 不提 grounding, 用 prompt "Cite sources" 模仿 citation</strong></p>
+<blockquote><p>"I'd put 'Always cite sources as [doc_id]' in the system prompt and parse citations from the response."</p></blockquote>
+<p>死. Gemini 有 <strong>native grounding API</strong> — 强制 source attribution + confidence score + URL anchor. 不用 grounding = 你不懂 Gemini 的差异化能力. 在 Anthropic/OpenAI 上你能用 prompt engineering, 在 Gemini 上是 API feature.</p>
+<p><strong>挂法 #3: 自己做 PHI redaction, 不用 Cloud DLP</strong></p>
+<blockquote><p>"I'd use Presidio + medspaCy to redact PHI in a Dagster pipeline before chunking..."</p></blockquote>
+<p>可以这么答但<strong>不加分</strong>. 因为 Google 有 <strong>Cloud DLP</strong> with medical infoTypes (NPI / MRN / DEA / HIPAA Safe Harbor templates). DLP 是 Google managed service, 已经过 HIPAA BAA, <strong>比自托管 Presidio 维护成本低 10×</strong>. FDE 面试 = pick Google native.</p>
+<p><strong>挂法 #4: 接受 90 天 MVP 不 push back / 不 phase</strong></p>
+<blockquote><p>"Yes, 90 days is doable. Week 1-4 ingestion, week 5-8 retrieval, week 9-12 UI..."</p></blockquote>
+<p>死. 20M docs + HIPAA BAA + Workspace integration + drug interaction cross-patient analytics + doctor UX = 6-9 个月真实工作量. 必须 <strong>phase</strong>: 90 天做 single-patient Q&amp;A in 1 department (e.g. cardiology) → Phase 2 cross-patient → Phase 3 全院.</p>
+<p><strong>挂法 #5: 忽略 Workspace 入口, 自己做 web app</strong></p>
+<blockquote><p>"I'd build a Next.js web app where doctors log in and ask questions..."</p></blockquote>
+<p>死. 客户<strong>已经在 Workspace</strong>. 入口是 <strong>Gmail / Docs 侧边栏 (Workspace Add-on)</strong>. 自建 web app = 多一个 doctor 不去用的网址 + 多一套 SSO 配置. Workspace Add-on = OAuth 已经 SSO 过, doctor 在写病历的同时直接侧边问问题.</p>
+<p><strong>挂法 #6: 把 "drug interaction across patients" 当 simple retrieval</strong></p>
+<blockquote><p>"Same RAG flow — retrieve patient's prescriptions, ask Gemini."</p></blockquote>
+<p>死. 这是 <strong>cross-patient analytics</strong> — "我所有的病人里, 谁现在的处方有 drug interaction". 这不是 RAG, 这是 <strong>BigQuery analytical query</strong> (跑 SQL 找所有该 doctor 的 patient 现有 active medication, 然后跑 drug interaction matrix). RAG 只在 narrative notes 上, 不在 structured medication list 上. <strong>必须区分 structured vs unstructured retrieval</strong>.</p>
+<hr />
+<h3>完美答案架构 (9 步 Response Architecture, 本题定制)</h3>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>Step</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Clarify (G·O·O·D-F·T)</strong></td><td>7 min</td><td>10 个 Q 沿 G·O·O·D-F·T 6 维度问, 锁 scope / EHR / PHI / SLA</td><td>"Before I sketch, I want to ask 10 things organized around 6 dimensions — goal, owners, obstacles, data, failure, timeline. Clinical Q&amp;A could mean 5 different products."</td></tr><tr><td>2</td><td><strong>HIPAA + Google Cloud frame</strong></td><td>4 min</td><td>HIPAA Tech Safeguards 5 条 → 映射到 Google 组件 (VPC-SC, CMEK, DLP, Audit Logs)</td><td>"Let me first frame HIPAA in Google Cloud — it's different controls from AWS. VPC-SC perimeter, Cloud DLP, CMEK in KMS, Data Access Audit Logs."</td></tr><tr><td>3</td><td><strong>Architecture overview</strong></td><td>6 min</td><td>一张 ASCII 图: BigQuery → Cloud Healthcare API → DLP → Vertex AI Search → Gemini grounded → Workspace Add-on</td><td>"Here's the high-level data flow. Notice the 5 Google primitives that I'm using as managed building blocks."</td></tr><tr><td>4</td><td><strong>Ingestion deep dive</strong></td><td>8 min</td><td>BigQuery clinical notes → DLP redact → Vertex AI Search datastore (Chunked + Embedded + Indexed automatic)</td><td>"Ingestion is where compliance + Google managed services do the most lifting."</td></tr><tr><td>5</td><td><strong>Query path deep dive</strong></td><td>10 min</td><td>Doctor in Workspace Add-on → ACL resolve → Vertex AI Search retrieve → Gemini Pro grounded generation → citation + confidence</td><td>"Query path has 6 stages. Notice ACL is pre-filter via Vertex AI Search filtering, not post."</td></tr><tr><td>6</td><td><strong>Cross-patient analytics</strong></td><td>6 min</td><td>Drug interaction query 走 BigQuery + structured medication list, NOT RAG. Hybrid: RAG for narrative, SQL for structured.</td><td>"The drug interaction question is NOT RAG — it's a BigQuery analytical query plus a drug interaction matrix. Different code path."</td></tr><tr><td>7</td><td><strong>Audit + observability</strong></td><td>5 min</td><td>Cloud Audit Logs (Data Access tier) + per-query LLM call audit → BigQuery (yes, audit in BigQuery) + Looker dashboard</td><td>"Audit is the OCR exam product. Every PHI access logged in Cloud Audit + per-call LLM audit in BigQuery, 6yr retention."</td></tr><tr><td>8</td><td><strong>90-day phased MVP</strong></td><td>8 min</td><td>Phase 1 (week 1-4): 1 dept, 1K notes, single-patient. Phase 2 (week 5-8): scale to dept. Phase 3 (week 9-13): cross-patient + go-live.</td><td>"I'd push back on 90 days for the full 20M scope. Phase 1 in 1 dept, then scale. Here's the 13-week breakdown."</td></tr><tr><td>9</td><td><strong>Trade-offs + close</strong></td><td>6 min</td><td>Vertex AI Search vs self-host / Gemini Pro vs Flash routing / structured vs unstructured / Workspace Add-on vs web app</td><td>"If you give me 6 months, I'd add agent loop for tool use. In 90 days, single-turn grounded Q&amp;A is the right scope."</td></tr></tbody></table></div>
+<hr />
+<h3>G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐</h3>
+<blockquote><p><strong>核心理念</strong>: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.</p></blockquote>
+<pre class="language-plaintext"><code class="language-plaintext">┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘</code></pre>
+<h4>G — Goal (→ feeds Decompose Step 1: KPI lock)</h4>
+<blockquote><p><strong>Q1</strong>: "When you say 'clinical Q&amp;A assistant', do you mean (a) <strong>single-patient history retrieval</strong> (most common — 'tell me this patient's med history'), (b) <strong>cross-patient analytics</strong> ('which of my patients have drug interaction risks'), (c) <strong>clinical decision support</strong> ('should I prescribe X'), or (d) <strong>all three</strong>? These are 3 totally different products. (a) is RAG, (b) is BigQuery SQL + RAG, (c) is FDA Class II medical device territory which I'd push back hard."</p></blockquote>
+<blockquote><p><strong>Q2</strong>: "What's the <strong>success metric</strong>? Time saved per chart review? Number of medication errors caught? Doctor NPS? Compliance audit pass? Different metrics drive different design — if it's audit pass, citation faithfulness is north star; if it's time saved, latency &lt; 3s is north star."</p></blockquote>
+<p><strong>这层 → 解锁 Decompose Step 1</strong>: 答完 G 问题, 你就知道这道题的 KPI 是什么 (e.g., citation faithfulness ≥ 95% + 30% chart review time saved + 100% JCAHO audit pass), 后面 5 步的所有决策按这个 KPI 优化.</p>
+<h4>O — Owner (→ feeds Decompose Step 2: Stakeholder map)</h4>
+<blockquote><p><strong>Q3</strong>: "Who's the <strong>buyer</strong> — CMO (Chief Medical Officer), CIO, or CMIO (Chief Medical Informatics Officer)? Each has different priorities. CMO wants clinical impact, CIO wants compliance + integration, CMIO bridges both. And who <strong>funds</strong> — IT budget or clinical operations?"</p></blockquote>
+<blockquote><p><strong>Q4</strong>: "Who <strong>uses</strong> day-to-day — attending physicians, residents, NPs/PAs, or all? And do nurses / front desk also need access? Different roles have different ACL needs. Plus: who's the <strong>internal champion</strong> — someone in the hospital we can pair with for 90 days? And what's the <strong>existing vendor landscape</strong> — Epic AI module, Dragon, Abridge/Suki — whose UX must we co-exist with?"</p></blockquote>
+<p><strong>这层 → 解锁 Step 2</strong>: 答完 O 问题, 你画出 stakeholder map (buyer = CMIO / user = cardiology attendings / blocker = compliance + Epic admin / SME = clinical informatics lead), 知道每步要 align 谁.</p>
+<h4>D — Data (→ feeds Step 3: 数据 inventory)</h4>
+<blockquote><p><strong>Q5</strong>: "How did the <strong>20M clinical notes get into BigQuery</strong>? Live FHIR sync via Cloud Healthcare API, or daily batch export from Epic? <strong>What's the freshness SLA</strong> — 5 min or 24 hours? Drug interaction question needs near-real-time, history question is fine with 24h."</p></blockquote>
+<blockquote><p><strong>Q6</strong>: "<strong>Data quality</strong>: how much of the 20M is (a) actual SOAP-formatted notes, (b) auto-generated boilerplate, (c) OCR-scanned older paper records (with errors), (d) dictated speech-to-text (with transcription errors)? Each requires different pre-processing. And: <strong>what % is non-English</strong> (Spanish often common in regional hospitals)?"</p></blockquote>
+<p><strong>这层 → 解锁 Step 3</strong>: 答完 D 问题, 你能画 data inventory 表 (source / volume / freshness / format / PHI level / owner / access path), 知道每个 sub-problem 用哪份数据 — e.g., single-patient Q&amp;A 用 FHIR + SOAP, 跨病人需要 BigQuery aggregate.</p>
+<h4>D — Deadline (→ feeds Step 4: 子问题排序)</h4>
+<blockquote><p><strong>Q7</strong>: "<strong>Why 90 days specifically</strong>? Is it driven by (a) JCAHO accreditation visit, (b) competitive pressure (Epic just shipped similar feature), (c) board mandate, (d) end-of-budget-year deadline? The driver determines what we can compromise. If it's JCAHO, the scope is much smaller (just demo + audit log). If it's competitive, scope is broader but quality bar lower."</p></blockquote>
+<blockquote><p><strong>Q8</strong>: "What are <strong>downstream dependencies after 90 days</strong>? Are we building a one-off MVP, or is this the foundation for a 2-year roadmap (cross-system, ambient AI scribe, agent tools)? If foundation, I'll over-invest in ontology + audit; if one-off, faster path to ship. And: <strong>what's the worst-case if a bad answer ships</strong> — doctor acts on hallucinated info → patient harm → lawsuit? That changes the reversibility budget."</p></blockquote>
+<p><strong>这层 → 解锁 Step 4</strong>: 答完 Deadline 问题, 你知道<strong>为什么</strong> 90 天这个数, 才能 push back 或拆 phase. Sub-problems 按 (deadline 紧迫度 × clinical risk × audit value) 排序 — JCAHO-blocking 的 audit log 排最前, cross-patient analytics 推到 Phase 2.</p>
+<h4>S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)</h4>
+<blockquote><p><strong>Q9</strong>: "If we ship in 90 days, which use case is the MVP — <strong>single-patient lookup</strong> (lowest liability), <strong>cross-patient pattern detection</strong> (BigQuery + RAG, medium liability), or <strong>clinical decision support</strong> (FDA territory)? My instinct: start with single-patient lookup only, defer cross-patient + decision support to v2 (require validation studies). What's the <strong>obvious overscope</strong> you're willing to cut on day 1?"</p></blockquote>
+<blockquote><p><strong>Q10</strong>: "For the 90-day MVP, would you accept the system <strong>refusing to answer</strong> on any of: (a) drug dosage questions, (b) any non-English notes, (c) records older than 5 years (OCR quality unknown), (d) any cross-patient query? Each refusal narrows scope and de-risks Phase 1 — but increases user friction. Which trade-off do you want?"</p></blockquote>
+<p><strong>这层 → 解锁 Step 5</strong>: 答完 S 问题, MVP 边界明确. 你知道<strong>哪 80% 砍掉先不做</strong> (cross-patient, decision support, non-English, drug dosage, full 20M scope, all 50 hospitals), 哪 20% 是 walking skeleton (1 dept × single-patient × English SOAP × FHIR-fresh data × Workspace Add-on UX × audit log).</p>
+<p><strong>面试官 likely 回答</strong> (我的假设):</p>
+<ul><li>(a) Single-patient retrieval 必做, (b) cross-patient drug interaction 是 stretch goal — Phase 2</li><li>北星 metric: 30% time saved on chart review (clinical impact) + 100% audit pass</li><li>Buyer = CMIO, funded jointly IT+clinical, internal champion = cardiology dept director</li><li>用 Epic 但 Epic 内部 AI 还没买. Workspace Enterprise + HIPAA addendum 已存在.</li><li>BigQuery 数据来自 Cloud Healthcare API (FHIR R4) 每小时增量同步</li><li>70% SOAP 笔记, 20% OCR 老记录 (有错), 5% Spanish, 5% boilerplate</li><li>Worst case = lawsuit. 必须 confidence threshold + doctor confirmation</li><li>90-day driven by JCAHO + CMIO promised CEO</li></ul>
+<p>→ <strong>Real scope reframe</strong>: 90 天 = <strong>1 个 cardiology dept, single-patient history Q&amp;A, with audit log + doctor confirmation pattern + Workspace Add-on</strong>. Cross-patient drug interaction → Phase 2 (month 4-6).</p>
+<hr />
+<h3>详细分析 + 回答 (60-min walkthrough)</h3>
+<h4>Phase 1: Clarify + KPI 锁定 (7 min)</h4>
+<blockquote><p>"Before I sketch, I want to be honest — 'clinical Q&amp;A' in 90 days for 20M notes is <strong>either Phase 1 of a multi-year roadmap or it's vaporware</strong>. Let me ask 10 things along Goal / Owners / Obstacles / Data / Failure / Timeline."</p>
+<p><em>(asks 10 questions, gets answers)</em></p>
+<p>"OK. <strong>Real scope for 90 days</strong>:</p>
+<ul><li>1 department (cardiology, ~50 doctors)</li><li>Single-patient history Q&amp;A only (NOT cross-patient yet)</li><li>Workspace Add-on UX (not a new web app)</li><li>Doctor confirmation required for any actionable insight</li><li>JCAHO-ready audit log</li></ul>
+<p>Cross-patient drug interaction → Phase 2 (month 4-6). Full 20M scope → Phase 3 (month 7-12).</p>
+<p><strong>Three KPIs</strong>:</p>
+<ul><li><strong>Retrieval quality</strong>: nDCG@10 ≥ 0.75 on cardiology golden set (500 attending-validated Q/A pairs)</li><li><strong>Citation faithfulness</strong>: ≥ 95% claims have grounded Vertex AI Search source (Gemini grounding confidence ≥ 0.8)</li><li><strong>Compliance</strong>: 0 PHI in Cloud Audit Logs export, 100% PHI access in Data Access logs, JCAHO mock audit pass</li></ul>
+<p><strong>Counter-metrics</strong>:</p>
+<ul><li><strong>Doctor friction</strong>: time per query &lt; 3s p50, &lt; 8s p99 (otherwise doctor abandons)</li><li><strong>False positive rate</strong> on actionable suggestions &lt; 1% (otherwise doctor stops trusting)</li></ul></blockquote>
+<h4>Phase 2: HIPAA + Google Cloud frame (4 min)</h4>
+<blockquote><p>"Let me frame HIPAA Tech Safeguards in Google Cloud — it's different controls from AWS, this is where FDE depth shows."</p></blockquote>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>HIPAA 45 CFR § 164.312</th><th>我用的 Google 组件</th></tr></thead><tbody><tr><td><strong>(a) Access Control</strong></td><td>IAM + Workspace OAuth (doctor SSO) + Vertex AI Search ACL filter (per-patient) + BigQuery column-level security</td></tr><tr><td><strong>(b) Audit Controls</strong></td><td>Cloud Audit Logs (Admin Activity + <strong>Data Access</strong> tier 必开) + per-call LLM audit emit → BigQuery <code>audit.llm_calls</code> partitioned table + 6yr retention via BigQuery Time Travel + Cloud Storage Object Lock backup</td></tr><tr><td><strong>(c) Integrity</strong></td><td>CMEK in Cloud KMS + Cloud Storage object versioning + chunk SHA-256 in Vertex AI Search metadata</td></tr><tr><td><strong>(d) Person/Entity Auth</strong></td><td>Workspace OAuth + <strong>step-up MFA</strong> on PHI-sensitive operations + IAM Workforce Identity</td></tr><tr><td><strong>(e) Transmission Security</strong></td><td>Private Service Connect for all Google APIs + Cloud Armor + VPC-SC perimeter around BigQuery + Vertex AI</td></tr></tbody></table></div>
+<p><strong>额外提一条 — VPC Service Controls</strong> ⭐:</p>
+<blockquote><p>"VPC-SC is Google's HIPAA secret weapon — you draw a perimeter around BigQuery, Vertex AI, GCS, KMS. Even if an attacker gets credentials, they <strong>can't exfiltrate data outside the perimeter</strong>. AWS doesn't have a direct equivalent — VPC endpoints are weaker. I'd insist on VPC-SC perimeter from day 1."</p></blockquote>
+<p><strong>BAA chain</strong> (必谈):</p>
+<ul><li>Google ↔ Customer: GCP BAA (covers BigQuery, Vertex AI, Cloud Storage, KMS, Cloud Healthcare API, Cloud DLP)</li><li>Google ↔ Customer: Workspace BAA (Workspace Enterprise + HIPAA addendum required)</li><li>Customer ↔ Us (FDE / consulting firm): subcontractor BAA</li><li><strong>No third-party LLM</strong> allowed unless their BAA covers PHI processing. Gemini grounding through Vertex AI = covered.</li></ul>
+<h4>Phase 3: Architecture overview (6 min)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">                Customer Google Cloud Org (HIPAA-enabled folder)
+                VPC-SC perimeter around: BigQuery + Vertex AI + GCS + KMS + Healthcare API
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Source-of-truth tier                                                             │    │
+│   │  ─ Epic EHR ─→ Cloud Healthcare API (FHIR R4 store) ─→ BigQuery (notes, meds, ICD)│    │
+│   │                hourly CDC via Healthcare API → BigQuery streaming insert          │    │
+│   │  ─ Older paper records → Document AI OCR → BigQuery (with confidence score)       │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Ingestion pipeline (Cloud Run jobs + Cloud Composer for orchestration)            │    │
+│   │                                                                                    │    │
+│   │  [1] BigQuery → read clinical notes (incremental by note_id watermark)            │    │
+│   │  [2] Cloud DLP: PHI detection (medical infoTypes) + de-identification              │    │
+│   │      ─ Direct identifiers (MRN, NPI, DEA): replaced with surrogate tokens         │    │
+│   │      ─ Quasi-identifiers (zip+DOB+rare ICD): k-anonymity check, &lt; 5 → quarantine  │    │
+│   │      ─ Redaction map → encrypted with CMEK, stored in BigQuery `phi_map` table    │    │
+│   │  [3] Section-aware chunking (SOAP boundaries respected) → ~3 chunks per note      │    │
+│   │      20M notes × 3 chunks = 60M chunks                                            │    │
+│   │  [4] Vertex AI Search datastore: import chunks via Discovery Engine API           │    │
+│   │      ─ Vertex AI Search auto-embeds (text-embedding-005, Google internal)         │    │
+│   │      ─ Auto-indexes (hybrid: dense + sparse)                                      │    │
+│   │      ─ Auto-reranks (semantic ranker built-in)                                    │    │
+│   │  [5] BigQuery `notes_meta` table: doc_id, patient_id, encounter_id, dept,         │    │
+│   │      note_date, ACL (allowed_provider_ids), redaction_hash                        │    │
+│   │  [6] Audit emit: `ingest.complete{doc_id, sha256, ts, dlp_version}` → BigQuery    │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Query path (Doctor uses Gmail / Docs side panel — Workspace Add-on)              │    │
+│   │                                                                                    │    │
+│   │  [Workspace OAuth (SSO)] → Cloud Run agent backend                                 │    │
+│   │     ▼                                                                              │    │
+│   │  [Q1] ACL resolve: SELECT patient_ids FROM care_team WHERE provider_id = $1       │    │
+│   │       (BigQuery query, 50ms)                                                      │    │
+│   │  [Q2] Intent classifier (Gemini 3 Flash, 80ms):                                   │    │
+│   │       ─ single-patient narrative → RAG path                                       │    │
+│   │       ─ cross-patient structured → BigQuery analytical path (Phase 2)             │    │
+│   │       ─ drug interaction → BigQuery + drug interaction matrix (Phase 2)           │    │
+│   │  [Q3] [RAG path]: Vertex AI Search query w/ filter `patient_id IN (acl_list)`     │    │
+│   │       returns top-10 chunks with relevance scores                                 │    │
+│   │  [Q4] Gemini 3 Pro with grounding: passes top-10 chunks as grounded context       │    │
+│   │       ─ Gemini auto-cites each claim with chunk_id                                │    │
+│   │       ─ Returns grounding confidence per claim (0.0-1.0)                          │    │
+│   │  [Q5] Confidence filter: claims with confidence &lt; 0.7 marked "unverified",        │    │
+│   │       UI shows raw chunk to doctor                                                │    │
+│   │  [Q6] Audit emit: `query.complete{doctor, patient_ids, doc_ids, ts, latency,      │    │
+│   │       grounding_confidence_avg}` → BigQuery `audit.llm_calls`                     │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Workspace Add-on (Gmail / Docs side panel)                                        │    │
+│   │  ─ Built with CardService (Workspace Add-ons SDK)                                  │    │
+│   │  ─ Doctor SSO already done                                                         │    │
+│   │  ─ Patient context: pull from current Doc/Gmail thread (if doctor is in EMR ref)  │    │
+│   │  ─ Query box → backend → grounded answer with inline citations + confidence       │    │
+│   │  ─ "Show source" click: opens chunk in modal, scrolls to highlighted span         │    │
+│   │  ─ "Confirm action" pattern: for any actionable suggestion, doctor must click     │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Audit + observability                                                             │    │
+│   │  ─ Cloud Audit Logs (Admin + Data Access enabled) → exported to BigQuery          │    │
+│   │  ─ Per-call LLM audit → BigQuery `audit.llm_calls` (6yr retention)                │    │
+│   │  ─ Looker Studio dashboard: queries/day, latency p50/p99, grounding confidence    │    │
+│   │  ─ Alerts: PHI in LLM output (defense in depth) → PagerDuty                       │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+
+   Outside VPC-SC perimeter (control plane only, no PHI):
+   ─ Terraform state in our GCS bucket (no data refs, just IaC)
+   ─ Eval golden set (synthetic only, no real PHI)
+   ─ Customer support tunnel: IAP (Identity-Aware Proxy) with session recording</code></pre>
+<h4>Phase 4: Ingestion deep dive (8 min)</h4>
+<p><strong>Step 4.1 — BigQuery is the source-of-truth (already there)</strong></p>
+<p>The customer already loaded 20M notes into BigQuery — <strong>don't move them</strong>. BigQuery is HIPAA-covered + already cost-paid + already has CMEK. Read from BigQuery, <strong>don't dual-store</strong>.</p>
+<p>Schema assumption:</p>
+<pre class="language-sql"><code class="language-sql">clinical_notes (
+  note_id STRING,
+  patient_id STRING,        -- internal MRN
+  encounter_id STRING,
+  provider_id STRING,       -- authoring physician
+  department STRING,        -- "cardiology", "ED", ...
+  note_date TIMESTAMP,
+  note_type STRING,         -- "progress_note", "discharge_summary", ...
+  note_text STRING,         -- raw SOAP text
+  source_system STRING,     -- "epic", "ocr_paper", "dictated"
+  language_code STRING      -- "en", "es"
+)</code></pre>
+<p>20M rows × ~3KB avg = ~60GB raw text in BigQuery. Cheap.</p>
+<p><strong>Step 4.2 — Cloud DLP for PHI redaction</strong></p>
+<p>Why DLP instead of self-host Presidio:</p>
+<ul><li>Native Google service, HIPAA-aligned (in BAA)</li><li>Built-in medical infoTypes: <code>US_HEALTHCARE_NPI</code>, <code>US_DEA_NUMBER</code>, <code>MEDICAL_RECORD_NUMBER</code>, <code>US_SOCIAL_SECURITY_NUMBER</code></li><li>Built-in Safe Harbor deidentification templates</li><li>Async processing: BigQuery → DLP <code>inspectContent</code> API → de-identified output back to BigQuery</li><li>~$1.50 per 1GB inspected → 60GB × $1.50 = <strong>$90 for full backfill</strong>. Negligible.</li></ul>
+<p>DLP de-identification config (Python):</p>
+<pre class="language-python"><code class="language-python"># DLP inspectTemplate for medical PHI
+deidentify_config = {
+    "info_type_transformations": {
+        "transformations": [
+            {
+                "info_types": [
+                    {"name": "US_HEALTHCARE_NPI"},
+                    {"name": "MEDICAL_RECORD_NUMBER"},
+                    {"name": "US_DEA_NUMBER"},
+                    {"name": "PERSON_NAME"},
+                    {"name": "DATE_OF_BIRTH"},
+                    {"name": "US_SOCIAL_SECURITY_NUMBER"},
+                    {"name": "STREET_ADDRESS"},
+                    {"name": "PHONE_NUMBER"},
+                    {"name": "EMAIL_ADDRESS"},
+                ],
+                "primitive_transformation": {
+                    "crypto_deterministic_config": {
+                        "crypto_key": {"kms_wrapped": kms_wrapped_key},
+                        "surrogate_info_type": {"name": "PHI_TOKEN"}
+                    }
+                }
+            }
+        ]
+    }
+}</code></pre>
+<p><strong>Why crypto-deterministic surrogate</strong>: same MRN → same surrogate. Allows cross-note linking ("patient X has 5 notes") <strong>without storing real MRN downstream</strong>. Reversible only via KMS-wrapped key, which requires break-glass approval.</p>
+<p><strong>Custom medical NER on top</strong>: DLP misses some implicit PHI — rare diagnosis + provider name in note signature. Add a <strong>MedSpacy + custom BERT</strong> layer on top of DLP for residual scan (5% of notes flagged for human review).</p>
+<p><strong>k-anonymity check</strong>: for any note where (zip5 + DOB + rare_ICD) appears as a combo, query BigQuery to count k. If k &lt; 5, route to quarantine (not indexed) and notify privacy officer.</p>
+<p><strong>Step 4.3 — Chunking + Vertex AI Search ingestion</strong></p>
+<p>Section-aware chunking (NOT fixed 512 tokens):</p>
+<pre class="language-python"><code class="language-python">def chunk_clinical_note(note_text, note_type):
+    if note_type == "progress_note":
+        # Parse SOAP sections
+        sections = parse_soap(note_text)  # [(Subjective, ...), (Objective, ...), ...]
+        chunks = []
+        for section_name, section_text in sections:
+            if len(section_text) &lt; 200:
+                # short section, keep as single chunk
+                chunks.append({"text": f"[{section_name}] {section_text}", ...})
+            else:
+                # long section, sub-chunk on sentence boundary, max 512 tokens
+                chunks.extend(sentence_chunk(section_text, max_tokens=512, prefix=section_name))
+        return chunks
+    elif note_type == "discharge_summary":
+        # different structure (Diagnoses, Procedures, Medications, Follow-up)
+        ...</code></pre>
+<p>Why section-aware: doctor query "what's the treatment plan" must hit the Plan section, not Subjective. Fixed chunking tears the SOAP semantic.</p>
+<p><strong>Vertex AI Search ingestion</strong> (the Google-native part):</p>
+<pre class="language-python"><code class="language-python">from google.cloud import discoveryengine_v1 as discoveryengine
+
+# Create a datastore (one-time)
+datastore = discoveryengine.DataStore(
+    display_name="clinical_notes_cardiology",
+    industry_vertical="HEALTHCARE",  # specific vertical for medical tuning
+    solution_types=[discoveryengine.SolutionType.SOLUTION_TYPE_SEARCH],
+    content_config="CONTENT_REQUIRED",  # we ingest documents not just metadata
+)
+
+# Import chunks
+documents = [
+    {
+        "id": chunk_id,
+        "structData": {
+            "patient_id": redacted_pid,  # surrogate from DLP
+            "encounter_id": eid,
+            "provider_ids_allowed": acl_list,  # care team
+            "note_date": ts,
+            "department": "cardiology",
+            "section": "Plan",
+            "note_type": "progress_note",
+        },
+        "content": {
+            "mimeType": "text/plain",
+            "rawText": chunk_text,
+        }
+    }
+    for chunk in chunks
+]
+# Bulk import via Cloud Storage
+import_documents_request = ImportDocumentsRequest(
+    parent=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}/branches/default_branch",
+    gcs_source=GcsSource(input_uris=["gs://clinical-notes-import/cardiology-*.jsonl"]),
+    reconciliation_mode=ReconciliationMode.INCREMENTAL,  # CDC-friendly
+)</code></pre>
+<p><strong>Vertex AI Search handles everything</strong>:</p>
+<ul><li>Auto-embedding (text-embedding-005, internal to Google, never leaves VPC-SC)</li><li>Auto-indexing (dense + sparse hybrid)</li><li>Auto-reranking (semantic ranker)</li><li>ACL via <code>structData</code> filters at query time</li></ul>
+<p><strong>Why this is the "FDE answer"</strong>: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting OpenSearch = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.</p>
+<p><strong>Throughput</strong>:</p>
+<ul><li>Backfill 60M chunks: Discovery Engine bulk import handles ~10K docs/sec → 60M / 10K = 6000s = ~2 hours per dept (cardiology subset ~3M chunks = 5 min)</li><li>Delta: hourly CDC from Cloud Healthcare API → 100-500 new chunks/hour → streaming insert</li></ul>
+<h4>Phase 5: Query path deep dive (10 min)</h4>
+<p><strong>Q1. ACL resolve (50ms)</strong>:</p>
+<pre class="language-sql"><code class="language-sql">-- BigQuery query, doctor's allowed patients
+SELECT patient_id 
+FROM care_team 
+WHERE provider_id = @doctor_id AND active = TRUE
+UNION ALL
+SELECT patient_id 
+FROM department_assignments 
+WHERE department_id IN (
+  SELECT department_id FROM provider_departments WHERE provider_id = @doctor_id
+) AND assignment_type = 'attending'</code></pre>
+<p>For cardiology with 50 doctors × avg 200 patients = 10K rows. Cached in Memorystore Redis with 5-min TTL.</p>
+<p><strong>Edge case — break-glass</strong>: if doctor's role includes "ED_attending" or "ICU_attending", expand ACL to ALL_PATIENTS but flag query with <code>break_glass=true</code>. Mandatory post-action audit.</p>
+<p><strong>Q2. Intent classifier (80ms)</strong>:</p>
+<p>Use <strong>Gemini 3 Flash</strong> ($0.50/$3 per 1M tokens) — cheap, fast. Classifies into:</p>
+<pre class="language-plaintext"><code class="language-plaintext">{
+  "intent": "patient_history_narrative" | "cross_patient_analytics" | "drug_interaction" | "clinical_decision",
+  "patient_context": "explicit" | "implicit_from_workspace_context",
+  "needs_actionable_confirmation": true | false
+}</code></pre>
+<p>Why Flash not Pro: classification is simple, Flash is 6× cheaper, 3× faster. <strong>Cost math</strong>: 25M queries/year × 200 input tokens × $0.50/1M = <strong>$2.5K/year</strong>. Negligible.</p>
+<p><strong>Q3. Vertex AI Search retrieve (200ms)</strong>:</p>
+<pre class="language-python"><code class="language-python">from google.cloud.discoveryengine_v1 import SearchServiceClient
+
+search_request = SearchRequest(
+    serving_config=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}/servingConfigs/default_search",
+    query="medication history for hypertension",
+    filter=f"patient_id: ANY({','.join([f'"{p}"' for p in allowed_patients])})",
+    page_size=10,
+    content_search_spec={
+        "snippet_spec": {"return_snippet": True, "max_snippet_count": 3},
+        "summary_spec": {"summary_result_count": 5},
+        "extractive_content_spec": {"max_extractive_answer_count": 5},
+    },
+    spell_correction_spec={"mode": "AUTO"},
+    query_expansion_spec={"condition": "AUTO"},
+)
+
+response = client.search(search_request)
+top_chunks = [r.document for r in response.results[:10]]</code></pre>
+<p><strong>Note ACL is a FILTER (pre-filter)</strong> — Vertex AI Search applies the filter at retrieval time. doctor never "sees" docs they can't access. HIPAA "minimum necessary" satisfied.</p>
+<p><strong>Q4. Gemini 3 Pro grounded generation (2000ms)</strong>:</p>
+<p>This is <strong>the Google differentiator</strong>:</p>
+<pre class="language-python"><code class="language-python">from google.cloud import aiplatform
+from vertexai.preview.generative_models import GenerativeModel, grounding
+
+model = GenerativeModel("gemini-3-pro")
+
+# Build grounded context from Vertex AI Search results
+grounding_source = grounding.VertexAISearch(
+    datastore=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}",
+)
+
+response = model.generate_content(
+    contents=[
+        f"You are a clinical assistant. Answer based ONLY on the patient's records.\n\n"
+        f"Patient query: {doctor_query}\n\n"
+        f"Be concise. Cite every claim with [chunk_id]. If uncertain, say so."
+    ],
+    tools=[grounding.GroundingTool(vertex_ai_search=grounding_source)],
+    generation_config={
+        "temperature": 0.0,  # deterministic for clinical
+        "max_output_tokens": 512,
+    },
+)
+
+# Gemini returns grounded response with attribution
+answer = response.text
+attribution = response.candidates[0].grounding_metadata
+# Each grounding chunk: {chunk_id, confidence, source_uri}</code></pre>
+<p><strong>Why grounding &gt; prompt-engineered citation</strong>:</p>
+<ul><li>Gemini grounding is <strong>API-level</strong> — Google's own model is trained to attribute. Compare: prompt-engineered Claude/GPT citation rates are 70-85%, Gemini grounding ~90%+.</li><li>Grounding returns <strong>confidence per chunk per claim</strong>. Easy threshold logic.</li><li>Source URI returned — UI can deep-link to BigQuery row.</li></ul>
+<p><strong>Cost math</strong> for generation:</p>
+<ul><li>avg query: 4K input tokens (top-10 chunks of 400 tokens each) + 500 output tokens</li><li>Gemini 3 Pro: $2/M in + $12/M out → per query = 4000 × $2/1M + 500 × $12/1M = $0.008 + $0.006 = <strong>$0.014/query</strong></li><li>5K doctors × 20 queries/day × 250 work days = 25M/year</li><li>Annual: 25M × $0.014 = <strong>$350K/year</strong> for full network</li><li>For 90-day MVP (cardiology 50 doctors): 50 × 20 × 90 = 90K queries × $0.014 = <strong>$1.3K</strong> total. Cheap.</li></ul>
+<p><strong>Q5. Confidence filter + fallback</strong>:</p>
+<pre class="language-python"><code class="language-python">LOW_CONFIDENCE_THRESHOLD = 0.7
+
+for claim, chunks in zip(parse_claims(answer), attribution.grounding_chunks):
+    avg_conf = mean(c.confidence for c in chunks)
+    if avg_conf &lt; LOW_CONFIDENCE_THRESHOLD:
+        # Mark this claim as unverified in UI
+        # Show raw chunk text to doctor instead of LLM paraphrase
+        ui_render.mark_unverified(claim, raw_chunks=chunks)</code></pre>
+<p><strong>Fallback mode for low overall confidence</strong>: if avg grounding confidence &lt; 0.5, <strong>don't generate at all</strong>. Show top-5 chunks raw, let doctor read. <strong>Goal: 0 hallucinated medical content</strong>.</p>
+<p><strong>Q6. Audit emit (20ms async)</strong>:</p>
+<pre class="language-python"><code class="language-python">audit_row = {
+    "query_id": str(uuid.uuid4()),
+    "doctor_id": authn.user_id,
+    "doctor_workspace_email": authn.email,
+    "patient_ids_accessed": list(allowed_patients &amp; actually_used),
+    "doc_ids_used": [c.id for c in top_chunks],
+    "query_text_sha256": hash(query),  # never log raw query (may contain PHI)
+    "intent": intent.classification,
+    "grounding_confidence_avg": avg_conf,
+    "latency_ms": elapsed_ms,
+    "model_version": "gemini-3-pro-2026-01",
+    "vertex_ai_search_datastore": DATASTORE_ID,
+    "ts": datetime.utcnow().isoformat(),
+    "break_glass": break_glass_flag,
+}
+# Async insert to BigQuery audit.llm_calls (partitioned by ts)
+bq_client.insert_rows_json("audit.llm_calls", [audit_row])</code></pre>
+<p>Partition <code>audit.llm_calls</code> by date, time-travel retention 7 days (BigQuery built-in) + export daily snapshot to GCS Object Lock for 6yr retention (HIPAA) + 10yr (JCAHO).</p>
+<h4>Phase 6: Cross-patient analytics path (Phase 2, 6 min)</h4>
+<blockquote><p>"The 'drug interaction across my patients' question is <strong>NOT RAG</strong>. Let me explain why this matters."</p></blockquote>
+<p><strong>Why not RAG for this</strong>:</p>
+<ul><li>"Which of my patients have drug interactions?" requires reasoning over the <strong>structured medication list</strong> of EACH patient, not the narrative note.</li><li>20M notes ≠ 20M patients. ~50K patients × 5 active meds each = 250K medication facts. <strong>Tiny dataset</strong>.</li><li>Drug interaction checking is <strong>deterministic lookup</strong> against a drug interaction matrix (DrugBank, FDA Orange Book, Lexicomp). Not LLM territory.</li></ul>
+<p><strong>Right path</strong>:</p>
+<pre class="language-sql"><code class="language-sql">-- BigQuery analytical query
+WITH active_meds AS (
+  SELECT 
+    p.patient_id,
+    m.medication_rxnorm_code,
+    m.dose,
+    m.start_date,
+    m.end_date
+  FROM medications m
+  JOIN care_team p ON m.patient_id = p.patient_id
+  WHERE p.provider_id = @doctor_id
+    AND p.active = TRUE
+    AND m.status = 'active'
+    AND (m.end_date IS NULL OR m.end_date &gt; CURRENT_DATE())
+),
+pairs AS (
+  SELECT 
+    a.patient_id,
+    a.medication_rxnorm_code AS med_a,
+    b.medication_rxnorm_code AS med_b
+  FROM active_meds a
+  JOIN active_meds b ON a.patient_id = b.patient_id AND a.medication_rxnorm_code &lt; b.medication_rxnorm_code
+)
+SELECT 
+  p.patient_id,
+  p.med_a,
+  p.med_b,
+  d.severity,
+  d.mechanism,
+  d.recommended_action
+FROM pairs p
+JOIN drug_interactions d 
+  ON p.med_a = d.med_a_rxnorm AND p.med_b = d.med_b_rxnorm
+WHERE d.severity IN ('major', 'contraindicated')
+ORDER BY 
+  CASE d.severity WHEN 'contraindicated' THEN 1 WHEN 'major' THEN 2 END;</code></pre>
+<p><strong>Then Gemini wraps the result</strong> as natural language summary:</p>
+<blockquote><p>"Doctor, you have <strong>3 patients with major drug interactions</strong>:</p>
+<ul><li><strong>Patient #PHI_TOKEN_4f7a</strong>: warfarin + amiodarone — INR risk. [view labs]</li><li><strong>Patient #PHI_TOKEN_8c2b</strong>: metformin + iohexol (recent CT) — lactic acidosis risk. [hold metformin guideline]</li><li><strong>Patient #PHI_TOKEN_1d9e</strong>: clopidogrel + omeprazole — reduced antiplatelet effect. [alt PPI suggested]"</li></ul></blockquote>
+<p><strong>Hybrid: structured query + LLM summarization</strong>. Citations point to BigQuery row IDs, not RAG chunks.</p>
+<p><strong>Why this is FDE-level thinking</strong>: 90% of candidates would shoehorn drug interaction into RAG ("retrieve all medication mentions"). The right answer is: <strong>different data type → different code path</strong>. Don't force RAG when SQL is cleaner.</p>
+<h4>Phase 7: Audit + observability (5 min)</h4>
+<p><strong>Audit log = the product</strong> for HIPAA / JCAHO.</p>
+<p><strong>Three tiers of audit</strong>:</p>
+<ol><li><strong>Cloud Audit Logs (infrastructure)</strong>:</li></ol>
+<ul><li><strong>Admin Activity logs</strong>: who changed IAM policy on Vertex AI Search datastore</li><li><strong>Data Access logs</strong> ⚠️ <strong>必须显式开</strong> (Google default OFF for cost):</li></ul>
+<pre class="language-hcl"><code class="language-hcl">     resource "google_project_iam_audit_config" "phi" {
+       project = var.project_id
+       service = "bigquery.googleapis.com"
+       audit_log_config {
+         log_type = "DATA_READ"
+       }
+       audit_log_config {
+         log_type = "DATA_WRITE"
+       }
+     }</code></pre>
+<p>This logs every BigQuery row read — critical for HIPAA "minimum necessary" demonstration.</p>
+<ul><li><strong>System Event logs</strong>: GCP-initiated system actions</li></ul>
+<ol><li><strong>Application audit (per-LLM-call)</strong>:</li></ol>
+<ul><li>BigQuery <code>audit.llm_calls</code> table (partitioned daily)</li><li>Every query / retrieval / generation logged with grounding confidence + latency + doctor + patients</li><li>Schema designed so OCR auditor can query: "show me all PHI accesses by doctor X in date range Y"</li></ul>
+<ol><li><strong>UI audit (doctor interactions)</strong>:</li></ol>
+<ul><li>Every "view source", "confirm action" click logged to BigQuery <code>audit.ui_events</code></li><li>Demonstrates doctor-in-the-loop pattern for OCR</li></ul>
+<p><strong>Retention</strong>:</p>
+<ul><li>BigQuery time-travel: 7 days (default)</li><li>Daily snapshot → GCS Object Lock bucket: <strong>6 years</strong> (HIPAA) + retention extended to <strong>10 years</strong> for JCAHO</li><li>GCS Object Lock = WORM (Write Once Read Many), immutable, even Google admin can't delete</li></ul>
+<p><strong>Looker Studio dashboard</strong> (CMIO daily view):</p>
+<ul><li>Queries/day per department</li><li>Latency p50/p99</li><li>Grounding confidence distribution (alert if &lt; 0.8 trend)</li><li>Top patient_ids accessed (anomaly detection — doctor accessing unrelated patients?)</li><li>Break-glass invocations / day</li></ul>
+<h4>Phase 8: 90-day phased MVP plan (8 min)</h4>
+<blockquote><p>"I want to push back on the implicit scope of '20M notes + all questions + go-live in 90 days'. Here's my phased plan."</p></blockquote>
+<p><strong>Phase 1 (Week 1-4): Cardiology dept only, single-patient Q&amp;A</strong></p>
+<ul><li>50 doctors, ~10K patients, ~3M chunks</li><li>Vertex AI Search datastore for cardiology</li><li>Cloud DLP redaction for cardiology subset</li><li>Workspace Add-on (Gmail side panel, simple version)</li><li>Grounded Gemini 3 Pro generation</li><li>Cloud Audit Logs Data Access tier ON</li><li>Daily standups with cardiology dept director (internal champion)</li><li><strong>Mid-phase checkpoint</strong>: end of week 2, 10-doctor private alpha + golden set eval (50 Q/A)</li></ul>
+<p><strong>Phase 2 (Week 5-8): Department expansion + golden set growth</strong></p>
+<ul><li>Add Internal Medicine + Family Medicine (2 more depts)</li><li>~150 doctors total</li><li>Expand Vertex AI Search datastore</li><li>Onboarding playbook: 1 dept = 1 week (data subset import + ACL config + UAT)</li><li>Doctor confirmation pattern hardened (UI for "I read this, I trust it")</li><li>Mid-phase: nDCG@10 ≥ 0.75 validated on 200 Q/A golden set across 3 depts</li></ul>
+<p><strong>Phase 3 (Week 9-13): JCAHO prep + go-live</strong></p>
+<ul><li>Audit log mock review with internal Compliance</li><li>Penetration test (Bishop Fox or NCC Group)</li><li>HIPAA risk assessment (qualified consultant)</li><li>Workspace Add-on final UX (with confidence indicators + "view source" + "confirm action")</li><li>Soft launch: 3 depts × 150 doctors</li><li><strong>Day 90</strong>: JCAHO accreditation visit demo</li></ul>
+<p><strong>Cross-patient analytics (drug interactions)</strong>: <strong>Phase 4 (Month 4-6)</strong>, not in 90-day MVP. Reason: requires drug interaction matrix licensing (Lexicomp ~$50K/year), additional structured BigQuery schema, additional UX patterns.</p>
+<p><strong>The push back</strong>:</p>
+<blockquote><p>"If you insist on full 20M + all 4 intents in 90 days: I'm going to <strong>honestly tell you we'll fail the JCAHO visit</strong>. We'll either ship a broken cross-patient query that hallucinates drug interactions (worse than nothing — patient harm), or we'll ship a feature that no doctor uses because Workspace Add-on UX is unfinished. <strong>Phase 1 (1 dept, single-patient, Workspace Add-on, audit-ready) is a real product on day 90, and Phase 2-3 follow with high confidence</strong>."</p></blockquote>
+<h4>Phase 9: Trade-offs + close (6 min)</h4>
+<p><strong>Decision 9.1 — Vertex AI Search vs self-host OpenSearch / Vespa</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Vertex AI Search</th><th>Self-host OpenSearch on GKE</th></tr></thead><tbody><tr><td>Build time (MVP)</td><td>1-2 weeks</td><td>4-6 weeks</td></tr><tr><td>HIPAA BAA</td><td>Yes (Google native)</td><td>Need to add to BAA chain</td></tr><tr><td>Hybrid search</td><td>Built-in</td><td>Need to configure</td></tr><tr><td>Reranking</td><td>Built-in semantic ranker</td><td>Need separate cross-encoder service</td></tr><tr><td>Grounding compatibility</td><td>Native with Gemini</td><td>Wrap manually</td></tr><tr><td>Cost (20M chunks)</td><td>~$2K/month</td><td>~$3K/month (compute) + ops</td></tr><tr><td>Customization</td><td>Limited (Google opinion)</td><td>Full</td></tr><tr><td>Operational</td><td>Zero</td><td>Team of 2-3</td></tr></tbody></table></div>
+<p><strong>My choice</strong>: <strong>Vertex AI Search</strong>. The customization limit (e.g. can't fine-tune ranker) is a real cost, but 90-day MVP needs speed. Phase 4+ we can evaluate Vespa if ranking quality plateaus.</p>
+<p><strong>Decision 9.2 — Gemini 3 Pro vs Gemini 3 Flash routing</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Intent</th><th>Model</th><th>Reason</th></tr></thead><tbody><tr><td>Intent classification</td><td>Flash</td><td>Simple, cheap, 6× lower cost</td></tr><tr><td>Single-patient narrative Q&amp;A</td><td>Pro</td><td>Quality matters, citation matters</td></tr><tr><td>Document summarization</td><td>Flash</td><td>Easier task, 4× cheaper</td></tr><tr><td>Cross-patient analytics summary</td><td>Pro</td><td>Complex reasoning over SQL result</td></tr><tr><td>Drug interaction explanation</td><td>Pro</td><td>Clinical reasoning, safety critical</td></tr></tbody></table></div>
+<p><strong>Routing logic in Cloud Run</strong>: 1-line <code>if intent in ["classification", "summarization"]: model = Flash</code>. Saves ~$200K/year at full scale.</p>
+<p><strong>Decision 9.3 — Workspace Add-on vs standalone web app</strong>:</p>
+<ul><li>Workspace Add-on <strong>wins</strong> because:</li><li>Doctor already SSO'd</li><li>In-context (patient ref in current Doc / Gmail thread)</li><li>Workspace admin governance applies (audit visibility, MFA enforcement)</li><li>Zero new URL to remember</li><li>Drawbacks: limited UI capabilities (CardService SDK is restrictive). For complex visualizations (drug interaction graph), might need a "Open in fullscreen" → web app fallback. <strong>Plan for that in Phase 2</strong>.</li></ul>
+<p><strong>Decision 9.4 — Phase 1 = 1 dept vs all depts thin slice</strong>:</p>
+<p>I chose <strong>1 dept full-stack</strong> over <strong>all depts thin slice</strong> because:</p>
+<ul><li>Cardiology has bounded vocabulary (ICD codes, medications, procedures) → golden set easier to build</li><li>Internal champion (1 dept director) is easier to source than 5</li><li>ACL complexity in 1 dept is manageable</li><li>1 dept failure = bounded blast radius for any issue</li><li>Multi-dept rollout starts in Phase 2 with playbook learned from Phase 1</li></ul>
+<hr />
+<h3>Gao Xin 简历专属 reframe + STAR</h3>
+<p>这道题映射你简历 4 个项目:</p>
+<h4>STAR: BNPL Chatbot (TikTok PayLater)</h4>
+<p><strong>Situation</strong>: TikTok PayLater 在 7 个市场跑, 每个市场 BNPL 客服 SLA 不同, 当时 70% query 转人工.</p>
+<p><strong>Task</strong>: 设计 RAG-based 客服 chatbot, 在 7 个市场上线, 在 OJK / BACEN 等不同监管下 audit pass.</p>
+<p><strong>Action</strong>:</p>
+<ul><li>用 hybrid retrieval (BM25 + dense embedding) over BNPL Q&amp;A 库 + 实时用户账户 (active loan, missed payment) 结构化数据</li><li>Citation 模式: 每个 claim 必须 link 到 KB doc id 或 user DB row</li><li>ACL pre-filter: user 只能看自己 records, agent service account 不能跨 user 读</li><li>Audit log immutable: 每次 chatbot interaction 写到 Indonesia local data center 满足 OJK data residency</li></ul>
+<p><strong>Result</strong>: 上线 6 个月内 67% query 自助解决, OJK audit 一次过, 0 PII leakage incident.</p>
+<p><strong>面试桥段</strong> (说给 Google FDE):</p>
+<blockquote><p>"我做 TikTok PayLater 的 BNPL chatbot 时, RAG 架构跟这道题 70% 重叠 — hybrid retrieval, ACL pre-filter, citation enforcement, immutable audit. 30% 增量是 (a) HIPAA 比 OJK / BACEN 多了 PHI redaction at ingest, (b) 医疗 hallucination 是 patient harm 不是 financial loss, 容忍度低 5×, (c) Google ecosystem 把这些都做成 managed services (DLP, Vertex AI Search, grounding), 我会重写 30% 用 Google primitives 替代我之前自己装的 stack. 我去之前会做 4 周 HIPAA + Google Cloud Healthcare API training."</p></blockquote>
+<h4>STAR: ConvFinQA multi-hop reasoning</h4>
+<p><strong>Situation</strong>: ConvFinQA 是金融 multi-hop QA benchmark, 复杂 query 需要 cross-document 推理.</p>
+<p><strong>Task</strong>: ablation 哪些组件 (retrieval / rerank / model) 对 accuracy 影响最大.</p>
+<p><strong>Action</strong>: 系统性 ablation — fix 2 components, vary 1, log accuracy. 发现 reranker &gt; model size &gt; retrieval recall.</p>
+<p><strong>Result</strong>: 把 ablation methodology 写成 internal playbook, 后续团队复用.</p>
+<p><strong>桥段</strong>:</p>
+<blockquote><p>"ConvFinQA multi-hop 经验直接套到 cross-patient drug interaction. 多 hop = '我所有患者 → 每个的 active meds → med pair → 查 interaction table → 重 rank 出 high severity'. 我会拆 4 hops, 每 hop 独立测 + Vertex AI evaluation framework."</p></blockquote>
+<h4>STAR: Internal Agent Platform onboarding</h4>
+<p><strong>Situation</strong>: 字节内部 Agent Platform 接入 50+ 服务, 每个服务 tool spec 不同.</p>
+<p><strong>Task</strong>: 设计 MCP-like 抽象, 让新服务 1 周内接入.</p>
+<p><strong>Action</strong>: 定义 canonical tool schema, 写 connector template, 每个服务 owner 填模板. 接入工作流 7 天闭环.</p>
+<p><strong>Result</strong>: 接入速度从 4 周 → 7 天, 平均.</p>
+<p><strong>桥段</strong>:</p>
+<blockquote><p>"Workspace Add-on 接 Vertex AI / Gemini / BigQuery / Cloud Healthcare API = 4 个 tool. 套我已有的 MCP-style connector 模板, 1 周内全部接通."</p></blockquote>
+<h4>STAR: Voice agent 7 markets (vLLM/SGLang)</h4>
+<p><strong>Situation</strong>: 字节 voice agent 在 7 个市场上线, 多语种 (英语 / 中文 / 印尼语 / 西语 / 葡语 / 阿语), 延迟敏感 (&lt; 800ms p99).</p>
+<p><strong>Task</strong>: 自部署 LLM (vLLM + SGLang) 优化吞吐 + 延迟.</p>
+<p><strong>Action</strong>: PagedAttention + continuous batching + 模型 INT8 量化 + 路由层根据 query 复杂度选 model.</p>
+<p><strong>Result</strong>: 单卡 throughput 3× 提升, p99 latency 降 40%.</p>
+<p><strong>桥段</strong>:</p>
+<blockquote><p>"Gemini 3 Pro vs Flash 路由这道题, 我做过同类工作 — 字节 voice agent 多语种多复杂度, 路由层根据 query complexity (token count + intent classifier) 选 model. 同套思路套到 Gemini Pro/Flash, 70% query 走 Flash 省 6× cost."</p></blockquote>
+<h4>Other resume hooks</h4>
+<ul><li><strong>Indonesia refund tier (OJK audit pass)</strong>: HIPAA audit + JCAHO 10-year retention 跟 OJK immutable + data residency 同结构, 直接套.</li><li><strong>TikTok PayLater 7 markets multi-tenant</strong>: hospital network 5 entity (acquired) 跟 7 market 多 tenant 同模式.</li></ul>
+<hr />
+<h3>5 个 Follow-ups</h3>
+<h4>Q1: "假设 customer IT 不允许打开 Data Access audit logs (担心 storage cost), 怎么办?"</h4>
+<p><strong>A</strong>: 这是 HIPAA 命门, 不能让步:</p>
+<blockquote><p>"Data Access logs is <strong>non-negotiable</strong> for HIPAA — OCR auditor 第一件事就是问 'show me every PHI read'. 不开 = audit fail. Cost concern is real but manageable:</p>
+<ol><li><strong>Estimate cost</strong>: BigQuery query logs ~$0.50/GB. 25M queries/year × 2KB/log = 50GB → <strong>$25/year</strong>. Negligible.</li><li><strong>Mitigation</strong>: 只对 BigQuery (PHI 数据库) 开 Data Access, GCS / KMS 已经通过 Admin Activity logs 覆盖核心操作. 不需要全部开.</li><li><strong>Retention tiering</strong>: hot in BigQuery 90 天, 然后导出 GCS Coldline (~$0.004/GB-month) 存 6-10 年. 6 年累计 ~$50.</li><li><strong>Push back</strong>: 我会直接对 CIO / CMIO 说 'opening Data Access logs is $50 over 6 years vs the cost of one HIPAA violation ($50K-$1.5M civil + criminal possible). I'm not comfortable shipping without this — it's also internal audit best practice.'</li></ol>
+<p>如果 still no go, I escalate. HIPAA 不能省."</p></blockquote>
+<h4>Q2: "Vertex AI Search 的 ranking 不够好, 心脏科医生抱怨经常 miss 重要 trial notes — 怎么改?"</h4>
+<p><strong>A</strong>: 多管齐下:</p>
+<blockquote><p>"几个 lever:</p>
+<ol><li><strong>Domain tuning</strong>: Vertex AI Search 支持 'industry_vertical=HEALTHCARE' 模板, 可能没 fully tuned 心脏科. 用 Vertex AI Search <strong>Tuning</strong> (custom dataset, 100-500 labeled queries) fine-tune 公司 datastore.</li><li><strong>Boost rules</strong>: 在 search request 里加 <code>boost_spec</code> — 同 patient 最新 30 天 notes boost 1.5×, attending 自己写的 boost 1.2×.</li><li><strong>Hybrid weighting</strong>: 默认 hybrid 50/50 dense/sparse, 心脏科多 keyword (drug name, ICD), 调到 30/70 给 sparse 更高权重.</li><li><strong>Custom embedding</strong>: 如果 ranking 仍然差, 考虑用 Vertex AI <strong>MatchingEngine</strong> (more control) 替代 Search, self-host PubMedBERT-medical 做 embedding. Trade-off: 多 4 周工作量 + 多团队维护. 我会先试 1-3, 不行才 4.</li><li><strong>Reranker stack</strong>: Vertex AI Search 的 reranker 是 generic. 接 a custom cross-encoder (medical fine-tune) 在 Vertex AI Search 输出之上再 rerank. 多 100ms latency 换 +0.05 nDCG."</li></ol></blockquote>
+<h4>Q3: "如果 OCR 来 audit, 你怎么 demo audit trail?"</h4>
+<p><strong>A</strong>: 这是 FDE 加分:</p>
+<blockquote><p>"Live demo, 我会准备 4 个 query scenarios:</p>
+<ol><li><strong>'show me every PHI access by doctor Dr. Smith in March 2026'</strong>:</li></ol>
+<pre class="language-sql"><code class="language-sql">   SELECT * FROM `audit.llm_calls` 
+   WHERE doctor_id = 'dr_smith' 
+     AND ts BETWEEN '2026-03-01' AND '2026-04-01'
+   ORDER BY ts;</code></pre>
+<p>展示每个 query 的 patient_ids, doc_ids, grounding confidence, model_version.</p>
+<ol><li><strong>'reconstruct what the LLM saw for query Q-12345'</strong>: 用 stored <code>doc_ids</code> + <code>query_text_sha256</code> (with break-glass key reverse), 完整 replay LLM input. <strong>Important: 我们 store hash 不 store query</strong> — query 本身可能含 PHI. Hash + break-glass replay 是平衡.</li></ol>
+<ol><li><strong>'show break-glass events with justification'</strong>: ED 医生在凌晨 3 点访问 ICU 病人, 强制弹 justification 输入 (text), 一并 log.</li></ol>
+<ol><li><strong>'prove minimum necessary'</strong>: 给一个 doctor + patient 例子, 用 BigQuery 跑 <code>WHERE patient_id NOT IN (SELECT patient_id FROM care_team WHERE provider_id = X) AND doctor_id = X</code>, 返回 0 行 = 没有越权访问.</li></ol>
+<p>加分: Looker Studio dashboard 永远在 CMIO 桌面, OCR 来了直接 walk through."</p></blockquote>
+<h4>Q4: "Workspace Add-on 限制太多, doctor 想看 drug interaction graph 怎么做?"</h4>
+<p><strong>A</strong>: Workspace Add-on (CardService) 不支持复杂 viz, 选项:</p>
+<blockquote><p>"两条路:</p>
+<ol><li><strong>Workspace Add-on 显示 summary, 'Open Full View' 按钮跳转 web app</strong> (内嵌 IAP). Web app 用 D3.js / Vis-network 画 drug interaction graph. Doctor 在 Workspace 看快速 answer, 复杂 viz 跳出去看. <strong>Cost</strong>: 多一个 Cloud Run service.</li></ol>
+<ol><li><strong>Workspace Add-on 嵌入 iframe to Apps Script web app</strong> — Apps Script 可以 host HTML/JS. 局限是 Apps Script 不能跑重计算. Compute backend 仍在 Cloud Run, frontend 嵌入 Add-on.</li></ol>
+<p>我推荐 <strong>Option 1</strong>, IAP 保护, 跟 Add-on 共用 SSO. Drug interaction graph 是 Phase 2 feature, 同时 ship web app."</p></blockquote>
+<h4>Q5: "你怎么 measure 这个系统 actually helping doctors, not just shipped?"</h4>
+<p><strong>A</strong>: 这是 FDE-vs-engineer 区别 — measure outcome:</p>
+<blockquote><p>"5 个 metric 分 3 层:</p>
+<p><strong>Leading (week-month)</strong>:</p>
+<ul><li><strong>Activation rate</strong>: % onboarded doctors who used in week 1. Target 60%.</li><li><strong>DAU/MAU</strong>: stickiness. Target 30%.</li><li><strong>Avg queries per doctor per week</strong>: Target 10+. Below 3 = not finding value.</li></ul>
+<p><strong>Mid-term (month-quarter)</strong>:</p>
+<ul><li><strong>Time saved per chart review</strong> (proxy): self-reported survey + Workspace event log (doctor goes from Gmail to EMR in N seconds, with/without assistant). Target 20-30% reduction.</li><li><strong>Citation click rate</strong>: doctors actually checking sources. Low = blind trust (concerning) or no trust at all (concerning).</li><li><strong>Confirm-action rate</strong>: doctors confirming AI suggestions vs ignoring. Target 60%+ confirm.</li></ul>
+<p><strong>Lagging (6-12 month)</strong>:</p>
+<ul><li><strong>Medication errors caught per 1K doctors per month</strong>: matched against incident reports.</li><li><strong>Doctor NPS</strong>: quarterly survey.</li><li><strong>Chart review time clinical study</strong>: RCT — half cardiology with assistant, half without. Measure note completion time, error rate.</li></ul>
+<p><strong>Counter-metrics (must not move bad)</strong>:</p>
+<ul><li><strong>Audit log size unusual spike</strong> (someone abusing access)</li><li><strong>Grounding confidence trending down</strong> (data quality degrading)</li><li><strong>Doctor friction reports</strong> (latency, wrong answers)</li></ul>
+<p>我会在 90-day MVP <strong>必须 instrument 5+ leading metrics</strong> in week 1, 才能在 day 90 retrospective 给 CMIO / Board 真实 ROI 数字."</p></blockquote>
+<hr />
+<h3>❌ 死路答法 (top 7)</h3>
+<ol><li><strong>冲 "I'd use OpenAI embeddings + Pinecone"</strong> — 直接挂. 不是 Google native, 不在客户 BAA.</li><li><strong>不用 Vertex AI Search, 自己装 OpenSearch on GKE</strong> — 重复造轮子, 90 天做不完.</li><li><strong>Citation 用 prompt "Always cite sources"</strong> — 不用 Gemini grounding API = 暴露不懂 Gemini.</li><li><strong>PHI redaction 用自托管 Presidio</strong> — 不加分, 应该用 Cloud DLP.</li><li><strong>接受 90 天做 20M + 全部 intent</strong> — 不 push back = 失败.</li><li><strong>建独立 web app</strong> — 客户已在 Workspace, 必须 Workspace Add-on.</li><li><strong>把 drug interaction 当 RAG 答</strong> — 应该 BigQuery SQL + drug interaction matrix.</li></ol>
+<hr />
+<h3>✅ 加分项 (top 10)</h3>
+<ol><li><strong>第一句话提 Vertex AI Search + Gemini grounding</strong> — signal "我懂 Google 差异化"</li><li><strong>Cloud DLP with medical infoTypes</strong> — 不是 self-host Presidio</li><li><strong>VPC-SC perimeter</strong> — Google 特有, 比 AWS VPC endpoint 高一层</li><li><strong>Data Access audit logs 必须显式开</strong> — 显示真用过 GCP HIPAA</li><li><strong>Workspace Add-on as primary UX</strong> — 整合客户 ecosystem</li><li><strong>结构化 vs 非结构化分开</strong> (drug interaction = SQL, history = RAG)</li><li><strong>Gemini Pro/Flash 路由 by intent</strong> — cost optimization 思维</li><li><strong>G·O·O·D-F·T 10-question clarify</strong> + 强 push back 90 days</li><li><strong>Cloud Healthcare API as EHR bridge</strong> — Google 原生 FHIR, 不要再自己搭</li><li><strong>Audit 3 层 (Cloud Audit + app + UI events)</strong> + 6-10 yr retention</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<blockquote><p><strong>Google FDE 临床 Q&amp;A = "Vertex AI Search + Gemini grounding + Workspace Add-on + Cloud DLP + BigQuery + VPC-SC + Cloud Audit Logs (Data Access tier) — 全 Google native"</strong>.</p>
+<p>关键判断: <strong>不要自己装 vector DB</strong>, <strong>必须用 grounding API 不是 prompt-engineered citation</strong>, <strong>drug interaction 走 BigQuery SQL 不是 RAG</strong>, <strong>Workspace Add-on 是 UX 入口</strong>, <strong>90 天 = 1 dept 单 patient 史 Q&amp;A 不是 20M 全量</strong>.</p></blockquote>
+<hr />
+<h3>Cheat Sheet</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Stack (全 Google native):
+  Source     : BigQuery (20M notes 已 在)
+  Bridge     : Cloud Healthcare API (FHIR R4)
+  PHI Redact : Cloud DLP (medical infoTypes)
+  OCR        : Document AI (老纸质记录)
+  Search     : Vertex AI Search (managed RAG)
+  LLM        : Gemini 3 Pro (grounded) + Flash (intent/sum)
+  UI         : Workspace Add-on (Gmail / Docs side panel)
+  Audit      : Cloud Audit Logs Data Access ON + BigQuery app audit
+  Sec        : VPC-SC + CMEK + IAP + Workforce Identity
+
+90-day phase:
+  Week 1-4  : Cardiology dept, single-patient Q&amp;A
+  Week 5-8  : 3 depts, golden set 200 Q/A
+  Week 9-13 : JCAHO prep + go-live demo
+  Phase 4+  : Cross-patient (drug interaction) BigQuery SQL
+
+KPI 3 layer:
+  L1 Compliance: 0 PHI leak, 100% access logged, JCAHO pass
+  L2 Quality   : nDCG@10 ≥ 0.75, grounding confidence ≥ 0.8
+  L3 Adoption  : 60% activation, 10 queries/doctor/week
+
+G·O·O·D-F·T Clarify 10 Q:
+  G - Goal: which intent? what success metric?
+  O - Owners: buyer = CMIO? funder? champion?
+  O - Obstacles: existing Epic AI? Workspace Ent + HIPAA?
+  D - Data: how into BigQuery? freshness? language?
+  F - Failure: worst-case patient harm mitigation?
+  T - Timeline: why 90 days (JCAHO)?  what next?
+
+死路:
+  - OpenAI embeddings (PHI leak)
+  - Self-host OpenSearch (重复造)
+  - Prompt citation (不用 grounding)
+  - Self-host Presidio (不用 DLP)
+  - 接 90 天 20M (不 push back)
+  - 独立 web app (不用 Add-on)
+  - Drug interaction 走 RAG (应走 SQL)
+
+加分:
+  - Vertex AI Search + Gemini grounding 第一句
+  - Cloud DLP + medical infoTypes
+  - VPC-SC perimeter (Google 特有)
+  - Data Access logs 显式开
+  - Workspace Add-on UX
+  - 结构化 vs 非结构化分开
+  - Pro/Flash 路由
+  - 3 层 audit + 6-10yr retention
+
+Cost (full 5K doctors):
+  Vertex AI Search: ~$2K/month
+  Gemini 3 Pro    : ~$350K/year (25M queries)
+  Gemini 3 Flash  : ~$2.5K/year (intent + sum)
+  Cloud DLP       : ~$90 one-time backfill + ~$50/month delta
+  BigQuery        : ~$5K/year storage + queries
+  Cloud Audit     : ~$50 over 6 years
+  Workspace Add-on: $0 (Workspace included)
+  Total           : ~$400K/year ≈ $80/doctor/year
+
+Latency (3s p50):
+  Auth + ACL    : 50ms
+  Intent class  : 80ms (Flash)
+  Vertex Search : 200ms
+  Gemini Pro gen: 2000ms
+  Conf filter   : 100ms
+  Audit emit    : 20ms async
+  Buffer        : 550ms
+
+Key phrases:
+  "Vertex AI Search handles chunking + embedding + rerank in one service"
+  "Gemini grounding is API-level, not prompt-engineered"
+  "Cloud DLP has US_HEALTHCARE_NPI + MEDICAL_RECORD_NUMBER"
+  "VPC-SC perimeter is Google-specific, stronger than AWS VPC endpoints"
+  "Drug interaction is BigQuery SQL not RAG"
+  "Workspace Add-on, not new web app — doctor SSO already"
+  "Phase 1: 1 dept, single-patient, JCAHO-ready"
+  "Data Access audit logs must be ON, default OFF — $50/6yr"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="zhenti-052-diagnose-model-getting-worse.html">← Q52 · [生产/可靠性] 客户报告模型「越来越差」, 你怎么排查模型漂移</a>
+    <a href="zhenti-p02-workspace-executive-assistant-agent.html">🔮 Q-P2 · [预测·Google FDE] Workspace 跨工具 agent (Gmail/Docs/Drive/Calendar executive assistant) →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown">## Q-P1 · Vertex AI + Gemini 临床 Q&A (HIPAA · 20M clinical notes)
+
+> "A regional hospital network uses **Google Workspace** and has **20 million clinical notes in BigQuery**. They want a **'clinical Q&A assistant' for doctors** that can answer questions like 'What's this patient's medication history?' or 'Have any of my patients shown drug interactions with their current prescriptions?' with **HIPAA compliance**. You have **Gemini 3 Pro, Vertex AI Search, and BigQuery** available. Design the system. **90-day MVP**."
+
+**中文翻译**:
+
+> "一个区域性医疗集团已经在用 **Google Workspace**, 而且他们 **2000 万份临床笔记** 都已经躺在 **BigQuery** 里了. 他们想做一个 **'临床 Q&A 助手'** 给医生用, 能回答类似 '这个病人的用药史是什么?' 或者 '我手上有没有哪些病人现有处方里出现了药物相互作用?' 这种问题, 必须 **HIPAA 合规**. 你手上能用的是 **Gemini 3 Pro / Vertex AI Search / BigQuery** 这套 Google 全家桶. 把这个系统设计出来. **90 天 MVP**."
+
+**Round**: System Design (60 min)
+**出处**: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合)
+**行业 / 约束**: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX
+**Distinguishing**: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 **Google primitives + 整合 + HIPAA**, 标准 FDE "pick right Google product" 题. 不能再答 OpenSearch / pgvector — 客户要求 Google-native.
+
+---
+
+## 📖 术语速查 (本题用到的)
+
+> 这道题 4 类术语必须先过, 否则跟面试官来回讲 Vertex AI 和 grounding 都接不上.
+
+### Google Cloud / Vertex AI 体系
+
+| 术语 | 解释 |
+|---|---|
+| **Vertex AI** ⭐ | Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场. |
+| **Vertex AI Search** ⭐ | Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. **不需要你自己装 OpenSearch / pgvector**. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高. |
+| **Vertex AI Agent Builder** | 上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage. |
+| **Gemini 3 Pro** ⭐ | Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens. |
+| **Gemini 3 Flash** ⭐ | 轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro. |
+| **Grounding** ⭐ | Gemini 的内置功能 — 让回答**强制溯源**到 Vertex AI Search 检索到的 docs, 自动加 citation. **比 prompt-engineered citation 可靠**, FDE 必提. |
+| **Function calling** | Gemini 内置 tool use 协议. 这道题用于查 FHIR / BigQuery / Drug interaction API. |
+| **BigQuery** ⭐ | Google 托管的 PB 级 columnar 数仓. 20M clinical notes 已经在这里 = 数据已经 ready. 关键: BigQuery 有 **native HIPAA 合规承诺 + BAA**. |
+| **BigQuery ML** | 在 BigQuery 内直接跑 SQL 训模型. 这题用于 medication history 聚合查询. |
+| **Document AI** | Google 的 OCR / 文档解析服务. 如果 clinical notes 里有 scan 件 (~20%) 必用. |
+| **Cloud DLP (Data Loss Prevention)** ⭐ | Google 的 PHI/PII 检测 + 脱敏服务. **2026 已经 HIPAA-aligned**, 替代 Presidio. 内置 medical infoTypes (US_HEALTHCARE_NPI, US_MEDICAL_RECORD_NUMBER, US_DEA_NUMBER 等). |
+| **Cloud KMS / Cloud HSM** | Google KMS = AWS KMS 对应物. CMEK = Customer-Managed Encryption Key. 医疗强制 CMEK. |
+| **VPC-SC (VPC Service Controls)** ⭐ | Google 特有 — 在 GCP API 周围画 perimeter, 防止 data exfiltration. 比 VPC endpoint 更高一层. HIPAA 部署必开. |
+| **Cloud Audit Logs** ⭐ | Admin Activity + Data Access + System Event 三类自动日志. **Data Access logs 必须显式开** (默认关), 这是 HIPAA audit 命门. |
+| **Workspace (Gmail/Calendar/Drive/Docs)** | 这家医院已经在用 = doctor 入口是 Gmail/Docs 侧栏, 不是新 web app. |
+
+### HIPAA / 临床领域
+
+| 术语 | 解释 |
+|---|---|
+| **HIPAA** | Health Insurance Portability and Accountability Act. 违反 = OCR 罚款 + 客户走人. |
+| **PHI** ⭐ | Protected Health Information. 18 类直接标识符 (name, MRN, SSN, DOB, address...). 准标识符组合 (rare diagnosis + zip + DOB) 也算. |
+| **BAA** ⭐ | Business Associate Agreement. **Google Cloud 已经默认提供 BAA** 给 covered service (BigQuery, Vertex AI, GCS, KMS). 但 Workspace 默认 BAA 范围有限制, 需要 Workspace Enterprise + HIPAA addendum. |
+| **HIPAA Safe Harbor de-identification** ⭐ | HIPAA 提供的去识别方法 — 移除 18 类标识符 → 数据可以"非 PHI" 化使用. 这题用于 cross-patient 分析的合规通道. |
+| **EHR / EMR** | Electronic Health Record. Epic 是市占率最高的 (~40% 大医院). 决定数据怎么进 BigQuery. |
+| **FHIR (R4)** | 现代医疗数据标准 (JSON / RESTful). Google Cloud 有 **Cloud Healthcare API** 原生支持 FHIR store. |
+| **Cloud Healthcare API** ⭐ | Google 的 FHIR / HL7v2 / DICOM 托管存储 + 转换服务. 这道题可直接当 EHR-to-BigQuery 中间层. |
+| **Clinical note** | 医生写的自由文本笔记 (SOAP 格式: Subjective / Objective / Assessment / Plan). 20M = ~5 年医生输出量 (一家 5K-doctor 网络). |
+| **ICD-10 / SNOMED CT** | 国际疾病分类 / 临床术语本体. retrieval 必用 keyword. |
+| **Drug interaction** ⭐ | 药物相互作用. 临床痛点 — 一个病人 5 个 specialist 各开 1 个药, 互相冲突. 这是题目特意点出的 "cross-patient + cross-note" 复杂 query. |
+| **Doctor-in-the-loop** | 医生在回路 — AI 给建议但医生确认, 不是 autonomous decision. 临床 AI 标配, 避免 FDA Class II medical device 监管. |
+| **Hallucination (medical)** | LLM 幻觉在医疗 = patient harm. citation 必须 token-span 级别可溯源. |
+| **k-anonymity** | 去识别度量 — 准标识符组合在数据集中至少 k 个相似. k<5 = 仍可识别. |
+
+### LLM / RAG / Grounding
+
+| 术语 | 解释 |
+|---|---|
+| **RAG** | Retrieval-Augmented Generation. 先检索后生成. |
+| **Grounded generation** ⭐ | Gemini 的 grounding 模式 — 把 retrieval docs 作为 hard context, **每个 claim 强制带 source attribution**. Google 把它做成 API-level feature, 不需要 prompt engineering. |
+| **Embedding** | 文本 → 向量. Vertex AI 提供 `text-embedding-005` (Google 内部) 和 `textembedding-gecko@003`. |
+| **Hybrid search** | Vertex AI Search 默认 hybrid (semantic + keyword). 不需要你手动配 BM25. |
+| **Reranker** | Vertex AI Search 内置 cross-encoder reranker. 不需要你 self-host BGE-reranker. |
+| **Citation faithfulness** | 引用忠实度 — 每个 claim 真的来自引用 source. Gemini grounding 内置 confidence score. |
+| **NLI (Natural Language Inference)** | 蕴含判断 — 验 claim 是否被 cited span 蕴含. Gemini grounding 已经内含 entailment. |
+| **Token cost (2026)** | Gemini 3 Pro $2/$12 per 1M | Flash $0.50/$3 | Claude Opus 4.7 $5/$25 | GPT-5.5 $5/$30. |
+
+### 集成 / 部署
+
+| 术语 | 解释 |
+|---|---|
+| **Workspace Add-on** ⭐ | 在 Gmail / Docs 侧栏装的扩展 — 医生不离开 Gmail 就能问问题. 这是这道题的核心 UX. |
+| **AppSheet / Apps Script** | Workspace 自带的低代码工具, 快速做 doctor-facing UI 原型. |
+| **OAuth 2.0 (Google)** | 用户授权第三方 app 访问 Workspace data 的协议. doctor 登录 = 已经 SSO 过. |
+| **IAM (Identity Access Management)** | Google Cloud 的权限模型. principal × role × resource. |
+| **Service Account** | Google Cloud 服务身份, 非人类. agent 后端用 service account 调 Vertex AI / BigQuery. |
+| **CMEK** | Customer-Managed Encryption Key. HIPAA 强制. |
+| **Private Service Connect** | Google 的 VPC peering 替代品, 私网调 Google API. |
+| **GKE (Google Kubernetes Engine)** | Google 托管 K8s. 自定义后端跑在这上面. |
+| **Cloud Run** | Google 托管 serverless container. 90-day MVP 适合, 不要 over-engineer K8s. |
+
+---
+
+## 这道题在考什么
+
+**不是**: 考你能不能 design 一个 RAG.
+
+**是**: 考你能不能 **(a) 选对 Google primitives** (b) **整合 BigQuery + Vertex AI Search + Gemini grounding + Workspace** (c) **在 HIPAA 红线下面做 90-day MVP**.
+
+4 个 signal:
+
+1. **Don't re-invent what Vertex AI Search already does** (不要重复造轮子) — 90% 候选人答 "我自己装 OpenSearch + 自训 embedding". 错. Google FDE 面试 = 用 **Vertex AI Search managed retrieval**. 自己装 = 显示你不懂 Google ecosystem.
+
+2. **Grounding ≠ prompt-engineered citation** (Gemini grounding 是 native API feature) — 这是 Google 跟 OpenAI/Anthropic 最大的差异化能力. 必须提到 grounding API + grounding confidence score. 否则你"不像懂 Gemini".
+
+3. **Workspace integration is the UX win** (Workspace 整合是 UX 的关键加分) — doctor 已经在 Gmail / Docs 里. 不要再做一个 web app, 做 Workspace Add-on. 这是 "FDE 理解 customer ecosystem" 的标志.
+
+4. **HIPAA in Google Cloud has different controls than AWS** (HIPAA 在 GCP 上是不同的控件) — 不能 copy/paste AWS HIPAA 答案. Google 特有: VPC-SC perimeter, Cloud DLP, Cloud Healthcare API, BigQuery column-level security, Org Policy constraints. 提这些 = signal "我真的用过 GCP".
+
+---
+
+## ❌ 最常见的挂法
+
+**挂法 #1: 自己装 vector DB + embedding pipeline, 不用 Vertex AI Search**
+
+> "I'd extract notes from BigQuery, chunk them, run embeddings via Vertex AI embedding API, store in pgvector on Cloud SQL, then call Gemini 3 Pro for generation."
+
+死. 你**忽略了**:
+- Vertex AI Search 是 Google 给 FDE 的官方 RAG building block — 你不用 = signal 你不懂 Google stack
+- pgvector 在 20M docs scale 性能崩 (latency 2s+)
+- 自己装意味着你要自己做 chunking, reranking, hybrid search, grounding — 全部 90 天做不完
+- Vertex AI Search 已经过 HIPAA BAA, pgvector 在 Cloud SQL 也 ok 但 hospital legal 还得再 review
+
+**挂法 #2: 不提 grounding, 用 prompt "Cite sources" 模仿 citation**
+
+> "I'd put 'Always cite sources as [doc_id]' in the system prompt and parse citations from the response."
+
+死. Gemini 有 **native grounding API** — 强制 source attribution + confidence score + URL anchor. 不用 grounding = 你不懂 Gemini 的差异化能力. 在 Anthropic/OpenAI 上你能用 prompt engineering, 在 Gemini 上是 API feature.
+
+**挂法 #3: 自己做 PHI redaction, 不用 Cloud DLP**
+
+> "I'd use Presidio + medspaCy to redact PHI in a Dagster pipeline before chunking..."
+
+可以这么答但**不加分**. 因为 Google 有 **Cloud DLP** with medical infoTypes (NPI / MRN / DEA / HIPAA Safe Harbor templates). DLP 是 Google managed service, 已经过 HIPAA BAA, **比自托管 Presidio 维护成本低 10×**. FDE 面试 = pick Google native.
+
+**挂法 #4: 接受 90 天 MVP 不 push back / 不 phase**
+
+> "Yes, 90 days is doable. Week 1-4 ingestion, week 5-8 retrieval, week 9-12 UI..."
+
+死. 20M docs + HIPAA BAA + Workspace integration + drug interaction cross-patient analytics + doctor UX = 6-9 个月真实工作量. 必须 **phase**: 90 天做 single-patient Q&A in 1 department (e.g. cardiology) → Phase 2 cross-patient → Phase 3 全院.
+
+**挂法 #5: 忽略 Workspace 入口, 自己做 web app**
+
+> "I'd build a Next.js web app where doctors log in and ask questions..."
+
+死. 客户**已经在 Workspace**. 入口是 **Gmail / Docs 侧边栏 (Workspace Add-on)**. 自建 web app = 多一个 doctor 不去用的网址 + 多一套 SSO 配置. Workspace Add-on = OAuth 已经 SSO 过, doctor 在写病历的同时直接侧边问问题.
+
+**挂法 #6: 把 "drug interaction across patients" 当 simple retrieval**
+
+> "Same RAG flow — retrieve patient's prescriptions, ask Gemini."
+
+死. 这是 **cross-patient analytics** — "我所有的病人里, 谁现在的处方有 drug interaction". 这不是 RAG, 这是 **BigQuery analytical query** (跑 SQL 找所有该 doctor 的 patient 现有 active medication, 然后跑 drug interaction matrix). RAG 只在 narrative notes 上, 不在 structured medication list 上. **必须区分 structured vs unstructured retrieval**.
+
+---
+
+## 完美答案架构 (9 步 Response Architecture, 本题定制)
+
+| # | Step | 时间 | 这层该说什么 (custom) | 开口句 |
+|---|---|---|---|---|
+| 1 | **Clarify (G·O·O·D-F·T)** | 7 min | 10 个 Q 沿 G·O·O·D-F·T 6 维度问, 锁 scope / EHR / PHI / SLA | "Before I sketch, I want to ask 10 things organized around 6 dimensions — goal, owners, obstacles, data, failure, timeline. Clinical Q&A could mean 5 different products." |
+| 2 | **HIPAA + Google Cloud frame** | 4 min | HIPAA Tech Safeguards 5 条 → 映射到 Google 组件 (VPC-SC, CMEK, DLP, Audit Logs) | "Let me first frame HIPAA in Google Cloud — it's different controls from AWS. VPC-SC perimeter, Cloud DLP, CMEK in KMS, Data Access Audit Logs." |
+| 3 | **Architecture overview** | 6 min | 一张 ASCII 图: BigQuery → Cloud Healthcare API → DLP → Vertex AI Search → Gemini grounded → Workspace Add-on | "Here's the high-level data flow. Notice the 5 Google primitives that I'm using as managed building blocks." |
+| 4 | **Ingestion deep dive** | 8 min | BigQuery clinical notes → DLP redact → Vertex AI Search datastore (Chunked + Embedded + Indexed automatic) | "Ingestion is where compliance + Google managed services do the most lifting." |
+| 5 | **Query path deep dive** | 10 min | Doctor in Workspace Add-on → ACL resolve → Vertex AI Search retrieve → Gemini Pro grounded generation → citation + confidence | "Query path has 6 stages. Notice ACL is pre-filter via Vertex AI Search filtering, not post." |
+| 6 | **Cross-patient analytics** | 6 min | Drug interaction query 走 BigQuery + structured medication list, NOT RAG. Hybrid: RAG for narrative, SQL for structured. | "The drug interaction question is NOT RAG — it's a BigQuery analytical query plus a drug interaction matrix. Different code path." |
+| 7 | **Audit + observability** | 5 min | Cloud Audit Logs (Data Access tier) + per-query LLM call audit → BigQuery (yes, audit in BigQuery) + Looker dashboard | "Audit is the OCR exam product. Every PHI access logged in Cloud Audit + per-call LLM audit in BigQuery, 6yr retention." |
+| 8 | **90-day phased MVP** | 8 min | Phase 1 (week 1-4): 1 dept, 1K notes, single-patient. Phase 2 (week 5-8): scale to dept. Phase 3 (week 9-13): cross-patient + go-live. | "I'd push back on 90 days for the full 20M scope. Phase 1 in 1 dept, then scale. Here's the 13-week breakdown." |
+| 9 | **Trade-offs + close** | 6 min | Vertex AI Search vs self-host / Gemini Pro vs Flash routing / structured vs unstructured / Workspace Add-on vs web app | "If you give me 6 months, I'd add agent loop for tool use. In 90 days, single-turn grounded Q&A is the right scope." |
+
+---
+
+## G·O·D·D·S Clarifying Framework (Clarify ↔ Decompose 双向映射) ⭐
+
+> **核心理念**: 5 个 clarifying 维度 1:1 映射到 5 个 decompose 步骤. 问完一轮 G·O·D·D·S, decompose 也就基本写好了.
+
+```
+┌──────────────┐     ┌───────────────────────────────────┐
+│ Clarify (问) │  →  │          Decompose (答)           │
+├──────────────┼─────┼───────────────────────────────────┤
+│ G oal        │ →   │ Step 1: KPI lock                  │
+│ O wner       │ →   │ Step 2: Stakeholder map           │
+│ D ata        │ →   │ Step 3: 数据 inventory            │
+│ D eadline    │ →   │ Step 4: 子问题排序 (risk × value) │
+│ S cope cut   │ →   │ Step 5: Walking-skeleton MVP      │
+└──────────────┴─────┴───────────────────────────────────┘
+```
+
+### G — Goal (→ feeds Decompose Step 1: KPI lock)
+
+> **Q1**: "When you say 'clinical Q&A assistant', do you mean (a) **single-patient history retrieval** (most common — 'tell me this patient's med history'), (b) **cross-patient analytics** ('which of my patients have drug interaction risks'), (c) **clinical decision support** ('should I prescribe X'), or (d) **all three**? These are 3 totally different products. (a) is RAG, (b) is BigQuery SQL + RAG, (c) is FDA Class II medical device territory which I'd push back hard."
+
+> **Q2**: "What's the **success metric**? Time saved per chart review? Number of medication errors caught? Doctor NPS? Compliance audit pass? Different metrics drive different design — if it's audit pass, citation faithfulness is north star; if it's time saved, latency < 3s is north star."
+
+**这层 → 解锁 Decompose Step 1**: 答完 G 问题, 你就知道这道题的 KPI 是什么 (e.g., citation faithfulness ≥ 95% + 30% chart review time saved + 100% JCAHO audit pass), 后面 5 步的所有决策按这个 KPI 优化.
+
+### O — Owner (→ feeds Decompose Step 2: Stakeholder map)
+
+> **Q3**: "Who's the **buyer** — CMO (Chief Medical Officer), CIO, or CMIO (Chief Medical Informatics Officer)? Each has different priorities. CMO wants clinical impact, CIO wants compliance + integration, CMIO bridges both. And who **funds** — IT budget or clinical operations?"
+
+> **Q4**: "Who **uses** day-to-day — attending physicians, residents, NPs/PAs, or all? And do nurses / front desk also need access? Different roles have different ACL needs. Plus: who's the **internal champion** — someone in the hospital we can pair with for 90 days? And what's the **existing vendor landscape** — Epic AI module, Dragon, Abridge/Suki — whose UX must we co-exist with?"
+
+**这层 → 解锁 Step 2**: 答完 O 问题, 你画出 stakeholder map (buyer = CMIO / user = cardiology attendings / blocker = compliance + Epic admin / SME = clinical informatics lead), 知道每步要 align 谁.
+
+### D — Data (→ feeds Step 3: 数据 inventory)
+
+> **Q5**: "How did the **20M clinical notes get into BigQuery**? Live FHIR sync via Cloud Healthcare API, or daily batch export from Epic? **What's the freshness SLA** — 5 min or 24 hours? Drug interaction question needs near-real-time, history question is fine with 24h."
+
+> **Q6**: "**Data quality**: how much of the 20M is (a) actual SOAP-formatted notes, (b) auto-generated boilerplate, (c) OCR-scanned older paper records (with errors), (d) dictated speech-to-text (with transcription errors)? Each requires different pre-processing. And: **what % is non-English** (Spanish often common in regional hospitals)?"
+
+**这层 → 解锁 Step 3**: 答完 D 问题, 你能画 data inventory 表 (source / volume / freshness / format / PHI level / owner / access path), 知道每个 sub-problem 用哪份数据 — e.g., single-patient Q&A 用 FHIR + SOAP, 跨病人需要 BigQuery aggregate.
+
+### D — Deadline (→ feeds Step 4: 子问题排序)
+
+> **Q7**: "**Why 90 days specifically**? Is it driven by (a) JCAHO accreditation visit, (b) competitive pressure (Epic just shipped similar feature), (c) board mandate, (d) end-of-budget-year deadline? The driver determines what we can compromise. If it's JCAHO, the scope is much smaller (just demo + audit log). If it's competitive, scope is broader but quality bar lower."
+
+> **Q8**: "What are **downstream dependencies after 90 days**? Are we building a one-off MVP, or is this the foundation for a 2-year roadmap (cross-system, ambient AI scribe, agent tools)? If foundation, I'll over-invest in ontology + audit; if one-off, faster path to ship. And: **what's the worst-case if a bad answer ships** — doctor acts on hallucinated info → patient harm → lawsuit? That changes the reversibility budget."
+
+**这层 → 解锁 Step 4**: 答完 Deadline 问题, 你知道**为什么** 90 天这个数, 才能 push back 或拆 phase. Sub-problems 按 (deadline 紧迫度 × clinical risk × audit value) 排序 — JCAHO-blocking 的 audit log 排最前, cross-patient analytics 推到 Phase 2.
+
+### S — Scope cut (→ feeds Step 5: Walking-skeleton MVP)
+
+> **Q9**: "If we ship in 90 days, which use case is the MVP — **single-patient lookup** (lowest liability), **cross-patient pattern detection** (BigQuery + RAG, medium liability), or **clinical decision support** (FDA territory)? My instinct: start with single-patient lookup only, defer cross-patient + decision support to v2 (require validation studies). What's the **obvious overscope** you're willing to cut on day 1?"
+
+> **Q10**: "For the 90-day MVP, would you accept the system **refusing to answer** on any of: (a) drug dosage questions, (b) any non-English notes, (c) records older than 5 years (OCR quality unknown), (d) any cross-patient query? Each refusal narrows scope and de-risks Phase 1 — but increases user friction. Which trade-off do you want?"
+
+**这层 → 解锁 Step 5**: 答完 S 问题, MVP 边界明确. 你知道**哪 80% 砍掉先不做** (cross-patient, decision support, non-English, drug dosage, full 20M scope, all 50 hospitals), 哪 20% 是 walking skeleton (1 dept × single-patient × English SOAP × FHIR-fresh data × Workspace Add-on UX × audit log).
+
+**面试官 likely 回答** (我的假设):
+- (a) Single-patient retrieval 必做, (b) cross-patient drug interaction 是 stretch goal — Phase 2
+- 北星 metric: 30% time saved on chart review (clinical impact) + 100% audit pass
+- Buyer = CMIO, funded jointly IT+clinical, internal champion = cardiology dept director
+- 用 Epic 但 Epic 内部 AI 还没买. Workspace Enterprise + HIPAA addendum 已存在.
+- BigQuery 数据来自 Cloud Healthcare API (FHIR R4) 每小时增量同步
+- 70% SOAP 笔记, 20% OCR 老记录 (有错), 5% Spanish, 5% boilerplate
+- Worst case = lawsuit. 必须 confidence threshold + doctor confirmation
+- 90-day driven by JCAHO + CMIO promised CEO
+
+→ **Real scope reframe**: 90 天 = **1 个 cardiology dept, single-patient history Q&A, with audit log + doctor confirmation pattern + Workspace Add-on**. Cross-patient drug interaction → Phase 2 (month 4-6).
+
+---
+
+## 详细分析 + 回答 (60-min walkthrough)
+
+### Phase 1: Clarify + KPI 锁定 (7 min)
+
+> "Before I sketch, I want to be honest — 'clinical Q&A' in 90 days for 20M notes is **either Phase 1 of a multi-year roadmap or it's vaporware**. Let me ask 10 things along Goal / Owners / Obstacles / Data / Failure / Timeline."
+>
+> *(asks 10 questions, gets answers)*
+>
+> "OK. **Real scope for 90 days**:
+> - 1 department (cardiology, ~50 doctors)
+> - Single-patient history Q&A only (NOT cross-patient yet)
+> - Workspace Add-on UX (not a new web app)
+> - Doctor confirmation required for any actionable insight
+> - JCAHO-ready audit log
+>
+> Cross-patient drug interaction → Phase 2 (month 4-6). Full 20M scope → Phase 3 (month 7-12).
+>
+> **Three KPIs**:
+> - **Retrieval quality**: nDCG@10 ≥ 0.75 on cardiology golden set (500 attending-validated Q/A pairs)
+> - **Citation faithfulness**: ≥ 95% claims have grounded Vertex AI Search source (Gemini grounding confidence ≥ 0.8)
+> - **Compliance**: 0 PHI in Cloud Audit Logs export, 100% PHI access in Data Access logs, JCAHO mock audit pass
+>
+> **Counter-metrics**:
+> - **Doctor friction**: time per query < 3s p50, < 8s p99 (otherwise doctor abandons)
+> - **False positive rate** on actionable suggestions < 1% (otherwise doctor stops trusting)
+
+### Phase 2: HIPAA + Google Cloud frame (4 min)
+
+> "Let me frame HIPAA Tech Safeguards in Google Cloud — it's different controls from AWS, this is where FDE depth shows."
+
+| HIPAA 45 CFR § 164.312 | 我用的 Google 组件 |
+|---|---|
+| **(a) Access Control** | IAM + Workspace OAuth (doctor SSO) + Vertex AI Search ACL filter (per-patient) + BigQuery column-level security |
+| **(b) Audit Controls** | Cloud Audit Logs (Admin Activity + **Data Access** tier 必开) + per-call LLM audit emit → BigQuery `audit.llm_calls` partitioned table + 6yr retention via BigQuery Time Travel + Cloud Storage Object Lock backup |
+| **(c) Integrity** | CMEK in Cloud KMS + Cloud Storage object versioning + chunk SHA-256 in Vertex AI Search metadata |
+| **(d) Person/Entity Auth** | Workspace OAuth + **step-up MFA** on PHI-sensitive operations + IAM Workforce Identity |
+| **(e) Transmission Security** | Private Service Connect for all Google APIs + Cloud Armor + VPC-SC perimeter around BigQuery + Vertex AI |
+
+**额外提一条 — VPC Service Controls** ⭐:
+
+> "VPC-SC is Google's HIPAA secret weapon — you draw a perimeter around BigQuery, Vertex AI, GCS, KMS. Even if an attacker gets credentials, they **can't exfiltrate data outside the perimeter**. AWS doesn't have a direct equivalent — VPC endpoints are weaker. I'd insist on VPC-SC perimeter from day 1."
+
+**BAA chain** (必谈):
+
+- Google ↔ Customer: GCP BAA (covers BigQuery, Vertex AI, Cloud Storage, KMS, Cloud Healthcare API, Cloud DLP)
+- Google ↔ Customer: Workspace BAA (Workspace Enterprise + HIPAA addendum required)
+- Customer ↔ Us (FDE / consulting firm): subcontractor BAA
+- **No third-party LLM** allowed unless their BAA covers PHI processing. Gemini grounding through Vertex AI = covered.
+
+### Phase 3: Architecture overview (6 min)
+
+```
+                Customer Google Cloud Org (HIPAA-enabled folder)
+                VPC-SC perimeter around: BigQuery + Vertex AI + GCS + KMS + Healthcare API
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Source-of-truth tier                                                             │    │
+│   │  ─ Epic EHR ─→ Cloud Healthcare API (FHIR R4 store) ─→ BigQuery (notes, meds, ICD)│    │
+│   │                hourly CDC via Healthcare API → BigQuery streaming insert          │    │
+│   │  ─ Older paper records → Document AI OCR → BigQuery (with confidence score)       │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Ingestion pipeline (Cloud Run jobs + Cloud Composer for orchestration)            │    │
+│   │                                                                                    │    │
+│   │  [1] BigQuery → read clinical notes (incremental by note_id watermark)            │    │
+│   │  [2] Cloud DLP: PHI detection (medical infoTypes) + de-identification              │    │
+│   │      ─ Direct identifiers (MRN, NPI, DEA): replaced with surrogate tokens         │    │
+│   │      ─ Quasi-identifiers (zip+DOB+rare ICD): k-anonymity check, < 5 → quarantine  │    │
+│   │      ─ Redaction map → encrypted with CMEK, stored in BigQuery `phi_map` table    │    │
+│   │  [3] Section-aware chunking (SOAP boundaries respected) → ~3 chunks per note      │    │
+│   │      20M notes × 3 chunks = 60M chunks                                            │    │
+│   │  [4] Vertex AI Search datastore: import chunks via Discovery Engine API           │    │
+│   │      ─ Vertex AI Search auto-embeds (text-embedding-005, Google internal)         │    │
+│   │      ─ Auto-indexes (hybrid: dense + sparse)                                      │    │
+│   │      ─ Auto-reranks (semantic ranker built-in)                                    │    │
+│   │  [5] BigQuery `notes_meta` table: doc_id, patient_id, encounter_id, dept,         │    │
+│   │      note_date, ACL (allowed_provider_ids), redaction_hash                        │    │
+│   │  [6] Audit emit: `ingest.complete{doc_id, sha256, ts, dlp_version}` → BigQuery    │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Query path (Doctor uses Gmail / Docs side panel — Workspace Add-on)              │    │
+│   │                                                                                    │    │
+│   │  [Workspace OAuth (SSO)] → Cloud Run agent backend                                 │    │
+│   │     ▼                                                                              │    │
+│   │  [Q1] ACL resolve: SELECT patient_ids FROM care_team WHERE provider_id = $1       │    │
+│   │       (BigQuery query, 50ms)                                                      │    │
+│   │  [Q2] Intent classifier (Gemini 3 Flash, 80ms):                                   │    │
+│   │       ─ single-patient narrative → RAG path                                       │    │
+│   │       ─ cross-patient structured → BigQuery analytical path (Phase 2)             │    │
+│   │       ─ drug interaction → BigQuery + drug interaction matrix (Phase 2)           │    │
+│   │  [Q3] [RAG path]: Vertex AI Search query w/ filter `patient_id IN (acl_list)`     │    │
+│   │       returns top-10 chunks with relevance scores                                 │    │
+│   │  [Q4] Gemini 3 Pro with grounding: passes top-10 chunks as grounded context       │    │
+│   │       ─ Gemini auto-cites each claim with chunk_id                                │    │
+│   │       ─ Returns grounding confidence per claim (0.0-1.0)                          │    │
+│   │  [Q5] Confidence filter: claims with confidence < 0.7 marked "unverified",        │    │
+│   │       UI shows raw chunk to doctor                                                │    │
+│   │  [Q6] Audit emit: `query.complete{doctor, patient_ids, doc_ids, ts, latency,      │    │
+│   │       grounding_confidence_avg}` → BigQuery `audit.llm_calls`                     │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Workspace Add-on (Gmail / Docs side panel)                                        │    │
+│   │  ─ Built with CardService (Workspace Add-ons SDK)                                  │    │
+│   │  ─ Doctor SSO already done                                                         │    │
+│   │  ─ Patient context: pull from current Doc/Gmail thread (if doctor is in EMR ref)  │    │
+│   │  ─ Query box → backend → grounded answer with inline citations + confidence       │    │
+│   │  ─ "Show source" click: opens chunk in modal, scrolls to highlighted span         │    │
+│   │  ─ "Confirm action" pattern: for any actionable suggestion, doctor must click     │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+│   ┌───────────────────────────────────────────────────────────────────────────────────┐    │
+│   │  Audit + observability                                                             │    │
+│   │  ─ Cloud Audit Logs (Admin + Data Access enabled) → exported to BigQuery          │    │
+│   │  ─ Per-call LLM audit → BigQuery `audit.llm_calls` (6yr retention)                │    │
+│   │  ─ Looker Studio dashboard: queries/day, latency p50/p99, grounding confidence    │    │
+│   │  ─ Alerts: PHI in LLM output (defense in depth) → PagerDuty                       │    │
+│   └───────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                            │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+
+   Outside VPC-SC perimeter (control plane only, no PHI):
+   ─ Terraform state in our GCS bucket (no data refs, just IaC)
+   ─ Eval golden set (synthetic only, no real PHI)
+   ─ Customer support tunnel: IAP (Identity-Aware Proxy) with session recording
+```
+
+### Phase 4: Ingestion deep dive (8 min)
+
+**Step 4.1 — BigQuery is the source-of-truth (already there)**
+
+The customer already loaded 20M notes into BigQuery — **don't move them**. BigQuery is HIPAA-covered + already cost-paid + already has CMEK. Read from BigQuery, **don't dual-store**.
+
+Schema assumption:
+```sql
+clinical_notes (
+  note_id STRING,
+  patient_id STRING,        -- internal MRN
+  encounter_id STRING,
+  provider_id STRING,       -- authoring physician
+  department STRING,        -- "cardiology", "ED", ...
+  note_date TIMESTAMP,
+  note_type STRING,         -- "progress_note", "discharge_summary", ...
+  note_text STRING,         -- raw SOAP text
+  source_system STRING,     -- "epic", "ocr_paper", "dictated"
+  language_code STRING      -- "en", "es"
+)
+```
+
+20M rows × ~3KB avg = ~60GB raw text in BigQuery. Cheap.
+
+**Step 4.2 — Cloud DLP for PHI redaction**
+
+Why DLP instead of self-host Presidio:
+- Native Google service, HIPAA-aligned (in BAA)
+- Built-in medical infoTypes: `US_HEALTHCARE_NPI`, `US_DEA_NUMBER`, `MEDICAL_RECORD_NUMBER`, `US_SOCIAL_SECURITY_NUMBER`
+- Built-in Safe Harbor deidentification templates
+- Async processing: BigQuery → DLP `inspectContent` API → de-identified output back to BigQuery
+- ~$1.50 per 1GB inspected → 60GB × $1.50 = **$90 for full backfill**. Negligible.
+
+DLP de-identification config (Python):
+
+```python
+# DLP inspectTemplate for medical PHI
+deidentify_config = {
+    "info_type_transformations": {
+        "transformations": [
+            {
+                "info_types": [
+                    {"name": "US_HEALTHCARE_NPI"},
+                    {"name": "MEDICAL_RECORD_NUMBER"},
+                    {"name": "US_DEA_NUMBER"},
+                    {"name": "PERSON_NAME"},
+                    {"name": "DATE_OF_BIRTH"},
+                    {"name": "US_SOCIAL_SECURITY_NUMBER"},
+                    {"name": "STREET_ADDRESS"},
+                    {"name": "PHONE_NUMBER"},
+                    {"name": "EMAIL_ADDRESS"},
+                ],
+                "primitive_transformation": {
+                    "crypto_deterministic_config": {
+                        "crypto_key": {"kms_wrapped": kms_wrapped_key},
+                        "surrogate_info_type": {"name": "PHI_TOKEN"}
+                    }
+                }
+            }
+        ]
+    }
+}
+```
+
+**Why crypto-deterministic surrogate**: same MRN → same surrogate. Allows cross-note linking ("patient X has 5 notes") **without storing real MRN downstream**. Reversible only via KMS-wrapped key, which requires break-glass approval.
+
+**Custom medical NER on top**: DLP misses some implicit PHI — rare diagnosis + provider name in note signature. Add a **MedSpacy + custom BERT** layer on top of DLP for residual scan (5% of notes flagged for human review).
+
+**k-anonymity check**: for any note where (zip5 + DOB + rare_ICD) appears as a combo, query BigQuery to count k. If k < 5, route to quarantine (not indexed) and notify privacy officer.
+
+**Step 4.3 — Chunking + Vertex AI Search ingestion**
+
+Section-aware chunking (NOT fixed 512 tokens):
+
+```python
+def chunk_clinical_note(note_text, note_type):
+    if note_type == "progress_note":
+        # Parse SOAP sections
+        sections = parse_soap(note_text)  # [(Subjective, ...), (Objective, ...), ...]
+        chunks = []
+        for section_name, section_text in sections:
+            if len(section_text) < 200:
+                # short section, keep as single chunk
+                chunks.append({"text": f"[{section_name}] {section_text}", ...})
+            else:
+                # long section, sub-chunk on sentence boundary, max 512 tokens
+                chunks.extend(sentence_chunk(section_text, max_tokens=512, prefix=section_name))
+        return chunks
+    elif note_type == "discharge_summary":
+        # different structure (Diagnoses, Procedures, Medications, Follow-up)
+        ...
+```
+
+Why section-aware: doctor query "what's the treatment plan" must hit the Plan section, not Subjective. Fixed chunking tears the SOAP semantic.
+
+**Vertex AI Search ingestion** (the Google-native part):
+
+```python
+from google.cloud import discoveryengine_v1 as discoveryengine
+
+# Create a datastore (one-time)
+datastore = discoveryengine.DataStore(
+    display_name="clinical_notes_cardiology",
+    industry_vertical="HEALTHCARE",  # specific vertical for medical tuning
+    solution_types=[discoveryengine.SolutionType.SOLUTION_TYPE_SEARCH],
+    content_config="CONTENT_REQUIRED",  # we ingest documents not just metadata
+)
+
+# Import chunks
+documents = [
+    {
+        "id": chunk_id,
+        "structData": {
+            "patient_id": redacted_pid,  # surrogate from DLP
+            "encounter_id": eid,
+            "provider_ids_allowed": acl_list,  # care team
+            "note_date": ts,
+            "department": "cardiology",
+            "section": "Plan",
+            "note_type": "progress_note",
+        },
+        "content": {
+            "mimeType": "text/plain",
+            "rawText": chunk_text,
+        }
+    }
+    for chunk in chunks
+]
+# Bulk import via Cloud Storage
+import_documents_request = ImportDocumentsRequest(
+    parent=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}/branches/default_branch",
+    gcs_source=GcsSource(input_uris=["gs://clinical-notes-import/cardiology-*.jsonl"]),
+    reconciliation_mode=ReconciliationMode.INCREMENTAL,  # CDC-friendly
+)
+```
+
+**Vertex AI Search handles everything**:
+- Auto-embedding (text-embedding-005, internal to Google, never leaves VPC-SC)
+- Auto-indexing (dense + sparse hybrid)
+- Auto-reranking (semantic ranker)
+- ACL via `structData` filters at query time
+
+**Why this is the "FDE answer"**: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting OpenSearch = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.
+
+**Throughput**:
+- Backfill 60M chunks: Discovery Engine bulk import handles ~10K docs/sec → 60M / 10K = 6000s = ~2 hours per dept (cardiology subset ~3M chunks = 5 min)
+- Delta: hourly CDC from Cloud Healthcare API → 100-500 new chunks/hour → streaming insert
+
+### Phase 5: Query path deep dive (10 min)
+
+**Q1. ACL resolve (50ms)**:
+
+```sql
+-- BigQuery query, doctor's allowed patients
+SELECT patient_id 
+FROM care_team 
+WHERE provider_id = @doctor_id AND active = TRUE
+UNION ALL
+SELECT patient_id 
+FROM department_assignments 
+WHERE department_id IN (
+  SELECT department_id FROM provider_departments WHERE provider_id = @doctor_id
+) AND assignment_type = 'attending'
+```
+
+For cardiology with 50 doctors × avg 200 patients = 10K rows. Cached in Memorystore Redis with 5-min TTL.
+
+**Edge case — break-glass**: if doctor's role includes "ED_attending" or "ICU_attending", expand ACL to ALL_PATIENTS but flag query with `break_glass=true`. Mandatory post-action audit.
+
+**Q2. Intent classifier (80ms)**:
+
+Use **Gemini 3 Flash** ($0.50/$3 per 1M tokens) — cheap, fast. Classifies into:
+
+```
+{
+  "intent": "patient_history_narrative" | "cross_patient_analytics" | "drug_interaction" | "clinical_decision",
+  "patient_context": "explicit" | "implicit_from_workspace_context",
+  "needs_actionable_confirmation": true | false
+}
+```
+
+Why Flash not Pro: classification is simple, Flash is 6× cheaper, 3× faster. **Cost math**: 25M queries/year × 200 input tokens × $0.50/1M = **$2.5K/year**. Negligible.
+
+**Q3. Vertex AI Search retrieve (200ms)**:
+
+```python
+from google.cloud.discoveryengine_v1 import SearchServiceClient
+
+search_request = SearchRequest(
+    serving_config=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}/servingConfigs/default_search",
+    query="medication history for hypertension",
+    filter=f"patient_id: ANY({','.join([f'"{p}"' for p in allowed_patients])})",
+    page_size=10,
+    content_search_spec={
+        "snippet_spec": {"return_snippet": True, "max_snippet_count": 3},
+        "summary_spec": {"summary_result_count": 5},
+        "extractive_content_spec": {"max_extractive_answer_count": 5},
+    },
+    spell_correction_spec={"mode": "AUTO"},
+    query_expansion_spec={"condition": "AUTO"},
+)
+
+response = client.search(search_request)
+top_chunks = [r.document for r in response.results[:10]]
+```
+
+**Note ACL is a FILTER (pre-filter)** — Vertex AI Search applies the filter at retrieval time. doctor never "sees" docs they can't access. HIPAA "minimum necessary" satisfied.
+
+**Q4. Gemini 3 Pro grounded generation (2000ms)**:
+
+This is **the Google differentiator**:
+
+```python
+from google.cloud import aiplatform
+from vertexai.preview.generative_models import GenerativeModel, grounding
+
+model = GenerativeModel("gemini-3-pro")
+
+# Build grounded context from Vertex AI Search results
+grounding_source = grounding.VertexAISearch(
+    datastore=f"projects/{PROJECT}/locations/global/dataStores/{DATASTORE_ID}",
+)
+
+response = model.generate_content(
+    contents=[
+        f"You are a clinical assistant. Answer based ONLY on the patient's records.\n\n"
+        f"Patient query: {doctor_query}\n\n"
+        f"Be concise. Cite every claim with [chunk_id]. If uncertain, say so."
+    ],
+    tools=[grounding.GroundingTool(vertex_ai_search=grounding_source)],
+    generation_config={
+        "temperature": 0.0,  # deterministic for clinical
+        "max_output_tokens": 512,
+    },
+)
+
+# Gemini returns grounded response with attribution
+answer = response.text
+attribution = response.candidates[0].grounding_metadata
+# Each grounding chunk: {chunk_id, confidence, source_uri}
+```
+
+**Why grounding > prompt-engineered citation**:
+- Gemini grounding is **API-level** — Google's own model is trained to attribute. Compare: prompt-engineered Claude/GPT citation rates are 70-85%, Gemini grounding ~90%+.
+- Grounding returns **confidence per chunk per claim**. Easy threshold logic.
+- Source URI returned — UI can deep-link to BigQuery row.
+
+**Cost math** for generation:
+- avg query: 4K input tokens (top-10 chunks of 400 tokens each) + 500 output tokens
+- Gemini 3 Pro: $2/M in + $12/M out → per query = 4000 × $2/1M + 500 × $12/1M = $0.008 + $0.006 = **$0.014/query**
+- 5K doctors × 20 queries/day × 250 work days = 25M/year
+- Annual: 25M × $0.014 = **$350K/year** for full network
+- For 90-day MVP (cardiology 50 doctors): 50 × 20 × 90 = 90K queries × $0.014 = **$1.3K** total. Cheap.
+
+**Q5. Confidence filter + fallback**:
+
+```python
+LOW_CONFIDENCE_THRESHOLD = 0.7
+
+for claim, chunks in zip(parse_claims(answer), attribution.grounding_chunks):
+    avg_conf = mean(c.confidence for c in chunks)
+    if avg_conf < LOW_CONFIDENCE_THRESHOLD:
+        # Mark this claim as unverified in UI
+        # Show raw chunk text to doctor instead of LLM paraphrase
+        ui_render.mark_unverified(claim, raw_chunks=chunks)
+```
+
+**Fallback mode for low overall confidence**: if avg grounding confidence < 0.5, **don't generate at all**. Show top-5 chunks raw, let doctor read. **Goal: 0 hallucinated medical content**.
+
+**Q6. Audit emit (20ms async)**:
+
+```python
+audit_row = {
+    "query_id": str(uuid.uuid4()),
+    "doctor_id": authn.user_id,
+    "doctor_workspace_email": authn.email,
+    "patient_ids_accessed": list(allowed_patients & actually_used),
+    "doc_ids_used": [c.id for c in top_chunks],
+    "query_text_sha256": hash(query),  # never log raw query (may contain PHI)
+    "intent": intent.classification,
+    "grounding_confidence_avg": avg_conf,
+    "latency_ms": elapsed_ms,
+    "model_version": "gemini-3-pro-2026-01",
+    "vertex_ai_search_datastore": DATASTORE_ID,
+    "ts": datetime.utcnow().isoformat(),
+    "break_glass": break_glass_flag,
+}
+# Async insert to BigQuery audit.llm_calls (partitioned by ts)
+bq_client.insert_rows_json("audit.llm_calls", [audit_row])
+```
+
+Partition `audit.llm_calls` by date, time-travel retention 7 days (BigQuery built-in) + export daily snapshot to GCS Object Lock for 6yr retention (HIPAA) + 10yr (JCAHO).
+
+### Phase 6: Cross-patient analytics path (Phase 2, 6 min)
+
+> "The 'drug interaction across my patients' question is **NOT RAG**. Let me explain why this matters."
+
+**Why not RAG for this**:
+- "Which of my patients have drug interactions?" requires reasoning over the **structured medication list** of EACH patient, not the narrative note.
+- 20M notes ≠ 20M patients. ~50K patients × 5 active meds each = 250K medication facts. **Tiny dataset**.
+- Drug interaction checking is **deterministic lookup** against a drug interaction matrix (DrugBank, FDA Orange Book, Lexicomp). Not LLM territory.
+
+**Right path**:
+
+```sql
+-- BigQuery analytical query
+WITH active_meds AS (
+  SELECT 
+    p.patient_id,
+    m.medication_rxnorm_code,
+    m.dose,
+    m.start_date,
+    m.end_date
+  FROM medications m
+  JOIN care_team p ON m.patient_id = p.patient_id
+  WHERE p.provider_id = @doctor_id
+    AND p.active = TRUE
+    AND m.status = 'active'
+    AND (m.end_date IS NULL OR m.end_date > CURRENT_DATE())
+),
+pairs AS (
+  SELECT 
+    a.patient_id,
+    a.medication_rxnorm_code AS med_a,
+    b.medication_rxnorm_code AS med_b
+  FROM active_meds a
+  JOIN active_meds b ON a.patient_id = b.patient_id AND a.medication_rxnorm_code < b.medication_rxnorm_code
+)
+SELECT 
+  p.patient_id,
+  p.med_a,
+  p.med_b,
+  d.severity,
+  d.mechanism,
+  d.recommended_action
+FROM pairs p
+JOIN drug_interactions d 
+  ON p.med_a = d.med_a_rxnorm AND p.med_b = d.med_b_rxnorm
+WHERE d.severity IN ('major', 'contraindicated')
+ORDER BY 
+  CASE d.severity WHEN 'contraindicated' THEN 1 WHEN 'major' THEN 2 END;
+```
+
+**Then Gemini wraps the result** as natural language summary:
+
+> "Doctor, you have **3 patients with major drug interactions**:
+> - **Patient #PHI_TOKEN_4f7a**: warfarin + amiodarone — INR risk. [view labs]
+> - **Patient #PHI_TOKEN_8c2b**: metformin + iohexol (recent CT) — lactic acidosis risk. [hold metformin guideline]
+> - **Patient #PHI_TOKEN_1d9e**: clopidogrel + omeprazole — reduced antiplatelet effect. [alt PPI suggested]"
+
+**Hybrid: structured query + LLM summarization**. Citations point to BigQuery row IDs, not RAG chunks.
+
+**Why this is FDE-level thinking**: 90% of candidates would shoehorn drug interaction into RAG ("retrieve all medication mentions"). The right answer is: **different data type → different code path**. Don't force RAG when SQL is cleaner.
+
+### Phase 7: Audit + observability (5 min)
+
+**Audit log = the product** for HIPAA / JCAHO.
+
+**Three tiers of audit**:
+
+1. **Cloud Audit Logs (infrastructure)**:
+   - **Admin Activity logs**: who changed IAM policy on Vertex AI Search datastore
+   - **Data Access logs** ⚠️ **必须显式开** (Google default OFF for cost):
+     ```hcl
+     resource "google_project_iam_audit_config" "phi" {
+       project = var.project_id
+       service = "bigquery.googleapis.com"
+       audit_log_config {
+         log_type = "DATA_READ"
+       }
+       audit_log_config {
+         log_type = "DATA_WRITE"
+       }
+     }
+     ```
+     This logs every BigQuery row read — critical for HIPAA "minimum necessary" demonstration.
+   - **System Event logs**: GCP-initiated system actions
+
+2. **Application audit (per-LLM-call)**:
+   - BigQuery `audit.llm_calls` table (partitioned daily)
+   - Every query / retrieval / generation logged with grounding confidence + latency + doctor + patients
+   - Schema designed so OCR auditor can query: "show me all PHI accesses by doctor X in date range Y"
+
+3. **UI audit (doctor interactions)**:
+   - Every "view source", "confirm action" click logged to BigQuery `audit.ui_events`
+   - Demonstrates doctor-in-the-loop pattern for OCR
+
+**Retention**:
+- BigQuery time-travel: 7 days (default)
+- Daily snapshot → GCS Object Lock bucket: **6 years** (HIPAA) + retention extended to **10 years** for JCAHO
+- GCS Object Lock = WORM (Write Once Read Many), immutable, even Google admin can't delete
+
+**Looker Studio dashboard** (CMIO daily view):
+- Queries/day per department
+- Latency p50/p99
+- Grounding confidence distribution (alert if < 0.8 trend)
+- Top patient_ids accessed (anomaly detection — doctor accessing unrelated patients?)
+- Break-glass invocations / day
+
+### Phase 8: 90-day phased MVP plan (8 min)
+
+> "I want to push back on the implicit scope of '20M notes + all questions + go-live in 90 days'. Here's my phased plan."
+
+**Phase 1 (Week 1-4): Cardiology dept only, single-patient Q&A**
+- 50 doctors, ~10K patients, ~3M chunks
+- Vertex AI Search datastore for cardiology
+- Cloud DLP redaction for cardiology subset
+- Workspace Add-on (Gmail side panel, simple version)
+- Grounded Gemini 3 Pro generation
+- Cloud Audit Logs Data Access tier ON
+- Daily standups with cardiology dept director (internal champion)
+- **Mid-phase checkpoint**: end of week 2, 10-doctor private alpha + golden set eval (50 Q/A)
+
+**Phase 2 (Week 5-8): Department expansion + golden set growth**
+- Add Internal Medicine + Family Medicine (2 more depts)
+- ~150 doctors total
+- Expand Vertex AI Search datastore
+- Onboarding playbook: 1 dept = 1 week (data subset import + ACL config + UAT)
+- Doctor confirmation pattern hardened (UI for "I read this, I trust it")
+- Mid-phase: nDCG@10 ≥ 0.75 validated on 200 Q/A golden set across 3 depts
+
+**Phase 3 (Week 9-13): JCAHO prep + go-live**
+- Audit log mock review with internal Compliance
+- Penetration test (Bishop Fox or NCC Group)
+- HIPAA risk assessment (qualified consultant)
+- Workspace Add-on final UX (with confidence indicators + "view source" + "confirm action")
+- Soft launch: 3 depts × 150 doctors
+- **Day 90**: JCAHO accreditation visit demo
+
+**Cross-patient analytics (drug interactions)**: **Phase 4 (Month 4-6)**, not in 90-day MVP. Reason: requires drug interaction matrix licensing (Lexicomp ~$50K/year), additional structured BigQuery schema, additional UX patterns.
+
+**The push back**:
+
+> "If you insist on full 20M + all 4 intents in 90 days: I'm going to **honestly tell you we'll fail the JCAHO visit**. We'll either ship a broken cross-patient query that hallucinates drug interactions (worse than nothing — patient harm), or we'll ship a feature that no doctor uses because Workspace Add-on UX is unfinished. **Phase 1 (1 dept, single-patient, Workspace Add-on, audit-ready) is a real product on day 90, and Phase 2-3 follow with high confidence**."
+
+### Phase 9: Trade-offs + close (6 min)
+
+**Decision 9.1 — Vertex AI Search vs self-host OpenSearch / Vespa**:
+
+| 维度 | Vertex AI Search | Self-host OpenSearch on GKE |
+|---|---|---|
+| Build time (MVP) | 1-2 weeks | 4-6 weeks |
+| HIPAA BAA | Yes (Google native) | Need to add to BAA chain |
+| Hybrid search | Built-in | Need to configure |
+| Reranking | Built-in semantic ranker | Need separate cross-encoder service |
+| Grounding compatibility | Native with Gemini | Wrap manually |
+| Cost (20M chunks) | ~$2K/month | ~$3K/month (compute) + ops |
+| Customization | Limited (Google opinion) | Full |
+| Operational | Zero | Team of 2-3 |
+
+**My choice**: **Vertex AI Search**. The customization limit (e.g. can't fine-tune ranker) is a real cost, but 90-day MVP needs speed. Phase 4+ we can evaluate Vespa if ranking quality plateaus.
+
+**Decision 9.2 — Gemini 3 Pro vs Gemini 3 Flash routing**:
+
+| Intent | Model | Reason |
+|---|---|---|
+| Intent classification | Flash | Simple, cheap, 6× lower cost |
+| Single-patient narrative Q&A | Pro | Quality matters, citation matters |
+| Document summarization | Flash | Easier task, 4× cheaper |
+| Cross-patient analytics summary | Pro | Complex reasoning over SQL result |
+| Drug interaction explanation | Pro | Clinical reasoning, safety critical |
+
+**Routing logic in Cloud Run**: 1-line `if intent in ["classification", "summarization"]: model = Flash`. Saves ~$200K/year at full scale.
+
+**Decision 9.3 — Workspace Add-on vs standalone web app**:
+
+- Workspace Add-on **wins** because:
+  - Doctor already SSO'd
+  - In-context (patient ref in current Doc / Gmail thread)
+  - Workspace admin governance applies (audit visibility, MFA enforcement)
+  - Zero new URL to remember
+- Drawbacks: limited UI capabilities (CardService SDK is restrictive). For complex visualizations (drug interaction graph), might need a "Open in fullscreen" → web app fallback. **Plan for that in Phase 2**.
+
+**Decision 9.4 — Phase 1 = 1 dept vs all depts thin slice**:
+
+I chose **1 dept full-stack** over **all depts thin slice** because:
+- Cardiology has bounded vocabulary (ICD codes, medications, procedures) → golden set easier to build
+- Internal champion (1 dept director) is easier to source than 5
+- ACL complexity in 1 dept is manageable
+- 1 dept failure = bounded blast radius for any issue
+- Multi-dept rollout starts in Phase 2 with playbook learned from Phase 1
+
+---
+
+## Gao Xin 简历专属 reframe + STAR
+
+这道题映射你简历 4 个项目:
+
+### STAR: BNPL Chatbot (TikTok PayLater)
+
+**Situation**: TikTok PayLater 在 7 个市场跑, 每个市场 BNPL 客服 SLA 不同, 当时 70% query 转人工.
+
+**Task**: 设计 RAG-based 客服 chatbot, 在 7 个市场上线, 在 OJK / BACEN 等不同监管下 audit pass.
+
+**Action**:
+- 用 hybrid retrieval (BM25 + dense embedding) over BNPL Q&A 库 + 实时用户账户 (active loan, missed payment) 结构化数据
+- Citation 模式: 每个 claim 必须 link 到 KB doc id 或 user DB row
+- ACL pre-filter: user 只能看自己 records, agent service account 不能跨 user 读
+- Audit log immutable: 每次 chatbot interaction 写到 Indonesia local data center 满足 OJK data residency
+
+**Result**: 上线 6 个月内 67% query 自助解决, OJK audit 一次过, 0 PII leakage incident.
+
+**面试桥段** (说给 Google FDE):
+> "我做 TikTok PayLater 的 BNPL chatbot 时, RAG 架构跟这道题 70% 重叠 — hybrid retrieval, ACL pre-filter, citation enforcement, immutable audit. 30% 增量是 (a) HIPAA 比 OJK / BACEN 多了 PHI redaction at ingest, (b) 医疗 hallucination 是 patient harm 不是 financial loss, 容忍度低 5×, (c) Google ecosystem 把这些都做成 managed services (DLP, Vertex AI Search, grounding), 我会重写 30% 用 Google primitives 替代我之前自己装的 stack. 我去之前会做 4 周 HIPAA + Google Cloud Healthcare API training."
+
+### STAR: ConvFinQA multi-hop reasoning
+
+**Situation**: ConvFinQA 是金融 multi-hop QA benchmark, 复杂 query 需要 cross-document 推理.
+
+**Task**: ablation 哪些组件 (retrieval / rerank / model) 对 accuracy 影响最大.
+
+**Action**: 系统性 ablation — fix 2 components, vary 1, log accuracy. 发现 reranker > model size > retrieval recall.
+
+**Result**: 把 ablation methodology 写成 internal playbook, 后续团队复用.
+
+**桥段**:
+> "ConvFinQA multi-hop 经验直接套到 cross-patient drug interaction. 多 hop = '我所有患者 → 每个的 active meds → med pair → 查 interaction table → 重 rank 出 high severity'. 我会拆 4 hops, 每 hop 独立测 + Vertex AI evaluation framework."
+
+### STAR: Internal Agent Platform onboarding
+
+**Situation**: 字节内部 Agent Platform 接入 50+ 服务, 每个服务 tool spec 不同.
+
+**Task**: 设计 MCP-like 抽象, 让新服务 1 周内接入.
+
+**Action**: 定义 canonical tool schema, 写 connector template, 每个服务 owner 填模板. 接入工作流 7 天闭环.
+
+**Result**: 接入速度从 4 周 → 7 天, 平均.
+
+**桥段**:
+> "Workspace Add-on 接 Vertex AI / Gemini / BigQuery / Cloud Healthcare API = 4 个 tool. 套我已有的 MCP-style connector 模板, 1 周内全部接通."
+
+### STAR: Voice agent 7 markets (vLLM/SGLang)
+
+**Situation**: 字节 voice agent 在 7 个市场上线, 多语种 (英语 / 中文 / 印尼语 / 西语 / 葡语 / 阿语), 延迟敏感 (< 800ms p99).
+
+**Task**: 自部署 LLM (vLLM + SGLang) 优化吞吐 + 延迟.
+
+**Action**: PagedAttention + continuous batching + 模型 INT8 量化 + 路由层根据 query 复杂度选 model.
+
+**Result**: 单卡 throughput 3× 提升, p99 latency 降 40%.
+
+**桥段**:
+> "Gemini 3 Pro vs Flash 路由这道题, 我做过同类工作 — 字节 voice agent 多语种多复杂度, 路由层根据 query complexity (token count + intent classifier) 选 model. 同套思路套到 Gemini Pro/Flash, 70% query 走 Flash 省 6× cost."
+
+### Other resume hooks
+
+- **Indonesia refund tier (OJK audit pass)**: HIPAA audit + JCAHO 10-year retention 跟 OJK immutable + data residency 同结构, 直接套.
+- **TikTok PayLater 7 markets multi-tenant**: hospital network 5 entity (acquired) 跟 7 market 多 tenant 同模式.
+
+---
+
+## 5 个 Follow-ups
+
+### Q1: "假设 customer IT 不允许打开 Data Access audit logs (担心 storage cost), 怎么办?"
+
+**A**: 这是 HIPAA 命门, 不能让步:
+
+> "Data Access logs is **non-negotiable** for HIPAA — OCR auditor 第一件事就是问 'show me every PHI read'. 不开 = audit fail. Cost concern is real but manageable:
+>
+> 1. **Estimate cost**: BigQuery query logs ~$0.50/GB. 25M queries/year × 2KB/log = 50GB → **$25/year**. Negligible.
+> 2. **Mitigation**: 只对 BigQuery (PHI 数据库) 开 Data Access, GCS / KMS 已经通过 Admin Activity logs 覆盖核心操作. 不需要全部开.
+> 3. **Retention tiering**: hot in BigQuery 90 天, 然后导出 GCS Coldline (~$0.004/GB-month) 存 6-10 年. 6 年累计 ~$50.
+> 4. **Push back**: 我会直接对 CIO / CMIO 说 'opening Data Access logs is $50 over 6 years vs the cost of one HIPAA violation ($50K-$1.5M civil + criminal possible). I'm not comfortable shipping without this — it's also internal audit best practice.'
+>
+> 如果 still no go, I escalate. HIPAA 不能省."
+
+### Q2: "Vertex AI Search 的 ranking 不够好, 心脏科医生抱怨经常 miss 重要 trial notes — 怎么改?"
+
+**A**: 多管齐下:
+
+> "几个 lever:
+>
+> 1. **Domain tuning**: Vertex AI Search 支持 'industry_vertical=HEALTHCARE' 模板, 可能没 fully tuned 心脏科. 用 Vertex AI Search **Tuning** (custom dataset, 100-500 labeled queries) fine-tune 公司 datastore.
+> 2. **Boost rules**: 在 search request 里加 `boost_spec` — 同 patient 最新 30 天 notes boost 1.5×, attending 自己写的 boost 1.2×.
+> 3. **Hybrid weighting**: 默认 hybrid 50/50 dense/sparse, 心脏科多 keyword (drug name, ICD), 调到 30/70 给 sparse 更高权重.
+> 4. **Custom embedding**: 如果 ranking 仍然差, 考虑用 Vertex AI **MatchingEngine** (more control) 替代 Search, self-host PubMedBERT-medical 做 embedding. Trade-off: 多 4 周工作量 + 多团队维护. 我会先试 1-3, 不行才 4.
+> 5. **Reranker stack**: Vertex AI Search 的 reranker 是 generic. 接 a custom cross-encoder (medical fine-tune) 在 Vertex AI Search 输出之上再 rerank. 多 100ms latency 换 +0.05 nDCG."
+
+### Q3: "如果 OCR 来 audit, 你怎么 demo audit trail?"
+
+**A**: 这是 FDE 加分:
+
+> "Live demo, 我会准备 4 个 query scenarios:
+>
+> 1. **'show me every PHI access by doctor Dr. Smith in March 2026'**:
+>    ```sql
+>    SELECT * FROM `audit.llm_calls` 
+>    WHERE doctor_id = 'dr_smith' 
+>      AND ts BETWEEN '2026-03-01' AND '2026-04-01'
+>    ORDER BY ts;
+>    ```
+>    展示每个 query 的 patient_ids, doc_ids, grounding confidence, model_version.
+>
+> 2. **'reconstruct what the LLM saw for query Q-12345'**: 用 stored `doc_ids` + `query_text_sha256` (with break-glass key reverse), 完整 replay LLM input. **Important: 我们 store hash 不 store query** — query 本身可能含 PHI. Hash + break-glass replay 是平衡.
+>
+> 3. **'show break-glass events with justification'**: ED 医生在凌晨 3 点访问 ICU 病人, 强制弹 justification 输入 (text), 一并 log.
+>
+> 4. **'prove minimum necessary'**: 给一个 doctor + patient 例子, 用 BigQuery 跑 `WHERE patient_id NOT IN (SELECT patient_id FROM care_team WHERE provider_id = X) AND doctor_id = X`, 返回 0 行 = 没有越权访问.
+>
+> 加分: Looker Studio dashboard 永远在 CMIO 桌面, OCR 来了直接 walk through."
+
+### Q4: "Workspace Add-on 限制太多, doctor 想看 drug interaction graph 怎么做?"
+
+**A**: Workspace Add-on (CardService) 不支持复杂 viz, 选项:
+
+> "两条路:
+>
+> 1. **Workspace Add-on 显示 summary, 'Open Full View' 按钮跳转 web app** (内嵌 IAP). Web app 用 D3.js / Vis-network 画 drug interaction graph. Doctor 在 Workspace 看快速 answer, 复杂 viz 跳出去看. **Cost**: 多一个 Cloud Run service.
+>
+> 2. **Workspace Add-on 嵌入 iframe to Apps Script web app** — Apps Script 可以 host HTML/JS. 局限是 Apps Script 不能跑重计算. Compute backend 仍在 Cloud Run, frontend 嵌入 Add-on.
+>
+> 我推荐 **Option 1**, IAP 保护, 跟 Add-on 共用 SSO. Drug interaction graph 是 Phase 2 feature, 同时 ship web app."
+
+### Q5: "你怎么 measure 这个系统 actually helping doctors, not just shipped?"
+
+**A**: 这是 FDE-vs-engineer 区别 — measure outcome:
+
+> "5 个 metric 分 3 层:
+>
+> **Leading (week-month)**:
+> - **Activation rate**: % onboarded doctors who used in week 1. Target 60%.
+> - **DAU/MAU**: stickiness. Target 30%.
+> - **Avg queries per doctor per week**: Target 10+. Below 3 = not finding value.
+>
+> **Mid-term (month-quarter)**:
+> - **Time saved per chart review** (proxy): self-reported survey + Workspace event log (doctor goes from Gmail to EMR in N seconds, with/without assistant). Target 20-30% reduction.
+> - **Citation click rate**: doctors actually checking sources. Low = blind trust (concerning) or no trust at all (concerning).
+> - **Confirm-action rate**: doctors confirming AI suggestions vs ignoring. Target 60%+ confirm.
+>
+> **Lagging (6-12 month)**:
+> - **Medication errors caught per 1K doctors per month**: matched against incident reports.
+> - **Doctor NPS**: quarterly survey.
+> - **Chart review time clinical study**: RCT — half cardiology with assistant, half without. Measure note completion time, error rate.
+>
+> **Counter-metrics (must not move bad)**:
+> - **Audit log size unusual spike** (someone abusing access)
+> - **Grounding confidence trending down** (data quality degrading)
+> - **Doctor friction reports** (latency, wrong answers)
+>
+> 我会在 90-day MVP **必须 instrument 5+ leading metrics** in week 1, 才能在 day 90 retrospective 给 CMIO / Board 真实 ROI 数字."
+
+---
+
+## ❌ 死路答法 (top 7)
+
+1. **冲 "I'd use OpenAI embeddings + Pinecone"** — 直接挂. 不是 Google native, 不在客户 BAA.
+2. **不用 Vertex AI Search, 自己装 OpenSearch on GKE** — 重复造轮子, 90 天做不完.
+3. **Citation 用 prompt "Always cite sources"** — 不用 Gemini grounding API = 暴露不懂 Gemini.
+4. **PHI redaction 用自托管 Presidio** — 不加分, 应该用 Cloud DLP.
+5. **接受 90 天做 20M + 全部 intent** — 不 push back = 失败.
+6. **建独立 web app** — 客户已在 Workspace, 必须 Workspace Add-on.
+7. **把 drug interaction 当 RAG 答** — 应该 BigQuery SQL + drug interaction matrix.
+
+---
+
+## ✅ 加分项 (top 10)
+
+1. **第一句话提 Vertex AI Search + Gemini grounding** — signal "我懂 Google 差异化"
+2. **Cloud DLP with medical infoTypes** — 不是 self-host Presidio
+3. **VPC-SC perimeter** — Google 特有, 比 AWS VPC endpoint 高一层
+4. **Data Access audit logs 必须显式开** — 显示真用过 GCP HIPAA
+5. **Workspace Add-on as primary UX** — 整合客户 ecosystem
+6. **结构化 vs 非结构化分开** (drug interaction = SQL, history = RAG)
+7. **Gemini Pro/Flash 路由 by intent** — cost optimization 思维
+8. **G·O·O·D-F·T 10-question clarify** + 强 push back 90 days
+9. **Cloud Healthcare API as EHR bridge** — Google 原生 FHIR, 不要再自己搭
+10. **Audit 3 层 (Cloud Audit + app + UI events)** + 6-10 yr retention
+
+---
+
+## 一句话总结
+
+> **Google FDE 临床 Q&A = "Vertex AI Search + Gemini grounding + Workspace Add-on + Cloud DLP + BigQuery + VPC-SC + Cloud Audit Logs (Data Access tier) — 全 Google native"**.
+>
+> 关键判断: **不要自己装 vector DB**, **必须用 grounding API 不是 prompt-engineered citation**, **drug interaction 走 BigQuery SQL 不是 RAG**, **Workspace Add-on 是 UX 入口**, **90 天 = 1 dept 单 patient 史 Q&A 不是 20M 全量**.
+
+---
+
+## Cheat Sheet
+
+```
+Stack (全 Google native):
+  Source     : BigQuery (20M notes 已 在)
+  Bridge     : Cloud Healthcare API (FHIR R4)
+  PHI Redact : Cloud DLP (medical infoTypes)
+  OCR        : Document AI (老纸质记录)
+  Search     : Vertex AI Search (managed RAG)
+  LLM        : Gemini 3 Pro (grounded) + Flash (intent/sum)
+  UI         : Workspace Add-on (Gmail / Docs side panel)
+  Audit      : Cloud Audit Logs Data Access ON + BigQuery app audit
+  Sec        : VPC-SC + CMEK + IAP + Workforce Identity
+
+90-day phase:
+  Week 1-4  : Cardiology dept, single-patient Q&A
+  Week 5-8  : 3 depts, golden set 200 Q/A
+  Week 9-13 : JCAHO prep + go-live demo
+  Phase 4+  : Cross-patient (drug interaction) BigQuery SQL
+
+KPI 3 layer:
+  L1 Compliance: 0 PHI leak, 100% access logged, JCAHO pass
+  L2 Quality   : nDCG@10 ≥ 0.75, grounding confidence ≥ 0.8
+  L3 Adoption  : 60% activation, 10 queries/doctor/week
+
+G·O·O·D-F·T Clarify 10 Q:
+  G - Goal: which intent? what success metric?
+  O - Owners: buyer = CMIO? funder? champion?
+  O - Obstacles: existing Epic AI? Workspace Ent + HIPAA?
+  D - Data: how into BigQuery? freshness? language?
+  F - Failure: worst-case patient harm mitigation?
+  T - Timeline: why 90 days (JCAHO)?  what next?
+
+死路:
+  - OpenAI embeddings (PHI leak)
+  - Self-host OpenSearch (重复造)
+  - Prompt citation (不用 grounding)
+  - Self-host Presidio (不用 DLP)
+  - 接 90 天 20M (不 push back)
+  - 独立 web app (不用 Add-on)
+  - Drug interaction 走 RAG (应走 SQL)
+
+加分:
+  - Vertex AI Search + Gemini grounding 第一句
+  - Cloud DLP + medical infoTypes
+  - VPC-SC perimeter (Google 特有)
+  - Data Access logs 显式开
+  - Workspace Add-on UX
+  - 结构化 vs 非结构化分开
+  - Pro/Flash 路由
+  - 3 层 audit + 6-10yr retention
+
+Cost (full 5K doctors):
+  Vertex AI Search: ~$2K/month
+  Gemini 3 Pro    : ~$350K/year (25M queries)
+  Gemini 3 Flash  : ~$2.5K/year (intent + sum)
+  Cloud DLP       : ~$90 one-time backfill + ~$50/month delta
+  BigQuery        : ~$5K/year storage + queries
+  Cloud Audit     : ~$50 over 6 years
+  Workspace Add-on: $0 (Workspace included)
+  Total           : ~$400K/year ≈ $80/doctor/year
+
+Latency (3s p50):
+  Auth + ACL    : 50ms
+  Intent class  : 80ms (Flash)
+  Vertex Search : 200ms
+  Gemini Pro gen: 2000ms
+  Conf filter   : 100ms
+  Audit emit    : 20ms async
+  Buffer        : 550ms
+
+Key phrases:
+  "Vertex AI Search handles chunking + embedding + rerank in one service"
+  "Gemini grounding is API-level, not prompt-engineered"
+  "Cloud DLP has US_HEALTHCARE_NPI + MEDICAL_RECORD_NUMBER"
+  "VPC-SC perimeter is Google-specific, stronger than AWS VPC endpoints"
+  "Drug interaction is BigQuery SQL not RAG"
+  "Workspace Add-on, not new web app — doctor SSO already"
+  "Phase 1: 1 dept, single-patient, JCAHO-ready"
+  "Data Access audit logs must be ON, default OFF — $50/6yr"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -41,6 +41,8 @@
     <h2>我的思路与解法</h2>
     <h3>Q02 · 端到端负责过的、技术上最有挑战的项目</h3>
 <blockquote><p>"Tell me about a technically challenging project you owned end-to-end. Walk me through the architecture decisions, what was hardest, and what you'd do differently."</p></blockquote>
+<p><strong>中文翻译</strong>:</p>
+<blockquote><p>"讲一个你端到端负责过的、技术上最有挑战的项目. 跟我过一遍你的架构决策, 哪里最难, 如果重做你会怎么改."</p></blockquote>
 <p><strong>Round</strong>: Behavioral / Technical Behavioral (30-45 min, 通常是 hiring manager round 中段) <strong>出处</strong>: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Databricks / Scale AI 高频. 类似变体: "tell me about a complex system you built" / "what's the hardest engineering problem you've solved"</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
@@ -64,7 +66,7 @@
 <hr />
 <h3>完美答案架构 (Layered Response)</h3>
 <p>这道题需要 ~5 分钟 monologue + follow-up. 8 段结构:</p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Context (1 句锁定项目)</strong></td><td>15s</td><td>What, scope, why mattered</td><td>"I led the voice agent debt collection system across 7 markets..."</td></tr><tr><td>2</td><td><strong>Why challenging (specific)</strong></td><td>30s</td><td>列 3 个具体技术挑战, 不是泛泛</td><td>"Three hard problems: multi-language ASR fallback, financial-figure hallucination, per-market compliance..."</td></tr><tr><td>3</td><td><strong>My ownership 边界</strong></td><td>15s</td><td>你 own 什么 vs 团队 own 什么</td><td>"I owned scoping, architecture, modeling pipeline, deployment, on-call. Team supported on ops integration and TTS voice cloning."</td></tr><tr><td>4</td><td><strong>Architecture decision 1 (deep)</strong></td><td>60s</td><td>选 1 个 hardest decision, 讲 trade-off</td><td>"Hardest decision was ASR fallback architecture. Three options: single vendor / parallel call / cascade..."</td></tr><tr><td>5</td><td><strong>Architecture decision 2 (deep)</strong></td><td>60s</td><td>另一个 decision, contrast 不同 type</td><td>"Second hard decision was hallucination reduction. Options: prompt-only / RAG / SFT / DPO..."</td></tr><tr><td>6</td><td><strong>Failure / pivot moment (vulnerability)</strong></td><td>45s</td><td>一个你 wrong call + 怎么改</td><td>"I initially scoped multi-market as 'translate prompts per language' — turned out wrong because debt communication culture differs..."</td></tr><tr><td>7</td><td><strong>Outcome (quantified)</strong></td><td>30s</td><td>数字 + business + technical</td><td>"7 markets in 6 months, Indonesia CER 18 → 25%, financial hallucination 4% → 0.3%..."</td></tr><tr><td>8</td><td><strong>What I'd do differently</strong></td><td>30s</td><td>Forward-looking learning</td><td>"I'd front-load cultural review and start with 2-market deep before going wide..."</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td><strong>Context (一句锁定项目)</strong></td><td>15s</td><td>What, scope, why mattered</td><td>"I led the voice agent debt collection system across 7 markets..."</td></tr><tr><td>2</td><td><strong>Why challenging (难在哪)</strong></td><td>30s</td><td>列 3 个具体技术挑战, 不是泛泛</td><td>"Three hard problems: multi-language ASR fallback, financial-figure hallucination, per-market compliance..."</td></tr><tr><td>3</td><td><strong>My ownership 边界 (你 own 什么)</strong></td><td>15s</td><td>你 own 什么 vs 团队 own 什么</td><td>"I owned scoping, architecture, modeling pipeline, deployment, on-call. Team supported on ops integration and TTS voice cloning."</td></tr><tr><td>4</td><td><strong>Architecture decision 1 (架构决策一)</strong></td><td>60s</td><td>选 1 个 hardest decision, 讲 trade-off</td><td>"Hardest decision was ASR fallback architecture. Three options: single vendor / parallel call / cascade..."</td></tr><tr><td>5</td><td><strong>Architecture decision 2 (架构决策二)</strong></td><td>60s</td><td>另一个 decision, contrast 不同 type</td><td>"Second hard decision was hallucination reduction. Options: prompt-only / RAG / SFT / DPO..."</td></tr><tr><td>6</td><td><strong>Failure / pivot moment (失败 / 转向时刻)</strong></td><td>45s</td><td>一个你 wrong call + 怎么改</td><td>"I initially scoped multi-market as 'translate prompts per language' — turned out wrong because debt communication culture differs..."</td></tr><tr><td>7</td><td><strong>Outcome (量化结果)</strong></td><td>30s</td><td>数字 + business + technical</td><td>"7 markets in 6 months, Indonesia CER 18 → 25%, financial hallucination 4% → 0.3%..."</td></tr><tr><td>8</td><td><strong>What I'd do differently (重做会怎么改)</strong></td><td>30s</td><td>Forward-looking learning</td><td>"I'd front-load cultural review and start with 2-market deep before going wide..."</td></tr></tbody></table></div>
 <p>Total: ~5 分钟 + interviewer follow up. 严格不超过 6 分钟.</p>
 <hr />
 <h3>详细回答 (Sample Monologue) — 可以照背</h3>
@@ -292,6 +294,10 @@ Time budget:
 
 > "Tell me about a technically challenging project you owned end-to-end. Walk me through the architecture decisions, what was hardest, and what you'd do differently."
 
+**中文翻译**:
+
+> "讲一个你端到端负责过的、技术上最有挑战的项目. 跟我过一遍你的架构决策, 哪里最难, 如果重做你会怎么改."
+
 **Round**: Behavioral / Technical Behavioral (30-45 min, 通常是 hiring manager round 中段)
 **出处**: Exponent 2026 FDE Guide · 公司: OpenAI / Anthropic / Palantir / Databricks / Scale AI 高频. 类似变体: "tell me about a complex system you built" / "what's the hardest engineering problem you've solved"
 
@@ -392,14 +398,14 @@ Time budget:
 
 | # | 层 | 时间 | 这层该说什么 | 开口句 |
 |---|---|---|---|---|
-| 1 | **Context (1 句锁定项目)** | 15s | What, scope, why mattered | "I led the voice agent debt collection system across 7 markets..." |
-| 2 | **Why challenging (specific)** | 30s | 列 3 个具体技术挑战, 不是泛泛 | "Three hard problems: multi-language ASR fallback, financial-figure hallucination, per-market compliance..." |
-| 3 | **My ownership 边界** | 15s | 你 own 什么 vs 团队 own 什么 | "I owned scoping, architecture, modeling pipeline, deployment, on-call. Team supported on ops integration and TTS voice cloning." |
-| 4 | **Architecture decision 1 (deep)** | 60s | 选 1 个 hardest decision, 讲 trade-off | "Hardest decision was ASR fallback architecture. Three options: single vendor / parallel call / cascade..." |
-| 5 | **Architecture decision 2 (deep)** | 60s | 另一个 decision, contrast 不同 type | "Second hard decision was hallucination reduction. Options: prompt-only / RAG / SFT / DPO..." |
-| 6 | **Failure / pivot moment (vulnerability)** | 45s | 一个你 wrong call + 怎么改 | "I initially scoped multi-market as 'translate prompts per language' — turned out wrong because debt communication culture differs..." |
-| 7 | **Outcome (quantified)** | 30s | 数字 + business + technical | "7 markets in 6 months, Indonesia CER 18 → 25%, financial hallucination 4% → 0.3%..." |
-| 8 | **What I'd do differently** | 30s | Forward-looking learning | "I'd front-load cultural review and start with 2-market deep before going wide..." |
+| 1 | **Context (一句锁定项目)** | 15s | What, scope, why mattered | "I led the voice agent debt collection system across 7 markets..." |
+| 2 | **Why challenging (难在哪)** | 30s | 列 3 个具体技术挑战, 不是泛泛 | "Three hard problems: multi-language ASR fallback, financial-figure hallucination, per-market compliance..." |
+| 3 | **My ownership 边界 (你 own 什么)** | 15s | 你 own 什么 vs 团队 own 什么 | "I owned scoping, architecture, modeling pipeline, deployment, on-call. Team supported on ops integration and TTS voice cloning." |
+| 4 | **Architecture decision 1 (架构决策一)** | 60s | 选 1 个 hardest decision, 讲 trade-off | "Hardest decision was ASR fallback architecture. Three options: single vendor / parallel call / cascade..." |
+| 5 | **Architecture decision 2 (架构决策二)** | 60s | 另一个 decision, contrast 不同 type | "Second hard decision was hallucination reduction. Options: prompt-only / RAG / SFT / DPO..." |
+| 6 | **Failure / pivot moment (失败 / 转向时刻)** | 45s | 一个你 wrong call + 怎么改 | "I initially scoped multi-market as 'translate prompts per language' — turned out wrong because debt communication culture differs..." |
+| 7 | **Outcome (量化结果)** | 30s | 数字 + business + technical | "7 markets in 6 months, Indonesia CER 18 → 25%, financial hallucination 4% → 0.3%..." |
+| 8 | **What I'd do differently (重做会怎么改)** | 30s | Forward-looking learning | "I'd front-load cultural review and start with 2-market deep before going wide..." |
 
 Total: ~5 分钟 + interviewer follow up. 严格不超过 6 分钟.
 
