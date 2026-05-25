@@ -418,12 +418,14 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         data_companies = "|".join(company_list)
         data_deep = "1" if is_deep else "0"
         data_algo = esc(algo_tag) if algo_tag else ""
+        # Hellointerview "Recent and Popular" rank (lower = better). 99999 = unranked.
+        data_pop = q.get("popularityRank") or 99999
         # Encode recency as a single comparable integer: year*1000 + month*10 + phase.
         # `most_recent` is the max-across-companies, already chosen above.
         rec_key = _recency_key(most_recent or "")
         data_recency = rec_key[0] * 1000 + rec_key[1] * 10 + rec_key[2]
         card = f"""
-<div class="q-card{' is-deep' if is_deep else ''}" data-type="{esc(qtype)}" data-companies="{esc(data_companies)}" data-deep="{data_deep}" data-algo="{data_algo}" data-reports="{total_reports}" data-recency="{data_recency}" data-title="{esc(q['title']).lower()}">
+<div class="q-card{' is-deep' if is_deep else ''}" data-type="{esc(qtype)}" data-companies="{esc(data_companies)}" data-deep="{data_deep}" data-algo="{data_algo}" data-reports="{total_reports}" data-recency="{data_recency}" data-popularity="{data_pop}" data-title="{esc(q['title']).lower()}">
   <a class="q-title" href="{href}">{esc(q['title'])}</a>
   <div class="q-tags">
     <span class="{tag_class(qtype)}">{esc(qtype)}</span>
@@ -471,9 +473,11 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
     for tag, count in algo_counts.most_common():
         algo_tabs.append(f'<button data-afilter="{esc(tag)}">{esc(tag)} ({count})</button>')
 
-    # Sort buttons
+    # Sort buttons — "Recent and Popular" matches hellointerview's default ranking
+    # (combines recency + popularity), so it's the new default.
     sort_tabs = [
-        '<button class="active" data-sort="recency">🕒 最近问询</button>',
+        '<button class="active" data-sort="popularity">🔥 Recent & Popular</button>',
+        '<button data-sort="recency">🕒 最近问询</button>',
         '<button data-sort="reports">📋 报告频次</button>',
         '<button data-sort="title">🔤 字母</button>',
     ]
@@ -544,7 +548,7 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
 </main>
 
 <script>
-const state = {{ cfilter: 'all', tfilter: 'all', dfilter: 'all', afilter: 'all', sort: 'recency' }};
+const state = {{ cfilter: 'all', tfilter: 'all', dfilter: 'all', afilter: 'all', sort: 'popularity' }};
 function applyFilters() {{
   document.querySelectorAll('.q-card').forEach(card => {{
     const companies = (card.dataset.companies || '').split('|');
@@ -559,6 +563,16 @@ function applySort() {{
   const grid = document.getElementById('q-grid');
   const cards = Array.from(grid.children);
   cards.sort((a, b) => {{
+    if (state.sort === 'popularity') {{
+      // Hellointerview's "Recent and Popular" — lower rank = better.
+      // Unranked (non-Coding / non-Google) cards get rank 99999, push to bottom.
+      const pa = Number(a.dataset.popularity || 99999), pb = Number(b.dataset.popularity || 99999);
+      if (pa !== pb) return pa - pb;
+      // tie-break: more reports first, then recency
+      const ra = Number(a.dataset.reports || 0), rb = Number(b.dataset.reports || 0);
+      if (rb !== ra) return rb - ra;
+      return Number(b.dataset.recency || 0) - Number(a.dataset.recency || 0);
+    }}
     if (state.sort === 'reports') {{
       const da = Number(a.dataset.reports || 0), db = Number(b.dataset.reports || 0);
       if (db !== da) return db - da;
@@ -575,6 +589,8 @@ function applySort() {{
   }});
   cards.forEach(c => grid.appendChild(c));
 }}
+// Apply default sort on page load (popularity)
+applySort();
 document.querySelectorAll('button[data-cfilter]').forEach(btn => {{
   btn.addEventListener('click', () => {{
     document.querySelectorAll('button[data-cfilter]').forEach(b => b.classList.remove('active'));

@@ -79,6 +79,12 @@ def main():
             # Carry top-level algorithm/data-structure tag if any source provides it
             if q.get("algoTag"):
                 entry["algoTag"] = q["algoTag"]
+            # Carry popularityRank (hellointerview's "Recent and Popular" position)
+            if q.get("popularityRank"):
+                # Keep the lowest rank (= most popular) if multiple sources contribute
+                cur = entry.get("popularityRank")
+                if cur is None or q["popularityRank"] < cur:
+                    entry["popularityRank"] = q["popularityRank"]
         print(f"  merged {company}: {len(items)} questions")
 
     items = list(merged.values())
