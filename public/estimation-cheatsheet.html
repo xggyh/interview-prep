@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📐 估算 / Napkin Math · 系统设计题速查</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; max-width: 980px; margin: 0 auto; padding: 16px 20px 80px; line-height: 1.65; color: #1f2328; background: #fafbfc; }
+header { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
+header h1 { margin: 0 0 6px; font-size: 26px; }
+header .subtitle { font-size: 14px; opacity: 0.95; }
+header a { color: white; text-decoration: underline; }
+section { background: white; border: 1px solid #d0d7de; border-radius: 10px; padding: 18px 22px; margin-bottom: 18px; }
+section h2 { font-size: 18px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid #f59e0b; color: #1f2328; }
+section h3 { font-size: 15px; margin: 16px 0 8px; color: #57606a; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 13px; }
+th { background: #f6f8fa; padding: 8px 10px; text-align: left; border: 1px solid #d0d7de; font-weight: 600; }
+td { padding: 6px 10px; border: 1px solid #d0d7de; vertical-align: top; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+pre { background: #1f2937; color: #f3f4f6; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+.pattern { background: linear-gradient(135deg, #fff, #fffbeb); border: 1px solid #f59e0b; border-radius: 10px; padding: 18px 22px; margin-bottom: 16px; }
+.pattern h2 { color: #b45309; border-bottom: 2px solid #f59e0b; }
+.pattern .trigger { background: #fef3c7; padding: 6px 10px; border-radius: 4px; font-size: 13px; margin: 4px 0 10px; display: inline-block; }
+.formula { background: #1e3a8a; color: white; padding: 12px 16px; border-radius: 6px; margin: 8px 0; font-family: monospace; font-size: 13px; white-space: pre; overflow-x: auto; }
+.example { background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 8px 0; }
+.example strong { color: #065f46; }
+.trap { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 8px 0; }
+.trap strong { color: #991b1b; }
+.calc { background: #eff6ff; border: 2px solid #2563eb; border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
+.calc label { display: block; font-size: 13px; margin: 8px 0 2px; color: #1e3a8a; font-weight: 600; }
+.calc input, .calc select { width: 100%; padding: 6px 10px; border: 1px solid #93c5fd; border-radius: 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.calc .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.calc .result { background: #1e3a8a; color: white; padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 14px; line-height: 1.7; }
+.calc .result strong { color: #fde68a; }
+nav.toc { background: #f6f8fa; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+nav.toc a { display: inline-block; margin: 2px 8px 2px 0; padding: 2px 8px; background: white; border: 1px solid #d0d7de; border-radius: 4px; text-decoration: none; color: #1f2328; }
+nav.toc a:hover { background: #f59e0b; color: white; border-color: #f59e0b; }
+.mnemonic { background: #fef3c7; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-style: italic; color: #92400e; margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📐 估算 / Napkin Math · 系统设计题速查</h1>
+  <div class="subtitle">8 维度 + 5 触发词模式 + 单机天花板 + 2026 LLM 价格 + 交互 calculator · <a href="checklist-6day.html">← 回 6 天 checklist</a></div>
+</header>
+
+<nav class="toc">
+  <strong>跳转:</strong>
+  <a href="#calculator">🧮 LLM 成本计算器</a>
+  <a href="#dimensions">8 维度</a>
+  <a href="#machines">单机天花板</a>
+  <a href="#pricing">LLM 价格</a>
+  <a href="#latency">延迟参考</a>
+  <a href="#formulas">4 公式</a>
+  <a href="#p1">P1: 量级</a>
+  <a href="#p2">P2: 延迟</a>
+  <a href="#p3">P3: LLM</a>
+  <a href="#p4">P4: 自托管</a>
+  <a href="#p5">P5: 多 region</a>
+</nav>
+
+<!-- ================================================== -->
+<!-- INTERACTIVE CALCULATOR -->
+<!-- ================================================== -->
+<section class="calc" id="calculator">
+  <h2 style="border-color:#2563eb;color:#1e3a8a">🧮 LLM 成本计算器 (即时)</h2>
+  <div class="grid">
+    <div>
+      <label>Input tokens / 次</label>
+      <input type="number" id="in_tok" value="5000" min="0">
+    </div>
+    <div>
+      <label>Output tokens / 次</label>
+      <input type="number" id="out_tok" value="500" min="0">
+    </div>
+    <div>
+      <label>模型</label>
+      <select id="model">
+        <option value="2,12">Gemini 3 Pro ($2/$12)</option>
+        <option value="0.5,3" selected>Gemini 3 Flash ($0.50/$3)</option>
+        <option value="5,25">Claude Opus 4.7 ($5/$25)</option>
+        <option value="1.5,7.5">Claude Sonnet 4.6 ($1.5/$7.5)</option>
+        <option value="5,30">GPT-5.5 ($5/$30)</option>
+      </select>
+    </div>
+    <div>
+      <label>Cache hit rate (%)</label>
+      <input type="number" id="cache" value="0" min="0" max="100">
+    </div>
+    <div>
+      <label>Volume (次 / 天)</label>
+      <input type="number" id="vol" value="100000" min="0">
+    </div>
+    <div>
+      <label>Batch API 50% off?</label>
+      <select id="batch">
+        <option value="1">否 (real-time)</option>
+        <option value="0.5">是 (Batch -50%)</option>
+      </select>
+    </div>
+  </div>
+  <div class="result" id="result">Loading...</div>
+  <div style="margin-top:8px;font-size:12px;color:#57606a">💡 用法: 改任意输入, 结果实时更新. 面试时心算用 anchor 数字 (Pro $0.016/conv typical, Flash $0.0017/conv typical).</div>
+</section>
+
+<!-- ================================================== -->
+<!-- 8 DIMENSIONS -->
+<!-- ================================================== -->
+<section id="dimensions">
+  <h2>🎯 8 个维度 — 系统设计题必扫</h2>
+  <div class="mnemonic">口诀: <strong>TLC SMN CA</strong> — "T-L-C 必答, S-M-N 看场景, C-A 客户合同看"</div>
+  <table>
+    <tr><th>维度</th><th>单位</th><th>何时关键</th><th>忘了会被钉死</th></tr>
+    <tr><td><strong>T</strong>hroughput</td><td>QPS / TPS / msg/s</td><td>任何并发系统</td><td>单机撑不住但你没说</td></tr>
+    <tr><td><strong>L</strong>atency</td><td>p50/p95/p99 ms</td><td>用户交互系统</td><td>没拆 budget per hop</td></tr>
+    <tr><td><strong>C</strong>ost</td><td>$/req, $/月, $/用户</td><td>任何 LLM / 云方案</td><td>$/月算不出, 客户问就跪</td></tr>
+    <tr><td><strong>S</strong>torage</td><td>GB / TB</td><td>大数据 / RAG</td><td>5000 万 doc 多少 TB 心里没数</td></tr>
+    <tr><td><strong>M</strong>emory</td><td>RAM GB</td><td>缓存 / 向量库</td><td>装不进单机才发现</td></tr>
+    <tr><td><strong>N</strong>etwork</td><td>GB/月 egress</td><td>跨 region / LLM 输出</td><td>出口费比 LLM 还贵</td></tr>
+    <tr><td><strong>C</strong>oncurrency</td><td>在 flight 数</td><td>DB pool / GPU batch</td><td>连接池被打爆</td></tr>
+    <tr><td><strong>A</strong>vailability</td><td>9's (99.9 / 99.99)</td><td>F500 客户合同</td><td>SLA 算不通</td></tr>
+  </table>
+</section>
+
+<!-- ================================================== -->
+<!-- SINGLE MACHINE LIMITS -->
+<!-- ================================================== -->
+<section id="machines">
+  <h2>🖥️ 单机天花板 (2026)</h2>
+  <p style="font-size:13px;color:#57606a">面试现场背这一张表 — "单机能撑 X" 是 scale up vs out 的分界线.</p>
+  <table>
+    <tr><th>系统</th><th>单机 QPS</th><th>内存 / 存储</th><th>注</th></tr>
+    <tr><td><strong>Redis</strong></td><td class="num">100K</td><td>64GB RAM, ~30M keys × 1KB</td><td>cluster 才能继续 scale</td></tr>
+    <tr><td><strong>Postgres</strong></td><td class="num">5-10K read / 1-5K write</td><td>1-10TB disk</td><td>再大要 partition / 分库</td></tr>
+    <tr><td><strong>MySQL</strong></td><td class="num">类似 Postgres</td><td>同上</td><td>InnoDB 同量级</td></tr>
+    <tr><td><strong>MongoDB</strong></td><td class="num">类似 Postgres</td><td>同上</td><td>sharding 早做</td></tr>
+    <tr><td><strong>Elasticsearch / node</strong></td><td class="num">1-5K</td><td>64GB heap, 1TB 索引</td><td>OpenSearch 同量级</td></tr>
+    <tr><td><strong>Kafka broker</strong></td><td class="num">100K msg/s</td><td>10MB/s per partition</td><td>分区是核心限制</td></tr>
+    <tr><td><strong>OpenSearch ANN (HNSW)</strong></td><td class="num">1-10K</td><td>= N × dim × 4B</td><td>内存吃满</td></tr>
+    <tr><td><strong>FAISS IVF-PQ</strong></td><td class="num">1K</td><td>1B vector / TB RAM</td><td>PQ 压 30x, 自部署最便宜</td></tr>
+    <tr><td><strong>vLLM Llama 3 8B (H100)</strong></td><td class="num">5-10K tok/s decode</td><td>80GB VRAM</td><td>speculative decode 再 ×2</td></tr>
+    <tr><td><strong>vLLM Llama 3 70B (2×H100)</strong></td><td class="num">1-2K tok/s decode</td><td>160GB VRAM</td><td>self-host 性价比甜点</td></tr>
+    <tr><td><strong>HTTP API server (Go/Rust)</strong></td><td class="num">50-100K</td><td>—</td><td>Node/Python ~10K</td></tr>
+    <tr><td><strong>HTTP API server (Python sync)</strong></td><td class="num">2-5K</td><td>—</td><td>async (FastAPI) 10-20K</td></tr>
+  </table>
+</section>
+
+<!-- ================================================== -->
+<!-- LLM PRICING -->
+<!-- ================================================== -->
+<section id="pricing">
+  <h2>💵 2026 LLM 价格 (per 1M tokens)</h2>
+  <table>
+    <tr><th>Model</th><th>Input $</th><th>Output $</th><th>备注</th></tr>
+    <tr><td><strong>Gemini 3 Pro</strong></td><td class="num">$2</td><td class="num">$12</td><td>2M context, 全能 frontier</td></tr>
+    <tr><td><strong>Gemini 3 Flash</strong></td><td class="num">$0.50</td><td class="num">$3</td><td>4x 便宜, 90% task 够</td></tr>
+    <tr><td><strong>Claude Opus 4.7</strong></td><td class="num">$5</td><td class="num">$25</td><td>长文 / reasoning 最强</td></tr>
+    <tr><td><strong>Claude Sonnet 4.6</strong></td><td class="num">$1.50</td><td class="num">$7.50</td><td>性价比之王</td></tr>
+    <tr><td><strong>GPT-5.5</strong></td><td class="num">$5</td><td class="num">$30</td><td>OpenAI 旗舰</td></tr>
+    <tr><td><strong>OpenAI text-embedding-3-small</strong></td><td class="num">$0.02</td><td>—</td><td>1M tokens ≈ 1500 docs (1K word each)</td></tr>
+    <tr><td><strong>OpenAI text-embedding-3-large</strong></td><td class="num">$0.13</td><td>—</td><td>3072 dim, quality 高</td></tr>
+    <tr><td><strong>Self-host Llama 3 70B</strong></td><td class="num">~$3 / 1M (24/7)</td><td>同</td><td>H100 $5/hr × 利用率</td></tr>
+  </table>
+
+  <h3>💡 省钱 knobs (面试主动提)</h3>
+  <table>
+    <tr><th>Knob</th><th>省 %</th><th>代价</th></tr>
+    <tr><td>OpenAI / Anthropic Batch API</td><td class="num">-50%</td><td>异步 24h 返回, 不能 real-time</td></tr>
+    <tr><td>Anthropic prompt caching</td><td class="num">-90% (cached input)</td><td>首次 +25%, 5min TTL</td></tr>
+    <tr><td>Gemini explicit cache</td><td class="num">-50% (cached)</td><td>API 主动管理</td></tr>
+    <tr><td>OpenAI auto prompt caching</td><td class="num">-50% (cached)</td><td>自动, 1024+ token prefix</td></tr>
+    <tr><td>Flash 替 Pro (90% task ok)</td><td class="num">-75%</td><td>3-5% accuracy 跌</td></tr>
+    <tr><td>Self-host Llama (大 volume)</td><td class="num">-80-90%</td><td>需 > 1B tok/月 + 24/7 才划算</td></tr>
+    <tr><td>Enterprise discount (大客户)</td><td class="num">-20-40%</td><td>谈判, 一般 > $50K/月 起谈</td></tr>
+  </table>
+</section>
+
+<!-- ================================================== -->
+<!-- LATENCY REFERENCE -->
+<!-- ================================================== -->
+<section id="latency">
+  <h2>⏱️ Latency 参考 (设计时按 10x 量级分桶)</h2>
+  <div class="mnemonic">心法: <strong>0.1ms → 1ms → 10ms → 100ms → 1s</strong> — 每跳一个量级</div>
+  <table>
+    <tr><th>操作</th><th>典型 latency</th></tr>
+    <tr><td>内存 hash lookup</td><td class="num">0.1ms</td></tr>
+    <tr><td>Redis GET (local)</td><td class="num">0.5-1ms</td></tr>
+    <tr><td>Redis GET (over network)</td><td class="num">1-2ms</td></tr>
+    <tr><td>DB 单行 PK 查 (有索引)</td><td class="num">1-5ms</td></tr>
+    <tr><td>Network RTT 同 region</td><td class="num">1-2ms</td></tr>
+    <tr><td>DB join (索引好, 千行)</td><td class="num">10-50ms</td></tr>
+    <tr><td>Vector search ANN (10M vec)</td><td class="num">10-100ms</td></tr>
+    <tr><td>Embedding 单次 (OpenAI API)</td><td class="num">50ms</td></tr>
+    <tr><td>Network RTT 跨 region</td><td class="num">50-100ms</td></tr>
+    <tr><td>Network RTT 跨大洲</td><td class="num">100-200ms</td></tr>
+    <tr><td><strong>LLM Flash 200 out tok</strong></td><td class="num">300ms</td></tr>
+    <tr><td><strong>LLM Pro 500 out tok</strong></td><td class="num">800ms-2s</td></tr>
+    <tr><td><strong>LLM Pro 2M context (10K out)</strong></td><td class="num">8-15s</td></tr>
+    <tr><td>S3 GetObject (1MB)</td><td class="num">30-100ms</td></tr>
+    <tr><td>HTTPS 握手 (cold)</td><td class="num">50-200ms</td></tr>
+  </table>
+</section>
+
+<!-- ================================================== -->
+<!-- 4 FORMULAS -->
+<!-- ================================================== -->
+<section id="formulas">
+  <h2>📐 4 个必背公式</h2>
+
+  <h3>1. LLM 月成本</h3>
+  <div class="formula">$/conv = (in_tok × $in + out_tok × $out) / 1,000,000
+$/月   = $/conv × conv_per_day × 30</div>
+  <div class="example"><strong>例</strong>: 客服 agent, 5K in + 500 out, Gemini Pro<br>
+  $/conv = (5000×2 + 500×12) / 1M = $0.016<br>
+  1M conv/月 → $16K/月</div>
+
+  <h3>2. 向量库内存</h3>
+  <div class="formula">RAM (GB) = N × dim × 4 (float32) / 1024³
+PQ 压缩后 ≈ 上面 / 30</div>
+  <div class="example"><strong>例</strong>: 5000 万 doc × 1024 dim<br>
+  Float32: 200GB · PQ 压缩后: ~7GB · 单机 64GB instance 装得下 (留 headroom)</div>
+
+  <h3>3. 并发 (Little's Law) — 算 DB pool / GPU batch</h3>
+  <div class="formula">in_flight = QPS × latency (秒)</div>
+  <div class="example"><strong>例</strong>: 1000 QPS × 0.2s p95 = 200 在 flight<br>
+  DB pool size = 200 × 1.25 buffer = 250 connections</div>
+
+  <h3>4. Storage 月成本</h3>
+  <div class="formula">$/月 = GB × $0.023 (S3 standard)
+       OR  GB × $0.004 (S3 Glacier)
+   + egress: GB out × $0.09 (AWS to internet)
+            GB cross-region × $0.02</div>
+</section>
+
+<!-- ================================================== -->
+<!-- PATTERN 1 -->
+<!-- ================================================== -->
+<section class="pattern" id="p1">
+  <h2>📦 P1 · 听到「几百万 / 上亿用户 / N 个文档」→ Storage + Memory</h2>
+  <div class="trigger">Trigger: 用户量 / 文档数 / 记录数 / 行数 / 历史 N 年数据</div>
+
+  <h3>① 你必须先澄清的 3 件事</h3>
+  <ol>
+    <li><strong>数据类型</strong>: 文本 / PDF / 图片 / 视频 (单位大小差 10-100x)</li>
+    <li><strong>留存周期</strong>: 永久 vs 90 天 vs 7 年 (HIPAA / SOX 要求 7+ 年)</li>
+    <li><strong>索引粒度</strong>: 整 doc 还是 chunk? chunk 数 = doc × 10-50, embedding 占大头</li>
+  </ol>
+
+  <h3>② 估算公式</h3>
+  <div class="formula">Total Storage = N × avg_size × replication × growth
+Memory (向量库) = N × dim × 4 bytes / 30 (PQ 压缩后)</div>
+
+  <h3>③ 必背 anchor 数字</h3>
+  <table>
+    <tr><th>单位</th><th>大小</th></tr>
+    <tr><td>1 个 PDF 病历</td><td>50-200KB (含 OCR text)</td></tr>
+    <tr><td>1 个 text chunk (512 tok)</td><td>~2KB</td></tr>
+    <tr><td>1 个 embedding (1024 dim float32)</td><td>4KB</td></tr>
+    <tr><td>1 个 embedding (PQ 压缩后)</td><td>96-128B</td></tr>
+    <tr><td>1 个 chunk 进 vector store</td><td>~6KB (text + embed + metadata)</td></tr>
+  </table>
+
+  <h3>④ 完整 worked example (Gao Xin 项目)</h3>
+  <div class="example">
+  <strong>5000 万医疗文档 HIPAA RAG (Q21)</strong><br>
+  <strong>Step 1 — Chunk 计算</strong>: 5000万 × 10 chunk/doc = 5 亿 chunks<br>
+  <strong>Step 2 — Storage 拆分</strong>:<br>
+  &nbsp;&nbsp;• Text (raw): 5亿 × 2KB = <strong>1TB</strong> (S3 = $23/月)<br>
+  &nbsp;&nbsp;• Embedding float32: 5亿 × 4KB = <strong>2TB</strong> (S3 = $46/月)<br>
+  &nbsp;&nbsp;• Embedding PQ 压缩: 5亿 × 100B = <strong>50GB</strong> (in-memory)<br>
+  &nbsp;&nbsp;• OpenSearch index 含 metadata: ~3-4TB<br>
+  <strong>Step 3 — Memory 实际能装</strong>: PQ 后 50GB → 单 64GB r6g.4xlarge 装下, 但生产留 3 节点 (HA + 增长)<br>
+  <strong>Step 4 — 月成本</strong>: OpenSearch m5.4xlarge × 3 = $3K/月 + S3 + cross-region replication ≈ <strong>$5K-10K/月 储存</strong>
+  </div>
+
+  <h3>⑤ 常见坑</h3>
+  <div class="trap">
+  <strong>Trap 1</strong>: 只算 raw byte, 忘了 metadata / index / WAL 倍数 (实际 ×1.5-2)<br>
+  <strong>Trap 2</strong>: 忘 replication factor (S3 默认 3 副本已含, 但 DB / ES 是额外的)<br>
+  <strong>Trap 3</strong>: 算了 storage 不算 memory (vector search 是 RAM-bound)<br>
+  <strong>Trap 4</strong>: 假设 chunk 数 = doc 数 (实际 10-50x)
+  </div>
+</section>
+
+<!-- ================================================== -->
+<!-- PATTERN 2 -->
+<!-- ================================================== -->
+<section class="pattern" id="p2">
+  <h2>⏱️ P2 · 听到「实时 / 低延迟 / sub-100ms」→ Latency Budget per Hop</h2>
+  <div class="trigger">Trigger: 实时 / 秒级 / sub-100ms / 低延迟 / interactive / real-time</div>
+
+  <h3>① 澄清 3 件事</h3>
+  <ol>
+    <li><strong>p50 vs p99</strong>? "100ms" 默认是 p50, p99 通常 ×3-5 (i.e., p99=300-500ms)</li>
+    <li><strong>端到端 vs 服务端 only</strong>? 端到端含网络 RTT, 服务端 only 是 server work</li>
+    <li><strong>网络 RTT</strong>? 同 region 1-2ms, 跨 region 50-100ms — 这是 fixed cost 必须先扣</li>
+  </ol>
+
+  <h3>② 估算流程 (5 步)</h3>
+  <div class="formula">1. 写下目标:    p99 = X ms (e.g., 100ms)
+2. 减 fixed cost:
+   - Client→LB:  5-20ms (depends on CDN/edge)
+   - LB→backend: 1-2ms
+   - Return:     5-20ms
+   ⇒ 业务可用 = X - 20-40ms
+3. 按 0.1/1/10/100ms 分桶, 每跳给 budget
+4. 加 cache: hit rate × cache_latency + miss × full_path
+5. p99 = (p99 of each step) sum, 不是 avg 相加</div>
+
+  <h3>③ 必背的 budget 模板</h3>
+  <table>
+    <tr><th>目标 p99</th><th>能做啥</th><th>不能做啥</th></tr>
+    <tr><td>10ms</td><td>cache lookup, in-memory hash</td><td>任何外部 call</td></tr>
+    <tr><td>100ms</td><td>cache + 1 DB call + 1 简单 logic</td><td>LLM, vector search 大库, 跨 region</td></tr>
+    <tr><td>500ms</td><td>+ LLM Flash 短答 + RAG 简单</td><td>Gemini Pro 长文, 复杂 agent</td></tr>
+    <tr><td>2s</td><td>+ LLM Pro + 完整 RAG</td><td>2M context, multi-step agent</td></tr>
+    <tr><td>10s+</td><td>+ 2M context, agent 5+ tool call</td><td>实时交互 (用户跑掉)</td></tr>
+  </table>
+
+  <h3>④ Worked example</h3>
+  <div class="example">
+  <strong>客户要 sub-100ms LLM 搜索 (Q28)</strong><br>
+  <strong>目标</strong>: p99 100ms 端到端<br>
+  <strong>Budget 拆解</strong>:<br>
+  &nbsp;&nbsp;• Client → server network: 20ms<br>
+  &nbsp;&nbsp;• 业务可用: 80ms<br>
+  &nbsp;&nbsp;• LLM call (Flash, 短答) 200ms+ ❌ 装不下!<br>
+  <strong>结论</strong>: 100ms 不能有 LLM 在 critical path<br>
+  <strong>方案</strong>:<br>
+  &nbsp;&nbsp;• 60% 走 cache (Redis, 5ms): 60% × 5 = 3ms<br>
+  &nbsp;&nbsp;• 30% 走 Flash 短答 (200ms): 但用户感知用 streaming first-token<br>
+  &nbsp;&nbsp;• 10% 走 Pro 完整 RAG (1s): 用户接受偶尔慢<br>
+  &nbsp;&nbsp;• Avg perceived first-token: 60×5 + 40×100 = ~43ms ✓
+  </div>
+
+  <h3>⑤ 常见坑</h3>
+  <div class="trap">
+  <strong>Trap 1</strong>: 心里只想 p50, 说 "100ms" 实际是 p50, 客户要 p99 立刻翻车<br>
+  <strong>Trap 2</strong>: 算了服务端忘了网络 (跨 region +50-100ms 是死局)<br>
+  <strong>Trap 3</strong>: Cascade 服务忘累加 (A → B → C, 每个 50ms = 150ms 不是 50ms)<br>
+  <strong>Trap 4</strong>: 算 happy path 忘 retry / timeout (失败 case latency ×2-3)
+  </div>
+</section>
+
+<!-- ================================================== -->
+<!-- PATTERN 3 -->
+<!-- ================================================== -->
+<section class="pattern" id="p3">
+  <h2>💰 P3 · 听到「LLM / RAG / 模型」→ $/conv × volume = $/月</h2>
+  <div class="trigger">Trigger: LLM / RAG / agent / GPT / Claude / Gemini / chatbot / assistant</div>
+
+  <h3>① 澄清 3 件事</h3>
+  <ol>
+    <li><strong>Input 长度</strong>: context size 大概多少 token? (FAQ: 500 / RAG: 5K / Long doc: 200K)</li>
+    <li><strong>Output 长度</strong>: 短答 (100) / 长生成 (5K)? 输出贵 6x</li>
+    <li><strong>Volume</strong>: 每天多少 conv / query?</li>
+  </ol>
+
+  <h3>② 估算公式</h3>
+  <div class="formula">$/conv = (in_tok × $in + out_tok × $out) / 1M
+$/月   = $/conv × conv/天 × 30
+
+省钱:
+  × (1 - cache_hit_rate × 0.5)   # auto cache 50% off
+  × 0.5 if batch_api
+  × 0.25 if Flash 替 Pro
+  × 0.1-0.2 if self-host (但要 break-even)</div>
+
+  <h3>③ 必背 anchor (per conversation)</h3>
+  <table>
+    <tr><th>场景</th><th>Input tok</th><th>Output tok</th><th>$/conv Pro</th><th>$/conv Flash</th></tr>
+    <tr><td>FAQ 单问答</td><td class="num">500</td><td class="num">100</td><td class="num">$0.0022</td><td class="num">$0.00055</td></tr>
+    <tr><td>RAG (5 chunk × 500)</td><td class="num">5K</td><td class="num">500</td><td class="num">$0.016</td><td class="num">$0.004</td></tr>
+    <tr><td>Multi-step agent</td><td class="num">30K</td><td class="num">2K</td><td class="num">$0.084</td><td class="num">$0.021</td></tr>
+    <tr><td>Long-doc 分析</td><td class="num">200K</td><td class="num">5K</td><td class="num">$0.46</td><td class="num">$0.115</td></tr>
+    <tr><td>2M context (律所 contract)</td><td class="num">1M</td><td class="num">10K</td><td class="num">$2.12</td><td class="num">$0.53</td></tr>
+  </table>
+
+  <h3>④ Worked example</h3>
+  <div class="example">
+  <strong>TikTok PayLater 客服 agent, 1M conv/月</strong><br>
+  <strong>Step 1</strong>: 单 conv = RAG, 5K in + 500 out<br>
+  <strong>Step 2</strong>: Gemini Pro list price = $0.016/conv → <strong>$16K/月</strong><br>
+  <strong>Step 3</strong>: 加 60% cache hit (热门 FAQ 重复): $16K × (1 - 0.6×0.5) = <strong>$11.2K/月</strong><br>
+  <strong>Step 4</strong>: 改 Gemini Flash (90% task ok): $11.2K × 0.25 = <strong>$2.8K/月</strong> ← <strong>省 83%</strong><br>
+  <strong>Step 5</strong>: 加 enterprise discount -30% (Google 大客户): <strong>$2K/月</strong> 落地<br>
+  <strong>面试 takeaway</strong>: 永远说 "list price $16K, 但经过 Flash + cache + enterprise 实际 $2K/月", 不要只报 list price.
+  </div>
+
+  <h3>⑤ 常见坑</h3>
+  <div class="trap">
+  <strong>Trap 1</strong>: 只算 input 忘 output (output 6x 贵, 输出 token 才是 cost 大头)<br>
+  <strong>Trap 2</strong>: 用 list price 不算 cache / batch (生产应该 30-60% cache hit)<br>
+  <strong>Trap 3</strong>: 忘 Embedding cost (RAG ingest 时一次性, 但 5亿 chunk × $0.02/1M = ~$1K-5K, 不小)<br>
+  <strong>Trap 4</strong>: 忘 retry tokens (failed call 还是消耗 token, 4-5% overhead)
+  </div>
+</section>
+
+<!-- ================================================== -->
+<!-- PATTERN 4 -->
+<!-- ================================================== -->
+<section class="pattern" id="p4">
+  <h2>🖥️ P4 · 听到「自托管 / on-prem」→ GPU 数 + Utilization Break-even</h2>
+  <div class="trigger">Trigger: self-host / 自托管 / on-prem / 不出 VPC / private / Llama / Mixtral / open weight</div>
+
+  <h3>① 澄清 3 件事</h3>
+  <ol>
+    <li><strong>实际 token/s 需求</strong>: peak / avg ratio? 业务 8h vs 24/7?</li>
+    <li><strong>Latency 要求</strong>: < 200ms 必须 self-host, > 500ms hosted 也行</li>
+    <li><strong>数据 sensitivity</strong>: 如果 hosted 走 BAA + zero retention 能签, 别自托管 (烧钱)</li>
+  </ol>
+
+  <h3>② 估算公式</h3>
+  <div class="formula">Throughput needed = QPS_peak × avg_output_tok (tok/s)
+GPU count = ceil(throughput / per_GPU_throughput / utilization)
+
+Break-even vs hosted:
+  self-host $/月 = GPU_count × $/hr × 24 × 30  +  ops_FTE × $20K/月
+  hosted $/月   = $/conv × volume
+  找交叉点
+
+经验:
+  < 100M tok/月  → hosted always win
+  100M-1B tok/月 → hosted 通常 win (除非 latency/data)
+  > 1B tok/月    → self-host win 5-10x (24/7 满载)
+  Utilization < 50% → self-host 永远输</div>
+
+  <h3>③ 必背 anchor</h3>
+  <table>
+    <tr><th>项</th><th>数字</th></tr>
+    <tr><td>H100 on AWS (on-demand)</td><td>~$5/hr</td></tr>
+    <tr><td>H100 on AWS (1-year reserved)</td><td>~$3/hr (-40%)</td></tr>
+    <tr><td>A100 80GB (on-demand)</td><td>~$3/hr</td></tr>
+    <tr><td>Llama 3 8B on H100 decode</td><td>5-10K tok/s</td></tr>
+    <tr><td>Llama 3 70B on 2×H100 decode</td><td>1-2K tok/s</td></tr>
+    <tr><td>Utilization target (production)</td><td>60-70% (留 headroom)</td></tr>
+    <tr><td>Ops FTE 全负载</td><td>$200-300K/年</td></tr>
+  </table>
+
+  <h3>④ Worked example</h3>
+  <div class="example">
+  <strong>F500 客户问: 1M conv/月 是否自托管 Llama 3 70B?</strong><br>
+  <strong>Step 1 — Throughput</strong>: 1M conv × 500 out tok = 500M tok/月. Peak 5x avg → ~2K tok/s peak<br>
+  <strong>Step 2 — GPU 数</strong>: 70B on 2×H100 = ~2K tok/s. <strong>1 instance (2 H100) 撑住 peak</strong>, 但单点风险 → 2 instances HA<br>
+  <strong>Step 3 — Self-host cost</strong>: 4 × H100 × $5/hr × 24 × 30 = $14.4K/月 + ops 0.5 FTE = $10K/月 = <strong>$24K/月</strong><br>
+  <strong>Step 4 — Hosted cost (对比)</strong>: 5K in + 500 out × $0.50/$3 (Flash) = $0.004/conv × 1M = <strong>$4K/月</strong><br>
+  <strong>结论</strong>: Hosted 便宜 6x ✓ <br>
+  <strong>啥时候反过来</strong>: 量增到 10M conv/月 = 5B tok/月, self-host $24K, hosted $40K — self-host 才赢. 量不到不要自托管.
+  </div>
+
+  <h3>⑤ 常见坑</h3>
+  <div class="trap">
+  <strong>Trap 1</strong>: 算单 GPU 单价没算 ops 成本 (实际 ops 2-3 FTE = $300-600K/年, 把 break-even 推远)<br>
+  <strong>Trap 2</strong>: 假设 24/7 满载 (实际业务 8h, utilization 33%, self-host idle 烧 2/3 钱)<br>
+  <strong>Trap 3</strong>: 忘 capacity buffer (peak 是 avg × 5-10x, 必须留 headroom)<br>
+  <strong>Trap 4</strong>: 用 list GPU 价没算 reserved instance (1y reserved -40%, 3y -60%)
+  </div>
+</section>
+
+<!-- ================================================== -->
+<!-- PATTERN 5 -->
+<!-- ================================================== -->
+<section class="pattern" id="p5">
+  <h2>🌍 P5 · 听到「多 region / F500 / SLA」→ Availability + Egress + DR Cost</h2>
+  <div class="trigger">Trigger: F500 / 多 region / 99.99 / SLA / DR / global / multi-AZ / disaster recovery</div>
+
+  <h3>① 澄清 3 件事</h3>
+  <ol>
+    <li><strong>SLA 几个 9</strong>? 99.9 vs 99.99 vs 99.999 down time 差 10-100x</li>
+    <li><strong>RTO / RPO 多少</strong>? RTO = 恢复时间, RPO = 数据丢失时间; F500 一般 RTO 5min RPO 0</li>
+    <li><strong>全球分布</strong>: 几个 region? cross-region egress 是 silent killer</li>
+  </ol>
+
+  <h3>② 估算公式</h3>
+  <div class="formula">Downtime 预算 (年):
+  99.9  (3 nine)  : 8.76 小时
+  99.95 (3.5)    : 4.38 小时
+  99.99 (4 nine) : 52.6 分钟
+  99.999 (5)     : 5.26 分钟
+
+Multi-region 成本倍数:
+  Active-active 2 region:  2x infra
+  Active-passive:         1.5x (passive 半负载)
+  Cold DR standby:        1.2x
+
+Egress cost:
+  AWS cross-region:   $0.02/GB
+  AWS to internet:    $0.09/GB
+  LLM output 1 tok ≈ 4-8 bytes (含 JSON overhead)</div>
+
+  <h3>③ 必背 anchor</h3>
+  <table>
+    <tr><th>SLA</th><th>Annual Downtime</th><th>Monthly</th><th>典型方案</th></tr>
+    <tr><td>99.0</td><td>3.65 天</td><td>7.3 小时</td><td>单 instance 也行</td></tr>
+    <tr><td>99.9</td><td>8.76 小时</td><td>43.8 分钟</td><td>多 AZ 单 region</td></tr>
+    <tr><td>99.95</td><td>4.38 小时</td><td>21.9 分钟</td><td>多 AZ + auto-failover</td></tr>
+    <tr><td><strong>99.99</strong></td><td><strong>52.6 分钟</strong></td><td><strong>4.4 分钟</strong></td><td><strong>active-active 2 region</strong></td></tr>
+    <tr><td>99.999</td><td>5.26 分钟</td><td>26 秒</td><td>active-active 3+ region, 罕见 SLA</td></tr>
+  </table>
+
+  <h3>④ Worked example</h3>
+  <div class="example">
+  <strong>F500 客户要 99.99% SLA, 多 region (Q23)</strong><br>
+  <strong>Step 1 — Downtime budget</strong>: 99.99 = 52 min/年 ≈ 4 min/月. 任何 deploy / DR drill 都要算进去<br>
+  <strong>Step 2 — Single region 不够</strong>: AWS RDS SLA 是 99.95 (4h/年), 单 region 不达标<br>
+  <strong>Step 3 — 方案: Active-Active 2 region</strong><br>
+  &nbsp;&nbsp;• us-east-1 主, us-west-2 主 (Route53 weighted)<br>
+  &nbsp;&nbsp;• Aurora global database, cross-region replication<br>
+  &nbsp;&nbsp;• Health check + auto-failover (2 min RTO)<br>
+  <strong>Step 4 — Cost breakdown</strong>:<br>
+  &nbsp;&nbsp;• Infra: $50K/月 × 2 = $100K<br>
+  &nbsp;&nbsp;• Cross-region replication egress: 假设 50GB/天 × 30 = 1.5TB/月 × $0.02 = $30 (可忽略)<br>
+  &nbsp;&nbsp;• Egress to internet (用户请求): 假设 10TB/月 × $0.09 = $900<br>
+  &nbsp;&nbsp;• 24/7 on-call: 2 FTE × $20K = $40K<br>
+  &nbsp;&nbsp;• Monitoring (Datadog): $5K<br>
+  &nbsp;&nbsp;<strong>Total: ~$145K/月 (vs single region ~$70K, 增量 +$75K for 99.99)</strong>
+  </div>
+
+  <h3>⑤ 常见坑</h3>
+  <div class="trap">
+  <strong>Trap 1</strong>: 99.9 vs 99.99 看起来差不多, 实际差 10x — 客户不知道, 你说服他降到 99.95 经常更经济<br>
+  <strong>Trap 2</strong>: 算 compute 忘 egress (跨 region egress 经常 = 30-50% of bill, 尤其大 LLM 流量)<br>
+  <strong>Trap 3</strong>: 忘 monitoring + on-call FTE cost (24/7 on-call 至少 2 FTE rotation, $40K/月)<br>
+  <strong>Trap 4</strong>: SLA composition — 你 service SLA 不能高于 dependency SLA. 你 99.99 但 RDS 99.95, 你最多 99.95<br>
+  <strong>Trap 5</strong>: Deploy / planned maintenance 不算 in SLA 通常, 但客户会问. 提前说 "scheduled maintenance excluded from 99.99 calc"
+  </div>
+</section>
+
+<!-- ================================================== -->
+<!-- FOOTER -->
+<!-- ================================================== -->
+<section style="background:#1f2937;color:#f3f4f6;border:none">
+  <h2 style="border-color:#f59e0b;color:#fde68a">🎯 面试现场 checklist (每题主动跑一遍)</h2>
+  <ol style="font-size:14px;line-height:2">
+    <li>听 problem statement → 找 trigger word (P1-P5)</li>
+    <li>问对应的 3 个澄清问题</li>
+    <li>算一遍 (用 calculator 或心算 anchor 数字)</li>
+    <li>说出数字 + 你的 assumption + cost / latency / storage</li>
+    <li>主动提省钱 knob (cache / batch / Flash / discount)</li>
+    <li>讲 break-even 或临界点 ("under 100M tok/月 hosted, over self-host")</li>
+    <li>提 trap (避坑信号: "but watch out for egress / output token / capacity buffer")</li>
+  </ol>
+  <p style="margin-top:16px;font-size:13px;opacity:0.85">⭐ FDE senior 和 junior 的差别就在 trap 那一条 — 能主动说出 "watch out" 的人是已经踩过坑的, 招他不用培训.</p>
+</section>
+
+<script>
+function calc() {
+  const inTok = +document.getElementById('in_tok').value || 0;
+  const outTok = +document.getElementById('out_tok').value || 0;
+  const [inP, outP] = document.getElementById('model').value.split(',').map(Number);
+  const cacheHit = (+document.getElementById('cache').value || 0) / 100;
+  const vol = +document.getElementById('vol').value || 0;
+  const batch = +document.getElementById('batch').value;
+  const modelName = document.getElementById('model').options[document.getElementById('model').selectedIndex].text;
+
+  const perConvNoCache = (inTok * inP + outTok * outP) / 1e6;
+  const perConvWithCache = perConvNoCache * (1 - cacheHit * 0.5);
+  const perConvFinal = perConvWithCache * batch;
+  const perDay = perConvFinal * vol;
+  const perMonth = perDay * 30;
+  const perYear = perDay * 365;
+
+  const result = document.getElementById('result');
+  result.innerHTML = `
+<strong>$/conversation (list)</strong>: $${perConvNoCache.toFixed(4)} <br>
+<strong>$/conversation (after cache ${(cacheHit*100).toFixed(0)}%, batch ${batch<1?'on':'off'})</strong>: $${perConvFinal.toFixed(4)} <br>
+<strong>$/day</strong>: $${perDay.toLocaleString('en-US', {maximumFractionDigits:0})} <br>
+<strong>$/month</strong>: $${perMonth.toLocaleString('en-US', {maximumFractionDigits:0})} <br>
+<strong>$/year</strong>: $${perYear.toLocaleString('en-US', {maximumFractionDigits:0})} <br>
+<span style="opacity:0.7;font-size:12px">Model: ${modelName} · ${(inTok+outTok).toLocaleString()} tot tok/conv · ${vol.toLocaleString()} conv/day</span>
+  `;
+}
+['in_tok','out_tok','model','cache','vol','batch'].forEach(id => {
+  document.getElementById(id).addEventListener('input', calc);
+  document.getElementById(id).addEventListener('change', calc);
+});
+calc();
+</script>
+
+</body>
+</html>
