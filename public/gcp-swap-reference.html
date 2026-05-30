@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🅖 AWS → GCP Swap Reference · Google FDE 适配</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; max-width: 960px; margin: 0 auto; padding: 16px 20px 80px; line-height: 1.78; color: #1f2328; background: #fafbfc; }
+header { background: linear-gradient(135deg, #4285f4, #0f9d58); color: white; padding: 28px 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 10px 30px rgba(66, 133, 244, 0.25); }
+header h1 { margin: 0 0 8px; font-size: 26px; }
+header .subtitle { font-size: 14px; opacity: 0.95; }
+header a { color: white; text-decoration: underline; }
+section { background: white; border: 1px solid #d0d7de; border-radius: 10px; padding: 18px 24px; margin-bottom: 18px; }
+section h2 { font-size: 18px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid #4285f4; color: #1a73e8; display: flex; align-items: center; gap: 8px; }
+section h3 { font-size: 14px; color: #57606a; margin: 16px 0 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th { background: #f6f8fa; padding: 8px 12px; text-align: left; border: 1px solid #d0d7de; font-weight: 600; font-size: 13px; }
+td { padding: 8px 12px; border: 1px solid #d0d7de; vertical-align: top; }
+td.aws { color: #ff9900; font-weight: 600; }
+td.gcp { color: #1a73e8; font-weight: 600; }
+td.swap { font-size: 12px; color: #57606a; }
+code { background: #f6f8fa; padding: 1px 6px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 12.5px; }
+.tip { background: linear-gradient(90deg, #e8f0fe, #ffffff); border-left: 4px solid #4285f4; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.warning { background: linear-gradient(90deg, #fef7e0, #ffffff); border-left: 4px solid #f9ab00; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.warning strong { color: #b45309; }
+nav.toc { background: #f6f8fa; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+nav.toc a { display: inline-block; margin: 2px 6px 2px 0; padding: 3px 10px; background: white; border: 1px solid #d0d7de; border-radius: 4px; text-decoration: none; color: #1f2328; }
+nav.toc a:hover { background: #4285f4; color: white; border-color: #4285f4; }
+.must { background: #fef2f2; border: 2px solid #ef4444; padding: 14px 18px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
+.must strong { color: #991b1b; }
+.gcp-only { background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.gcp-only strong { color: #065f46; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🅖 AWS → GCP Swap Reference</h1>
+  <div class="subtitle">面 Google FDE 时, 任何 AWS 工具张嘴说出来都减分. 这页是 1:1 mapping + Google 独有优势话术. <a href="cram.html">← Hub</a></div>
+</header>
+
+<nav class="toc">
+  <strong>跳转:</strong>
+  <a href="#golden">🏆 黄金法则</a>
+  <a href="#compute">Compute</a>
+  <a href="#storage">Storage</a>
+  <a href="#data">Data / Analytics</a>
+  <a href="#llm">LLM / AI</a>
+  <a href="#network">Network</a>
+  <a href="#security">Security / IAM</a>
+  <a href="#observability">Observability</a>
+  <a href="#hipaa">HIPAA 套件</a>
+  <a href="#talking">面试话术</a>
+</nav>
+
+<!-- ============================================ -->
+<section id="golden">
+  <h2>🏆 5 条黄金法则 (面试当下脑里跑)</h2>
+  <ol style="margin-left:20px">
+    <li><strong>默认 GCP-first</strong> — 听到题目立刻在脑里把 stack 摆成 GCP, 不是 AWS 翻译版.</li>
+    <li><strong>主动提 Google 独有优势</strong> — Gemini 3 Pro 2M context / Vertex AI in customer project / Workspace 入口 / TPU. 别人没有的, 别只比相同的.</li>
+    <li><strong>BAA 自动覆盖</strong> — 面试官提到 HIPAA / GDPR / FedRAMP, 一定说 "Vertex AI / BigQuery / GCS / Document AI / Healthcare API 都在 Google BAA list 默认覆盖". 这是 GCP vs OpenAI 直接 API 的最大差异化.</li>
+    <li><strong>用 GCP 自家术语</strong> — VPC Service Controls / CMEK / Cloud Audit Logs / Private Service Connect. 这些一说就是内行.</li>
+    <li><strong>承认 AWS 等也行</strong> — 但要补一句 "but for this Google FDE engagement I'd default to GCP-native stack" 显示你不是 AWS-only 一根筋.</li>
+  </ol>
+</section>
+
+<!-- ============================================ -->
+<section id="compute">
+  <h2>💻 Compute / 容器 / 运行时</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">EC2</td><td class="gcp">Compute Engine (GCE)</td><td class="swap">VM 实例</td></tr>
+    <tr><td class="aws">EKS</td><td class="gcp">GKE (Google Kubernetes Engine)</td><td class="swap">k8s 托管, GKE 是 k8s 的祖宗</td></tr>
+    <tr><td class="aws">ECS / Fargate</td><td class="gcp">Cloud Run</td><td class="swap">serverless container, 比 ECS 更顺</td></tr>
+    <tr><td class="aws">Lambda</td><td class="gcp">Cloud Functions / Cloud Run</td><td class="swap">FaaS</td></tr>
+    <tr><td class="aws">Batch</td><td class="gcp">Cloud Batch / Cloud Run jobs</td><td class="swap">批处理</td></tr>
+    <tr><td class="aws">p5.48xlarge (8×H100)</td><td class="gcp">A3 Mega VM (8×H100)</td><td class="swap">GCP 还有 TPU v5p / v6e (Google 独有, 性价比好)</td></tr>
+    <tr><td class="aws">Trainium / Inferentia</td><td class="gcp">TPU v5p / v6e</td><td class="swap"><strong>面 Google 时提 TPU</strong> — 这是 Google 独门武器</td></tr>
+    <tr><td class="aws">App Runner</td><td class="gcp">Cloud Run</td><td class="swap">web app deploy</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<section id="storage">
+  <h2>💾 Storage</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">S3</td><td class="gcp">Cloud Storage (GCS)</td><td class="swap">bucket / object 概念一致</td></tr>
+    <tr><td class="aws">S3 Glacier</td><td class="gcp">GCS Coldline / Archive</td><td class="swap">archive tier, $0.004/GB-mo</td></tr>
+    <tr><td class="aws">EBS</td><td class="gcp">Persistent Disk / Hyperdisk</td><td class="swap">block storage. Hyperdisk ML 是 GPU 训练专用</td></tr>
+    <tr><td class="aws">EFS</td><td class="gcp">Filestore</td><td class="swap">NFS</td></tr>
+    <tr><td class="aws">FSx Lustre</td><td class="gcp">Parallelstore / Hyperdisk ML</td><td class="swap">高性能并行 FS (训练用)</td></tr>
+    <tr><td class="aws">S3 Object Lock (HIPAA)</td><td class="gcp">GCS Bucket Lock + retention policy</td><td class="swap">immutable storage for compliance</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<section id="data">
+  <h2>📊 Data / Analytics / Database</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">RDS (Postgres/MySQL)</td><td class="gcp">Cloud SQL / AlloyDB</td><td class="swap">AlloyDB 是 GCP 自家 Postgres-compat, 性能 4x</td></tr>
+    <tr><td class="aws">DynamoDB</td><td class="gcp">Firestore / Bigtable</td><td class="swap">Firestore=document, Bigtable=wide-column 大规模</td></tr>
+    <tr><td class="aws">Redshift</td><td class="gcp">BigQuery</td><td class="swap">BigQuery 是 serverless DW, no cluster 管理</td></tr>
+    <tr><td class="aws">Snowflake (3rd party)</td><td class="gcp">BigQuery (默认) / Snowflake on GCP (也有)</td><td class="swap"><strong>面 Google 时 default BigQuery</strong></td></tr>
+    <tr><td class="aws">Athena</td><td class="gcp">BigQuery (Federated Queries) / Looker</td><td class="swap">ad-hoc SQL</td></tr>
+    <tr><td class="aws">Glue / Step Functions</td><td class="gcp">Dataflow / Cloud Workflows</td><td class="swap">Dataflow = Apache Beam 托管</td></tr>
+    <tr><td class="aws">EMR</td><td class="gcp">Dataproc</td><td class="swap">Spark / Hadoop</td></tr>
+    <tr><td class="aws">Kinesis Data Streams</td><td class="gcp">Pub/Sub + Dataflow</td><td class="swap">streaming</td></tr>
+    <tr><td class="aws">Kinesis Firehose</td><td class="gcp">Pub/Sub → BigQuery direct ingest</td><td class="swap">stream-to-warehouse</td></tr>
+    <tr><td class="aws">MSK (managed Kafka)</td><td class="gcp">Pub/Sub (preferred) / Confluent on GCP</td><td class="swap">GCP 推 Pub/Sub, 但 Kafka 也能跑</td></tr>
+    <tr><td class="aws">ElastiCache (Redis)</td><td class="gcp">Memorystore (Redis / Memcached / Valkey)</td><td class="swap">managed cache</td></tr>
+    <tr><td class="aws">SQS</td><td class="gcp">Pub/Sub (主流) / Cloud Tasks (HTTP)</td><td class="swap">Cloud Tasks 是 HTTP-based 短任务, Pub/Sub 是 pub-sub</td></tr>
+    <tr><td class="aws">SNS</td><td class="gcp">Pub/Sub</td><td class="swap">fan-out</td></tr>
+    <tr><td class="aws">SES</td><td class="gcp">SendGrid (3rd party) / Cloud Functions + Gmail API</td><td class="swap">email, GCP 没原生 SES</td></tr>
+    <tr><td class="aws">Airflow (MWAA)</td><td class="gcp">Cloud Composer</td><td class="swap">orchestration</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<section id="llm">
+  <h2>🧠 LLM / AI / ML (最关键!)</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">Bedrock</td><td class="gcp">Vertex AI Model Garden</td><td class="swap">multi-model platform, in customer's tenant</td></tr>
+    <tr><td class="aws">Bedrock Claude</td><td class="gcp">Vertex AI Claude (Model Garden) / 或 Anthropic API</td><td class="swap">Claude 在两边都能跑</td></tr>
+    <tr><td class="aws">Bedrock Titan Embed</td><td class="gcp">Vertex AI Embeddings (<code>text-embedding-005</code>, 768 dim)</td><td class="swap"></td></tr>
+    <tr><td class="aws">Bedrock Titan / Llama / Mistral</td><td class="gcp"><strong>Gemini 3 Pro / Flash (Google 自家 frontier!)</strong></td><td class="swap">Bedrock 没自家 frontier model, Vertex 有 Gemini</td></tr>
+    <tr><td class="aws">OpenSearch (k-NN, ANN)</td><td class="gcp">Vertex AI Vector Search</td><td class="swap">原名 Matching Engine, HNSW + IVF</td></tr>
+    <tr><td class="aws">Pinecone / Qdrant (3rd party)</td><td class="gcp">Vertex AI Vector Search</td><td class="swap">GCP-native, 不要在面试用 3rd party</td></tr>
+    <tr><td class="aws">SageMaker</td><td class="gcp">Vertex AI Training / Workbench / Pipelines</td><td class="swap">end-to-end ML platform</td></tr>
+    <tr><td class="aws">Textract (OCR + form)</td><td class="gcp">Document AI</td><td class="swap">Document AI 有专门的 healthcare / 法律 / 发票 processor</td></tr>
+    <tr><td class="aws">Comprehend / Comprehend Medical</td><td class="gcp">Healthcare NLP API + Cloud DLP (PHI 检测)</td><td class="swap">Cloud DLP 有 healthcare profile 自带 PHI detection</td></tr>
+    <tr><td class="aws">Rekognition (vision)</td><td class="gcp">Vision AI / Vertex AI Vision</td><td class="swap"></td></tr>
+    <tr><td class="aws">Transcribe</td><td class="gcp">Speech-to-Text</td><td class="swap"></td></tr>
+    <tr><td class="aws">Polly</td><td class="gcp">Text-to-Speech</td><td class="swap"></td></tr>
+    <tr><td class="aws">Translate</td><td class="gcp">Translation API / Gemini</td><td class="swap"></td></tr>
+    <tr><td class="aws">Lex</td><td class="gcp">Dialogflow CX</td><td class="swap">conversational AI builder</td></tr>
+  </table>
+
+  <div class="gcp-only">
+    <strong>🅖 Google 独有 (面试一定提)</strong>:<br>
+    • <strong>Gemini 3 Pro 2M context</strong> — 比 Claude 200K, GPT-5.5 128K 多 10-15x<br>
+    • <strong>TPU v5p / v6e</strong> — Google 独有, 大规模训练性价比好<br>
+    • <strong>Vertex AI in customer project</strong> — model 不出 customer 边界, BAA 自动覆盖<br>
+    • <strong>Workspace 入口</strong> — Gmail / Docs / Drive / Calendar 直接接 agent (AWS 没有这入口)<br>
+    • <strong>Model Garden</strong> — Gemini + Claude + Llama + Mistral 一站调用
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="network">
+  <h2>🌐 Network</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">VPC</td><td class="gcp">VPC (类似概念但 global 默认)</td><td class="swap">GCP VPC 跨 region 默认互通</td></tr>
+    <tr><td class="aws">VPC Endpoint / PrivateLink</td><td class="gcp">Private Service Connect / Private Google Access</td><td class="swap">private access to GCP services</td></tr>
+    <tr><td class="aws">Direct Connect</td><td class="gcp">Cloud Interconnect / Partner Interconnect</td><td class="swap">dedicated link</td></tr>
+    <tr><td class="aws">Transit Gateway</td><td class="gcp">Network Connectivity Center</td><td class="swap">multi-VPC hub</td></tr>
+    <tr><td class="aws">ALB / NLB</td><td class="gcp">Cloud Load Balancing (HTTP / TCP)</td><td class="swap">GCP LB 是 anycast IP 全球</td></tr>
+    <tr><td class="aws">Route 53</td><td class="gcp">Cloud DNS</td><td class="swap"></td></tr>
+    <tr><td class="aws">CloudFront</td><td class="gcp">Cloud CDN / Media CDN</td><td class="swap"></td></tr>
+    <tr><td class="aws">API Gateway</td><td class="gcp">API Gateway / Apigee</td><td class="swap">Apigee 是企业级 (Google 收的 acquisition)</td></tr>
+    <tr><td class="aws">WAF</td><td class="gcp">Cloud Armor</td><td class="swap">DDoS + WAF + bot mgmt</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<section id="security">
+  <h2>🔐 Security / IAM</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">IAM (AWS)</td><td class="gcp">IAM (GCP)</td><td class="swap">同名但 model 不同: GCP 用 project + resource hierarchy</td></tr>
+    <tr><td class="aws">IAM Identity Center (SSO)</td><td class="gcp">Cloud Identity + IAM</td><td class="swap"></td></tr>
+    <tr><td class="aws">Cognito (user pool)</td><td class="gcp">Identity Platform / Firebase Auth</td><td class="swap">end-user auth</td></tr>
+    <tr><td class="aws">STS (temporary creds)</td><td class="gcp">Service Account impersonation + Workload Identity</td><td class="swap"></td></tr>
+    <tr><td class="aws">KMS</td><td class="gcp">Cloud KMS</td><td class="swap">CMEK = Customer-Managed Encryption Keys</td></tr>
+    <tr><td class="aws">CloudHSM</td><td class="gcp">Cloud HSM</td><td class="swap"></td></tr>
+    <tr><td class="aws">Secrets Manager</td><td class="gcp">Secret Manager</td><td class="swap"></td></tr>
+    <tr><td class="aws">GuardDuty</td><td class="gcp">Security Command Center (SCC)</td><td class="swap"></td></tr>
+    <tr><td class="aws">Inspector</td><td class="gcp">SCC + Web Security Scanner</td><td class="swap"></td></tr>
+    <tr><td class="aws">Macie (PII discovery)</td><td class="gcp">Cloud DLP (Data Loss Prevention)</td><td class="swap">Cloud DLP 内置 PHI / PII / 信用卡等 profile</td></tr>
+    <tr><td class="aws">Service Control Policies (SCP)</td><td class="gcp">VPC Service Controls + Organization Policies</td><td class="swap">VPC SC 是 data perimeter, 锁数据不出边界</td></tr>
+    <tr><td class="aws">PrivateLink + S3 VPC endpoint</td><td class="gcp">Private Service Connect + VPC Service Controls</td><td class="swap">私有访问</td></tr>
+  </table>
+
+  <div class="tip"><strong>VPC Service Controls 是 GCP 的特色</strong>: 把多个 service (Vertex AI / BigQuery / GCS / Document AI) 锁进一个 perimeter, 数据出不去也进不来. F500 / 医疗客户超喜欢. AWS 没有等价的 service-level perimeter.</div>
+</section>
+
+<!-- ============================================ -->
+<section id="observability">
+  <h2>📊 Observability / Audit</h2>
+  <table>
+    <tr><th>AWS</th><th>GCP</th><th>笔记</th></tr>
+    <tr><td class="aws">CloudWatch Metrics</td><td class="gcp">Cloud Monitoring</td><td class="swap"></td></tr>
+    <tr><td class="aws">CloudWatch Logs</td><td class="gcp">Cloud Logging</td><td class="swap"></td></tr>
+    <tr><td class="aws">CloudTrail</td><td class="gcp">Cloud Audit Logs</td><td class="swap">合规审计</td></tr>
+    <tr><td class="aws">X-Ray</td><td class="gcp">Cloud Trace</td><td class="swap">distributed tracing</td></tr>
+    <tr><td class="aws">CloudWatch Alarms</td><td class="gcp">Cloud Monitoring Alerts</td><td class="swap"></td></tr>
+    <tr><td class="aws">CloudWatch RUM</td><td class="gcp">Firebase Performance Monitoring</td><td class="swap">real-user monitoring</td></tr>
+    <tr><td class="aws">EventBridge</td><td class="gcp">Eventarc</td><td class="swap">event router</td></tr>
+    <tr><td class="aws">3rd party (Datadog / Grafana)</td><td class="gcp">都可以 + Grafana Cloud / Cloud Monitoring</td><td class="swap"></td></tr>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<section id="hipaa">
+  <h2>🏥 HIPAA / Healthcare 黄金套件 (面 Google 医疗题必背)</h2>
+  <div class="must">
+    <strong>背稿</strong>: <br>
+    "GCP 在 healthcare 这边有 <strong>BAA-covered 全套</strong>: <br>
+    • <strong>Document AI</strong> (HL7/FHIR + PDF OCR + Healthcare DocAI processor)<br>
+    • <strong>Healthcare API</strong> (FHIR / HL7v2 / DICOM 原生支持)<br>
+    • <strong>Cloud DLP with healthcare profile</strong> (自动 PHI 识别)<br>
+    • <strong>Vertex AI in customer project</strong> (model 不出客户 VPC)<br>
+    • <strong>Vertex AI Vector Search</strong> (HNSW + IVF, 千万级向量)<br>
+    • <strong>BigQuery</strong> (HIPAA-covered DW)<br>
+    • <strong>GCS + Bucket Lock</strong> (immutable storage 7+ 年 retention)<br>
+    • <strong>Cloud KMS CMEK</strong> (customer-managed keys)<br>
+    • <strong>Cloud Audit Logs</strong> (永久 audit)<br>
+    • <strong>VPC Service Controls</strong> (lock data perimeter)<br>
+    全部默认 BAA, 客户 legal sign-off 速度比 AWS / OpenAI 快 2-3x."
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="talking">
+  <h2>🎤 面试话术 — 3 个口播版本</h2>
+
+  <h3>① 设计题被问 "你会怎么 deploy"</h3>
+  <div class="tip">
+  "Default to GCP-native stack since this is a Google FDE engagement. The agent runs on <strong>Vertex AI</strong> in customer's GCP project, data sits in <strong>BigQuery</strong> with CMEK, retrieval through <strong>Vertex AI Vector Search</strong>, and Workspace surfaces if user-facing. Customer audit goes to <strong>Cloud Audit Logs</strong>. The whole perimeter is locked with <strong>VPC Service Controls</strong>."
+  </div>
+
+  <h3>② 被问 "为什么 GCP 不 AWS"</h3>
+  <div class="tip">
+  "Three things AWS can't match for this use case: (1) Gemini 3 Pro's 2M context — Claude on Bedrock is 200K, Llama is 128K. (2) Vertex AI in customer's own project with BAA covered, vs Bedrock which is multi-tenant managed. (3) Workspace as the last-mile distribution — no AWS equivalent for Gmail / Docs / Drive integration. Then there's TPU for cost-sensitive training. But I'm not religious — for non-GenAI workloads, AWS / Azure are all valid."
+  </div>
+
+  <h3>③ 客户已经在 AWS, 怎么 propose 用 GCP</h3>
+  <div class="tip">
+  "I wouldn't ask the customer to fully migrate — that's a deal-killer. I'd propose a <strong>hybrid pattern</strong>: keep their compute on AWS, but the AI workload (Vertex AI + Gemini) runs on GCP, connected via <strong>Cloud Interconnect</strong> or peering. Data flows: AWS RDS → BigQuery (federated query, no copy) → Vertex AI. They keep their existing investment, get Gemini's capability. This is the standard 'best-of-breed' enterprise pattern in 2026."
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="hubswap">
+  <h2>📋 快速 swap 备忘录 (面试前 5 分钟扫)</h2>
+  <table>
+    <tr><th>听到 AWS 名</th><th>口语换 GCP 名</th></tr>
+    <tr><td>S3</td><td>GCS / Cloud Storage</td></tr>
+    <tr><td>Bedrock</td><td>Vertex AI</td></tr>
+    <tr><td>OpenSearch</td><td>Vertex AI Vector Search</td></tr>
+    <tr><td>Textract</td><td>Document AI</td></tr>
+    <tr><td>Comprehend Medical</td><td>Healthcare NLP + Cloud DLP</td></tr>
+    <tr><td>KMS</td><td>Cloud KMS</td></tr>
+    <tr><td>CloudTrail</td><td>Cloud Audit Logs</td></tr>
+    <tr><td>Kinesis</td><td>Pub/Sub + Dataflow</td></tr>
+    <tr><td>Lambda</td><td>Cloud Functions / Cloud Run</td></tr>
+    <tr><td>SQS</td><td>Pub/Sub (or Cloud Tasks)</td></tr>
+    <tr><td>EKS</td><td>GKE</td></tr>
+    <tr><td>Snowflake</td><td>BigQuery</td></tr>
+    <tr><td>RDS</td><td>Cloud SQL / AlloyDB</td></tr>
+    <tr><td>DynamoDB</td><td>Firestore / Bigtable</td></tr>
+    <tr><td>VPC Endpoint</td><td>Private Service Connect</td></tr>
+    <tr><td>SCP</td><td>VPC Service Controls + Org Policy</td></tr>
+    <tr><td>EC2 H100</td><td>A3 Mega VM / TPU</td></tr>
+    <tr><td>Pinecone / Qdrant</td><td>Vertex AI Vector Search</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
