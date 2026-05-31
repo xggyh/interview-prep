@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⚡ T3.2 · MCP / API Proxy Layer 抽象 — 冲刺版 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE Summary / ⚡ T3.2 · MCP / API Proxy Layer 抽象 — 冲刺版</div>
+  <h1>⚡ T3.2 · MCP / API Proxy Layer 抽象 — 冲刺版</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde-summary">Google FDE Summary</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#9333ea"><strong>Google FDE Summary</strong> · Senior+ · 📋 8 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t3-mcp-api-proxy-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t3-mcp-api-proxy-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Model Context Protocol · vendor abstraction · auth/observability central · 200 行能背</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🔌 T3.2 · MCP (Model Context Protocol) / API Proxy 抽象 — 冲刺版</h1>
+<blockquote><p>完整版: <a href="gfde-t3-mcp-api-proxy.html">gfde-t3-mcp-api-proxy.html</a>. 200 行能背版.</p></blockquote>
+<hr />
+<h3>📋 我会这样答 (Sample Monologue)</h3>
+<p><strong>Clarify (10 sec)</strong>: "假设: multi-vendor LLM (Claude + Gemini + GPT-5.5), 50 internal microservice × 10 endpoints = 500 tools, OAuth + on-behalf-of, quarterly schema change, 2s latency budget per tool call, multi-tenant SaaS."</p>
+<p><strong>核心 framing</strong>: 不要把 50 个 API hardcode 到 LLM prompt (25K token prompt + 30% 误选率). 走 <strong>MCP-based Gateway</strong> = 2026 industry standard.</p>
+<h4>Layer 1: MCP 3 原语 (vs OpenAI function call)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Resources : 只读数据  file://docs/policy.md, db://users/42
+Tools     : 可执行函数 create_order, send_email
+Prompts   : 可复用模板 "summarize_meeting_notes"</code></pre>
+<p>MCP (Anthropic 2024 开源, 2026 业界标准) = vendor-neutral, 跨 Claude/Gemini/GPT. JSON-RPC over stdio/HTTP/SSE/WebSocket. OpenAI function calling 只对应 Tools, 没 Resources/Prompts.</p>
+<h4>Layer 2: Gateway 6 责任 (统一入口)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">1. Tool discovery   RAG over tool descriptions (Qdrant + RRF)
+2. Auth + OBO       OAuth scope exchange (RFC 8693), token broker
+3. Rate limit       Token bucket per (user, tool, tenant)
+4. Observability    OTel trace propagation end-to-end
+5. Caching          Idempotent reads, per-tool TTL
+6. Versioning       Schema diff CI + adapter chain + 90-day deprecation</code></pre>
+<h4>Layer 3: 500 tools 怎么 discovery (LLM context 装不下)</h4>
+<pre class="language-python"><code class="language-python">async def list_tools(user, query):
+    accessible = await rbac.tools_for(user)         # L1 RBAC filter
+    if query:
+        emb = await embed(query)                     # L2 RAG search
+        candidates = await qdrant.search(emb, top_k=50,
+            filter={"tool_id": {"$in": accessible}})
+    ranked = rank_by_usage_history(candidates, user) # L3 历史加权
+    return ranked[:20]                               # 返 top-20</code></pre>
+<p><strong>4 层 discovery</strong>: RBAC → RAG → Hierarchical (domain→category→tool) → meta-tool <code>find_tool</code>. 实战: tool 选率 70% → 92% after RAG + history boost.</p>
+<h4>Layer 4: OBO (enterprise 红线)</h4>
+<pre class="language-python"><code class="language-python">service_token = await oauth.exchange(
+    user_token=req.user_token,
+    target_service=tool_meta.service,
+    scopes=tool_meta.required_scopes,  # scope ≤ user's perms
+)
+# Agent 永远不能拥有比用户更高权限</code></pre>
+<p>Agent service principal 不直接调 API. 每次走 token broker 换 service_token, scope ≤ user 权限. Bug 时 agent 不能越界. RFC 8693 OAuth 2.0 token exchange.</p>
+<h4>Edge cases</h4>
+<ul><li><strong>EC1 Customer schema 季度升级 break agent</strong>: semver 在 tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite alert pass rate drop.</li><li><strong>EC2 MCP server crash</strong>: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.</li><li><strong>EC3 Auto-gen MCP from OpenAPI</strong>: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.</li><li><strong>EC4 Latency sub-100ms 不允许 MCP overhead</strong>: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.</li><li><strong>EC5 Legacy mainframe COBOL 没 modern API</strong>: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop S3 daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".</li></ul>
+<h4>Production hardening</h4>
+<ul><li><strong>Trace propagation</strong>: OTel <code>traceparent</code> header inject before forward. E2E: agent → gateway → MCP server → real API.</li><li><strong>Cost attribution</strong>: per-span tag (tenant_id, tool_id), monthly bill auto-gen.</li><li><strong>Cache policy</strong>: idempotent read cached (per-tool TTL), write 永不 cache, per-user namespace 隔离敏感数据.</li><li><strong>Eval suite</strong>: 200-500 golden cases per tool, daily run, alert on pass rate drop &gt; 5pp.</li></ul>
+<h4>🪝 Resume hook</h4>
+<p>"On ByteDance Internal Agent Platform we built 200+ tool catalog (pre-MCP, rolled JSON-RPC), 50 services × 4 avg endpoint. RAG-based discovery 把 LLM context 35K → 4K token (每 call 省 $0.06), tool 误选率 30% → 8%. OBO 通过 token broker 实现 — early version agent 有 admin scope, security review caught, 3 周建 broker. Voice agent 7 markets 每 market 独立 OAuth scope. 这就是 staff-level MCP/gateway 设计."</p>
+<hr />
+<h3>🔥 5 Follow-ups</h3>
+<p><strong>Q1: MCP overhead - extra hop latency cost?</strong> Single proxy hop ~5-20ms (HTTP + JSON-RPC serialize). Auth + OBO ~1-2ms cached / 50ms cold. Rate limit Redis Lua 1-2ms. Observability inject &lt;1ms. 总 ~10-25ms — 2s budget 完全 OK. Sub-100ms 硬需求: OBO cache 10min + sidecar Envoy ext_authz.</p>
+<p><strong>Q2: Customer API 变更 break agent. 怎么 handle?</strong> (1) semver 在 MCP tool spec; (2) adapter chain v1↔v2 declarative or code; (3) deprecation warning in response 90-day window; (4) eval suite daily alert pass rate drop; (5) customer 自动 notification (email + dashboard); (6) schema diff CI check — breaking change without major bump = PR fail.</p>
+<p><strong>Q3: 500 tools 怎么处理 beyond RAG?</strong> Hierarchical (domain → category → tool, LLM 2-call 选). Per-agent specialization (support agent 只看 support tool). Per-user RBAC pre-filter before RAG. Meta-tool <code>find_tool</code> 让 LLM 主动调. Usage history boost (recent + frequent rank higher). Hybrid BM25 + dense embedding RRF.</p>
+<p><strong>Q4: MCP vs OpenAI function calling 何时选?</strong> OpenAI function call: in-process, 单 vendor, fast, 简单. LLM-side 协议. MCP: cross-process, vendor-neutral, 有 versioning, dynamic discovery, Resources + Prompts. Tool-side 协议. <strong>互补不互斥</strong> — MCP tool def 可 adapter 转 OpenAI function format. 选 MCP 当 multi-vendor / customer-owned tools / long-term platform / dynamic discovery.</p>
+<p><strong>Q5: Prompt injection / tool abuse 风险 with MCP?</strong> MCP 不变好坏, 但抽象层是 enforce 策略最佳位置. (1) Tool description sanitize (LLM 读 description = 注入面); (2) arg schema validate before call; (3) OBO scope 兜底 (LLM 被骗也限权限); (4) 敏感 tool 必须 user explicit confirm (<code>send_email</code>, <code>transfer_money</code>); (5) audit log every call; (6) rate limit + quota 防 burn budget. Gateway 是 chokepoint, 安全实施在这里.</p>
+<hr />
+<h3>❌ 易错点 (10 条红线)</h3>
+<ol><li><strong>Hardcode 500 tools in LLM context</strong> — token cost + selection accuracy 暴跌</li><li><strong>Agent has direct API access</strong> — 无 OBO, scope creep, security review fail</li><li><strong>No tool discovery</strong> — agent 不知用哪个 tool, error 多</li><li><strong>Auto-gen MCP from OpenAPI</strong> — description 太技术, LLM 选错</li><li><strong>No versioning</strong> — customer schema 变更直接 break agent</li><li><strong>No circuit breaker per server</strong> — 一个 server 挂 → agent 死循环 retry</li><li><strong>MCP 当 LLM 协议</strong> (concept 混淆) — MCP 是 tool-side, function calling 是 LLM-side</li><li><strong>Cache all tool outputs</strong> — write op 不能 cache, 灾难</li><li><strong>OAuth token broker 缺失</strong> — agent 用 user_token 直接调所有 service (安全事故)</li><li><strong>No trace propagation</strong> — debug agent flow 不可能</li></ol>
+<hr />
+<h3>✅ 加分项 (12 条)</h3>
+<ol><li><strong>MCP 3 原语</strong> (Resources / Tools / Prompts) awareness</li><li><strong>Gateway 6 责任</strong> 清晰列举</li><li><strong>OBO</strong> as enterprise standard, <strong>RFC 8693</strong> OAuth token exchange by name</li><li><strong>RAG-based discovery</strong> + embedding + RRF + recency boost</li><li><strong>Hierarchical / meta-tool</strong> 替代方案 for 500+ tools</li><li><strong>Adapter pattern</strong> for non-MCP-native APIs (~1 day per service)</li><li><strong>Versioning strategy</strong> + deprecation 90-day window</li><li><strong>Eval suite + schema diff CI</strong> for drift detection</li><li><strong>OpenTelemetry trace propagation</strong> end-to-end</li><li><strong>Legacy 4 patterns</strong> (REST adapter / 3270 scrape / file drop / graceful degrade tier 1-4)</li><li><strong>2026 vendor-neutral</strong> (Anthropic + Google + OpenAI 都支持 MCP)</li><li><strong>Quote Internal Agent Platform 70 → 92% tool accuracy</strong></li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p><strong>MCP-based Gateway 是 2026 LLM agent integration 事实标准</strong>: 一个统一入口 + 3 原语 (Resources/Tools/Prompts) + 6 责任 (discovery/auth/RL/obs/cache/version). 500 tool 用 RAG discovery + RBAC + 历史加权. 50 service 用 1 天/服务 adapter. Schema 演化用 version + adapter chain + 90 day deprecation. OBO 保证 agent 权限 ≤ 用户权限. 这是 staff-level platform 设计.</p>
+<hr />
+<h3>🃏 Cheat Sheet (印 1 页随身)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">MCP (Model Context Protocol):
+  Anthropic 2024 开源, 2026 业界标准
+  Vendor-neutral (Claude + Gemini + GPT)
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio / HTTP / SSE / WebSocket
+
+Gateway 6 责任: Tool discovery (RAG) + Auth+OBO (OAuth exchange) + Rate limit (per user×tool×tenant) + Observability (OTel propagation) + Caching (idempotent reads) + Versioning+adapter
+
+500 tools discovery: L1 RBAC filter + L2 RAG vector top-20 + L3 Hierarchical (domain→category→tool) + L4 Meta-tool find_tool + usage history boost + RRF (dense+BM25)
+
+OBO (On-Behalf-Of):
+  User token → exchange service token, scope ≤ user
+  RFC 8693 OAuth 2.0 token exchange
+  Agent never more perms than user
+
+Adapter pattern: REST → MCP wrapper ~1 day/service, hand-curate description (NOT auto-gen OpenAPI), translate args + error codes
+
+Versioning: semver in tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite
+
+Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop S3 / always graceful degrade tier 1-4
+
+Cache policy: idempotent read cached w/ TTL, write NEVER cached, per-user isolation, semantic for fuzzy
+
+Trace: OTel `traceparent` header inject before forward, E2E agent→gateway→mcp→real api
+
+Circuit breaker: per-MCP-server CB, 10 fails/1min → open 5min cooldown, health check 30s
+
+Cost: per-call LLM + tool + obs overhead, tag span tenant_id+tool_id, monthly bill auto-gen
+
+When NOT MCP: single vendor + small tool + greenfield / sub-100ms hard / stateful SSH long-running
+When MCP: multi-vendor / customer-owned tools / long-term platform / need dynamic discovery
+
+Discovery accuracy (your Internal Agent Platform):
+  Without RAG 70% tool selection / With RAG+history 92%
+  Context 35K → 4K token (per-call save $0.06)
+
+红线:
+  - All tools in LLM prompt
+  - Agent direct API call (no OBO)
+  - No tool discovery
+  - Auto-gen from OpenAPI
+  - No versioning
+  - No circuit breaker
+  - Cache writes
+  - No trace propagation
+  - MCP = function calling 概念混淆
+
+Resume quotes:
+  "Internal Agent Platform 200+ tools, 70→92% accuracy via RAG"
+  "Voice agent 7 markets per-tenant OBO"
+  "BNPL chatbot intent → tool routing"
+  "Pre-MCP rolled own JSON-RPC, lesson learned"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t3-stateless-stateful-summary.html">← ⚡ T3.1 · Stateless vs Stateful Agent 架构 — 冲刺版</a>
+    <a href="gfde-t3-high-throughput-summary.html">⚡ T3.3 · 1M QPS High-throughput LLM Serving — 冲刺版 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🔌 T3.2 · MCP (Model Context Protocol) / API Proxy 抽象 — 冲刺版
+
+> 完整版: [gfde-t3-mcp-api-proxy.html](gfde-t3-mcp-api-proxy.html). 200 行能背版.
+
+---
+
+## 📋 我会这样答 (Sample Monologue)
+
+**Clarify (10 sec)**:
+"假设: multi-vendor LLM (Claude + Gemini + GPT-5.5), 50 internal microservice × 10 endpoints = 500 tools, OAuth + on-behalf-of, quarterly schema change, 2s latency budget per tool call, multi-tenant SaaS."
+
+**核心 framing**: 不要把 50 个 API hardcode 到 LLM prompt (25K token prompt + 30% 误选率). 走 **MCP-based Gateway** = 2026 industry standard.
+
+### Layer 1: MCP 3 原语 (vs OpenAI function call)
+
+```
+Resources : 只读数据  file://docs/policy.md, db://users/42
+Tools     : 可执行函数 create_order, send_email
+Prompts   : 可复用模板 "summarize_meeting_notes"
+```
+
+MCP (Anthropic 2024 开源, 2026 业界标准) = vendor-neutral, 跨 Claude/Gemini/GPT. JSON-RPC over stdio/HTTP/SSE/WebSocket. OpenAI function calling 只对应 Tools, 没 Resources/Prompts.
+
+### Layer 2: Gateway 6 责任 (统一入口)
+
+```
+1. Tool discovery   RAG over tool descriptions (Qdrant + RRF)
+2. Auth + OBO       OAuth scope exchange (RFC 8693), token broker
+3. Rate limit       Token bucket per (user, tool, tenant)
+4. Observability    OTel trace propagation end-to-end
+5. Caching          Idempotent reads, per-tool TTL
+6. Versioning       Schema diff CI + adapter chain + 90-day deprecation
+```
+
+### Layer 3: 500 tools 怎么 discovery (LLM context 装不下)
+
+```python
+async def list_tools(user, query):
+    accessible = await rbac.tools_for(user)         # L1 RBAC filter
+    if query:
+        emb = await embed(query)                     # L2 RAG search
+        candidates = await qdrant.search(emb, top_k=50,
+            filter={"tool_id": {"$in": accessible}})
+    ranked = rank_by_usage_history(candidates, user) # L3 历史加权
+    return ranked[:20]                               # 返 top-20
+```
+
+**4 层 discovery**: RBAC → RAG → Hierarchical (domain→category→tool) → meta-tool `find_tool`. 实战: tool 选率 70% → 92% after RAG + history boost.
+
+### Layer 4: OBO (enterprise 红线)
+
+```python
+service_token = await oauth.exchange(
+    user_token=req.user_token,
+    target_service=tool_meta.service,
+    scopes=tool_meta.required_scopes,  # scope ≤ user's perms
+)
+# Agent 永远不能拥有比用户更高权限
+```
+
+Agent service principal 不直接调 API. 每次走 token broker 换 service_token, scope ≤ user 权限. Bug 时 agent 不能越界. RFC 8693 OAuth 2.0 token exchange.
+
+### Edge cases
+
+- **EC1 Customer schema 季度升级 break agent**: semver 在 tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite alert pass rate drop.
+- **EC2 MCP server crash**: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.
+- **EC3 Auto-gen MCP from OpenAPI**: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.
+- **EC4 Latency sub-100ms 不允许 MCP overhead**: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.
+- **EC5 Legacy mainframe COBOL 没 modern API**: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop S3 daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".
+
+### Production hardening
+
+- **Trace propagation**: OTel `traceparent` header inject before forward. E2E: agent → gateway → MCP server → real API.
+- **Cost attribution**: per-span tag (tenant_id, tool_id), monthly bill auto-gen.
+- **Cache policy**: idempotent read cached (per-tool TTL), write 永不 cache, per-user namespace 隔离敏感数据.
+- **Eval suite**: 200-500 golden cases per tool, daily run, alert on pass rate drop > 5pp.
+
+### 🪝 Resume hook
+
+"On ByteDance Internal Agent Platform we built 200+ tool catalog (pre-MCP, rolled JSON-RPC), 50 services × 4 avg endpoint. RAG-based discovery 把 LLM context 35K → 4K token (每 call 省 $0.06), tool 误选率 30% → 8%. OBO 通过 token broker 实现 — early version agent 有 admin scope, security review caught, 3 周建 broker. Voice agent 7 markets 每 market 独立 OAuth scope. 这就是 staff-level MCP/gateway 设计."
+
+---
+
+## 🔥 5 Follow-ups
+
+**Q1: MCP overhead - extra hop latency cost?**
+Single proxy hop ~5-20ms (HTTP + JSON-RPC serialize). Auth + OBO ~1-2ms cached / 50ms cold. Rate limit Redis Lua 1-2ms. Observability inject <1ms. 总 ~10-25ms — 2s budget 完全 OK. Sub-100ms 硬需求: OBO cache 10min + sidecar Envoy ext_authz.
+
+**Q2: Customer API 变更 break agent. 怎么 handle?**
+(1) semver 在 MCP tool spec; (2) adapter chain v1↔v2 declarative or code; (3) deprecation warning in response 90-day window; (4) eval suite daily alert pass rate drop; (5) customer 自动 notification (email + dashboard); (6) schema diff CI check — breaking change without major bump = PR fail.
+
+**Q3: 500 tools 怎么处理 beyond RAG?**
+Hierarchical (domain → category → tool, LLM 2-call 选). Per-agent specialization (support agent 只看 support tool). Per-user RBAC pre-filter before RAG. Meta-tool `find_tool` 让 LLM 主动调. Usage history boost (recent + frequent rank higher). Hybrid BM25 + dense embedding RRF.
+
+**Q4: MCP vs OpenAI function calling 何时选?**
+OpenAI function call: in-process, 单 vendor, fast, 简单. LLM-side 协议. MCP: cross-process, vendor-neutral, 有 versioning, dynamic discovery, Resources + Prompts. Tool-side 协议. **互补不互斥** — MCP tool def 可 adapter 转 OpenAI function format. 选 MCP 当 multi-vendor / customer-owned tools / long-term platform / dynamic discovery.
+
+**Q5: Prompt injection / tool abuse 风险 with MCP?**
+MCP 不变好坏, 但抽象层是 enforce 策略最佳位置. (1) Tool description sanitize (LLM 读 description = 注入面); (2) arg schema validate before call; (3) OBO scope 兜底 (LLM 被骗也限权限); (4) 敏感 tool 必须 user explicit confirm (`send_email`, `transfer_money`); (5) audit log every call; (6) rate limit + quota 防 burn budget. Gateway 是 chokepoint, 安全实施在这里.
+
+---
+
+## ❌ 易错点 (10 条红线)
+
+1. **Hardcode 500 tools in LLM context** — token cost + selection accuracy 暴跌
+2. **Agent has direct API access** — 无 OBO, scope creep, security review fail
+3. **No tool discovery** — agent 不知用哪个 tool, error 多
+4. **Auto-gen MCP from OpenAPI** — description 太技术, LLM 选错
+5. **No versioning** — customer schema 变更直接 break agent
+6. **No circuit breaker per server** — 一个 server 挂 → agent 死循环 retry
+7. **MCP 当 LLM 协议** (concept 混淆) — MCP 是 tool-side, function calling 是 LLM-side
+8. **Cache all tool outputs** — write op 不能 cache, 灾难
+9. **OAuth token broker 缺失** — agent 用 user_token 直接调所有 service (安全事故)
+10. **No trace propagation** — debug agent flow 不可能
+
+---
+
+## ✅ 加分项 (12 条)
+
+1. **MCP 3 原语** (Resources / Tools / Prompts) awareness
+2. **Gateway 6 责任** 清晰列举
+3. **OBO** as enterprise standard, **RFC 8693** OAuth token exchange by name
+4. **RAG-based discovery** + embedding + RRF + recency boost
+5. **Hierarchical / meta-tool** 替代方案 for 500+ tools
+6. **Adapter pattern** for non-MCP-native APIs (~1 day per service)
+7. **Versioning strategy** + deprecation 90-day window
+8. **Eval suite + schema diff CI** for drift detection
+9. **OpenTelemetry trace propagation** end-to-end
+10. **Legacy 4 patterns** (REST adapter / 3270 scrape / file drop / graceful degrade tier 1-4)
+11. **2026 vendor-neutral** (Anthropic + Google + OpenAI 都支持 MCP)
+12. **Quote Internal Agent Platform 70 → 92% tool accuracy**
+
+---
+
+## 一句话总结
+
+**MCP-based Gateway 是 2026 LLM agent integration 事实标准**: 一个统一入口 + 3 原语 (Resources/Tools/Prompts) + 6 责任 (discovery/auth/RL/obs/cache/version). 500 tool 用 RAG discovery + RBAC + 历史加权. 50 service 用 1 天/服务 adapter. Schema 演化用 version + adapter chain + 90 day deprecation. OBO 保证 agent 权限 ≤ 用户权限. 这是 staff-level platform 设计.
+
+---
+
+## 🃏 Cheat Sheet (印 1 页随身)
+
+```
+MCP (Model Context Protocol):
+  Anthropic 2024 开源, 2026 业界标准
+  Vendor-neutral (Claude + Gemini + GPT)
+  3 primitives: Resources / Tools / Prompts
+  JSON-RPC over stdio / HTTP / SSE / WebSocket
+
+Gateway 6 责任: Tool discovery (RAG) + Auth+OBO (OAuth exchange) + Rate limit (per user×tool×tenant) + Observability (OTel propagation) + Caching (idempotent reads) + Versioning+adapter
+
+500 tools discovery: L1 RBAC filter + L2 RAG vector top-20 + L3 Hierarchical (domain→category→tool) + L4 Meta-tool find_tool + usage history boost + RRF (dense+BM25)
+
+OBO (On-Behalf-Of):
+  User token → exchange service token, scope ≤ user
+  RFC 8693 OAuth 2.0 token exchange
+  Agent never more perms than user
+
+Adapter pattern: REST → MCP wrapper ~1 day/service, hand-curate description (NOT auto-gen OpenAPI), translate args + error codes
+
+Versioning: semver in tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite
+
+Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop S3 / always graceful degrade tier 1-4
+
+Cache policy: idempotent read cached w/ TTL, write NEVER cached, per-user isolation, semantic for fuzzy
+
+Trace: OTel `traceparent` header inject before forward, E2E agent→gateway→mcp→real api
+
+Circuit breaker: per-MCP-server CB, 10 fails/1min → open 5min cooldown, health check 30s
+
+Cost: per-call LLM + tool + obs overhead, tag span tenant_id+tool_id, monthly bill auto-gen
+
+When NOT MCP: single vendor + small tool + greenfield / sub-100ms hard / stateful SSH long-running
+When MCP: multi-vendor / customer-owned tools / long-term platform / need dynamic discovery
+
+Discovery accuracy (your Internal Agent Platform):
+  Without RAG 70% tool selection / With RAG+history 92%
+  Context 35K → 4K token (per-call save $0.06)
+
+红线:
+  - All tools in LLM prompt
+  - Agent direct API call (no OBO)
+  - No tool discovery
+  - Auto-gen from OpenAPI
+  - No versioning
+  - No circuit breaker
+  - Cache writes
+  - No trace propagation
+  - MCP = function calling 概念混淆
+
+Resume quotes:
+  "Internal Agent Platform 200+ tools, 70→92% accuracy via RAG"
+  "Voice agent 7 markets per-tenant OBO"
+  "BNPL chatbot intent → tool routing"
+  "Pre-MCP rolled own JSON-RPC, lesson learned"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⚡ T3.5 · Rate Limit / Queue / Cache Layer — 冲刺版 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE Summary / ⚡ T3.5 · Rate Limit / Queue / Cache Layer — 冲刺版</div>
+  <h1>⚡ T3.5 · Rate Limit / Queue / Cache Layer — 冲刺版</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde-summary">Google FDE Summary</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#9333ea"><strong>Google FDE Summary</strong> · Senior+ · 📋 7 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t3-rate-limit-queue-cache-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t3-rate-limit-queue-cache-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">token bucket dual-layer · Cloud Tasks · semantic cache · 200 行能背</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>💰 T3.5 · Rate Limit / Queue / Cache Layer 设计 — 冲刺版</h1>
+<blockquote><p>完整版: <a href="gfde-t3-rate-limit-queue-cache.html">gfde-t3-rate-limit-queue-cache.html</a>. 200 行能背版.</p></blockquote>
+<hr />
+<h3>📋 我会这样答 (Sample Monologue)</h3>
+<p><strong>Clarify (10 sec)</strong>: "假设: customer chatbot 100K QPS bursty (100x peak), Claude Opus 4.7 vendor 10K TPM / 100 RPM rate limit, $5/$25 per 1M token, 3 tier tenant (gold/silver/bronze), monthly contract per tenant, multi-vendor + self-host vLLM available."</p>
+<p><strong>核心 framing</strong>: LLM API 慢+贵+rate-limited. <strong>5-layer defense</strong> 累积 8-12x cost reduction without quality loss. 不做 cost defense, blended cost 高 5-10x.</p>
+<h4>Layer 1: Cache (try first, cheapest, no LLM call)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">A. Exact-match (hash)       SHA256(model+prompt+temp+seed), TTL 1h, 10-20% hit
+B. Semantic (embedding)     cosine &gt;0.95, 30-50% hit FAQ workload
+C. Tool output              per-tool TTL (get_balance 5s, static 24h), 60-90% hit
+D. LLM prefix (vLLM/Anthropic) server-side, 60-90% shared prefix, 90% off cached input
+Combined: ~60% of queries avoid full LLM call</code></pre>
+<h4>Layer 2: Priority Queue + per-tenant concurrency</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Gold   queue depth 100   p99 &lt;2s   concurrency 50  Sonnet 4.6 / Gemini Pro
+Silver queue depth 500   p99 &lt;5s   concurrency 20  Haiku / Flash
+Bronze queue depth 2000  p99 &lt;30s  concurrency 5   Flash
+Free   queue depth 10K   best-eff  concurrency 1   Flash + canned</code></pre>
+<p>Per-tenant Redis Lua semaphore (atomic, &lt;1ms). 防 noisy neighbor: tenant A spike 不能拖 tenant B (gold).</p>
+<h4>Layer 3: Vendor rate limit (token bucket per vendor)</h4>
+<pre class="language-python"><code class="language-python">def check_vendor_limit(req):
+    # 每 vendor 独立 bucket
+    if not vendor_bucket[req.vendor].try_acquire(req.tokens):
+        # 429 → spillover to alt vendor
+        return spillover(req)
+    # 多维 token bucket
+    rate_limit(f"user:{req.user_id}", limit=100, window=60)
+    rate_limit(f"tenant:{req.tenant_id}", limit=10000, window=60)</code></pre>
+<p>429 → Retry-After 尊重. Spillover chain: Self-host → Gemini Flash → Claude.</p>
+<h4>Layer 4: Cost-aware model routing (黄金 90/9/1)</h4>
+<pre class="language-python"><code class="language-python">def route(query, history, user_tier, budget_remaining):
+    complexity = classify_complexity(query, history)  # cheap LLM Haiku or heuristic
+    
+    if budget_remaining &lt; 0.01:
+        return "gemini-3-flash" if user_tier == "gold" else raise BudgetExhausted
+    
+    if complexity &lt; 0.3:    return "gemini-3-flash"   # 90% $0.50/$3
+    elif complexity &lt; 0.7:  return "gemini-3-pro"     # 9% $2/$12
+    else:                   return "claude-opus-4.7"  # 1% $5/$25</code></pre>
+<p>Blended cost: $0.0011 × 90% + $0.0044 × 9% + $0.0085 × 1% = <strong>$0.0014 / call</strong>. vs all-Opus $0.0085 → <strong>84% reduction</strong>, eval drop &lt;1%.</p>
+<h4>Layer 5: Budget enforcement (per-tenant monthly cap)</h4>
+<pre class="language-python"><code class="language-python"># Atomic Redis Lua + Postgres durable
+if redis.eval(LUA_INCR_IF_BELOW, key, increment, limit):
+    proceed
+else:
+    if 80% used:   alert email
+    if 95% used:   urgent + in-app banner
+    if 100% used:  hard stop "monthly limit reached, upgrade"</code></pre>
+<p>Per-tenant atomic check (Redis Lua) + Postgres durable record. Cost spike detector (5x hourly vs 7d baseline) → proactive alert.</p>
+<h4>Edge cases</h4>
+<ul><li><strong>EC1 Burst 100x (10K QPS spike)</strong>: pre-launch capacity plan (2h warm 10x replica) + tenant temp 升级 Gold + aggressive cache 预热 (lower threshold 0.95 → 0.90) + spillover to alt vendor. Communicate "request #423 in queue, est 30s" instead of silent fail.</li><li><strong>EC2 Semantic cache wrong-hit</strong>: threshold per product (medical 0.97, FAQ 0.88, general 0.95). Verification pass: cheap LLM Haiku ($1/$5) compares cached question to current, 10ms latency. Personalization layer fills template (don't return verbatim).</li><li><strong>EC3 Cache invalidation stale</strong>: TTL based (1h general / 5min fresh data like balance) + event-based (data update → Pub/Sub → invalidate matching) + versioning (cache key includes data_version, bump on update).</li><li><strong>EC4 Single-tenant noisy neighbor</strong>: token bucket per tenant + concurrency semaphore + tier-based dispatch + isolated replica pool for gold + backpressure visible to client (429 with Retry-After + queue depth in headers).</li><li><strong>EC5 Free user 用完 budget</strong>: 提前 alert 80% / 90% → at limit ($5) → graceful response (不 silent fail) → cached-only mode (familiar queries 还能 work) → cheap model fallback (Flash 4x cheaper extends budget 4x).</li></ul>
+<h4>Production hardening</h4>
+<p><strong>Graceful degradation 7-step ladder</strong>:</p>
+<pre class="language-plaintext"><code class="language-plaintext">L1 queue &gt;80%     → smaller model (Pro → Flash)
+L2 cost trend up  → aggressive cache (0.95 → 0.90)
+L3 vendor 429     → spillover to alt vendor
+L4 latency &gt;3s    → drop parallel tool calls
+L5 context &gt;30K   → drop multi-turn (single-shot)
+L6 severe         → canned response from cache
+L7 total fail     → static "service busy, try later"</code></pre>
+<h4>🪝 Resume hook</h4>
+<p>"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, <strong>cost reduction 42%</strong>. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. <strong>Budget</strong>: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."</p>
+<hr />
+<h3>🔥 5 Follow-ups</h3>
+<p><strong>Q1: Semantic cache wrong-hit (返回相似但不同 query 的答案), 怎么 mitigate?</strong> <strong>Threshold tuning per domain</strong>: medical 0.97 / FAQ 0.88 / general 0.95. <strong>Verification pass</strong>: cheap Haiku ($1/$5) compare cached question to current, 10ms latency. <strong>Personalization layer</strong>: cached answer + user context → tailored (不 return verbatim). <strong>Per-domain stricter</strong>: 金融/医疗高 threshold. <strong>A/B canned vs LLM</strong>: measure thumbs ratio, canned 匹配 LLM → safe.</p>
+<p><strong>Q2: Cache invalidation - 数据变 stale answer?</strong> <strong>TTL based</strong>: 1h general / 5min fresh (real-time balance). <strong>Event-based</strong>: data update → Pub/Sub → invalidate matching pattern. <strong>Versioning</strong>: cache key includes data_version, bump on update → naturally bypass old. <strong>Best-effort 5% stale acceptable</strong> for cost saving; alert if more. <strong>Per-tool config</strong>: get_balance 5s, get_static_doc 24h.</p>
+<p><strong>Q3: Customer 说 cache 让 response 'feel canned'. Address?</strong> <strong>Variation layer</strong>: cache + cheap LLM 'rephrase' for variety. <strong>Lower threshold + personalize</strong>: get semantic hit + quick personalization pass. <strong>Smarter granularity</strong>: cache structured answer, LLM formats per user. <strong>Disable cache for chatty / creative</strong> (only cache transactional). <strong>Personalization slots</strong>: cached "Your balance is {AMOUNT}, due {DATE}" — fill from DB.</p>
+<p><strong>Q4: Burst 100x - queue fills, users wait long. Better?</strong> <strong>Reservation system</strong>: gold tier guaranteed slots, never wait. <strong>Spillover to cheaper model</strong>: never reject, downgrade. <strong>Async response</strong> for non-realtime: "we'll notify when ready". <strong>Pre-scale based on burst prediction</strong>: ML on traffic patterns scale ahead. <strong>Communicate</strong>: "high traffic, request #423, est 30s". <strong>Customer SLA enforce</strong>: gold pays for guaranteed slots, that's the value.</p>
+<p><strong>Q5: Cost grew 3x in 1 week - root cause?</strong> Common causes: (1) new customer high traffic (check tenant spend leaderboard); (2) prompt template change increased token count (check prompt_template_version metric); (3) cache hit rate dropped (new query patterns? invalidation bug?); (4) model auto-routed expensive more (check model distribution); (5) loop bug agent re-calling LLM (check per-session call count); (6) hostile use / jailbreak inflating tokens; (7) RAG corpus update increased context size. Observability slice dashboard 必须 catch each.</p>
+<hr />
+<h3>❌ 易错点 (10 条红线)</h3>
+<ol><li><strong>No cache layer</strong> — 50% wasted cost on redundant LLM calls</li><li><strong>One queue for all tenants</strong> — noisy neighbor, gold 被 bronze 拖死</li><li><strong>Sync to LLM API (no queue)</strong> — burst → vendor 429 → cascade fail</li><li><strong>Single model for all</strong> — cost 5-10x over optimal</li><li><strong>No budget cap</strong> — runaway customer 烧光 bank ($50K/天)</li><li><strong>Cache threshold too loose</strong> — wrong-hits 用户骂</li><li><strong>No graceful degradation</strong> — peak = total fail</li><li><strong>No multi-vendor failover</strong> — vendor down = service down</li><li><strong>Cache invalidation 缺失</strong> — stale answers</li><li><strong>No retry-after respect</strong> — 429 retry loop amplifies issue</li></ol>
+<hr />
+<h3>✅ 加分项 (12 条)</h3>
+<ol><li><strong>4-layer cache</strong> (exact / semantic / tool / LLM prefix)</li><li><strong>Per-tenant priority queues</strong> (gold/silver/bronze)</li><li><strong>Per-tenant Redis Lua semaphore</strong> (atomic, &lt;1ms)</li><li><strong>Cost-aware routing</strong> with complexity classifier (90/9/1 黄金分布)</li><li><strong>Budget enforcement</strong> with atomic Lua + Postgres durable</li><li><strong>Graceful degradation 7-step ladder</strong></li><li><strong>Cache invalidation strategy</strong> (TTL + event-based + versioning)</li><li><strong>Multi-vendor failover</strong> chain (Self-host → Flash → Claude)</li><li><strong>Cost spike detector</strong> (proactive, 5x baseline)</li><li><strong>Backpressure signal</strong> in response headers</li><li><strong>2026 model pricing precise</strong> (Flash $0.50/$3, Pro $2/$12, Opus $5/$25, Sonnet $3/$15)</li><li><strong>Quote BNPL 38% hit / 42% cost reduction</strong> + Indonesia $50K saved</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p><strong>LLM cost/scale = 5 layers (cache + queue + rate-limit + cost-routing + budget) + graceful degradation ladder + multi-vendor failover</strong>. 4-layer cache 节 60% LLM call. Cost-aware routing 90/9/1 → 84% cost reduction. Budget cap 防 runaway. Per-tenant 隔离 + priority queue 保 gold SLA. 这是 staff-level cost engineering.</p>
+<hr />
+<h3>🃏 Cheat Sheet (印 1 页随身)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 layers in order:
+  L1 Cache (exact + semantic + tool + LLM prefix)
+  L2 Queue (per-tier priority + per-tenant concurrency)
+  L3 Rate limit (token bucket per vendor + per tenant)
+  L4 Cost-aware model routing
+  L5 Budget enforcement (per-tenant monthly cap)
+
+4-layer cache:
+  Exact (hash):   10-20% hit, 100% accurate, TTL 1h
+  Semantic (emb): 30-50% on FAQ, 0.95 threshold
+  Tool output:    per-tool TTL (balance 5s, static 24h)
+  LLM prefix:     vLLM/Anthropic server-side, 60-90% shared
+
+Semantic cache: 0.95 baseline / 0.90 aggressive FAQ / 0.88 verify w/ Haiku / medical 0.97
+
+Priority queue tiers:
+  Gold   depth 100  p99 &lt;2s  conc 50 Sonnet/Pro
+  Silver depth 500  p99 &lt;5s  conc 20 Haiku/Flash
+  Bronze depth 2K   p99 &lt;30s conc 5  Flash
+  Free   depth 10K  best-eff conc 1  Flash+canned
+
+Cost-aware routing (90/9/1 黄金):
+  &lt;0.3 Flash/Self-host 90% / &lt;0.7 Pro 9% / ≥0.7 Opus 1%
+  → Saves 84% vs all-Opus
+
+2026 pricing (memorize):
+  Gemini 3 Flash $0.50/$3 (cache $0.10)
+  Gemini 3 Pro   $2/$12   (cache $0.40)
+  Haiku 4.5      $1/$5    (cache $0.10)
+  Sonnet 4.6     $3/$15   (cache $0.30)
+  Opus 4.7       $5/$25   (cache $0.50)
+  GPT-5.5        $5/$30   (cache $1)
+  Self-host 70B  ~$0.30 all
+
+Budget enforcement: per-tenant cap + Atomic Redis Lua + Postgres durable + alert 80/95/100% + 5x baseline spike detector + pre-flight estimate
+
+Graceful degrade 7-step: L1 smaller model / L2 aggressive cache / L3 spillover vendor / L4 drop parallel tools / L5 drop multi-turn / L6 canned / L7 static "try later"
+
+Cache invalidation: TTL 1h general / 5min fresh + event-based Pub/Sub + versioned key
+
+Per-tenant isolation: token bucket per (user,tool,tenant) + concurrency Redis Lua + dedicated replicas gold + backpressure headers
+
+Multi-vendor failover: Self-host 90% / Gemini Flash 8% / Claude Opus 2% — same internal API contract
+
+Observability: cache hit/tier, queue depth/tier, cost/tenant real-time+forecast, model distribution, degradation events, budget util
+
+Cost math 100K QPS: all-Opus $73M/day → optimized $12M/day (84% reduction, $0.0085 → $0.0014/call)
+
+红线:
+  - No cache (50% waste)
+  - One queue for all (noisy neighbor)
+  - Sync to LLM (burst blow)
+  - Single model (cost 5-10x)
+  - No budget cap (runaway)
+  - Cache threshold too loose
+  - No degradation (peak fail)
+  - Single vendor (down = down)
+
+Resume quotes:
+  "BNPL semantic cache 38% hit, cost -42%"
+  "Voice agent 7 markets per-tenant budget+concurrency"
+  "TikTok payment Redis Lua atomic, &lt;1ms"
+  "Self-host Llama 70B 90%, $0.30/1M"
+  "Indonesia customer bug $50K saved via budget cap"</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t3-observability-summary.html">← ⚡ T3.4 · Agent System Observability — 冲刺版</a>
+    <a href="gfde-t3-eventual-consistency-summary.html">⚡ T3.6 · Eventual Consistency for Agent State — 冲刺版 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 💰 T3.5 · Rate Limit / Queue / Cache Layer 设计 — 冲刺版
+
+> 完整版: [gfde-t3-rate-limit-queue-cache.html](gfde-t3-rate-limit-queue-cache.html). 200 行能背版.
+
+---
+
+## 📋 我会这样答 (Sample Monologue)
+
+**Clarify (10 sec)**:
+"假设: customer chatbot 100K QPS bursty (100x peak), Claude Opus 4.7 vendor 10K TPM / 100 RPM rate limit, $5/$25 per 1M token, 3 tier tenant (gold/silver/bronze), monthly contract per tenant, multi-vendor + self-host vLLM available."
+
+**核心 framing**: LLM API 慢+贵+rate-limited. **5-layer defense** 累积 8-12x cost reduction without quality loss. 不做 cost defense, blended cost 高 5-10x.
+
+### Layer 1: Cache (try first, cheapest, no LLM call)
+
+```
+A. Exact-match (hash)       SHA256(model+prompt+temp+seed), TTL 1h, 10-20% hit
+B. Semantic (embedding)     cosine >0.95, 30-50% hit FAQ workload
+C. Tool output              per-tool TTL (get_balance 5s, static 24h), 60-90% hit
+D. LLM prefix (vLLM/Anthropic) server-side, 60-90% shared prefix, 90% off cached input
+Combined: ~60% of queries avoid full LLM call
+```
+
+### Layer 2: Priority Queue + per-tenant concurrency
+
+```
+Gold   queue depth 100   p99 <2s   concurrency 50  Sonnet 4.6 / Gemini Pro
+Silver queue depth 500   p99 <5s   concurrency 20  Haiku / Flash
+Bronze queue depth 2000  p99 <30s  concurrency 5   Flash
+Free   queue depth 10K   best-eff  concurrency 1   Flash + canned
+```
+
+Per-tenant Redis Lua semaphore (atomic, <1ms). 防 noisy neighbor: tenant A spike 不能拖 tenant B (gold).
+
+### Layer 3: Vendor rate limit (token bucket per vendor)
+
+```python
+def check_vendor_limit(req):
+    # 每 vendor 独立 bucket
+    if not vendor_bucket[req.vendor].try_acquire(req.tokens):
+        # 429 → spillover to alt vendor
+        return spillover(req)
+    # 多维 token bucket
+    rate_limit(f"user:{req.user_id}", limit=100, window=60)
+    rate_limit(f"tenant:{req.tenant_id}", limit=10000, window=60)
+```
+
+429 → Retry-After 尊重. Spillover chain: Self-host → Gemini Flash → Claude.
+
+### Layer 4: Cost-aware model routing (黄金 90/9/1)
+
+```python
+def route(query, history, user_tier, budget_remaining):
+    complexity = classify_complexity(query, history)  # cheap LLM Haiku or heuristic
+    
+    if budget_remaining < 0.01:
+        return "gemini-3-flash" if user_tier == "gold" else raise BudgetExhausted
+    
+    if complexity < 0.3:    return "gemini-3-flash"   # 90% $0.50/$3
+    elif complexity < 0.7:  return "gemini-3-pro"     # 9% $2/$12
+    else:                   return "claude-opus-4.7"  # 1% $5/$25
+```
+
+Blended cost: $0.0011 × 90% + $0.0044 × 9% + $0.0085 × 1% = **$0.0014 / call**. vs all-Opus $0.0085 → **84% reduction**, eval drop <1%.
+
+### Layer 5: Budget enforcement (per-tenant monthly cap)
+
+```python
+# Atomic Redis Lua + Postgres durable
+if redis.eval(LUA_INCR_IF_BELOW, key, increment, limit):
+    proceed
+else:
+    if 80% used:   alert email
+    if 95% used:   urgent + in-app banner
+    if 100% used:  hard stop "monthly limit reached, upgrade"
+```
+
+Per-tenant atomic check (Redis Lua) + Postgres durable record. Cost spike detector (5x hourly vs 7d baseline) → proactive alert.
+
+### Edge cases
+
+- **EC1 Burst 100x (10K QPS spike)**: pre-launch capacity plan (2h warm 10x replica) + tenant temp 升级 Gold + aggressive cache 预热 (lower threshold 0.95 → 0.90) + spillover to alt vendor. Communicate "request #423 in queue, est 30s" instead of silent fail.
+- **EC2 Semantic cache wrong-hit**: threshold per product (medical 0.97, FAQ 0.88, general 0.95). Verification pass: cheap LLM Haiku ($1/$5) compares cached question to current, 10ms latency. Personalization layer fills template (don't return verbatim).
+- **EC3 Cache invalidation stale**: TTL based (1h general / 5min fresh data like balance) + event-based (data update → Pub/Sub → invalidate matching) + versioning (cache key includes data_version, bump on update).
+- **EC4 Single-tenant noisy neighbor**: token bucket per tenant + concurrency semaphore + tier-based dispatch + isolated replica pool for gold + backpressure visible to client (429 with Retry-After + queue depth in headers).
+- **EC5 Free user 用完 budget**: 提前 alert 80% / 90% → at limit ($5) → graceful response (不 silent fail) → cached-only mode (familiar queries 还能 work) → cheap model fallback (Flash 4x cheaper extends budget 4x).
+
+### Production hardening
+
+**Graceful degradation 7-step ladder**:
+```
+L1 queue >80%     → smaller model (Pro → Flash)
+L2 cost trend up  → aggressive cache (0.95 → 0.90)
+L3 vendor 429     → spillover to alt vendor
+L4 latency >3s    → drop parallel tool calls
+L5 context >30K   → drop multi-turn (single-shot)
+L6 severe         → canned response from cache
+L7 total fail     → static "service busy, try later"
+```
+
+### 🪝 Resume hook
+
+"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, **cost reduction 42%**. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. **Budget**: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
+
+---
+
+## 🔥 5 Follow-ups
+
+**Q1: Semantic cache wrong-hit (返回相似但不同 query 的答案), 怎么 mitigate?**
+**Threshold tuning per domain**: medical 0.97 / FAQ 0.88 / general 0.95. **Verification pass**: cheap Haiku ($1/$5) compare cached question to current, 10ms latency. **Personalization layer**: cached answer + user context → tailored (不 return verbatim). **Per-domain stricter**: 金融/医疗高 threshold. **A/B canned vs LLM**: measure thumbs ratio, canned 匹配 LLM → safe.
+
+**Q2: Cache invalidation - 数据变 stale answer?**
+**TTL based**: 1h general / 5min fresh (real-time balance). **Event-based**: data update → Pub/Sub → invalidate matching pattern. **Versioning**: cache key includes data_version, bump on update → naturally bypass old. **Best-effort 5% stale acceptable** for cost saving; alert if more. **Per-tool config**: get_balance 5s, get_static_doc 24h.
+
+**Q3: Customer 说 cache 让 response 'feel canned'. Address?**
+**Variation layer**: cache + cheap LLM 'rephrase' for variety. **Lower threshold + personalize**: get semantic hit + quick personalization pass. **Smarter granularity**: cache structured answer, LLM formats per user. **Disable cache for chatty / creative** (only cache transactional). **Personalization slots**: cached "Your balance is {AMOUNT}, due {DATE}" — fill from DB.
+
+**Q4: Burst 100x - queue fills, users wait long. Better?**
+**Reservation system**: gold tier guaranteed slots, never wait. **Spillover to cheaper model**: never reject, downgrade. **Async response** for non-realtime: "we'll notify when ready". **Pre-scale based on burst prediction**: ML on traffic patterns scale ahead. **Communicate**: "high traffic, request #423, est 30s". **Customer SLA enforce**: gold pays for guaranteed slots, that's the value.
+
+**Q5: Cost grew 3x in 1 week - root cause?**
+Common causes: (1) new customer high traffic (check tenant spend leaderboard); (2) prompt template change increased token count (check prompt_template_version metric); (3) cache hit rate dropped (new query patterns? invalidation bug?); (4) model auto-routed expensive more (check model distribution); (5) loop bug agent re-calling LLM (check per-session call count); (6) hostile use / jailbreak inflating tokens; (7) RAG corpus update increased context size. Observability slice dashboard 必须 catch each.
+
+---
+
+## ❌ 易错点 (10 条红线)
+
+1. **No cache layer** — 50% wasted cost on redundant LLM calls
+2. **One queue for all tenants** — noisy neighbor, gold 被 bronze 拖死
+3. **Sync to LLM API (no queue)** — burst → vendor 429 → cascade fail
+4. **Single model for all** — cost 5-10x over optimal
+5. **No budget cap** — runaway customer 烧光 bank ($50K/天)
+6. **Cache threshold too loose** — wrong-hits 用户骂
+7. **No graceful degradation** — peak = total fail
+8. **No multi-vendor failover** — vendor down = service down
+9. **Cache invalidation 缺失** — stale answers
+10. **No retry-after respect** — 429 retry loop amplifies issue
+
+---
+
+## ✅ 加分项 (12 条)
+
+1. **4-layer cache** (exact / semantic / tool / LLM prefix)
+2. **Per-tenant priority queues** (gold/silver/bronze)
+3. **Per-tenant Redis Lua semaphore** (atomic, <1ms)
+4. **Cost-aware routing** with complexity classifier (90/9/1 黄金分布)
+5. **Budget enforcement** with atomic Lua + Postgres durable
+6. **Graceful degradation 7-step ladder**
+7. **Cache invalidation strategy** (TTL + event-based + versioning)
+8. **Multi-vendor failover** chain (Self-host → Flash → Claude)
+9. **Cost spike detector** (proactive, 5x baseline)
+10. **Backpressure signal** in response headers
+11. **2026 model pricing precise** (Flash $0.50/$3, Pro $2/$12, Opus $5/$25, Sonnet $3/$15)
+12. **Quote BNPL 38% hit / 42% cost reduction** + Indonesia $50K saved
+
+---
+
+## 一句话总结
+
+**LLM cost/scale = 5 layers (cache + queue + rate-limit + cost-routing + budget) + graceful degradation ladder + multi-vendor failover**. 4-layer cache 节 60% LLM call. Cost-aware routing 90/9/1 → 84% cost reduction. Budget cap 防 runaway. Per-tenant 隔离 + priority queue 保 gold SLA. 这是 staff-level cost engineering.
+
+---
+
+## 🃏 Cheat Sheet (印 1 页随身)
+
+```
+5 layers in order:
+  L1 Cache (exact + semantic + tool + LLM prefix)
+  L2 Queue (per-tier priority + per-tenant concurrency)
+  L3 Rate limit (token bucket per vendor + per tenant)
+  L4 Cost-aware model routing
+  L5 Budget enforcement (per-tenant monthly cap)
+
+4-layer cache:
+  Exact (hash):   10-20% hit, 100% accurate, TTL 1h
+  Semantic (emb): 30-50% on FAQ, 0.95 threshold
+  Tool output:    per-tool TTL (balance 5s, static 24h)
+  LLM prefix:     vLLM/Anthropic server-side, 60-90% shared
+
+Semantic cache: 0.95 baseline / 0.90 aggressive FAQ / 0.88 verify w/ Haiku / medical 0.97
+
+Priority queue tiers:
+  Gold   depth 100  p99 <2s  conc 50 Sonnet/Pro
+  Silver depth 500  p99 <5s  conc 20 Haiku/Flash
+  Bronze depth 2K   p99 <30s conc 5  Flash
+  Free   depth 10K  best-eff conc 1  Flash+canned
+
+Cost-aware routing (90/9/1 黄金):
+  <0.3 Flash/Self-host 90% / <0.7 Pro 9% / ≥0.7 Opus 1%
+  → Saves 84% vs all-Opus
+
+2026 pricing (memorize):
+  Gemini 3 Flash $0.50/$3 (cache $0.10)
+  Gemini 3 Pro   $2/$12   (cache $0.40)
+  Haiku 4.5      $1/$5    (cache $0.10)
+  Sonnet 4.6     $3/$15   (cache $0.30)
+  Opus 4.7       $5/$25   (cache $0.50)
+  GPT-5.5        $5/$30   (cache $1)
+  Self-host 70B  ~$0.30 all
+
+Budget enforcement: per-tenant cap + Atomic Redis Lua + Postgres durable + alert 80/95/100% + 5x baseline spike detector + pre-flight estimate
+
+Graceful degrade 7-step: L1 smaller model / L2 aggressive cache / L3 spillover vendor / L4 drop parallel tools / L5 drop multi-turn / L6 canned / L7 static "try later"
+
+Cache invalidation: TTL 1h general / 5min fresh + event-based Pub/Sub + versioned key
+
+Per-tenant isolation: token bucket per (user,tool,tenant) + concurrency Redis Lua + dedicated replicas gold + backpressure headers
+
+Multi-vendor failover: Self-host 90% / Gemini Flash 8% / Claude Opus 2% — same internal API contract
+
+Observability: cache hit/tier, queue depth/tier, cost/tenant real-time+forecast, model distribution, degradation events, budget util
+
+Cost math 100K QPS: all-Opus $73M/day → optimized $12M/day (84% reduction, $0.0085 → $0.0014/call)
+
+红线:
+  - No cache (50% waste)
+  - One queue for all (noisy neighbor)
+  - Sync to LLM (burst blow)
+  - Single model (cost 5-10x)
+  - No budget cap (runaway)
+  - Cache threshold too loose
+  - No degradation (peak fail)
+  - Single vendor (down = down)
+
+Resume quotes:
+  "BNPL semantic cache 38% hit, cost -42%"
+  "Voice agent 7 markets per-tenant budget+concurrency"
+  "TikTok payment Redis Lua atomic, <1ms"
+  "Self-host Llama 70B 90%, $0.30/1M"
+  "Indonesia customer bug $50K saved via budget cap"
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⚡ T1.1 · Idempotent Tool 设计 (Agent 反复调用不出事) — 冲刺版 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE Summary / ⚡ T1.1 · Idempotent Tool 设计 (Agent 反复调用不出事) — 冲刺版</div>
+  <h1>⚡ T1.1 · Idempotent Tool 设计 (Agent 反复调用不出事) — 冲刺版</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde-summary">Google FDE Summary</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#9333ea"><strong>Google FDE Summary</strong> · Senior+ · 📋 10 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t1-idempotency-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t1-idempotency-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">Sample monologue + 5 follow-ups + 易错 + 加分 + cheat sheet · 200 行能背 · 对应 T1.1 完整版</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>⚡ T1.1 · Idempotent Tool 设计 — 冲刺版</h1>
+<blockquote><p>完整版: <a href="gfde-t1-idempotency.html">gfde-t1-idempotency.html</a>. 这页是 200 行能背版.</p></blockquote>
+<hr />
+<h3>📋 我会这样答 (Sample Monologue)</h3>
+<p><strong>Clarify (10 sec)</strong>: "假设: bank API 不原生支持 idempotency_key, dedup window 24h, worst-case double charge = compliance event, agent runtime owns the key, multi-tenant SaaS."</p>
+<p><strong>3-layer 架构</strong>:</p>
+<h4>Layer 1: Idempotency key generation (at agent runtime)</h4>
+<ul><li><strong>Runtime 生成, 不是 LLM</strong>. LLM sampling 非确定, 同 intent 可能给不同 key.</li><li>组成: <code>blake2b(tenant_id + session_id + tool_name + canonical(args))</code></li><li><code>canonical(args)</code> = sort_keys + Decimal precision + str normalize.</li><li><strong>必带 tenant_id</strong> — 跨 tenant 碰撞 = SaaS 安全事故.</li></ul>
+<h4>Layer 2: 3-state dedup (Redis hot + DB warm)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">GET idem:{key}
+  in_flight    → poll 200ms (or Pub/Sub wait), max 10s, 否则 409 Retry-After
+  completed    → 返回 cached result (deterministic replay)
+  not_exist    → SETNX with TTL 24h, execute
+  failed       → 同 not_exist (允许重试)
+  failed_perm  → tombstone, 拒绝重试</code></pre>
+<p>Pub/Sub 通知 in_flight 完成, 比 dumb-poll 省 latency. DB tier (Postgres / Cloud SQL) 兜底 &gt;24h.</p>
+<h4>Layer 3: Cross-vendor wrapper</h4>
+<p>Bank 不支持 idempotency? 模式:</p>
+<ul><li><strong>A. Native passthrough</strong> (Stripe-style): pass <code>Idempotency-Key</code> header to vendor ⭐ 最稳</li><li><strong>B. Wrapper full ownership</strong>: 我们 own dedup + 单点责任</li><li><strong>C. Check-then-execute via query API</strong>: distributed lock → <code>query_by_external_ref(ref)</code> → if exists return → else execute</li><li><strong>D. Best-effort + nightly reconciliation</strong>: 跑对账, 业务 accept 微小 dup rate</li></ul>
+<h4>Edge cases (按问到的顺序背)</h4>
+<ul><li><strong>EC1 网络超时</strong>: bank 可能 commit 可能没 → 返回 <code>state='unknown'</code>, agent 调 <code>get_transfer_status(ref)</code> 确认. 不盲重试.</li><li><strong>EC2 LLM 调整 args 重试</strong>: 新 args → 新 key → 新 transaction. Prompt 层指令 "Always retry SAME args first". Audit log 标记 "LLM-initiated adjusted retry".</li><li><strong>EC3 Redis 挂</strong>: destructive tool <strong>fail closed</strong> (拒绝执行). Read tool fail open (跳 dedup OK).</li><li><strong>EC4 24h 后同 args 合法新 intent</strong>: UI 提供 <code>force_new=True</code> flag 显式 bypass.</li><li><strong>EC5 Worker 中途 crash</strong>: in_flight 带 heartbeat. Stale &gt;30s → re-query vendor by external_ref → 已 commit 标 completed, 否则重执行.</li></ul>
+<h4>Production hardening (1 min wrap)</h4>
+<ul><li><strong>Monitor</strong>: dedup hit rate (~2% expected, alert &gt;10% = upstream 异常); in_flight p99 wait; key cardinality</li><li><strong>Audit log</strong>: every hit 标 reason (retry / dup / collision suspect)</li><li><strong>Reconciliation</strong>: nightly 对比 our log vs bank ledger</li><li><strong>Property test</strong>: hypothesis 跑并发, 不变式 <code>count(distinct execution) &lt;= count(distinct key)</code></li><li><strong>No SPOF</strong>: Redis cluster + DB replica</li></ul>
+<h4>🪝 Resume hook</h4>
+<p>"我在 TikTok PayLater 7 国 voice agent 跑过这套. 5 个 market 走 Pattern A (vendor 支持), 2 个 legacy (墨西哥 + 印尼) 走 Pattern C 加 distributed lock + transaction lookup. 6 个月后 double-charge incident 从 ~3/月 → 0."</p>
+<hr />
+<h3>🔥 5 Follow-ups (面试官会问)</h3>
+<p><strong>Q1: Redis 挂了, fail-open 还是 fail-closed?</strong> 按 tool 分类: read = open (跳 dedup); write-idempotent = fall back DB tier; <strong>destructive (transfer/charge/delete) = 永远 closed</strong>. 宁可不执行不要双花.</p>
+<p><strong>Q2: Vendor 自带 idempotency_key 但只 5 分钟 TTL, 你要 24h?</strong> 2 层: Bank 5min handle transient retry; 我们 24h handle cross-session retry (用户关电脑); &gt;24h 走 vendor 永久 ledger + <code>external_ref</code> lookup. 三个 window 写进 client doc.</p>
+<p><strong>Q3: Agent 出错后调整 args 重试 (例如 +$10), 新 key, 但原 transaction 可能还在执行?</strong> 这是 LLM 的责任, runtime 抓不到. 防御:</p>
+<ol><li>Prompt: "On error, retry SAME args first; only adjust after <code>get_transaction_status</code> 确认原 didn't execute"</li><li>每个 destructive tool 必带 <code>get_transaction(ref)</code> companion tool</li><li>提供 <code>cancel_transfer(ref)</code> 紧急补偿</li><li>Audit log 标 "LLM adjusted-args retry" 供人工 review</li></ol>
+<p><strong>Q4: 怎么测?</strong> 4 层: Unit (并发 2 call 同 key → 1 execution); Integration (mid-call kill network); Property-based (hypothesis 随机 args 序列, 不变式 distinct_exec ≤ distinct_key); Chaos (Redis kill mid-flight 验 graceful); Production shadow (历史流量关 idem 跑, 数 would-be doubles).</p>
+<p><strong>Q5: 3rd-party API 完全不支持 idempotency?</strong> 走 Pattern B/C/D:</p>
+<ul><li>B Wrapper own dedup (我们单点责任)</li><li>C Distributed lock (Redis Redlock / ZK) + vendor <code>query_by_external_ref</code> API</li><li>D Best-effort + nightly reconciliation + manual compensation flow</li><li>最次也要 reconciliation, 否则 ledger 永远不一致</li></ul>
+<hr />
+<h3>❌ 易错点 (10 条红线)</h3>
+<ol><li>让 <strong>LLM 生成 idempotency_key</strong> — non-deterministic, key 不稳</li><li>Key 不含 <code>tenant_id</code> — 跨租户撞车, 安全事故</li><li>没考虑 <strong>in-flight race</strong> (SETNX atomic 是关键)</li><li>TTL 太长 → logical collision risk; 太短 → 跨 session 重试漏</li><li>Redis 挂时 destructive tool <strong>fail-open</strong> — 可能双花, 灾难</li><li>没 audit log — dedup hit 不可观察</li><li>Args 不 canonical 化 (e.g., <code>{a:1, b:2}</code> vs <code>{b:2, a:1}</code>) — hash 不同, dedup 失效</li><li>跨 vendor 没 wrapper — vendor 不支持就裸奔</li><li>没 reconciliation — 我们 log 与 vendor ledger 最终不一致</li><li>Tool 内部本身不 idempotent — wrapper 也救不了 (e.g., <code>SELECT ... FOR UPDATE</code> 没拿到锁)</li></ol>
+<hr />
+<h3>✅ 加分项 (13 条)</h3>
+<ol><li>Agent runtime 生成 key + BLAKE2b-128 hash</li><li>3-state state machine (in_flight / completed / failed)</li><li>SETNX atomic + 短 poll handle race</li><li>Pub/Sub 通知 in_flight done (vs dumb poll)</li><li>Stripe-style key passthrough to vendor</li><li>Multi-tier storage (Redis 24h + DB 30d + ledger permanent)</li><li>Fail-closed on destructive + fail-open on read</li><li>Nightly reconciliation job</li><li>Cardinality math (50M keys/day → Redis cluster 单集群 ok)</li><li>Audit hit log with reason</li><li>Cross-vendor decision tree (A/B/C/D)</li><li>Property-based test (hypothesis 并发不变式)</li><li>Voice agent 7-market 实战 story + double-charge 数字</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>Idempotent tool = <strong>runtime 生成确定性 key + 3 态机协调并发 + 短长 TTL 双 tier + destructive fail-closed + 跨 vendor wrapper + 持续对账</strong>. LLM 比 human 更易触发 retry, idempotency 是最后防线.</p>
+<hr />
+<h3>🃏 Cheat Sheet (印 1 页随身)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">Idempotency key:
+  Source: agent runtime (NOT LLM, NOT server)
+  Composition: tenant_id + session_id + tool_name + canonical(args)
+  Hash: BLAKE2b-128 (16 bytes / 32 hex)
+  Canonical: sort_keys + Decimal precision + str normalize
+
+State machine:
+  none → in_flight → completed
+              ↓
+            failed (retryable) → none
+              ↓
+        failed_permanent (tombstone)
+
+In-flight race:
+  redis.set(key, in_flight, nx=True, ex=ttl)  # atomic
+  If exists in_flight: poll 200ms or Pub/Sub wait, max 10s, else 409
+
+TTL multi-tier:
+  Redis hot:    24h
+  DB warm:      30d
+  Bank ledger:  permanent
+  + nightly reconciliation
+
+Failure policy:
+  Tool safety  | Redis down  | DB down
+  read         | skip dedup  | skip dedup
+  write-idem   | use DB      | local 5m
+  destructive  | FAIL CLOSED | FAIL CLOSED
+
+Cross-vendor patterns:
+  A. Native idem header (Stripe) → pass-through ⭐
+  B. Wrapper full ownership
+  C. Check-then-execute via query API + lock
+  D. Best-effort + reconciliation (legacy)
+
+Worker crash:
+  in_flight entry: worker_id + last_heartbeat
+  Stale &gt; 30s → re-query vendor by external_ref
+              → committed: mark completed
+              → not: re-execute
+
+Cost / cardinality:
+  1M users × 50 calls/day = 50M keys
+  Redis: 5GB, single cluster ok
+  Hit rate: ~2% normal, alert &gt; 10%
+
+Monitor:
+  - dedup hit rate
+  - in_flight wait p99
+  - key cardinality growth
+  - reconciliation mismatch count
+
+Test:
+  - concurrent same-key invocation property
+  - chaos kill Redis mid-flight
+  - production shadow with idem disabled
+
+红线:
+  - LLM-generated key
+  - Fail-open on infra failure for destructive
+  - No reconciliation
+  - No audit</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t1-overview-summary.html">← ⚡ T1 Overview · Agent Tool Calling 全景 — 冲刺版</a>
+    <a href="gfde-t1-retry-fallback-summary.html">⚡ T1.2 · Tool Retry / Timeout / Fallback 策略 — 冲刺版 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># ⚡ T1.1 · Idempotent Tool 设计 — 冲刺版
+
+> 完整版: [gfde-t1-idempotency.html](gfde-t1-idempotency.html). 这页是 200 行能背版.
+
+---
+
+## 📋 我会这样答 (Sample Monologue)
+
+**Clarify (10 sec)**:
+"假设: bank API 不原生支持 idempotency_key, dedup window 24h, worst-case double charge = compliance event, agent runtime owns the key, multi-tenant SaaS."
+
+**3-layer 架构**:
+
+### Layer 1: Idempotency key generation (at agent runtime)
+
+- **Runtime 生成, 不是 LLM**. LLM sampling 非确定, 同 intent 可能给不同 key.
+- 组成: `blake2b(tenant_id + session_id + tool_name + canonical(args))`
+- `canonical(args)` = sort_keys + Decimal precision + str normalize.
+- **必带 tenant_id** — 跨 tenant 碰撞 = SaaS 安全事故.
+
+### Layer 2: 3-state dedup (Redis hot + DB warm)
+
+```
+GET idem:{key}
+  in_flight    → poll 200ms (or Pub/Sub wait), max 10s, 否则 409 Retry-After
+  completed    → 返回 cached result (deterministic replay)
+  not_exist    → SETNX with TTL 24h, execute
+  failed       → 同 not_exist (允许重试)
+  failed_perm  → tombstone, 拒绝重试
+```
+
+Pub/Sub 通知 in_flight 完成, 比 dumb-poll 省 latency. DB tier (Postgres / Cloud SQL) 兜底 >24h.
+
+### Layer 3: Cross-vendor wrapper
+
+Bank 不支持 idempotency? 模式:
+- **A. Native passthrough** (Stripe-style): pass `Idempotency-Key` header to vendor ⭐ 最稳
+- **B. Wrapper full ownership**: 我们 own dedup + 单点责任
+- **C. Check-then-execute via query API**: distributed lock → `query_by_external_ref(ref)` → if exists return → else execute
+- **D. Best-effort + nightly reconciliation**: 跑对账, 业务 accept 微小 dup rate
+
+### Edge cases (按问到的顺序背)
+
+- **EC1 网络超时**: bank 可能 commit 可能没 → 返回 `state='unknown'`, agent 调 `get_transfer_status(ref)` 确认. 不盲重试.
+- **EC2 LLM 调整 args 重试**: 新 args → 新 key → 新 transaction. Prompt 层指令 "Always retry SAME args first". Audit log 标记 "LLM-initiated adjusted retry".
+- **EC3 Redis 挂**: destructive tool **fail closed** (拒绝执行). Read tool fail open (跳 dedup OK).
+- **EC4 24h 后同 args 合法新 intent**: UI 提供 `force_new=True` flag 显式 bypass.
+- **EC5 Worker 中途 crash**: in_flight 带 heartbeat. Stale >30s → re-query vendor by external_ref → 已 commit 标 completed, 否则重执行.
+
+### Production hardening (1 min wrap)
+
+- **Monitor**: dedup hit rate (~2% expected, alert >10% = upstream 异常); in_flight p99 wait; key cardinality
+- **Audit log**: every hit 标 reason (retry / dup / collision suspect)
+- **Reconciliation**: nightly 对比 our log vs bank ledger
+- **Property test**: hypothesis 跑并发, 不变式 `count(distinct execution) <= count(distinct key)`
+- **No SPOF**: Redis cluster + DB replica
+
+### 🪝 Resume hook
+
+"我在 TikTok PayLater 7 国 voice agent 跑过这套. 5 个 market 走 Pattern A (vendor 支持), 2 个 legacy (墨西哥 + 印尼) 走 Pattern C 加 distributed lock + transaction lookup. 6 个月后 double-charge incident 从 ~3/月 → 0."
+
+---
+
+## 🔥 5 Follow-ups (面试官会问)
+
+**Q1: Redis 挂了, fail-open 还是 fail-closed?**
+按 tool 分类: read = open (跳 dedup); write-idempotent = fall back DB tier; **destructive (transfer/charge/delete) = 永远 closed**. 宁可不执行不要双花.
+
+**Q2: Vendor 自带 idempotency_key 但只 5 分钟 TTL, 你要 24h?**
+2 层: Bank 5min handle transient retry; 我们 24h handle cross-session retry (用户关电脑); >24h 走 vendor 永久 ledger + `external_ref` lookup. 三个 window 写进 client doc.
+
+**Q3: Agent 出错后调整 args 重试 (例如 +$10), 新 key, 但原 transaction 可能还在执行?**
+这是 LLM 的责任, runtime 抓不到. 防御:
+1. Prompt: "On error, retry SAME args first; only adjust after `get_transaction_status` 确认原 didn't execute"
+2. 每个 destructive tool 必带 `get_transaction(ref)` companion tool
+3. 提供 `cancel_transfer(ref)` 紧急补偿
+4. Audit log 标 "LLM adjusted-args retry" 供人工 review
+
+**Q4: 怎么测?**
+4 层: Unit (并发 2 call 同 key → 1 execution); Integration (mid-call kill network); Property-based (hypothesis 随机 args 序列, 不变式 distinct_exec ≤ distinct_key); Chaos (Redis kill mid-flight 验 graceful); Production shadow (历史流量关 idem 跑, 数 would-be doubles).
+
+**Q5: 3rd-party API 完全不支持 idempotency?**
+走 Pattern B/C/D:
+- B Wrapper own dedup (我们单点责任)
+- C Distributed lock (Redis Redlock / ZK) + vendor `query_by_external_ref` API
+- D Best-effort + nightly reconciliation + manual compensation flow
+- 最次也要 reconciliation, 否则 ledger 永远不一致
+
+---
+
+## ❌ 易错点 (10 条红线)
+
+1. 让 **LLM 生成 idempotency_key** — non-deterministic, key 不稳
+2. Key 不含 `tenant_id` — 跨租户撞车, 安全事故
+3. 没考虑 **in-flight race** (SETNX atomic 是关键)
+4. TTL 太长 → logical collision risk; 太短 → 跨 session 重试漏
+5. Redis 挂时 destructive tool **fail-open** — 可能双花, 灾难
+6. 没 audit log — dedup hit 不可观察
+7. Args 不 canonical 化 (e.g., `{a:1, b:2}` vs `{b:2, a:1}`) — hash 不同, dedup 失效
+8. 跨 vendor 没 wrapper — vendor 不支持就裸奔
+9. 没 reconciliation — 我们 log 与 vendor ledger 最终不一致
+10. Tool 内部本身不 idempotent — wrapper 也救不了 (e.g., `SELECT ... FOR UPDATE` 没拿到锁)
+
+---
+
+## ✅ 加分项 (13 条)
+
+1. Agent runtime 生成 key + BLAKE2b-128 hash
+2. 3-state state machine (in_flight / completed / failed)
+3. SETNX atomic + 短 poll handle race
+4. Pub/Sub 通知 in_flight done (vs dumb poll)
+5. Stripe-style key passthrough to vendor
+6. Multi-tier storage (Redis 24h + DB 30d + ledger permanent)
+7. Fail-closed on destructive + fail-open on read
+8. Nightly reconciliation job
+9. Cardinality math (50M keys/day → Redis cluster 单集群 ok)
+10. Audit hit log with reason
+11. Cross-vendor decision tree (A/B/C/D)
+12. Property-based test (hypothesis 并发不变式)
+13. Voice agent 7-market 实战 story + double-charge 数字
+
+---
+
+## 一句话总结
+
+Idempotent tool = **runtime 生成确定性 key + 3 态机协调并发 + 短长 TTL 双 tier + destructive fail-closed + 跨 vendor wrapper + 持续对账**. LLM 比 human 更易触发 retry, idempotency 是最后防线.
+
+---
+
+## 🃏 Cheat Sheet (印 1 页随身)
+
+```
+Idempotency key:
+  Source: agent runtime (NOT LLM, NOT server)
+  Composition: tenant_id + session_id + tool_name + canonical(args)
+  Hash: BLAKE2b-128 (16 bytes / 32 hex)
+  Canonical: sort_keys + Decimal precision + str normalize
+
+State machine:
+  none → in_flight → completed
+              ↓
+            failed (retryable) → none
+              ↓
+        failed_permanent (tombstone)
+
+In-flight race:
+  redis.set(key, in_flight, nx=True, ex=ttl)  # atomic
+  If exists in_flight: poll 200ms or Pub/Sub wait, max 10s, else 409
+
+TTL multi-tier:
+  Redis hot:    24h
+  DB warm:      30d
+  Bank ledger:  permanent
+  + nightly reconciliation
+
+Failure policy:
+  Tool safety  | Redis down  | DB down
+  read         | skip dedup  | skip dedup
+  write-idem   | use DB      | local 5m
+  destructive  | FAIL CLOSED | FAIL CLOSED
+
+Cross-vendor patterns:
+  A. Native idem header (Stripe) → pass-through ⭐
+  B. Wrapper full ownership
+  C. Check-then-execute via query API + lock
+  D. Best-effort + reconciliation (legacy)
+
+Worker crash:
+  in_flight entry: worker_id + last_heartbeat
+  Stale > 30s → re-query vendor by external_ref
+              → committed: mark completed
+              → not: re-execute
+
+Cost / cardinality:
+  1M users × 50 calls/day = 50M keys
+  Redis: 5GB, single cluster ok
+  Hit rate: ~2% normal, alert > 10%
+
+Monitor:
+  - dedup hit rate
+  - in_flight wait p99
+  - key cardinality growth
+  - reconciliation mismatch count
+
+Test:
+  - concurrent same-key invocation property
+  - chaos kill Redis mid-flight
+  - production shadow with idem disabled
+
+红线:
+  - LLM-generated key
+  - Fail-open on infra failure for destructive
+  - No reconciliation
+  - No audit
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

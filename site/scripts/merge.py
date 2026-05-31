@@ -45,6 +45,8 @@ SOURCES = [
     ("FDE", ROOT / "site" / "data" / "fde-questions.json"),
     # Google FDE prep — HR-tipped topic areas (Tool calling / RAG / LLM eng / Delivery)
     ("Google FDE", ROOT / "site" / "data" / "google-fde-prep.json"),
+    # Google FDE Summary — 200-line interview-ready 总结 (sample monologue + 5 followups + traps + bonus + cheat sheet)
+    ("Google FDE Summary", ROOT / "site" / "data" / "gfde-summary.json"),
     # Review / rapid-recall pages — extracted Extended Cheat Sheets from the 49 full pages
     ("Review", ROOT / "site" / "data" / "review-pages.json"),
     # 真题 — Exponent 2026 整理的 FDE 52 道高频真题 (Palantir/OpenAI/Anthropic/Databricks/Scale/ElevenLabs)

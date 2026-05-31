@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⚡ T4.2 · 业务流程 → Agent Workflow 抽象 — 冲刺版 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE Summary / ⚡ T4.2 · 业务流程 → Agent Workflow 抽象 — 冲刺版</div>
+  <h1>⚡ T4.2 · 业务流程 → Agent Workflow 抽象 — 冲刺版</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde-summary">Google FDE Summary</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#9333ea"><strong>Google FDE Summary</strong> · Senior+ · 📋 9 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t4-workflow-abstraction-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t4-workflow-abstraction-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">from N customers to 1 abstraction · template + config + override · 200 行能背</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🎯 T4.2 · 业务流程 → Agent Workflow 抽象 — 冲刺版</h1>
+<blockquote><p>完整版: <a href="gfde-t4-workflow-abstraction.html">gfde-t4-workflow-abstraction.html</a>. 200 行能背版.</p></blockquote>
+<hr />
+<h3>📋 我会这样答 (Sample Monologue)</h3>
+<p><strong>Clarify (10 sec)</strong>: "假设: 客户给 12-step manual workflow (e.g., loan approval / claim handling), 部分步骤监管要求 human, single underwriter 决策 final, 100 application/day 量, 1-2 wrong approve/month 错误容忍, GCP + Vertex AI 限定."</p>
+<p><strong>核心 framing</strong>: 90% real enterprise workflow = <strong>hybrid</strong>, 不是 "全 auto" 也不是 "全人". 工程上<strong>绝大多数难点不在 LLM, 在 handoff + state + trust</strong>.</p>
+<h4>Layer 1: 3-Question Framework (per step 分类)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Q1 Deterministic? (same input → same output?)
+Q2 Reversible? (can undo if wrong?)
+Q3 Latency? (real-time vs async OK?)
+
+→ 5 outcomes:
+  Det + Rev + Async      → Agent automate (background)
+  Det + Rev + Real-time  → Agent automate (with fallback)
+  Det + Irrev            → Confirm-required agent (draft + human sign)
+  Judgment + Rev         → Agent assist (draft + human decide)
+  Judgment + Irrev       → Human only (agent provides context)</code></pre>
+<h4>Layer 2: 12-Step Loan Workflow 应用矩阵</h4>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>Step</th><th>Det?</th><th>Rev?</th><th>Owner</th><th>Why</th></tr></thead><tbody><tr><td>1</td><td>Receive application</td><td>Y</td><td>Y</td><td>Agent</td><td>Parse + ack</td></tr><tr><td>2</td><td>KYC check</td><td>Mixed</td><td>N</td><td><strong>Hybrid</strong> (agent prep + human verify)</td><td>法规要求人眼</td></tr><tr><td>3</td><td>Credit bureau pull</td><td>Y</td><td>Y</td><td>Agent</td><td>API deterministic</td></tr><tr><td>4</td><td>Credit score interpret</td><td>Mostly</td><td>Y</td><td>Agent + escalate outlier</td><td>大多 routine</td></tr><tr><td>5</td><td>Income verify</td><td>Mixed</td><td>Y</td><td>Agent assist (OCR + sum) + human spot-check</td><td>Sub-step decomp</td></tr><tr><td>6</td><td>Employer call</td><td>N</td><td>Y</td><td>Human (agent draft script)</td><td>Relationship</td></tr><tr><td>7</td><td>Appraisal request</td><td>Y</td><td>Y</td><td>Agent</td><td>Scheduling</td></tr><tr><td>8</td><td>Appraisal review</td><td>Judgment</td><td>Y</td><td><strong>Hybrid</strong> (agent extract + flag, human validate)</td><td>Numbers det, judgment human</td></tr><tr><td>9</td><td>DTI calc</td><td>Y</td><td>Y</td><td>Agent</td><td>Formula</td></tr><tr><td>10</td><td>Risk assess</td><td>Judgment</td><td>Y</td><td>Agent assist (ML score + reasoning)</td><td>Model + interpret</td></tr><tr><td>11</td><td>Final decision</td><td>Judgment</td><td><strong>N</strong></td><td><strong>Human only</strong></td><td>法律责任 + 不可逆</td></tr><tr><td>12</td><td>Communicate</td><td>Y</td><td>Mostly</td><td><strong>Confirm-required</strong> (agent draft + underwriter sign)</td><td>Template + irrev</td></tr></tbody></table></div>
+<p><strong>结果</strong>: 8/12 agent 参与, 4/12 纯人. <strong>Customer keeps human touch on judgment + irreversible, agent handles deterministic 80%</strong>.</p>
+<h4>Layer 3: Hybrid Handoff UI (smooth transition)</h4>
+<p><strong>Bad</strong> (常见): "Loan #4283 needs review, click here" → human 读 30 页 PDF → 20 min. <strong>Good</strong>: human dashboard 显示 agent prep + flagged concerns + 1-click actions + SLA → 2 min decide.</p>
+<p><strong>Checklist</strong> (每个 hybrid step UI 必含):</p>
+<ul><li>Agent's preliminary work (visible)</li><li>Specific Q to answer ("Approve KYC" 比 "Review all" 清楚)</li><li>Flagged concerns (agent's uncertainty)</li><li>Quick actions 1-click (Approve / Decline / Kick-back / Escalate)</li><li>Time SLA (deadline 可见)</li><li>Context links (raw doc on demand)</li><li>Audit log (prior agent steps)</li><li>Notes field (后续 audit)</li><li>Disagree path (training signal)</li></ul>
+<h4>Layer 4: State Persistence — Workflow Engine</h4>
+<p>朴素 Python script restart 丢 state. 用 <strong>Temporal</strong> (90% 选择 for enterprise) 持久化每 step. Pattern: <code>workflow.execute_activity(parse_application, ..., timeout=5m)</code> for durable steps + <code>workflow.wait_for_signal('kyc_verified', timeout=days=3)</code> for human waits (signal-based, 可等 days).</p>
+<p><strong>Temporal core features</strong>: Durable activities (per-step DB persisted) / Signals (wait for external event) / Timeouts (SLA enforcement) / Retry policies / Replay (time-travel debug) / Versioning (multi-version coexist) / Saga compensation (failure undo).</p>
+<h4>Edge cases (5 个最高频)</h4>
+<ul><li><strong>EC1 Agent disagree with human (agent decline, human approve)</strong>: Signal-rich training data, but humans biased/inconsistent. Outcome-based label (1-yr repay history) &gt; raw human override. Audit random sample, 别 blindly fine-tune.</li><li><strong>EC2 Step mixed Det + Judgment (income verify)</strong>: Sub-step decomposition — extract numbers (agent) + threshold compare (agent) + judgment kernel (human). 80/20: 80% time agent, 20% human.</li><li><strong>EC3 客户要 agent autonomous on Step 11 (final decision)</strong>: <strong>Strong push back</strong>. Legal liability + 监管 (Fair Lending Act) + discrimination risk + customer trust. Compromise: agent recommends + underwriter signs 10 sec for routine.</li><li><strong>EC4 Step 6 employer call automate?</strong>: Voice agent calling employer sounds robotic, employer hesitates. Hybrid — agent <strong>drafts script</strong> for human caller. Volume math: 100 calls × 5 min = 8 hr, ROI 不大. Revisit Phase 5+ 当 voice quality improves.</li><li><strong>EC5 Phase 4 routine autonomous criteria</strong>: Pre-defined sign-off — loan &lt; $100K + credit &gt; 720 + DTI &lt; 35% + no red flag + within standard product + existing customer track record. 10% sampled by human audit. Per-jurisdiction bound. Quarterly review.</li></ul>
+<h4>Production hardening (Trust Ladder 4 Phase)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Phase 0 baseline:    全人工
+Phase 1 (wk 1-8):    Suggest mode, human approves all
+  advance: override &lt; 10%, time saved &gt; 20%
+Phase 2 (wk 8-16):   Auto-execute deterministic steps
+  advance: error &lt; 1%, time saved &gt; 40%
+Phase 3 (wk 16-32):  Auto + escalate outliers
+  advance: escalation &lt; 5%, satisfaction OK
+Phase 4 (wk 32+):    Autonomous on routine (criteria-defined)
+  audit: 10% human sample
+  Stays human regardless: Step 11 final + Step 6 employer call</code></pre>
+<p><strong>Rollback</strong>: 任何 phase 指标 &gt; 2x threshold → rollback to previous phase + investigate.</p>
+<h4>🪝 Resume hook</h4>
+<p>"Indonesia refund tier 就是这套 3-question framework. Tier 1 (small &lt; IDR 50K, routine 'wrong item') = fully auto agent decides + executes. Tier 2 (moderate IDR 50K-500K) = confirm-required (agent draft + ops 1-click sign). Tier 3 (high-value &gt; IDR 500K / fraud signal / VIP) = full human (agent provides summary). Phase rollout — wk 1-6 Phase 1 agent suggests all + human reviews all, wk 6-12 Phase 2 auto on tier 1, wk 12+ Phase 3 auto tier 1+2 + human tier 3. Each phase advance only when human-override rate stable &lt; 5% over 2-week window. ONE incident in Phase 2 — agent loop bug auto-refunded duplicate, anomaly detector caught 4 min, bulk reverted via compensating handler 12 min. Postmortem → fix → new safeguard (per-customer daily refund cap)."</p>
+<hr />
+<h3>🔥 5 Follow-ups</h3>
+<p><strong>Q1: Agent 和 human disagree (agent decline, human approve). 训 agent on human label?</strong> Carefully. Yes signal (human override 是 rich data), but humans biased/inconsistent. <strong>Outcome-based label</strong> (loan repaid?) &gt; raw override. Audit sample by senior. Combine: weight outcome-confirmed higher than raw override. 不要 blindly fine-tune.</p>
+<p><strong>Q2: Step 是 mixed (income verify = extract numbers ✓ + decide if "enough")?</strong> Sub-step decomposition. (a) OCR extract (agent) / (b) sum 12-month (agent) / (c) compare threshold (agent) / (d) judgment "is income stable?" (human) / (e) "ask more docs?" (human). 80% time in a-c, 20% in d-e. 80% efficiency without giving up judgment.</p>
+<p><strong>Q3: 客户要 agent autonomous on Step 11 (final decision). Push back?</strong> <strong>Yes strongly</strong>. Legal liability (谁 accountable for AI denial?) + regulator (Fair Lending Act) + discrimination risk (bias hard to prove absent) + customer trust. Compromise: agent recommends + reasoning + flagged concerns. Underwriter signs 10 sec for routine (vs 10 min manual). Speed + compliance + legal safety.</p>
+<p><strong>Q4: Step 6 employer call — voice agent could do it. Worth?</strong> Robot voice → employer hesitates to verify info. Hybrid — voice agent drafts script for human caller (saves prep). Volume math: 100 calls × 5 min = 8 hr/day, ROI 不大. Revisit Phase 5+ 当 voice 改进 + employer accept AI.</p>
+<p><strong>Q5: Phase 4 — 哪些 loan 算 "routine"?</strong> Pre-defined criteria (sign-off with underwriter team): loan &lt; $X (e.g., $100K) + credit &gt; Y (720) + DTI &lt; Z (35%) + no red flag + within standard product + existing customer w/ track record. Per-jurisdiction bound. 10% human sample audit. Kick-back loop. Quarterly review.</p>
+<hr />
+<h3>❌ 易错点 (10 条红线)</h3>
+<ol><li><strong>Automate everything</strong> — 法规违规 (KYC) + 不可逆错 + 信任崩</li><li><strong>No 3-question framework</strong> — gut-feel automation choice</li><li><strong>Agent + human duplicate work</strong> — no clear handoff protocol</li><li><strong>No state persistence</strong> — human work re-done after pause</li><li><strong>No trust ladder</strong> — push too fast, 1st incident → 全 rollback</li><li><strong>Human task UI shows everything</strong> — overload, 30-min review instead of 2-min</li><li><strong>No override metric</strong> — disagreement invisible</li><li><strong>Atomic step assumption</strong> — judgment step locked as human-only (miss 80% decomposition)</li><li><strong>No SLA / timeout</strong> — workflow stuck waiting human forever</li><li><strong>No customer-visible phase tracker</strong> — customer doesn't see your discipline</li></ol>
+<hr />
+<h3>✅ 加分项 (12 条)</h3>
+<ol><li>3-question framework explicit (Det / Rev / Latency)</li><li>Per-step matrix for 12 steps with rationale</li><li>Hybrid handoff UI checklist (prep / Q / actions / SLA)</li><li>State persistence with Temporal (signal-based human wait)</li><li>Trust ladder 4 phase + advancement criteria</li><li>Override-rate observability + alert on drift</li><li>Sub-step decomposition for "judgment" step (80/20 split)</li><li>Customer-visible phase tracker + live KPI</li><li>Per-jurisdiction Phase 4 criteria (loan &lt; $X + credit &gt; Y + DTI &lt; Z)</li><li>Signal-driven human wait with timeout + escalate</li><li>Saga / compensation for failed step undo</li><li>Indonesia refund tier phased rollout + incident story (4 min anomaly catch)</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>T4.2 = <strong>3-question framework 分类每步 + Temporal-like engine 持久 state + 4-phase trust ladder 渐进 autonomy + hybrid handoff UI 不让人重读 + sub-step decomposition 把 judgment 拆到 80% 可 auto</strong>. 工程上<strong>绝大多数难点不在 LLM, 在 handoff + state + trust</strong>.</p>
+<hr />
+<h3>🃏 Cheat Sheet (印 1 页)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">3-question framework (per step):
+  Q1 Deterministic? Q2 Reversible? Q3 Latency-sensitive?
+
+5 categorization outcomes:
+  Det + Rev + Async    → Agent automate (background)
+  Det + Rev + RT       → Agent automate (with fallback)
+  Det + Irrev          → Confirm-required (draft + sign)
+  Judgment + Rev       → Agent assist (draft + human decide)
+  Judgment + Irrev     → Human only (agent context)
+
+12-step loan workflow:
+  1  Receive          → Agent
+  2  KYC              → Hybrid (agent gather + human verify)
+  3  Credit pull      → Agent
+  4  Credit interpret → Agent + escalate outlier
+  5  Income verify    → Agent 80% + human 20% judgment
+  6  Employer call    → Human (agent draft script)
+  7  Appraisal req    → Agent
+  8  Appraisal review → Hybrid
+  9  DTI calc         → Agent
+  10 Risk assess      → Agent assist
+  11 Final decision   → Human (always, legal liability)
+  12 Communicate      → Confirm-required
+
+Hybrid handoff UI checklist:
+  Agent prep visible / Specific Q to answer /
+  Flagged concerns / 1-click quick actions /
+  Time SLA / Context links / Audit log /
+  Notes field / Disagree path (training signal)
+
+Workflow engine:
+  Temporal  90% choice, enterprise (durable, signals, replay, saga)
+  DBOS / AWS Step Functions / self-built (only simple)
+
+Trust Ladder 4 phases:
+  Phase 1 (w1-8):   Suggest mode, human approves all
+    advance: override &lt; 10%, time saved &gt; 20%
+  Phase 2 (w8-16):  Auto deterministic + reversible
+    advance: error &lt; 1%, time saved &gt; 40%
+  Phase 3 (w16-32): Auto + escalate outlier
+    advance: escalation &lt; 5%
+  Phase 4 (w32+):   Autonomous on routine (criteria-defined)
+    audit: 10% human sample
+  Stays human regardless: final decision + employer call
+
+Sub-step decomposition:
+  Judgment-looking step = (det extract × 80%) + (judgment kernel × 20%)
+  Agent: extract / lookup / compute / threshold (80%)
+  Human: judgment kernel (20%)
+  → 80% efficiency without giving up judgment
+
+Override metric:
+  Per-step disagreement rate (alert &gt; 10%)
+  Outcome verify (was override correct retrospectively?)
+  Training signal carefully (bias risk)
+
+Customer-visible:
+  Phase tracker / Live KPI / Roadmap (Phase 2/3/4)
+
+Anti-patterns (红线):
+  - Automate all / No 3-question / Duplicate agent+human
+  - No state persistence / No trust ladder / UI overload
+  - No override metric / Atomic step assumption / No SLA
+
+Resume hooks:
+  - BNPL chatbot collection workflow map
+  - Indonesia refund tier 1/2/3 phased rollout
+  - Voice agent escalation transcript transfer
+  - TikTok payment Temporal-like durable workflow</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t4-customer-scoping-summary.html">← ⚡ T4.1 · Customer Scoping Playbook (模糊需求 → MVP) — 冲刺版</a>
+    <a href="gfde-t4-human-agent-interaction-summary.html">⚡ T4.3 · Human-Agent Interaction 设计 (何时找人 / 怎么找) — 冲刺版 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🎯 T4.2 · 业务流程 → Agent Workflow 抽象 — 冲刺版
+
+> 完整版: [gfde-t4-workflow-abstraction.html](gfde-t4-workflow-abstraction.html). 200 行能背版.
+
+---
+
+## 📋 我会这样答 (Sample Monologue)
+
+**Clarify (10 sec)**:
+"假设: 客户给 12-step manual workflow (e.g., loan approval / claim handling), 部分步骤监管要求 human, single underwriter 决策 final, 100 application/day 量, 1-2 wrong approve/month 错误容忍, GCP + Vertex AI 限定."
+
+**核心 framing**: 90% real enterprise workflow = **hybrid**, 不是 "全 auto" 也不是 "全人". 工程上**绝大多数难点不在 LLM, 在 handoff + state + trust**.
+
+### Layer 1: 3-Question Framework (per step 分类)
+
+```
+Q1 Deterministic? (same input → same output?)
+Q2 Reversible? (can undo if wrong?)
+Q3 Latency? (real-time vs async OK?)
+
+→ 5 outcomes:
+  Det + Rev + Async      → Agent automate (background)
+  Det + Rev + Real-time  → Agent automate (with fallback)
+  Det + Irrev            → Confirm-required agent (draft + human sign)
+  Judgment + Rev         → Agent assist (draft + human decide)
+  Judgment + Irrev       → Human only (agent provides context)
+```
+
+### Layer 2: 12-Step Loan Workflow 应用矩阵
+
+| # | Step | Det? | Rev? | Owner | Why |
+|---|---|---|---|---|---|
+| 1 | Receive application | Y | Y | Agent | Parse + ack |
+| 2 | KYC check | Mixed | N | **Hybrid** (agent prep + human verify) | 法规要求人眼 |
+| 3 | Credit bureau pull | Y | Y | Agent | API deterministic |
+| 4 | Credit score interpret | Mostly | Y | Agent + escalate outlier | 大多 routine |
+| 5 | Income verify | Mixed | Y | Agent assist (OCR + sum) + human spot-check | Sub-step decomp |
+| 6 | Employer call | N | Y | Human (agent draft script) | Relationship |
+| 7 | Appraisal request | Y | Y | Agent | Scheduling |
+| 8 | Appraisal review | Judgment | Y | **Hybrid** (agent extract + flag, human validate) | Numbers det, judgment human |
+| 9 | DTI calc | Y | Y | Agent | Formula |
+| 10 | Risk assess | Judgment | Y | Agent assist (ML score + reasoning) | Model + interpret |
+| 11 | Final decision | Judgment | **N** | **Human only** | 法律责任 + 不可逆 |
+| 12 | Communicate | Y | Mostly | **Confirm-required** (agent draft + underwriter sign) | Template + irrev |
+
+**结果**: 8/12 agent 参与, 4/12 纯人. **Customer keeps human touch on judgment + irreversible, agent handles deterministic 80%**.
+
+### Layer 3: Hybrid Handoff UI (smooth transition)
+
+**Bad** (常见): "Loan #4283 needs review, click here" → human 读 30 页 PDF → 20 min.
+**Good**: human dashboard 显示 agent prep + flagged concerns + 1-click actions + SLA → 2 min decide.
+
+**Checklist** (每个 hybrid step UI 必含):
+- Agent's preliminary work (visible)
+- Specific Q to answer ("Approve KYC" 比 "Review all" 清楚)
+- Flagged concerns (agent's uncertainty)
+- Quick actions 1-click (Approve / Decline / Kick-back / Escalate)
+- Time SLA (deadline 可见)
+- Context links (raw doc on demand)
+- Audit log (prior agent steps)
+- Notes field (后续 audit)
+- Disagree path (training signal)
+
+### Layer 4: State Persistence — Workflow Engine
+
+朴素 Python script restart 丢 state. 用 **Temporal** (90% 选择 for enterprise) 持久化每 step. Pattern: `workflow.execute_activity(parse_application, ..., timeout=5m)` for durable steps + `workflow.wait_for_signal('kyc_verified', timeout=days=3)` for human waits (signal-based, 可等 days).
+
+**Temporal core features**: Durable activities (per-step DB persisted) / Signals (wait for external event) / Timeouts (SLA enforcement) / Retry policies / Replay (time-travel debug) / Versioning (multi-version coexist) / Saga compensation (failure undo).
+
+### Edge cases (5 个最高频)
+
+- **EC1 Agent disagree with human (agent decline, human approve)**: Signal-rich training data, but humans biased/inconsistent. Outcome-based label (1-yr repay history) > raw human override. Audit random sample, 别 blindly fine-tune.
+- **EC2 Step mixed Det + Judgment (income verify)**: Sub-step decomposition — extract numbers (agent) + threshold compare (agent) + judgment kernel (human). 80/20: 80% time agent, 20% human.
+- **EC3 客户要 agent autonomous on Step 11 (final decision)**: **Strong push back**. Legal liability + 监管 (Fair Lending Act) + discrimination risk + customer trust. Compromise: agent recommends + underwriter signs 10 sec for routine.
+- **EC4 Step 6 employer call automate?**: Voice agent calling employer sounds robotic, employer hesitates. Hybrid — agent **drafts script** for human caller. Volume math: 100 calls × 5 min = 8 hr, ROI 不大. Revisit Phase 5+ 当 voice quality improves.
+- **EC5 Phase 4 routine autonomous criteria**: Pre-defined sign-off — loan < $100K + credit > 720 + DTI < 35% + no red flag + within standard product + existing customer track record. 10% sampled by human audit. Per-jurisdiction bound. Quarterly review.
+
+### Production hardening (Trust Ladder 4 Phase)
+
+```
+Phase 0 baseline:    全人工
+Phase 1 (wk 1-8):    Suggest mode, human approves all
+  advance: override < 10%, time saved > 20%
+Phase 2 (wk 8-16):   Auto-execute deterministic steps
+  advance: error < 1%, time saved > 40%
+Phase 3 (wk 16-32):  Auto + escalate outliers
+  advance: escalation < 5%, satisfaction OK
+Phase 4 (wk 32+):    Autonomous on routine (criteria-defined)
+  audit: 10% human sample
+  Stays human regardless: Step 11 final + Step 6 employer call
+```
+
+**Rollback**: 任何 phase 指标 > 2x threshold → rollback to previous phase + investigate.
+
+### 🪝 Resume hook
+
+"Indonesia refund tier 就是这套 3-question framework. Tier 1 (small < IDR 50K, routine 'wrong item') = fully auto agent decides + executes. Tier 2 (moderate IDR 50K-500K) = confirm-required (agent draft + ops 1-click sign). Tier 3 (high-value > IDR 500K / fraud signal / VIP) = full human (agent provides summary). Phase rollout — wk 1-6 Phase 1 agent suggests all + human reviews all, wk 6-12 Phase 2 auto on tier 1, wk 12+ Phase 3 auto tier 1+2 + human tier 3. Each phase advance only when human-override rate stable < 5% over 2-week window. ONE incident in Phase 2 — agent loop bug auto-refunded duplicate, anomaly detector caught 4 min, bulk reverted via compensating handler 12 min. Postmortem → fix → new safeguard (per-customer daily refund cap)."
+
+---
+
+## 🔥 5 Follow-ups
+
+**Q1: Agent 和 human disagree (agent decline, human approve). 训 agent on human label?**
+Carefully. Yes signal (human override 是 rich data), but humans biased/inconsistent. **Outcome-based label** (loan repaid?) > raw override. Audit sample by senior. Combine: weight outcome-confirmed higher than raw override. 不要 blindly fine-tune.
+
+**Q2: Step 是 mixed (income verify = extract numbers ✓ + decide if "enough")?**
+Sub-step decomposition. (a) OCR extract (agent) / (b) sum 12-month (agent) / (c) compare threshold (agent) / (d) judgment "is income stable?" (human) / (e) "ask more docs?" (human). 80% time in a-c, 20% in d-e. 80% efficiency without giving up judgment.
+
+**Q3: 客户要 agent autonomous on Step 11 (final decision). Push back?**
+**Yes strongly**. Legal liability (谁 accountable for AI denial?) + regulator (Fair Lending Act) + discrimination risk (bias hard to prove absent) + customer trust. Compromise: agent recommends + reasoning + flagged concerns. Underwriter signs 10 sec for routine (vs 10 min manual). Speed + compliance + legal safety.
+
+**Q4: Step 6 employer call — voice agent could do it. Worth?**
+Robot voice → employer hesitates to verify info. Hybrid — voice agent drafts script for human caller (saves prep). Volume math: 100 calls × 5 min = 8 hr/day, ROI 不大. Revisit Phase 5+ 当 voice 改进 + employer accept AI.
+
+**Q5: Phase 4 — 哪些 loan 算 "routine"?**
+Pre-defined criteria (sign-off with underwriter team): loan < $X (e.g., $100K) + credit > Y (720) + DTI < Z (35%) + no red flag + within standard product + existing customer w/ track record. Per-jurisdiction bound. 10% human sample audit. Kick-back loop. Quarterly review.
+
+---
+
+## ❌ 易错点 (10 条红线)
+
+1. **Automate everything** — 法规违规 (KYC) + 不可逆错 + 信任崩
+2. **No 3-question framework** — gut-feel automation choice
+3. **Agent + human duplicate work** — no clear handoff protocol
+4. **No state persistence** — human work re-done after pause
+5. **No trust ladder** — push too fast, 1st incident → 全 rollback
+6. **Human task UI shows everything** — overload, 30-min review instead of 2-min
+7. **No override metric** — disagreement invisible
+8. **Atomic step assumption** — judgment step locked as human-only (miss 80% decomposition)
+9. **No SLA / timeout** — workflow stuck waiting human forever
+10. **No customer-visible phase tracker** — customer doesn't see your discipline
+
+---
+
+## ✅ 加分项 (12 条)
+
+1. 3-question framework explicit (Det / Rev / Latency)
+2. Per-step matrix for 12 steps with rationale
+3. Hybrid handoff UI checklist (prep / Q / actions / SLA)
+4. State persistence with Temporal (signal-based human wait)
+5. Trust ladder 4 phase + advancement criteria
+6. Override-rate observability + alert on drift
+7. Sub-step decomposition for "judgment" step (80/20 split)
+8. Customer-visible phase tracker + live KPI
+9. Per-jurisdiction Phase 4 criteria (loan < $X + credit > Y + DTI < Z)
+10. Signal-driven human wait with timeout + escalate
+11. Saga / compensation for failed step undo
+12. Indonesia refund tier phased rollout + incident story (4 min anomaly catch)
+
+---
+
+## 一句话总结
+
+T4.2 = **3-question framework 分类每步 + Temporal-like engine 持久 state + 4-phase trust ladder 渐进 autonomy + hybrid handoff UI 不让人重读 + sub-step decomposition 把 judgment 拆到 80% 可 auto**. 工程上**绝大多数难点不在 LLM, 在 handoff + state + trust**.
+
+---
+
+## 🃏 Cheat Sheet (印 1 页)
+
+```
+3-question framework (per step):
+  Q1 Deterministic? Q2 Reversible? Q3 Latency-sensitive?
+
+5 categorization outcomes:
+  Det + Rev + Async    → Agent automate (background)
+  Det + Rev + RT       → Agent automate (with fallback)
+  Det + Irrev          → Confirm-required (draft + sign)
+  Judgment + Rev       → Agent assist (draft + human decide)
+  Judgment + Irrev     → Human only (agent context)
+
+12-step loan workflow:
+  1  Receive          → Agent
+  2  KYC              → Hybrid (agent gather + human verify)
+  3  Credit pull      → Agent
+  4  Credit interpret → Agent + escalate outlier
+  5  Income verify    → Agent 80% + human 20% judgment
+  6  Employer call    → Human (agent draft script)
+  7  Appraisal req    → Agent
+  8  Appraisal review → Hybrid
+  9  DTI calc         → Agent
+  10 Risk assess      → Agent assist
+  11 Final decision   → Human (always, legal liability)
+  12 Communicate      → Confirm-required
+
+Hybrid handoff UI checklist:
+  Agent prep visible / Specific Q to answer /
+  Flagged concerns / 1-click quick actions /
+  Time SLA / Context links / Audit log /
+  Notes field / Disagree path (training signal)
+
+Workflow engine:
+  Temporal  90% choice, enterprise (durable, signals, replay, saga)
+  DBOS / AWS Step Functions / self-built (only simple)
+
+Trust Ladder 4 phases:
+  Phase 1 (w1-8):   Suggest mode, human approves all
+    advance: override < 10%, time saved > 20%
+  Phase 2 (w8-16):  Auto deterministic + reversible
+    advance: error < 1%, time saved > 40%
+  Phase 3 (w16-32): Auto + escalate outlier
+    advance: escalation < 5%
+  Phase 4 (w32+):   Autonomous on routine (criteria-defined)
+    audit: 10% human sample
+  Stays human regardless: final decision + employer call
+
+Sub-step decomposition:
+  Judgment-looking step = (det extract × 80%) + (judgment kernel × 20%)
+  Agent: extract / lookup / compute / threshold (80%)
+  Human: judgment kernel (20%)
+  → 80% efficiency without giving up judgment
+
+Override metric:
+  Per-step disagreement rate (alert > 10%)
+  Outcome verify (was override correct retrospectively?)
+  Training signal carefully (bias risk)
+
+Customer-visible:
+  Phase tracker / Live KPI / Roadmap (Phase 2/3/4)
+
+Anti-patterns (红线):
+  - Automate all / No 3-question / Duplicate agent+human
+  - No state persistence / No trust ladder / UI overload
+  - No override metric / Atomic step assumption / No SLA
+
+Resume hooks:
+  - BNPL chatbot collection workflow map
+  - Indonesia refund tier 1/2/3 phased rollout
+  - Voice agent escalation transcript transfer
+  - TikTok payment Temporal-like durable workflow
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

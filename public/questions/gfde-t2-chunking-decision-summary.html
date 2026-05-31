@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⚡ T2.2 · Chunking 策略决策树 — 冲刺版 · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Google FDE Summary / ⚡ T2.2 · Chunking 策略决策树 — 冲刺版</div>
+  <h1>⚡ T2.2 · Chunking 策略决策树 — 冲刺版</h1>
+  <div class="header-meta">
+    <span class="tag tag-google-fde-summary">Google FDE Summary</span>
+    <span class="tag tag-level">Senior+</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#9333ea"><strong>Google FDE Summary</strong> · Senior+ · 📋 8 · 🕒 Mid May, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/gfde-t2-chunking-decision-summary.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/gfde-t2-chunking-decision-summary.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">doc-type-aware recursive split · 512 token + 50 overlap · ablation defense · 200 行能背</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>✂️ T2.2 · Chunking 策略决策树 — 冲刺版</h1>
+<blockquote><p>完整版: <a href="gfde-t2-chunking-decision.html">gfde-t2-chunking-decision.html</a>. 这页是 200 行能背版.</p></blockquote>
+<hr />
+<h3>📋 我会这样答 (Sample Monologue)</h3>
+<p><strong>Clarify (10 sec)</strong>: "假设: 10K technical PDFs 50-500 页, mixed prose+tables+code+formulas, query 是 fact-lookup + concept-explanation, embedding 用 text-embedding-005 (768d, 2K max), daily reindex 可接受, latency budget 1s, multi-tenant."</p>
+<p><strong>4-layer chunking pipeline (recall 71→87 的关键)</strong>:</p>
+<h4>Layer 1: Strategy decision tree (按 doc 类型选)</h4>
+<pre class="language-plaintext"><code class="language-plaintext">Pure prose (blog/FAQ)            → Recursive 512 tok + 64 overlap ⭐ default
+Markdown/HTML w/ headers         → Heading-aware recursive
+PDF w/ tables (legal/财报)       → Document AI parse → doc-structure aware
+Code / Repo                      → Tree-sitter AST, function-level atomic
+Chat / Conversation logs         → Turn-based, 3-5 turn group
+Mixed enterprise wiki             → Late chunking (Jina v3 / Cohere v4) ⭐ 2026</code></pre>
+<h4>Layer 2: Multi-modal special handling</h4>
+<ul><li><strong>Tables</strong>: ATOMIC chunk (永远不切), Markdown serialize + caption + 上下文一起 embed</li><li><strong>Code</strong>: ATOMIC (跨 def 不切), imports + signature + body 作 chunk, symbol metadata</li><li><strong>Formula</strong>: 保留 LaTeX (不渲染图), 加文字描述 embed</li><li><strong>Figure</strong>: caption + alt text chunk, 或 multimodal embed (CLIP)</li><li><strong>List</strong>: 短 atomic, 长 split at item boundary (不切 item 中间)</li></ul>
+<h4>Layer 3: Metadata enrichment</h4>
+<pre class="language-python"><code class="language-python">Chunk = {
+    'chunk_id': hash(doc_id + heading_path + chunk_index),  # 稳定 ID for delta
+    'doc_id', 'heading_path', 'page_range', 'section_level',
+    'is_table'/'is_code'/'is_figure', 'tenant_id', 'visibility',
+    'acl_groups', 'pii_level', 'created_at', 'updated_at',
+    'quality_score', 'is_canonical', 'language', 'product',
+}
+# Embed text prepend heading: f"{' &gt; '.join(heading_path)}\n\n{chunk.text}"</code></pre>
+<h4>Layer 4: Delta indexing + versioning + hot/warm</h4>
+<ul><li><strong>Delta</strong>: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)</li><li><strong>Versioning</strong>: 双写 v2 + v3, traffic split 80/20, eval pass → cutover</li><li><strong>Hot + warm</strong>: last 24h in-memory 5min refresh + rest daily Qdrant, RRF merge</li><li><strong>Async pipeline</strong>: doc change → Pub/Sub queue → background worker</li></ul>
+<h4>Edge cases (背 5 个)</h4>
+<ul><li><strong>EC1 切表格中间</strong>: naive fixed-512 把表格切两半, 半个表无意义 → Document AI 解析为 table element, atomic chunk + Markdown serialize, caption embed.</li><li><strong>EC2 Heading 丢上下文</strong>: "Rated voltage: 5V" 不知是哪个设备 → embed_text prepend heading_path ('iPhone 15 Pro Max &gt; Specs &gt; Electrical\n\n5V'), embedding 有 context.</li><li><strong>EC3 Random chunk ID</strong>: 每次 random UUID → delta indexing 不可能 (无法 diff) → 用 <code>hash(doc_id + heading_path + chunk_index_in_section)</code> 结构性 hash.</li><li><strong>EC4 Tokenizer mismatch</strong>: 用 GPT tokenizer 数 token 但 embedding 用 BERT → 估算偏差 30%+ → 用 embedding model 自己的 tokenizer 数.</li><li><strong>EC5 PII tagging 漏</strong>: chunk 含 SSN/credit card 直接 embed 进 index → 索引前 Cloud DLP 扫描, mask 或 drop, 标 pii_level 用于检索时 perms.</li></ul>
+<h4>Production hardening (1 min)</h4>
+<ul><li><strong>Eval sweep</strong>: chunk_size ∈ {256,384,512,768,1024} × overlap ∈ {0,25,50,100} × strategy ∈ {fixed, sentence, heading-aware} — 找最优 NDCG@10</li><li><strong>Slice eval</strong>: table_query / how_to_query / code_query — 每 slice 独立改造</li><li><strong>CI regression</strong>: 每次 chunker 改动跑 eval, recall drop &gt;2pp 阻断 merge</li><li><strong>Per-source-type chunker</strong>: FAQ atomic / policy heading-aware / ticket turn-aware / code AST</li><li><strong>2026 trend</strong>: Late chunking (整 doc 先 embed 再切 pool) intra-doc context heavy +30-40% recall</li></ul>
+<h4>🪝 Resume hook</h4>
+<p>"BNPL chatbot 3 chunker 共存: FAQ atomic (1 FAQ = 1 chunk, avg 100 tok), policy heading-aware (avg 600 tok, retain hierarchy), ticket turn-aware (avg 300 tok, split by speaker). Metadata <code>source_type</code> 让 retrieval 混搜但 boost policy &gt; ticket. Naive 一刀切 512 recall@10 = 71%, 后变 84%. 最大单点 8pp 收益是 table-as-atomic — 监管表格 (利率/费率 cap) 是最高价值 content, 切 mid-cell 完全废. ConvFinQA 用 LlamaParse / Document AI 解析财报表格 + 用 tree-sitter parse 配套 code 例, 每类独立 chunker."</p>
+<hr />
+<h3>🔥 5 Follow-ups (面试官会问)</h3>
+<p><strong>Q1: 小 chunk 更多向量, 存储 cost 担忧?</strong> 1M chunks × 768d × 4 bytes = 3GB, Qdrant/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.</p>
+<p><strong>Q2: Reindex — doc 改时重 embed 贵?</strong> Delta indexing: chunk-level hash, 仅 re-embed changed; chunk_id 稳定 via <code>hash(doc_id + heading_path + chunk_index)</code>; versioning 灰度 (v_old + v_new 双写一段时间); async via Pub/Sub queue background worker; hot index for sub-5-min freshness on new docs.</p>
+<p><strong>Q3: 有些 chunk 是 'TOC' / 'copyright' / junk, 怎么过?</strong> Pre-filter at index time: heuristic on heading text ('Table of Contents', 'References') skip; quality score (keyword density / structure); hand-curated stoplist for known patterns; LLM cheap pass 'is this informative?' on questionable.</p>
+<p><strong>Q4: 用户问题跨 3 个 section, retrieval 拿 1 个 miss 2 个?</strong> Hierarchical / parent-doc: small chunk retrieve, large parent chunk return (更多 context); multi-query expand 分 3 sub-query; iterative agentic retrieve (LLM 看 gap 再 retrieve); document-level retrieval first 再 chunk within; <strong>Late chunking</strong> chunks inherently 有 doc context.</p>
+<p><strong>Q5: Late chunking 听起来好, 为啥不全用?</strong> Embedding cost 高 (long-context inference $$); model availability (Jina v3 / Gemini long-ctx 才支持); reindex granularity (任何 chunk 改 → 全 doc re-embed, delta 不便); best use: 长 doc 高 intra-doc context (legal/科研); not for: 短 doc / 日变 / 多租户 doc 差异大.</p>
+<hr />
+<h3>❌ 易错点 (10 条红线)</h3>
+<ol><li>Fixed-size everywhere — no structural awareness, 切表格代码句子</li><li>No overlap — boundary info 丢, 跨 chunk 答案抓不到</li><li>Heading discarded — "5V" 不知什么设备, embedding 没 context</li><li>Cut tables / code mid — 半张表 / 半个 function 无意义</li><li>All same chunk_size for all source-types — FAQ/policy/code 一刀切</li><li>No metadata — retrieval 无法 filter / boost</li><li>No eval, 凭 feel chunk_size — silent regression</li><li>Full reindex on each update — 10K doc 40min stop-the-world</li><li>Random chunk IDs — delta indexing impossible</li><li>No PII tagging — compliance 炸弹 (GDPR/PDPA)</li></ol>
+<hr />
+<h3>✅ 加分项 (10 条)</h3>
+<ol><li><strong>Decision tree</strong> for strategy (5 strategies by doc type)</li><li>Heading-aware + recursive fallback as default</li><li>Overlap rationale (10-15% chunk size, 防 boundary 切碎)</li><li>Multi-modal special handling (table/code/formula/figure atomic)</li><li>Metadata enrichment 完整 schema (heading_path/perms/freshness/PII)</li><li><strong>Late chunking</strong> (Jina v3 / Cohere v4) 2026 hot trend +30-40%</li><li><strong>Delta indexing</strong> + chunk_id structural hash</li><li>Eval sweep chunk_size × overlap × strategy + slice by query type</li><li>Per-source-type chunker (FAQ atomic / policy heading / ticket turn / code AST)</li><li>Quote BNPL 3-strategy 71→84 recall + table-as-atomic 8pp jump</li></ol>
+<hr />
+<h3>一句话总结</h3>
+<p>Chunking = <strong>「按 doc 结构切 + 不切表格/代码/句子 + 附 heading metadata + overlap 兜底边界 + 多 source 多策略 + delta indexing + eval sweep 量化」</strong>. 不是 "fixed 512" 一个数字, 是<strong>多策略组合 + 工程流水线 + 持续 eval</strong>.</p>
+<hr />
+<h3>🃏 Cheat Sheet (印 1 页随身)</h3>
+<pre class="language-plaintext"><code class="language-plaintext">5 strategies (decision tree):
+  Fixed-size + overlap   baseline, unstructured prose
+  Sentence-aware         略好 fallback
+  Paragraph/section      有 paragraph break
+  Heading-aware ⭐       hierarchical, best general
+  Late chunking ⭐ 2026  long-ctx embed model (Jina v3), +30-40%
+
+Typical sizes:
+  256 tokens:  high precision, low recall
+  512-768:     sweet spot ⭐ default
+  1024+:       more context, noisier (dilution)
+  Overlap:     10-15% (50-64 tok for 512)
+  Code:        0 overlap (each func atomic, independent)
+
+Multi-modal handling:
+  Tables:    atomic + Markdown serialize + caption + 上下文 embed
+  Code:      atomic + symbol metadata + lang annotation, no mid-func split
+  Formulas:  LaTeX preserved + textual description
+  Figures:   caption + alt + optional CLIP multimodal embed
+  Lists:     atomic if short, item-boundary split if long
+
+Metadata schema (production):
+  Identity:  chunk_id (structural hash), doc_id, chunk_index, total
+  Source:    doc_title, doc_url, doc_type, source_system
+  Structure: heading_path, page_range, is_table/code/figure, section_level
+  Time:      created_at, updated_at, effective_date
+  Access:    tenant_id, visibility, acl_groups, pii_level
+  Quality:   quality_score, view_count, feedback_rate, is_canonical
+  Tags:      tags, language, product
+
+Embed with heading context:
+  embed_text = ' &gt; '.join(heading_path) + '\n\n' + chunk.text
+  e.g., "iPhone 15 Pro Max &gt; Specs &gt; Electrical\n\nRated voltage: 5V"
+
+Delta indexing:
+  chunk_id = hash(doc_id + heading_path + chunk_index_in_section)  # stable
+  Compute new chunk hashes per doc
+  Diff with existing → to_add / to_update / to_delete
+  Apply to dense + sparse index
+  Async via Pub/Sub queue
+
+Versioning + 灰度:
+  Double-write v_old + v_new for transition
+  Traffic split per user_id hash (80/20)
+  Eval v_new &gt;= v_old → cutover, drop v_old
+
+Hot + warm index:
+  Hot: last 24h, in-memory (Redis vec or small Qdrant), 5min refresh
+  Warm: rest, async delta indexing daily
+  Search both, RRF merge
+
+Eval methodology:
+  Eval set: 200 human-labeled + 1000 LLM-synthetic
+  Sweep: chunk_size × overlap × strategy
+  Slice: table_query / how_to / code_query / multilingual
+  CI: recall drop &gt;2pp blocks merge
+  Per-quarter refresh (query distribution drift)
+
+Per-source-type chunker:
+  FAQ:     atomic (1 entry = 1 chunk, ~100 tok)
+  Policy:  heading-aware (~600 tok)
+  Ticket:  turn-aware (~300 tok, split by speaker)
+  Code:    AST-based (tree-sitter, function/class)
+  Paper:   section-aware (~800 tok, abstract/method/results)
+  Web:     trafilatura clean + recursive
+  PDF:     Document AI / Unstructured / LlamaParse + doc-aware
+
+GCP stack (2026):
+  Document AI         (PDF parse + table extract + OCR)
+  Vertex Vector Search (向量库 + filter)
+  Vertex Embeddings   (text-embedding-005, 768d, $0.025/1M)
+  Cloud DLP           (PII detect/mask)
+  Cloud Storage       (raw PDF blob)
+  Pub/Sub             (delta reindex queue)
+  BigQuery            (chunk metadata + analytics)
+  Cloud Run           (chunker worker, async)
+  VPC Service Controls (tenant isolation)
+  AWS: Textract / OpenSearch / Kendra comparison
+
+Tool zoo:
+  PDF parse:     unstructured, pymupdf, LlamaParse, Document AI
+  Table extract: Camelot, Tabula, Textract, Document AI Form Parser
+  Code AST:      tree-sitter (语言无关)
+  PII:           presidio (Microsoft), Cloud DLP
+  Embedding:     text-embedding-005, gemini-embedding, bge-large
+  Late chunking: jina-embeddings-v3 (8K ctx)
+  Vector DB:     Vertex Vector Search, Qdrant, Pinecone, Weaviate
+
+红线:
+  - Fixed-size everywhere
+  - No overlap
+  - Cut tables / code mid
+  - Heading discarded from embed
+  - No metadata / no PII tagging
+  - All same chunk_size
+  - No eval / no slice
+  - Full reindex on update
+  - Random chunk IDs (delta impossible)</code></pre>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="gfde-t2-hybrid-search-summary.html">← ⚡ T2.1 · Hybrid Search 设计 (Dense + Sparse + Rerank) — 冲刺版</a>
+    <a href="gfde-t2-context-window-mgmt-summary.html">⚡ T2.3 · Context Window 管理 (什么留 / 压缩 / 扔) — 冲刺版 →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># ✂️ T2.2 · Chunking 策略决策树 — 冲刺版
+
+> 完整版: [gfde-t2-chunking-decision.html](gfde-t2-chunking-decision.html). 这页是 200 行能背版.
+
+---
+
+## 📋 我会这样答 (Sample Monologue)
+
+**Clarify (10 sec)**:
+"假设: 10K technical PDFs 50-500 页, mixed prose+tables+code+formulas, query 是 fact-lookup + concept-explanation, embedding 用 text-embedding-005 (768d, 2K max), daily reindex 可接受, latency budget 1s, multi-tenant."
+
+**4-layer chunking pipeline (recall 71→87 的关键)**:
+
+### Layer 1: Strategy decision tree (按 doc 类型选)
+
+```
+Pure prose (blog/FAQ)            → Recursive 512 tok + 64 overlap ⭐ default
+Markdown/HTML w/ headers         → Heading-aware recursive
+PDF w/ tables (legal/财报)       → Document AI parse → doc-structure aware
+Code / Repo                      → Tree-sitter AST, function-level atomic
+Chat / Conversation logs         → Turn-based, 3-5 turn group
+Mixed enterprise wiki             → Late chunking (Jina v3 / Cohere v4) ⭐ 2026
+```
+
+### Layer 2: Multi-modal special handling
+
+- **Tables**: ATOMIC chunk (永远不切), Markdown serialize + caption + 上下文一起 embed
+- **Code**: ATOMIC (跨 def 不切), imports + signature + body 作 chunk, symbol metadata
+- **Formula**: 保留 LaTeX (不渲染图), 加文字描述 embed
+- **Figure**: caption + alt text chunk, 或 multimodal embed (CLIP)
+- **List**: 短 atomic, 长 split at item boundary (不切 item 中间)
+
+### Layer 3: Metadata enrichment
+
+```python
+Chunk = {
+    'chunk_id': hash(doc_id + heading_path + chunk_index),  # 稳定 ID for delta
+    'doc_id', 'heading_path', 'page_range', 'section_level',
+    'is_table'/'is_code'/'is_figure', 'tenant_id', 'visibility',
+    'acl_groups', 'pii_level', 'created_at', 'updated_at',
+    'quality_score', 'is_canonical', 'language', 'product',
+}
+# Embed text prepend heading: f"{' > '.join(heading_path)}\n\n{chunk.text}"
+```
+
+### Layer 4: Delta indexing + versioning + hot/warm
+
+- **Delta**: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)
+- **Versioning**: 双写 v2 + v3, traffic split 80/20, eval pass → cutover
+- **Hot + warm**: last 24h in-memory 5min refresh + rest daily Qdrant, RRF merge
+- **Async pipeline**: doc change → Pub/Sub queue → background worker
+
+### Edge cases (背 5 个)
+
+- **EC1 切表格中间**: naive fixed-512 把表格切两半, 半个表无意义 → Document AI 解析为 table element, atomic chunk + Markdown serialize, caption embed.
+- **EC2 Heading 丢上下文**: "Rated voltage: 5V" 不知是哪个设备 → embed_text prepend heading_path ('iPhone 15 Pro Max > Specs > Electrical\n\n5V'), embedding 有 context.
+- **EC3 Random chunk ID**: 每次 random UUID → delta indexing 不可能 (无法 diff) → 用 `hash(doc_id + heading_path + chunk_index_in_section)` 结构性 hash.
+- **EC4 Tokenizer mismatch**: 用 GPT tokenizer 数 token 但 embedding 用 BERT → 估算偏差 30%+ → 用 embedding model 自己的 tokenizer 数.
+- **EC5 PII tagging 漏**: chunk 含 SSN/credit card 直接 embed 进 index → 索引前 Cloud DLP 扫描, mask 或 drop, 标 pii_level 用于检索时 perms.
+
+### Production hardening (1 min)
+
+- **Eval sweep**: chunk_size ∈ {256,384,512,768,1024} × overlap ∈ {0,25,50,100} × strategy ∈ {fixed, sentence, heading-aware} — 找最优 NDCG@10
+- **Slice eval**: table_query / how_to_query / code_query — 每 slice 独立改造
+- **CI regression**: 每次 chunker 改动跑 eval, recall drop >2pp 阻断 merge
+- **Per-source-type chunker**: FAQ atomic / policy heading-aware / ticket turn-aware / code AST
+- **2026 trend**: Late chunking (整 doc 先 embed 再切 pool) intra-doc context heavy +30-40% recall
+
+### 🪝 Resume hook
+
+"BNPL chatbot 3 chunker 共存: FAQ atomic (1 FAQ = 1 chunk, avg 100 tok), policy heading-aware (avg 600 tok, retain hierarchy), ticket turn-aware (avg 300 tok, split by speaker). Metadata `source_type` 让 retrieval 混搜但 boost policy > ticket. Naive 一刀切 512 recall@10 = 71%, 后变 84%. 最大单点 8pp 收益是 table-as-atomic — 监管表格 (利率/费率 cap) 是最高价值 content, 切 mid-cell 完全废. ConvFinQA 用 LlamaParse / Document AI 解析财报表格 + 用 tree-sitter parse 配套 code 例, 每类独立 chunker."
+
+---
+
+## 🔥 5 Follow-ups (面试官会问)
+
+**Q1: 小 chunk 更多向量, 存储 cost 担忧?**
+1M chunks × 768d × 4 bytes = 3GB, Qdrant/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.
+
+**Q2: Reindex — doc 改时重 embed 贵?**
+Delta indexing: chunk-level hash, 仅 re-embed changed; chunk_id 稳定 via `hash(doc_id + heading_path + chunk_index)`; versioning 灰度 (v_old + v_new 双写一段时间); async via Pub/Sub queue background worker; hot index for sub-5-min freshness on new docs.
+
+**Q3: 有些 chunk 是 'TOC' / 'copyright' / junk, 怎么过?**
+Pre-filter at index time: heuristic on heading text ('Table of Contents', 'References') skip; quality score (keyword density / structure); hand-curated stoplist for known patterns; LLM cheap pass 'is this informative?' on questionable.
+
+**Q4: 用户问题跨 3 个 section, retrieval 拿 1 个 miss 2 个?**
+Hierarchical / parent-doc: small chunk retrieve, large parent chunk return (更多 context); multi-query expand 分 3 sub-query; iterative agentic retrieve (LLM 看 gap 再 retrieve); document-level retrieval first 再 chunk within; **Late chunking** chunks inherently 有 doc context.
+
+**Q5: Late chunking 听起来好, 为啥不全用?**
+Embedding cost 高 (long-context inference $$); model availability (Jina v3 / Gemini long-ctx 才支持); reindex granularity (任何 chunk 改 → 全 doc re-embed, delta 不便); best use: 长 doc 高 intra-doc context (legal/科研); not for: 短 doc / 日变 / 多租户 doc 差异大.
+
+---
+
+## ❌ 易错点 (10 条红线)
+
+1. Fixed-size everywhere — no structural awareness, 切表格代码句子
+2. No overlap — boundary info 丢, 跨 chunk 答案抓不到
+3. Heading discarded — "5V" 不知什么设备, embedding 没 context
+4. Cut tables / code mid — 半张表 / 半个 function 无意义
+5. All same chunk_size for all source-types — FAQ/policy/code 一刀切
+6. No metadata — retrieval 无法 filter / boost
+7. No eval, 凭 feel chunk_size — silent regression
+8. Full reindex on each update — 10K doc 40min stop-the-world
+9. Random chunk IDs — delta indexing impossible
+10. No PII tagging — compliance 炸弹 (GDPR/PDPA)
+
+---
+
+## ✅ 加分项 (10 条)
+
+1. **Decision tree** for strategy (5 strategies by doc type)
+2. Heading-aware + recursive fallback as default
+3. Overlap rationale (10-15% chunk size, 防 boundary 切碎)
+4. Multi-modal special handling (table/code/formula/figure atomic)
+5. Metadata enrichment 完整 schema (heading_path/perms/freshness/PII)
+6. **Late chunking** (Jina v3 / Cohere v4) 2026 hot trend +30-40%
+7. **Delta indexing** + chunk_id structural hash
+8. Eval sweep chunk_size × overlap × strategy + slice by query type
+9. Per-source-type chunker (FAQ atomic / policy heading / ticket turn / code AST)
+10. Quote BNPL 3-strategy 71→84 recall + table-as-atomic 8pp jump
+
+---
+
+## 一句话总结
+
+Chunking = **「按 doc 结构切 + 不切表格/代码/句子 + 附 heading metadata + overlap 兜底边界 + 多 source 多策略 + delta indexing + eval sweep 量化」**. 不是 "fixed 512" 一个数字, 是**多策略组合 + 工程流水线 + 持续 eval**.
+
+---
+
+## 🃏 Cheat Sheet (印 1 页随身)
+
+```
+5 strategies (decision tree):
+  Fixed-size + overlap   baseline, unstructured prose
+  Sentence-aware         略好 fallback
+  Paragraph/section      有 paragraph break
+  Heading-aware ⭐       hierarchical, best general
+  Late chunking ⭐ 2026  long-ctx embed model (Jina v3), +30-40%
+
+Typical sizes:
+  256 tokens:  high precision, low recall
+  512-768:     sweet spot ⭐ default
+  1024+:       more context, noisier (dilution)
+  Overlap:     10-15% (50-64 tok for 512)
+  Code:        0 overlap (each func atomic, independent)
+
+Multi-modal handling:
+  Tables:    atomic + Markdown serialize + caption + 上下文 embed
+  Code:      atomic + symbol metadata + lang annotation, no mid-func split
+  Formulas:  LaTeX preserved + textual description
+  Figures:   caption + alt + optional CLIP multimodal embed
+  Lists:     atomic if short, item-boundary split if long
+
+Metadata schema (production):
+  Identity:  chunk_id (structural hash), doc_id, chunk_index, total
+  Source:    doc_title, doc_url, doc_type, source_system
+  Structure: heading_path, page_range, is_table/code/figure, section_level
+  Time:      created_at, updated_at, effective_date
+  Access:    tenant_id, visibility, acl_groups, pii_level
+  Quality:   quality_score, view_count, feedback_rate, is_canonical
+  Tags:      tags, language, product
+
+Embed with heading context:
+  embed_text = ' > '.join(heading_path) + '\n\n' + chunk.text
+  e.g., "iPhone 15 Pro Max > Specs > Electrical\n\nRated voltage: 5V"
+
+Delta indexing:
+  chunk_id = hash(doc_id + heading_path + chunk_index_in_section)  # stable
+  Compute new chunk hashes per doc
+  Diff with existing → to_add / to_update / to_delete
+  Apply to dense + sparse index
+  Async via Pub/Sub queue
+
+Versioning + 灰度:
+  Double-write v_old + v_new for transition
+  Traffic split per user_id hash (80/20)
+  Eval v_new >= v_old → cutover, drop v_old
+
+Hot + warm index:
+  Hot: last 24h, in-memory (Redis vec or small Qdrant), 5min refresh
+  Warm: rest, async delta indexing daily
+  Search both, RRF merge
+
+Eval methodology:
+  Eval set: 200 human-labeled + 1000 LLM-synthetic
+  Sweep: chunk_size × overlap × strategy
+  Slice: table_query / how_to / code_query / multilingual
+  CI: recall drop >2pp blocks merge
+  Per-quarter refresh (query distribution drift)
+
+Per-source-type chunker:
+  FAQ:     atomic (1 entry = 1 chunk, ~100 tok)
+  Policy:  heading-aware (~600 tok)
+  Ticket:  turn-aware (~300 tok, split by speaker)
+  Code:    AST-based (tree-sitter, function/class)
+  Paper:   section-aware (~800 tok, abstract/method/results)
+  Web:     trafilatura clean + recursive
+  PDF:     Document AI / Unstructured / LlamaParse + doc-aware
+
+GCP stack (2026):
+  Document AI         (PDF parse + table extract + OCR)
+  Vertex Vector Search (向量库 + filter)
+  Vertex Embeddings   (text-embedding-005, 768d, $0.025/1M)
+  Cloud DLP           (PII detect/mask)
+  Cloud Storage       (raw PDF blob)
+  Pub/Sub             (delta reindex queue)
+  BigQuery            (chunk metadata + analytics)
+  Cloud Run           (chunker worker, async)
+  VPC Service Controls (tenant isolation)
+  AWS: Textract / OpenSearch / Kendra comparison
+
+Tool zoo:
+  PDF parse:     unstructured, pymupdf, LlamaParse, Document AI
+  Table extract: Camelot, Tabula, Textract, Document AI Form Parser
+  Code AST:      tree-sitter (语言无关)
+  PII:           presidio (Microsoft), Cloud DLP
+  Embedding:     text-embedding-005, gemini-embedding, bge-large
+  Late chunking: jina-embeddings-v3 (8K ctx)
+  Vector DB:     Vertex Vector Search, Qdrant, Pinecone, Weaviate
+
+红线:
+  - Fixed-size everywhere
+  - No overlap
+  - Cut tables / code mid
+  - Heading discarded from embed
+  - No metadata / no PII tagging
+  - All same chunk_size
+  - No eval / no slice
+  - Full reindex on update
+  - Random chunk IDs (delta impossible)
+```
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>
