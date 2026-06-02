@@ -7,48 +7,32 @@
 <style>
 @page { size: A4; margin: 1.2cm; }
 * { box-sizing: border-box; }
-body {
-    font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-    font-size: 10.5pt; line-height: 1.55; color: #1a1a1a; margin: 0; padding: 0;
-}
+body { font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt; line-height: 1.55; color: #1a1a1a; margin: 0; padding: 0; }
 .category { page-break-before: always; padding: 0 4px; }
 .category:first-of-type { page-break-before: avoid; }
-h1 {
-    font-size: 22pt; color: #0F62FE; text-align: center;
-    border-bottom: 3px solid #0F62FE; padding-bottom: 10px; margin: 0 0 6px;
-}
+h1 { font-size: 22pt; color: #0F62FE; text-align: center;
+    border-bottom: 3px solid #0F62FE; padding-bottom: 10px; margin: 0 0 6px; }
 .subtitle { text-align:center; color:#666; font-size:10pt; margin-bottom: 18px; }
-h2 {
-    font-size: 16pt; color: #fff; background: #0F62FE;
-    padding: 8px 14px; border-radius: 6px; margin: 0 0 4px;
-}
-.pattern-note {
-    background: #E5F0FF; border-left: 4px solid #0F62FE;
-    padding: 8px 12px; margin: 6px 0 14px; font-size: 9.8pt; border-radius: 0 4px 4px 0;
-}
-h3 {
-    font-size: 12pt; color: #161616; margin: 14px 0 4px;
-    border-left: 4px solid #24A148; padding-left: 8px;
-}
+h2 { font-size: 16pt; color: #fff; background: #0F62FE;
+    padding: 8px 14px; border-radius: 6px; margin: 0 0 4px; }
+.pattern-note { background: #E5F0FF; border-left: 4px solid #0F62FE;
+    padding: 8px 12px; margin: 6px 0 14px; font-size: 9.8pt; border-radius: 0 4px 4px 0; }
+h3 { font-size: 12pt; color: #161616; margin: 14px 0 4px;
+    border-left: 4px solid #24A148; padding-left: 8px; }
 .approach { font-size: 9.8pt; margin: 3px 0; }
 .approach b { color: #0043CE; }
-.cx {
-    font-size: 9.3pt; color: #6929C4; font-weight: 600;
+.cx { font-size: 9.3pt; color: #6929C4; font-weight: 600;
     background: #F6F2FF; padding: 3px 8px; border-radius: 4px;
-    display: inline-block; margin: 3px 0;
-}
-pre {
-    background: #161616; color: #f4f4f4; padding: 10px 12px;
+    display: inline-block; margin: 3px 0; }
+pre { background: #161616; color: #f4f4f4; padding: 10px 12px;
     border-radius: 6px; overflow-x: auto; font-size: 8.6pt; line-height: 1.45;
     margin: 5px 0; font-family: "SF Mono", Menlo, Consolas, monospace;
-    page-break-inside: avoid;
-}
+    page-break-inside: avoid; white-space: pre; }
 .kw { color: #ff7eb6; }
 .cm { color: #8d8d8d; font-style: italic; }
-.toc {
-    background: #f4f4f4; border-radius: 8px; padding: 14px 20px; margin: 14px 0;
-    columns: 2; column-gap: 30px; font-size: 10pt;
-}
+.toc { background: #f4f4f4; border-radius: 8px; padding: 14px 20px; margin: 14px 0;
+    columns: 2; column-gap: 30px; font-size: 10pt; }
 .toc div { margin: 3px 0; break-inside: avoid; }
 .toc .num { color:#0F62FE; font-weight:700; }
 table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 9.2pt; }
@@ -64,7 +48,7 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <body>
 
 <h1>Google 面试算法分类总结</h1>
-<div class="subtitle">13 大类别 · 思路 + 代码 + 时空复杂度 · 含单调栈 &amp; 线段树 · 2026-06</div>
+<div class="subtitle">13 大类 · 完整代码 + 思路 + 时空复杂度 · 含单调栈 &amp; 线段树 · 2026-06</div>
 
 <div class="toc">
 <div><span class="num">1.</span> 并查集 Union-Find</div>
@@ -85,56 +69,82 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <!-- ========== 1. 并查集 ========== -->
 <div class="category">
 <h2>1. 并查集 Union-Find</h2>
-<div class="pattern-note"><b>信号:</b>「分组 / 连通性 / 传递性 / 朋友圈 / 动态加边」。<b>三件套:</b>parent 数组 + find(路径压缩) + union(计组数)。每操作近似 O(1)(α 反阿克曼)。</div>
+<div class="pattern-note"><b>信号:</b>「分组 / 连通性 / 传递性 / 朋友圈 / 动态加边」。<b>三件套:</b>parent 数组 + find(路径压缩) + union(计组数)。每操作近似 O(1)。</div>
 
 <h3>#547 Number of Provinces — 模板</h3>
-<div class="approach">union 所有相连城市,维护组数计数器,返回最终组数。</div>
 <pre><span class="kw">class</span> Solution:
     <span class="kw">def</span> findCircleNum(self, isConnected):
         n = len(isConnected)
         parent = list(range(n))
-        self.count = n                       <span class="cm"># 组数</span>
+        self.count = n                               <span class="cm"># 组数</span>
+
         <span class="kw">def</span> find(x):
             <span class="kw">while</span> parent[x] != x:
-                parent[x] = parent[parent[x]]   <span class="cm"># 路径压缩</span>
+                parent[x] = parent[parent[x]]        <span class="cm"># 路径压缩</span>
                 x = parent[x]
             <span class="kw">return</span> x
+
         <span class="kw">def</span> union(x, y):
             rx, ry = find(x), find(y)
             <span class="kw">if</span> rx != ry:
                 parent[rx] = ry
-                self.count -= 1              <span class="cm"># 合并成功,组数-1</span>
+                self.count -= 1                      <span class="cm"># 合并成功,组数-1</span>
+
         <span class="kw">for</span> i <span class="kw">in</span> range(n):
-            <span class="kw">for</span> j <span class="kw">in</span> range(i+1, n):
+            <span class="kw">for</span> j <span class="kw">in</span> range(i + 1, n):
                 <span class="kw">if</span> isConnected[i][j] == 1:
                     union(i, j)
         <span class="kw">return</span> self.count</pre>
 <div class="cx">时间 O(n²·α) ≈ O(n²) · 空间 O(n)</div>
 
 <h3>#1101 Earliest Moment Everyone Become Friends</h3>
-<div class="approach">同模板,<b>多两步</b>:按 timestamp 排序 + 组数变 1 时返回当前时刻。</div>
-<pre><span class="kw">def</span> earliestAcq(self, logs, n):
-    logs.sort()                              <span class="cm"># ① 按时间排序</span>
-    parent = list(range(n)); self.count = n
-    <span class="cm"># find / union 同 #547 ...</span>
-    <span class="kw">for</span> t, a, b <span class="kw">in</span> logs:
-        union(a, b)
-        <span class="kw">if</span> self.count == 1:                  <span class="cm"># ③ 全连通</span>
-            <span class="kw">return</span> t
-    <span class="kw">return</span> -1</pre>
+<div class="approach">同模板,<b>多两步</b>:按 timestamp 排序 + 组数变 1 返回当前时刻。</div>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> earliestAcq(self, logs, n):
+        logs.sort()                                  <span class="cm"># ① 按 timestamp 排序</span>
+        parent = list(range(n))
+        self.count = n
+
+        <span class="kw">def</span> find(x):
+            <span class="kw">while</span> parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            <span class="kw">return</span> x
+
+        <span class="kw">def</span> union(x, y):
+            rx, ry = find(x), find(y)
+            <span class="kw">if</span> rx != ry:
+                parent[rx] = ry
+                self.count -= 1
+
+        <span class="kw">for</span> t, a, b <span class="kw">in</span> logs:
+            union(a, b)
+            <span class="kw">if</span> self.count == 1:                      <span class="cm"># ③ 全连通</span>
+                <span class="kw">return</span> t
+        <span class="kw">return</span> -1</pre>
 <div class="cx">时间 O(E log E) · 空间 O(n)</div>
 
 <h3>#737 Sentence Similarity II</h3>
-<div class="approach">同义词对 union 成组;逐位置检查 w1==w2 或 find 同根。<b>传递性 → 并查集</b>。</div>
-<pre><span class="kw">def</span> areSentencesSimilarTwo(self, s1, s2, pairs):
-    <span class="kw">if</span> len(s1) != len(s2): <span class="kw">return</span> <span class="kw">False</span>
-    parent = {}
-    <span class="kw">def</span> find(x):
-        parent.setdefault(x, x)
-        <span class="kw">if</span> parent[x] != x: parent[x] = find(parent[x])
-        <span class="kw">return</span> parent[x]
-    <span class="kw">for</span> a, b <span class="kw">in</span> pairs: parent[find(a)] = find(b)
-    <span class="kw">return</span> all(w1==w2 <span class="kw">or</span> find(w1)==find(w2) <span class="kw">for</span> w1,w2 <span class="kw">in</span> zip(s1,s2))</pre>
+<div class="approach">同义词对 union 成组;逐位置检查相同或同根。<b>传递性 → 并查集</b>。</div>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> areSentencesSimilarTwo(self, sentence1, sentence2, pairs):
+        <span class="kw">if</span> len(sentence1) != len(sentence2):
+            <span class="kw">return</span> <span class="kw">False</span>
+        parent = {}
+
+        <span class="kw">def</span> find(x):
+            parent.setdefault(x, x)
+            <span class="kw">if</span> parent[x] != x:
+                parent[x] = find(parent[x])
+            <span class="kw">return</span> parent[x]
+
+        <span class="kw">for</span> a, b <span class="kw">in</span> pairs:
+            parent[find(a)] = find(b)
+
+        <span class="kw">for</span> w1, w2 <span class="kw">in</span> zip(sentence1, sentence2):
+            <span class="kw">if</span> w1 != w2 <span class="kw">and</span> find(w1) != find(w2):
+                <span class="kw">return</span> <span class="kw">False</span>
+        <span class="kw">return</span> <span class="kw">True</span></pre>
 <div class="cx">时间 O((P+N)·α) · 空间 O(词数)</div>
 <div class="tip"><b>组数套路:</b> union 成功 count-=1。#547 返回最终组数;#1101 监控变 1;#323 连通分量数。</div>
 </div>
@@ -142,73 +152,120 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <!-- ========== 2. 区间/扫描线 ========== -->
 <div class="category">
 <h2>2. 区间 / 扫描线 Intervals &amp; Sweep Line</h2>
-<div class="pattern-note"><b>信号:</b>「区间合并 / 重叠 / 最大并发 / 空隙」。<b>套路:</b>排序 + 扫描(维护 prev_end 或堆或差分)。判重叠公式:<b>s1 &lt; e2 and s2 &lt; e1</b>。</div>
+<div class="pattern-note"><b>信号:</b>「区间合并 / 重叠 / 最大并发 / 空隙」。<b>套路:</b>排序 + 扫描(prev_end / 堆 / 差分)。判重叠:<b>s1 &lt; e2 and s2 &lt; e1</b>。</div>
 
-<h3>#56 Merge Intervals / #759 / #3169 — 合并 &amp; 找空隙</h3>
-<div class="approach"><b>排序 + prev_end 扫描</b>:重叠则延伸,否则记录新段/空隙。</div>
-<pre><span class="cm"># #3169 数空闲天:合并忙碌区间,缝即空闲</span>
-<span class="kw">def</span> countDays(self, days, meetings):
-    meetings.sort(key=<span class="kw">lambda</span> x: x[0])
-    free, prev_end = 0, 0
-    <span class="kw">for</span> s, e <span class="kw">in</span> meetings:
-        <span class="kw">if</span> s &gt; prev_end + 1:
-            free += s - prev_end - 1         <span class="cm"># 空隙</span>
-        prev_end = max(prev_end, e)          <span class="cm"># 注意 max(内嵌区间)</span>
-    <span class="kw">if</span> days &gt; prev_end: free += days - prev_end
-    <span class="kw">return</span> free</pre>
+<h3>#56 Merge Intervals — 合并</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> merge(self, intervals):
+        intervals.sort(key=<span class="kw">lambda</span> x: x[0])
+        res = []
+        <span class="kw">for</span> s, e <span class="kw">in</span> intervals:
+            <span class="kw">if</span> <span class="kw">not</span> res <span class="kw">or</span> res[-1][1] &lt; s:        <span class="cm"># 不重叠 → 新段</span>
+                res.append([s, e])
+            <span class="kw">else</span>:
+                res[-1][1] = max(res[-1][1], e)      <span class="cm"># 重叠 → 延伸</span>
+        <span class="kw">return</span> res</pre>
+<div class="cx">时间 O(n log n) · 空间 O(n)</div>
+
+<h3>#3169 Count Days Without Meetings — 找空隙</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> countDays(self, days, meetings):
+        meetings.sort(key=<span class="kw">lambda</span> x: x[0])
+        free, prev_end = 0, 0
+        <span class="kw">for</span> s, e <span class="kw">in</span> meetings:
+            <span class="kw">if</span> s &gt; prev_end + 1:
+                free += s - prev_end - 1             <span class="cm"># 空隙</span>
+            prev_end = max(prev_end, e)              <span class="cm"># 注意 max(内嵌区间)</span>
+        <span class="kw">if</span> days &gt; prev_end:
+            free += days - prev_end                  <span class="cm"># 末尾空隙</span>
+        <span class="kw">return</span> free</pre>
 <div class="cx">时间 O(n log n) · 空间 O(1)</div>
 
-<h3>#253 Meeting Rooms II — 最大并发(最少房间)</h3>
-<div class="approach">按 start 排序,最小堆存进行中会议的 end;堆顶≤当前start则复用。堆大小=房间数。</div>
+<h3>#253 Meeting Rooms II — 最大并发</h3>
 <pre><span class="kw">import</span> heapq
-<span class="kw">def</span> minMeetingRooms(self, intervals):
-    intervals.sort(key=<span class="kw">lambda</span> x: x[0])
-    heap = []
-    <span class="kw">for</span> s, e <span class="kw">in</span> intervals:
-        <span class="kw">if</span> heap <span class="kw">and</span> heap[0] &lt;= s:
-            heapq.heappop(heap)              <span class="cm"># 复用</span>
-        heapq.heappush(heap, e)
-    <span class="kw">return</span> len(heap)</pre>
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> minMeetingRooms(self, intervals):
+        intervals.sort(key=<span class="kw">lambda</span> x: x[0])
+        heap = []                                    <span class="cm"># 进行中会议的 end</span>
+        <span class="kw">for</span> s, e <span class="kw">in</span> intervals:
+            <span class="kw">if</span> heap <span class="kw">and</span> heap[0] &lt;= s:
+                heapq.heappop(heap)                  <span class="cm"># 复用最早结束的房间</span>
+            heapq.heappush(heap, e)
+        <span class="kw">return</span> len(heap)</pre>
 <div class="cx">时间 O(n log n) · 空间 O(n)</div>
 
 <h3>#2402 Meeting Rooms III — 双堆 + 等待</h3>
-<div class="approach">idle 堆存空房号,busy 堆存(end,房号);没空房则延后等最早结束的。</div>
-<pre><span class="kw">def</span> mostBooked(self, n, meetings):
-    meetings.sort()
-    idle = list(range(n)); heapq.heapify(idle)
-    busy = []; count = [0]*n
-    <span class="kw">for</span> s, e <span class="kw">in</span> meetings:
-        <span class="kw">while</span> busy <span class="kw">and</span> busy[0][0] &lt;= s:
-            _, r = heapq.heappop(busy); heapq.heappush(idle, r)
-        <span class="kw">if</span> idle:
-            r = heapq.heappop(idle); heapq.heappush(busy, (e, r))
-        <span class="kw">else</span>:
-            end, r = heapq.heappop(busy)
-            heapq.heappush(busy, (end + (e-s), r))
-        count[r] += 1
-    <span class="kw">return</span> count.index(max(count))</pre>
+<pre><span class="kw">import</span> heapq
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> mostBooked(self, n, meetings):
+        meetings.sort()
+        idle = list(range(n))                        <span class="cm"># 空房号(最小堆)</span>
+        heapq.heapify(idle)
+        busy = []                                    <span class="cm"># (end, 房号)</span>
+        count = [0] * n
+        <span class="kw">for</span> s, e <span class="kw">in</span> meetings:
+            <span class="kw">while</span> busy <span class="kw">and</span> busy[0][0] &lt;= s:      <span class="cm"># 释放已结束的</span>
+                _, r = heapq.heappop(busy)
+                heapq.heappush(idle, r)
+            <span class="kw">if</span> idle:                                 <span class="cm"># 有空房 → 最小编号</span>
+                r = heapq.heappop(idle)
+                heapq.heappush(busy, (e, r))
+            <span class="kw">else</span>:                                    <span class="cm"># 没空房 → 等最早结束</span>
+                end, r = heapq.heappop(busy)
+                heapq.heappush(busy, (end + (e - s), r))
+            count[r] += 1
+        <span class="kw">return</span> count.index(max(count))</pre>
 <div class="cx">时间 O(m log m + m log n) · 空间 O(n)</div>
 
-<h3>#1854 Maximum Population Year — 差分数组</h3>
-<div class="approach">出生 +1、死亡 -1;前缀和=当年人口,> 取最早峰值。</div>
-<pre><span class="kw">def</span> maximumPopulation(self, logs):
-    delta = [0]*2051
-    <span class="kw">for</span> b, d <span class="kw">in</span> logs:
-        delta[b] += 1; delta[d] -= 1
-    cur = mx = ans = 0
-    <span class="kw">for</span> y <span class="kw">in</span> range(1950, 2051):
-        cur += delta[y]
-        <span class="kw">if</span> cur &gt; mx: mx, ans = cur, y
-    <span class="kw">return</span> ans</pre>
+<h3>#1854 Maximum Population Year — 差分</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> maximumPopulation(self, logs):
+        delta = [0] * 2051
+        <span class="kw">for</span> b, d <span class="kw">in</span> logs:
+            delta[b] += 1
+            delta[d] -= 1
+        cur = mx = ans = 0
+        <span class="kw">for</span> y <span class="kw">in</span> range(1950, 2051):
+            cur += delta[y]                          <span class="cm"># 前缀和=当年人口</span>
+            <span class="kw">if</span> cur &gt; mx:
+                mx, ans = cur, y
+        <span class="kw">return</span> ans</pre>
 <div class="cx">时间 O(N+Y) · 空间 O(Y)</div>
 
+<h3>#759 Employee Free Time — 摊平+合并+找缝</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> employeeFreeTime(self, schedule):
+        intervals = []
+        <span class="kw">for</span> emp <span class="kw">in</span> schedule:                     <span class="cm"># 摊平</span>
+            <span class="kw">for</span> iv <span class="kw">in</span> emp:
+                intervals.append(iv)
+        intervals.sort(key=<span class="kw">lambda</span> x: x[0])
+        merged = []
+        <span class="kw">for</span> iv <span class="kw">in</span> intervals:                      <span class="cm"># 合并</span>
+            <span class="kw">if</span> <span class="kw">not</span> merged <span class="kw">or</span> merged[-1][1] &lt; iv[0]:
+                merged.append(iv)
+            <span class="kw">else</span>:
+                merged[-1][1] = max(merged[-1][1], iv[1])
+        res = []
+        <span class="kw">for</span> i <span class="kw">in</span> range(1, len(merged)):           <span class="cm"># 相邻合并区间的缝=空闲</span>
+            res.append([merged[i-1][1], merged[i][0]])
+        <span class="kw">return</span> res</pre>
+<div class="cx">时间 O(n log n) · 空间 O(n)</div>
+
 <h3>#729 My Calendar I — 区间冲突</h3>
-<div class="approach">暴力 O(n²) 查重叠(s1&lt;e2 and s2&lt;e1);或 SortedList 二分相邻 O(log n)。</div>
-<pre><span class="kw">def</span> book(self, start, end):
-    <span class="kw">for</span> s, e <span class="kw">in</span> self.books:
-        <span class="kw">if</span> start &lt; e <span class="kw">and</span> s &lt; end: <span class="kw">return</span> <span class="kw">False</span>
-    self.books.append((start, end)); <span class="kw">return</span> <span class="kw">True</span></pre>
-<div class="cx">暴力 book O(n) / 二分 O(log n) · 空间 O(n)</div>
+<pre><span class="kw">class</span> MyCalendar:
+    <span class="kw">def</span> __init__(self):
+        self.books = []
+
+    <span class="kw">def</span> book(self, start, end):
+        <span class="kw">for</span> s, e <span class="kw">in</span> self.books:
+            <span class="kw">if</span> start &lt; e <span class="kw">and</span> s &lt; end:           <span class="cm"># 重叠公式</span>
+                <span class="kw">return</span> <span class="kw">False</span>
+        self.books.append((start, end))
+        <span class="kw">return</span> <span class="kw">True</span></pre>
+<div class="cx">book O(n) · 空间 O(n)</div>
 <div class="tip"><b>家族:</b>#252 有无冲突 · #253 最大并发 · 租车 并发+编号 · #2402 编号+等待 · #1854 峰值位置。</div>
 </div>
 
@@ -218,105 +275,146 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <div class="pattern-note"><b>信号:</b>「嵌套 / 括号 / 表达式 / 后进先出」。栈顶永远是 <b>[-1]</b>。</div>
 
 <h3>#20 Valid Parentheses</h3>
-<div class="approach">左括号入栈,右括号匹配栈顶,最后查栈空。</div>
-<pre><span class="kw">def</span> isValid(self, s):
-    stack = []; pairs = {<span class="cm">')'</span>:<span class="cm">'('</span>, <span class="cm">']'</span>:<span class="cm">'['</span>, <span class="cm">'}'</span>:<span class="cm">'{'</span>}
-    <span class="kw">for</span> ch <span class="kw">in</span> s:
-        <span class="kw">if</span> ch <span class="kw">in</span> pairs:
-            <span class="kw">if</span> <span class="kw">not</span> stack <span class="kw">or</span> stack[-1] != pairs[ch]: <span class="kw">return</span> <span class="kw">False</span>
-            stack.pop()
-        <span class="kw">else</span>: stack.append(ch)
-    <span class="kw">return</span> <span class="kw">not</span> stack</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> isValid(self, s):
+        stack = []
+        pairs = {<span class="cm">')'</span>: <span class="cm">'('</span>, <span class="cm">']'</span>: <span class="cm">'['</span>, <span class="cm">'}'</span>: <span class="cm">'{'</span>}
+        <span class="kw">for</span> ch <span class="kw">in</span> s:
+            <span class="kw">if</span> ch <span class="kw">in</span> pairs:                       <span class="cm"># 右括号</span>
+                <span class="kw">if</span> <span class="kw">not</span> stack <span class="kw">or</span> stack[-1] != pairs[ch]:
+                    <span class="kw">return</span> <span class="kw">False</span>
+                stack.pop()
+            <span class="kw">else</span>:
+                stack.append(ch)
+        <span class="kw">return</span> <span class="kw">not</span> stack</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
 
 <h3>#394 Decode String — 栈处理嵌套</h3>
-<div class="approach">遇 [ 压(当前串,倍数),遇 ] 弹出拼接 prev + k*cur。</div>
-<pre><span class="kw">def</span> decodeString(self, s):
-    stack = []; cur = <span class="cm">""</span>; num = 0
-    <span class="kw">for</span> ch <span class="kw">in</span> s:
-        <span class="kw">if</span> ch.isdigit(): num = num*10 + int(ch)
-        <span class="kw">elif</span> ch == <span class="cm">'['</span>: stack.append((cur, num)); cur, num = <span class="cm">""</span>, 0
-        <span class="kw">elif</span> ch == <span class="cm">']'</span>: prev, k = stack.pop(); cur = prev + k*cur
-        <span class="kw">else</span>: cur += ch
-    <span class="kw">return</span> cur</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> decodeString(self, s):
+        stack = []
+        cur = <span class="cm">""</span>
+        num = 0
+        <span class="kw">for</span> ch <span class="kw">in</span> s:
+            <span class="kw">if</span> ch.isdigit():
+                num = num * 10 + int(ch)             <span class="cm"># 多位数</span>
+            <span class="kw">elif</span> ch == <span class="cm">'['</span>:
+                stack.append((cur, num))             <span class="cm"># 存现场</span>
+                cur, num = <span class="cm">""</span>, 0
+            <span class="kw">elif</span> ch == <span class="cm">']'</span>:
+                prev, k = stack.pop()
+                cur = prev + k * cur                 <span class="cm"># 拼接</span>
+            <span class="kw">else</span>:
+                cur += ch
+        <span class="kw">return</span> cur</pre>
 <div class="cx">时间 O(输出长) · 空间 O(嵌套深度)</div>
 
-<h3>#224 / #227 Basic Calculator — 表达式求值</h3>
-<div class="approach">#224 括号压栈现场;#227 优先级:*/ 立即算、+- 延迟求和。</div>
-<pre><span class="cm"># #227: + - * / 无括号</span>
-<span class="kw">def</span> calculate(self, s):
-    stack = []; num = 0; op = <span class="cm">'+'</span>
-    <span class="kw">for</span> i, ch <span class="kw">in</span> enumerate(s):
-        <span class="kw">if</span> ch.isdigit(): num = num*10 + int(ch)
-        <span class="kw">if</span> ch <span class="kw">in</span> <span class="cm">'+-*/'</span> <span class="kw">or</span> i == len(s)-1:
-            <span class="kw">if</span> op == <span class="cm">'+'</span>: stack.append(num)
-            <span class="kw">elif</span> op == <span class="cm">'-'</span>: stack.append(-num)
-            <span class="kw">elif</span> op == <span class="cm">'*'</span>: stack.append(stack.pop()*num)
-            <span class="kw">else</span>: stack.append(int(stack.pop()/num))
-            op, num = ch, 0
-    <span class="kw">return</span> sum(stack)</pre>
+<h3>#224 Basic Calculator — 含括号 (+ - )</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> calculate(self, s):
+        stack = []
+        result = 0
+        num = 0
+        sign = 1
+        <span class="kw">for</span> ch <span class="kw">in</span> s:
+            <span class="kw">if</span> ch.isdigit():
+                num = num * 10 + int(ch)
+            <span class="kw">elif</span> ch == <span class="cm">'+'</span>:
+                result += sign * num; num, sign = 0, 1
+            <span class="kw">elif</span> ch == <span class="cm">'-'</span>:
+                result += sign * num; num, sign = 0, -1
+            <span class="kw">elif</span> ch == <span class="cm">'('</span>:
+                stack.append(result); stack.append(sign)
+                result, sign = 0, 1
+            <span class="kw">elif</span> ch == <span class="cm">')'</span>:
+                result += sign * num; num = 0
+                result *= stack.pop()                <span class="cm"># 括号前符号</span>
+                result += stack.pop()                <span class="cm"># 括号前结果</span>
+        <span class="kw">return</span> result + sign * num</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
-<div class="tip"><b>家族:</b>#20 匹配 · #394 解码 · #224/#227/#772 计算器 · #735 行星碰撞。共同根:栈处理嵌套/优先级。</div>
+
+<h3>#227 Basic Calculator II — 优先级 (+ - * /)</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> calculate(self, s):
+        stack = []
+        num = 0
+        op = <span class="cm">'+'</span>
+        <span class="kw">for</span> i, ch <span class="kw">in</span> enumerate(s):
+            <span class="kw">if</span> ch.isdigit():
+                num = num * 10 + int(ch)
+            <span class="kw">if</span> ch <span class="kw">in</span> <span class="cm">'+-*/'</span> <span class="kw">or</span> i == len(s) - 1:
+                <span class="kw">if</span> op == <span class="cm">'+'</span>: stack.append(num)
+                <span class="kw">elif</span> op == <span class="cm">'-'</span>: stack.append(-num)
+                <span class="kw">elif</span> op == <span class="cm">'*'</span>: stack.append(stack.pop() * num)
+                <span class="kw">else</span>: stack.append(int(stack.pop() / num))  <span class="cm"># 截断向0</span>
+                op, num = ch, 0
+        <span class="kw">return</span> sum(stack)</pre>
+<div class="cx">时间 O(n) · 空间 O(n)</div>
+<div class="tip"><b>家族:</b>#20 匹配 · #394 解码 · #224/#227/#772 计算器 · #735 行星碰撞。</div>
 </div>
 
 <!-- ========== 4. 单调栈 ========== -->
 <div class="category">
 <h2>4. 单调栈 Monotonic Stack <span class="tag">新</span></h2>
-<div class="pattern-note"><b>信号:</b>「下一个更大/更小元素」「每个元素左右第一个比它大/小的」「柱状图面积」「接雨水」。<b>核心:</b>维护一个单调(递增或递减)的栈,新元素入栈前弹出破坏单调性的,弹出时即可结算答案。<b>每个元素进出栈各一次 → O(n)</b>。</div>
+<div class="pattern-note"><b>信号:</b>「下一个更大/更小」「柱状图面积」「接雨水」。<b>核心:</b>维护单调栈,新元素入栈前弹出破坏单调性的,<b>弹出瞬间结算答案</b>。每元素进出各一次 → O(n)。</div>
 
-<h3>#739 Daily Temperatures — 下一个更暖的天</h3>
-<div class="approach">维护<b>递减</b>栈(存下标);新温度更高时,弹出的元素「等到了更暖的天」。</div>
-<pre><span class="kw">def</span> dailyTemperatures(self, temps):
-    res = [0]*len(temps)
-    stack = []                               <span class="cm"># 存下标,温度递减</span>
-    <span class="kw">for</span> i, t <span class="kw">in</span> enumerate(temps):
-        <span class="kw">while</span> stack <span class="kw">and</span> temps[stack[-1]] &lt; t:
-            j = stack.pop()
-            res[j] = i - j                   <span class="cm"># 等了 i-j 天</span>
-        stack.append(i)
-    <span class="kw">return</span> res</pre>
+<h3>#739 Daily Temperatures — 下一个更暖</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> dailyTemperatures(self, temperatures):
+        res = [0] * len(temperatures)
+        stack = []                                   <span class="cm"># 存下标,温度递减</span>
+        <span class="kw">for</span> i, t <span class="kw">in</span> enumerate(temperatures):
+            <span class="kw">while</span> stack <span class="kw">and</span> temperatures[stack[-1]] &lt; t:
+                j = stack.pop()
+                res[j] = i - j                       <span class="cm"># 等了 i-j 天</span>
+            stack.append(i)
+        <span class="kw">return</span> res</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
 
 <h3>#496 Next Greater Element I</h3>
-<div class="approach">递减栈;弹出时记录「下一个更大」到哈希表。</div>
-<pre><span class="kw">def</span> nextGreaterElement(self, nums1, nums2):
-    nxt = {}; stack = []
-    <span class="kw">for</span> x <span class="kw">in</span> nums2:
-        <span class="kw">while</span> stack <span class="kw">and</span> stack[-1] &lt; x:
-            nxt[stack.pop()] = x
-        stack.append(x)
-    <span class="kw">return</span> [nxt.get(x, -1) <span class="kw">for</span> x <span class="kw">in</span> nums1]</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> nextGreaterElement(self, nums1, nums2):
+        nxt = {}
+        stack = []
+        <span class="kw">for</span> x <span class="kw">in</span> nums2:
+            <span class="kw">while</span> stack <span class="kw">and</span> stack[-1] &lt; x:
+                nxt[stack.pop()] = x
+            stack.append(x)
+        <span class="kw">return</span> [nxt.get(x, -1) <span class="kw">for</span> x <span class="kw">in</span> nums1]</pre>
 <div class="cx">时间 O(n+m) · 空间 O(n)</div>
 
 <h3>#84 Largest Rectangle in Histogram — 经典难题</h3>
-<div class="approach">维护<b>递增</b>栈;弹出时以该高度为矮边算矩形宽度=右边界-左边界-1。末尾加哨兵 0 清空栈。</div>
-<pre><span class="kw">def</span> largestRectangleArea(self, heights):
-    stack = []; max_area = 0
-    heights = heights + [0]                  <span class="cm"># 哨兵,逼出剩余</span>
-    <span class="kw">for</span> i, h <span class="kw">in</span> enumerate(heights):
-        <span class="kw">while</span> stack <span class="kw">and</span> heights[stack[-1]] &gt; h:
-            height = heights[stack.pop()]
-            width = i <span class="kw">if</span> <span class="kw">not</span> stack <span class="kw">else</span> i - stack[-1] - 1
-            max_area = max(max_area, height * width)
-        stack.append(i)
-    <span class="kw">return</span> max_area</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> largestRectangleArea(self, heights):
+        stack = []                                   <span class="cm"># 下标,高度递增</span>
+        max_area = 0
+        heights = heights + [0]                      <span class="cm"># 哨兵清空栈</span>
+        <span class="kw">for</span> i, h <span class="kw">in</span> enumerate(heights):
+            <span class="kw">while</span> stack <span class="kw">and</span> heights[stack[-1]] &gt; h:
+                height = heights[stack.pop()]
+                width = i <span class="kw">if</span> <span class="kw">not</span> stack <span class="kw">else</span> i - stack[-1] - 1
+                max_area = max(max_area, height * width)
+            stack.append(i)
+        <span class="kw">return</span> max_area</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
 
-<h3>#42 Trapping Rain Water — 接雨水(双指针版)</h3>
-<div class="approach">每个位置存水 = min(左最高,右最高) - 自己高度。双指针 O(1) 空间最优(也可单调栈)。</div>
-<pre><span class="kw">def</span> trap(self, height):
-    left, right = 0, len(height)-1
-    lmax = rmax = water = 0
-    <span class="kw">while</span> left &lt; right:
-        <span class="kw">if</span> height[left] &lt; height[right]:
-            lmax = max(lmax, height[left])
-            water += lmax - height[left]; left += 1
-        <span class="kw">else</span>:
-            rmax = max(rmax, height[right])
-            water += rmax - height[right]; right -= 1
-    <span class="kw">return</span> water</pre>
+<h3>#42 Trapping Rain Water — 双指针 O(1) 空间</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> trap(self, height):
+        left, right = 0, len(height) - 1
+        lmax = rmax = water = 0
+        <span class="kw">while</span> left &lt; right:
+            <span class="kw">if</span> height[left] &lt; height[right]:
+                lmax = max(lmax, height[left])
+                water += lmax - height[left]
+                left += 1
+            <span class="kw">else</span>:
+                rmax = max(rmax, height[right])
+                water += rmax - height[right]
+                right -= 1
+        <span class="kw">return</span> water</pre>
 <div class="cx">时间 O(n) · 空间 O(1)</div>
-<div class="tip"><b>口诀:</b>「找右边/左边第一个更大」→ <b>递减栈</b>;「找更小 / 算面积矮边」→ <b>递增栈</b>。弹出的瞬间就是结算答案的时机。<br><b>家族:</b>#739 · #496/#503 · #84 · #42 · #316 去重 · #901 股价跨度。</div>
+<div class="tip"><b>口诀:</b>「找右/左第一个更大」→ <b>递减栈</b>;「算面积矮边」→ <b>递增栈</b>。弹出瞬间结算。<br><b>家族:</b>#739 · #496/#503 · #84 · #42 · #316 · #901 股价跨度。</div>
 </div>
 
 <!-- ========== 5. 堆/Top-K ========== -->
@@ -325,211 +423,416 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <div class="pattern-note"><b>信号:</b>「第 K 大/小」「Top K」「数据流中位数」「反复取极值+合并」。<b>取最大用负数模拟 max-heap</b>。</div>
 
 <h3>#215 Kth Largest — Quick Select</h3>
-<div class="approach">partition + 只递归含目标的一半。第 k 大 = 升序第 (n-k) 位。随机 pivot 防最坏。</div>
 <pre><span class="kw">import</span> random
-<span class="kw">def</span> findKthLargest(self, nums, k):
-    target = len(nums) - k
-    lo, hi = 0, len(nums)-1
-    <span class="kw">while</span> lo &lt;= hi:
-        p = self.partition(nums, lo, hi)
-        <span class="kw">if</span> p == target: <span class="kw">return</span> nums[p]
-        <span class="kw">elif</span> p &lt; target: lo = p+1
-        <span class="kw">else</span>: hi = p-1
-<span class="kw">def</span> partition(self, nums, lo, hi):
-    r = random.randint(lo, hi); nums[r], nums[hi] = nums[hi], nums[r]
-    pivot = nums[hi]; i = lo
-    <span class="kw">for</span> j <span class="kw">in</span> range(lo, hi):
-        <span class="kw">if</span> nums[j] &lt; pivot: nums[i], nums[j] = nums[j], nums[i]; i += 1
-    nums[i], nums[hi] = nums[hi], nums[i]; <span class="kw">return</span> i</pre>
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> findKthLargest(self, nums, k):
+        target = len(nums) - k                       <span class="cm"># 升序第 (n-k) 位</span>
+        lo, hi = 0, len(nums) - 1
+        <span class="kw">while</span> lo &lt;= hi:
+            p = self.partition(nums, lo, hi)
+            <span class="kw">if</span> p == target: <span class="kw">return</span> nums[p]
+            <span class="kw">elif</span> p &lt; target: lo = p + 1
+            <span class="kw">else</span>: hi = p - 1
+
+    <span class="kw">def</span> partition(self, nums, lo, hi):
+        r = random.randint(lo, hi)                   <span class="cm"># 随机pivot防最坏</span>
+        nums[r], nums[hi] = nums[hi], nums[r]
+        pivot = nums[hi]
+        i = lo
+        <span class="kw">for</span> j <span class="kw">in</span> range(lo, hi):
+            <span class="kw">if</span> nums[j] &lt; pivot:
+                nums[i], nums[j] = nums[j], nums[i]
+                i += 1
+        nums[i], nums[hi] = nums[hi], nums[i]
+        <span class="kw">return</span> i</pre>
 <div class="cx">时间 O(n) 平均 / O(n²) 最坏 · 空间 O(1)</div>
 
 <h3>#347 Top K Frequent — 桶排序 O(n)</h3>
-<div class="approach">Counter 统计 + 按频率分桶(索引=频率),从高频往低扫凑 k 个。</div>
-<pre><span class="kw">def</span> topKFrequent(self, nums, k):
-    cnt = Counter(nums); n = len(nums)
-    buckets = [[] <span class="kw">for</span> _ <span class="kw">in</span> range(n+1)]
-    <span class="kw">for</span> num, f <span class="kw">in</span> cnt.items(): buckets[f].append(num)
-    res = []
-    <span class="kw">for</span> i <span class="kw">in</span> range(n, 0, -1):
-        <span class="kw">for</span> num <span class="kw">in</span> buckets[i]:
-            res.append(num)
-            <span class="kw">if</span> len(res) == k: <span class="kw">return</span> res</pre>
+<pre><span class="kw">from</span> collections <span class="kw">import</span> Counter
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> topKFrequent(self, nums, k):
+        cnt = Counter(nums)
+        n = len(nums)
+        buckets = [[] <span class="kw">for</span> _ <span class="kw">in</span> range(n + 1)]   <span class="cm"># 索引=频率</span>
+        <span class="kw">for</span> num, f <span class="kw">in</span> cnt.items():
+            buckets[f].append(num)
+        res = []
+        <span class="kw">for</span> i <span class="kw">in</span> range(n, 0, -1):              <span class="cm"># 从高频往低</span>
+            <span class="kw">for</span> num <span class="kw">in</span> buckets[i]:
+                res.append(num)
+                <span class="kw">if</span> len(res) == k:
+                    <span class="kw">return</span> res
+        <span class="kw">return</span> res</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
 
 <h3>#1167 Connect Sticks — Huffman 贪心</h3>
-<div class="approach">每次合并最短两根(早合并的被反复累加)。最小堆。</div>
-<pre><span class="kw">def</span> connectSticks(self, sticks):
-    heapq.heapify(sticks); total = 0
-    <span class="kw">while</span> len(sticks) &gt; 1:
-        a = heapq.heappop(sticks); b = heapq.heappop(sticks)
-        total += a + b; heapq.heappush(sticks, a + b)
-    <span class="kw">return</span> total</pre>
+<pre><span class="kw">import</span> heapq
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> connectSticks(self, sticks):
+        heapq.heapify(sticks)
+        total = 0
+        <span class="kw">while</span> len(sticks) &gt; 1:
+            a = heapq.heappop(sticks)                <span class="cm"># 最短两根</span>
+            b = heapq.heappop(sticks)
+            total += a + b
+            heapq.heappush(sticks, a + b)            <span class="cm"># 合并放回</span>
+        <span class="kw">return</span> total</pre>
 <div class="cx">时间 O(n log n) · 空间 O(1)</div>
-<div class="tip"><b>三种 Top-K:</b>Quick Select O(n) 一次性 · 堆 O(n log k) 数据流 · 桶排序 O(n)。<b>数据流中位数:</b>双堆(#295/#480/#1825)。</div>
+
+<h3>#295 Find Median from Data Stream — 双堆</h3>
+<pre><span class="kw">import</span> heapq
+
+<span class="kw">class</span> MedianFinder:
+    <span class="kw">def</span> __init__(self):
+        self.small = []                              <span class="cm"># 大顶堆(存负数):较小一半</span>
+        self.large = []                              <span class="cm"># 小顶堆:较大一半</span>
+
+    <span class="kw">def</span> addNum(self, num):
+        heapq.heappush(self.small, -num)
+        heapq.heappush(self.large, -heapq.heappop(self.small))
+        <span class="kw">if</span> len(self.large) &gt; len(self.small):    <span class="cm"># 平衡</span>
+            heapq.heappush(self.small, -heapq.heappop(self.large))
+
+    <span class="kw">def</span> findMedian(self):
+        <span class="kw">if</span> len(self.small) &gt; len(self.large):
+            <span class="kw">return</span> -self.small[0]
+        <span class="kw">return</span> (-self.small[0] + self.large[0]) / 2</pre>
+<div class="cx">addNum O(log n) · findMedian O(1) · 空间 O(n)</div>
+<div class="tip"><b>三种 Top-K:</b>Quick Select O(n) · 堆 O(n log k) · 桶排序 O(n)。<b>数据流中位数:</b>双堆(#295/#480/#1825)。</div>
 </div>
 
 <!-- ========== 6. DFS/回溯/岛屿 ========== -->
 <div class="category">
 <h2>6. DFS / 回溯 / 岛屿</h2>
-<div class="pattern-note"><b>两类区别:</b><br>· <b>连通块/数岛</b>:seen 永久标记,<b>不回溯</b>(否则重复计数);flag「全称性」初始 True。<br>· <b>路径搜索</b>:seen add→remove <b>回溯</b>(格子可被不同路径复用);flag「存在性」初始 False;<b>返回值要接住</b>。</div>
+<div class="pattern-note"><b>两类区别:</b><br>· <b>连通块/数岛</b>:seen 永久标记<b>不回溯</b>;flag「全称性」初始 True。<br>· <b>路径搜索</b>:seen add→remove <b>回溯</b>;flag「存在性」初始 False;<b>返回值要接住</b>。</div>
 
-<h3>岛屿三兄弟(#200 / #1254 / #1905)</h3>
-<table>
-<tr><th>题</th><th>陆地值</th><th>flag</th><th>翻 False 条件</th></tr>
-<tr><td>#200 数量</td><td>'1'(字符串)</td><td>无</td><td>—</td></tr>
-<tr><td>#1254 闭合</td><td>0(反!)</td><td>is_closed</td><td>碰边界</td></tr>
-<tr><td>#1905 子岛</td><td>1(两网格)</td><td>is_sub</td><td>grid1 对应为 0</td></tr>
-</table>
-<pre><span class="cm"># #1254 闭合岛(0=陆地,1=水)</span>
-<span class="kw">def</span> closedIsland(self, grid):
-    m, n = len(grid), len(grid[0]); seen = set(); is_closed = <span class="kw">True</span>
-    <span class="kw">def</span> dfs(i, j):
-        <span class="kw">nonlocal</span> is_closed
-        <span class="kw">if</span> i&lt;0 <span class="kw">or</span> i&gt;=m <span class="kw">or</span> j&lt;0 <span class="kw">or</span> j&gt;=n <span class="kw">or</span> grid[i][j]==1 <span class="kw">or</span> (i,j) <span class="kw">in</span> seen: <span class="kw">return</span>
-        seen.add((i,j))                      <span class="cm"># 永久标记,不回溯</span>
-        <span class="kw">if</span> i==0 <span class="kw">or</span> i==m-1 <span class="kw">or</span> j==0 <span class="kw">or</span> j==n-1: is_closed = <span class="kw">False</span>
-        <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]: dfs(i+dx, j+dy)
-    count = 0
-    <span class="kw">for</span> i <span class="kw">in</span> range(m):
-        <span class="kw">for</span> j <span class="kw">in</span> range(n):
-            <span class="kw">if</span> grid[i][j]==0 <span class="kw">and</span> (i,j) <span class="kw">not</span> <span class="kw">in</span> seen:
-                is_closed = <span class="kw">True</span>; dfs(i,j)
-                <span class="kw">if</span> is_closed: count += 1
-    <span class="kw">return</span> count</pre>
+<h3>#200 Number of Islands</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> numIslands(self, grid):
+        <span class="kw">if</span> <span class="kw">not</span> grid: <span class="kw">return</span> 0
+        m, n = len(grid), len(grid[0])
+        seen = set()
+
+        <span class="kw">def</span> dfs(i, j):
+            <span class="kw">if</span> i &lt; 0 <span class="kw">or</span> i &gt;= m <span class="kw">or</span> j &lt; 0 <span class="kw">or</span> j &gt;= n <span class="kw">or</span> grid[i][j] == <span class="cm">'0'</span> <span class="kw">or</span> (i,j) <span class="kw">in</span> seen:
+                <span class="kw">return</span>
+            seen.add((i, j))                         <span class="cm"># 永久标记,不回溯</span>
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                dfs(i + dx, j + dy)
+
+        count = 0
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                <span class="kw">if</span> grid[i][j] == <span class="cm">'1'</span> <span class="kw">and</span> (i,j) <span class="kw">not</span> <span class="kw">in</span> seen:
+                    dfs(i, j)
+                    count += 1
+        <span class="kw">return</span> count</pre>
+<div class="cx">时间 O(m·n) · 空间 O(m·n)</div>
+
+<h3>#1254 Closed Islands (0=陆地, 1=水)</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> closedIsland(self, grid):
+        m, n = len(grid), len(grid[0])
+        seen = set()
+        is_closed = <span class="kw">True</span>
+
+        <span class="kw">def</span> dfs(i, j):
+            <span class="kw">nonlocal</span> is_closed
+            <span class="kw">if</span> i &lt; 0 <span class="kw">or</span> i &gt;= m <span class="kw">or</span> j &lt; 0 <span class="kw">or</span> j &gt;= n <span class="kw">or</span> grid[i][j] == 1 <span class="kw">or</span> (i,j) <span class="kw">in</span> seen:
+                <span class="kw">return</span>
+            seen.add((i, j))
+            <span class="kw">if</span> i == 0 <span class="kw">or</span> i == m-1 <span class="kw">or</span> j == 0 <span class="kw">or</span> j == n-1:
+                is_closed = <span class="kw">False</span>                     <span class="cm"># 碰边界</span>
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                dfs(i + dx, j + dy)
+
+        count = 0
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                <span class="kw">if</span> grid[i][j] == 0 <span class="kw">and</span> (i,j) <span class="kw">not</span> <span class="kw">in</span> seen:
+                    is_closed = <span class="kw">True</span>
+                    dfs(i, j)
+                    <span class="kw">if</span> is_closed:
+                        count += 1
+        <span class="kw">return</span> count</pre>
+<div class="cx">时间 O(m·n) · 空间 O(m·n)</div>
+
+<h3>#695 Max Area of Island — DFS 返回面积</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> maxAreaOfIsland(self, grid):
+        m, n = len(grid), len(grid[0])
+        seen = set()
+
+        <span class="kw">def</span> dfs(i, j):
+            <span class="kw">if</span> i &lt; 0 <span class="kw">or</span> i &gt;= m <span class="kw">or</span> j &lt; 0 <span class="kw">or</span> j &gt;= n <span class="kw">or</span> grid[i][j] == 0 <span class="kw">or</span> (i,j) <span class="kw">in</span> seen:
+                <span class="kw">return</span> 0                            <span class="cm"># 不贡献面积</span>
+            seen.add((i, j))
+            area = 1                                 <span class="cm"># 自己 1 个</span>
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                area += dfs(i + dx, j + dy)          <span class="cm"># 加四方向</span>
+            <span class="kw">return</span> area
+
+        <span class="kw">return</span> max((dfs(i, j) <span class="kw">for</span> i <span class="kw">in</span> range(m) <span class="kw">for</span> j <span class="kw">in</span> range(n)), default=0)</pre>
 <div class="cx">时间 O(m·n) · 空间 O(m·n)</div>
 
 <h3>#79 Word Search — 路径回溯</h3>
-<div class="approach">每格启动 DFS,seen add/remove 回溯,found flag 初始 False,返回值接住。</div>
-<pre><span class="kw">def</span> exist(self, grid, word):
-    m, n = len(grid), len(grid[0]); seen = set()
-    <span class="kw">def</span> dfs(i, j, cnt):
-        <span class="kw">if</span> cnt == len(word): <span class="kw">return</span> <span class="kw">True</span>      <span class="cm"># 先判!在越界前</span>
-        <span class="kw">if</span> i&lt;0 <span class="kw">or</span> i&gt;=m <span class="kw">or</span> j&lt;0 <span class="kw">or</span> j&gt;=n <span class="kw">or</span> (i,j) <span class="kw">in</span> seen <span class="kw">or</span> grid[i][j]!=word[cnt]:
-            <span class="kw">return</span> <span class="kw">False</span>
-        seen.add((i,j)); found = <span class="kw">False</span>
-        <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
-            <span class="kw">if</span> dfs(i+dx, j+dy, cnt+1): found = <span class="kw">True</span>; <span class="kw">break</span>
-        seen.remove((i,j))                   <span class="cm"># 回溯</span>
-        <span class="kw">return</span> found
-    <span class="kw">return</span> any(dfs(i,j,0) <span class="kw">for</span> i <span class="kw">in</span> range(m) <span class="kw">for</span> j <span class="kw">in</span> range(n))</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> exist(self, grid, word):
+        m, n = len(grid), len(grid[0])
+        seen = set()
+
+        <span class="kw">def</span> dfs(i, j, cnt):
+            <span class="kw">if</span> cnt == len(word): <span class="kw">return</span> <span class="kw">True</span>      <span class="cm"># 先判!在越界前</span>
+            <span class="kw">if</span> (i &lt; 0 <span class="kw">or</span> i &gt;= m <span class="kw">or</span> j &lt; 0 <span class="kw">or</span> j &gt;= n
+                    <span class="kw">or</span> (i,j) <span class="kw">in</span> seen <span class="kw">or</span> grid[i][j] != word[cnt]):
+                <span class="kw">return</span> <span class="kw">False</span>
+            seen.add((i, j))
+            found = <span class="kw">False</span>
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                <span class="kw">if</span> dfs(i+dx, j+dy, cnt+1):
+                    found = <span class="kw">True</span>; <span class="kw">break</span>
+            seen.remove((i, j))                      <span class="cm"># 回溯</span>
+            <span class="kw">return</span> found
+
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                <span class="kw">if</span> dfs(i, j, 0):
+                    <span class="kw">return</span> <span class="kw">True</span>
+        <span class="kw">return</span> <span class="kw">False</span></pre>
 <div class="cx">时间 O(m·n·3^L) · 空间 O(L)</div>
 
 <h3>#489 Robot Room Cleaner — puzzle 回溯</h3>
-<div class="approach">相对坐标 (0,0);方向数组顺时针配 turnRight;go_back() 物理复位;<b>循环末尾 turnRight 同步朝向</b>。</div>
-<pre><span class="kw">def</span> cleanRoom(self, robot):
-    dirs = [(-1,0),(0,1),(1,0),(0,-1)]; visited = set()
-    <span class="kw">def</span> go_back():
-        robot.turnRight(); robot.turnRight(); robot.move()
-        robot.turnRight(); robot.turnRight()
-    <span class="kw">def</span> bt(r, c, d):
-        visited.add((r,c)); robot.clean()
-        <span class="kw">for</span> i <span class="kw">in</span> range(4):
-            nd = (d+i) % 4; dx, dy = dirs[nd]
-            nr, nc = r+dx, c+dy
-            <span class="kw">if</span> (nr,nc) <span class="kw">not</span> <span class="kw">in</span> visited <span class="kw">and</span> robot.move():
-                bt(nr, nc, nd); go_back()
-            robot.turnRight()                <span class="cm"># ★ 同步物理朝向</span>
-    bt(0, 0, 0)</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> cleanRoom(self, robot):
+        dirs = [(-1,0),(0,1),(1,0),(0,-1)]           <span class="cm"># 顺时针配 turnRight</span>
+        visited = set()
+
+        <span class="kw">def</span> go_back():                           <span class="cm"># 物理复位,方向不变</span>
+            robot.turnRight(); robot.turnRight()
+            robot.move()
+            robot.turnRight(); robot.turnRight()
+
+        <span class="kw">def</span> bt(r, c, d):
+            visited.add((r, c))
+            robot.clean()
+            <span class="kw">for</span> i <span class="kw">in</span> range(4):
+                nd = (d + i) % 4
+                dx, dy = dirs[nd]
+                nr, nc = r + dx, c + dy
+                <span class="kw">if</span> (nr, nc) <span class="kw">not</span> <span class="kw">in</span> visited <span class="kw">and</span> robot.move():
+                    bt(nr, nc, nd)
+                    go_back()
+                robot.turnRight()                    <span class="cm"># ★ 同步物理朝向</span>
+
+        bt(0, 0, 0)</pre>
 <div class="cx">时间 O(N-M) · 空间 O(N-M)</div>
 
-<h3>#366 Find Leaves — 后序(高度分层)</h3>
-<div class="approach">节点被摘轮次 = 它的高度;后序算高度,按高度分组。</div>
-<pre><span class="kw">def</span> findLeaves(self, root):
-    res = collections.defaultdict(list)
-    <span class="kw">def</span> height(node):
-        <span class="kw">if</span> <span class="kw">not</span> node: <span class="kw">return</span> -1
-        h = 1 + max(height(node.left), height(node.right))
-        res[h].append(node.val); <span class="kw">return</span> h
-    height(root)
-    <span class="kw">return</span> [res[i] <span class="kw">for</span> i <span class="kw">in</span> range(max(res)+1)]</pre>
+<h3>#366 Find Leaves — 后序分层</h3>
+<pre><span class="kw">import</span> collections
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> findLeaves(self, root):
+        res = collections.defaultdict(list)
+
+        <span class="kw">def</span> height(node):
+            <span class="kw">if</span> <span class="kw">not</span> node: <span class="kw">return</span> -1
+            h = 1 + max(height(node.left), height(node.right))
+            res[h].append(node.val)                  <span class="cm"># 按高度分组</span>
+            <span class="kw">return</span> h
+
+        height(root)
+        <span class="kw">return</span> [res[i] <span class="kw">for</span> i <span class="kw">in</span> range(max(res) + 1)]</pre>
 <div class="cx">时间 O(n) · 空间 O(h)</div>
+<div class="tip"><b>岛屿:</b>#200(1陆) · #1254(0陆,is_closed) · #1905(两网格,is_sub) · #695(返回面积)。<b>数岛不回溯,路径要回溯。</b></div>
 </div>
 
 <!-- ========== 7. BFS/图/最短路 ========== -->
 <div class="category">
 <h2>7. BFS / 图 / 最短路</h2>
-<div class="pattern-note"><b>选算法:</b>无权最短→BFS · 非负权→Dijkstra · 有约束/负权→Bellman-Ford · 用完所有边→欧拉路径 · 依赖排序→拓扑。<br><b>Dijkstra 综合:</b>改 COMBINE 旋钮:最小和=cost+w · 最大化最小=min()+负堆 · 最小化最大=max()。</div>
+<div class="pattern-note"><b>选算法:</b>无权最短→BFS · 非负权→Dijkstra · 有约束/负权→Bellman-Ford · 用完所有边→欧拉 · 依赖排序→拓扑。<b>Dijkstra COMBINE:</b>最小和=cost+w · 最大化最小=min()+负堆 · 最小化最大=max()。</div>
 
 <h3>#743 Network Delay — Dijkstra 模板</h3>
-<pre><span class="kw">def</span> networkDelayTime(self, times, n, k):
-    graph = collections.defaultdict(list)
-    <span class="kw">for</span> u, v, w <span class="kw">in</span> times: graph[u].append((v, w))
-    dist = {}; heap = [(0, k)]
-    <span class="kw">while</span> heap:
-        d, node = heapq.heappop(heap)
-        <span class="kw">if</span> node <span class="kw">in</span> dist: <span class="kw">continue</span>     <span class="cm"># 第一次弹出即最短</span>
-        dist[node] = d
-        <span class="kw">for</span> nei, w <span class="kw">in</span> graph[node]:
-            <span class="kw">if</span> nei <span class="kw">not</span> <span class="kw">in</span> dist: heapq.heappush(heap, (d+w, nei))
-    <span class="kw">return</span> max(dist.values()) <span class="kw">if</span> len(dist)==n <span class="kw">else</span> -1</pre>
+<pre><span class="kw">import</span> heapq, collections
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> networkDelayTime(self, times, n, k):
+        graph = collections.defaultdict(list)
+        <span class="kw">for</span> u, v, w <span class="kw">in</span> times:
+            graph[u].append((v, w))
+        dist = {}
+        heap = [(0, k)]
+        <span class="kw">while</span> heap:
+            d, node = heapq.heappop(heap)
+            <span class="kw">if</span> node <span class="kw">in</span> dist: <span class="kw">continue</span>          <span class="cm"># 第一次弹出即最短</span>
+            dist[node] = d
+            <span class="kw">for</span> nei, w <span class="kw">in</span> graph[node]:
+                <span class="kw">if</span> nei <span class="kw">not</span> <span class="kw">in</span> dist:
+                    heapq.heappush(heap, (d + w, nei))
+        <span class="kw">return</span> max(dist.values()) <span class="kw">if</span> len(dist) == n <span class="kw">else</span> -1</pre>
 <div class="cx">时间 O(E log V) · 空间 O(V+E)</div>
 
 <h3>#1631 Path Min Effort — 最小化最大(瓶颈)</h3>
-<div class="approach">COMBINE = max(已有瓶颈, 相邻差);min-heap。</div>
-<pre><span class="kw">def</span> minimumEffortPath(self, heights):
-    m, n = len(heights), len(heights[0])
-    effort = [[float(<span class="cm">'inf'</span>)]*n <span class="kw">for</span> _ <span class="kw">in</span> range(m)]; effort[0][0]=0
-    heap = [(0,0,0)]
-    <span class="kw">while</span> heap:
-        e, x, y = heapq.heappop(heap)
-        <span class="kw">if</span> x==m-1 <span class="kw">and</span> y==n-1: <span class="kw">return</span> e
-        <span class="kw">if</span> e &gt; effort[x][y]: <span class="kw">continue</span>
-        <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
-            nx, ny = x+dx, y+dy
-            <span class="kw">if</span> 0&lt;=nx&lt;m <span class="kw">and</span> 0&lt;=ny&lt;n:
-                ne = max(e, abs(heights[nx][ny]-heights[x][y]))
-                <span class="kw">if</span> ne &lt; effort[nx][ny]:
-                    effort[nx][ny] = ne; heapq.heappush(heap, (ne, nx, ny))</pre>
+<pre><span class="kw">import</span> heapq
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> minimumEffortPath(self, heights):
+        m, n = len(heights), len(heights[0])
+        effort = [[float(<span class="cm">'inf'</span>)] * n <span class="kw">for</span> _ <span class="kw">in</span> range(m)]
+        effort[0][0] = 0
+        heap = [(0, 0, 0)]
+        <span class="kw">while</span> heap:
+            e, x, y = heapq.heappop(heap)
+            <span class="kw">if</span> x == m-1 <span class="kw">and</span> y == n-1: <span class="kw">return</span> e
+            <span class="kw">if</span> e &gt; effort[x][y]: <span class="kw">continue</span>
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                nx, ny = x + dx, y + dy
+                <span class="kw">if</span> 0 &lt;= nx &lt; m <span class="kw">and</span> 0 &lt;= ny &lt; n:
+                    ne = max(e, abs(heights[nx][ny] - heights[x][y]))
+                    <span class="kw">if</span> ne &lt; effort[nx][ny]:
+                        effort[nx][ny] = ne
+                        heapq.heappush(heap, (ne, nx, ny))</pre>
 <div class="cx">时间 O(mn log mn) · 空间 O(mn)</div>
 
 <h3>#2258 Escape Fire — 多源BFS + 二分</h3>
-<div class="approach">多源BFS算火到每格时间;二分等待时间;BFS验证(终点 ≥ 放宽一格)。</div>
-<pre><span class="cm"># ① 多源BFS: 所有火格入队算 fire[i][j]</span>
-<span class="cm"># ② can(wait): 从(0,0)等wait后BFS, 非终点 fire&gt;t, 终点 fire&gt;=t</span>
-<span class="cm"># ③ 二分 wait ∈ [0, m*n], 全可逃返回 10**9</span></pre>
+<pre><span class="kw">from</span> math <span class="kw">import</span> inf
+<span class="kw">from</span> collections <span class="kw">import</span> deque
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> maximumMinutes(self, grid):
+        m, n = len(grid), len(grid[0])
+        DIRS = [(0,1),(0,-1),(1,0),(-1,0)]
+        fire = [[inf] * n <span class="kw">for</span> _ <span class="kw">in</span> range(m)]
+        q = deque()
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):                       <span class="cm"># ① 多源BFS算火时间</span>
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                <span class="kw">if</span> grid[i][j] == 1:
+                    fire[i][j] = 0; q.append((i, j))
+        <span class="kw">while</span> q:
+            x, y = q.popleft()
+            <span class="kw">for</span> dx, dy <span class="kw">in</span> DIRS:
+                nx, ny = x+dx, y+dy
+                <span class="kw">if</span> 0&lt;=nx&lt;m <span class="kw">and</span> 0&lt;=ny&lt;n <span class="kw">and</span> grid[nx][ny]==0 <span class="kw">and</span> fire[nx][ny]==inf:
+                    fire[nx][ny] = fire[x][y] + 1; q.append((nx, ny))
+
+        <span class="kw">def</span> can(wait):                           <span class="cm"># ② 验证等wait能否到终点</span>
+            <span class="kw">if</span> fire[0][0] &lt;= wait: <span class="kw">return</span> <span class="kw">False</span>
+            seen = {(0,0)}
+            q = deque([(0, 0, wait)])
+            <span class="kw">while</span> q:
+                x, y, t = q.popleft()
+                <span class="kw">for</span> dx, dy <span class="kw">in</span> DIRS:
+                    nx, ny = x+dx, y+dy
+                    <span class="kw">if</span> 0&lt;=nx&lt;m <span class="kw">and</span> 0&lt;=ny&lt;n <span class="kw">and</span> grid[nx][ny]!=2 <span class="kw">and</span> (nx,ny) <span class="kw">not</span> <span class="kw">in</span> seen:
+                        nt = t + 1
+                        <span class="kw">if</span> nx==m-1 <span class="kw">and</span> ny==n-1:
+                            <span class="kw">if</span> fire[nx][ny] &gt;= nt: <span class="kw">return</span> <span class="kw">True</span>   <span class="cm"># 终点放宽</span>
+                        <span class="kw">elif</span> fire[nx][ny] &gt; nt:
+                            seen.add((nx,ny)); q.append((nx,ny,nt))
+            <span class="kw">return</span> <span class="kw">False</span>
+
+        lo, hi, ans = 0, m*n, -1                     <span class="cm"># ③ 二分等待时间</span>
+        <span class="kw">while</span> lo &lt;= hi:
+            mid = (lo + hi) // 2
+            <span class="kw">if</span> can(mid): ans = mid; lo = mid + 1
+            <span class="kw">else</span>: hi = mid - 1
+        <span class="kw">return</span> 10**9 <span class="kw">if</span> ans == m*n <span class="kw">else</span> ans</pre>
 <div class="cx">时间 O(mn log mn) · 空间 O(mn)</div>
 
 <h3>#2101 Detonate Bombs — 有向图 BFS</h3>
-<div class="approach">建有向图(i炸到j:dx²+dy²≤ri²,距离平方);每点 BFS 数可达取 max。</div>
-<pre><span class="kw">for</span> i <span class="kw">in</span> range(n):
-    <span class="kw">for</span> j <span class="kw">in</span> range(n):
-        <span class="kw">if</span> i!=j <span class="kw">and</span> (xi-xj)**2+(yi-yj)**2 &lt;= ri*ri:
-            graph[i].append(j)               <span class="cm"># 有向!</span></pre>
+<pre><span class="kw">import</span> collections
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> maximumDetonation(self, bombs):
+        n = len(bombs)
+        graph = collections.defaultdict(list)
+        <span class="kw">for</span> i <span class="kw">in</span> range(n):                       <span class="cm"># 建有向图</span>
+            xi, yi, ri = bombs[i]
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                <span class="kw">if</span> i != j:
+                    xj, yj, _ = bombs[j]
+                    <span class="kw">if</span> (xi-xj)**2 + (yi-yj)**2 &lt;= ri*ri:   <span class="cm"># 距离平方</span>
+                        graph[i].append(j)
+
+        <span class="kw">def</span> bfs(start):
+            seen = {start}
+            queue = collections.deque([start])
+            <span class="kw">while</span> queue:
+                node = queue.popleft()
+                <span class="kw">for</span> nei <span class="kw">in</span> graph[node]:
+                    <span class="kw">if</span> nei <span class="kw">not</span> <span class="kw">in</span> seen:
+                        seen.add(nei); queue.append(nei)
+            <span class="kw">return</span> len(seen)
+
+        <span class="kw">return</span> max(bfs(i) <span class="kw">for</span> i <span class="kw">in</span> range(n))</pre>
 <div class="cx">时间 O(n³) · 空间 O(n²)</div>
 
-<h3>#2115 Recipes — 拓扑排序(Kahn)</h3>
-<div class="approach">supplies 入度0先入队;recipe 入度=配料数;料齐则解锁。</div>
-<pre><span class="kw">def</span> findAllRecipes(self, recipes, ingredients, supplies):
-    graph = defaultdict(list); indeg = defaultdict(int)
-    <span class="kw">for</span> i, r <span class="kw">in</span> enumerate(recipes):
-        <span class="kw">for</span> ing <span class="kw">in</span> ingredients[i]:
-            graph[ing].append(r); indeg[r] += 1
-    queue = deque(supplies); res = []
-    <span class="kw">while</span> queue:
-        item = queue.popleft()
-        <span class="kw">for</span> r <span class="kw">in</span> graph[item]:
-            indeg[r] -= 1
-            <span class="kw">if</span> indeg[r] == 0: res.append(r); queue.append(r)
-    <span class="kw">return</span> res</pre>
+<h3>#2115 Find All Recipes — 拓扑排序 (Kahn)</h3>
+<pre><span class="kw">from</span> collections <span class="kw">import</span> defaultdict, deque
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> findAllRecipes(self, recipes, ingredients, supplies):
+        graph = defaultdict(list)
+        indeg = defaultdict(int)
+        <span class="kw">for</span> i, r <span class="kw">in</span> enumerate(recipes):           <span class="cm"># 建图</span>
+            <span class="kw">for</span> ing <span class="kw">in</span> ingredients[i]:
+                graph[ing].append(r)
+                indeg[r] += 1
+        queue = deque(supplies)                      <span class="cm"># supplies入度0先入队</span>
+        res = []
+        <span class="kw">while</span> queue:
+            item = queue.popleft()
+            <span class="kw">for</span> r <span class="kw">in</span> graph[item]:
+                indeg[r] -= 1
+                <span class="kw">if</span> indeg[r] == 0:                    <span class="cm"># 料齐 → 解锁</span>
+                    res.append(r); queue.append(r)
+        <span class="kw">return</span> res</pre>
 <div class="cx">时间 O(V+E) · 空间 O(V+E)</div>
-<div class="tip"><b>拓扑 vs 欧拉:</b>拓扑排<b>节点</b>(各一次,无环);欧拉走<b>边</b>(节点可重复,可成环,#332 Hierholzer:排序+DFS走到底+后序反转)。</div>
+
+<h3>#332 Reconstruct Itinerary — 欧拉路径 (Hierholzer)</h3>
+<pre><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">class</span> Solution:
+    <span class="kw">def</span> findItinerary(self, tickets):
+        graph = defaultdict(list)
+        <span class="kw">for</span> src, dst <span class="kw">in</span> sorted(tickets, reverse=<span class="kw">True</span>):
+            graph[src].append(dst)                   <span class="cm"># 反序,pop()取最小</span>
+        stack = [<span class="cm">"JFK"</span>]
+        res = []
+        <span class="kw">while</span> stack:
+            <span class="kw">while</span> graph[stack[-1]]:
+                stack.append(graph[stack[-1]].pop())
+            res.append(stack.pop())                  <span class="cm"># 后序</span>
+        <span class="kw">return</span> res[::-1]                          <span class="cm"># 反转</span></pre>
+<div class="cx">时间 O(E log E) · 空间 O(E)</div>
+<div class="tip"><b>拓扑 vs 欧拉:</b>拓扑排<b>节点</b>(各一次,无环);欧拉走<b>边</b>(节点可重复,可成环)。</div>
 </div>
 
 <!-- ========== 8. Trie ========== -->
 <div class="category">
 <h2>8. Trie 字典树</h2>
-<div class="pattern-note"><b>信号:</b>「前缀匹配 / 多词搜索 / 自动补全 / 词典」。<b>核心:</b>嵌套 dict,沿字符走,结尾标记。加频率→补全,加 DFS→网格,加路径→文件系统。</div>
+<div class="pattern-note"><b>信号:</b>「前缀匹配 / 多词搜索 / 自动补全 / 词典」。<b>核心:</b>嵌套 dict,沿字符走,结尾标记。</div>
 
 <h3>#208 Implement Trie</h3>
 <pre><span class="kw">class</span> Trie:
-    <span class="kw">def</span> __init__(self): self.root = {}
+    <span class="kw">def</span> __init__(self):
+        self.root = {}
+
     <span class="kw">def</span> insert(self, word):
         node = self.root
-        <span class="kw">for</span> ch <span class="kw">in</span> word: node = node.setdefault(ch, {})
-        node[<span class="cm">'#'</span>] = <span class="kw">True</span>
+        <span class="kw">for</span> ch <span class="kw">in</span> word:
+            node = node.setdefault(ch, {})
+        node[<span class="cm">'#'</span>] = <span class="kw">True</span>                       <span class="cm"># 结尾标记</span>
+
     <span class="kw">def</span> search(self, word):
-        node = self._find(word); <span class="kw">return</span> node <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span> <span class="kw">and</span> <span class="cm">'#'</span> <span class="kw">in</span> node
-    <span class="kw">def</span> startsWith(self, p): <span class="kw">return</span> self._find(p) <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>
+        node = self._find(word)
+        <span class="kw">return</span> node <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span> <span class="kw">and</span> <span class="cm">'#'</span> <span class="kw">in</span> node
+
+    <span class="kw">def</span> startsWith(self, prefix):
+        <span class="kw">return</span> self._find(prefix) <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>
+
     <span class="kw">def</span> _find(self, s):
         node = self.root
         <span class="kw">for</span> ch <span class="kw">in</span> s:
@@ -539,93 +842,115 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <div class="cx">insert/search/startsWith O(L) · 空间 O(总字符数)</div>
 
 <h3>#212 Word Search II — Trie + DFS</h3>
-<div class="approach">所有词建 Trie('#'存整词),只扫一遍 board,沿 Trie 走 + 剪枝。</div>
-<pre><span class="kw">def</span> findWords(self, board, words):
-    trie = {}
-    <span class="kw">for</span> w <span class="kw">in</span> words:
-        node = trie
-        <span class="kw">for</span> ch <span class="kw">in</span> w: node = node.setdefault(ch, {})
-        node[<span class="cm">'#'</span>] = w
-    m, n = len(board), len(board[0]); res = []
-    <span class="kw">def</span> dfs(i, j, node):
-        ch = board[i][j]
-        <span class="kw">if</span> ch <span class="kw">not</span> <span class="kw">in</span> node: <span class="kw">return</span>
-        nxt = node[ch]
-        <span class="kw">if</span> <span class="cm">'#'</span> <span class="kw">in</span> nxt: res.append(nxt[<span class="cm">'#'</span>]); <span class="kw">del</span> nxt[<span class="cm">'#'</span>]
-        board[i][j] = <span class="cm">'#'</span>
-        <span class="kw">for</span> di, dj <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
-            ni, nj = i+di, j+dj
-            <span class="kw">if</span> 0&lt;=ni&lt;m <span class="kw">and</span> 0&lt;=nj&lt;n <span class="kw">and</span> board[ni][nj]!=<span class="cm">'#'</span>: dfs(ni, nj, nxt)
-        board[i][j] = ch
-    <span class="kw">for</span> i <span class="kw">in</span> range(m):
-        <span class="kw">for</span> j <span class="kw">in</span> range(n): dfs(i, j, trie)
-    <span class="kw">return</span> res</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> findWords(self, board, words):
+        trie = {}
+        <span class="kw">for</span> w <span class="kw">in</span> words:                          <span class="cm"># 建 Trie</span>
+            node = trie
+            <span class="kw">for</span> ch <span class="kw">in</span> w:
+                node = node.setdefault(ch, {})
+            node[<span class="cm">'#'</span>] = w                          <span class="cm"># 存整词</span>
+        m, n = len(board), len(board[0])
+        res = []
+
+        <span class="kw">def</span> dfs(i, j, node):
+            ch = board[i][j]
+            <span class="kw">if</span> ch <span class="kw">not</span> <span class="kw">in</span> node: <span class="kw">return</span>          <span class="cm"># 剪枝</span>
+            nxt = node[ch]
+            <span class="kw">if</span> <span class="cm">'#'</span> <span class="kw">in</span> nxt:
+                res.append(nxt[<span class="cm">'#'</span>])
+                <span class="kw">del</span> nxt[<span class="cm">'#'</span>]                       <span class="cm"># 防重复</span>
+            board[i][j] = <span class="cm">'#'</span>
+            <span class="kw">for</span> di, dj <span class="kw">in</span> [(0,1),(0,-1),(1,0),(-1,0)]:
+                ni, nj = i+di, j+dj
+                <span class="kw">if</span> 0&lt;=ni&lt;m <span class="kw">and</span> 0&lt;=nj&lt;n <span class="kw">and</span> board[ni][nj] != <span class="cm">'#'</span>:
+                    dfs(ni, nj, nxt)
+            board[i][j] = ch                         <span class="cm"># 回溯</span>
+
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                dfs(i, j, trie)
+        <span class="kw">return</span> res</pre>
 <div class="cx">时间 O(m·n·3^L) · 空间 O(总字符数)</div>
-<div class="tip"><b>家族:</b>#208 基础 · #212 网格多词 · #642 补全(+频率) · #139 分词 · #648/#720 前缀匹配。</div>
+<div class="tip"><b>家族:</b>#208 基础 · #212 网格多词 · #642 补全(+频率) · #139 分词 · #648/#720。</div>
 </div>
 
 <!-- ========== 9. 树/BST ========== -->
 <div class="category">
 <h2>9. 树 / BST</h2>
-<div class="pattern-note"><b>遍历选择:</b>BST升序/第k→<b>中序</b> · 树高/直径/自底向上→<b>后序</b> · 复制/序列化→<b>前序</b> · 按层→<b>BFS</b>。<b>BST性质:</b>左&lt;根&lt;右,中序升序。</div>
+<div class="pattern-note"><b>遍历:</b>BST升序/第k→<b>中序</b> · 树高/直径→<b>后序</b> · 复制/序列化→<b>前序</b> · 按层→<b>BFS</b>。BST性质:左&lt;根&lt;右。</div>
 
-<h3>#236 LCA — 最近公共祖先(模板)</h3>
-<pre><span class="kw">def</span> lowestCommonAncestor(self, root, p, q):
-    <span class="kw">if</span> <span class="kw">not</span> root <span class="kw">or</span> root==p <span class="kw">or</span> root==q: <span class="kw">return</span> root
-    L = self.lowestCommonAncestor(root.left, p, q)
-    R = self.lowestCommonAncestor(root.right, p, q)
-    <span class="kw">if</span> L <span class="kw">and</span> R: <span class="kw">return</span> root         <span class="cm"># 分居两侧→当前是LCA</span>
-    <span class="kw">return</span> L <span class="kw">or</span> R</pre>
+<h3>#236 LCA — 最近公共祖先</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> lowestCommonAncestor(self, root, p, q):
+        <span class="kw">if</span> <span class="kw">not</span> root <span class="kw">or</span> root == p <span class="kw">or</span> root == q:
+            <span class="kw">return</span> root
+        L = self.lowestCommonAncestor(root.left, p, q)
+        R = self.lowestCommonAncestor(root.right, p, q)
+        <span class="kw">if</span> L <span class="kw">and</span> R: <span class="kw">return</span> root             <span class="cm"># 分居两侧→LCA</span>
+        <span class="kw">return</span> L <span class="kw">or</span> R</pre>
 <div class="cx">时间 O(n) · 空间 O(h)</div>
 
 <h3>#450 Delete Node in BST</h3>
-<div class="approach">找到后三种情况:无孩子删;一孩子顶替;两孩子用中序后继(右子树最小)替换再删后继。</div>
-<pre><span class="kw">def</span> deleteNode(self, root, key):
-    <span class="kw">if</span> <span class="kw">not</span> root: <span class="kw">return</span> <span class="kw">None</span>
-    <span class="kw">if</span> key &lt; root.val: root.left = self.deleteNode(root.left, key)
-    <span class="kw">elif</span> key &gt; root.val: root.right = self.deleteNode(root.right, key)
-    <span class="kw">else</span>:
-        <span class="kw">if</span> <span class="kw">not</span> root.left: <span class="kw">return</span> root.right
-        <span class="kw">if</span> <span class="kw">not</span> root.right: <span class="kw">return</span> root.left
-        succ = root.right
-        <span class="kw">while</span> succ.left: succ = succ.left
-        root.val = succ.val
-        root.right = self.deleteNode(root.right, succ.val)
-    <span class="kw">return</span> root</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> deleteNode(self, root, key):
+        <span class="kw">if</span> <span class="kw">not</span> root: <span class="kw">return</span> <span class="kw">None</span>
+        <span class="kw">if</span> key &lt; root.val:
+            root.left = self.deleteNode(root.left, key)
+        <span class="kw">elif</span> key &gt; root.val:
+            root.right = self.deleteNode(root.right, key)
+        <span class="kw">else</span>:
+            <span class="kw">if</span> <span class="kw">not</span> root.left: <span class="kw">return</span> root.right
+            <span class="kw">if</span> <span class="kw">not</span> root.right: <span class="kw">return</span> root.left
+            succ = root.right                        <span class="cm"># 中序后继=右子树最小</span>
+            <span class="kw">while</span> succ.left:
+                succ = succ.left
+            root.val = succ.val
+            root.right = self.deleteNode(root.right, succ.val)
+        <span class="kw">return</span> root</pre>
 <div class="cx">时间 O(h) · 空间 O(h)</div>
 
-<h3>#98 Validate BST / #230 Kth Smallest</h3>
-<pre><span class="cm"># #98 传上下界</span>
-<span class="kw">def</span> isValidBST(self, root):
-    <span class="kw">def</span> valid(node, low, high):
-        <span class="kw">if</span> <span class="kw">not</span> node: <span class="kw">return</span> <span class="kw">True</span>
-        <span class="kw">if</span> <span class="kw">not</span> (low &lt; node.val &lt; high): <span class="kw">return</span> <span class="kw">False</span>
-        <span class="kw">return</span> valid(node.left, low, node.val) <span class="kw">and</span> valid(node.right, node.val, high)
-    <span class="kw">return</span> valid(root, float(<span class="cm">'-inf'</span>), float(<span class="cm">'inf'</span>))
+<h3>#98 Validate BST</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> isValidBST(self, root):
+        <span class="kw">def</span> valid(node, low, high):
+            <span class="kw">if</span> <span class="kw">not</span> node: <span class="kw">return</span> <span class="kw">True</span>
+            <span class="kw">if</span> <span class="kw">not</span> (low &lt; node.val &lt; high):
+                <span class="kw">return</span> <span class="kw">False</span>
+            <span class="kw">return</span> (valid(node.left, low, node.val) <span class="kw">and</span>
+                    valid(node.right, node.val, high))
+        <span class="kw">return</span> valid(root, float(<span class="cm">'-inf'</span>), float(<span class="cm">'inf'</span>))</pre>
+<div class="cx">时间 O(n) · 空间 O(h)</div>
 
-<span class="cm"># #230 中序迭代第k小</span>
-<span class="kw">def</span> kthSmallest(self, root, k):
-    stack, node = [], root
-    <span class="kw">while</span> node <span class="kw">or</span> stack:
-        <span class="kw">while</span> node: stack.append(node); node = node.left
-        node = stack.pop(); k -= 1
-        <span class="kw">if</span> k == 0: <span class="kw">return</span> node.val
-        node = node.right</pre>
-<div class="cx">#98 O(n)/O(h) · #230 O(h+k)/O(h)</div>
+<h3>#230 Kth Smallest in BST — 中序迭代</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> kthSmallest(self, root, k):
+        stack, node = [], root
+        <span class="kw">while</span> node <span class="kw">or</span> stack:
+            <span class="kw">while</span> node:                          <span class="cm"># 一路向左</span>
+                stack.append(node); node = node.left
+            node = stack.pop()                       <span class="cm"># 中序下一个</span>
+            k -= 1
+            <span class="kw">if</span> k == 0: <span class="kw">return</span> node.val
+            node = node.right</pre>
+<div class="cx">时间 O(h+k) · 空间 O(h)</div>
 
-<h3>#1522 Diameter N-Ary / #543 树直径</h3>
-<div class="approach">后序;每点算「最深两条子链之和」更新全局,返回「单边最深」给父。</div>
-<pre><span class="kw">def</span> diameter(self, root):
-    self.ans = 0
-    <span class="kw">def</span> depth(node):
-        top1 = top2 = 0
-        <span class="kw">for</span> ch <span class="kw">in</span> node.children:
-            d = depth(ch) + 1
-            <span class="kw">if</span> d &gt; top1: top1, top2 = d, top1
-            <span class="kw">elif</span> d &gt; top2: top2 = d
-        self.ans = max(self.ans, top1 + top2)
-        <span class="kw">return</span> top1
-    depth(root); <span class="kw">return</span> self.ans</pre>
+<h3>#1522 Diameter of N-Ary Tree — 后序</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> diameter(self, root):
+        self.ans = 0
+
+        <span class="kw">def</span> depth(node):
+            top1 = top2 = 0                          <span class="cm"># 最深/次深子链</span>
+            <span class="kw">for</span> ch <span class="kw">in</span> node.children:
+                d = depth(ch) + 1
+                <span class="kw">if</span> d &gt; top1: top1, top2 = d, top1
+                <span class="kw">elif</span> d &gt; top2: top2 = d
+            self.ans = max(self.ans, top1 + top2)    <span class="cm"># 过node的最长</span>
+            <span class="kw">return</span> top1                              <span class="cm"># 向上带单边</span>
+
+        depth(root)
+        <span class="kw">return</span> self.ans</pre>
 <div class="cx">时间 O(n) · 空间 O(h)</div>
 <div class="tip"><b>BST五件套:</b>#700查 · #701插 · #450删 · #230第k · #98验证。<b>#235 BST的LCA</b>用大小性质 O(h)。</div>
 </div>
@@ -633,103 +958,224 @@ tr:nth-child(even) td { background:#f7f7f7; }
 <!-- ========== 10. 二分 ========== -->
 <div class="category">
 <h2>10. 二分 Binary Search</h2>
-<div class="pattern-note"><b>只精通一套:闭区间 lo≤hi</b>。hi=len-1,while lo≤hi,两边都 ±1。别和 lo&lt;hi 混用。<br><b>二分答案:</b>「最大化可行值」→ 可行 lo=mid+1 记录 ans,否则 hi=mid-1。</div>
+<div class="pattern-note"><b>只精通一套:闭区间 lo≤hi</b>。hi=len-1,while lo≤hi,两边都 ±1。<b>二分答案:</b>「最大化可行值」→ 可行 lo=mid+1 记 ans。</div>
 
 <h3>#704 Binary Search — 模板</h3>
-<pre><span class="kw">def</span> search(self, nums, target):
-    lo, hi = 0, len(nums) - 1            <span class="cm"># 闭区间</span>
-    <span class="kw">while</span> lo &lt;= hi:                       <span class="cm"># &lt;=</span>
-        mid = (lo + hi) // 2
-        <span class="kw">if</span> nums[mid] == target: <span class="kw">return</span> mid
-        <span class="kw">elif</span> nums[mid] &lt; target: lo = mid + 1
-        <span class="kw">else</span>: hi = mid - 1
-    <span class="kw">return</span> -1</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> search(self, nums, target):
+        lo, hi = 0, len(nums) - 1                    <span class="cm"># 闭区间</span>
+        <span class="kw">while</span> lo &lt;= hi:                           <span class="cm"># &lt;=</span>
+            mid = (lo + hi) // 2
+            <span class="kw">if</span> nums[mid] == target:
+                <span class="kw">return</span> mid
+            <span class="kw">elif</span> nums[mid] &lt; target:
+                lo = mid + 1
+            <span class="kw">else</span>:
+                hi = mid - 1
+        <span class="kw">return</span> -1</pre>
 <div class="cx">时间 O(log n) · 空间 O(1)</div>
 
-<h3>二分答案模板(如 #2258 等待时间 / #1631 effort)</h3>
+<h3>#34 Find First and Last Position — 找边界</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> searchRange(self, nums, target):
+        <span class="kw">def</span> lower_bound(t):                      <span class="cm"># 第一个 &gt;= t 的位置</span>
+            lo, hi = 0, len(nums)
+            <span class="kw">while</span> lo &lt; hi:
+                mid = (lo + hi) // 2
+                <span class="kw">if</span> nums[mid] &lt; t: lo = mid + 1
+                <span class="kw">else</span>: hi = mid
+            <span class="kw">return</span> lo
+        left = lower_bound(target)
+        <span class="kw">if</span> left == len(nums) <span class="kw">or</span> nums[left] != target:
+            <span class="kw">return</span> [-1, -1]
+        <span class="kw">return</span> [left, lower_bound(target + 1) - 1]</pre>
+<div class="cx">时间 O(log n) · 空间 O(1)</div>
+
+<h3>二分答案模板(如 #2258 / #1631)</h3>
 <pre>lo, hi, ans = 0, MAX, -1
 <span class="kw">while</span> lo &lt;= hi:
     mid = (lo + hi) // 2
-    <span class="kw">if</span> can(mid):                         <span class="cm"># 可行</span>
-        ans = mid; lo = mid + 1          <span class="cm"># 试更大</span>
-    <span class="kw">else</span>: hi = mid - 1
+    <span class="kw">if</span> can(mid):                                 <span class="cm"># 可行</span>
+        ans = mid; lo = mid + 1                  <span class="cm"># 试更大</span>
+    <span class="kw">else</span>:
+        hi = mid - 1
 <span class="kw">return</span> ans</pre>
-<div class="cx">时间 O(log(范围)·验证) · 空间 取决于验证</div>
-<div class="tip"><b>信号:</b>有序数组找值 · 「最大化最小/最小化最大」 · 答案单调可二分 · #35/#34/#153/#33 旋转数组。</div>
+<div class="cx">时间 O(log(范围)·验证) · 空间 取决验证</div>
+<div class="tip"><b>信号:</b>有序找值 · 「最大化最小/最小化最大」 · 答案单调 · #35/#153/#33 旋转数组。</div>
 </div>
 
 <!-- ========== 11. OOP 设计 ========== -->
 <div class="category">
 <h2>11. OOP 设计 Design</h2>
-<div class="pattern-note"><b>L5 高频。</b>套路:选对核心结构(嵌套dict/双栈/HashMap+链表/堆)→ __init__ 初始化 → 每方法维护不变式 → 主动报复杂度 + follow-up(并发/持久化/undo)。</div>
+<div class="pattern-note"><b>L5 高频。</b>选对结构(嵌套dict/双栈/HashMap+链表/堆)→ __init__ → 每方法维护不变式 → 报复杂度 + follow-up。</div>
 
 <h3>#146 LRU Cache — O(1)</h3>
 <pre><span class="kw">from</span> collections <span class="kw">import</span> OrderedDict
+
 <span class="kw">class</span> LRUCache:
     <span class="kw">def</span> __init__(self, capacity):
-        self.cap = capacity; self.cache = OrderedDict()
+        self.cap = capacity
+        self.cache = OrderedDict()
+
     <span class="kw">def</span> get(self, key):
         <span class="kw">if</span> key <span class="kw">not</span> <span class="kw">in</span> self.cache: <span class="kw">return</span> -1
-        self.cache.move_to_end(key); <span class="kw">return</span> self.cache[key]
+        self.cache.move_to_end(key)
+        <span class="kw">return</span> self.cache[key]
+
     <span class="kw">def</span> put(self, key, value):
-        <span class="kw">if</span> key <span class="kw">in</span> self.cache: self.cache.move_to_end(key)
+        <span class="kw">if</span> key <span class="kw">in</span> self.cache:
+            self.cache.move_to_end(key)
         self.cache[key] = value
         <span class="kw">if</span> len(self.cache) &gt; self.cap:
-            self.cache.popitem(last=<span class="kw">False</span>)   <span class="cm"># 弹首=最久未用</span></pre>
+            self.cache.popitem(last=<span class="kw">False</span>)        <span class="cm"># 弹首=最久未用</span></pre>
 <div class="cx">每操作 O(1) · 空间 O(capacity)</div>
 
-<h3>#588 In-Memory File System — 嵌套 dict</h3>
-<pre><span class="kw">def</span> _walk(self, path):                  <span class="cm"># 沿路径走,自动建目录</span>
-    node = self.root
-    <span class="kw">if</span> path == <span class="cm">'/'</span>: <span class="kw">return</span> node
-    <span class="kw">for</span> part <span class="kw">in</span> path.split(<span class="cm">'/'</span>)[1:]:
-        node = node.setdefault(part, {})
-    <span class="kw">return</span> node
-<span class="kw">def</span> ls(self, path):
-    node = self._walk(path)
-    <span class="kw">if</span> isinstance(node, str): <span class="kw">return</span> [path.split(<span class="cm">'/'</span>)[-1]]
-    <span class="kw">return</span> sorted(node.keys())</pre>
+<h3>#460 LFU Cache — O(1)</h3>
+<pre><span class="kw">from</span> collections <span class="kw">import</span> OrderedDict, defaultdict
+
+<span class="kw">class</span> LFUCache:
+    <span class="kw">def</span> __init__(self, capacity):
+        self.cap = capacity
+        self.min_freq = 0
+        self.key_to_val = {}
+        self.key_to_freq = {}
+        self.freq_to_keys = defaultdict(OrderedDict)
+
+    <span class="kw">def</span> _touch(self, key):
+        f = self.key_to_freq[key]
+        <span class="kw">del</span> self.freq_to_keys[f][key]
+        <span class="kw">if</span> <span class="kw">not</span> self.freq_to_keys[f] <span class="kw">and</span> f == self.min_freq:
+            self.min_freq += 1
+        self.key_to_freq[key] = f + 1
+        self.freq_to_keys[f + 1][key] = <span class="kw">None</span>
+
+    <span class="kw">def</span> get(self, key):
+        <span class="kw">if</span> key <span class="kw">not</span> <span class="kw">in</span> self.key_to_val: <span class="kw">return</span> -1
+        self._touch(key)
+        <span class="kw">return</span> self.key_to_val[key]
+
+    <span class="kw">def</span> put(self, key, value):
+        <span class="kw">if</span> self.cap == 0: <span class="kw">return</span>
+        <span class="kw">if</span> key <span class="kw">in</span> self.key_to_val:
+            self.key_to_val[key] = value; self._touch(key); <span class="kw">return</span>
+        <span class="kw">if</span> len(self.key_to_val) &gt;= self.cap:
+            ev, _ = self.freq_to_keys[self.min_freq].popitem(last=<span class="kw">False</span>)
+            <span class="kw">del</span> self.key_to_val[ev]; <span class="kw">del</span> self.key_to_freq[ev]
+        self.key_to_val[key] = value
+        self.key_to_freq[key] = 1
+        self.freq_to_keys[1][key] = <span class="kw">None</span>
+        self.min_freq = 1</pre>
+<div class="cx">每操作 O(1) · 空间 O(capacity)</div>
+
+<h3>#588 In-Memory File System</h3>
+<pre><span class="kw">class</span> FileSystem:
+    <span class="kw">def</span> __init__(self):
+        self.root = {}
+
+    <span class="kw">def</span> _walk(self, path):
+        node = self.root
+        <span class="kw">if</span> path == <span class="cm">'/'</span>: <span class="kw">return</span> node
+        <span class="kw">for</span> part <span class="kw">in</span> path.split(<span class="cm">'/'</span>)[1:]:
+            node = node.setdefault(part, {})
+        <span class="kw">return</span> node
+
+    <span class="kw">def</span> ls(self, path):
+        node = self._walk(path)
+        <span class="kw">if</span> isinstance(node, str):                <span class="cm"># 文件</span>
+            <span class="kw">return</span> [path.split(<span class="cm">'/'</span>)[-1]]
+        <span class="kw">return</span> sorted(node.keys())
+
+    <span class="kw">def</span> mkdir(self, path):
+        self._walk(path)
+
+    <span class="kw">def</span> addContentToFile(self, filePath, content):
+        parts = filePath.split(<span class="cm">'/'</span>)
+        name = parts[-1]
+        node = self._walk(<span class="cm">'/'</span>.join(parts[:-1]) <span class="kw">or</span> <span class="cm">'/'</span>)
+        node[name] = node.get(name, <span class="cm">''</span>) + content
+
+    <span class="kw">def</span> readContentFromFile(self, filePath):
+        <span class="kw">return</span> self._walk(filePath)</pre>
 <div class="cx">ls O(路径+k log k) · 其余 O(路径) · 空间 O(总内容)</div>
 
-<h3>#2296 Text Editor — 双栈夹光标</h3>
-<pre><span class="kw">def</span> cursorLeft(self, k):
-    cnt = min(k, len(self.left))
-    <span class="kw">for</span> _ <span class="kw">in</span> range(cnt): self.right.append(self.left.pop())
-    <span class="kw">return</span> <span class="cm">''</span>.join(self.left[-10:])</pre>
+<h3>#2296 Design Text Editor — 双栈夹光标</h3>
+<pre><span class="kw">class</span> TextEditor:
+    <span class="kw">def</span> __init__(self):
+        self.left = []
+        self.right = []
+
+    <span class="kw">def</span> addText(self, text):
+        <span class="kw">for</span> ch <span class="kw">in</span> text:
+            self.left.append(ch)
+
+    <span class="kw">def</span> deleteText(self, k):
+        cnt = min(k, len(self.left))
+        <span class="kw">for</span> _ <span class="kw">in</span> range(cnt):
+            self.left.pop()
+        <span class="kw">return</span> cnt
+
+    <span class="kw">def</span> cursorLeft(self, k):
+        cnt = min(k, len(self.left))
+        <span class="kw">for</span> _ <span class="kw">in</span> range(cnt):
+            self.right.append(self.left.pop())
+        <span class="kw">return</span> <span class="cm">''</span>.join(self.left[-10:])
+
+    <span class="kw">def</span> cursorRight(self, k):
+        cnt = min(k, len(self.right))
+        <span class="kw">for</span> _ <span class="kw">in</span> range(cnt):
+            self.left.append(self.right.pop())
+        <span class="kw">return</span> <span class="cm">''</span>.join(self.left[-10:])</pre>
 <div class="cx">各操作 O(k) · 空间 O(总字符)</div>
 
 <h3>#251 Flatten 2D Vector — 迭代器</h3>
-<div class="approach">(row,col)双指针 + _advance() 跳空行;next/hasNext 都先 _advance。</div>
-<pre><span class="kw">def</span> _advance(self):
-    <span class="kw">while</span> self.row &lt; len(self.vec) <span class="kw">and</span> self.col == len(self.vec[self.row]):
-        self.row += 1; self.col = 0
-<span class="kw">def</span> next(self):
-    self._advance(); v = self.vec[self.row][self.col]; self.col += 1; <span class="kw">return</span> v
-<span class="kw">def</span> hasNext(self):
-    self._advance(); <span class="kw">return</span> self.row &lt; len(self.vec)</pre>
+<pre><span class="kw">class</span> Vector2D:
+    <span class="kw">def</span> __init__(self, vec):
+        self.vec = vec
+        self.row = 0
+        self.col = 0
+
+    <span class="kw">def</span> _advance(self):                          <span class="cm"># 跳过空行/读完的行</span>
+        <span class="kw">while</span> self.row &lt; len(self.vec) <span class="kw">and</span> self.col == len(self.vec[self.row]):
+            self.row += 1
+            self.col = 0
+
+    <span class="kw">def</span> next(self):
+        self._advance()
+        v = self.vec[self.row][self.col]
+        self.col += 1
+        <span class="kw">return</span> v
+
+    <span class="kw">def</span> hasNext(self):
+        self._advance()
+        <span class="kw">return</span> self.row &lt; len(self.vec)</pre>
 <div class="cx">均摊 O(1) · 空间 O(1)</div>
-<div class="tip"><b>家族:</b>#146 LRU · #460 LFU(三件套+min_freq) · #588/#2296 · #251/#173/#341 迭代器 · #208 Trie · 电梯(状态机+双堆) · #1825 MK均值(三段桶)。</div>
+<div class="tip"><b>家族:</b>#146 LRU · #460 LFU · #588/#2296 · #251/#173/#341 迭代器 · #208 Trie · #1825 MK均值(三段桶)。</div>
 </div>
 
 <!-- ========== 12. 线段树/BIT ========== -->
 <div class="category">
 <h2>12. 线段树 / 树状数组 BIT <span class="tag">新</span></h2>
-<div class="pattern-note"><b>信号:</b>「<b>带修改的区间查询</b>」(数组会变 + 反复查区间和/最值)。普通数组改O(1)查O(n);前缀和查O(1)改O(n);<b>线段树两者都 O(log n)</b>。只做前缀和→BIT 更简洁;要区间最值/区间改→线段树。</div>
+<div class="pattern-note"><b>信号:</b>「<b>带修改的区间查询</b>」。普通数组改O(1)查O(n);前缀和查O(1)改O(n);<b>线段树两者都 O(log n)</b>。只前缀和→BIT 更简洁;区间最值/区间改→线段树。</div>
 
-<h3>#307 Range Sum Query Mutable — 模板题</h3>
-<div class="approach">线段树:叶子存值,内部存合并;update沿路径向上;query爬树取边角块。</div>
-<pre><span class="kw">class</span> NumArray:                          <span class="cm"># 线段树(迭代)</span>
+<h3>#307 Range Sum Query Mutable — 线段树</h3>
+<pre><span class="kw">class</span> NumArray:
     <span class="kw">def</span> __init__(self, nums):
-        self.n = len(nums); self.tree = [0]*(2*self.n)
-        <span class="kw">for</span> i <span class="kw">in</span> range(self.n): self.tree[self.n+i] = nums[i]
-        <span class="kw">for</span> i <span class="kw">in</span> range(self.n-1, 0, -1):
+        self.n = len(nums)
+        self.tree = [0] * (2 * self.n)               <span class="cm"># [n,2n)叶子</span>
+        <span class="kw">for</span> i <span class="kw">in</span> range(self.n):
+            self.tree[self.n + i] = nums[i]
+        <span class="kw">for</span> i <span class="kw">in</span> range(self.n - 1, 0, -1):       <span class="cm"># 自底向上建</span>
             self.tree[i] = self.tree[2*i] + self.tree[2*i+1]
+
     <span class="kw">def</span> update(self, index, val):
-        i = index + self.n; self.tree[i] = val
-        <span class="kw">while</span> i &gt; 1:
-            i //= 2; self.tree[i] = self.tree[2*i] + self.tree[2*i+1]
+        i = index + self.n
+        self.tree[i] = val
+        <span class="kw">while</span> i &gt; 1:                              <span class="cm"># 向上更新</span>
+            i //= 2
+            self.tree[i] = self.tree[2*i] + self.tree[2*i+1]
+
     <span class="kw">def</span> sumRange(self, left, right):
-        l, r = left+self.n, right+1+self.n   <span class="cm"># 含两端→半开</span>
+        l, r = left + self.n, right + 1 + self.n     <span class="cm"># 含两端→半开</span>
         res = 0
         <span class="kw">while</span> l &lt; r:
             <span class="kw">if</span> l &amp; 1: res += self.tree[l]; l += 1
@@ -738,70 +1184,106 @@ tr:nth-child(even) td { background:#f7f7f7; }
         <span class="kw">return</span> res</pre>
 <div class="cx">build O(n) · update/query O(log n) · 空间 O(n)</div>
 
-<h3>BIT 树状数组(求和更简洁)</h3>
+<h3>BIT 树状数组 — 求和更简洁</h3>
 <pre><span class="kw">class</span> BIT:
-    <span class="kw">def</span> __init__(self, n): self.tree = [0]*(n+1)
-    <span class="kw">def</span> update(self, i, delta):           <span class="cm"># 1-indexed</span>
-        <span class="kw">while</span> i &lt; len(self.tree):
-            self.tree[i] += delta; i += i &amp; (-i)   <span class="cm"># lowbit</span>
-    <span class="kw">def</span> query(self, i):                   <span class="cm"># 前缀和[1,i]</span>
+    <span class="kw">def</span> __init__(self, n):
+        self.n = n
+        self.tree = [0] * (n + 1)                    <span class="cm"># 1-indexed</span>
+
+    <span class="kw">def</span> update(self, i, delta):
+        <span class="kw">while</span> i &lt;= self.n:
+            self.tree[i] += delta
+            i += i &amp; (-i)                            <span class="cm"># lowbit 跳下一个</span>
+
+    <span class="kw">def</span> query(self, i):                          <span class="cm"># 前缀和 [1,i]</span>
         s = 0
-        <span class="kw">while</span> i &gt; 0: s += self.tree[i]; i -= i &amp; (-i)
+        <span class="kw">while</span> i &gt; 0:
+            s += self.tree[i]
+            i -= i &amp; (-i)
         <span class="kw">return</span> s</pre>
 <div class="cx">update/query O(log n) · 空间 O(n)</div>
 
 <h3>#315 Count of Smaller After Self — BIT 应用</h3>
-<div class="approach">离散化 + 从右往左,query(rank-1)=右边比它小的个数,再 update(rank)。</div>
-<pre><span class="kw">def</span> countSmaller(self, nums):
-    rank = {v:i+1 <span class="kw">for</span> i,v <span class="kw">in</span> enumerate(sorted(set(nums)))}
-    n = len(rank); tree = [0]*(n+1); res = []
-    <span class="kw">def</span> upd(i):
-        <span class="kw">while</span> i &lt;= n: tree[i]+=1; i += i&amp;(-i)
-    <span class="kw">def</span> qry(i):
-        s=0
-        <span class="kw">while</span> i&gt;0: s+=tree[i]; i-=i&amp;(-i)
-        <span class="kw">return</span> s
-    <span class="kw">for</span> x <span class="kw">in</span> reversed(nums):
-        r = rank[x]; res.append(qry(r-1)); upd(r)
-    <span class="kw">return</span> res[::-1]</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> countSmaller(self, nums):
+        rank = {v: i+1 <span class="kw">for</span> i, v <span class="kw">in</span> enumerate(sorted(set(nums)))}
+        n = len(rank)
+        tree = [0] * (n + 1)
+        res = []
+
+        <span class="kw">def</span> upd(i):
+            <span class="kw">while</span> i &lt;= n:
+                tree[i] += 1; i += i &amp; (-i)
+
+        <span class="kw">def</span> qry(i):
+            s = 0
+            <span class="kw">while</span> i &gt; 0:
+                s += tree[i]; i -= i &amp; (-i)
+            <span class="kw">return</span> s
+
+        <span class="kw">for</span> x <span class="kw">in</span> reversed(nums):                  <span class="cm"># 从右往左</span>
+            r = rank[x]
+            res.append(qry(r - 1))                   <span class="cm"># 右边比它小的个数</span>
+            upd(r)
+        <span class="kw">return</span> res[::-1]</pre>
 <div class="cx">时间 O(n log n) · 空间 O(n)</div>
-<div class="tip"><b>Lazy Propagation:</b>区间整体加值时,节点记「欠加值」,用到才下推,保持 O(log n)。<b>家族:</b>#307 · #315 · #327 · #715 区间模块 · #2407。</div>
+<div class="tip"><b>Lazy Propagation:</b>区间整体加值时,节点记「欠加值」,用到才下推。<b>家族:</b>#307 · #315 · #327 · #715 · #2407。</div>
 </div>
 
 <!-- ========== 13. 贪心/模拟 ========== -->
 <div class="category">
 <h2>13. 贪心 / 模拟</h2>
-<div class="pattern-note"><b>贪心:</b>无模板,靠分类讨论 + 找「一次操作最多解决几个」+ 处理奇偶/余数。先举小例子找规律再归纳。<b>模拟:</b>照题意逐步走,注意原地修改技巧。</div>
+<div class="pattern-note"><b>贪心:</b>无模板,分类讨论 + 找「一次操作最多解决几个」+ 处理奇偶/余数。<b>模拟:</b>照题意逐步走,注意原地修改技巧。</div>
 
 <h3>#1247 Min Swaps Strings Equal — 贪心配对</h3>
-<div class="approach">只看不匹配的两类 xy/yx;同类配对1次,跨类配对2次;总数奇则-1。</div>
-<pre><span class="kw">def</span> minimumSwap(self, s1, s2):
-    xy = yx = 0
-    <span class="kw">for</span> a, b <span class="kw">in</span> zip(s1, s2):
-        <span class="kw">if</span> a==<span class="cm">'x'</span> <span class="kw">and</span> b==<span class="cm">'y'</span>: xy += 1
-        <span class="kw">elif</span> a==<span class="cm">'y'</span> <span class="kw">and</span> b==<span class="cm">'x'</span>: yx += 1
-    <span class="kw">if</span> (xy+yx) % 2 == 1: <span class="kw">return</span> -1
-    <span class="kw">return</span> xy//2 + yx//2 + (xy%2)*2</pre>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> minimumSwap(self, s1, s2):
+        xy = yx = 0
+        <span class="kw">for</span> a, b <span class="kw">in</span> zip(s1, s2):
+            <span class="kw">if</span> a == <span class="cm">'x'</span> <span class="kw">and</span> b == <span class="cm">'y'</span>: xy += 1
+            <span class="kw">elif</span> a == <span class="cm">'y'</span> <span class="kw">and</span> b == <span class="cm">'x'</span>: yx += 1
+        <span class="kw">if</span> (xy + yx) % 2 == 1:                    <span class="cm"># 总奇 → 无解</span>
+            <span class="kw">return</span> -1
+        <span class="kw">return</span> xy // 2 + yx // 2 + (xy % 2) * 2  <span class="cm"># 同类1次,跨类2次</span></pre>
 <div class="cx">时间 O(n) · 空间 O(1)</div>
 
-<h3>#289 Game of Life — 原地模拟(bit编码)</h3>
-<div class="approach">同时更新:bit0存旧、bit1存新;第一遍 |=2 写新,第二遍 &gt;&gt;=1 移下来。</div>
-<pre><span class="kw">for</span> i <span class="kw">in</span> range(m):
-    <span class="kw">for</span> j <span class="kw">in</span> range(n):
-        live = sum((board[i+dx][j+dy] &amp; 1)
-                   <span class="kw">for</span> dx,dy <span class="kw">in</span> dirs8 <span class="kw">if</span> 0&lt;=i+dx&lt;m <span class="kw">and</span> 0&lt;=j+dy&lt;n)
-        <span class="kw">if</span> board[i][j]&amp;1:
-            <span class="kw">if</span> live <span class="kw">in</span> (2,3): board[i][j] |= 2
-        <span class="kw">elif</span> live == 3: board[i][j] |= 2
-<span class="cm"># 第二遍 board[i][j] &gt;&gt;= 1</span></pre>
+<h3>#289 Game of Life — 原地模拟 (bit编码)</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> gameOfLife(self, board):
+        m, n = len(board), len(board[0])
+        DIRS = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):                       <span class="cm"># ① 新状态写到 bit1</span>
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                live = 0
+                <span class="kw">for</span> dx, dy <span class="kw">in</span> DIRS:
+                    ni, nj = i + dx, j + dy
+                    <span class="kw">if</span> 0&lt;=ni&lt;m <span class="kw">and</span> 0&lt;=nj&lt;n <span class="kw">and</span> (board[ni][nj] &amp; 1) == 1:
+                        live += 1                    <span class="cm"># 读旧值 bit0</span>
+                <span class="kw">if</span> board[i][j] &amp; 1:
+                    <span class="kw">if</span> live == 2 <span class="kw">or</span> live == 3:
+                        board[i][j] |= 2             <span class="cm"># 保持活</span>
+                <span class="kw">elif</span> live == 3:
+                    board[i][j] |= 2                 <span class="cm"># 复活</span>
+        <span class="kw">for</span> i <span class="kw">in</span> range(m):                       <span class="cm"># ② 右移取新值</span>
+            <span class="kw">for</span> j <span class="kw">in</span> range(n):
+                board[i][j] &gt;&gt;= 1</pre>
 <div class="cx">时间 O(m·n) · 空间 O(1)</div>
 
-<h3>#3439 Reschedule Meetings — 问题转化(滑窗)</h3>
-<div class="approach">「移动k个会议」=「合并 k+1 段相邻空隙」= 定长滑窗最大和。</div>
-<pre>gaps = [开头空隙] + [中间空隙...] + [结尾空隙]   <span class="cm"># n+1 段</span>
-window = k + 1; cur = sum(gaps[:window]); best = cur
-<span class="kw">for</span> i <span class="kw">in</span> range(window, len(gaps)):
-    cur += gaps[i] - gaps[i-window]; best = max(best, cur)</pre>
+<h3>#3439 Reschedule Meetings — 问题转化 (滑窗)</h3>
+<pre><span class="kw">class</span> Solution:
+    <span class="kw">def</span> maxFreeTime(self, eventTime, k, startTime, endTime):
+        n = len(startTime)
+        gaps = [startTime[0]]                        <span class="cm"># 开头空隙</span>
+        <span class="kw">for</span> i <span class="kw">in</span> range(1, n):
+            gaps.append(startTime[i] - endTime[i-1]) <span class="cm"># 中间</span>
+        gaps.append(eventTime - endTime[-1])         <span class="cm"># 结尾</span>
+        window = k + 1                               <span class="cm"># 移k个=合并k+1段缝</span>
+        cur = sum(gaps[:window])
+        best = cur
+        <span class="kw">for</span> i <span class="kw">in</span> range(window, len(gaps)):
+            cur += gaps[i] - gaps[i - window]        <span class="cm"># 滑窗</span>
+            best = max(best, cur)
+        <span class="kw">return</span> best</pre>
 <div class="cx">时间 O(n) · 空间 O(n)</div>
 <div class="tip"><b>贪心信号:</b>「最少操作」「最优配对」「区间选择」。<b>转化能力</b>是关键:把陌生问题翻译成已知模型(滑窗/背包/区间)。</div>
 </div>
