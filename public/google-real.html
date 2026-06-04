@@ -66,6 +66,22 @@ pre { background:#0b1120; color:#e2e8f0; padding:14px 16px; border-radius:8px; o
   font-size:13px; line-height:1.55; font-family:"SF Mono",Menlo,Consolas,monospace; border:1px solid #1e293b; margin: 6px 0; }
 .kw { color:#f472b6; } .cm { color:#64748b; font-style:italic; }
 .pending { color:#fbbf24; font-size:13px; padding: 14px; background:#1e293b; border-radius:8px; border:1px dashed #475569; }
+/* 进度条 + 勾选 */
+.progress-wrap { background:#1e293b; border:1px solid #334155; border-radius:10px; padding:12px 16px; margin-bottom:16px; }
+.progress-top { display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#cbd5e1; margin-bottom:8px; }
+.progress-top b { color:#34d399; }
+.progress-bar { height:8px; background:#0b1120; border-radius:6px; overflow:hidden; }
+.progress-fill { height:100%; background:linear-gradient(90deg,#34d399,#10b981); transition:width 0.3s; }
+.chk { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; min-width:22px;
+  border:2px solid #475569; border-radius:6px; color:transparent; font-size:13px; font-weight:700; cursor:pointer; user-select:none; transition:all 0.15s; }
+.chk:hover { border-color:#34d399; }
+.chk.on { background:#10b981; border-color:#10b981; color:#fff; }
+.qcard.done { opacity:0.55; }
+.qcard.done .qtitle { text-decoration:line-through; }
+.done-btn { display:inline-block; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid #334155; background:#1e293b; color:#cbd5e1; margin-bottom:14px; }
+.done-btn.on { background:#10b981; border-color:#10b981; color:#fff; }
+.reset-link { font-size:11px; color:#64748b; cursor:pointer; }
+.reset-link:hover { color:#ef4444; }
 
 /* mobile */
 .menu-btn { display:none; position:fixed; top:10px; left:10px; z-index:60; background:#6366f1; color:#fff;
@@ -90,7 +106,7 @@ footer a { color:#64748b; }
   </aside>
   <main class="main" id="main"></main>
 </div>
-<script src="gq-data.js?v=enh50must"></script>
+<script src="gq-data.js?v=progress"></script>
 <script>
 const GQ = window.GQ, CATS = window.CATS;
 // count per category
@@ -124,8 +140,22 @@ function hl(code){
 const main = document.getElementById('main');
 let curCat = 'all', curSearch = '';
 
+// 已掌握状态(localStorage 持久化)
+let done = new Set(JSON.parse(localStorage.getItem('gq_done')||'[]'));
+function saveDone(){ localStorage.setItem('gq_done', JSON.stringify([...done])); }
+function toggleDone(id){ if(done.has(id)) done.delete(id); else done.add(id); saveDone(); }
+function resetDone(){ if(confirm('确定清空所有「已掌握」记录?')){ done = new Set(); saveDone(); renderList(); } }
+
 function repBadge(r){
   return `<span class="rep ${r<2?'low':''}">🔥 ${r}</span>`;
+}
+function progressBar(list){
+  const total = list.length, d = list.filter(q=>done.has(q.id)).length;
+  const pct = total? Math.round(d/total*100):0;
+  return `<div class="progress-wrap">
+    <div class="progress-top"><span>📊 进度 <b>${d}</b> / ${total} 已掌握 (${pct}%)</span><span class="reset-link" onclick="resetDone()">清空记录</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+  </div>`;
 }
 
 function renderList(){
@@ -145,12 +175,14 @@ function renderList(){
   } else if(curCat!=='all'){
     h += `<div class="overview">📂 <b>${catName}</b> · 这一类共 ${counts[curCat]} 道真题。点任意题进详情(中英题面 + 带注释代码 + 复杂度 + 带代码 follow-up)。建议从 🔥 高频往低刷。</div>`;
   }
+  h += progressBar(list);
   if(list.length===0){ h += '<div class="pending">没找到匹配的题。</div>'; main.innerHTML=h; return; }
   list.forEach((q,i)=>{
     const gi = GQ.indexOf(q);
-    h += `<div class="qcard" data-i="${gi}" ${q.must?'style="border-color:rgba(251,191,36,0.4)"':''}>
-      <div class="row1">${repBadge(q.reports)}${q.must?'<span style="font-size:11px;color:#fbbf24;font-weight:700">⭐必看</span>':''}<span class="qtitle">${esc(q.en)}</span><span class="qcn">${esc(q.cn)}</span></div>
-      <div style="margin-top:4px"><span class="diff">${esc(q.level||'')}</span> · <span class="badge" style="font-size:9px;padding:1px 6px">${catMap[q.cat]}</span> <span class="has-sol">✓ 完整解答+注释</span></div>
+    const isDone = done.has(q.id);
+    h += `<div class="qcard ${isDone?'done':''}" data-i="${gi}" ${q.must?'style="border-color:rgba(251,191,36,0.4)"':''}>
+      <div class="row1"><span class="chk ${isDone?'on':''}" data-chk="${q.id}" title="标记已掌握">✓</span>${repBadge(q.reports)}${q.must?'<span style="font-size:11px;color:#fbbf24;font-weight:700">⭐必看</span>':''}<span class="qtitle">${esc(q.en)}</span><span class="qcn">${esc(q.cn)}</span></div>
+      <div style="margin-top:4px;padding-left:30px"><span class="diff">${esc(q.level||'')}</span> · <span class="badge" style="font-size:9px;padding:1px 6px">${catMap[q.cat]}</span> <span class="has-sol">✓ 完整解答+注释</span></div>
     </div>`;
   });
   main.innerHTML = h;
@@ -164,6 +196,7 @@ function renderDetail(idx){
   h += `<div class="detail-title">${esc(q.en)}</div>`;
   h += `<div class="detail-cn">${esc(q.cn)}</div>`;
   h += `<div class="badges">${repBadge(q.reports)}${q.must?'<span class="badge" style="background:rgba(251,191,36,0.2);color:#fbbf24;border-color:#fbbf24">⭐ 冲刺必看</span>':''}<span class="badge">${catMap[q.cat]}</span><span class="badge">${esc(q.level||'')}</span><span class="badge">最近: ${esc(q.last||'')}</span></div>`;
+  h += `<div class="done-btn ${done.has(q.id)?'on':''}" data-doneid="${q.id}" data-idx="${idx}">${done.has(q.id)?'✓ 已掌握 (点击取消)':'○ 标记已掌握'}</div>`;
   // 题面
   h += `<div class="sec-h">📋 题目 (EN)</div><div class="desc-box">${esc(q.desc||'(无描述)')}</div>`;
   if(q.sol){
@@ -197,6 +230,10 @@ catlist.addEventListener('click', e=>{
   document.querySelector('.sidebar').classList.remove('open');
 });
 main.addEventListener('click', e=>{
+  const dbtn = e.target.closest('[data-doneid]');
+  if(dbtn){ toggleDone(dbtn.dataset.doneid); renderDetail(parseInt(dbtn.dataset.idx)); return; }
+  const chk = e.target.closest('[data-chk]');
+  if(chk){ e.stopPropagation(); toggleDone(chk.dataset.chk); renderList(); return; }
   const card = e.target.closest('.qcard'); if(!card) return;
   renderDetail(parseInt(card.dataset.i));
 });
