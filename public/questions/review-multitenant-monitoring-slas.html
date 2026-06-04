@@ -92,9 +92,9 @@ Cardinality strategy:
 Large SaaS, $$ → Datadog (less ops, more $$$)
 
 Storage tier:
-Hot: raw 7d, 1-min rollups 30d (Postgres/OpenSearch)
-Warm: 1-min 30-90d in SSD (S3 Parquet)
-Cold: 1-hour 1y, daily 3y+ (S3 Glacier)
+Hot: raw 7d, 1-min rollups 30d (Postgres/Vertex AI Vector Search)
+Warm: 1-min 30-90d in SSD (GCS Parquet)
+Cold: 1-hour 1y, daily 3y+ (GCS Glacier)
 Per-tier retention: Bronze 30d, Silver 90d, Gold 1y
 
 Routing per severity:
@@ -137,7 +137,7 @@ Dedup 1h per (tenant × metric)</code></pre>
 <h4>5 业务场景变体 (anchor stories)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Variant</th><th>Tenant model</th><th>Key challenge</th></tr></thead><tbody><tr><td>TikTok voice agent 7 markets</td><td>7 markets = 7 tenants</td><td>Indonesia / Vietnam Gold, Thailand / Philippines Silver, SG / MY Bronze, Korea pilot</td></tr><tr><td>BNPL chatbot merchant tenants</td><td>1000+ 商户, top 10% = 80% 流量</td><td>Top 商户 dedicated LLM endpoint, 长尾 shared</td></tr><tr><td>Internal Agent Platform</td><td>ByteDance team-as-tenant</td><td>cost chargeback per team, internal SLA</td></tr><tr><td>ConvFinQA fair share</td><td>researcher-as-tenant</td><td>WFQ instead of tiered</td></tr><tr><td>Cloudflare-style 10K+ SaaS</td><td>长尾极端</td><td>top 1% = 50% resources, Bronze 80% tenant only 5% 流量</td></tr></tbody></table></div>
 <h4>Storage tier strategy</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use</th></tr></thead><tbody><tr><td>Hot</td><td>7d raw + 30d 1-min rollups</td><td>Postgres / OpenSearch</td><td>real-time query, alert</td></tr><tr><td>Warm</td><td>30-90d 1-min in SSD</td><td>S3 Parquet</td><td>slow query 调查</td></tr><tr><td>Cold</td><td>1y 1-hour, 3y+ daily</td><td>S3 Glacier</td><td>compliance retention</td></tr><tr><td>Per-tier retention</td><td>Bronze 30d / Silver 90d / Gold 1y</td><td>varies</td><td>tier-scaled</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use</th></tr></thead><tbody><tr><td>Hot</td><td>7d raw + 30d 1-min rollups</td><td>Postgres / Vertex AI Vector Search</td><td>real-time query, alert</td></tr><tr><td>Warm</td><td>30-90d 1-min in SSD</td><td>GCS Parquet</td><td>slow query 调查</td></tr><tr><td>Cold</td><td>1y 1-hour, 3y+ daily</td><td>GCS Glacier</td><td>compliance retention</td></tr><tr><td>Per-tier retention</td><td>Bronze 30d / Silver 90d / Gold 1y</td><td>varies</td><td>tier-scaled</td></tr></tbody></table></div>
 <h4>Per-tier physical isolation (K8s)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Isolation</th><th>Method</th></tr></thead><tbody><tr><td>Gold</td><td>Dedicated node pool</td><td>K8s taint=tier:gold + toleration on Gold pods + nodeSelector</td></tr><tr><td>Silver</td><td>Pooled priority A</td><td>PriorityClass A + 80% slot quota</td></tr><tr><td>Bronze</td><td>Pooled priority B</td><td>PriorityClass B + 20% slot quota</td></tr><tr><td>All</td><td>Hard ceiling per tenant</td><td>even within tier, cap absolute QPS</td></tr></tbody></table></div>
 <h4>Billing requirements (合规)</h4>
@@ -289,9 +289,9 @@ Cardinality strategy:
 Large SaaS, $$ → Datadog (less ops, more $$$)
 
 Storage tier:
-Hot: raw 7d, 1-min rollups 30d (Postgres/OpenSearch)
-Warm: 1-min 30-90d in SSD (S3 Parquet)
-Cold: 1-hour 1y, daily 3y+ (S3 Glacier)
+Hot: raw 7d, 1-min rollups 30d (Postgres/Vertex AI Vector Search)
+Warm: 1-min 30-90d in SSD (GCS Parquet)
+Cold: 1-hour 1y, daily 3y+ (GCS Glacier)
 Per-tier retention: Bronze 30d, Silver 90d, Gold 1y
 
 Routing per severity:
@@ -466,9 +466,9 @@ Dedup 1h per (tenant × metric)
 
 | Tier | Retention | Storage | Use |
 |---|---|---|---|
-| Hot | 7d raw + 30d 1-min rollups | Postgres / OpenSearch | real-time query, alert |
-| Warm | 30-90d 1-min in SSD | S3 Parquet | slow query 调查 |
-| Cold | 1y 1-hour, 3y+ daily | S3 Glacier | compliance retention |
+| Hot | 7d raw + 30d 1-min rollups | Postgres / Vertex AI Vector Search | real-time query, alert |
+| Warm | 30-90d 1-min in SSD | GCS Parquet | slow query 调查 |
+| Cold | 1y 1-hour, 3y+ daily | GCS Glacier | compliance retention |
 | Per-tier retention | Bronze 30d / Silver 90d / Gold 1y | varies | tier-scaled |
 
 ### Per-tier physical isolation (K8s)

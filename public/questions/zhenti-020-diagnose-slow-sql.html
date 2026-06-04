@@ -58,13 +58,13 @@
 <h4>性能问题分类</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Stale statistics</strong> ⭐</td><td>autovacuum 没及时跑, stats 跟数据脱钩. 80% "突然变慢" 的根因.</td></tr><tr><td><strong>Bloat (膨胀)</strong></td><td>UPDATE/DELETE 后 dead tuple 不及时回收, 表变大. pct_dead &gt; 20% 是警戒线.</td></tr><tr><td><strong>Index bloat</strong></td><td>索引也有 bloat. <code>REINDEX CONCURRENTLY</code>.</td></tr><tr><td><strong>Plan flip / Plan regression</strong> ⭐</td><td>Planner 选不同 plan, 性能突变. 改一行 query / stats refresh 都可能触发.</td></tr><tr><td><strong>Cardinality misestimate</strong></td><td>planner 估行数偏离实际. 致命: nested loop with huge outer.</td></tr><tr><td><strong>Cache hit ratio</strong></td><td><code>hit / (hit + read)</code>. &lt; 99% = buffer pool 太小或 working set 太大.</td></tr><tr><td><strong><code>work_mem</code> spill</strong></td><td>sort/hash 内存不够 spill 到 disk. <code>Sort: external merge Disk: N kB</code> 警示.</td></tr><tr><td><strong>Lock contention</strong></td><td>等锁. <code>pg_stat_activity</code> 看 <code>wait_event_type=Lock</code>.</td></tr><tr><td><strong>Connection pool exhausted</strong></td><td>client 拿不到 connection. PgBouncer / RDS Proxy 缓解.</td></tr></tbody></table></div>
 <h4>Partitioning</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>PARTITION BY RANGE / LIST / HASH</code></strong> ⭐</td><td>分区策略: range (date), list (region), hash (customer_id).</td></tr><tr><td><strong>Partition pruning</strong> ⭐</td><td>query 只扫相关 partition. WHERE 必带 partition key.</td></tr><tr><td><strong>Hot vs cold partitions</strong></td><td>近期 partition 放 SSD, 老 partition 放 HDD / S3.</td></tr><tr><td><strong><code>DROP TABLE old_partition</code></strong></td><td>删老 partition 是 O(1) — 删整文件, 比 <code>DELETE</code> 快百万倍.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>PARTITION BY RANGE / LIST / HASH</code></strong> ⭐</td><td>分区策略: range (date), list (region), hash (customer_id).</td></tr><tr><td><strong>Partition pruning</strong> ⭐</td><td>query 只扫相关 partition. WHERE 必带 partition key.</td></tr><tr><td><strong>Hot vs cold partitions</strong></td><td>近期 partition 放 SSD, 老 partition 放 HDD / GCS.</td></tr><tr><td><strong><code>DROP TABLE old_partition</code></strong></td><td>删老 partition 是 O(1) — 删整文件, 比 <code>DELETE</code> 快百万倍.</td></tr></tbody></table></div>
 <h4>系统 / 配置</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong><code>shared_buffers</code></strong></td><td>PG 内存缓冲池 size. 一般 25% RAM.</td></tr><tr><td><strong><code>effective_cache_size</code></strong></td><td>Planner 估的 OS + PG cache 大小. 影响 plan 选择 (大 → 偏好 random read 索引).</td></tr><tr><td><strong><code>work_mem</code></strong></td><td>单 sort/hash 操作可用内存. ad-hoc query SET 大, OLTP keep 小.</td></tr><tr><td><strong><code>random_page_cost</code> / <code>seq_page_cost</code></strong></td><td>Planner 用的 cost 比例. SSD 应调低 <code>random_page_cost</code> (默认 4 → 1.1).</td></tr><tr><td><strong><code>max_parallel_workers_per_gather</code></strong></td><td>并行 worker 上限. 大 query 受益.</td></tr><tr><td><strong><code>iostat -x 1</code></strong></td><td>Linux 看磁盘 IOPS / utilization. 100% = saturated.</td></tr><tr><td><strong>EBS / IOPS</strong></td><td>AWS 块存储. gp3 默认 3000 IOPS, 可付费提到 16k.</td></tr></tbody></table></div>
 <h4>客户沟通 / FDE 加分</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Customer empathy</strong> ⭐</td><td>客户着急时你冷静 + 系统化排查. Don't blame customer.</td></tr><tr><td><strong>Root cause + ETA + Prevention</strong></td><td>客户报告 3 件套: 因 / 修 / 防.</td></tr><tr><td><strong>Runbook / Playbook</strong></td><td>团队 wiki: "若 X 慢 → 看 Y → 跑 Z". 新人也能 follow.</td></tr><tr><td><strong>Slow query SLO</strong></td><td>业务目标: p99 &lt; 5s 等. 超阈值 → page on-call.</td></tr></tbody></table></div>
 <h4>其他 DB 对照</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>MySQL <code>EXPLAIN FORMAT=JSON</code></strong></td><td>MySQL 版 plan, 跟 PG 差不多概念.</td></tr><tr><td><strong>Snowflake query profile</strong></td><td>UI 看 stage 时间分布; <code>Bytes Spilled to Remote Storage</code> 警示.</td></tr><tr><td><strong>BigQuery execution graph</strong></td><td>UI; <code>bytes_billed</code> 决定 $$. 无 index, 靠 partition + cluster columns.</td></tr><tr><td><strong>ClickHouse</strong></td><td>列存 OLAP, query 是 PG 100x. 不同的 mental model.</td></tr><tr><td><strong>Trino / Presto</strong></td><td>联邦 query engine. 跨数据源 SQL.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>MySQL <code>EXPLAIN FORMAT=JSON</code></strong></td><td>MySQL 版 plan, 跟 PG 差不多概念.</td></tr><tr><td><strong>BigQuery query profile</strong></td><td>UI 看 stage 时间分布; <code>Bytes Spilled to Remote Storage</code> 警示.</td></tr><tr><td><strong>BigQuery execution graph</strong></td><td>UI; <code>bytes_billed</code> 决定 $$. 无 index, 靠 partition + cluster columns.</td></tr><tr><td><strong>ClickHouse</strong></td><td>列存 OLAP, query 是 PG 100x. 不同的 mental model.</td></tr><tr><td><strong>Trino / Presto</strong></td><td>联邦 query engine. 跨数据源 SQL.</td></tr></tbody></table></div>
 <hr />
 <h3>这道题在考什么</h3>
 <p>不会写 SQL 也能装 1 年 — DB perf debugging 是真硬功夫:</p>
@@ -459,9 +459,9 @@ FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;</code></pre>
 <p><strong>Q4</strong>: "如果 customer 不让 ALTER TABLE 加 index, 怎么办?"</p>
 <p>A:</p>
 <ol><li><strong>Materialized view</strong> 跑 ad-hoc 不动 schema, refresh nightly</li><li><strong>Read replica</strong> + index 只加 replica</li><li><strong>Rewrite query</strong> 用现有 index</li><li><strong><code>CREATE INDEX CONCURRENTLY</code></strong> — online, no lock, customer 应该接受 (vs <code>CREATE INDEX</code> 阻塞 write)</li><li><strong>Communication</strong>: 解释 risk, ETA, 跟客户走 change management</li></ol>
-<p><strong>Q5</strong>: "Postgres 看完, 同样问题 MySQL / Snowflake / BigQuery 怎么看?"</p>
+<p><strong>Q5</strong>: "Postgres 看完, 同样问题 MySQL / BigQuery / BigQuery 怎么看?"</p>
 <p>A:</p>
-<ul><li><strong>MySQL</strong>: <code>EXPLAIN FORMAT=JSON</code>, <code>SHOW PROFILE</code>, <code>SHOW STATUS</code> for cache hits. Stats via <code>ANALYZE TABLE</code>. Composite index 列顺序同 PG.</li><li><strong>Snowflake</strong>: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever</li><li><strong>BigQuery</strong>: execution graph in console; <code>bytes_billed</code> 决定 cost; partition pruning + cluster columns; no index (BQ doesn't index, sorts/scans)</li><li><strong>Trino / Presto</strong>: EXPLAIN; partition pruning + bucketed tables</li></ul>
+<ul><li><strong>MySQL</strong>: <code>EXPLAIN FORMAT=JSON</code>, <code>SHOW PROFILE</code>, <code>SHOW STATUS</code> for cache hits. Stats via <code>ANALYZE TABLE</code>. Composite index 列顺序同 PG.</li><li><strong>BigQuery</strong>: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever</li><li><strong>BigQuery</strong>: execution graph in console; <code>bytes_billed</code> 决定 cost; partition pruning + cluster columns; no index (BQ doesn't index, sorts/scans)</li><li><strong>Trino / Presto</strong>: EXPLAIN; partition pruning + bucketed tables</li></ul>
 <hr />
 <h3>死路答法</h3>
 <ol><li><strong>"加 index 就行"</strong> without EXPLAIN — 可能 index 错列, 没用</li><li><strong>加 index on <code>status</code></strong> — low cardinality, often useless alone</li><li><strong><code>SELECT *</code></strong> in dashboard — 抓全列, 没 covering index 帮不了</li><li><strong><code>ORDER BY ... LIMIT 1000</code> 没 index on sort column</strong> — sort spill</li><li><strong><code>WHERE col LIKE '%text%'</code></strong> — leading wildcard, no index</li><li><strong><code>OR</code> between two indexed columns</strong> — planner 多见 seq scan; rewrite UNION ALL</li><li><strong>没 ANALYZE</strong> — stats 错 planner 全错</li><li><strong><code>VACUUM FULL</code> in business hours</strong> — locks table, customer 怒</li><li><strong>Blame customer</strong> — "你 query 烂" → tone 错, 不解决问题</li><li><strong>加索引不 CONCURRENTLY</strong> — <code>CREATE INDEX</code> 默认 acquires Share-Exclusive lock, 阻 writes 全程</li></ol>
@@ -631,7 +631,7 @@ FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;</code></pre>
 |---|---|
 | **`PARTITION BY RANGE / LIST / HASH`** ⭐ | 分区策略: range (date), list (region), hash (customer_id). |
 | **Partition pruning** ⭐ | query 只扫相关 partition. WHERE 必带 partition key. |
-| **Hot vs cold partitions** | 近期 partition 放 SSD, 老 partition 放 HDD / S3. |
+| **Hot vs cold partitions** | 近期 partition 放 SSD, 老 partition 放 HDD / GCS. |
 | **`DROP TABLE old_partition`** | 删老 partition 是 O(1) — 删整文件, 比 `DELETE` 快百万倍. |
 
 ### 系统 / 配置
@@ -660,7 +660,7 @@ FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;</code></pre>
 | 术语 | 解释 |
 |---|---|
 | **MySQL `EXPLAIN FORMAT=JSON`** | MySQL 版 plan, 跟 PG 差不多概念. |
-| **Snowflake query profile** | UI 看 stage 时间分布; `Bytes Spilled to Remote Storage` 警示. |
+| **BigQuery query profile** | UI 看 stage 时间分布; `Bytes Spilled to Remote Storage` 警示. |
 | **BigQuery execution graph** | UI; `bytes_billed` 决定 $$. 无 index, 靠 partition + cluster columns. |
 | **ClickHouse** | 列存 OLAP, query 是 PG 100x. 不同的 mental model. |
 | **Trino / Presto** | 联邦 query engine. 跨数据源 SQL. |
@@ -1255,11 +1255,11 @@ A:
 4. **`CREATE INDEX CONCURRENTLY`** — online, no lock, customer 应该接受 (vs `CREATE INDEX` 阻塞 write)
 5. **Communication**: 解释 risk, ETA, 跟客户走 change management
 
-**Q5**: "Postgres 看完, 同样问题 MySQL / Snowflake / BigQuery 怎么看?"
+**Q5**: "Postgres 看完, 同样问题 MySQL / BigQuery / BigQuery 怎么看?"
 
 A:
 - **MySQL**: `EXPLAIN FORMAT=JSON`, `SHOW PROFILE`, `SHOW STATUS` for cache hits. Stats via `ANALYZE TABLE`. Composite index 列顺序同 PG.
-- **Snowflake**: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever
+- **BigQuery**: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever
 - **BigQuery**: execution graph in console; `bytes_billed` 决定 cost; partition pruning + cluster columns; no index (BQ doesn't index, sorts/scans)
 - **Trino / Presto**: EXPLAIN; partition pruning + bucketed tables
 

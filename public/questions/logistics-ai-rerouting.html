@@ -189,7 +189,7 @@ Production (week 8+): citywide, kill switch + 4 维度 alert
     cost_over_baseline = max(0, total_cost - baseline_cost) / baseline_cost
 
     return delivery_rate - lambda_ * cost_over_baseline</code></pre>
-<p><strong>Lambda 调节</strong>: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.</p>
+<p><strong>Cloud Functions 调节</strong>: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.</p>
 <p><strong>Why CADR not separate metrics</strong>: agent 训练 / RL reward 必须有 single scalar. 多 metric 会导致 Pareto front 选不出.</p>
 <h4>1.2 多轴 stratification (不能光看 aggregate)</h4>
 <pre class="language-python"><code class="language-python">strata = {
@@ -1208,7 +1208,7 @@ def cadr(period, lambda_=0.5):
     return delivery_rate - lambda_ * cost_over_baseline
 ```
 
-**Lambda 调节**: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.
+**Cloud Functions 调节**: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.
 
 **Why CADR not separate metrics**: agent 训练 / RL reward 必须有 single scalar. 多 metric 会导致 Pareto front 选不出.
 

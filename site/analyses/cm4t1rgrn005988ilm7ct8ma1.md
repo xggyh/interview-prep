@@ -2,14 +2,14 @@
 
 | 名词 | 一句话解释 | 类比 |
 |---|---|---|
-| **Blob storage / S3** | 存大文件（图片 / 视频）的云服务，按对象 key 访问 | 自助仓储 |
+| **Blob storage / GCS** | 存大文件（图片 / 视频）的云服务，按对象 key 访问 | 自助仓储 |
 | **Multipart upload** | 把大文件切成小块分别上传，最后合并 | 大象切块装冰箱 |
-| **Presigned URL** | 时效性 token + URL，让 client **直接上传到 S3** 而无需走 backend | 一次性入场券 |
+| **Presigned URL** | 时效性 token + URL，让 client **直接上传到 GCS** 而无需走 backend | 一次性入场券 |
 | **CDN** | 把文件缓存到全球边缘节点，用户从最近的取 | 全球连锁加盟店 |
 | **EXIF** | 照片元数据（拍摄时间 / GPS / 相机型号），相机自动写入 | 照片"出生证" |
 | **WebP / AVIF** | 比 JPEG 更高效的现代图片格式（小 30-50%） | 同样照片用更小盒装 |
 | **Thumbnail / Variant** | 缩略图 / 不同尺寸版本（128/512/1024px） | 一张照片印成不同大小 |
-| **Worker / Lambda** | 异步执行任务的服务（vs 同步 API） | 后厨而不是前台 |
+| **Worker / Cloud Functions** | 异步执行任务的服务（vs 同步 API） | 后厨而不是前台 |
 | **Idempotency** | 同一操作做 N 次结果跟 1 次一样 | 按 N 次按钮 = 1 次电梯 |
 | **NSFW** | Not Safe For Work，违规 / 成人 / 暴力内容 | 不雅照片 |
 | **Perceptual hash** | 基于图片内容算"视觉指纹"，类似图片 hash 相近 | 油画上的签名 |
@@ -114,7 +114,7 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
   60k × 3 MB = 180 GB/sec
 ```
 
-→ 如果 upload 走 backend → 180 GB/s 带宽，全球需几百 server。**不行**。必须 client 直传 S3。
+→ 如果 upload 走 backend → 180 GB/s 带宽，全球需几百 server。**不行**。必须 client 直传 GCS。
 
 ### 3.2 存储
 
@@ -124,7 +124,7 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
 × 365 day = 1.8 EB/year
 ```
 
-→ 用 hot/warm/cold tiering 控成本（hot 1 month 在 S3 Standard，warm 90 day 在 S3 IA，cold 1+ year 在 Glacier）。
+→ 用 hot/warm/cold tiering 控成本（hot 1 month 在 GCS Standard，warm 90 day 在 GCS IA，cold 1+ year 在 Glacier）。
 
 ### 3.3 下载
 
@@ -156,7 +156,7 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
        │  POST /upload (multipart/form-data)
        ▼
    ┌──────────────┐
-   │ Backend      │  接收 5 MB 流，处理，写 S3
+   │ Backend      │  接收 5 MB 流，处理，写 GCS
    └──────────────┘
 ```
 
@@ -167,20 +167,20 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
 
 ### 4.2 第 1 步：Direct-to-S3 + Presigned URL
 
-让 client **直接传到 S3**，backend 只生成上传凭证。
+让 client **直接传到 GCS**，backend 只生成上传凭证。
 
 ```ascii
    Step 1: Client → POST /upload/init
-         → Server 调 S3 API 创建 multipart upload session
+         → Server 调 GCS API 创建 multipart upload session
          → Server 返回：
            - upload_id
            - 多个 presigned URLs (one per part, 5 MB chunk)
    
-   Step 2: Client → PUT each chunk directly to S3
+   Step 2: Client → PUT each chunk directly to GCS
          (并发上传多个 chunk)
    
    Step 3: Client → POST /upload/complete
-         → Server 调 S3 CompleteMultipartUpload
+         → Server 调 GCS CompleteMultipartUpload
          → Server: enqueue async processing
          → Server: return image_id 给 client
 ```
@@ -201,7 +201,7 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
          │
          ▼
    ┌──────────────┐
-   │ S3 Event /   │  S3 上传完触发 event 或 Kafka 写入
+   │ GCS Event /   │  GCS 上传完触发 event 或 Kafka 写入
    │ Kafka topic  │
    └──────┬───────┘
           │
@@ -214,7 +214,7 @@ Google 报告 4 人，是经典 SD 入门题。考点：**Direct-to-S3 upload + 
    │ 3. Format convert → WebP     │
    │ 4. EXIF extract              │
    │ 5. NSFW check (ML model)     │
-   │ 6. Upload variants to S3     │
+   │ 6. Upload variants to GCS     │
    │ 7. Update DB record          │
    └──────┬───────────────────────┘
           │
@@ -247,7 +247,7 @@ CDN 缓存所有 variant（图片是 immutable，可 TTL = 永久）。99%+ hit 
 ┌────────────────────────────────────────────────────────────┐
 │                     Client                                 │
 │   1. POST /upload/init → get presigned URLs                │
-│   2. PUT chunks directly to S3 (并发)                      │
+│   2. PUT chunks directly to GCS (并发)                      │
 │   3. POST /upload/complete → backend enqueue processing    │
 └────────────────────────────────────────────────────────────┘
                           │
@@ -255,11 +255,11 @@ CDN 缓存所有 variant（图片是 immutable，可 TTL = 永久）。99%+ hit 
         │                 │                  │
         ▼                 ▼                  ▼
    ┌─────────┐     ┌────────────┐    ┌──────────────┐
-   │ Upload  │     │ S3         │    │ DB           │
+   │ Upload  │     │ GCS         │    │ DB           │
    │ API     │     │ (original) │    │ (metadata)   │
    └─────────┘     └─────┬──────┘    └──────┬───────┘
                          │                  │
-                         │ S3 event         │
+                         │ GCS event         │
                          ▼                  │
                    ┌──────────────┐         │
                    │ Kafka topic  │         │
@@ -279,7 +279,7 @@ CDN 缓存所有 variant（图片是 immutable，可 TTL = 永久）。99%+ hit 
                           │
                           ▼
                    ┌──────────────┐
-                   │ S3 (variants)│
+                   │ GCS (variants)│
                    └──────┬───────┘
                           │
                           ▼
@@ -337,13 +337,13 @@ POST /upload/complete
 }
 
 # Backend
-- 调 S3 CompleteMultipartUpload(upload_id, parts)
+- 调 GCS CompleteMultipartUpload(upload_id, parts)
 - DB: INSERT images (id, user_id, original_url, status='processing')
 - Kafka: produce {image_id, original_url} to image.uploaded topic
 - Return: {image_id, status='processing'}
 ```
 
-**Resumable trick**：上传失败的 chunk 可以**只重传那个 chunk**，已成功的 chunk S3 已记 ETag，不必重传。
+**Resumable trick**：上传失败的 chunk 可以**只重传那个 chunk**，已成功的 chunk GCS 已记 ETag，不必重传。
 
 ### 5.2 Image Worker 详细
 
@@ -352,7 +352,7 @@ from PIL import Image
 import asyncio
 
 async def process_image(event):
-    """Triggered by Kafka event after S3 upload complete."""
+    """Triggered by Kafka event after GCS upload complete."""
     image_id = event['image_id']
     s3_key = event['original_url']
 
@@ -387,7 +387,7 @@ async def process_image(event):
     notify_user(image_id, 'ready')
 
 async def resize_and_upload(img, target_width, image_id, name):
-    """Resize 后转 WebP 上传到 S3."""
+    """Resize 后转 WebP 上传到 GCS."""
     aspect = img.size[1] / img.size[0]
     target_h = int(target_width * aspect)
     resized = img.resize((target_width, target_h), Image.LANCZOS)
@@ -406,7 +406,7 @@ async def resize_and_upload(img, target_width, image_id, name):
 CREATE TABLE images (
   id              UUID PRIMARY KEY,
   user_id         UUID NOT NULL,
-  original_url    TEXT,                  -- S3 path
+  original_url    TEXT,                  -- GCS path
   variants        JSONB,                 -- {thumb: url, medium: url, large: url}
   status          TEXT,                  -- 'uploading' / 'processing' / 'ready' / 'flagged' / 'failed'
   bytes           BIGINT,
@@ -459,12 +459,12 @@ variants 数量固定 (3-4 个)，每条 image 都有。Single JSONB column 减�
 ### 5.5 CDN + Hot/Cold Tiering
 
 ```
-S3 Standard:  最近 1 个月内的图，CDN 频繁访问
-S3 IA:        1-3 月，访问频率低，每月 retrieve 费
-S3 Glacier:   1+ 年，几乎不访问，retrieve 几分钟到几小时
+GCS Standard:  最近 1 个月内的图，CDN 频繁访问
+GCS IA:        1-3 月，访问频率低，每月 retrieve 费
+GCS Glacier:   1+ 年，几乎不访问，retrieve 几分钟到几小时
 ```
 
-CDN cache 永久（图片 immutable）。CDN miss → S3 (Standard) hit。如果用户访问超老照片，S3 Standard miss → 触发 retrieve from Glacier → 用户等几秒 → 通知 ready。
+CDN cache 永久（图片 immutable）。CDN miss → GCS (Standard) hit。如果用户访问超老照片，GCS Standard miss → 触发 retrieve from Glacier → 用户等几秒 → 通知 ready。
 
 ### 5.6 Deduplication (可选 v2)
 
@@ -557,11 +557,11 @@ async function upload(file) {
 > 
 > 估算：60k QPS upload peak × 3 MB = 180 GB/s。这一秒就告诉我 **backend 不能接图片流量** —— 这是 trillion-dollar mistake，必须 direct-to-S3。
 > 
-> 流程是 **3-step**：(1) Client POST /upload/init，server 调 S3 创建 multipart session，返回 presigned URL；(2) Client 直接 PUT chunks 到 S3；(3) Client POST /upload/complete，server 触发 async 处理。
+> 流程是 **3-step**：(1) Client POST /upload/init，server 调 GCS 创建 multipart session，返回 presigned URL；(2) Client 直接 PUT chunks 到 GCS；(3) Client POST /upload/complete，server 触发 async 处理。
 > 
 > 异步处理是关键。Server 在 step 3 立刻 return，用户不等。Image worker pool 从 Kafka 消费 event：download → 生成 thumb/medium/large（PIL resize）→ NSFW ML 检测 → 写 DB → 通知用户。整个流程通常 5-30 秒，用户先看 loading 占位，ready 后 push 通知 / WebSocket 推送。
 > 
-> CDN serve 所有 variants —— 图 immutable，TTL 设永久，99%+ hit rate。S3 hot/cold tiering 节省成本：1 月内热数据 S3 Standard，1 年后下沉到 Glacier。
+> CDN serve 所有 variants —— 图 immutable，TTL 设永久，99%+ hit rate。GCS hot/cold tiering 节省成本：1 月内热数据 GCS Standard，1 年后下沉到 Glacier。
 > 
 > Resumable 关键在 multipart —— 失败 chunk 单独重传不必全重。Client SDK 用 localStorage 记 upload_id + part 状态。
 > 
@@ -577,7 +577,7 @@ async function upload(file) {
 
 ### Q2: 用户撤销上传到一半？
 
-**答**：S3 multipart upload 有 abort API。Server 检测到 client 取消（idle 超时 / explicit cancel）→ 调 abort → S3 释放未完成 part 的存储。
+**答**：GCS multipart upload 有 abort API。Server 检测到 client 取消（idle 超时 / explicit cancel）→ 调 abort → GCS 释放未完成 part 的存储。
 
 ### Q3: 上传后用户立即看不到 thumbnail（worker 还没处理完）？
 
@@ -604,14 +604,14 @@ async function upload(file) {
 
 ### Q8: GDPR 删除？
 
-**答**：删除有 30 天 grace period (soft delete) → 物理 delete S3 object + variants + CDN cache invalidation + DB hard delete。
+**答**：删除有 30 天 grace period (soft delete) → 物理 delete GCS object + variants + CDN cache invalidation + DB hard delete。
 
 ---
 
 ## 9. 常见易错点
 
 > [!pitfall]
-> ❌ **上传走 backend** —— 流量爆 + 不能 scale；必须 client 直传 S3；  
+> ❌ **上传走 backend** —— 流量爆 + 不能 scale；必须 client 直传 GCS；  
 > ❌ **不用 multipart** —— 大文件断了全重传，体验差；  
 > ❌ **Sync processing** —— 用户等 30 秒；必须 async；  
 > ❌ **Variant URL hardcode 进 schema** —— 加新 size 要 alter table；用 JSONB；  
@@ -644,4 +644,4 @@ async function upload(file) {
 3. **CDN + multi-variant + tiered storage 是成本三件套**。Image-heavy 系统不做这 3 件成本 10x 涨。
 
 > [!followup]
-> **学习推荐**：(a) 跑一遍 AWS S3 multipart upload tutorial；(b) 看 Instagram engineering blog 关于 image pipeline 的几篇；(c) 自己用 Python + Flask + boto3 实现一个 mini image uploader；(d) 学 Cloudflare Images / imgproxy 这种"动态 image resize" 替代预生成 variant 的思路；(e) 读 EXIF 标准，理解 GPS 隐私问题（很多 app 默认 strip 上传图的 GPS）。
+> **学习推荐**：(a) 跑一遍 GCS (Cloud Storage) multipart upload tutorial；(b) 看 Instagram engineering blog 关于 image pipeline 的几篇；(c) 自己用 Python + Flask + boto3 实现一个 mini image uploader；(d) 学 Cloudflare Images / imgproxy 这种"动态 image resize" 替代预生成 variant 的思路；(e) 读 EXIF 标准，理解 GPS 隐私问题（很多 app 默认 strip 上传图的 GPS）。

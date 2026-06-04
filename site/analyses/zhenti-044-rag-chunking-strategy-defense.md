@@ -56,8 +56,8 @@
 | 术语 | 解释 |
 |---|---|
 | **Vector DB** | 存 embedding + 支持 ANN 搜索的 DB. |
-| **Qdrant** | Rust 写的开源 vector DB. Production 流行选择. |
-| **Pinecone** | 商业 managed vector DB. 起步快. |
+| **Vertex AI Vector Search** | Rust 写的开源 vector DB. Production 流行选择. |
+| **Vertex AI Vector Search** | 商业 managed vector DB. 起步快. |
 | **Weaviate** | 开源 vector DB, GraphQL API. |
 | **Milvus** | 开源 vector DB. 大规模 production. |
 | **ANN (Approximate Nearest Neighbor)** | 近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次. |
@@ -863,7 +863,7 @@ async def retrieve_with_type_aware_rerank(query, tenant_id, top_k=10):
                                      ▼
                     ┌──────────────────────────────────────┐
                     │   STORAGE                            │
-                    │  Vector DB (Qdrant / Pinecone)       │
+                    │  Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)       │
                     │  + Metadata DB (Postgres)            │
                     │  + BM25 index (Elasticsearch)        │
                     └──────────────────────────────────────┘

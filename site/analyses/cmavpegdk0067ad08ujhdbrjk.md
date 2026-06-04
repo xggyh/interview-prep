@@ -123,7 +123,7 @@ Batch job 必须**幂等**：如果跑到一半挂了，第二次跑要能从中
 ### 5. 分区策略
 
 - Ledger 按 `created_at` 月分区 + `account_id` hash 子分区
-- 热数据（30 天内）在主 Postgres，冷数据归档到 S3 + Athena
+- 热数据（30 天内）在主 Postgres，冷数据归档到 GCS + Athena
 - 读 / 报表查询走只读副本 + 列存（ClickHouse 同步）
 
 ## 取舍 / 权衡

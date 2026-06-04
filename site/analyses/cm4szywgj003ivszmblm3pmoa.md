@@ -119,7 +119,7 @@ Player A ─WebSocket─→ Game Server ─WebSocket─→ Player B
               │ Persist
               ↓
 ┌─────────────────────────────────┐
-│  Game DB (Spanner / DynamoDB)     │
+│  Game DB (Spanner / Firestore / Bigtable)     │
 │  - On move: append to PGN          │
 │  - On end: full game record        │
 └─────────────────────────────────┘

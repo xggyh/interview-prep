@@ -41,7 +41,7 @@
 | **Microsoft Presidio** ⭐ | **开源 PII 检测 + 脱敏**. SSN, 信用卡, email, 电话, 姓名 都能识别. Self-host 免费. |
 | **Perspective API** | Google 的 toxicity 评分 — 免费 1 QPS. |
 | **Azure Content Safety** | Microsoft hosted 内容安全 — toxic / hate / sexual / violence 多维分类. |
-| **AWS Bedrock Guardrails** | AWS hosted — 类似 Azure, AWS 生态. |
+| **Vertex AI Guardrails** | AWS hosted — 类似 Azure, AWS 生态. |
 | **Pydantic** ⭐ | Python schema 验证. **Output validation 的 90% 用 Pydantic** — 强制 LLM 输出 valid JSON, 字段在 allowed list 里. |
 | **PII (Personally Identifiable Information)** | 个人可识别信息 — SSN / 信用卡 / 姓名 / email / 电话 / 地址. PII 泄漏 = 监管罚. |
 | **PHI (Protected Health Information)** | 健康相关 PII — 诊断, 用药, MRN (medical record number). HIPAA 范围. |
@@ -303,7 +303,7 @@ class InputFilter:
 | **Guardrails AI** | Output schema + validators | Free + paid features |
 | **Llama Guard 3** | Open content classifier | Free (self-host) |
 | **Azure Content Safety** | Microsoft hosted | $1/1k images, $0.50/1k text |
-| **AWS Bedrock Guardrails** | AWS hosted | $0.75/1k policy evaluation |
+| **Vertex AI Guardrails** | AWS hosted | $0.75/1k policy evaluation |
 | **Perspective API** | Toxicity scoring | Free 1 QPS |
 
 **Hybrid pattern (production-grade)**:
@@ -1088,7 +1088,7 @@ Don't just disable guardrails — that's the opposite mistake. Tune thresholds +
 5. **Refusal on medical advice**: hard rule, never give diagnosis/treatment recommendations
 6. **Human-in-loop higher bar**: any output recommending action requires human review
 7. **Egress monitoring**: outbound API calls audited for PHI leak
-8. **Data residency**: model deployed in HIPAA-eligible region (e.g., AWS Bedrock HIPAA region)
+8. **Data residency**: model deployed in HIPAA-eligible region (e.g., Vertex AI HIPAA region)
 9. **Access control tighter**: per-user / per-role within healthcare org
 
 **Q4**: "What's the highest-leverage guardrail per dollar spent?"
@@ -1181,8 +1181,8 @@ Don't just disable guardrails — that's the opposite mistake. Tune thresholds +
 
 Specific tools (2026):
   Injection: Lakera Guard, PromptArmor, custom Haiku FT
-  PII: Microsoft Presidio, AWS Comprehend PII
-  Content safety: Azure Content Safety, AWS Bedrock Guardrails, Llama Guard 3
+  PII: Microsoft Presidio, Cloud DLP / Healthcare NLP PII
+  Content safety: Azure Content Safety, Vertex AI Guardrails, Llama Guard 3
   Rules: NeMo Guardrails (NVIDIA), Guardrails AI
   Toxicity: Perspective API
 

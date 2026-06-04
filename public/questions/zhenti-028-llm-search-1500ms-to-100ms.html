@@ -64,7 +64,7 @@
 <h4>质量评估</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>nDCG@10</strong> ⭐</td><td>Normalized Discounted Cumulative Gain top-10 — 检索质量金标准.</td></tr><tr><td><strong>MRR (Mean Reciprocal Rank)</strong></td><td>平均倒数排名.</td></tr><tr><td><strong>Recall@K</strong></td><td>top-K 中相关文档比例.</td></tr><tr><td><strong>Precision@K</strong></td><td>top-K 中精确率.</td></tr><tr><td><strong>Factuality</strong></td><td>事实准确性 — LLM 输出有依据 vs 编造.</td></tr><tr><td><strong>Hallucination</strong></td><td>幻觉 — 编造内容.</td></tr><tr><td><strong>Human eval / Golden set</strong></td><td>人工评估 / 黄金集.</td></tr><tr><td><strong>Active learning</strong></td><td>主动学习 — 低 confidence 样本人工标后重训.</td></tr><tr><td><strong>A/B test</strong></td><td>上线前的对比实验.</td></tr></tbody></table></div>
 <h4>部署 / 后处理</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>PII redaction</strong></td><td>PII 脱敏.</td></tr><tr><td><strong>Audit log</strong></td><td>审计日志.</td></tr><tr><td><strong>Async fire-and-forget</strong></td><td>异步不阻塞主流程.</td></tr><tr><td><strong>CDN / Edge caching</strong></td><td>边缘缓存 — Cloudflare / CloudFront.</td></tr><tr><td><strong>OTel (OpenTelemetry)</strong></td><td>observability 标准.</td></tr><tr><td><strong>Bedrock</strong></td><td>AWS LLM 托管服务.</td></tr><tr><td><strong>T4 / H100 GPU</strong></td><td>NVIDIA GPU 型号.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>PII redaction</strong></td><td>PII 脱敏.</td></tr><tr><td><strong>Audit log</strong></td><td>审计日志.</td></tr><tr><td><strong>Async fire-and-forget</strong></td><td>异步不阻塞主流程.</td></tr><tr><td><strong>CDN / Edge caching</strong></td><td>边缘缓存 — Cloudflare / CloudFront.</td></tr><tr><td><strong>OTel (OpenTelemetry)</strong></td><td>observability 标准.</td></tr><tr><td><strong>Vertex AI</strong></td><td>AWS LLM 托管服务.</td></tr><tr><td><strong>T4 / H100 GPU</strong></td><td>NVIDIA GPU 型号.</td></tr></tbody></table></div>
 <hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 "更快", 是考你<strong>理解每一个 ms 在哪 + 知道哪些可以 cut</strong>:</p>
@@ -193,7 +193,7 @@ filtered = [r for r in results if r.doc_id in user_acl_ids]
 
 # Good: prefilter then search
 hnsw.search(query_emb, k=10, filter_ids=user_acl_ids)  # internal candidate skip</code></pre>
-<p>Most vector DBs (Qdrant, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.</p>
+<p>Most vector DBs (Vertex AI Vector Search, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.</p>
 <p><strong>Fix 3: Hybrid (BM25 + HNSW)</strong></p>
 <p>If query has rare token (e.g., product code "ABC-123"), BM25 wins. HNSW alone misses.</p>
 <pre class="language-python"><code class="language-python"># Parallel
@@ -205,7 +205,7 @@ hnsw_res, bm25_res = await asyncio.gather(hnsw_task, bm25_task)
 final = rrf_fuse(hnsw_res, bm25_res, k=10)</code></pre>
 <p>Latency: max(hnsw, bm25) = ~50ms (parallel).</p>
 <p><strong>Fix 4: Pre-computed dense + sparse</strong></p>
-<ul><li>HNSW for dense</li><li>BM25 sparse via Lucene/OpenSearch</li><li>ColBERT for late interaction (precompute token embeddings, score at query time)</li></ul>
+<ul><li>HNSW for dense</li><li>BM25 sparse via Lucene/Vertex AI Vector Search</li><li>ColBERT for late interaction (precompute token embeddings, score at query time)</li></ul>
 <p>Latency: 30-50ms hybrid retrieval.</p>
 <p><strong>Result</strong>: 200ms → 30-50ms</p>
 <h4>Phase 5: Reranker: skip ladder + cascade (重排器: 阶梯跳过 + 级联) (8 min)</h4>
@@ -300,7 +300,7 @@ asyncio.create_task(maybe_sample_for_eval(query, response))</code></pre>
 <p><strong>Volumes</strong>:</p>
 <ul><li>1M queries/day, 50 QPS sustained, 200 peak</li></ul>
 <p><strong>Hardware (cascading)</strong>:</p>
-<ul><li>Embedding: 4× T4 GPUs (BGE-small batched) = $300/m</li><li>HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m</li><li>Cross-encoder rerank: 2× T4 = $150/m</li><li>LLM (Claude Haiku via Bedrock): pay per token = $5K/m for 200K queries × analytical path</li></ul>
+<ul><li>Embedding: 4× T4 GPUs (BGE-small batched) = $300/m</li><li>HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m</li><li>Cross-encoder rerank: 2× T4 = $150/m</li><li>LLM (Claude Haiku via Vertex AI): pay per token = $5K/m for 200K queries × analytical path</li></ul>
 <p><strong>Cache</strong>:</p>
 <ul><li>Redis cluster (3× cache.r6g.large): $400/m</li><li>80% embed hit, 50% result hit</li></ul>
 <p><strong>Total</strong>: ~$9.5K/m for 1M queries = $0.0001 per query (cf. $32K/m before)</p>
@@ -537,7 +537,7 @@ Streaming:
 | **Async fire-and-forget** | 异步不阻塞主流程. |
 | **CDN / Edge caching** | 边缘缓存 — Cloudflare / CloudFront. |
 | **OTel (OpenTelemetry)** | observability 标准. |
-| **Bedrock** | AWS LLM 托管服务. |
+| **Vertex AI** | AWS LLM 托管服务. |
 | **T4 / H100 GPU** | NVIDIA GPU 型号. |
 
 ---
@@ -785,7 +785,7 @@ filtered = [r for r in results if r.doc_id in user_acl_ids]
 hnsw.search(query_emb, k=10, filter_ids=user_acl_ids)  # internal candidate skip
 ```
 
-Most vector DBs (Qdrant, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.
+Most vector DBs (Vertex AI Vector Search, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.
 
 **Fix 3: Hybrid (BM25 + HNSW)**
 
@@ -806,7 +806,7 @@ Latency: max(hnsw, bm25) = ~50ms (parallel).
 **Fix 4: Pre-computed dense + sparse**
 
 - HNSW for dense
-- BM25 sparse via Lucene/OpenSearch
+- BM25 sparse via Lucene/Vertex AI Vector Search
 - ColBERT for late interaction (precompute token embeddings, score at query time)
 
 Latency: 30-50ms hybrid retrieval.
@@ -1015,7 +1015,7 @@ Mitigation: A/B test before rollout, measure nDCG@10 + human eval on 1% sample.
 - Embedding: 4× T4 GPUs (BGE-small batched) = $300/m
 - HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m
 - Cross-encoder rerank: 2× T4 = $150/m
-- LLM (Claude Haiku via Bedrock): pay per token = $5K/m for 200K queries × analytical path
+- LLM (Claude Haiku via Vertex AI): pay per token = $5K/m for 200K queries × analytical path
 
 **Cache**:
 - Redis cluster (3× cache.r6g.large): $400/m

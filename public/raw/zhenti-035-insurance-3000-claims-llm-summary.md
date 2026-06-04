@@ -74,7 +74,7 @@
 
 | 术语 | 解释 |
 |---|---|
-| **Claude on AWS Bedrock + PrivateLink** | 私有部署 Claude — 数据不走公网, 中等合规适用. |
+| **Claude on Vertex AI + PrivateLink** | 私有部署 Claude — 数据不走公网, 中等合规适用. |
 | **Llama 3.1 70B fine-tuned** | 自托管开源模型. |
 | **Prompt caching** ⭐ | 提示缓存 — 相同 prompt 前缀的 token 缓存复用, 大幅降本. Batch 处理必用. |
 | **Citation tracking** ⭐ | 引用追踪 — 每个 fact 必须 trace 回源文档的 paragraph + sentence. 这题 non-negotiable, hallucination = 监管曝光. |
@@ -269,7 +269,7 @@ NOT "summarize 30M claims for everyone".
 - Some states (e.g., NY DFS) require **algorithmic accountability documentation** for any AI processing customer data
 
 **Architecture implications**:
-- **Self-hosted LLM**: Claude on Bedrock (AWS PrivateLink) or Llama 3.1 70B fine-tuned
+- **Self-hosted LLM**: Claude on Vertex AI (AWS PrivateLink) or Llama 3.1 70B fine-tuned
 - **Privacy layer FIRST**: classifier separates privileged / HIPAA / standard claims, routes accordingly
 - **Citation tracking**: every fact in output traces to a source paragraph (chunk ID + offset)
 - **Per-state config**: model + prompt template differs by state per regulatory requirement
@@ -473,11 +473,11 @@ The **ConvFinQA** project is directly relevant — that's where you did **multi-
 **A**: Order-of-magnitude with assumptions stated:
 
 - Avg claim file: ~10K tokens (mix of structured + notes + reports)
-- Model: Claude 3.5 Sonnet on AWS Bedrock with prompt caching
+- Model: Claude 3.5 Sonnet on Vertex AI with prompt caching
 - Input tokens: 5M × 10K = 50B; at $3/1M with caching effective rate ~$1.5/1M = **$75K**
 - Output tokens: 5M × 500 = 2.5B; at $15/1M = **$37.5K**
 - Embedding for retrieval: 5M × ~1500 chunks × 384-dim = ~$5K (one-time)
-- Infrastructure (S3, Bedrock, compute, monitoring): ~$10K
+- Infrastructure (GCS, Vertex AI, compute, monitoring): ~$10K
 - **Total batch one-time: ~$130K**
 
 This is an order of magnitude smaller than my "$1M-$5M" mention earlier — that's the spread depending on model choice and document size. **For a $X billion insurer, $130K is a rounding error**.

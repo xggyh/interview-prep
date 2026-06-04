@@ -41,7 +41,7 @@
     <h2>我的思路与解法</h2>
     <h3>题目（verbatim）</h3>
 <blockquote><p>"Design <strong>multi-tenant SaaS monitoring</strong> with <strong>varying client SLA requirements</strong>. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."</p></blockquote>
-<p><strong>出处</strong>: fde.academy 技术 round. Databricks / Snowflake / Datadog / Cloudflare 都问过.</p>
+<p><strong>出处</strong>: fde.academy 技术 round. Databricks / BigQuery / Datadog / Cloudflare 都问过.</p>
 <p><strong>Round</strong>: Technical Integration (45-60 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
@@ -727,7 +727,7 @@ def public_status():
 <ul><li>Pooled Bronze infra <strong>completely separate physical</strong> from Silver/Gold</li><li>Cross-tier blast radius <strong>zero by design</strong></li><li>Automated anomaly detection on Bronze: 100x normal → temporary throttle + alert customer</li><li>WAF rules on Bronze tier IP ranges (if applicable)</li><li>If proven malicious: terminate tenant per ToS</li></ul>
 <p><strong>Q3</strong>: "1B events/day storage cost — how reduce?"</p>
 <p><strong>A</strong>:</p>
-<ul><li><strong>Tiered storage</strong>: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in S3</li><li><strong>Aggregate-first</strong>: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y</li><li><strong>Sampling</strong> for non-critical metrics (debug traces 1/100), but <strong>never for billing</strong></li><li><strong>Per-tenant retention</strong>: Bronze 30d, Silver 90d, Gold 1y</li><li><strong>Compression</strong>: Prometheus block compression / Mimir blocks → 10x storage saving</li></ul>
+<ul><li><strong>Tiered storage</strong>: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in GCS</li><li><strong>Aggregate-first</strong>: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y</li><li><strong>Sampling</strong> for non-critical metrics (debug traces 1/100), but <strong>never for billing</strong></li><li><strong>Per-tenant retention</strong>: Bronze 30d, Silver 90d, Gold 1y</li><li><strong>Compression</strong>: Prometheus block compression / Mimir blocks → 10x storage saving</li></ul>
 <p><strong>Q4</strong>: "Customer disputes a billing line. How do we prove?"</p>
 <p><strong>A</strong>:</p>
 <ul><li><strong>Per-request audit log</strong> retained 13 months (1 year + buffer for legal)</li><li>Tenant can <strong>self-serve usage report</strong> (CSV download)</li><li>Dispute window <strong>60 days</strong></li><li><strong>Cryptographic signature</strong> on monthly invoice (tamper-proof, HMAC)</li><li>Internal "<strong>billing replay</strong>" tool: ops can reconstruct billing from raw logs to verify</li><li>Match against telemetry DB (double-entry bookkeeping consistency)</li></ul>
@@ -854,7 +854,7 @@ Noisy neighbor protection:
 
 > "Design **multi-tenant SaaS monitoring** with **varying client SLA requirements**. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."
 
-**出处**: fde.academy 技术 round. Databricks / Snowflake / Datadog / Cloudflare 都问过.
+**出处**: fde.academy 技术 round. Databricks / BigQuery / Datadog / Cloudflare 都问过.
 
 **Round**: Technical Integration (45-60 min)
 
@@ -1891,7 +1891,7 @@ def public_status():
 **Q3**: "1B events/day storage cost — how reduce?"
 
 **A**:
-- **Tiered storage**: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in S3
+- **Tiered storage**: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in GCS
 - **Aggregate-first**: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y
 - **Sampling** for non-critical metrics (debug traces 1/100), but **never for billing**
 - **Per-tenant retention**: Bronze 30d, Silver 90d, Gold 1y

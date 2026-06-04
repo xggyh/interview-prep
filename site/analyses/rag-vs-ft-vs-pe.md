@@ -211,7 +211,7 @@ User: "Saya tidak bisa membayar bulan ini, apa yang harus dilakukan?"
   ↓
 [1. Intent classify] (Haiku 4.5 + PE) → intent: "payment_difficulty"
   ↓
-[2. RAG retrieve] (Qdrant) → policy chunks on debt restructuring
+[2. RAG retrieve] (Vertex AI Vector Search) → policy chunks on debt restructuring
   ↓
 [3. Generate response] (SFT Sonnet 4.6 on Indonesian collection data)
    → "Halo, kami memahami situasi Anda. Berikut opsi yang tersedia: ..."
@@ -527,7 +527,7 @@ Verdict: All 3
    - Metadata extractor (heading, freshness, ACL)
 
 2. Storage:
-   - Vector DB (Qdrant, Pinecone, Weaviate, Vespa, Milvus)
+   - Vector DB (Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Vespa, Milvus)
    - Optional: BM25 index (Elasticsearch, Tantivy)
    - Metadata store (Postgres)
 

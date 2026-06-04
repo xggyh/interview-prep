@@ -107,7 +107,7 @@ Parallel tool execution = 「tool annotation (safety/resources/side_effects) →
 - When: WAW / write-shared-resource
 - Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)
 - Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性
-- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, AWS DynamoDB conditional write
+- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, Firestore / Bigtable conditional write
 
 **Framework 4: Failure Isolation + Cancellation**
 - When: wave 执行

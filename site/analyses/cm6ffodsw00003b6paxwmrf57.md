@@ -85,7 +85,7 @@ CREATE TABLE channel_members (
 -- partition key = channel_id, clustering = msg_id DESC, thread_root_id
 CREATE TABLE messages (
   channel_id      UUID,
-  msg_id          BIGINT,            -- Snowflake
+  msg_id          BIGINT,            -- BigQuery
   thread_root_id  BIGINT,            -- null 顶层；非 null 是回复
   sender_id       UUID,
   body            TEXT,
@@ -123,7 +123,7 @@ CREATE TABLE messages (
 
 ### 6. 文件附件
 
-- 客户端先 `POST /uploads` → 得 S3 presigned URL → 直接上传 S3
+- 客户端先 `POST /uploads` → 得 GCS presigned URL → 直接上传 GCS
 - 上传完成回调 → 创建 file record → 消息 body 引用 file_id
 - 下载时校验 channel membership 权限
 
@@ -140,7 +140,7 @@ CREATE TABLE messages (
 | Thread 嵌套 | 两级 | 无限递归：查询慢、UI 难做 |
 | Unread | client local + last_read_msg_id source | 实时服务端 count：QPS 高 |
 | Fan-out | push to online + push-notif for offline | 纯 pull：消息延迟感差 |
-| Channel membership | Postgres | DynamoDB：JOIN 不友好 |
+| Channel membership | Postgres | Firestore / Bigtable：JOIN 不友好 |
 
 ## 与通用 Chat/Messaging 区别（面试官爱问）
 
@@ -164,4 +164,4 @@ CREATE TABLE messages (
 > ❌ 私有 channel 写入不校验 membership：权限漏洞。
 
 > [!followup]
-> "Huddles（音频房间）？" → WebRTC mesh / SFU。"Slack Connect（跨 workspace channel）？" → 引入 federation 层，membership 跨 workspace 解析。"如何降低 channel join 后的"历史回灌"成本？" → 按 channel 维度做 cold/hot 分层，老消息存便宜的 S3 Parquet。
+> "Huddles（音频房间）？" → WebRTC mesh / SFU。"Slack Connect（跨 workspace channel）？" → 引入 federation 层，membership 跨 workspace 解析。"如何降低 channel join 后的"历史回灌"成本？" → 按 channel 维度做 cold/hot 分层，老消息存便宜的 GCS Parquet。

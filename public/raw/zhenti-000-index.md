@@ -118,7 +118,7 @@
 |---|---|---|
 | Q21 | HIPAA + 5000 万文档医疗 RAG 系统 | 医疗 + 合规 |
 | Q22 | 12 个零散零售数据源汇入预测模型 | 数据工程 pipeline |
-| Q23 | F500 在自己 AWS VPC + Okta SSO + Snowflake | 企业部署 |
+| Q23 | F500 在自己 AWS VPC + Okta SSO + BigQuery | 企业部署 |
 | Q24 | 500 仓库经理 + 99% 送达率 AI agent 评估框架 | eval framework |
 | Q25 | 诊断 LLM 推理 pipeline 高延迟 | OpenAI 最爱 (tokenization/网络/batch/KV cache) |
 | Q26 | 支持优先级 + 重试 + 死信的分布式任务队列 | 真实工程 |

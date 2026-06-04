@@ -96,7 +96,7 @@ Idempotency = 「runtime 生成 deterministic key (tenant+session+tool+canonical
 - When: 高吞吐 + 跨 session retry
 - Algorithm: Redis (24h hot) → Postgres (30d warm) → bank ledger (permanent)
 - Trade-off: TTL 长安全但 logical collision risk; TTL 短安全但跨 session miss
-- Tools: Redis ElastiCache, Postgres UNIQUE(idem_key), DynamoDB conditional writes
+- Tools: Redis Memorystore, Postgres UNIQUE(idem_key), Firestore / Bigtable conditional writes
 
 **Framework 4: Failure Policy Matrix**
 - When: Redis / DB 挂时
@@ -108,7 +108,7 @@ Idempotency = 「runtime 生成 deterministic key (tenant+session+tool+canonical
 - When: 下游 vendor 不一致
 - Algorithm: A pass-through (Stripe) / B wrapper-owned / C check-then-execute / D best-effort + reconciliation
 - Trade-off: vendor TTL 短 → wrapper 长 TTL 兜底
-- Tools: Stripe Idempotency-Key header, PayPal-Request-Id, MessageDeduplicationId (SQS FIFO)
+- Tools: Stripe Idempotency-Key header, PayPal-Request-Id, MessageDeduplicationId (Cloud Tasks FIFO)
 
 ### 关键决策树 (ASCII)
 
@@ -189,7 +189,7 @@ Hit rate: ~2% (real retry); alert if > 10% (upstream broken)
   1. TTL > 30d → logical collision (用户合法重发同 args)
   2. TTL < 1min → 跨 session retry 失效
   3. Wrapper TTL 24h vs Stripe 24h → 跨 24h dedup 丢 → bank ledger 兜底
-- Tools: Redis ElastiCache (managed HA), DragonflyDB/KeyDB (Redis-compatible faster), Postgres UNIQUE, S3 Parquet cold archive
+- Tools: Redis Memorystore (managed HA), DragonflyDB/KeyDB (Redis-compatible faster), Postgres UNIQUE, GCS Parquet cold archive
 
 **Problem 4: Failure Modes**
 - 核心解法:
@@ -217,7 +217,7 @@ Pattern D (legacy SMS no API): best-effort + nightly reconciliation alert duplic
   1. Pattern C race: 2 thread 都 search miss → 都 create → 双花 → wrapper lock 串行
   2. Vendor TTL 5min vs wrapper 24h → 24h-1d 之间 wrapper miss → bank external_ref 永久 truth
   3. Voice agent 7 markets 不同 vendor → 统一 wrapper 抽象, agent 不感知差异
-- Tools: Stripe / PayPal SDK native idem, AWS SQS FIFO MessageDeduplicationId, Temporal workflow_id auto-idem, Saga compensating, Outbox + Debezium CDC
+- Tools: Stripe / PayPal SDK native idem, Cloud Tasks / Pub/Sub FIFO MessageDeduplicationId, Temporal workflow_id auto-idem, Saga compensating, Outbox + Debezium CDC
 
 ### Production gotchas (top 15)
 

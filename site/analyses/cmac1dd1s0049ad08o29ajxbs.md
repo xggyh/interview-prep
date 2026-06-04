@@ -61,7 +61,7 @@ OpenAI Staff 级（Mobile System Design），1 人报告。考点：**mobile-fir
           ┌─────────────────────┐
           │  Storage            │
           │  - threads/msgs PG  │
-          │  - object S3        │
+          │  - object GCS        │
           └─────────────────────┘
 ```
 

@@ -155,7 +155,7 @@ events
 
 - **Hot (last 7 days raw)**: InfluxDB / ClickHouse
 - **Warm (1-year 1-min agg)**: InfluxDB downsampled
-- **Cold (5-year 1-hour agg)**: S3 Parquet
+- **Cold (5-year 1-hour agg)**: GCS Parquet
 - **Current state (latest event per robot)**: Redis Hash
 
 ### Step 4: Dashboard
@@ -307,7 +307,7 @@ If robots have low bandwidth (e.g., mobile / IoT):
 >    - Redis: per-robot current state
 >    - InfluxDB / ClickHouse: 7 days raw
 >    - Downsample to 1-min retain 1 year
->    - 1-hour Parquet to S3 for 5 years
+>    - 1-hour Parquet to GCS for 5 years
 > 5. **Dashboard**: WebSocket subscribe + Redis pub/sub fan-out
 > 6. **Alerting**: Flink rule evaluator → PagerDuty
 >
@@ -395,7 +395,7 @@ Small to medium scale: InfluxDB. Large analytics (billion-row scans): ClickHouse
 
 1. **MQTT + EMQX/VerneMQ** at scale
 2. **Flink for stream processing**
-3. **Layered storage** (Redis / TSDB / S3)
+3. **Layered storage** (Redis / TSDB / GCS)
 4. **Continuous downsampling** with retention policies
 5. **Redis pub/sub for dashboard fan-out**
 6. **Edge aggregation** for bandwidth-constrained robots
@@ -416,7 +416,7 @@ Pipeline 4 stages:
     Redis: current state per robot
     InfluxDB/ClickHouse: 7d raw
     Downsample 1-min → 1y
-    1-hour Parquet S3 → 5y
+    1-hour Parquet GCS → 5y
   Display: Dashboard Service WebSocket + Redis pub/sub
 
 Storage retention:

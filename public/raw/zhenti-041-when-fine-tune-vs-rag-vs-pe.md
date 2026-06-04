@@ -42,7 +42,7 @@
 |---|---|
 | **Chunking** | 把长文档切成小块. 大小 (256 / 512 / 1024 token) + overlap (overlap 50-100 token 防 cut off) 影响 retrieval 质量. |
 | **Embedding** | 把 text → 1024 维向量. 用 cosine similarity 比较相似度. 模型如 text-embedding-3-large / Voyage-3 / BGE-M3. |
-| **Vector DB / 向量数据库** | 存 embedding 的数据库 — Qdrant / Pinecone / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速. |
+| **Vector DB / 向量数据库** | 存 embedding 的数据库 — Vertex AI Vector Search / Vertex AI Vector Search / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速. |
 | **Dense retrieval** | 用 embedding 找相似 — 适合 semantic match (paraphrase). 但抓不到 exact ID / SKU. |
 | **Sparse retrieval / BM25** | 关键词匹配 — BM25 算法. 适合 exact match (产品号, 人名). 跟 dense 互补. |
 | **Hybrid retrieval** | Dense + BM25 同时跑, 合并结果. Production-grade RAG 标配, 比单一方法 +10pp recall. |
@@ -388,7 +388,7 @@ Week 1 — PE baseline:
   - "PE-only baseline is 72% accuracy. RAG candidate."
 
 Week 2 — RAG iteration:
-  - Build vector index (Qdrant / Pinecone)
+  - Build vector index (Vertex AI Vector Search / Vertex AI Vector Search)
   - Hybrid retrieval (dense + BM25)
   - Add reranker (bge-reranker / Cohere)
   - Measure lift: 72% → 88%
@@ -659,7 +659,7 @@ print(result)
                                          │          ▼          │
                                          │  ┌───────────────┐  │
                                          │  │  Dense + BM25 │  │
-                                         │  │   (Qdrant)    │  │
+                                         │  │   (Vertex AI Vector Search)    │  │
                                          │  └───────┬───────┘  │
                                          │          ▼          │
                                          │  ┌───────────────┐  │
@@ -715,12 +715,12 @@ print(result)
 
 **架构**:
 - PE: structured prompt, intent → routing → response template
-- RAG: Qdrant + hybrid retrieval + cross-encoder rerank
+- RAG: Vertex AI Vector Search + hybrid retrieval + cross-encoder rerank
 - No FT (考虑过, ruled out because freshness)
 
 **Quantified**:
 - Routing accuracy 70% → 92% (+22pp) — 主要 lift 来自 tool description 改进 (PE) + chunk strategy (RAG), 不是模型升级
-- 月成本 ~$15k (Sonnet 4.6 + Qdrant) vs $37k all-Opus PE-only
+- 月成本 ~$15k (Sonnet 4.6 + Vertex AI Vector Search) vs $37k all-Opus PE-only
 - 4-signal composite confidence allowed escalation policy (PE + calibration)
 
 ### Case B: Voice agent multi-market (FT + PE, no RAG)

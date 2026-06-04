@@ -62,7 +62,7 @@
 <h4>Business semantics (这题特有)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Return rate</strong> ⭐</td><td>退货率. 3 种定义: (a) order count 比, (b) item count 比, (c) dollar amount 比. 必须 clarify.</td></tr><tr><td><strong>Status whitelist vs blacklist</strong></td><td>Whitelist = <code>IN ('COMPLETED', 'SHIPPED')</code> 显式; Blacklist = <code>!= 'CANCELLED'</code> 漏未来新状态. <strong>Whitelist &gt; Blacklist</strong>.</td></tr><tr><td><strong>Sample size guard</strong></td><td><code>orders_total &gt;= 5</code> — 防 1/1 = 100% 噪声. 业务标准.</td></tr><tr><td><strong>Chargeback</strong></td><td>持卡人投诉发卡行强扣 + 罚款. 跟普通 refund 不同.</td></tr><tr><td><strong>Cohort analysis</strong></td><td>按入会季度 / 人群分组看 metric 趋势.</td></tr></tbody></table></div>
 <h4>数据质量 / 工程</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>dbt model</strong></td><td>dbt = data build tool. <code>model.sql</code> + tests, lineage 自动 build. 现代 BI 标准.</td></tr><tr><td><strong><code>pg_stat_statements</code></strong></td><td>PG 扩展, 记录所有 query 统计. 找 top-N 慢查询.</td></tr><tr><td><strong>Read replica</strong></td><td>主库 → 从库. BI 走 replica 不卡 master.</td></tr><tr><td><strong>Columnar OLAP store</strong></td><td>BigQuery / Snowflake / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍.</td></tr><tr><td><strong><code>(1,234.56)</code> 负数表示</strong></td><td>财务报告习惯, 括号 = 负数. Parse 时要识别.</td></tr><tr><td><strong>Currency / FX rates</strong></td><td>多币种不能直接 SUM. 加 <code>fx_rates(date, ccy, rate)</code> JOIN.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>dbt model</strong></td><td>dbt = data build tool. <code>model.sql</code> + tests, lineage 自动 build. 现代 BI 标准.</td></tr><tr><td><strong><code>pg_stat_statements</code></strong></td><td>PG 扩展, 记录所有 query 统计. 找 top-N 慢查询.</td></tr><tr><td><strong>Read replica</strong></td><td>主库 → 从库. BI 走 replica 不卡 master.</td></tr><tr><td><strong>Columnar OLAP store</strong></td><td>BigQuery / BigQuery / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍.</td></tr><tr><td><strong><code>(1,234.56)</code> 负数表示</strong></td><td>财务报告习惯, 括号 = 负数. Parse 时要识别.</td></tr><tr><td><strong>Currency / FX rates</strong></td><td>多币种不能直接 SUM. 加 <code>fx_rates(date, ccy, rate)</code> JOIN.</td></tr></tbody></table></div>
 <hr />
 <h3>这道题在考什么</h3>
 <p>很多人写一个 <code>SELECT customer_id FROM orders JOIN returns ... GROUP BY ... HAVING count(*) &gt; 0.3 * count(*)</code> 就交. 0 分. 真考的是:</p>
@@ -539,7 +539,7 @@ orders (customer_id) [for grouping]      — sort/hash aggregate</code></pre>
 <p>通常 dual report — 两个都展示给 business. SQL 改 <code>WHERE r.return_ts BETWEEN ...</code>.</p>
 <p><strong>Q2</strong>: "1B orders / 100M customers, 你怎么 scale?"</p>
 <p>A:</p>
-<ol><li><strong>Partition orders</strong> by month (range): pruning to last 3 months only</li><li><strong>Materialized view</strong> refresh nightly</li><li><strong>Sharding</strong> by customer_id hash if even 1 quarter doesn't fit</li><li><strong>Columnar store</strong> (BigQuery, Snowflake, ClickHouse) for OLAP workload</li><li><strong>Pre-aggregated table</strong> maintained by streaming job (e.g., Flink consumes Kafka)</li><li><strong>Sample</strong>: business doesn't always need exact — 1% sample give 99% confidence</li></ol>
+<ol><li><strong>Partition orders</strong> by month (range): pruning to last 3 months only</li><li><strong>Materialized view</strong> refresh nightly</li><li><strong>Sharding</strong> by customer_id hash if even 1 quarter doesn't fit</li><li><strong>Columnar store</strong> (BigQuery, BigQuery, ClickHouse) for OLAP workload</li><li><strong>Pre-aggregated table</strong> maintained by streaming job (e.g., Flink consumes Kafka)</li><li><strong>Sample</strong>: business doesn't always need exact — 1% sample give 99% confidence</li></ol>
 <p><strong>Q3</strong>: "What if <code>returns.order_id</code> could be NULL (e.g., bulk return covering multiple orders)?"</p>
 <p>A: Schema bug, 但 defensive:</p>
 <pre class="language-sql"><code class="language-sql">INNER JOIN returns r ON r.order_id = oiq.order_id AND r.order_id IS NOT NULL</code></pre>
@@ -590,7 +590,7 @@ orders (customer_id) [for grouping]      — sort/hash aggregate</code></pre>
 --   - Partition orders by month (RANGE)
 --   - Materialized view + nightly refresh CONCURRENTLY
 --   - Read replica for BI
---   - Columnar OLAP (BigQuery / Snowflake) for ad-hoc
+--   - Columnar OLAP (BigQuery / BigQuery) for ad-hoc
 
 -- Variants:
 --   - Dollar-weighted: SUM(return_amount) / SUM(total_amount)
@@ -720,7 +720,7 @@ orders (customer_id) [for grouping]      — sort/hash aggregate</code></pre>
 | **dbt model** | dbt = data build tool. `model.sql` + tests, lineage 自动 build. 现代 BI 标准. |
 | **`pg_stat_statements`** | PG 扩展, 记录所有 query 统计. 找 top-N 慢查询. |
 | **Read replica** | 主库 → 从库. BI 走 replica 不卡 master. |
-| **Columnar OLAP store** | BigQuery / Snowflake / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍. |
+| **Columnar OLAP store** | BigQuery / BigQuery / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍. |
 | **`(1,234.56)` 负数表示** | 财务报告习惯, 括号 = 负数. Parse 时要识别. |
 | **Currency / FX rates** | 多币种不能直接 SUM. 加 `fx_rates(date, ccy, rate)` JOIN. |
 
@@ -1375,7 +1375,7 @@ A:
 1. **Partition orders** by month (range): pruning to last 3 months only
 2. **Materialized view** refresh nightly
 3. **Sharding** by customer_id hash if even 1 quarter doesn't fit
-4. **Columnar store** (BigQuery, Snowflake, ClickHouse) for OLAP workload
+4. **Columnar store** (BigQuery, BigQuery, ClickHouse) for OLAP workload
 5. **Pre-aggregated table** maintained by streaming job (e.g., Flink consumes Kafka)
 6. **Sample**: business doesn't always need exact — 1% sample give 99% confidence
 
@@ -1480,7 +1480,7 @@ Production: 选 3, 静态 fx rate at-time-of-order, 不会因 fx 浮动改历史
 --   - Partition orders by month (RANGE)
 --   - Materialized view + nightly refresh CONCURRENTLY
 --   - Read replica for BI
---   - Columnar OLAP (BigQuery / Snowflake) for ad-hoc
+--   - Columnar OLAP (BigQuery / BigQuery) for ad-hoc
 
 -- Variants:
 --   - Dollar-weighted: SUM(return_amount) / SUM(total_amount)

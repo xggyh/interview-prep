@@ -73,8 +73,8 @@
 | **RAG (Retrieval-Augmented Generation)** | 检索增强生成 — LLM 先检索内部文档, 再基于文档生成答案 + 引用. 比 fine-tuning 适合企业内部知识. |
 | **Self-hosted vs API** ⭐ | 模型部署模式选择 — 自托管 (数据不离开公司) vs commercial API (数据走 OpenAI/Anthropic). **药企几乎必选 self-hosted**, 是 IP / 法务决策不是技术决策. |
 | **Llama 3.1 70B / Mistral** | 主流 self-host LLM. 这题 likely 选择. |
-| **AWS Bedrock + PrivateLink** | AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择. |
-| **Qdrant / Weaviate (self-hosted)** | 自托管向量数据库. 用 self-hosted 而不是 Pinecone (SaaS) 因为 IP team 不批多租户云服务. |
+| **Vertex AI + PrivateLink** | AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择. |
+| **Vertex AI Vector Search / Weaviate (self-hosted)** | 自托管向量数据库. 用 self-hosted 而不是 Vertex AI Vector Search (SaaS) 因为 IP team 不批多租户云服务. |
 | **Hallucination (幻觉)** | LLM 编造不存在的事实 — 在化学领域 = 编造化合物结构 / 假活性数据. 极危险. |
 | **Citation / provenance** | 每个答案必须引用来源文档. Audit + 合规必需. |
 | **Walking skeleton** | 最薄端到端版本, 每组件可 mock 但流程跑通. **Decomposition 题 MVP 方法论**. |
@@ -255,10 +255,10 @@ This is **NOT** "deploy AI assistant across the company". It's "**get one team u
 - Patent prep notes are in Word docs on individual attorneys' laptops, not in any DB. Defer permanently to v2 if ever.
 
 **Architecture implications**:
-- **Must be self-hosted**: Llama 3 / Mistral / Anthropic claude on AWS Bedrock with PrivateLink (depending on what IP / InfoSec approves)
+- **Must be self-hosted**: Llama 3 / Mistral / Anthropic claude on Vertex AI with PrivateLink (depending on what IP / InfoSec approves)
 - **Likely choice**: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster
 - **Backup model**: smaller (8B) for cost / latency optimization, with re-ranker
-- **Vector DB**: self-hosted (Qdrant / Weaviate), NOT Pinecone (multi-tenant SaaS, IP team won't approve)
+- **Vector DB**: self-hosted (Vertex AI Vector Search / Weaviate), NOT Vertex AI Vector Search (multi-tenant SaaS, IP team won't approve)
 
 ---
 
@@ -385,7 +385,7 @@ After IP team approves the architecture review:
 >
 > **Three things to flag proactively**:
 >
-> **(a) Self-hosted is non-negotiable**. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Pinecone is out, Qdrant / Weaviate self-hosted are in.
+> **(a) Self-hosted is non-negotiable**. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Vertex AI Vector Search is out, Vertex AI Vector Search / Weaviate self-hosted are in.
 >
 > **(b) Trade secret data is DEFERRED**. Pre-filing compound structures + patent prep notes are the highest-risk data and adding them to pilot v1 = repeat of the ChatGPT leak trauma. IP team will block. Defer to v2 after pilot proves architecture.
 >
@@ -575,7 +575,7 @@ Data classification (THE artifact):
 Architecture (IP-forced):
   Self-hosted Llama 3.1 70B or Mistral
   Internal AWS / SageMaker
-  Qdrant / Weaviate self-host (NOT Pinecone)
+  Vertex AI Vector Search / Weaviate self-host (NOT Vertex AI Vector Search)
   PrivateLink, no public internet egress
   Audit log immutable 7 yr
 

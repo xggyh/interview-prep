@@ -182,7 +182,7 @@ on record(item):
    └────────────────────────────────┘
          ↓
    ┌────────────────────────────────┐
-   │  Redis ZSET / DynamoDB           │
+   │  Redis ZSET / Firestore / Bigtable           │
    │  - Query API serves top-K        │
    └────────────────────────────────┘
 ```

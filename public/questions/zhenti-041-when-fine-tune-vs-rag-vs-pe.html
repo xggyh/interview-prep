@@ -52,7 +52,7 @@
 <h4>Fine-tune 子流派</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SFT (Supervised Fine-Tuning)</strong></td><td>标准的监督训练 — 给 (输入, 期望输出) 对, model 学 next-token prediction. FT 最基础形式.</td></tr><tr><td><strong>DPO (Direct Preference Optimization)</strong></td><td>用 (chosen, rejected) 对学偏好. 不需要 reward model, 比 RLHF 简单稳定. 2024+ 主流.</td></tr><tr><td><strong>RLHF (Reinforcement Learning from Human Feedback)</strong></td><td>训 reward model + PPO. 复杂但 quality 上限最高 — Claude / GPT 后训用这个.</td></tr><tr><td><strong>LoRA (Low-Rank Adaptation)</strong></td><td>只训 1-3% 参数, 不动 base model. 比 full FT 便宜 10x + 减少 catastrophic forgetting.</td></tr><tr><td><strong>QLoRA</strong></td><td>4-bit 量化 + LoRA. 单 GPU 也能 FT 70B model.</td></tr><tr><td><strong>PEFT (Parameter-Efficient Fine-Tuning)</strong></td><td>总称 — LoRA / QLoRA / adapter 都属 PEFT. 跟 full FT 对立.</td></tr><tr><td><strong>Catastrophic forgetting</strong></td><td>FT 后 model 把通用能力忘了 — 学新任务太狠, 老任务变笨. 修法: 混 20% general 数据.</td></tr><tr><td><strong>Continued pre-training</strong></td><td>在 base model 上继续 pre-train (无监督), 给 domain 知识. 比 SFT 更"基础", 但贵 + 不稳.</td></tr></tbody></table></div>
 <h4>RAG / 检索 ⭐</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Chunking</strong></td><td>把长文档切成小块. 大小 (256 / 512 / 1024 token) + overlap (overlap 50-100 token 防 cut off) 影响 retrieval 质量.</td></tr><tr><td><strong>Embedding</strong></td><td>把 text → 1024 维向量. 用 cosine similarity 比较相似度. 模型如 text-embedding-3-large / Voyage-3 / BGE-M3.</td></tr><tr><td><strong>Vector DB / 向量数据库</strong></td><td>存 embedding 的数据库 — Qdrant / Pinecone / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速.</td></tr><tr><td><strong>Dense retrieval</strong></td><td>用 embedding 找相似 — 适合 semantic match (paraphrase). 但抓不到 exact ID / SKU.</td></tr><tr><td><strong>Sparse retrieval / BM25</strong></td><td>关键词匹配 — BM25 算法. 适合 exact match (产品号, 人名). 跟 dense 互补.</td></tr><tr><td><strong>Hybrid retrieval</strong></td><td>Dense + BM25 同时跑, 合并结果. Production-grade RAG 标配, 比单一方法 +10pp recall.</td></tr><tr><td><strong>Reranker / cross-encoder</strong></td><td>第二阶段精排. Dense 召回 top-50, cross-encoder 重新打分留 top-10. 模型如 bge-reranker / Cohere Rerank.</td></tr><tr><td><strong>HyDE (Hypothetical Document Embeddings)</strong></td><td>让 LLM 先生成"假想答案", 再用这个答案的 embedding 去检索. 对短查询 / 模糊查询有效.</td></tr><tr><td><strong>Citation</strong></td><td>RAG 输出附"来源是 chunk X". 合规 (medical / legal) 必须有, 也方便 hallucination 排查.</td></tr><tr><td><strong>Long-context</strong></td><td>模型支持的最大 input token. 2026: Gemini 3 Pro 2M / Claude Opus 4.7 1M. 改变了一些 RAG 边界.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Chunking</strong></td><td>把长文档切成小块. 大小 (256 / 512 / 1024 token) + overlap (overlap 50-100 token 防 cut off) 影响 retrieval 质量.</td></tr><tr><td><strong>Embedding</strong></td><td>把 text → 1024 维向量. 用 cosine similarity 比较相似度. 模型如 text-embedding-3-large / Voyage-3 / BGE-M3.</td></tr><tr><td><strong>Vector DB / 向量数据库</strong></td><td>存 embedding 的数据库 — Vertex AI Vector Search / Vertex AI Vector Search / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速.</td></tr><tr><td><strong>Dense retrieval</strong></td><td>用 embedding 找相似 — 适合 semantic match (paraphrase). 但抓不到 exact ID / SKU.</td></tr><tr><td><strong>Sparse retrieval / BM25</strong></td><td>关键词匹配 — BM25 算法. 适合 exact match (产品号, 人名). 跟 dense 互补.</td></tr><tr><td><strong>Hybrid retrieval</strong></td><td>Dense + BM25 同时跑, 合并结果. Production-grade RAG 标配, 比单一方法 +10pp recall.</td></tr><tr><td><strong>Reranker / cross-encoder</strong></td><td>第二阶段精排. Dense 召回 top-50, cross-encoder 重新打分留 top-10. 模型如 bge-reranker / Cohere Rerank.</td></tr><tr><td><strong>HyDE (Hypothetical Document Embeddings)</strong></td><td>让 LLM 先生成"假想答案", 再用这个答案的 embedding 去检索. 对短查询 / 模糊查询有效.</td></tr><tr><td><strong>Citation</strong></td><td>RAG 输出附"来源是 chunk X". 合规 (medical / legal) 必须有, 也方便 hallucination 排查.</td></tr><tr><td><strong>Long-context</strong></td><td>模型支持的最大 input token. 2026: Gemini 3 Pro 2M / Claude Opus 4.7 1M. 改变了一些 RAG 边界.</td></tr></tbody></table></div>
 <h4>评估 / Eval</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Golden set / Eval set</strong></td><td>200-2000 个手标的 (query, expected answer) 对, 用来 measure model 改动.</td></tr><tr><td><strong>LLM-as-judge</strong></td><td>用另一个 LLM 给输出打分. 必须<strong>不同 model</strong>自评 (否则 bias), 必须<strong>校准过</strong> (Cohen's kappa &gt; 0.6).</td></tr><tr><td><strong>Pass@k</strong></td><td>采样 k 次, 至少一次对就算对. Coding eval 常用.</td></tr><tr><td><strong>Brier score</strong></td><td>概率预测校准指标 — predicted 0.9 confidence 时, 实际是不是 90% 对?</td></tr></tbody></table></div>
 <h4>推理 / 部署</h4>
@@ -250,7 +250,7 @@ Week 1 — PE baseline:
   - "PE-only baseline is 72% accuracy. RAG candidate."
 
 Week 2 — RAG iteration:
-  - Build vector index (Qdrant / Pinecone)
+  - Build vector index (Vertex AI Vector Search / Vertex AI Vector Search)
   - Hybrid retrieval (dense + BM25)
   - Add reranker (bge-reranker / Cohere)
   - Measure lift: 72% → 88%
@@ -501,7 +501,7 @@ print(result)
                                          │          ▼          │
                                          │  ┌───────────────┐  │
                                          │  │  Dense + BM25 │  │
-                                         │  │   (Qdrant)    │  │
+                                         │  │   (Vertex AI Vector Search)    │  │
                                          │  └───────┬───────┘  │
                                          │          ▼          │
                                          │  ┌───────────────┐  │
@@ -550,9 +550,9 @@ print(result)
 <h4>Case A: BNPL chatbot — PE + RAG (70 → 92%)</h4>
 <p><strong>为什么不 FT</strong>: FAQ + policy docs 每周更新, FT 会立刻 stale. Re-train 每周 $25k 不经济.</p>
 <p><strong>架构</strong>:</p>
-<ul><li>PE: structured prompt, intent → routing → response template</li><li>RAG: Qdrant + hybrid retrieval + cross-encoder rerank</li><li>No FT (考虑过, ruled out because freshness)</li></ul>
+<ul><li>PE: structured prompt, intent → routing → response template</li><li>RAG: Vertex AI Vector Search + hybrid retrieval + cross-encoder rerank</li><li>No FT (考虑过, ruled out because freshness)</li></ul>
 <p><strong>Quantified</strong>:</p>
-<ul><li>Routing accuracy 70% → 92% (+22pp) — 主要 lift 来自 tool description 改进 (PE) + chunk strategy (RAG), 不是模型升级</li><li>月成本 ~$15k (Sonnet 4.6 + Qdrant) vs $37k all-Opus PE-only</li><li>4-signal composite confidence allowed escalation policy (PE + calibration)</li></ul>
+<ul><li>Routing accuracy 70% → 92% (+22pp) — 主要 lift 来自 tool description 改进 (PE) + chunk strategy (RAG), 不是模型升级</li><li>月成本 ~$15k (Sonnet 4.6 + Vertex AI Vector Search) vs $37k all-Opus PE-only</li><li>4-signal composite confidence allowed escalation policy (PE + calibration)</li></ul>
 <h4>Case B: Voice agent multi-market (FT + PE, no RAG)</h4>
 <p><strong>为什么 FT</strong>: 6 语言 (印尼 / 越南 / 泰国 / 菲律宾 / 巴西 / 墨西哥) 一致的 firm-but-polite collection tone. PE 试过 system prompt + few-shot, 印尼 OK 但越南 / 葡语 inconsistent.</p>
 <p><strong>为什么不 RAG</strong>: Tone 是 style, 不是 facts. Collection policy 每市场静态.</p>
@@ -721,7 +721,7 @@ Quotes for interview:
 |---|---|
 | **Chunking** | 把长文档切成小块. 大小 (256 / 512 / 1024 token) + overlap (overlap 50-100 token 防 cut off) 影响 retrieval 质量. |
 | **Embedding** | 把 text → 1024 维向量. 用 cosine similarity 比较相似度. 模型如 text-embedding-3-large / Voyage-3 / BGE-M3. |
-| **Vector DB / 向量数据库** | 存 embedding 的数据库 — Qdrant / Pinecone / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速. |
+| **Vector DB / 向量数据库** | 存 embedding 的数据库 — Vertex AI Vector Search / Vertex AI Vector Search / Weaviate / Milvus. 支持 ANN (approximate nearest neighbor) 加速. |
 | **Dense retrieval** | 用 embedding 找相似 — 适合 semantic match (paraphrase). 但抓不到 exact ID / SKU. |
 | **Sparse retrieval / BM25** | 关键词匹配 — BM25 算法. 适合 exact match (产品号, 人名). 跟 dense 互补. |
 | **Hybrid retrieval** | Dense + BM25 同时跑, 合并结果. Production-grade RAG 标配, 比单一方法 +10pp recall. |
@@ -1067,7 +1067,7 @@ Week 1 — PE baseline:
   - "PE-only baseline is 72% accuracy. RAG candidate."
 
 Week 2 — RAG iteration:
-  - Build vector index (Qdrant / Pinecone)
+  - Build vector index (Vertex AI Vector Search / Vertex AI Vector Search)
   - Hybrid retrieval (dense + BM25)
   - Add reranker (bge-reranker / Cohere)
   - Measure lift: 72% → 88%
@@ -1338,7 +1338,7 @@ print(result)
                                          │          ▼          │
                                          │  ┌───────────────┐  │
                                          │  │  Dense + BM25 │  │
-                                         │  │   (Qdrant)    │  │
+                                         │  │   (Vertex AI Vector Search)    │  │
                                          │  └───────┬───────┘  │
                                          │          ▼          │
                                          │  ┌───────────────┐  │
@@ -1394,12 +1394,12 @@ print(result)
 
 **架构**:
 - PE: structured prompt, intent → routing → response template
-- RAG: Qdrant + hybrid retrieval + cross-encoder rerank
+- RAG: Vertex AI Vector Search + hybrid retrieval + cross-encoder rerank
 - No FT (考虑过, ruled out because freshness)
 
 **Quantified**:
 - Routing accuracy 70% → 92% (+22pp) — 主要 lift 来自 tool description 改进 (PE) + chunk strategy (RAG), 不是模型升级
-- 月成本 ~$15k (Sonnet 4.6 + Qdrant) vs $37k all-Opus PE-only
+- 月成本 ~$15k (Sonnet 4.6 + Vertex AI Vector Search) vs $37k all-Opus PE-only
 - 4-signal composite confidence allowed escalation policy (PE + calibration)
 
 ### Case B: Voice agent multi-market (FT + PE, no RAG)

@@ -50,7 +50,7 @@
 | **Stripe-style 阶梯 backoff** ⭐ | Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式. |
 | **Thundering herd** | 雷暴 — 多 worker 同时重试导致瞬间洪峰. |
 | **Circuit breaker** | 熔断器 — 错误率高时直接拒绝, 给下游恢复时间. |
-| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念. |
+| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. Cloud Tasks 概念. |
 | **Lease / Leased** | 租约 — task 被 worker 持有的状态. |
 | **Heartbeat** ⭐ | 心跳 — long-running worker 定期续 lease, 防 spurious retry. |
 | **ack / nack** | acknowledge / negative ack — 任务完成 / 失败的通知. |
@@ -77,7 +77,7 @@
 | **Redis Streams** | Redis 5+ 的 stream 数据结构, 100K TPS 量级. |
 | **RabbitMQ** | 经典 AMQP 队列, Erlang 实现. |
 | **Postgres SKIP LOCKED** ⭐ | Postgres 9.5+ 的特性 — `FOR UPDATE SKIP LOCKED` 让多 worker 跳过已锁行. |
-| **SQS (Simple Queue Service)** | AWS 托管队列. |
+| **Cloud Tasks (Simple Queue Service)** | AWS 托管队列. |
 | **Temporal** ⭐ | 工作流编排引擎 (不仅是队列). 长 workflow + state 适合. |
 | **Celery** | Python 经典任务队列库. |
 | **Outbox pattern** | 任务和业务 state 在同一 DB transaction, 后异步 publish. |
@@ -130,7 +130,7 @@
 3. **Retry strategy** — Stripe-style 阶梯 (30s/2m/10m/1h/6h/24h) + jitter, 不是 simple exponential
 4. **Idempotency** — 同一 task 不能跑两次, idempotency key + dedup window
 5. **Per-tenant fair scheduling** — token bucket / weighted fair queueing / per-tenant topic
-6. **Visibility timeout** — worker pick task 后多久没 ack 就 re-deliver, 是 SQS / DLQ 关键
+6. **Visibility timeout** — worker pick task 后多久没 ack 就 re-deliver, 是 Cloud Tasks / DLQ 关键
 7. **Worker heartbeat** — long-running task 怎么续期 visibility, 不被 spurious retry
 8. **Observability** — 卡 task 怎么 debug, lineage 怎么 trace
 9. **菜鸟答案失败点**: "Celery + Redis + retry decorator" — 完全没回答 fairness / priority / DLQ / visibility timeout 这些 真正 production 痛点.
@@ -161,7 +161,7 @@
 | 5 | Retry + DLQ | 10 min | Stripe-style backoff + DLQ structure + manual replay | "Exponential 不够, Stripe 阶梯 + jitter, 8 attempts → DLQ" |
 | 6 | Idempotency + visibility | 8 min | Idempotency key + visibility timeout + heartbeat | "Idempotency key in payload, visibility 5min default, heartbeat for long" |
 | 7 | Multi-tenant fairness | 6 min | Per-tenant queue + weighted fair scheduling | "Per-tenant topic + WFQ dispatcher" |
-| 8 | Trade-offs + close | 7 min | Build vs Temporal / SQS / Cloud queue | "10K TPS 我们自建 OK, > 100K 就 Kafka. Temporal 是补充不是替代" |
+| 8 | Trade-offs + close | 7 min | Build vs Temporal / Cloud Tasks / Cloud queue | "10K TPS 我们自建 OK, > 100K 就 Kafka. Temporal 是补充不是替代" |
 
 ---
 
@@ -308,7 +308,7 @@ Non-functional:
 | RabbitMQ | 50K TPS | OK | Native | OK | Medium | Classic but aging |
 | Redis Streams | 100K TPS | OK | Sorted set | OK | Low | New-ish, Redis 6+ |
 | Postgres SKIP LOCKED | 10-30K TPS | Great | SQL ORDER BY | Easy (group by tenant) | Low | DB-coupled, simple |
-| AWS SQS | 30K TPS | OK | Multi-queue + priority pattern | Per-queue | None | Managed, vendor lock |
+| Cloud Tasks / Pub/Sub | 30K TPS | OK | Multi-queue + priority pattern | Per-queue | None | Managed, vendor lock |
 | Temporal | 10K TPS | Excellent (durable workflow) | Built-in | Built-in | Medium | Workflow not queue |
 
 **我推**: Postgres SKIP LOCKED + Redis (sorted set for fast peek) hybrid.
@@ -330,8 +330,8 @@ Non-functional:
 - 没有 native idempotency
 - Cluster failover 历史上 painful
 
-**Why not SQS**:
-- 如果客户用 AWS 唯一, SQS 是好选项
+**Why not Cloud Tasks**:
+- 如果客户用 AWS 唯一, Cloud Tasks 是好选项
 - 但 visibility timeout max 12h 限制
 - 没有 native per-tenant fairness (需要 multi-queue)
 - 不 portable
@@ -759,16 +759,16 @@ VIP 客户可能要 dedicated worker pool:
 
 我推: queue 做 stateless task (90% case), Temporal 做 long workflow (10%). Two systems coexist.
 
-**Decision 8.3 — vs SQS / Cloud Tasks**
+**Decision 8.3 — vs Cloud Tasks / Cloud Tasks**
 
-| 维度 | Self-host | SQS |
+| 维度 | Self-host | Cloud Tasks |
 |---|---|---|
 | Ops | We run | Managed |
-| Cost @ 10K TPS | Postgres $1K/m + Redis $500/m + ops | SQS $4K/m |
+| Cost @ 10K TPS | Postgres $1K/m + Redis $500/m + ops | Cloud Tasks $4K/m |
 | Customization | Full | Limited (priority is hack) |
 | Vendor | None | AWS |
 
-If on AWS and < 50K TPS, SQS is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.
+If on AWS and < 50K TPS, Cloud Tasks is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.
 
 **Decision 8.4 — Visibility timeout strategy**
 
@@ -817,7 +817,7 @@ If on AWS and < 50K TPS, SQS is no-brainer. 我们 self-host because cross-cloud
 
 **Redis** (sorted sets per tenant):
 - 200 tenant × avg 10K ready tasks × 100B per entry = 200MB hot
-- ElastiCache cache.r6g.large × 2 (HA): $250/month
+- Memorystore cache.r6g.large × 2 (HA): $250/month
 
 **Workers**:
 - Avg task 1s, 10K TPS → 10K workers concurrent
@@ -919,7 +919,7 @@ reframe: "我在字节做 BNPL refund 时本质就是 task queue + retry + DLQ +
 ```
 Backing store: Postgres SKIP LOCKED + Redis (sorted set, dedup)
               Aurora db.r6g.4xlarge × 3 = $2K/m
-              ElastiCache r6g.large × 2 = $250/m
+              Memorystore r6g.large × 2 = $250/m
 
 Capability mapping:
   Priority:     ORDER BY priority, scheduled_at
@@ -958,7 +958,7 @@ vs alternatives:
   Kafka: 100K+ TPS but bad for 10min tasks (HOL block)
   Redis Streams: 100K TPS, less durable
   Temporal: workflow > queue, use for multi-step
-  SQS: managed but no native priority/fairness
+  Cloud Tasks: managed but no native priority/fairness
 
 SLO:
   99.95% availability

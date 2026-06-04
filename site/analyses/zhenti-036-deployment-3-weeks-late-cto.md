@@ -71,7 +71,7 @@
 
 | 术语 | 解释 |
 |---|---|
-| **Snowflake cluster** | Snowflake 云数仓 — 这题集成对象, 出权限问题. |
+| **BigQuery cluster** | BigQuery 云数仓 — 这题集成对象, 出权限问题. |
 | **Data governance committee** | 数据治理委员会 — 客户内部审批组织, biweekly meeting 是 bottleneck. |
 | **Inference latency** | 推理延迟 — LLM 部署的关键性能指标. 这题超 spec 3x. |
 | **Prompt strategy / Routing model** | 提示策略 / 路由模型 — mitigation 提到的技术手段, 用小模型先 route 减少大模型调用. |
@@ -126,7 +126,7 @@
 >
 > **We're slipping the deployment by 3 weeks. New target is June 15th, was May 25th.**
 >
-> Two reasons. First, the data integration with your **Snowflake cluster ran into a permissions issue** that took us 9 business days to resolve — we hit it 2 weeks in, your team and ours were aligned on root cause within 48 hours but **the actual unblock required your data governance committee's approval** which has biweekly meetings. Second, we discovered the **inference latency was 3x our spec** on your particular query mix and we rebuilt the prompt strategy and added a smaller routing model — that took another 6 business days.
+> Two reasons. First, the data integration with your **BigQuery cluster ran into a permissions issue** that took us 9 business days to resolve — we hit it 2 weeks in, your team and ours were aligned on root cause within 48 hours but **the actual unblock required your data governance committee's approval** which has biweekly meetings. Second, we discovered the **inference latency was 3x our spec** on your particular query mix and we rebuilt the prompt strategy and added a smaller routing model — that took another 6 business days.
 >
 > **The impact on your Q3 product launch**: 3 weeks slips your soft-launch from May 30th to June 22nd. Your hard-launch on July 15th is still on track. I want to be honest — **the soft-launch slip is real and I won't pretend it's minor**.
 >
@@ -148,7 +148,7 @@
 >
 > What's your reaction? What questions do you have? I'd rather hear them now than later."
 
-**中文意思**: "Mark, 我直说, 因为我知道你时间宝贵. 我打这个电话就是来汇报坏消息的. **部署要延期 3 周. 新目标是 6 月 15 号, 原定是 5 月 25 号**. 两个原因. 第一, 跟你们 Snowflake 集群的数据集成踩到了一个权限问题, 我们花了 9 个工作日才解决 — 我们 2 周时碰到的, 你们团队和我们 48 小时内就对齐了根因, 但 **真正解锁要你们数据治理委员会批准**, 而他们是 biweekly (每两周一次) 开会. 第二, 我们发现在你们具体的 query mix 上 **推理延迟比 spec 高 3 倍**, 我们重写了 prompt 策略 + 加了一个更小的 routing model, 又用了 6 个工作日. **对你们 Q3 产品发布的影响**: 软发布从 5 月 30 → 6 月 22. 硬发布 7 月 15 不变. 我想说实话 — **软发布的滑期是真的, 我不会装作不是大事**. **从今天开始动起来的事**: 1. **我亲自接管跟你们数据治理团队的 daily standup**, 不再是 biweekly 的瓶颈, 这周五已经口头同意了一个加急审批 session. 2. 加了一位 senior engineer (Sarah, 我们 infra lead) 接下来 3 周全职做你这个 account, 昨天已经开始. 3. **每天太平洋时间下午 4 点我会发一份 5 行的 daily status 邮件**, 一直到上线, 你不用问. **我对 6 月 15 号有 80% 把握**. 剩下的风险是数据治理审批 — 如果周五没批下来, 就还要再加 2 周, 我会当天告诉你. **我需要你做两件事**: 1. **周五的数据治理 session** — 你的 sponsor 得帮我们抢这个 slot, 你今天下午能打个电话吗? 2. 如果要往你们组织内部 escalate, 应该找谁? 你的反应是? 有什么问题? 我宁愿现在听, 不要后面听."
+**中文意思**: "Mark, 我直说, 因为我知道你时间宝贵. 我打这个电话就是来汇报坏消息的. **部署要延期 3 周. 新目标是 6 月 15 号, 原定是 5 月 25 号**. 两个原因. 第一, 跟你们 BigQuery 集群的数据集成踩到了一个权限问题, 我们花了 9 个工作日才解决 — 我们 2 周时碰到的, 你们团队和我们 48 小时内就对齐了根因, 但 **真正解锁要你们数据治理委员会批准**, 而他们是 biweekly (每两周一次) 开会. 第二, 我们发现在你们具体的 query mix 上 **推理延迟比 spec 高 3 倍**, 我们重写了 prompt 策略 + 加了一个更小的 routing model, 又用了 6 个工作日. **对你们 Q3 产品发布的影响**: 软发布从 5 月 30 → 6 月 22. 硬发布 7 月 15 不变. 我想说实话 — **软发布的滑期是真的, 我不会装作不是大事**. **从今天开始动起来的事**: 1. **我亲自接管跟你们数据治理团队的 daily standup**, 不再是 biweekly 的瓶颈, 这周五已经口头同意了一个加急审批 session. 2. 加了一位 senior engineer (Sarah, 我们 infra lead) 接下来 3 周全职做你这个 account, 昨天已经开始. 3. **每天太平洋时间下午 4 点我会发一份 5 行的 daily status 邮件**, 一直到上线, 你不用问. **我对 6 月 15 号有 80% 把握**. 剩下的风险是数据治理审批 — 如果周五没批下来, 就还要再加 2 周, 我会当天告诉你. **我需要你做两件事**: 1. **周五的数据治理 session** — 你的 sponsor 得帮我们抢这个 slot, 你今天下午能打个电话吗? 2. 如果要往你们组织内部 escalate, 应该找谁? 你的反应是? 有什么问题? 我宁愿现在听, 不要后面听."
 
 → **3 minutes flat**. Then shut up. (3 分钟讲完, 然后闭嘴.)
 

@@ -44,7 +44,7 @@
 | **Kafka** | LinkedIn 开源的分布式消息队列 — 高吞吐 + 持久. 适合 5000+ TPS. 自托管 ops 重. |
 | **Apache Pulsar** | Yahoo 开源 — Kafka 的竞争对手, multi-tenancy 更好. Gao Xin Brazil 项目用过. |
 | **RabbitMQ** | 经典消息队列 — 比 Kafka 轻量, 适合中等 scale. |
-| **SQS (Simple Queue Service)** | AWS 托管消息队列 — 0 ops, pay-per-use. 替代 Kafka 的轻方案. |
+| **Cloud Tasks (Simple Queue Service)** | AWS 托管消息队列 — 0 ops, pay-per-use. 替代 Kafka 的轻方案. |
 | **MSK (Managed Streaming for Kafka)** | AWS 托管 Kafka — 不自己运维 cluster. |
 | **K8s (Kubernetes)** ⭐ | 容器编排系统 — 部署微服务必备. 自运维 K8s 集群 = 高 ops 成本. |
 | **On-prem (On-premises)** ⭐ | 本地部署 — 自己机房 / 自己机器. 跟 cloud-managed 相反. |
@@ -53,7 +53,7 @@
 | **RDS (Relational Database Service)** | AWS 托管 Postgres / MySQL — 自动 backup + patch + DR. |
 | **Read replicas** | 读副本 — Postgres scale 的标准方法, 不需要拆 microservices. |
 | **Partitioning / Sharding** | 分区 / 分片 — Postgres scale 的另一标准方法. |
-| **Worker queue / Job queue** | 异步任务队列 — 不一定要 Kafka, SQS / RabbitMQ 都行. |
+| **Worker queue / Job queue** | 异步任务队列 — 不一定要 Kafka, Cloud Tasks / RabbitMQ 都行. |
 
 ### 架构决策维度
 
@@ -72,7 +72,7 @@
 | 术语 | 解释 |
 |---|---|
 | **InfoSec (信息安全部)** | 客户的 InfoSec 部门 — 通常更保守, 偏好 on-prem (但常基于过时认知). |
-| **AWS managed services** | AWS 托管服务 — RDS, MSK, SQS, etc. 比 self-host 合规更强 (SOC2, FedRAMP, HIPAA). |
+| **AWS managed services** | AWS 托管服务 — RDS, MSK, Cloud Tasks, etc. 比 self-host 合规更强 (SOC2, FedRAMP, HIPAA). |
 | **SOC2 / FedRAMP / HIPAA** | 三种主流合规标准. AWS managed services 通常都过. |
 | **DR (Disaster Recovery)** | 灾备恢复 — managed services 自动处理. |
 | **Patching** | 打补丁 — managed services 自动. Self-host 自己来. |
@@ -203,7 +203,7 @@
 >
 > **An alternative I'd consider**:
 >
-> **Phase 1 (now)**: Monolith + Postgres + managed worker queue (SQS / managed Kafka). Ship in 4 weeks. Handle 50 TPS easily, scale to 500 TPS.
+> **Phase 1 (now)**: Monolith + Postgres + managed worker queue (Cloud Tasks / managed Kafka). Ship in 4 weeks. Handle 50 TPS easily, scale to 500 TPS.
 >
 > **Phase 2 (when scale demands)**: If 5000+ TPS materializes, then extract the hot services into microservices. **Migrating monolith → microservices is well-tooled and predictable**. Not zero cost, but **deferring complexity until you need it**.
 >
@@ -211,7 +211,7 @@
 >
 > **But — your call. You have context I don't.**"
 
-**中文意思**: "**不是 '应该' — 那是你的决定**. 但让我分享我会考虑的: **关于 10x scale**: 50 TPS 的 10x 是 500 TPS. **如果 workload 跟今天类似, Postgres + 一个 worker queue 轻松扛 500 TPS**. **Kafka + microservices** 通常在 **5000+ TPS** 才合理. **你 10x 的目标可能不需要 microservices**. 除非 10x 同时伴随 **本质形态变化** (新模式、新数据类型、不同延迟目标), 配合 read replicas 和 partitioning, monolith 能 scale 到几千 TPS. **关于 40% platform 带宽**: 那是巨大的成本. 4 个 engineer 的 40% = 永远 1.6 个 engineer 在做运维. 如果我们 ship monolith + managed services, 那 1.6 个 engineer 做 feature. **18 个月下来, 那是大约 24 个 engineer-month 的 feature 工作**. **关于 2 年前的 InfoSec review**: 我会让他们重新评估. AWS managed services 变化很大. 决策应该基于当前能力, 不是 2 年前的 context. **如果他们重评后还是偏好 on-prem, 那是有效答案**. 但 review 值得做. **我会考虑的替代**: **Phase 1 (现在)**: Monolith + Postgres + managed worker queue (SQS / managed Kafka). 4 周能上. 轻松扛 50 TPS, scale 到 500 TPS. **Phase 2 (scale 需要时)**: 如果 5000+ TPS 真的来了, 把热点服务抽成 microservices. **monolith → microservices 的迁移工具成熟、可预测**. 不是 0 成本, 但 **把复杂度推迟到你需要时再付**. **我不在主张的**: microservices 是错的. **对 5000+ TPS 系统它是对的**. 我主张的是 **复杂度是为未来买的, 不是为今天, 你可以延迟这笔付款**. **但 — 你的决定. 你有我没有的 context**."
+**中文意思**: "**不是 '应该' — 那是你的决定**. 但让我分享我会考虑的: **关于 10x scale**: 50 TPS 的 10x 是 500 TPS. **如果 workload 跟今天类似, Postgres + 一个 worker queue 轻松扛 500 TPS**. **Kafka + microservices** 通常在 **5000+ TPS** 才合理. **你 10x 的目标可能不需要 microservices**. 除非 10x 同时伴随 **本质形态变化** (新模式、新数据类型、不同延迟目标), 配合 read replicas 和 partitioning, monolith 能 scale 到几千 TPS. **关于 40% platform 带宽**: 那是巨大的成本. 4 个 engineer 的 40% = 永远 1.6 个 engineer 在做运维. 如果我们 ship monolith + managed services, 那 1.6 个 engineer 做 feature. **18 个月下来, 那是大约 24 个 engineer-month 的 feature 工作**. **关于 2 年前的 InfoSec review**: 我会让他们重新评估. AWS managed services 变化很大. 决策应该基于当前能力, 不是 2 年前的 context. **如果他们重评后还是偏好 on-prem, 那是有效答案**. 但 review 值得做. **我会考虑的替代**: **Phase 1 (现在)**: Monolith + Postgres + managed worker queue (Cloud Tasks / managed Kafka). 4 周能上. 轻松扛 50 TPS, scale 到 500 TPS. **Phase 2 (scale 需要时)**: 如果 5000+ TPS 真的来了, 把热点服务抽成 microservices. **monolith → microservices 的迁移工具成熟、可预测**. 不是 0 成本, 但 **把复杂度推迟到你需要时再付**. **我不在主张的**: microservices 是错的. **对 5000+ TPS 系统它是对的**. 我主张的是 **复杂度是为未来买的, 不是为今天, 你可以延迟这笔付款**. **但 — 你的决定. 你有我没有的 context**."
 
 → Specific concerns + alternative offered. **Then immediately re-assert their authority**. (具体顾虑 + 替代方案. **然后立刻把决定权交回他们**.)
 
@@ -260,7 +260,7 @@
 >
 > 2. **Pressure-test the 10x assumption with your business team**: is it really 10x at 500 TPS, or 10x at 5000+ TPS? Make sure you have shape clarity.
 >
-> 3. **If InfoSec OK with managed services + scale target is 500 TPS-ish**: monolith + Postgres + SQS for v1. Migrate to microservices if and when scale actually demands.
+> 3. **If InfoSec OK with managed services + scale target is 500 TPS-ish**: monolith + Postgres + Cloud Tasks for v1. Migrate to microservices if and when scale actually demands.
 >
 > 4. **If InfoSec mandates on-prem or scale is genuinely 5000+ TPS**: stick with your current architecture, but **I'd argue for fewer microservices to start** — maybe 2-3 services instead of 6. Easier ops, can split further later.
 >
@@ -276,7 +276,7 @@
 >
 > I'll wait. **Whatever you and your team decide, we'll execute on it well**."
 
-**中文意思**: "**我的建议**: 1. **让 InfoSec 重新评估 managed services**: 1 周. 如果他们还说 on-prem, 那就约束了答案. 2. **跟你 business team 压力测试 10x 假设**: 真的是 500 TPS 的 10x, 还是 5000+ TPS 的 10x? 确保你对 shape 清晰. 3. **如果 InfoSec 接受 managed services + scale 目标在 500 TPS 左右**: v1 用 monolith + Postgres + SQS. 真的 scale 来了再迁 microservices. 4. **如果 InfoSec 强制 on-prem 或者 scale 真的是 5000+ TPS**: 维持你当前架构, 但 **我会主张一开始 microservices 数量少一些** — 也许 2-3 个服务而不是 6 个. 运维更容易, 后面可以再拆. **我不在做的**: 告诉你我的架构对、你的错. **你的业务、团队、过去项目、政治 context 都比我了解**. **你和团队决定哪个**, 我的工作就是把它 ship 好. **我在做的**: 确保你有完整信息做决定. **如果你已经评估过我的 3 个顾虑, 答案还是 microservices on-prem, 那是个好答案 — 我只想确认我们一起评估过**. **我需要你做**: 1. **下周二前**: InfoSec 重评决定 (yes/no) 2. **下周五前**: scale 目标确认 (500 TPS 还是 5000+) 3. **再下周二前**: 最终架构决定 我会等. **不管你和团队决定什么, 我们都会执行得好**."
+**中文意思**: "**我的建议**: 1. **让 InfoSec 重新评估 managed services**: 1 周. 如果他们还说 on-prem, 那就约束了答案. 2. **跟你 business team 压力测试 10x 假设**: 真的是 500 TPS 的 10x, 还是 5000+ TPS 的 10x? 确保你对 shape 清晰. 3. **如果 InfoSec 接受 managed services + scale 目标在 500 TPS 左右**: v1 用 monolith + Postgres + Cloud Tasks. 真的 scale 来了再迁 microservices. 4. **如果 InfoSec 强制 on-prem 或者 scale 真的是 5000+ TPS**: 维持你当前架构, 但 **我会主张一开始 microservices 数量少一些** — 也许 2-3 个服务而不是 6 个. 运维更容易, 后面可以再拆. **我不在做的**: 告诉你我的架构对、你的错. **你的业务、团队、过去项目、政治 context 都比我了解**. **你和团队决定哪个**, 我的工作就是把它 ship 好. **我在做的**: 确保你有完整信息做决定. **如果你已经评估过我的 3 个顾虑, 答案还是 microservices on-prem, 那是个好答案 — 我只想确认我们一起评估过**. **我需要你做**: 1. **下周二前**: InfoSec 重评决定 (yes/no) 2. **下周五前**: scale 目标确认 (500 TPS 还是 5000+) 3. **再下周二前**: 最终架构决定 我会等. **不管你和团队决定什么, 我们都会执行得好**."
 
 ---
 

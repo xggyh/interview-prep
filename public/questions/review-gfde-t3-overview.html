@@ -72,7 +72,7 @@
 <p><strong>Sub-topic 4: Observability (4 layers)</strong></p>
 <ul><li>When: 任何 production LLM, 必装</li><li>Algorithm: L1 OTel trace, L2 LLM trace (LangSmith), L3 cost track, L4 eval-in-prod</li><li>Trade-off: 100% sample $$$$$, tail-based sample 1% baseline + 100% slow/error</li><li>Tools: OpenTelemetry, Honeycomb, Datadog, Tempo, LangSmith, Phoenix, Helicone, Langfuse, Braintrust, Presidio (PII)</li></ul>
 <p><strong>Sub-topic 5: Rate Limit / Queue / Cache (4-layer cost defense)</strong></p>
-<ul><li>When: 100K+ QPS / multi-tenant / cost runaway risk</li><li>Algorithm: cache → priority queue → token bucket rate → cost-aware route</li><li>Trade-off: 8-12x cost ↓ blended, 但 cache wrong-hit 是 silent kill</li><li>Tools: Redis Lua atomic, Pinecone semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router</li></ul>
+<ul><li>When: 100K+ QPS / multi-tenant / cost runaway risk</li><li>Algorithm: cache → priority queue → token bucket rate → cost-aware route</li><li>Trade-off: 8-12x cost ↓ blended, 但 cache wrong-hit 是 silent kill</li><li>Tools: Redis Lua atomic, Vertex AI Vector Search semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router</li></ul>
 <p><strong>Sub-topic 6: Eventual Consistency (3 patterns)</strong></p>
 <ul><li>When: agent multi-step 跨 vendor 副作用</li><li>Algorithm: Saga (&lt; 5 步), Outbox (cross-service no framework), Workflow engine (5+ 步)</li><li>Trade-off: Temporal lock-in vs handroll bug-prone</li><li>Tools: <strong>Temporal</strong>, <strong>DBOS</strong>, Inngest, Kafka outbox, Postgres SELECT FOR UPDATE SKIP LOCKED, Stripe Idempotency-Key</li></ul>
 <h4>🌳 关键决策树 (ASCII)</h4>
@@ -105,7 +105,7 @@ Consistency pattern?
 TP=8 needed when model &gt; 80GB FP8</code></pre>
 <p><strong>Framework 2: 4-Layer Observability</strong></p>
 <ul><li>L1 OTel trace: span.attr llm.model, input_tokens, cost_usd, prompt_template_version</li><li>L2 LLM logs: prompt + completion (PII-redacted), tool calls, eval scores</li><li>L3 Cost: per-(user,feature,model)/day; daily/monthly tenant report</li><li>L4 Eval: 5% sample LLM-judge + force-flag, drift MMD test daily</li><li>Sampling: 1% baseline + 100% error/slow/expensive/VIP/jailbreak</li></ul>
-<p><strong>Framework 3: 4-Layer Cost Defense</strong> | Layer | Saving | Mechanism | |---|---|---| | L1 Cache (exact + semantic + prefix) | 30-50% | Pinecone 0.95 + vLLM block share | | L2 Queue (priority/tenant) | 0% (SLA保) | Redis sorted set, gold = score×1e10 | | L3 Rate limit | 0% (防滥用) | Token bucket per user/tenant/model | | L4 Cost-aware routing | 5-6x | 70% Flash + 25% Pro + 5% Opus | | Combined | <strong>8-12x</strong> | $5/1M → $0.5-0.85/1M blended |</p>
+<p><strong>Framework 3: 4-Layer Cost Defense</strong> | Layer | Saving | Mechanism | |---|---|---| | L1 Cache (exact + semantic + prefix) | 30-50% | Vertex AI Vector Search 0.95 + vLLM block share | | L2 Queue (priority/tenant) | 0% (SLA保) | Redis sorted set, gold = score×1e10 | | L3 Rate limit | 0% (防滥用) | Token bucket per user/tenant/model | | L4 Cost-aware routing | 5-6x | 70% Flash + 25% Pro + 5% Opus | | Combined | <strong>8-12x</strong> | $5/1M → $0.5-0.85/1M blended |</p>
 <p><strong>Framework 4: 3 Consistency Patterns</strong> | Pattern | When | Code skeleton | |---|---|---| | Saga | &lt; 5 步 + clear undo | try forward; except: reverse compensate | | Outbox | cross-service | tx { biz + outbox.insert }; worker poll FOR UPDATE SKIP LOCKED | | Workflow ⭐ | 5+ / long / audit | @workflow.defn + execute_activity retry_policy |</p>
 <h4>🔥 Production gotchas (top 15)</h4>
 <ol><li><strong>Cost runaway</strong>: Agent infinite self-call → per-session cap $1 + max 10 iter + auto-stop</li><li><strong>Timeout propagation</strong>: 30s outer &lt; 25s LLM call → deadline header passed downstream</li><li><strong>Provider 429</strong>: OpenAI burst limit → multi-provider failover (OpenAI → Anthropic → self-host vLLM)</li><li><strong>KV cache thrash</strong>: 每 req new conv → 0 prefix hit → 必须 stable system prompt + sticky route</li><li><strong>Streaming interrupt</strong>: client 断连 → resumable token anchor or full retry idempotent</li><li><strong>Log explosion</strong>: 100K QPS × full prompt = TB/day → sample + redact + tier storage</li><li><strong>PII in prompt</strong>: 用户粘信用卡 → Presidio NER redact before LLM call + log</li><li><strong>Cache poisoning</strong>: 1 bad response 服万人 → eval-gated cache write + invalidate API</li><li><strong>Tenant isolation</strong>: tenant A 的 cache hit tenant B → per-tenant namespace + RLS</li><li><strong>Eval drift</strong>: prompt 改 12% faithfulness 掉 → pre-deploy eval gate + 7-day MMD</li><li><strong>Provider deprecation</strong>: gpt-4 EOL → multi-model eval + abstract via gateway</li><li><strong>Workflow stuck</strong>: 等 human forever → time-bound waits + escalation</li><li><strong>Cost dashboard 错</strong>: 忘算 cached input → 用 provider response.usage 不是 estimate</li><li><strong>Spec decoding accept &lt; 50%</strong>: 关掉, overhead &gt; 收益</li><li><strong>TP &gt; node</strong>: 跨 node 通信 kill perf, 70B FP8 single-node 8×H100 sweet spot</li></ol>
@@ -126,7 +126,7 @@ TP=8 needed when model &gt; 80GB FP8</code></pre>
 35-42  Failure    至少 3 个 gotcha: cost runaway / timeout propagate / eval drift
 42-45  Resume     "On voice agent / BNPL / Indonesia refund / Internal Agent Platform"</code></pre>
 <h4>🧰 2026 工具生态 quick lookup</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认选择</th><th>Alt</th><th>你简历用过</th></tr></thead><tbody><tr><td>Inference engine</td><td>vLLM 0.6+</td><td>SGLang, TensorRT-LLM</td><td>✅ vLLM, SGLang</td></tr><tr><td>Training framework</td><td>Megatron-LM + DeepSpeed</td><td>FSDP, Colossal-AI</td><td>✅ DeepSpeed</td></tr><tr><td>LLM proxy router</td><td>LiteLLM</td><td>OpenRouter, Portkey</td><td>自建</td></tr><tr><td>Workflow engine</td><td>Temporal</td><td>DBOS, Inngest</td><td>✅ Temporal</td></tr><tr><td>Observability (trace)</td><td>OpenTelemetry → Honeycomb/Datadog</td><td>Tempo, Jaeger</td><td>✅ OTel</td></tr><tr><td>LLM-specific obs</td><td>LangSmith</td><td>Phoenix, Helicone, Langfuse, Braintrust</td><td>✅ LangSmith</td></tr><tr><td>Vector DB</td><td>Pinecone</td><td>Qdrant, Milvus, Weaviate</td><td>✅ Pinecone</td></tr><tr><td>Cache</td><td>Redis Cluster</td><td>DragonFly, KeyDB</td><td>✅ Redis</td></tr><tr><td>Queue</td><td>Kafka</td><td>NATS, RabbitMQ</td><td>✅ Kafka</td></tr><tr><td>Service mesh</td><td>Envoy</td><td>Istio, Linkerd</td><td>✅ Envoy</td></tr><tr><td>PII redaction</td><td>Microsoft Presidio</td><td>AWS Macie</td><td>✅ Presidio</td></tr><tr><td>Eval suite</td><td>Braintrust</td><td>OpenAI Evals, Anthropic Evals</td><td>自建</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认选择</th><th>Alt</th><th>你简历用过</th></tr></thead><tbody><tr><td>Inference engine</td><td>vLLM 0.6+</td><td>SGLang, TensorRT-LLM</td><td>✅ vLLM, SGLang</td></tr><tr><td>Training framework</td><td>Megatron-LM + DeepSpeed</td><td>FSDP, Colossal-AI</td><td>✅ DeepSpeed</td></tr><tr><td>LLM proxy router</td><td>LiteLLM</td><td>OpenRouter, Portkey</td><td>自建</td></tr><tr><td>Workflow engine</td><td>Temporal</td><td>DBOS, Inngest</td><td>✅ Temporal</td></tr><tr><td>Observability (trace)</td><td>OpenTelemetry → Honeycomb/Datadog</td><td>Tempo, Jaeger</td><td>✅ OTel</td></tr><tr><td>LLM-specific obs</td><td>LangSmith</td><td>Phoenix, Helicone, Langfuse, Braintrust</td><td>✅ LangSmith</td></tr><tr><td>Vector DB</td><td>Vertex AI Vector Search</td><td>Vertex AI Vector Search, Milvus, Weaviate</td><td>✅ Vertex AI Vector Search</td></tr><tr><td>Cache</td><td>Redis Cluster</td><td>DragonFly, KeyDB</td><td>✅ Redis</td></tr><tr><td>Queue</td><td>Kafka</td><td>NATS, RabbitMQ</td><td>✅ Kafka</td></tr><tr><td>Service mesh</td><td>Envoy</td><td>Istio, Linkerd</td><td>✅ Envoy</td></tr><tr><td>PII redaction</td><td>Microsoft Presidio</td><td>AWS Macie</td><td>✅ Presidio</td></tr><tr><td>Eval suite</td><td>Braintrust</td><td>OpenAI Evals, Anthropic Evals</td><td>自建</td></tr></tbody></table></div>
 <h4>🔢 关键 production 数字 (记下来)</h4>
 <ul><li>HF Transformers baseline: 5-10 QPS / A100 (8B)</li><li>vLLM full stack: 200-600 QPS / A100 (8B) — 50-60x baseline</li><li>TTFT target: voice 280ms / chat 800ms / batch 2-5s</li><li>Semantic cache hit rate: FAQ 30-50% / general chatbot 15-25%</li><li>Prefix cache (vLLM with conv_id hint + sticky): 80-85%</li><li>Anthropic prompt cache discount: 90% off cached input (1h TTL)</li><li>Spec decoding accept rate sweet spot: 70-80%</li><li>FP8 quality drop: &lt; 0.5% (sweet spot 2026)</li><li>INT4 (AWQ) quality drop: 2-5% (consumer chatbot OK, legal/medical 不行)</li><li>70B FP8: TP=8 single node 8×H100 80GB sweet spot</li><li>Indonesia refund: 156K processed, 1.9% verify-on-timeout, 0 double-refund</li></ul>
 <h4>🧠 mental model anchors (背一句话)</h4>
@@ -254,7 +254,7 @@ LLM system 是「30s/req + $0.01-1/req + 非确定输出 + 1 req → N downstrea
 - When: 100K+ QPS / multi-tenant / cost runaway risk
 - Algorithm: cache → priority queue → token bucket rate → cost-aware route
 - Trade-off: 8-12x cost ↓ blended, 但 cache wrong-hit 是 silent kill
-- Tools: Redis Lua atomic, Pinecone semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router
+- Tools: Redis Lua atomic, Vertex AI Vector Search semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router
 
 **Sub-topic 6: Eventual Consistency (3 patterns)**
 - When: agent multi-step 跨 vendor 副作用
@@ -308,7 +308,7 @@ TP=8 needed when model > 80GB FP8
 **Framework 3: 4-Layer Cost Defense**
 | Layer | Saving | Mechanism |
 |---|---|---|
-| L1 Cache (exact + semantic + prefix) | 30-50% | Pinecone 0.95 + vLLM block share |
+| L1 Cache (exact + semantic + prefix) | 30-50% | Vertex AI Vector Search 0.95 + vLLM block share |
 | L2 Queue (priority/tenant) | 0% (SLA保) | Redis sorted set, gold = score×1e10 |
 | L3 Rate limit | 0% (防滥用) | Token bucket per user/tenant/model |
 | L4 Cost-aware routing | 5-6x | 70% Flash + 25% Pro + 5% Opus |
@@ -410,7 +410,7 @@ TP=8 needed when model > 80GB FP8
 | Workflow engine | Temporal | DBOS, Inngest | ✅ Temporal |
 | Observability (trace) | OpenTelemetry → Honeycomb/Datadog | Tempo, Jaeger | ✅ OTel |
 | LLM-specific obs | LangSmith | Phoenix, Helicone, Langfuse, Braintrust | ✅ LangSmith |
-| Vector DB | Pinecone | Qdrant, Milvus, Weaviate | ✅ Pinecone |
+| Vector DB | Vertex AI Vector Search | Vertex AI Vector Search, Milvus, Weaviate | ✅ Vertex AI Vector Search |
 | Cache | Redis Cluster | DragonFly, KeyDB | ✅ Redis |
 | Queue | Kafka | NATS, RabbitMQ | ✅ Kafka |
 | Service mesh | Envoy | Istio, Linkerd | ✅ Envoy |

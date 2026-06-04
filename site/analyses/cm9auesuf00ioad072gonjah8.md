@@ -448,14 +448,14 @@ Layer 3: Spanner (source of truth)
 
 ### 5.5 为什么 Spanner 做 source of truth
 
-可能的选择：Postgres, MySQL, Cassandra, DynamoDB, Spanner.
+可能的选择：Postgres, MySQL, Cassandra, Firestore / Bigtable, Spanner.
 
 | 选项 | 强一致 | 全球分布 | 写吞吐 | 取舍 |
 |---|---|---|---|---|
 | Postgres | ✓ | ✗ | 中 | 单 region 强，跨 region 弱 |
 | MySQL + 读副本 | 主写强一致 | 副本弱 | 中 | 读副本读 stale 数据 |
 | Cassandra | ✗（最终一致） | ✓ | 高 | admin block 后 dashboard 短期看不到 |
-| DynamoDB | ✓ | 单 region 强；多 region 异步 | 高 | AWS 锁定 |
+| Firestore / Bigtable | ✓ | 单 region 强；多 region 异步 | 高 | AWS 锁定 |
 | **Spanner** | **✓（全球强一致）** | **✓** | **高** | 贵但符合需求 |
 
 **关键考量**：admin block 一个 IP，立即在 dashboard 看到 status 变化。这要求**强一致**。Cassandra 这种 eventual consistency 会让 admin 困惑（"我刚 block 了，怎么 UI 还显示 active？"）。
@@ -589,7 +589,7 @@ admin clicks "Block" in dashboard
 
 > [!pitfall]
 > ❌ **只用一层 Redis cache**，没 Bloom filter —— 1M QPS / 100k 每 instance = 10+ Redis instance 同时跑，还是受限 + 网络往返延迟无法 < 5ms；  
-> ❌ **用 Cassandra / DynamoDB eventual consistency** 做 source of truth —— admin block 后 UI 等几秒才更新，体验差且让 admin 怀疑系统坏了；  
+> ❌ **用 Cassandra / Firestore / Bigtable eventual consistency** 做 source of truth —— admin block 后 UI 等几秒才更新，体验差且让 admin 怀疑系统坏了；  
 > ❌ **Bloom filter 加完不重建** —— unblock 后 Bloom 留下"幽灵 entry"，false positive 率会慢慢爬高；6 小时重建是工业实践；  
 > ❌ **不做 audit log** —— 合规失败，无法追溯"谁封了谁"；  
 > ❌ **delete entry 直接物理删** —— 失去历史，无法回溯；  

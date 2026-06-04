@@ -220,7 +220,7 @@
 <p><strong>Scaling</strong>:</p>
 <ul><li>Trigger detection runs as background job, not per-shipment</li><li>Shipment scoring is embarrassingly parallel: 6K/hr = 1.7/sec, trivial</li><li>Bottleneck is SAP TM API rate limits (typically 100-500 IDoc/min, vendor-specific)</li></ul>
 <p><strong>Architecture for scale</strong>:</p>
-<ul><li>Trigger detector → SQS / Kafka queue</li><li>Scoring workers (horizontal scale, 5-20 workers)</li><li>SAP write rate-limited with backoff</li><li>Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)</li></ul>
+<ul><li>Trigger detector → Cloud Tasks / Kafka queue</li><li>Scoring workers (horizontal scale, 5-20 workers)</li><li>SAP write rate-limited with backoff</li><li>Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)</li></ul>
 <p>This is <strong>system design within the FDE answer</strong>, not the main exam. Mention it briefly, deep-dive if asked.</p>
 <hr />
 <h3>❌ 死路答法 (top 7)</h3>
@@ -851,7 +851,7 @@ This is the **scope reduction is FDE core skill** moment. Customer wants global 
 - Bottleneck is SAP TM API rate limits (typically 100-500 IDoc/min, vendor-specific)
 
 **Architecture for scale**:
-- Trigger detector → SQS / Kafka queue
+- Trigger detector → Cloud Tasks / Kafka queue
 - Scoring workers (horizontal scale, 5-20 workers)
 - SAP write rate-limited with backoff
 - Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)

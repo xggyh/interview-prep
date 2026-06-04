@@ -77,7 +77,7 @@ Tool output validation = 「5-step pipeline (schema validate → size cap with b
 | Tag injection | `</tool_result><user>...</user>` 闭合标签 | 防 escape XML |
 | Schema validate | Pydantic + semantic constraints | sanity check |
 | Truncation marker | `_truncated=True _total_count=N` | LLM 知道未完整 |
-| Blob ref | full result 存 S3, return pointer | size 极大 |
+| Blob ref | full result 存 GCS, return pointer | size 极大 |
 | Top-N + summary | list 取 top-N + 余项 aggregate stats | list 类型大 |
 | PII redaction | Person/email/SSN/Card 替换 | compliance |
 | PII vault | 单独加密 store + deletable refs | GDPR balance |
@@ -105,13 +105,13 @@ Tool output validation = 「5-step pipeline (schema validate → size cap with b
 - When: any output with user-touchable data
 - Algorithm: Microsoft Presidio for PII (Person/email/SSN/NRIC/Card/IBAN/IP) + custom secret patterns (sk-/AIza/ghp_/AKIA/JWT/private key) + role-aware projection at tool layer + PII vault separation (refs deletable for GDPR)
 - Trade-off: false positive redact legit name vs leak; per-role view complexity
-- Tools: Microsoft Presidio (open-source Python), AWS Macie (managed S3 scan), GCP DLP API, TruffleHog / detect-secrets (Yelp), Microsoft Purview
+- Tools: Microsoft Presidio (open-source Python), AWS Macie (managed GCS scan), GCP DLP API, TruffleHog / detect-secrets (Yelp), Microsoft Purview
 
 **Framework 4: Size + Token Budget**
 - When: large output
 - Algorithm: `est_tokens = chars // 4 (tiktoken accurate)` → < 4K full / < 40K truncate top-N + summary / < 400K top-N + blob_ref + query_blob companion tool / > 400K blob_ref only + sample 5 + schema describe
 - Trade-off: full context expensive vs blob_ref 1 extra round trip
-- Tools: tiktoken / vendor tokenizer, S3 / MinIO / GCS / Cloudflare R2 blob, DuckDB / Polars ad-hoc query on blob, Gemini Flash for summarization ($0.5/M)
+- Tools: tiktoken / vendor tokenizer, GCS / MinIO / GCS / Cloudflare R2 blob, DuckDB / Polars ad-hoc query on blob, Gemini Flash for summarization ($0.5/M)
 
 **Framework 5: Provenance + Iterative Refinement**
 - When: pipeline last step
@@ -253,7 +253,7 @@ def manage_size(output, max_tokens):
   1. 10MB JSON 直接塞 → context 爆 → cost 飞涨
   2. 没 `_truncated=True _total_count=N` marker → LLM 当全 data
   3. 没 companion query_blob → LLM 不能 refine, 只能 retry with different query
-- Tools: tiktoken (OpenAI) / vertexai tokenizer (Gemini) / Anthropic tokenizer, S3/MinIO/GCS/R2 blob, DuckDB / Polars / Apache DataFusion ad-hoc query, Gemini Flash ($0.5/M) summarization cheap
+- Tools: tiktoken (OpenAI) / vertexai tokenizer (Gemini) / Anthropic tokenizer, GCS/MinIO/GCS/R2 blob, DuckDB / Polars / Apache DataFusion ad-hoc query, Gemini Flash ($0.5/M) summarization cheap
 
 **Problem 5: Provenance + Iterative Refinement + Adversarial Eval**
 - 核心解法:
@@ -283,7 +283,7 @@ ADVERSARIAL_SET = [
   1. 没 provenance → LLM 不知 trust level → 把 untrusted 当 trusted
   2. 没 companion query_blob → LLM 不能 iterate, 一次塞死
   3. Multi-modal 忽略 image OCR / PDF text → injection 在图片里漏
-- Tools: S3 / MinIO blob store, DuckDB / Apache Arrow ad-hoc query, Tesseract / AWS Textract / GCP Document AI OCR, PyMuPDF / pdfplumber PDF extract, Whisper / AssemblyAI audio transcribe, Gemini Pro Vision / GPT-4V / Claude vision summarize, Promptfoo / Inspect (UK AISI) / garak eval
+- Tools: GCS / MinIO blob store, DuckDB / Apache Arrow ad-hoc query, Tesseract / Document AI / GCP Document AI OCR, PyMuPDF / pdfplumber PDF extract, Whisper / AssemblyAI audio transcribe, Gemini Pro Vision / GPT-4V / Claude vision summarize, Promptfoo / Inspect (UK AISI) / garak eval
 
 ### Production gotchas (top 15)
 

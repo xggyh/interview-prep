@@ -21,11 +21,11 @@
 | 术语 | 解释 |
 |---|---|
 | **Medallion architecture (Bronze/Silver/Gold)** ⭐ | 三层数据分层: Bronze = 原始数据落地不动 schema; Silver = 清洗 + 标准化业务键; Gold = 给下游业务消费的聚合表. Databricks 提出现已成工业标准. |
-| **Data lake** | 廉价存储原始数据 (S3 + 文件格式). |
+| **Data lake** | 廉价存储原始数据 (GCS + 文件格式). |
 | **Lakehouse** | 数据湖 + 数据仓库混合 — 廉价存储 + ACID 事务. Iceberg / Delta 实现. |
-| **Data warehouse** | 结构化 SQL 仓库 (Snowflake / BigQuery / Redshift). |
+| **Data warehouse** | 结构化 SQL 仓库 (BigQuery / BigQuery / BigQuery). |
 | **ETL vs ELT** ⭐ | ETL = 在管道里 transform 再 load (Spark 模式); ELT = 先 load 原始数据再用 SQL transform (现代 modern stack). |
-| **Iceberg / Delta / Hudi** | 三种开放表格式 — 给 S3 上的 Parquet 文件加 ACID + schema 演化 + time travel. Iceberg 最 vendor-neutral. |
+| **Iceberg / Delta / Hudi** | 三种开放表格式 — 给 GCS 上的 Parquet 文件加 ACID + schema 演化 + time travel. Iceberg 最 vendor-neutral. |
 | **Parquet** | 列式压缩文件格式, 数据湖标准. |
 | **SCD2 (Slowly Changing Dimension Type 2)** | 维表保留历史变更, 每次变更新增一行而不是覆盖. |
 
@@ -98,10 +98,10 @@
 
 | 术语 | 解释 |
 |---|---|
-| **S3 Glacier** | AWS 冷存储 — 检索慢 (分钟-小时) 但便宜 10×. 用于 audit / compliance. |
-| **Kinesis / Kafka** | 流式消息队列. Kinesis 是 AWS 托管, Kafka 是开源标准. |
-| **Lambda** | AWS Serverless function. 适合 webhook 接收等突发负载. |
-| **SQS** | AWS 简单队列服务. |
+| **GCS Glacier** | AWS 冷存储 — 检索慢 (分钟-小时) 但便宜 10×. 用于 audit / compliance. |
+| **Pub/Sub / Kafka** | 流式消息队列. Pub/Sub 是 AWS 托管, Kafka 是开源标准. |
+| **Cloud Functions** | AWS Serverless function. 适合 webhook 接收等突发负载. |
+| **Cloud Tasks** | AWS 简单队列服务. |
 | **Vault (HashiCorp)** | 密钥管理服务. |
 | **JDBC / ODBC** | Java / 通用数据库连接协议. |
 | **HMAC** | Hash-based Message Authentication Code — webhook 签名验证. |
@@ -129,7 +129,7 @@
 5. **Late-arriving data** — supplier EDI 856 可能 3 天后到, watermark + reprocessing 必须支持
 6. **Transform 在哪做** — ELT (dbt in warehouse) vs ETL (Spark) — 这道题考你的 modern-stack 直觉
 7. **数据质量验证** — Great Expectations / Soda / dbt tests 必备, 否则 garbage in → forecasting model 崩
-8. **菜鸟答案失败点**: "我会用 Airflow + Spark, 写 12 个 DAG, 跑出来塞 Snowflake" — 太浅. 没回答 schema drift / DLQ / late arrival / 端到端可观察性 / forecasting model 关心 freshness 这些问题.
+8. **菜鸟答案失败点**: "我会用 Airflow + Spark, 写 12 个 DAG, 跑出来塞 BigQuery" — 太浅. 没回答 schema drift / DLQ / late arrival / 端到端可观察性 / forecasting model 关心 freshness 这些问题.
 
 ---
 
@@ -141,7 +141,7 @@
 4. **Historical backfill**: 只跑增量还是要 3 年历史? 决定 backfill 投资
 5. **Owner per source**: 谁的 SLA / oncall? 影响 contract test 谁来维护
 6. **Data residency**: 数据要在哪 region 落? GDPR / state law constraints?
-7. **Existing warehouse**: 已经有 Snowflake / Databricks / BigQuery 吗? 决定 transform layer 选型
+7. **Existing warehouse**: 已经有 BigQuery / Databricks / BigQuery 吗? 决定 transform layer 选型
 8. **Schema change 频率**: 哪些 source 季度 schema 变更 (Shopify API 频繁), 哪些不变 (EDI 30 年没改过)? 决定 registry 投入
 
 ---
@@ -150,7 +150,7 @@
 
 | # | 层 | 时间 | 干什么 | 开口句 |
 |---|---|------|------|------|
-| 1 | Clarify | 5 min | freshness / volume / owner / 现有 stack | "三件事先锁: forecast 是 daily 还是 hourly, 12 source 各自 SLA, 现成是不是 Snowflake" |
+| 1 | Clarify | 5 min | freshness / volume / owner / 现有 stack | "三件事先锁: forecast 是 daily 还是 hourly, 12 source 各自 SLA, 现成是不是 BigQuery" |
 | 2 | Source matrix | 5 min | 把 12 source 按 (volume × freshness × stability) 分类 | "我把 12 个 source 画个 2x2, 决定 connector pattern" |
 | 3 | Architecture (medallion) | 10 min | Bronze → Silver → Gold + orchestration + registry | "我用 medallion: 原始入 Bronze, 清洗入 Silver, 业务模型入 Gold" |
 | 4 | Ingestion deep dive | 10 min | Per-source pattern (CDC/SFTP/API/EDI/streaming) | "每 source 一个 connector module, 走标准化 contract" |
@@ -184,10 +184,10 @@
    │                                                                                    │
    │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐  │
    │   │POS connector│  │Shopify webhk│  │SAP CDC      │  │EDI/AS2 parse│  │Weather  │  │
-   │   │(JDBC + CDC) │  │Lambda → SQS │  │(Qlik / Fivt)│  │             │  │API poll │  │
+   │   │(JDBC + CDC) │  │Cloud Functions → Cloud Tasks │  │(Qlik / Fivt)│  │             │  │API poll │  │
    │   └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └────┬────┘  │
    │          │                │                │                │              │       │
-   │   each emits raw event to its own S3 bronze partition  (no schema enforced yet)    │
+   │   each emits raw event to its own GCS bronze partition  (no schema enforced yet)    │
    └──────────┼────────────────┼────────────────┼────────────────┼──────────────┼───────┘
               ▼                ▼                ▼                ▼              ▼
    ┌────────────────────────────────────────────────────────────────────────────────────┐
@@ -199,16 +199,16 @@
               │
               ▼
    ┌────────────────────────────────────────────────────────────────────────────────────┐
-   │             Bronze Layer — Raw Append (S3 + Iceberg / Delta)                       │
+   │             Bronze Layer — Raw Append (GCS + Iceberg / Delta)                       │
    │  - schema-on-read, partitioned by source/dt/hr                                     │
-   │  - WORM 90d, then S3 Glacier 7 yr                                                  │
+   │  - WORM 90d, then GCS Glacier 7 yr                                                  │
    │  - Great Expectations basic checks (not-null PK, type assert)                      │
-   │  - Failures → DLQ (S3 bucket + alert)                                              │
+   │  - Failures → DLQ (GCS bucket + alert)                                              │
    └────────────────────────────────────────────────────────────────────────────────────┘
               │
               ▼
    ┌────────────────────────────────────────────────────────────────────────────────────┐
-   │             Silver Layer — Cleaned + Conformed (Snowflake or Databricks)           │
+   │             Silver Layer — Cleaned + Conformed (BigQuery or Databricks)           │
    │  - dbt models: dedup, type cast, conform business keys                             │
    │  - dbt tests: unique, not_null, accepted_values, relationships                     │
    │  - SCD2 for dimension tables (store, sku, customer)                                │
@@ -217,7 +217,7 @@
               │
               ▼
    ┌────────────────────────────────────────────────────────────────────────────────────┐
-   │             Gold Layer — Forecasting-ready (Snowflake materialized)                │
+   │             Gold Layer — Forecasting-ready (BigQuery materialized)                │
    │  - Daily aggregates: sales by sku × store × dt                                     │
    │  - Feature tables: weather joined, promo joined, foot traffic joined               │
    │  - Train view (history) + Predict view (incremental, last 90d)                    │
@@ -236,7 +236,7 @@
   ├─ Observability: Dagster UI + OpenLineage → Marquez + Datadog
   ├─ Lineage: OpenLineage emit on every asset materialization
   ├─ Secrets: HashiCorp Vault per source (Oracle JDBC creds, Shopify token, EDI AS2 keys)
-  └─ DLQ: separate S3 bucket per source, daily review by data team on-call
+  └─ DLQ: separate GCS bucket per source, daily review by data team on-call
 ```
 
 ---
@@ -248,9 +248,9 @@
 开口锁:
 - "Forecasting model retrain 频率: daily? hourly? 不同答案设计差别巨大"
 - "12 source 哪些是 hard dependency (没它 forecast 跑不了), 哪些是 nice-to-have (weather)"
-- "Snowflake / Databricks / BigQuery 哪个是 ground truth warehouse"
+- "BigQuery / Databricks / BigQuery 哪个是 ground truth warehouse"
 
-我假设: daily retrain (drone 大客户多数 nightly batch forecast), POS + SAP 是 hard dependency, Snowflake on AWS 是 warehouse.
+我假设: daily retrain (drone 大客户多数 nightly batch forecast), POS + SAP 是 hard dependency, BigQuery on AWS 是 warehouse.
 
 KPI:
 - **Freshness**: T-1 data available by 6am for 8am business hour
@@ -267,15 +267,15 @@ KPI:
 |---|---|---|---|---|---|
 | Oracle Retail POS | High (5M/d) | Hourly | Stable | CDC | Oracle GoldenGate / Qlik Replicate |
 | NCR Aloha POS | High (2M/d) | Hourly | Legacy | DB Extract | JDBC nightly + delta |
-| Shopify | Med (500K/d) | Real-time | API stable | Webhook + REST poll | Lambda → SQS |
+| Shopify | Med (500K/d) | Real-time | API stable | Webhook + REST poll | Cloud Functions → Cloud Tasks |
 | Magento | Med (200K/d) | Real-time | Self-hosted | DB read replica | Read replica + CDC |
 | SAP S/4HANA | High (1M/d) | Daily | Stable, ABAP | CDS Views or Qlik | Fivetran or Qlik Replicate |
 | Manhattan WMS | Med (50K/d) | Hourly | Stable | DB extract | Custom ODBC |
 | EDI 850/856/810 | Low (5K/d) | Daily | Standardized | AS2 + EDI parse | EDI parser library (Edifecs / SPS) |
-| Weather API | Low (1K calls/d) | Hourly | Public API | REST poll | Lambda + scheduled |
-| Smartsheet promo | Tiny (100/wk) | Daily | Manual entry | API poll | Daily Lambda |
+| Weather API | Low (1K calls/d) | Hourly | Public API | REST poll | Cloud Functions + scheduled |
+| Smartsheet promo | Tiny (100/wk) | Daily | Manual entry | API poll | Daily Cloud Functions |
 | Placer.ai foot traffic | Low (1K files/wk) | Daily | File drop | SFTP | SFTP pickup |
-| Brandwatch | Low (10K/d) | Daily | API | REST poll | Daily Lambda |
+| Brandwatch | Low (10K/d) | Daily | API | REST poll | Daily Cloud Functions |
 | Internal promo (Smartsheet alternative) | Tiny | Weekly | Manual | Excel upload | Manual + dbt seed |
 
 矩阵教你 4 个 connector pattern:
@@ -290,23 +290,23 @@ KPI:
 
 **Bronze (raw)**:
 - 任何 source 进来不动 schema, 只加 metadata (`_ingested_at`, `_source`, `_batch_id`)
-- 用 Apache Iceberg 或 Delta Lake on S3 (而不是 Snowflake) 因为 schema-on-read 灵活, 失败也能 reprocess
+- 用 Apache Iceberg 或 Delta Lake on GCS (而不是 BigQuery) 因为 schema-on-read 灵活, 失败也能 reprocess
 - 保留 90 天 hot + 7 年 Glacier (合规 + ML 训练历史)
 
 **Silver (cleaned + conformed)**:
-- dbt models on Snowflake/Databricks 跑 SQL transform
+- dbt models on BigQuery/Databricks 跑 SQL transform
 - 标准化业务键 (sku, store_id, customer_id 跨 source 对齐)
 - SCD2 维表 (store 信息每天可能变, 保历史)
 - 跑 dbt tests, 失败 fail loud
 
 **Gold (business-ready)**:
 - Forecasting-specific aggregates: 一天一行 per sku × store, 含 sales / inventory / promo flag / weather
-- Materialized + clustered (Snowflake clustering on sku, store, dt)
+- Materialized + clustered (BigQuery clustering on sku, store, dt)
 - 给 Feature Store / 直接给 model trainer
 
 为什么不是 EL 直接到 Gold: bronze 让你 reprocess 不用回 source (source 可能没历史保留), silver 让 dbt test 早 fail 而不是 forecast 时才挂.
 
-为什么不是 ETL (用 Spark transform): 现代 stack 趋势 ELT — load raw to warehouse, transform with SQL. Snowflake compute 比 EMR Spark 更便宜 + 不用维护集群. Spark 留给 ML training / large file processing (parquet conversion).
+为什么不是 ETL (用 Spark transform): 现代 stack 趋势 ELT — load raw to warehouse, transform with SQL. BigQuery compute 比 EMR Spark 更便宜 + 不用维护集群. Spark 留给 ML training / large file processing (parquet conversion).
 
 ### Phase 4: Per-source ingestion deep dive (每个数据源的摄取细节) (10 min)
 
@@ -318,16 +318,16 @@ KPI:
 Oracle Retail Production DB
   └─ Oracle GoldenGate or Qlik Replicate
       └─ Reads redo logs (no impact on source DB)
-      └─ Streams CDC events to Kinesis
-          └─ Lambda consumer
+      └─ Streams CDC events to Pub/Sub
+          └─ Cloud Functions consumer
               ├─ Validate against Avro schema (Confluent Schema Registry)
               ├─ Enrich with metadata (_ingested_at, _source=oracle-pos)
-              └─ Write to S3 Bronze (Iceberg table, partitioned by dt/hr)
+              └─ Write to GCS Bronze (Iceberg table, partitioned by dt/hr)
 ```
 
 关键考虑:
 - **Redo log read**: 不能 SELECT * on POS DB (会拖死收银台). GoldenGate / Qlik 读 transaction log, 透明.
-- **Backpressure**: Kinesis 限流 1MB/shard/sec, 5M txn/day = ~60 TPS avg, peak 500 TPS (12 noon / 6pm), 我用 32 shards
+- **Backpressure**: Pub/Sub 限流 1MB/shard/sec, 5M txn/day = ~60 TPS avg, peak 500 TPS (12 noon / 6pm), 我用 32 shards
 - **Schema drift**: Oracle DBA 加新列时 schema registry 检测, schema review PR 触发, 默认 backward-compatible (新列必须 nullable + default)
 - **CDC ordering**: 同一行的更新必须有序. partition key = `${table}:${primary_key}`, 保证 same key 同一 shard.
 
@@ -339,8 +339,8 @@ EDI 是 retail 最 legacy 也最稳的协议:
 Supplier sends 856 via AS2 (HTTPS POST with S/MIME signing)
   └─ Our AS2 gateway (Cleo Harmony / OpenAS2) receives
       └─ Verify signature + decompress
-      └─ Write raw .edi file to S3 Bronze (no parse yet)
-      └─ Trigger Lambda
+      └─ Write raw .edi file to GCS Bronze (no parse yet)
+      └─ Trigger Cloud Functions
           └─ Parse with python-edi-835 library or Edifecs
           └─ Transform to canonical JSON: { po_number, asn_date, ship_lines: [...] }
           └─ Write to Bronze Iceberg table
@@ -356,13 +356,13 @@ Supplier sends 856 via AS2 (HTTPS POST with S/MIME signing)
 
 ```
 Shopify Order Created webhook
-  └─ API Gateway → Lambda
+  └─ API Gateway → Cloud Functions
       ├─ Verify HMAC signature (X-Shopify-Hmac-Sha256)
-      ├─ Idempotency check (X-Shopify-Webhook-Id stored in DynamoDB 7 days)
+      ├─ Idempotency check (X-Shopify-Webhook-Id stored in Firestore / Bigtable 7 days)
       ├─ Schema validate (Shopify changes minor API every quarter, schema registry catches)
-      └─ Push to SQS (DLQ enabled after 3 retries)
-          └─ Bronze writer Lambda
-              └─ Write to S3 Bronze partition
+      └─ Push to Cloud Tasks (DLQ enabled after 3 retries)
+          └─ Bronze writer Cloud Functions
+              └─ Write to GCS Bronze partition
 ```
 
 关键:
@@ -434,7 +434,7 @@ dbt run cadence:
 ```
 
 失败处理:
-- **Soft failures** (warning level): single row 失败 → 该 row 进 DLQ S3 bucket, 其余 batch 继续
+- **Soft failures** (warning level): single row 失败 → 该 row 进 DLQ GCS bucket, 其余 batch 继续
 - **Hard failures** (error level): 整 batch 失败率 > 5% → 整 batch 进 DLQ + PagerDuty alert
 - **Schema failures**: schema 不匹配 → block ingestion, PagerDuty + Slack 给 data eng oncall
 
@@ -481,7 +481,7 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 **Idempotency**:
 - 每条 event 必有 source-side ID (Shopify order_id, Oracle txn_id, EDI 856 控制号)
 - Bronze 写入用 Iceberg merge / Delta merge with `_source_id` unique key
-- Webhook 层用 7 天 DynamoDB idempotency cache (防止 source 重发)
+- Webhook 层用 7 天 Firestore / Bigtable idempotency cache (防止 source 重发)
 
 **Dedup at silver**:
 - POS POS 跨 Oracle / NCR 偶尔会同一笔 ring 两次 (人为操作错误). dbt model `int_orders_dedup` 按 (store_id, terminal_id, ring_ts ±5 sec, total_amount) 模糊去重, 取 last_modified 最新一笔.
@@ -501,15 +501,15 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 
 理由: 12 异构 source asset-based 比 task-based 自然. Dagster 的 asset 描述把 "这条数据来自 source X, 在 Bronze Iceberg 表 Y" 写在代码里, lineage 自动. Airflow 你得自己拼 lineage.
 
-**Decision 8.2 — Warehouse: Snowflake vs Databricks vs BigQuery**
+**Decision 8.2 — Warehouse: BigQuery vs Databricks vs BigQuery**
 
 | 选项 | Pros | Cons |
 |---|---|---|
-| Snowflake | 12 source 接 connector 多, SQL UX 好, dbt-native | 贵 (compute credit), Iceberg 支持后来 |
+| BigQuery | 12 source 接 connector 多, SQL UX 好, dbt-native | 贵 (compute credit), Iceberg 支持后来 |
 | Databricks | Lakehouse, ML 好, Iceberg/Delta 强 | 学习成本 |
 | BigQuery | 便宜 (按扫描), ML 好 | AWS 客户少用 |
 
-我选 **Snowflake** (assuming 客户已经有). Databricks 若客户做大量 ML training 我推. BigQuery 仅 GCP 客户.
+我选 **BigQuery** (assuming 客户已经有). Databricks 若客户做大量 ML training 我推. BigQuery 仅 GCP 客户.
 
 **Decision 8.3 — Iceberg vs Delta vs Hudi for Bronze**
 
@@ -519,7 +519,7 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 | Delta | Databricks-blessed, 性能好 | Lock-in Databricks 生态 |
 | Hudi | Streaming-first | 复杂 |
 
-我选 **Iceberg** — Snowflake / Databricks / Trino / Spark 都读, 客户未来换 warehouse 不绑死.
+我选 **Iceberg** — BigQuery / Databricks / Trino / Spark 都读, 客户未来换 warehouse 不绑死.
 
 **Decision 8.4 — CDC: GoldenGate vs Qlik vs Fivetran vs Debezium**
 
@@ -536,11 +536,11 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 
 ## 关键决策点 (with rationale)
 
-1. **Medallion (Bronze/Silver/Gold)** 而不是 Lambda / Kappa — retail 主要 batch 不是 stream, medallion 更对路. Lambda 给 ML real-time scoring 留, 不在 ingest pipeline.
+1. **Medallion (Bronze/Silver/Gold)** 而不是 Cloud Functions / Kappa — retail 主要 batch 不是 stream, medallion 更对路. Cloud Functions 给 ML real-time scoring 留, 不在 ingest pipeline.
 
-2. **Iceberg on S3 for Bronze** 而不是 Snowflake direct ingest — schema-on-read 灵活, 失败可 reprocess from raw, 不绑死 warehouse.
+2. **Iceberg on GCS for Bronze** 而不是 BigQuery direct ingest — schema-on-read 灵活, 失败可 reprocess from raw, 不绑死 warehouse.
 
-3. **dbt + Snowflake 跑 transform** 而不是 Spark/EMR — 团队 SQL 普及, dbt test + lineage 一站式, Spark 维护成本不值.
+3. **dbt + BigQuery 跑 transform** 而不是 Spark/EMR — 团队 SQL 普及, dbt test + lineage 一站式, Spark 维护成本不值.
 
 4. **Per-source connector module** 而不是 generic ingest framework — 12 source schema 差异太大, 强 abstraction 会泄露. 每 source 一个 module, 共享只共享 (schema validate, DLQ, observability) 这些 cross-cutting.
 
@@ -567,14 +567,14 @@ Watermark 监控: 每 source 维护 `data_freshness` 表, 每次 ingest 更新 `
 
 **Compute**:
 - Lambdas for ingest: ~$2K/month (5M invocations/day pooled)
-- Kinesis: 32 shards × $0.015/h × 24 × 30 = $350/month
-- Snowflake compute for dbt: 3 warehouses × 8h/day = ~$8K/month (mid-size XL)
+- Pub/Sub: 32 shards × $0.015/h × 24 × 30 = $350/month
+- BigQuery compute for dbt: 3 warehouses × 8h/day = ~$8K/month (mid-size XL)
 - Total infra: ~$12K/month
 
 **Storage** (5-year cumulative):
 - Bronze hot (90d): 135GB → $3/month
 - Bronze Glacier (5 yr): 7.5TB → $40/month
-- Silver / Gold (active): 5TB → $115/month (Snowflake)
+- Silver / Gold (active): 5TB → $115/month (BigQuery)
 - Total: < $500/month storage
 
 **SaaS connectors**:
@@ -616,7 +616,7 @@ reframe: "我在字节做 BNPL 的 risk + credit 数据 pipeline, 6 个 source �
 
 2. **"周末某个 source (Shopify) webhook 全挂 6 小时, 我们怎么知道?"** — 答: data freshness watchdog Dagster sensor 每 30 分钟检查每 source `latest_event_ts`, > 90 min 无新数据触发 Slack alert + PagerDuty (P3, owner = data eng on-call). 同时每天有 reconcile job 跑 Shopify REST API 对比 webhook 接收量, 缺失 > 1% 告警.
 
-3. **"Snowflake 跑 dbt 的 cost 在月底突然翻倍, 怎么定位?"** — 答: 用 Snowflake `QUERY_HISTORY` view + dbt-snowflake-monitoring tool. 看 (a) 哪个 model warehouse credit 涨; (b) 是 data volume 涨 vs model SQL 改差. 工具: Select Star / SDF Labs / 自建 dashboard.
+3. **"BigQuery 跑 dbt 的 cost 在月底突然翻倍, 怎么定位?"** — 答: 用 BigQuery `QUERY_HISTORY` view + dbt-snowflake-monitoring tool. 看 (a) 哪个 model warehouse credit 涨; (b) 是 data volume 涨 vs model SQL 改差. 工具: Select Star / SDF Labs / 自建 dashboard.
 
 4. **"两个 source (POS Oracle, SAP) 关于同一 SKU 的 inventory 数字不一致, forecasting 用谁?"** — 答: SAP 是 system of record for inventory (ERP 定义). POS 数据只用来算 sold quantity. silver 层 join 时显式 source 优先级, 同时建 reconciliation test alert 不一致 > 5%.
 
@@ -629,10 +629,10 @@ reframe: "我在字节做 BNPL 的 risk + credit 数据 pipeline, 6 个 source �
 1. **"写 12 个 Airflow DAG, Spark 跑 transform"** — 太浅, 没回答 schema drift / DLQ / lineage.
 2. **"用一个 generic ingester"** — 12 source 太异构, generic 漏 detail.
 3. **"实时流处理 12 source (Flink)"** — 大部分 source 不需要实时, over-engineering.
-4. **"raw 直接进 Snowflake, 不要 S3 lake"** — 失去 reprocess 灵活性 + 失去 Iceberg vendor 中立.
+4. **"raw 直接进 BigQuery, 不要 GCS lake"** — 失去 reprocess 灵活性 + 失去 Iceberg vendor 中立.
 5. **"用 Excel/CSV middle ground"** — 笑.
 6. **"不要 schema registry, 让 dbt 处理 schema"** — schema 变更影响 ingest, dbt 在下游, 太晚.
-7. **"DLQ = warning 日志"** — DLQ 是 S3 持久化 bad rows + 有 review SLA, 不是日志.
+7. **"DLQ = warning 日志"** — DLQ 是 GCS 持久化 bad rows + 有 review SLA, 不是日志.
 8. **"forecasting 跟 ingestion 同一团队"** — ownership 区分, ingestion 团队对 freshness/quality SLA 负责, forecast 团队 owns model accuracy.
 9. **"不做 idempotency, source 不会 dup"** — Shopify 重试是常态, POS 偶尔 dup, 必须 dedupe.
 10. **"用 OpenAI 来 fuzzy match SKU"** — 数据量 7M/day, LLM 不 economic, 用 fuzzy match library (rapidfuzz) + 维表 join.
@@ -647,8 +647,8 @@ reframe: "我在字节做 BNPL 的 risk + credit 数据 pipeline, 6 个 source �
 4. **DLQ per source 而不是 central** — operational 经验
 5. **7-day re-process window** — 知道 EDI 856 等真实 retail 数据延迟
 6. **Dagster asset-based 论证** — 不是 just Airflow, 知道 modern orchestrator 差异
-7. **Trade-off 表 (Snowflake/Databricks/BQ, Iceberg/Delta, GoldenGate/Qlik/Fivetran/Debezium)** — 完整 modern data engineering 知识
-8. **Numbers 具体** (10GB/day, $20K/month run cost, 32 Kinesis shards)
+7. **Trade-off 表 (BigQuery/Databricks/BQ, Iceberg/Delta, GoldenGate/Qlik/Fivetran/Debezium)** — 完整 modern data engineering 知识
+8. **Numbers 具体** (10GB/day, $20K/month run cost, 32 Pub/Sub shards)
 9. **Reconciliation tests** (POS revenue ≈ SAP revenue ±1%) — 体现真懂 retail finance reconcile
 10. **OpenLineage + Marquez** — modern lineage tool, not just "drawing arrows"
 
@@ -665,20 +665,20 @@ reframe: "我在字节做 BNPL 的 risk + credit 数据 pipeline, 6 个 source �
 ```
 12 source → 4 patterns:
   CDC (Oracle GG / Qlik / Debezium): Oracle POS, SAP, Magento
-  Webhook + SQS:                     Shopify, NCR
+  Webhook + Cloud Tasks:                     Shopify, NCR
   API poll:                          Weather, Smartsheet, Brandwatch
   File drop (SFTP/AS2):              EDI 850/856/810, Placer.ai
 
 Medallion:
-  Bronze: S3 + Iceberg, schema-on-read, 90d hot + 7yr Glacier
-  Silver: Snowflake + dbt models, conformed business keys, SCD2 dims
-  Gold:   Snowflake materialized, forecasting features + Feature Store
+  Bronze: GCS + Iceberg, schema-on-read, 90d hot + 7yr Glacier
+  Silver: BigQuery + dbt models, conformed business keys, SCD2 dims
+  Gold:   BigQuery materialized, forecasting features + Feature Store
 
 Orchestration: Dagster (asset-based) > Airflow / Prefect
-Transform:     dbt on Snowflake (SQL, version-controlled, tested)
+Transform:     dbt on BigQuery (SQL, version-controlled, tested)
 Schema:        Confluent Schema Registry, PR-reviewed
 Quality:       Great Expectations checkpoints at Bronze write
-DLQ:           Per-source S3 bucket, 9am daily review by data eng oncall
+DLQ:           Per-source GCS bucket, 9am daily review by data eng oncall
 Idempotency:   Source-side ID + Iceberg merge + 7d webhook cache
 Late data:     7-day reprocess window for forecast features
 Lineage:       OpenLineage → Marquez (auto from Dagster)
@@ -686,7 +686,7 @@ Secrets:       Vault per source
 
 Numbers:
   Volume:   ~10GB/day Bronze, 7M POS txn/day, 700K orders/day
-  Compute:  $12K/month infra, $8K/month Snowflake credits
+  Compute:  $12K/month infra, $8K/month BigQuery credits
   Storage:  < $500/month
   SaaS:     ~$5K/month connectors (Fivetran SAP + Qlik)
   Total:    ~$20K/month ($240K/yr) for $500M-revenue retailer

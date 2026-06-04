@@ -694,7 +694,7 @@ def can_user(user, perm, file, ts):
 <p><strong>Most permissive wins</strong> unless explicit DENY. Same time-window semantics apply to group membership.</p>
 <p><strong>Q3</strong>: "What if events arrive out of order (delayed)?"</p>
 <p><strong>A</strong>:</p>
-<ul><li>Append to per-node grant list anyway</li><li><strong>Re-sort</strong> the affected list after insert (O(N log N) but rare for delayed events)</li><li>Or use <strong>sorted insert</strong> (<code>bisect.insort</code>) per event — O(N) insert but O(log N) lookup</li><li>For high-volume, use <strong>immutable event log + periodic reconcile</strong> (Lambda architecture style)</li><li><strong>Invalidate</strong> materialized view for affected (user, file, perm) tuples</li></ul>
+<ul><li>Append to per-node grant list anyway</li><li><strong>Re-sort</strong> the affected list after insert (O(N log N) but rare for delayed events)</li><li>Or use <strong>sorted insert</strong> (<code>bisect.insort</code>) per event — O(N) insert but O(log N) lookup</li><li>For high-volume, use <strong>immutable event log + periodic reconcile</strong> (Cloud Functions architecture style)</li><li><strong>Invalidate</strong> materialized view for affected (user, file, perm) tuples</li></ul>
 <p><strong>Q4</strong>: "What about deletions of files?"</p>
 <p><strong>A</strong>:</p>
 <ul><li>Add <code>deleted_at</code> to <code>FileNode</code> (soft delete)</li><li><code>can_user</code> first checks <code>created_at &lt;= ts &lt; deleted_at</code></li><li><strong>Audit log preserves grants even after deletion</strong> for compliance</li><li>Hard delete (purge from storage): after retention window (e.g., 90 days), but keep audit reference</li></ul>
@@ -1846,7 +1846,7 @@ def can_user(user, perm, file, ts):
 - Append to per-node grant list anyway
 - **Re-sort** the affected list after insert (O(N log N) but rare for delayed events)
 - Or use **sorted insert** (`bisect.insort`) per event — O(N) insert but O(log N) lookup
-- For high-volume, use **immutable event log + periodic reconcile** (Lambda architecture style)
+- For high-volume, use **immutable event log + periodic reconcile** (Cloud Functions architecture style)
 - **Invalidate** materialized view for affected (user, file, perm) tuples
 
 **Q4**: "What about deletions of files?"

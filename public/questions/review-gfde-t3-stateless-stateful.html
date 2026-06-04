@@ -46,7 +46,7 @@
 <h3>🎤 答题逻辑 (Response Architecture)</h3>
 <blockquote><p>被问到 <strong>"agent service 应该 stateless 还是 stateful? 对 (a) chatbot (b) coding agent (c) voice agent 分别推荐"</strong>, 我按这 7 层回答, 不跳序.</p></blockquote>
 <h4>📐 Stateless vs Stateful — 7 层结构</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>4-axis 比较框架</td><td>90s</td><td>latency / scale / failover / cost 四维度, 不是 yes/no 选择. Stateless: ∞ scale + simple FO + 30 wire重传 vs Stateful: TTFT 280ms + sticky FO 复杂</td><td>"Stateless vs stateful 不是二选一, 我用 4-axis 框架 — latency, scale, failover, cost..."</td></tr><tr><td>2</td><td>默认 stance</td><td>30s</td><td><strong>默认 stateless 95% 场景</strong> (OpenAI / Anthropic API 都是这样), voice / sub-500ms 才例外. 这是 industry 默认</td><td>"Default position: stateless. OpenAI / Anthropic 公开 API 都 stateless 是有原因的..."</td></tr><tr><td>3</td><td>3 use-case 决策</td><td>3 min</td><td>(a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 S3 — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable</td><td>"Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..."</td></tr><tr><td>4</td><td>Hybrid pattern 揭示</td><td>2 min</td><td>"Stateless" 是 API 语义, server 内部其实 implicitly stateful — in-process LRU + Redis + DB + GPU KV cache. 4 tier hierarchy</td><td>"Now the dirty secret — 'stateless' is API semantics, server is implicitly stateful via 4-tier cache hierarchy..."</td></tr><tr><td>5</td><td>KV cache 复用 mechanics</td><td>3 min</td><td>vLLM PagedAttention 自动 prefix 复用. Client 传 conversation_id hint → sticky route → 80-85% prefix cache hit rate. SGLang RadixAttention multi-turn 多 20-30%</td><td>"The hidden stateful layer is GPU KV cache — vLLM PagedAttention 自动 share prefix, hit rate 80-85% with sticky..."</td></tr><tr><td>6</td><td>Failover edge cases</td><td>2 min</td><td>Stateless: any pod takes over, 0 user impact, but 30K token re-prefill cost. Stateful: pod dies → reconnect to any pod, 200ms re-warm acceptable for voice. 跨 region &lt; 1s FO 要 Redis cross-region replicate</td><td>"Failover differs sharply — stateless free but expensive re-prefill, stateful needs warm-up budget..."</td></tr><tr><td>7</td><td>简历 resume hook</td><td>90s</td><td>"Voice agent 7 markets is stateful WebSocket (TTFT 280ms target). BNPL chatbot is stateless REST + Redis blob (任意 pod serve, 2-5s p99). Decision driver: voice &lt; 500ms vs chatbot accepts 2-5s"</td><td>"On voice agent (TikTok / ByteDance) we ran stateful WebSocket — on BNPL chatbot we ran stateless REST..."</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>这层该说什么 (custom)</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>4-axis 比较框架</td><td>90s</td><td>latency / scale / failover / cost 四维度, 不是 yes/no 选择. Stateless: ∞ scale + simple FO + 30 wire重传 vs Stateful: TTFT 280ms + sticky FO 复杂</td><td>"Stateless vs stateful 不是二选一, 我用 4-axis 框架 — latency, scale, failover, cost..."</td></tr><tr><td>2</td><td>默认 stance</td><td>30s</td><td><strong>默认 stateless 95% 场景</strong> (OpenAI / Anthropic API 都是这样), voice / sub-500ms 才例外. 这是 industry 默认</td><td>"Default position: stateless. OpenAI / Anthropic 公开 API 都 stateless 是有原因的..."</td></tr><tr><td>3</td><td>3 use-case 决策</td><td>3 min</td><td>(a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 GCS — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable</td><td>"Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..."</td></tr><tr><td>4</td><td>Hybrid pattern 揭示</td><td>2 min</td><td>"Stateless" 是 API 语义, server 内部其实 implicitly stateful — in-process LRU + Redis + DB + GPU KV cache. 4 tier hierarchy</td><td>"Now the dirty secret — 'stateless' is API semantics, server is implicitly stateful via 4-tier cache hierarchy..."</td></tr><tr><td>5</td><td>KV cache 复用 mechanics</td><td>3 min</td><td>vLLM PagedAttention 自动 prefix 复用. Client 传 conversation_id hint → sticky route → 80-85% prefix cache hit rate. SGLang RadixAttention multi-turn 多 20-30%</td><td>"The hidden stateful layer is GPU KV cache — vLLM PagedAttention 自动 share prefix, hit rate 80-85% with sticky..."</td></tr><tr><td>6</td><td>Failover edge cases</td><td>2 min</td><td>Stateless: any pod takes over, 0 user impact, but 30K token re-prefill cost. Stateful: pod dies → reconnect to any pod, 200ms re-warm acceptable for voice. 跨 region &lt; 1s FO 要 Redis cross-region replicate</td><td>"Failover differs sharply — stateless free but expensive re-prefill, stateful needs warm-up budget..."</td></tr><tr><td>7</td><td>简历 resume hook</td><td>90s</td><td>"Voice agent 7 markets is stateful WebSocket (TTFT 280ms target). BNPL chatbot is stateless REST + Redis blob (任意 pod serve, 2-5s p99). Decision driver: voice &lt; 500ms vs chatbot accepts 2-5s"</td><td>"On voice agent (TikTok / ByteDance) we ran stateful WebSocket — on BNPL chatbot we ran stateless REST..."</td></tr></tbody></table></div>
 <h4>🎯 为啥按这个序</h4>
 <p>4-axis 比较先把题从二元拉到光谱, 强制面试官思考维度. 默认 stateless 表态后, per-use-case 决策展示你能 zoom-in 不同场景. Hybrid pattern 是中段 senior 加分 — "你以为是 stateless, 其实server 4 tier stateful". KV cache 是 LLM 独有的隐藏 stateful 层, 多数候选人不知道 — 主动讲是 staff 信号. Failover edge case 把 trade-off 落到操作细节 (200ms re-warm). 简历最后, voice + BNPL 两个项目正好对应 stateful / stateless 双案例.</p>
 <h4>🔥 哪一层最容易被追问 deeper</h4>
@@ -91,7 +91,7 @@ KV cache hit rate optimization?
 <pre class="language-plaintext"><code class="language-plaintext">Stateless API:    p99 200-1200ms, infinite scale, wire 10x, &lt; 1s failover 0 loss
 Stateful single:  p99 150-350ms, 100K+ pods ok, wire 1x, 5-30s failover lose checkpoint
 Stateful AA:      p99 150-350ms, 100K+, wire 1x, &lt; 1s failover 3x cost</code></pre>
-<ul><li>核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA</li><li>Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢</li><li>Tools: Locust / k6 latency benchmark, AWS CloudWatch RTO/RPO, Envoy active-active</li></ul>
+<ul><li>核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA</li><li>Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢</li><li>Tools: Locust / k6 latency benchmark, Cloud Monitoring RTO/RPO, Envoy active-active</li></ul>
 <p><strong>Problem 2: Hybrid Pattern — Logically Stateless + 4-Tier Cache</strong></p>
 <pre class="language-python"><code class="language-python">def serve(req):
     conv_id = req.conv_id
@@ -134,7 +134,7 @@ sticky routing: hash(conv_id) % N → 固定 pod, KV 在该 GPU 显存
   → 0 message loss
 
 Stateful single:
-  - Checkpoint 5-30s interval (snapshot to S3)
+  - Checkpoint 5-30s interval (snapshot to GCS)
   - Pod die → spare pod load snapshot + replay WAL
   - Lose 5-30s data + 200-500ms TTFT cold start
 
@@ -142,7 +142,7 @@ Active-Active:
   - Replicate delta (operation log) cross-region &lt; 1s
   - Conflict: last-write-wins or vector clock CRDT
   - 3x cost for replicas</code></pre>
-<ul><li>Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写</li><li>Tools: AWS S3 for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey</li></ul>
+<ul><li>Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写</li><li>Tools: GCS (Cloud Storage) for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey</li></ul>
 <h4>🔥 Production gotchas (top 15)</h4>
 <ol><li><strong>Stateless API 强制 sticky</strong>: 违反 stateless 假设, 单 pod 挂全体 user 受影响</li><li><strong>Stateful 无 failover plan</strong>: 死一个 pod 丢一晚 session</li><li><strong>不传 conv_id 给 LLM</strong>: KV cache 0 hit, TTFT 翻倍</li><li><strong>每 turn 重传 50K token (no cache hint)</strong>: cost 5x, latency 大</li><li><strong>In-memory only state (无 DB backup)</strong>: pod 死 = data gone</li><li><strong>DB write 在 LLM call 之后</strong>: crash 时 LLM 已 mutate downstream 但 state 没存</li><li><strong>Idempotency key 缺失</strong>: retry 双发 SMS / 双扣款</li><li><strong>State 无 size cap</strong>: 100MB session blob, GC 拖死</li><li><strong>Conv &gt; 100 turn 不 summarize</strong>: token cost 线性涨</li><li><strong>Active-Active conflict resolution 没设计</strong>: split-brain 时数据 corrupt</li><li><strong>Voice 用 REST polling 不 WebSocket</strong>: TTFT 1.5s, 客户体验糟</li><li><strong>Sticky LB 没 hash by conv_id</strong>: pod 平均分配 cache 但 same conv 跨 pod</li><li><strong>Checkpoint 30s + RPO 0 矛盾</strong>: 选 SLA 时不算 RPO</li><li><strong>Prompt 微改 → cache 全失效</strong>: 没意识到 cache key 是 token 序列</li><li><strong>Cross-region replication lag &gt; 5s</strong>: AA 失效但仍 routes traffic</li></ol>
 <h4>💬 简历 reframe 索引</h4>
@@ -170,7 +170,7 @@ vLLM prefix cache hit rate (production 实测):
   + conv_id hint:            70-80%
   + sticky routing (Envoy hash conv_id): 80-85% ⭐</code></pre>
 <h4>🧰 2026 工具栈 quick lookup</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你简历</th></tr></thead><tbody><tr><td>Stateless API framework</td><td>FastAPI / Express</td><td>Go Gin, Rust Axum</td><td>FastAPI</td></tr><tr><td>L1 in-process cache</td><td>Caffeine / Guava</td><td>LRU dict</td><td>Caffeine</td></tr><tr><td>L2 warm cache</td><td>Redis Cluster</td><td>DragonFly, KeyDB</td><td>Redis</td></tr><tr><td>L3 cold store</td><td>Postgres</td><td>DynamoDB, Cassandra</td><td>Postgres</td></tr><tr><td>L4 KV cache (LLM)</td><td>vLLM PagedAttn</td><td>SGLang RadixAttn, TensorRT-LLM</td><td>vLLM + SGLang ✅</td></tr><tr><td>Sticky LB</td><td>Envoy hash</td><td>HAProxy, NGINX consistent hash</td><td>Envoy</td></tr><tr><td>WebSocket</td><td>Envoy WS / Socket.io</td><td>uWebSockets</td><td>Envoy</td></tr><tr><td>Workflow engine</td><td>Temporal</td><td>DBOS, Inngest</td><td>Temporal ✅</td></tr><tr><td>Idempotency</td><td>Redis SETNX + DB unique</td><td>Vendor Idempotency-Key</td><td>Redis + Postgres</td></tr><tr><td>CRDT</td><td>Y.js / Automerge</td><td>Loro</td><td>—</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你简历</th></tr></thead><tbody><tr><td>Stateless API framework</td><td>FastAPI / Express</td><td>Go Gin, Rust Axum</td><td>FastAPI</td></tr><tr><td>L1 in-process cache</td><td>Caffeine / Guava</td><td>LRU dict</td><td>Caffeine</td></tr><tr><td>L2 warm cache</td><td>Redis Cluster</td><td>DragonFly, KeyDB</td><td>Redis</td></tr><tr><td>L3 cold store</td><td>Postgres</td><td>Firestore / Bigtable, Cassandra</td><td>Postgres</td></tr><tr><td>L4 KV cache (LLM)</td><td>vLLM PagedAttn</td><td>SGLang RadixAttn, TensorRT-LLM</td><td>vLLM + SGLang ✅</td></tr><tr><td>Sticky LB</td><td>Envoy hash</td><td>HAProxy, NGINX consistent hash</td><td>Envoy</td></tr><tr><td>WebSocket</td><td>Envoy WS / Socket.io</td><td>uWebSockets</td><td>Envoy</td></tr><tr><td>Workflow engine</td><td>Temporal</td><td>DBOS, Inngest</td><td>Temporal ✅</td></tr><tr><td>Idempotency</td><td>Redis SETNX + DB unique</td><td>Vendor Idempotency-Key</td><td>Redis + Postgres</td></tr><tr><td>CRDT</td><td>Y.js / Automerge</td><td>Loro</td><td>—</td></tr></tbody></table></div>
 <h4>🎬 45-min 节奏 (T3.1 专属)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">0-5    Clarify    "voice or chat? p99 latency? failover RTO/RPO?
                   Multi-region? Tenant isolation? Compliance?"
@@ -211,7 +211,7 @@ vLLM prefix cache hit rate (production 实测):
 |---|---|---|---|---|
 | 1 | 4-axis 比较框架 | 90s | latency / scale / failover / cost 四维度, 不是 yes/no 选择. Stateless: ∞ scale + simple FO + 30 wire重传 vs Stateful: TTFT 280ms + sticky FO 复杂 | "Stateless vs stateful 不是二选一, 我用 4-axis 框架 — latency, scale, failover, cost..." |
 | 2 | 默认 stance | 30s | **默认 stateless 95% 场景** (OpenAI / Anthropic API 都是这样), voice / sub-500ms 才例外. 这是 industry 默认 | "Default position: stateless. OpenAI / Anthropic 公开 API 都 stateless 是有原因的..." |
-| 3 | 3 use-case 决策 | 3 min | (a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 S3 — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable | "Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..." |
+| 3 | 3 use-case 决策 | 3 min | (a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 GCS — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable | "Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..." |
 | 4 | Hybrid pattern 揭示 | 2 min | "Stateless" 是 API 语义, server 内部其实 implicitly stateful — in-process LRU + Redis + DB + GPU KV cache. 4 tier hierarchy | "Now the dirty secret — 'stateless' is API semantics, server is implicitly stateful via 4-tier cache hierarchy..." |
 | 5 | KV cache 复用 mechanics | 3 min | vLLM PagedAttention 自动 prefix 复用. Client 传 conversation_id hint → sticky route → 80-85% prefix cache hit rate. SGLang RadixAttention multi-turn 多 20-30% | "The hidden stateful layer is GPU KV cache — vLLM PagedAttention 自动 share prefix, hit rate 80-85% with sticky..." |
 | 6 | Failover edge cases | 2 min | Stateless: any pod takes over, 0 user impact, but 30K token re-prefill cost. Stateful: pod dies → reconnect to any pod, 200ms re-warm acceptable for voice. 跨 region < 1s FO 要 Redis cross-region replicate | "Failover differs sharply — stateless free but expensive re-prefill, stateful needs warm-up budget..." |
@@ -325,7 +325,7 @@ Stateful AA:      p99 150-350ms, 100K+, wire 1x, < 1s failover 3x cost
 ```
 - 核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA
 - Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢
-- Tools: Locust / k6 latency benchmark, AWS CloudWatch RTO/RPO, Envoy active-active
+- Tools: Locust / k6 latency benchmark, Cloud Monitoring RTO/RPO, Envoy active-active
 
 **Problem 2: Hybrid Pattern — Logically Stateless + 4-Tier Cache**
 
@@ -391,7 +391,7 @@ Stateless full flow:
   → 0 message loss
 
 Stateful single:
-  - Checkpoint 5-30s interval (snapshot to S3)
+  - Checkpoint 5-30s interval (snapshot to GCS)
   - Pod die → spare pod load snapshot + replay WAL
   - Lose 5-30s data + 200-500ms TTFT cold start
 
@@ -401,7 +401,7 @@ Active-Active:
   - 3x cost for replicas
 ```
 - Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写
-- Tools: AWS S3 for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey
+- Tools: GCS (Cloud Storage) for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey
 
 ### 🔥 Production gotchas (top 15)
 
@@ -486,7 +486,7 @@ vLLM prefix cache hit rate (production 实测):
 | Stateless API framework | FastAPI / Express | Go Gin, Rust Axum | FastAPI |
 | L1 in-process cache | Caffeine / Guava | LRU dict | Caffeine |
 | L2 warm cache | Redis Cluster | DragonFly, KeyDB | Redis |
-| L3 cold store | Postgres | DynamoDB, Cassandra | Postgres |
+| L3 cold store | Postgres | Firestore / Bigtable, Cassandra | Postgres |
 | L4 KV cache (LLM) | vLLM PagedAttn | SGLang RadixAttn, TensorRT-LLM | vLLM + SGLang ✅ |
 | Sticky LB | Envoy hash | HAProxy, NGINX consistent hash | Envoy |
 | WebSocket | Envoy WS / Socket.io | uWebSockets | Envoy |

@@ -187,8 +187,8 @@ Reversibility judgment?
 - 核心解法:
   ```
   Trade-off matrix (cost / latency / dev-time / vendor-lock / extensibility):
-    Pinecone:  managed, fast, $$, vendor-lock
-    Qdrant:    self-host, customizable, $, ops-burden
+    Vertex AI Vector Search:  managed, fast, $$, vendor-lock
+    Vertex AI Vector Search:    self-host, customizable, $, ops-burden
     pgvector:  in-existing-DB, cheapest, slow at 1M+
   
   Reversibility check:

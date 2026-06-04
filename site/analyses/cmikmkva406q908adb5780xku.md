@@ -6,7 +6,7 @@
 | **CNN (ResNet/EfficientNet)** | 卷积神经网络，从像素学 visual feature | 视觉系统 |
 | **CLIP** | OpenAI 模型，把 image 和 text embed 到同一空间 | 让"狗"文本和"狗"图片向量接近 |
 | **ANN (Approximate Nearest Neighbor)** | 近似最近邻搜索，亿级向量秒级查 | "找最像的"快速查 |
-| **FAISS / Milvus / Pinecone** | 业界主流 vector DB | 向量数据库品牌 |
+| **FAISS / Milvus / Vertex AI Vector Search** | 业界主流 vector DB | 向量数据库品牌 |
 | **HNSW** | Hierarchical Navigable Small World，最常用 ANN 算法 | 图结构搜索 |
 | **Reverse image search** | 上传图找类似图 | Google 图片识图 |
 | **Text-to-image search** | 文字描述找图 | "夕阳海边" → 找到相关图 |
@@ -107,7 +107,7 @@ Feature extraction worker
    ├── OCR (Tesseract / Vision API)
    └── Metadata extraction (EXIF: GPS, date, camera)
    ↓
-Vector DB (FAISS / Milvus) + Metadata DB (Spanner/DynamoDB)
+Vector DB (FAISS / Milvus) + Metadata DB (Spanner/Firestore / Bigtable)
    ↓
 Searchable
 ```
@@ -139,7 +139,7 @@ Image upload → CLIP/ResNet vision encoder → image_vec [512]
 ```
 Vector DB: FAISS IVF-PQ index, sharded by image_id
 Metadata: Spanner (image_id, owner, upload_time, GPS, objects, OCR text)
-Image bytes: S3 (cold), CDN edge (hot)
+Image bytes: GCS (cold), CDN edge (hot)
 ```
 
 ### Step 5: Personal vs Global separation
@@ -308,7 +308,7 @@ Many photos 有可读文字 (receipt, screenshot, sign):
 ### Q3: "user 上传新图，几秒后可搜，怎么实现？"
 
 **A**：
-1. Image → S3 → Kafka event
+1. Image → GCS → Kafka event
 2. Worker pull → CLIP infer (50ms on GPU)
 3. Embed insert to **delta FAISS index** (separate small index, fast write)
 4. Query: search delta + main index, merge
@@ -391,7 +391,7 @@ Vector DB:
   Future: DiskANN / SPANN (SSD-based)
 
 Storage:
-  Raw images: S3 (5 PB for 5T images)
+  Raw images: GCS (5 PB for 5T images)
   Embeddings: 20 TB compressed
   Metadata + OCR text: Spanner / ES
   Index: FAISS cluster

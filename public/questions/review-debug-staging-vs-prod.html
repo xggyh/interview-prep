@@ -62,12 +62,12 @@
 <h4>核心心智模型 (1 sentence)</h4>
 <p>Staging vs prod inconsistency debug = "先 clarify 'wrong / different / slower' → stabilize (rollback if &gt; 50% impact) → reproduce (trace_id + snapshot + replay) → cheap-first 7-diff source (config 35% / model 20% / time 15% / data 12% / state 10% / dep 5% / scale 3%) → fix + prevent (golden trace + canary + shadow)", 90% root cause 不是 model 本身是 D2/D3 (config / model hash).</p>
 <h4>术语全表</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>Staging vs Production</td><td>两个环境, 理想一样实际 drift</td><td>整体框架</td></tr><tr><td>Inconsistency</td><td>wrong / different / slower 3 类</td><td>必先 clarify</td></tr><tr><td>Reproducibility</td><td>给一个 prod failure 能在 staging 复现</td><td>80% 成功标志</td></tr><tr><td>trace_id</td><td>OpenTelemetry span ID, 端到端 propagation</td><td>找 specific request 必备</td></tr><tr><td>D1-D7</td><td>data / config / model / dep / scale / state / time</td><td>7 类 diff source</td></tr><tr><td>Cheap-first</td><td>hash diff &lt; config diff &lt; dep diff &lt; dist diff &lt; load test</td><td>诊断顺序</td></tr><tr><td>Golden trace</td><td>200-500 case CI gate eval</td><td>防 regression</td></tr><tr><td>Shadow mode</td><td>1-10% 流量 fork 到 staging, async compare</td><td>drift visibility</td></tr><tr><td>Canary deploy</td><td>1% → 10% → 50% → 100% with auto-rollback</td><td>防全量伤害</td></tr><tr><td>Snapshot</td><td>failure 时存 full reproduce context (S3 30d)</td><td>后续 replay 用</td></tr><tr><td>PSI</td><td>Population Stability Index, 衡量 distribution drift</td><td>D1 数据 drift</td></tr><tr><td>KS test</td><td>Kolmogorov-Smirnov 累积分布最大差</td><td>D1 detection</td></tr><tr><td>Singleflight</td><td>dlock + cache 防 thundering herd refresh</td><td>D7 token expire</td></tr><tr><td>Prefix cache</td><td>vLLM KV cache 复用前 prefix</td><td>D5/D6 scale + state</td></tr><tr><td>Replay tool</td><td>prod trace → staging run, compare output</td><td>parity verify</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>Staging vs Production</td><td>两个环境, 理想一样实际 drift</td><td>整体框架</td></tr><tr><td>Inconsistency</td><td>wrong / different / slower 3 类</td><td>必先 clarify</td></tr><tr><td>Reproducibility</td><td>给一个 prod failure 能在 staging 复现</td><td>80% 成功标志</td></tr><tr><td>trace_id</td><td>OpenTelemetry span ID, 端到端 propagation</td><td>找 specific request 必备</td></tr><tr><td>D1-D7</td><td>data / config / model / dep / scale / state / time</td><td>7 类 diff source</td></tr><tr><td>Cheap-first</td><td>hash diff &lt; config diff &lt; dep diff &lt; dist diff &lt; load test</td><td>诊断顺序</td></tr><tr><td>Golden trace</td><td>200-500 case CI gate eval</td><td>防 regression</td></tr><tr><td>Shadow mode</td><td>1-10% 流量 fork 到 staging, async compare</td><td>drift visibility</td></tr><tr><td>Canary deploy</td><td>1% → 10% → 50% → 100% with auto-rollback</td><td>防全量伤害</td></tr><tr><td>Snapshot</td><td>failure 时存 full reproduce context (GCS 30d)</td><td>后续 replay 用</td></tr><tr><td>PSI</td><td>Population Stability Index, 衡量 distribution drift</td><td>D1 数据 drift</td></tr><tr><td>KS test</td><td>Kolmogorov-Smirnov 累积分布最大差</td><td>D1 detection</td></tr><tr><td>Singleflight</td><td>dlock + cache 防 thundering herd refresh</td><td>D7 token expire</td></tr><tr><td>Prefix cache</td><td>vLLM KV cache 复用前 prefix</td><td>D5/D6 scale + state</td></tr><tr><td>Replay tool</td><td>prod trace → staging run, compare output</td><td>parity verify</td></tr></tbody></table></div>
 <h4>5 个核心 framework / pattern</h4>
 <p><strong>Framework 1</strong>: 7 diff sources cheap → expensive</p>
 <ul><li>When: production-only bug</li><li>Algorithm: D2 config (35% RC) → D3 model SHA (20%) → D4 deps (5%) → D1 data dist (12%) → D7 time (15%) → D6 state (10%) → D5 scale (3%); 按 occurrence × diagnostic cost 排序</li><li>Trade-off: 跳过 cheap → 浪费 hours, 但深奥 bug 必到 D5/D6</li><li>Tools: kubectl get cm diff, pip freeze diff, sha256sum 校验</li></ul>
 <p><strong>Framework 2</strong>: Reproducibility 三件套 (trace + snapshot + replay)</p>
-<ul><li>When: prod failure debugging</li><li>Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot S3 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare</li><li>Trade-off: snapshot 存储 vs forensic 能力</li><li>Tools: opentelemetry SDK, structlog with trace_id, S3 30d retention bucket</li></ul>
+<ul><li>When: prod failure debugging</li><li>Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot GCS 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare</li><li>Trade-off: snapshot 存储 vs forensic 能力</li><li>Tools: opentelemetry SDK, structlog with trace_id, GCS 30d retention bucket</li></ul>
 <p><strong>Framework 3</strong>: Environment parity (Golden + Shadow + Canary)</p>
 <ul><li>When: 防 future drift</li><li>Algorithm: Golden traces 200-500 case CI gate / Shadow mode 1-10% async fork / Canary 1→10→50→100% auto-rollback on error budget</li><li>Trade-off: shadow $$, but catch drift before customer</li><li>Tools: Argo Rollouts, Flagger, custom shadow proxy</li></ul>
 <p><strong>Framework 4</strong>: Stateful diff (cache / in-mem / KV / replica)</p>
@@ -117,7 +117,7 @@ Fix + Prevent:
 <p><strong>Problem 1: 7 类 diff source 系统排查</strong></p>
 <ul><li>核心解法: cheap → expensive 顺序 (D2 35% / D3 20% / D7 15% / D1 12% / D6 10% / D4 5% / D5 3%); 每类有专属诊断工具</li><li>Top 3 gotchas: 不要立刻怀疑 model (90% RC 不在 model) / "recently changed" 永远先查 / 不跳到 GPU 非确定性 (配置 1 行不同的概率高 10x)</li><li>Tools: PSI / KS test (D1), config diff (D2), sha256 (D3), pip freeze (D4), vegeta/wrk (D5), state dump (D6), time audit (D7)</li></ul>
 <p><strong>Problem 2: Reproducibility instrumentation (trace + snapshot + replay)</strong></p>
-<ul><li>核心解法: OpenTelemetry trace_id 端到端 (LLM metadata + response header + audit) / RequestSnapshot dataclass (trace_id, model_id, model_sha, image_sha, pod_id, seed, temperature, feature_flags, result) / ReplayTool prod-trace → staging-run + compare</li><li>Top 3 gotchas: trace_id 进 LLM API metadata 字段 (OpenAI / Anthropic dashboard 才能查) / snapshot 必含 model_sha 不仅 model_id / replay 要 override seed 才 deterministic</li><li>Tools: opentelemetry-sdk, structlog, S3 snapshots bucket 30d retention</li></ul>
+<ul><li>核心解法: OpenTelemetry trace_id 端到端 (LLM metadata + response header + audit) / RequestSnapshot dataclass (trace_id, model_id, model_sha, image_sha, pod_id, seed, temperature, feature_flags, result) / ReplayTool prod-trace → staging-run + compare</li><li>Top 3 gotchas: trace_id 进 LLM API metadata 字段 (OpenAI / Anthropic dashboard 才能查) / snapshot 必含 model_sha 不仅 model_id / replay 要 override seed 才 deterministic</li><li>Tools: opentelemetry-sdk, structlog, GCS snapshots bucket 30d retention</li></ul>
 <p><strong>Problem 3: Environment parity (Golden / Shadow / Canary)</strong></p>
 <ul><li>核心解法: Golden 200-500 case CI gate (每 incident 加 1 防 regression) + Shadow 1-10% async fork + Canary Argo Rollouts 1→10→50→100% auto-rollback (error rate / latency / agent success rate)</li><li>Top 3 gotchas: shadow 必 async 不阻塞 user / semantic similarity not exact match (LLM 有合理变化) / canary auto-rollback 阈值要 specific (error rate &gt; 1% vs baseline 0.1%)</li><li>Tools: Argo Rollouts / Flagger, semantic shadow diff using embedding cosine</li></ul>
 <p><strong>Problem 4: Stateful diff (cache / in-mem / vLLM KV / replica)</strong></p>
@@ -139,7 +139,7 @@ Fix + Prevent:
 <h4>Canary deploy auto-rollback conditions (Argo Rollouts spec)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Metric</th><th>Threshold</th><th>Action</th></tr></thead><tbody><tr><td>Error rate</td><td>&gt; 1% (vs baseline 0.1%)</td><td>rollback</td></tr><tr><td>p99 latency</td><td>&gt; 2× baseline</td><td>rollback</td></tr><tr><td>agent_success_rate</td><td>&lt; 95%</td><td>rollback</td></tr><tr><td>5xx rate</td><td>&gt; 0.5%</td><td>rollback</td></tr><tr><td>OOM kills</td><td>any in 10 min</td><td>rollback</td></tr><tr><td>GPU OOM</td><td>any</td><td>rollback</td></tr><tr><td>Restart rate</td><td>&gt; 5/min</td><td>rollback</td></tr></tbody></table></div>
 <h4>工具栈 (real production)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Stage</th><th>Tool</th></tr></thead><tbody><tr><td>Trace</td><td>OpenTelemetry + Tempo/Jaeger</td></tr><tr><td>Log</td><td>structlog + Loki / Datadog</td></tr><tr><td>Metric</td><td>Prometheus + Grafana / Datadog</td></tr><tr><td>Snapshot store</td><td>S3 30d retention</td></tr><tr><td>Canary</td><td>Argo Rollouts / Flagger</td></tr><tr><td>Shadow proxy</td><td>Envoy / custom Lua filter</td></tr><tr><td>Replay tool</td><td>custom CLI on snapshots</td></tr><tr><td>Golden traces</td><td>YAML in repo, CI gate</td></tr><tr><td>Hash assertion</td><td>Cosign / Sigstore for image sig</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Stage</th><th>Tool</th></tr></thead><tbody><tr><td>Trace</td><td>OpenTelemetry + Tempo/Jaeger</td></tr><tr><td>Log</td><td>structlog + Loki / Datadog</td></tr><tr><td>Metric</td><td>Prometheus + Grafana / Datadog</td></tr><tr><td>Snapshot store</td><td>GCS 30d retention</td></tr><tr><td>Canary</td><td>Argo Rollouts / Flagger</td></tr><tr><td>Shadow proxy</td><td>Envoy / custom Lua filter</td></tr><tr><td>Replay tool</td><td>custom CLI on snapshots</td></tr><tr><td>Golden traces</td><td>YAML in repo, CI gate</td></tr><tr><td>Hash assertion</td><td>Cosign / Sigstore for image sig</td></tr></tbody></table></div>
 <h4>RequestSnapshot dataclass fields</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Field</th><th>Purpose</th></tr></thead><tbody><tr><td>trace_id</td><td>end-to-end identifier</td></tr><tr><td>timestamp</td><td>when failed</td></tr><tr><td>user_id</td><td>who hit it</td></tr><tr><td>region</td><td>geo dimension</td></tr><tr><td>request_body</td><td>replay input</td></tr><tr><td>request_headers</td><td>auth + meta</td></tr><tr><td>model_id</td><td>which model</td></tr><tr><td>model_sha</td><td>content-addressed</td></tr><tr><td>tokenizer_sha</td><td>content-addressed</td></tr><tr><td>image_sha</td><td>container ID</td></tr><tr><td>pod_id</td><td>replica ID</td></tr><tr><td>gpu_type</td><td>hardware</td></tr><tr><td>feature_flags</td><td>active flags snapshot</td></tr><tr><td>config_snapshot_sha</td><td>config ref</td></tr><tr><td>system_prompt_hash</td><td>which prompt version</td></tr><tr><td>temperature</td><td>LLM param</td></tr><tr><td>top_p</td><td>LLM param</td></tr><tr><td>max_tokens</td><td>LLM param</td></tr><tr><td>seed</td><td>reproducibility</td></tr><tr><td>response_body</td><td>what was returned</td></tr><tr><td>latency_ms</td><td>timing</td></tr><tr><td>error</td><td>if any</td></tr></tbody></table></div>
 <h4>5 业务场景变体 (anchor stories)</h4>
@@ -230,7 +230,7 @@ Staging vs prod inconsistency debug = "先 clarify 'wrong / different / slower' 
 | Golden trace | 200-500 case CI gate eval | 防 regression |
 | Shadow mode | 1-10% 流量 fork 到 staging, async compare | drift visibility |
 | Canary deploy | 1% → 10% → 50% → 100% with auto-rollback | 防全量伤害 |
-| Snapshot | failure 时存 full reproduce context (S3 30d) | 后续 replay 用 |
+| Snapshot | failure 时存 full reproduce context (GCS 30d) | 后续 replay 用 |
 | PSI | Population Stability Index, 衡量 distribution drift | D1 数据 drift |
 | KS test | Kolmogorov-Smirnov 累积分布最大差 | D1 detection |
 | Singleflight | dlock + cache 防 thundering herd refresh | D7 token expire |
@@ -247,9 +247,9 @@ Staging vs prod inconsistency debug = "先 clarify 'wrong / different / slower' 
 
 **Framework 2**: Reproducibility 三件套 (trace + snapshot + replay)
 - When: prod failure debugging
-- Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot S3 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare
+- Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot GCS 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare
 - Trade-off: snapshot 存储 vs forensic 能力
-- Tools: opentelemetry SDK, structlog with trace_id, S3 30d retention bucket
+- Tools: opentelemetry SDK, structlog with trace_id, GCS 30d retention bucket
 
 **Framework 3**: Environment parity (Golden + Shadow + Canary)
 - When: 防 future drift
@@ -322,7 +322,7 @@ Fix + Prevent:
 **Problem 2: Reproducibility instrumentation (trace + snapshot + replay)**
 - 核心解法: OpenTelemetry trace_id 端到端 (LLM metadata + response header + audit) / RequestSnapshot dataclass (trace_id, model_id, model_sha, image_sha, pod_id, seed, temperature, feature_flags, result) / ReplayTool prod-trace → staging-run + compare
 - Top 3 gotchas: trace_id 进 LLM API metadata 字段 (OpenAI / Anthropic dashboard 才能查) / snapshot 必含 model_sha 不仅 model_id / replay 要 override seed 才 deterministic
-- Tools: opentelemetry-sdk, structlog, S3 snapshots bucket 30d retention
+- Tools: opentelemetry-sdk, structlog, GCS snapshots bucket 30d retention
 
 **Problem 3: Environment parity (Golden / Shadow / Canary)**
 - 核心解法: Golden 200-500 case CI gate (每 incident 加 1 防 regression) + Shadow 1-10% async fork + Canary Argo Rollouts 1→10→50→100% auto-rollback (error rate / latency / agent success rate)
@@ -436,7 +436,7 @@ Fix + Prevent:
 | Trace | OpenTelemetry + Tempo/Jaeger |
 | Log | structlog + Loki / Datadog |
 | Metric | Prometheus + Grafana / Datadog |
-| Snapshot store | S3 30d retention |
+| Snapshot store | GCS 30d retention |
 | Canary | Argo Rollouts / Flagger |
 | Shadow proxy | Envoy / custom Lua filter |
 | Replay tool | custom CLI on snapshots |

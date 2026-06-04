@@ -147,7 +147,7 @@
 | 术语 | 解释 |
 |---|---|
 | **Iceberg lake** | 数据湖表格式 — 用于 cold telemetry 存储. |
-| **Snowflake** | 数据仓库 — cost dashboard 源数据. |
+| **BigQuery** | 数据仓库 — cost dashboard 源数据. |
 | **FINRA / SOC 2 / HIPAA** | 合规框架. |
 | **RBAC** | 角色 / 行级访问控制. |
 | **Sankey diagram** | 桑基图 — 显示 tool 调用顺序流. |
@@ -237,7 +237,7 @@
    │     ▸ Metrics → Prometheus / Datadog Metrics                                   │
    │     ▸ Logs → Loki / Datadog Logs                                               │
    │     ▸ Evals → LangSmith / custom store                                         │
-   │     ▸ Costs → Iceberg lake → Snowflake → Datadog                               │
+   │     ▸ Costs → Iceberg lake → BigQuery → Datadog                               │
    └─────────┬─────────────┬─────────────────┬───────────────┬──────────────────────┘
              │             │                 │               │
              ▼             ▼                 ▼               ▼
@@ -352,7 +352,7 @@ agent.run (root span)
 W3C TraceContext (`traceparent` header). 跨 service:
 - Agent → MCP gateway: pass traceparent
 - MCP gateway → tool server: pass traceparent
-- Tool server → external API (Snowflake/SAP): pass if supported (otherwise audit only)
+- Tool server → external API (BigQuery/SAP): pass if supported (otherwise audit only)
 
 Result: 单一 trace view 跨整个 agent + 所有 tool + LLM call.
 
@@ -767,7 +767,7 @@ I推 hybrid:
 
 **Storage**:
 - Tempo / Datadog traces: 75GB × 30 day = 2.2TB hot, $50/GB-month = $110K/month — too high
-- Cost-control: 30 day for tier-1 only, 7 day others, S3 cold for 90 day
+- Cost-control: 30 day for tier-1 only, 7 day others, GCS cold for 90 day
 
 **Logs**:
 - 1TB/day at 5 log lines / run × 1KB = $1200/day Datadog = $36K/month
@@ -816,7 +816,7 @@ reframe: "我做 PayLater agent 时直接面对这道题. Stack 是 OTel + LangS
 
 1. **"如果 LLM provider (Anthropic) 没 OTel native, 怎么集成?"** — 答: (a) Anthropic Python SDK 2026 自带 OTel hook (PostHogAI / Helicone proxy 也 OK); (b) 自己 wrap SDK 在 trace span 里; (c) 用 LangChain / LangGraph (有 OTel built-in); (d) Helicone proxy on top of Anthropic — adds tracing layer.
 
-2. **"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"** — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold S3); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + S3 backend) 比 Datadog cheaper.
+2. **"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"** — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold GCS); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + GCS backend) 比 Datadog cheaper.
 
 3. **"customer 想看自己 trace 但不能看到 prompt 内容 (他们 PII), how?"** — 答: PII redact 后给 customer trace. 自身 PII 已经 redact (因为 own VPC 部署 redact happen 在 source). 同时给 customer "request raw" 按钮, 走 break-glass: customer DPO 审批 + 24h time-bound access.
 

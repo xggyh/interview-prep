@@ -54,13 +54,13 @@ OpenAI 报告 63 次，是这个数据集里最热的 SD 题。考点与 `Design
   ┌──────┐ ┌─────────┐         ┌────────────┐
   │ Log  │ │ Artifact│         │ Workflow   │
   │ Pipe │ │ Store   │         │ State DB   │
-  │ (Kafka)│ (S3)   │          │ (Postgres) │
+  │ (Kafka)│ (GCS)   │          │ (Postgres) │
   └──────┘ └─────────┘          └────────────┘
        │
        ▼
   ┌──────────┐
   │ Live tail│  SSE 实时
-  │ + S3 cold│  归档
+  │ + GCS cold│  归档
   └──────────┘
 ```
 
@@ -120,15 +120,15 @@ runner stdout/stderr
     │
     ├── SSE 实时推前端
     │
-    └── 异步归档 S3 (Parquet 压缩，30 天后冷归档)
+    └── 异步归档 GCS (Parquet 压缩，30 天后冷归档)
 ```
 
-前端 `GET /runs/{id}/jobs/{jid}/logs/stream` → SSE 实时 tail。结束后切到 S3 静态 GET。
+前端 `GET /runs/{id}/jobs/{jid}/logs/stream` → SSE 实时 tail。结束后切到 GCS 静态 GET。
 
 ### 6. Artifact
 
-- 用户在 yml `actions/upload-artifact` → runner POST → API GW → S3 multipart upload
-- 下载 actions/download-artifact 同样走 API + S3 presigned URL
+- 用户在 yml `actions/upload-artifact` → runner POST → API GW → GCS multipart upload
+- 下载 actions/download-artifact 同样走 API + GCS presigned URL
 - 默认 90 天 expire
 
 ### 7. 计费
@@ -147,7 +147,7 @@ runner stdout/stderr
 | 隔离 | VM per job | Container：被 escape 风险 |
 | 队列 | Kafka 按 label 分 topic | 单大队列：路由难 |
 | Orchestrator | Stateless service + Postgres | Temporal：可以但增加依赖 |
-| 日志 | Kafka 实时 + S3 归档 | 直接 DB：吞吐撑不住 |
+| 日志 | Kafka 实时 + GCS 归档 | 直接 DB：吞吐撑不住 |
 | Runner 启动 | warm pool 30 秒 P99 | Cold start：用户骂 |
 
 ## 容量估算
@@ -171,7 +171,7 @@ runner stdout/stderr
 > ❌ Self-hosted runner push 模型 —— NAT 后客户跑不了；必须 pull；
 > ❌ workflow yml 用户改一次重 schedule —— 必须按 commit_sha 缓存；
 > ❌ 单大 job queue —— GitHub-hosted 抢占 self-hosted 资源；
-> ❌ artifact 走 API 主流量 —— 应直传 S3。
+> ❌ artifact 走 API 主流量 —— 应直传 GCS。
 
 > [!followup]
 > "Schedule cron 怎么实现？" → 单独 cron service 按 yml 注册 cron 表达式，到点触发。"Workflow approval（人审批）？" → orchestrator 在该 job 之前进入 `waiting` 状态，等 webhook。"Reusable workflow？" → yml 里 `uses: other/workflow.yml`，orchestrator 解析时递归展开。

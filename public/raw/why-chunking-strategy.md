@@ -1173,9 +1173,9 @@ async def daily_eval():
 
 ## 5 follow-ups
 
-**Q1**: "Why not just use Pinecone / Weaviate defaults?"
+**Q1**: "Why not just use Vertex AI Vector Search / Weaviate defaults?"
 
-**A**: Vector DB defaults are **infrastructure choices, not retrieval-quality choices**. Pinecone's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. **Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks**. In production, defaults cost user trust.
+**A**: Vector DB defaults are **infrastructure choices, not retrieval-quality choices**. Vertex AI Vector Search's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. **Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks**. In production, defaults cost user trust.
 
 **Q2**: "Tell me about a time chunking strategy failed."
 

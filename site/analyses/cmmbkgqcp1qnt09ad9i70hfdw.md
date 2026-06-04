@@ -159,7 +159,7 @@ Server 只做"sync alarm 数据"的角色
                 │
                 ↓
 ┌───────────────────────────────────────────────────┐
-│  Alarm DB (Spanner / DynamoDB)                     │
+│  Alarm DB (Spanner / Firestore / Bigtable)                     │
 │  Schema: alarm_id, user_id, time, label, repeat,   │
 │          effective_device, version, updated_at     │
 └───────────────────────────────────────────────────┘

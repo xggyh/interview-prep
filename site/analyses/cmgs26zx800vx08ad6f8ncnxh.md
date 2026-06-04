@@ -22,7 +22,7 @@
 **Global VM Monitoring System** = hyperscale cloud（AWS / GCP / Azure / 阿里云）给客户提供"我所有 VM 健康状况"的 service。
 
 **典型场景**：
-- AWS CloudWatch 监控你 EC2 instances
+- Cloud Monitoring 监控你 EC2 instances
 - GCP Cloud Monitoring 看 GCE VMs
 - 阿里云监控看 ECS
 - 自建 OpenStack 私有云的运维 dashboard
@@ -501,7 +501,7 @@ US-East region 故障 →
 
 ### Q6: 全 region 数据汇总到 federation，跨洋延迟大怎么办?
 
-**答**：Federation 只查近 1 hour 实时；老数据每 region 各自 cold storage，cross-region query 用 async batch (Athena over S3 Parquet)。
+**答**：Federation 只查近 1 hour 实时；老数据每 region 各自 cold storage，cross-region query 用 async batch (Athena over GCS Parquet)。
 
 ### Q7: 客户怎么 onboard 自己的 VM?
 
@@ -551,4 +551,4 @@ US-East region 故障 →
 3. **Hypervisor-aware monitoring 是 cloud value-add**。客户自己装的 monitoring 只能看 guest OS，cloud 厂商能 expose hypervisor 层（noisy neighbor / steal time）。这是客户为啥用 native monitoring 而非第三方的理由。
 
 > [!followup]
-> **学习推荐**：(a) 试 AWS CloudWatch / GCP Cloud Monitoring 实际操作；(b) 读 Thanos / Cortex 架构；(c) 看 Datadog multi-tenant talk；(d) 学 Prometheus exposition + relabeling；(e) 思考 "cloud monitoring 怎么不竞争自己的 customer SaaS biz" (AWS 自己卖 CloudWatch，但 Datadog 也跑在 AWS 上)。
+> **学习推荐**：(a) 试 Cloud Monitoring / GCP Cloud Monitoring 实际操作；(b) 读 Thanos / Cortex 架构；(c) 看 Datadog multi-tenant talk；(d) 学 Prometheus exposition + relabeling；(e) 思考 "cloud monitoring 怎么不竞争自己的 customer SaaS biz" (AWS 自己卖 Cloud Monitoring，但 Datadog 也跑在 AWS 上)。

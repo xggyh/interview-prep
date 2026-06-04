@@ -192,7 +192,7 @@ TP=8, PP=4, DP=4 → 128 GPU, MFU 45-55% 是工业目标
 L1 Result cache (exact hash): 10-20% hit
   Key = hash(model + prompt + temperature + seed)
 L2 Semantic cache (embedding): 30-50% hit FAQ workload
-  Pinecone 0.95 threshold; per-domain tunable
+  Vertex AI Vector Search 0.95 threshold; per-domain tunable
 L3 Prefix cache (vLLM server): 60-90% hit shared prefix
   Auto + conv_id hint
 L4 Tool output cache: per-tool TTL
@@ -204,7 +204,7 @@ Vendor prefix cache discount:
   Google: 75% off
 ```
 - Top 3 gotchas: (1) semantic threshold 0.90 看似激进但 wrong-hit 是 silent kill (2) prefix cache 不 per-tenant → cross-tenant leak (3) cache invalidation 不 event-based → stale
-- Tools: Redis (L1), Pinecone (L2), vLLM auto (L3), per-tool config (L4)
+- Tools: Redis (L1), Vertex AI Vector Search (L2), vLLM auto (L3), per-tool config (L4)
 
 **Problem 4: Speculative Decoding + Quantization Trade-offs**
 
@@ -236,7 +236,7 @@ S-LoRA pattern:
   Base 70B Llama frozen (140GB FP16 / 70GB FP8)
   Per-tenant LoRA adapter 50-100 MB
   GPU hot pool: 200 LoRA cached
-  Cold: load from CPU RAM (50ms) or S3 (500ms)
+  Cold: load from CPU RAM (50ms) or GCS (500ms)
   
 vLLM: --enable-lora --max-loras 50 --lora-modules tenant1=path tenant2=path
 
@@ -338,6 +338,6 @@ Routing:
 | Spec decoding | vLLM Eagle | Medusa, draft same-family | Eagle ✅ |
 | Multi-LoRA | vLLM Multi-LoRA / S-LoRA | Punica | vLLM Multi-LoRA |
 | Parallelism | TP within node + DP across | PP only when 200B+ | TP=8 |
-| Cache | vLLM prefix + Pinecone semantic | Redis exact | vLLM + Pinecone |
+| Cache | vLLM prefix + Vertex AI Vector Search semantic | Redis exact | vLLM + Vertex AI Vector Search |
 | Observability | Prometheus + Grafana | NVIDIA DCGM, Nsight | Prometheus |
 | Router | LiteLLM | OpenRouter, Portkey | LiteLLM

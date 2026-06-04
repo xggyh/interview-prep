@@ -16,12 +16,12 @@
 | 1 | Burst 数学锚点 | 1 min | Sustained 100 QPS → spike 10K QPS (100x). Provider 100 RPM → 100/60 = 1.67 RPS = **1/600 of peak**. Naive 直打 = 99.83% 429. 这是 burst 的真实 economic | "Let me anchor the burst math — 100 RPM provider vs 10K QPS spike = 1/600 throughput. 99.83% 429 if naive..." |
 | 2 | Clarify 5 问 | 90s | Multi-tenant? Tier (gold/silver/bronze)? p99 vs p50 SLA? Cost budget $/month? Quality regression tolerance? PII/compliance? | "5 clarify — tier model, SLA, budget, quality tolerance, compliance" |
 | 3 | 4-layer cost defense 概览 | 1 min | L1 cache (40% reduction) / L2 priority queue (SLA 保护) / L3 rate limit (defense) / L4 cost-aware routing (5-6x). Combined **8-12x blended cost ↓** | "4 layers stacked — cache, queue, rate, routing. Combined 8-12x blended cost reduction..." |
-| 4 | L1 多 cache 设计 | 4 min | (a) **Exact** hash(model+prompt+temp+seed), 10-20% hit; (b) **Semantic** Pinecone, threshold **0.97 safety / 0.95 normal**, 30-50% FAQ hit; (c) **Tool output** cache for idempotent tool; (d) **vLLM prefix** 自动 share KV. **Per-tenant namespace 防 cross-tenant leak** | "Cache 4 sub-layers — exact, semantic (threshold 0.97), tool output, vLLM prefix. Per-tenant namespace 是红线..." |
+| 4 | L1 多 cache 设计 | 4 min | (a) **Exact** hash(model+prompt+temp+seed), 10-20% hit; (b) **Semantic** Vertex AI Vector Search, threshold **0.97 safety / 0.95 normal**, 30-50% FAQ hit; (c) **Tool output** cache for idempotent tool; (d) **vLLM prefix** 自动 share KV. **Per-tenant namespace 防 cross-tenant leak** | "Cache 4 sub-layers — exact, semantic (threshold 0.97), tool output, vLLM prefix. Per-tenant namespace 是红线..." |
 | 5 | L2 priority queue | 2 min | Per-tenant Redis sorted set, score = `tier_priority × 1e10 + timestamp`. Gold tier 5% traffic 优先, Silver 25%, Bronze 70%. Per-tier max concurrency, noisy neighbor 隔离 | "L2 — Redis sorted set per tenant, score = priority×1e10 + ts. Gold 5%, Silver 25%, Bronze 70% concurrency budget..." |
 | 6 | L3 token bucket 多维 | 2 min | 5 dimension: user / tenant / API key / model / global. Redis Lua atomic, < 1ms. **Token-based 不是 request-based** (LLM 1 req 可以 50K token). 429 retry-after header propagate | "L3 token bucket 5-dim — user, tenant, API key, model, global. Critical: token-based not request-based..." |
 | 7 | L4 cost-aware routing | 3 min | 70% Flash ($0.50/$3) + 25% Pro ($2/$12) + 5% Opus ($5/$25). Complexity classify (heuristic + small LLM). Tier override: gold + complex → Opus. Budget exhausted → cheap-only or fallback canned | "L4 routing — 70/25/5 baseline. Complexity classifier (small LLM judge). Budget exhausted → graceful degrade..." |
 | 8 | Graceful degradation ladder | 2 min | 5 step: priority queue → smaller model → aggressive cache → canned response → "服务忙稍后". 每步 cost ↓ quality ↓, 但永远不挂 | "Graceful ladder 5 steps — queue → smaller → cache → canned → busy. 永远不返回 5xx..." |
-| 9 | 简历 resume hook | 90s | "TikTok PayLater chatbot peak 5K QPS. 4-layer: semantic 35% hit (Pinecone 0.97), priority queue gold 5%, token bucket per user/tenant, 70/25/5 routing. Blended $0.85/1M vs $5/1M = **6x savings**, faithfulness ≥ 0.85 unchanged. Eval harness 证明 no quality regression" | "On TikTok PayLater 5K QPS, blended cost $0.85/1M vs $5/1M = 6x, eval harness 证明 no regression..." |
+| 9 | 简历 resume hook | 90s | "TikTok PayLater chatbot peak 5K QPS. 4-layer: semantic 35% hit (Vertex AI Vector Search 0.97), priority queue gold 5%, token bucket per user/tenant, 70/25/5 routing. Blended $0.85/1M vs $5/1M = **6x savings**, faithfulness ≥ 0.85 unchanged. Eval harness 证明 no quality regression" | "On TikTok PayLater 5K QPS, blended cost $0.85/1M vs $5/1M = 6x, eval harness 证明 no regression..." |
 
 ### 🎯 为啥按这个序
 
@@ -82,7 +82,7 @@ LLM API 慢 + 贵 + rate-limited, 防御靠 **5 layer 叠加** (cache → queue 
 - When: 50% 流量是 cache-able (FAQ-heavy)
 - Algorithm: exact (hash) → semantic (embedding 0.95) → tool output (per-TTL) → LLM prefix (vLLM)
 - Trade-off: stale data vs cost; wrong-hit on semantic
-- Tools: Redis (exact + tool), Pinecone / Qdrant (semantic, threshold 0.95-0.97), vLLM (prefix), per-tool config
+- Tools: Redis (exact + tool), Vertex AI Vector Search / Vertex AI Vector Search (semantic, threshold 0.95-0.97), vLLM (prefix), per-tool config
 
 **Layer 2: Priority Queue + Concurrency**
 - When: multi-tenant, SLA differential
@@ -159,7 +159,7 @@ async def cached_llm_call(req):
     return resp
 ```
 - Top 3 gotchas: (1) semantic threshold 0.90 wrong-hit silent (用 0.95+) (2) cache 不 per-tenant → cross-tenant leak (3) write 不 eval-gated → poisoning
-- Tools: Redis (exact), Pinecone (semantic, threshold 0.95), vLLM prefix cache (auto)
+- Tools: Redis (exact), Vertex AI Vector Search (semantic, threshold 0.95), vLLM prefix cache (auto)
 
 **Problem 2: Priority Queue + Per-Tenant Concurrency**
 
@@ -302,7 +302,7 @@ class DegradationController:
 
 | 题考点 | 你的项目 | 1-line story |
 |---|---|---|
-| Semantic cache | BNPL chatbot | "Pinecone 0.95 threshold, FAQ 38% hit, cost ↓ 42%" |
+| Semantic cache | BNPL chatbot | "Vertex AI Vector Search 0.95 threshold, FAQ 38% hit, cost ↓ 42%" |
 | Priority queue | Voice agent 7 markets | "Gold 50 concurrent, Silver 20, Bronze 5, Free 1; SLA differential" |
 | Cost-aware routing | TikTok PayLater 5k QPS | "70/25/5 Flash/Pro/Opus, blended $0.85/1M (vs $5)" |
 | Budget cap | Voice agent | "Per-tenant monthly $5K cap, Redis Lua atomic, 80/95/100 alert" |
@@ -359,14 +359,14 @@ class DegradationController:
 | 类别 | 默认 | Alt | 你用过 |
 |---|---|---|---|
 | Cache (exact + tool) | Redis Cluster | DragonFly, KeyDB | Redis ✅ |
-| Vector cache (semantic) | Pinecone | Qdrant, Milvus, Weaviate | Pinecone ✅ |
+| Vector cache (semantic) | Vertex AI Vector Search | Vertex AI Vector Search, Milvus, Weaviate | Vertex AI Vector Search ✅ |
 | LLM prefix cache | vLLM auto | SGLang RadixAttn | vLLM ✅ |
 | Atomic check | Redis Lua | Postgres advisory lock | Redis Lua ✅ |
 | Priority queue | Redis sorted set | Kafka tiered topic | Redis |
 | Concurrency sema | Redis SETNX | semaphore service | Redis Lua |
 | Router | LiteLLM | OpenRouter, Portkey | LiteLLM |
 | Rate limit | Envoy filter | Kong, NGINX | Envoy |
-| Budget tracker | Postgres + Redis | DynamoDB atomic | Postgres + Redis |
+| Budget tracker | Postgres + Redis | Firestore / Bigtable atomic | Postgres + Redis |
 | Alert | PagerDuty + Slack | Opsgenie | PagerDuty |
 | Self-host | vLLM TP=8 H100 | TensorRT-LLM | vLLM ✅ |
 
@@ -383,7 +383,7 @@ class DegradationController:
 
 ### 🔢 关键 production 数字
 
-- BNPL semantic cache: Pinecone 0.95, 38% hit, cost ↓ 42%
+- BNPL semantic cache: Vertex AI Vector Search 0.95, 38% hit, cost ↓ 42%
 - TikTok PayLater: 5k QPS peak, 70/25/5 routing, blended $0.85/1M
 - Voice agent 7 markets: per-tenant $5K monthly cap, 80/95/100 alert
 - Self-host Llama 70B: $0.30/1M output (vLLM TP=8 H100)

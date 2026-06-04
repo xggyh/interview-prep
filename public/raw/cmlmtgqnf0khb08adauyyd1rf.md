@@ -98,7 +98,7 @@ service:foo AND level:error
 | limit 10
 ```
 
-或 SQL on logs (DuckDB / Snowflake style)。
+或 SQL on logs (DuckDB / BigQuery style)。
 
 ### 6. Live tail
 
@@ -136,7 +136,7 @@ Enterprise tier 卖点。
 ## Differentiation vs Splunk / DataDog
 
 - **Modern UX** (Splunk old, DataDog complex)
-- **Cheaper cold tier** (S3 Parquet vs Splunk indexer)
+- **Cheaper cold tier** (GCS Parquet vs Splunk indexer)
 - **Open OTel standard** (avoid vendor lock-in)
 - **AI-powered insights** (auto anomaly, summary)
 
@@ -144,7 +144,7 @@ Enterprise tier 卖点。
 
 > [!pitfall]
 > ❌ 不 multi-tenant isolation → cross-customer data leak；
-> ❌ Hot tier 全 30 days → 成本爆 (10x of S3 Parquet)；
+> ❌ Hot tier 全 30 days → 成本爆 (10x of GCS Parquet)；
 > ❌ Self-service onboarding 麻烦 → developer 不 stick；
 > ❌ 无 audit log → enterprise 不买；
 > ❌ Query language too custom → 学习曲线 high。

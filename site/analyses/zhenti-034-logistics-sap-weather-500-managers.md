@@ -500,7 +500,7 @@ This is the **scope reduction is FDE core skill** moment. Customer wants global 
 - Bottleneck is SAP TM API rate limits (typically 100-500 IDoc/min, vendor-specific)
 
 **Architecture for scale**:
-- Trigger detector → SQS / Kafka queue
+- Trigger detector → Cloud Tasks / Kafka queue
 - Scoring workers (horizontal scale, 5-20 workers)
 - SAP write rate-limited with backoff
 - Per-manager alert deduped (don't spam manager with 50 alerts for same weather event)

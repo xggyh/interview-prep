@@ -91,7 +91,7 @@ class TemplateEngine:
 <p>迭代查找最内层 placeholder（regex <code>\w+</code> 不含 <code>${</code> 所以匹配的就是内层）。</p>
 <h3>易错点</h3>
 <div class="callout callout-pitfall"><strong>易错点 / Red Flag</strong><p>❌ 不做 cycle detection —— 递归爆栈； ❌ visited 用全局 set 不回溯 —— <code>a</code> 出现两条独立路径时第二次误判 cycle； ❌ Regex 错（如忘了 <code>\</code> 转义 <code>$</code> 和 <code>{}</code>）； ❌ 找不到 key 时不处理 —— 输出含原始 <code>${var}</code> 或应该 raise。</p></div>
-<div class="callout callout-key"><strong>核心要点</strong><p>模板引擎核心：<strong>递归 expand + cycle detection</strong>。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Lambda calc 替换。</p></div>
+<div class="callout callout-key"><strong>核心要点</strong><p>模板引擎核心：<strong>递归 expand + cycle detection</strong>。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Cloud Functions calc 替换。</p></div>
 <div class="callout callout-followup"><strong>延伸 / Follow-up</strong><p>"支持函数式占位 <code>${upper(name)}</code>？" → 解析 <code>name</code> 后再 apply function；"延迟 evaluation？" → 返回 lambda 而非 string；"性能（大模板）？" → 预 parse 成 AST 树，多次 render 时直接 walk；"streaming？" → 一边读一边输出，碰到完整 <code>${...}</code> 时展开。</p></div>
   </section>
 
@@ -201,7 +201,7 @@ def render_nested(s, mapping):
 > ❌ 找不到 key 时不处理 —— 输出含原始 `${var}` 或应该 raise。
 
 > [!key]
-> 模板引擎核心：**递归 expand + cycle detection**。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Lambda calc 替换。
+> 模板引擎核心：**递归 expand + cycle detection**。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Cloud Functions calc 替换。
 
 > [!followup]
 > "支持函数式占位 `${upper(name)}`？" → 解析 `name` 后再 apply function；"延迟 evaluation？" → 返回 lambda 而非 string；"性能（大模板）？" → 预 parse 成 AST 树，多次 render 时直接 walk；"streaming？" → 一边读一边输出，碰到完整 `${...}` 时展开。

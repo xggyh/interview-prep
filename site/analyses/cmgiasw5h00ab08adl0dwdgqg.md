@@ -131,7 +131,7 @@ Embedding model 升级 → 老 vector incompatible。Index 支持 multi-version�
 > ❌ Index 不版本化 → model upgrade 时灾难。
 
 > [!key]
-> 三大要点：(1) **HNSW for accuracy** / **IVF-PQ for scale**；(2) **Hybrid pre/post filter**；(3) **Sharding + replication for QPS**。Vector DB 是新 hot DB category（Pinecone, Weaviate, Milvus）。
+> 三大要点：(1) **HNSW for accuracy** / **IVF-PQ for scale**；(2) **Hybrid pre/post filter**；(3) **Sharding + replication for QPS**。Vector DB 是新 hot DB category（Vertex AI Vector Search, Weaviate, Milvus）。
 
 > [!followup]
 > "如何 delete vector？" → HNSW 不易，标记 deleted + periodic rebuild；"GPU 加速？" → GPU-friendly index (FAISS-GPU)；"Hybrid sparse + dense search？" → BM25 + dense vector → rerank。

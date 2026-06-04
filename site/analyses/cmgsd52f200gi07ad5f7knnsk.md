@@ -227,7 +227,7 @@ Every action logged immutable:
 **Storage**:
 - Immediate: Kafka (event sourcing)
 - Hot 30 days: Elasticsearch (for query)
-- Cold 5 years: S3 (compliance retention)
+- Cold 5 years: GCS (compliance retention)
 
 **Tamper-proof**:
 - Append-only Kafka topic
@@ -329,7 +329,7 @@ Attacker tricks LLM into using its capabilities maliciously.
 > 2. **Delegation flow**: OAuth-like consent — user 看到 scope list, 同意 → grant created with TTL
 > 3. **Token issuance**: short-lived JWT (15 min) signed by IAM, contains `sub=agent, act=user, scope=[...]`
 > 4. **Target API**: validate JWT (cached JWKS pub key) + check scope + enforce
-> 5. **Audit**: every action → Kafka → Elasticsearch (30d hot) → S3 (5y cold), append-only + hash chain
+> 5. **Audit**: every action → Kafka → Elasticsearch (30d hot) → GCS (5y cold), append-only + hash chain
 > 6. **Revocation**: Redis revoke list + Kafka push to API servers
 >
 > **Defenses against prompt injection**:
@@ -452,7 +452,7 @@ Components:
   Delegation Manager (grants)
   Token Service (issue/verify)
   Policy Engine (OPA / Rego, RBAC + ABAC)
-  Audit Logger (Kafka → ES → S3, hash-chain)
+  Audit Logger (Kafka → ES → GCS, hash-chain)
 
 Revocation:
   Short TTL primary

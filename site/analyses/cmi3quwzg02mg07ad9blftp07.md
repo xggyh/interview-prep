@@ -482,7 +482,7 @@ ML insights:
   - Optimal staffing per store per shift
 ```
 
-存 BigQuery / Snowflake → 跑 SQL + ML。
+存 BigQuery / BigQuery → 跑 SQL + ML。
 
 ---
 

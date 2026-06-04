@@ -264,7 +264,7 @@ Q: 用户 role → mask 哪些?
 | Schema validate | pydantic, JSON schema, marshmallow | 起步必备 |
 | Intent classify | Gemini 3 Flash, Claude Haiku 4.5 | Fast + cheap |
 | Tracing | Phoenix (Arize), LangSmith, Langfuse | Per-tool latency |
-| Blob | S3, GCS, Azure Blob | Tool output > 1K |
+| Blob | GCS, GCS, Azure Blob | Tool output > 1K |
 | SQL parse | sqlparse, sqlglot | Intent rules |
 | Citation validate | 自实现 regex + Flash SC | Hallucinate cite 防 |
 | XML | python lxml escape | Close-tag attack 防 |

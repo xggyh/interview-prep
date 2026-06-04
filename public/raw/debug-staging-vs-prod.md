@@ -1050,7 +1050,7 @@ Diagnostic flow:
 
 Reproducibility 三件套:
   trace_id propagation (OpenTelemetry)
-  Per-failure snapshot (S3, 30d retain)
+  Per-failure snapshot (GCS, 30d retain)
   Replay tool (prod trace → staging run)
 
 Env parity strategies:

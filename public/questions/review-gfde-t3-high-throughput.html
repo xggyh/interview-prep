@@ -131,7 +131,7 @@ TP=8, PP=4, DP=4 → 128 GPU, MFU 45-55% 是工业目标</code></pre>
 <pre class="language-plaintext"><code class="language-plaintext">L1 Result cache (exact hash): 10-20% hit
   Key = hash(model + prompt + temperature + seed)
 L2 Semantic cache (embedding): 30-50% hit FAQ workload
-  Pinecone 0.95 threshold; per-domain tunable
+  Vertex AI Vector Search 0.95 threshold; per-domain tunable
 L3 Prefix cache (vLLM server): 60-90% hit shared prefix
   Auto + conv_id hint
 L4 Tool output cache: per-tool TTL
@@ -141,7 +141,7 @@ Vendor prefix cache discount:
   Anthropic: 90% off (1h TTL)
   OpenAI: 50% off
   Google: 75% off</code></pre>
-<ul><li>Top 3 gotchas: (1) semantic threshold 0.90 看似激进但 wrong-hit 是 silent kill (2) prefix cache 不 per-tenant → cross-tenant leak (3) cache invalidation 不 event-based → stale</li><li>Tools: Redis (L1), Pinecone (L2), vLLM auto (L3), per-tool config (L4)</li></ul>
+<ul><li>Top 3 gotchas: (1) semantic threshold 0.90 看似激进但 wrong-hit 是 silent kill (2) prefix cache 不 per-tenant → cross-tenant leak (3) cache invalidation 不 event-based → stale</li><li>Tools: Redis (L1), Vertex AI Vector Search (L2), vLLM auto (L3), per-tool config (L4)</li></ul>
 <p><strong>Problem 4: Speculative Decoding + Quantization Trade-offs</strong></p>
 <pre class="language-plaintext"><code class="language-plaintext">Spec decoding accept rate:
   Same-family draft model (Llama 3 8B for 70B): 70-80% accept
@@ -165,7 +165,7 @@ vLLM config:
   Base 70B Llama frozen (140GB FP16 / 70GB FP8)
   Per-tenant LoRA adapter 50-100 MB
   GPU hot pool: 200 LoRA cached
-  Cold: load from CPU RAM (50ms) or S3 (500ms)
+  Cold: load from CPU RAM (50ms) or GCS (500ms)
   
 vLLM: --enable-lora --max-loras 50 --lora-modules tenant1=path tenant2=path
 
@@ -187,7 +187,7 @@ Routing:
 <h4>🔢 关键 production 数字 (你简历项目)</h4>
 <ul><li>Voice agent TTFT: 800ms → 280ms (65% drop via 6-lever)</li><li>BNPL Llama 70B FP8 TP=8: H100×8 NVLink, $0.30/1M output</li><li>BNPL self-host vs hosted Opus: 80x cost ↓ at scale</li><li>Voice agent 7 markets S-LoRA: 6x GPU saving (1 base + 7 LoRA pool)</li><li>Voice agent Eagle spec decoding: 72% accept, 2.3x latency drop</li><li>BNPL SGLang RadixAttn multi-turn cache: 20-30% extra hit vs vLLM</li><li>Megatron + DeepSpeed 200B: TP=8 PP=4 DP=4, 128 GPU, MFU 47%</li><li>Anthropic prompt cache: 90% off cached input, 1h TTL</li><li>FP8 H100 vs FP16: 2x throughput, &lt; 0.5% eval drop</li></ul>
 <h4>🧰 2026 工具栈 quick lookup</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你用过</th></tr></thead><tbody><tr><td>Inference engine</td><td>vLLM 0.6+</td><td>SGLang, TensorRT-LLM</td><td>vLLM + SGLang ✅</td></tr><tr><td>Training framework</td><td>Megatron + DeepSpeed</td><td>FSDP, Colossal-AI</td><td>DeepSpeed ✅</td></tr><tr><td>Hardware</td><td>H100 80GB / H200 144GB / B100 FP4</td><td>A100 (older)</td><td>H100</td></tr><tr><td>Quantization</td><td>FP8 (H100 native)</td><td>AWQ INT4, GPTQ</td><td>FP8 + INT4</td></tr><tr><td>Spec decoding</td><td>vLLM Eagle</td><td>Medusa, draft same-family</td><td>Eagle ✅</td></tr><tr><td>Multi-LoRA</td><td>vLLM Multi-LoRA / S-LoRA</td><td>Punica</td><td>vLLM Multi-LoRA</td></tr><tr><td>Parallelism</td><td>TP within node + DP across</td><td>PP only when 200B+</td><td>TP=8</td></tr><tr><td>Cache</td><td>vLLM prefix + Pinecone semantic</td><td>Redis exact</td><td>vLLM + Pinecone</td></tr><tr><td>Observability</td><td>Prometheus + Grafana</td><td>NVIDIA DCGM, Nsight</td><td>Prometheus</td></tr><tr><td>Router</td><td>LiteLLM</td><td>OpenRouter, Portkey</td><td>LiteLLM</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>默认</th><th>Alt</th><th>你用过</th></tr></thead><tbody><tr><td>Inference engine</td><td>vLLM 0.6+</td><td>SGLang, TensorRT-LLM</td><td>vLLM + SGLang ✅</td></tr><tr><td>Training framework</td><td>Megatron + DeepSpeed</td><td>FSDP, Colossal-AI</td><td>DeepSpeed ✅</td></tr><tr><td>Hardware</td><td>H100 80GB / H200 144GB / B100 FP4</td><td>A100 (older)</td><td>H100</td></tr><tr><td>Quantization</td><td>FP8 (H100 native)</td><td>AWQ INT4, GPTQ</td><td>FP8 + INT4</td></tr><tr><td>Spec decoding</td><td>vLLM Eagle</td><td>Medusa, draft same-family</td><td>Eagle ✅</td></tr><tr><td>Multi-LoRA</td><td>vLLM Multi-LoRA / S-LoRA</td><td>Punica</td><td>vLLM Multi-LoRA</td></tr><tr><td>Parallelism</td><td>TP within node + DP across</td><td>PP only when 200B+</td><td>TP=8</td></tr><tr><td>Cache</td><td>vLLM prefix + Vertex AI Vector Search semantic</td><td>Redis exact</td><td>vLLM + Vertex AI Vector Search</td></tr><tr><td>Observability</td><td>Prometheus + Grafana</td><td>NVIDIA DCGM, Nsight</td><td>Prometheus</td></tr><tr><td>Router</td><td>LiteLLM</td><td>OpenRouter, Portkey</td><td>LiteLLM</td></tr></tbody></table></div>
   </section>
 
   
@@ -393,7 +393,7 @@ TP=8, PP=4, DP=4 → 128 GPU, MFU 45-55% 是工业目标
 L1 Result cache (exact hash): 10-20% hit
   Key = hash(model + prompt + temperature + seed)
 L2 Semantic cache (embedding): 30-50% hit FAQ workload
-  Pinecone 0.95 threshold; per-domain tunable
+  Vertex AI Vector Search 0.95 threshold; per-domain tunable
 L3 Prefix cache (vLLM server): 60-90% hit shared prefix
   Auto + conv_id hint
 L4 Tool output cache: per-tool TTL
@@ -405,7 +405,7 @@ Vendor prefix cache discount:
   Google: 75% off
 ```
 - Top 3 gotchas: (1) semantic threshold 0.90 看似激进但 wrong-hit 是 silent kill (2) prefix cache 不 per-tenant → cross-tenant leak (3) cache invalidation 不 event-based → stale
-- Tools: Redis (L1), Pinecone (L2), vLLM auto (L3), per-tool config (L4)
+- Tools: Redis (L1), Vertex AI Vector Search (L2), vLLM auto (L3), per-tool config (L4)
 
 **Problem 4: Speculative Decoding + Quantization Trade-offs**
 
@@ -437,7 +437,7 @@ S-LoRA pattern:
   Base 70B Llama frozen (140GB FP16 / 70GB FP8)
   Per-tenant LoRA adapter 50-100 MB
   GPU hot pool: 200 LoRA cached
-  Cold: load from CPU RAM (50ms) or S3 (500ms)
+  Cold: load from CPU RAM (50ms) or GCS (500ms)
   
 vLLM: --enable-lora --max-loras 50 --lora-modules tenant1=path tenant2=path
 
@@ -539,7 +539,7 @@ Routing:
 | Spec decoding | vLLM Eagle | Medusa, draft same-family | Eagle ✅ |
 | Multi-LoRA | vLLM Multi-LoRA / S-LoRA | Punica | vLLM Multi-LoRA |
 | Parallelism | TP within node + DP across | PP only when 200B+ | TP=8 |
-| Cache | vLLM prefix + Pinecone semantic | Redis exact | vLLM + Pinecone |
+| Cache | vLLM prefix + Vertex AI Vector Search semantic | Redis exact | vLLM + Vertex AI Vector Search |
 | Observability | Prometheus + Grafana | NVIDIA DCGM, Nsight | Prometheus |
 | Router | LiteLLM | OpenRouter, Portkey | LiteLLM
 </script>

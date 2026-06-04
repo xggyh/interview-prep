@@ -133,9 +133,9 @@ Month 3+: 真正需要 real-time 时再上 CDC
 <h4>场景 A: Customer's SAP R/3 — 你最常遇到</h4>
 <p><strong>Setup</strong>: 法国制造业客户, SAP R/3 用了 15 年. 你 deploy AI 库存预测.</p>
 <p><strong>Reality check</strong>:</p>
-<ul><li>SAP 数据在 Oracle DB 后端, 几千张表 (MARA, MARC, MARD, MSEG...)</li><li>IT 不让你碰 prod DB</li><li>但 BI team 每天凌晨从 SAP 导出 CSV 到 Snowflake</li></ul>
+<ul><li>SAP 数据在 Oracle DB 后端, 几千张表 (MARA, MARC, MARD, MSEG...)</li><li>IT 不让你碰 prod DB</li><li>但 BI team 每天凌晨从 SAP 导出 CSV 到 BigQuery</li></ul>
 <p><strong>Phase 1 (Week 1-2)</strong>:</p>
-<ul><li>你和 BI team 谈, 同样的 CSV 给你 read</li><li>你接 Snowflake, 你的 AI model 训练 + 推理用日级数据</li><li>部署 1 个 demo dashboard 给客户看</li></ul>
+<ul><li>你和 BI team 谈, 同样的 CSV 给你 read</li><li>你接 BigQuery, 你的 AI model 训练 + 推理用日级数据</li><li>部署 1 个 demo dashboard 给客户看</li></ul>
 <p><strong>Phase 2 (Month 2-3)</strong>:</p>
 <ul><li>用 phase 1 ROI ($X saved by AI prediction) 谈 IT</li><li>申请 SAP 的 read-only Oracle replica (30 min lag)</li><li>你的 model 升级到 hourly</li></ul>
 <p><strong>Phase 3 (Month 4-6)</strong>:</p>
@@ -167,9 +167,9 @@ Mexico:         legacy + new mix ↔ ESB
 <hr />
 <h3>6. 工程上要做什么 (实现 checklist)</h3>
 <p><strong>Phase 0 — Discovery (Week 1)</strong>:</p>
-<ol><li>跟 customer IT 谈: "你们 BI team 怎么读 SAP / ERP 的?"</li><li>跟 BI / data engineering team 直接接触, 看现有 ETL</li><li>调查 ERP 厂商 (是 SAP? Oracle? JDE? 各有不同 escape hatch)</li><li>列出你的 use case 需要的具体数据 (哪些表 / 哪些字段)</li><li>找出 customer 已有的 staging Snowflake / Redshift / on-prem warehouse</li></ol>
+<ol><li>跟 customer IT 谈: "你们 BI team 怎么读 SAP / ERP 的?"</li><li>跟 BI / data engineering team 直接接触, 看现有 ETL</li><li>调查 ERP 厂商 (是 SAP? Oracle? JDE? 各有不同 escape hatch)</li><li>列出你的 use case 需要的具体数据 (哪些表 / 哪些字段)</li><li>找出 customer 已有的 staging BigQuery / BigQuery / on-prem warehouse</li></ol>
 <p><strong>Phase 1 — File drop baseline (Week 2-4)</strong>:</p>
-<ol><li>跟 BI 协调: 现有 CSV export 加 1 个 dump for AI use case</li><li>你的服务接 SFTP / shared S3, 增量读取</li><li>Schema validation (上游变了就 alert)</li><li>在你的平台跑 first AI model 用 day-1 数据</li><li><strong>部署 visible value</strong> — 至少 1 个 dashboard / 1 个 insight 给客户看</li></ol>
+<ol><li>跟 BI 协调: 现有 CSV export 加 1 个 dump for AI use case</li><li>你的服务接 SFTP / shared GCS, 增量读取</li><li>Schema validation (上游变了就 alert)</li><li>在你的平台跑 first AI model 用 day-1 数据</li><li><strong>部署 visible value</strong> — 至少 1 个 dashboard / 1 个 insight 给客户看</li></ol>
 <p><strong>Phase 2 — DB replica (Month 2-3)</strong>:</p>
 <ol><li>用 phase 1 的 ROI 数据跟 IT 重谈</li><li>申请 SAP DB 的 read-only replica</li><li>你的 adapter 直读 replica</li><li>Schema mapping document (你要看的 20 张表 是哪些)</li><li>SAP analyst 时间 (mapping 20 张表通常 1-2 周)</li></ol>
 <p><strong>Phase 3 — CDC (Month 4-6)</strong>:</p>
@@ -1083,11 +1083,11 @@ Month 3+: 真正需要 real-time 时再上 CDC
 **Reality check**:
 - SAP 数据在 Oracle DB 后端, 几千张表 (MARA, MARC, MARD, MSEG...)
 - IT 不让你碰 prod DB
-- 但 BI team 每天凌晨从 SAP 导出 CSV 到 Snowflake
+- 但 BI team 每天凌晨从 SAP 导出 CSV 到 BigQuery
 
 **Phase 1 (Week 1-2)**: 
 - 你和 BI team 谈, 同样的 CSV 给你 read
-- 你接 Snowflake, 你的 AI model 训练 + 推理用日级数据
+- 你接 BigQuery, 你的 AI model 训练 + 推理用日级数据
 - 部署 1 个 demo dashboard 给客户看
 
 **Phase 2 (Month 2-3)**:
@@ -1158,12 +1158,12 @@ Mexico:         legacy + new mix ↔ ESB
 2. 跟 BI / data engineering team 直接接触, 看现有 ETL
 3. 调查 ERP 厂商 (是 SAP? Oracle? JDE? 各有不同 escape hatch)
 4. 列出你的 use case 需要的具体数据 (哪些表 / 哪些字段)
-5. 找出 customer 已有的 staging Snowflake / Redshift / on-prem warehouse
+5. 找出 customer 已有的 staging BigQuery / BigQuery / on-prem warehouse
 
 **Phase 1 — File drop baseline (Week 2-4)**:
 
 6. 跟 BI 协调: 现有 CSV export 加 1 个 dump for AI use case
-7. 你的服务接 SFTP / shared S3, 增量读取
+7. 你的服务接 SFTP / shared GCS, 增量读取
 8. Schema validation (上游变了就 alert)
 9. 在你的平台跑 first AI model 用 day-1 数据
 10. **部署 visible value** — 至少 1 个 dashboard / 1 个 insight 给客户看

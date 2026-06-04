@@ -90,7 +90,7 @@
 
 **Storage**:
 - Hot (last 30 days): 1.5 × 10^12 msg × 200 B = 300 TB
-- Cold (older): 几年 history → 10 PB scale → cold tier (S3/GCS)
+- Cold (older): 几年 history → 10 PB scale → cold tier (GCS/GCS)
 
 **Network**:
 - Send 1.8M msg/sec × avg 1KB = 1.8 GB/s upstream
@@ -262,8 +262,8 @@ Message m1 from A → B
 ### Deep Dive 4: Storage Strategy
 
 **Hot vs Cold**:
-- Last 90 days: Cassandra / DynamoDB (fast random read by conversation_id)
-- Older: S3 archived (cold tier, 10× cheaper)
+- Last 90 days: Cassandra / Firestore / Bigtable (fast random read by conversation_id)
+- Older: GCS archived (cold tier, 10× cheaper)
 
 **Schema design**:
 ```
@@ -342,7 +342,7 @@ SK: message_id (ULID, lex sorts by time)
 > **架构**：
 > 1. **WebSocket server pool** (1000 servers × 100k connection each)，sticky session via consistent hashing on user_id
 > 2. **Pub/sub via Kafka** (shard topic 1000 个) 跨 server 路由
-> 3. **Sharded DB** (by conversation_id)：hot 90 天在 Cassandra，cold 在 S3
+> 3. **Sharded DB** (by conversation_id)：hot 90 天在 Cassandra，cold 在 GCS
 > 4. **Group fan-out**: push for < 500, pull for > 10k
 > 5. **Presence** via Redis TTL key + subscribe model
 >
@@ -438,7 +438,7 @@ SK: message_id (ULID, lex sorts by time)
    → WebSocket Server Pool (1000 nodes, sticky session)
    → Kafka pub/sub (1000 shard topics)
    → Message DB (sharded by conv_id, Cassandra)
-   → Cold tier (S3)
+   → Cold tier (GCS)
    → APNs/FCM for offline push
 
 核心问题:
@@ -457,8 +457,8 @@ Status flow:
   (每变化 → push to sender)
 
 Storage:
-  Hot 90 天: Cassandra/DynamoDB
-  Cold: S3 archive
+  Hot 90 天: Cassandra/Firestore / Bigtable
+  Cold: GCS archive
   GDPR: tombstone + scheduled physical delete
 
 数字:

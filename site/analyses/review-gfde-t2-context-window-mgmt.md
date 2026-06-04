@@ -72,7 +72,7 @@
 | **Sliding window** | 仅保最近 N turn verbatim | 短会话 baseline |
 | **Hierarchical summary** | 4-tier ancient/middle/recent/latest | Long agent ⭐ |
 | **Selective pruning** | 按 importance score (LLM-judge) 砍低分 turn | Hybrid 配合 |
-| **External memory** | Blob (S3) + Vector DB (Qdrant) + Structured (Postgres) | 数据 > 1K 不进 context |
+| **External memory** | Blob (GCS) + Vector DB (Vertex AI Vector Search) + Structured (Postgres) | 数据 > 1K 不进 context |
 | **Tool output externalization** | > 1K 存 blob, 留 short summary + ref_id | 防爆 |
 | **Lost in middle** | Liu 2023, attention U 形, 中部 30-40% recall | Long ctx 通用问题 |
 | **Pinned message** | 永不被 compact 的关键 turn | 系统决策 / 用户偏好 |
@@ -92,9 +92,9 @@
 
 **Framework 2**: External Memory (3 层 store)
 - When: 任何 long agent
-- Algorithm: Blob (S3, tool outputs > 1K) + Vector DB (Qdrant, episodic search) + Postgres (decisions/prefs/state)
+- Algorithm: Blob (GCS, tool outputs > 1K) + Vector DB (Vertex AI Vector Search, episodic search) + Postgres (decisions/prefs/state)
 - Trade-off: 1 extra hop, 但 context 不爆
-- Tools: S3 / GCS, Qdrant / Pinecone, Postgres / Redis / DynamoDB
+- Tools: GCS / GCS, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable
 
 **Framework 3**: Tool Output Externalization
 - When: tool result > 1K token
@@ -156,13 +156,13 @@ Q: 用什么模型省钱?
 - Tools: LangChain ConversationSummaryBufferMemory, MemGPT, LlamaIndex memory
 
 **Problem 2: External Memory Architecture**
-- 3 层 store: Blob (S3) → tool outputs / files / artifacts; Vector DB (Qdrant) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)
+- 3 层 store: Blob (GCS) → tool outputs / files / artifacts; Vector DB (Vertex AI Vector Search) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)
 - Blob usage: store(content) → ref_id, agent tool fetch(ref_id) on demand
 - Vector DB: 老 turn segment → embed → upsert with metadata (turn#, ts, type)
 - Postgres schema: session_id, key, value, type (decision/pref/state), created_at
 - 一致性: write-through (decision 先 Postgres 后 context); read-back probe
 - Top 3 gotchas: 不 externalize 大输出 / vector DB cross-session 混 / Postgres 没 session_id 隔离
-- Tools: S3 / GCS / Azure Blob, Qdrant / Pinecone, Postgres / Redis / DynamoDB
+- Tools: GCS / GCS / Azure Blob, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable
 
 **Problem 3: Tool Output Externalization**
 - 阈值: ≤1K inline / 1K-5K summary+ref / 5K-50K minimal+ref / >50K reject
@@ -215,7 +215,7 @@ Q: 用什么模型省钱?
 | 题考点 | 你的项目 | 1-line story |
 |---|---|---|
 | Compaction | Voice agent 7 markets | 10-20 turn 20K+ tok, hierarchical 4-tier + recent 5 verbatim, token 减半 |
-| External memory | BNPL multi-turn agent | Postgres (decisions) + Qdrant (history embed) + S3 (tool blob) |
+| External memory | BNPL multi-turn agent | Postgres (decisions) + Vertex AI Vector Search (history embed) + GCS (tool blob) |
 | Tool externalization | ConvFinQA 5 calc tools | Tool result > 5K 走 blob ref, summary inline, context 稳态 30K |
 | Lost-in-middle | Voice agent | Decision log + pinned + periodic recap 每 10 turn, 关键 recall 95%+ |
 | Cost / routing | Internal Agent Plt | Flash 简单 + Opus 推理 + Haiku batch, session $ ↓ 60% |
@@ -259,9 +259,9 @@ Q: 用什么模型省钱?
 | 类别 | Tool | 一句话 |
 |---|---|---|
 | Memory libs | LangChain ConversationSummaryBufferMemory, LlamaIndex memory, MemGPT | 起步 |
-| Vector DB | Qdrant, Pinecone, Weaviate | Episodic memory |
-| Blob | S3, GCS, Azure Blob | Tool output > 1K |
-| Structured | Postgres, Redis, DynamoDB | Decisions / state |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate | Episodic memory |
+| Blob | GCS, GCS, Azure Blob | Tool output > 1K |
+| Structured | Postgres, Redis, Firestore / Bigtable | Decisions / state |
 | Tracing | Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry | Phoenix 开源 |
 | Prompt cache | Anthropic 5min, Gemini context cache 1h | 90% off cached |
 | Cost dashboard | OTel + Grafana / Phoenix | Per-session $ |

@@ -577,7 +577,7 @@ CDN by (region, limit) 作 cache key。
 
 ### Q6: 历史 trending（"昨天热门是什么"）怎么查？
 
-**答**：每分钟 trending snapshot 写到 cold storage (BigQuery / S3 Parquet)。Query 时按时间查。冷数据不影响实时 hot path。
+**答**：每分钟 trending snapshot 写到 cold storage (BigQuery / GCS Parquet)。Query 时按时间查。冷数据不影响实时 hot path。
 
 ### Q7: 怎么 detect 操纵 trending 的事件（aka "trends manipulation"）？
 

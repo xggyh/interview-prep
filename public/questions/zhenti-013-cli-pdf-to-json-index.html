@@ -724,7 +724,7 @@ if __name__ == '__main__':
 <ol><li><strong>Empty PDF</strong> (0 pages) → emit DocIndex with <code>page_count=0</code>, <code>error='empty'</code></li><li><strong>Encrypted PDF</strong> → pdfplumber 抛 PDFPasswordIncorrect, catch, mark <code>error</code></li><li><strong>Corrupted PDF</strong> → catch + log, 不 abort 整个 batch</li><li><strong>Scanned image PDF</strong> → pdfplumber 返回空, OCR fallback (if enabled)</li><li><strong>Mixed scanned + text</strong> (常见: 封面扫描, 正文 text) → per-page fallback</li><li><strong>Non-English</strong> (中文 / 阿拉伯) → spaCy <code>en_core_web_sm</code> 不识别 — 切 <code>zh_core_web_sm</code>/<code>xx_ent_wiki_sm</code></li><li><strong>Big PDF</strong> (500 pages) → text 可能 5MB, spaCy 截断 1M chars; LLM 必 chunk</li><li><strong>Duplicate PDF</strong> (同样 bytes 不同 path) → 用 <code>file_hash</code> dedupe</li><li><strong>LLM 返回 non-JSON</strong> → catch JSONDecodeError, log, skip chunk</li><li><strong>LLM 超 budget</strong> → 停止追加 chunk, 但 emit 已经抽出的</li><li><strong>Interrupted run</strong> → master index 已有的 doc_id 跳过 (resume)</li><li><strong>Permission denied / file not exist</strong> → log + counter</li><li><strong>Multi-file with same stem</strong> → doc_id 加 hash 后缀避免冲突</li><li><strong>Long filename / special chars</strong> → 落盘安全字符化</li><li><strong>Concurrent writes to master index</strong> → 用 <code>tmp + os.replace</code> atomic rename</li></ol>
 <h4>Step 4: Trade-offs + extensions (取舍与扩展, 5-10 min)</h4>
 <p><strong>Production hardening</strong>:</p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>问题</th><th>解法</th></tr></thead><tbody><tr><td>1M PDFs, 单机跑不完</td><td>Queue (SQS / Redis) + worker fleet; 每个 worker 处理一个</td></tr><tr><td>中途崩了</td><td>resume via <code>file_hash in master</code> (本地) — 分布式用 status row</td></tr><tr><td>Cost runaway</td><td>per-doc budget + per-batch budget + Slack alert at 80%</td></tr><tr><td>LLM 不稳定</td><td>spaCy 默认 + <code>--use-llm-only-if-confidence-low</code></td></tr><tr><td>Schema 演进</td><td>output JSON 加 <code>schema_version</code> field, downstream migrate</td></tr><tr><td>Search 性能</td><td>dump JSON 后, 灌进 Elasticsearch / Tantivy</td></tr><tr><td>Multilingual</td><td>detect 语言 → pick correct spaCy 模型 / LLM prompt</td></tr><tr><td>OCR 慢</td><td>gpu OCR (<code>easyocr</code>) 或 <code>paddleocr</code> 比 tesseract 快 5x</td></tr><tr><td>Privacy / PII</td><td>LLM 前先 redact SSN/credit card patterns; on-prem LLM (vLLM)</td></tr><tr><td>Costing accuracy</td><td>用 real-time pricing table, 不 hardcode</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>问题</th><th>解法</th></tr></thead><tbody><tr><td>1M PDFs, 单机跑不完</td><td>Queue (Cloud Tasks / Redis) + worker fleet; 每个 worker 处理一个</td></tr><tr><td>中途崩了</td><td>resume via <code>file_hash in master</code> (本地) — 分布式用 status row</td></tr><tr><td>Cost runaway</td><td>per-doc budget + per-batch budget + Slack alert at 80%</td></tr><tr><td>LLM 不稳定</td><td>spaCy 默认 + <code>--use-llm-only-if-confidence-low</code></td></tr><tr><td>Schema 演进</td><td>output JSON 加 <code>schema_version</code> field, downstream migrate</td></tr><tr><td>Search 性能</td><td>dump JSON 后, 灌进 Elasticsearch / Tantivy</td></tr><tr><td>Multilingual</td><td>detect 语言 → pick correct spaCy 模型 / LLM prompt</td></tr><tr><td>OCR 慢</td><td>gpu OCR (<code>easyocr</code>) 或 <code>paddleocr</code> 比 tesseract 快 5x</td></tr><tr><td>Privacy / PII</td><td>LLM 前先 redact SSN/credit card patterns; on-prem LLM (vLLM)</td></tr><tr><td>Costing accuracy</td><td>用 real-time pricing table, 不 hardcode</td></tr></tbody></table></div>
 <p><strong>Architecture upgrade</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Naive (本题):
   for pdf in pdfs:
@@ -735,9 +735,9 @@ Multi-worker:
   ProcessPoolExecutor — 8 cores, 8x throughput
 
 Distributed:
-  Queue (Redis / SQS) — workers pick pdfs from queue
+  Queue (Redis / Cloud Tasks) — workers pick pdfs from queue
   Status DB (Postgres) — record processed file_hash
-  S3 — store PDFs + output JSON
+  GCS — store PDFs + output JSON
 
 Pipeline-y:
   Airflow / Prefect DAG: scan → batch (100) → extract → entity → load
@@ -768,7 +768,7 @@ python pdfindex.py search ./out --query "Anthropic"</code></pre>
 <h3>5 个 Follow-ups</h3>
 <p><strong>Q1</strong>: "客户给你 10M PDFs, 你的 CLI 怎么 scale?"</p>
 <p>A: CLI 设计基本不变, 但 runtime 不是单机:</p>
-<ol><li><strong>CLI 入队</strong> mode: <code>pdfindex enqueue /docs/* --queue redis://...</code> 把文件路径推到 queue</li><li><strong>Worker fleet</strong>: <code>pdfindex worker --queue redis://... --concurrency 4</code> 跑在 K8s</li><li><strong>Status DB</strong>: Postgres 表 <code>(file_hash, status, output_path, processed_at, error)</code></li><li><strong>Output</strong>: 直接写 S3 + 灌 Elasticsearch</li><li><strong>CLI 仍然能 query</strong>: <code>pdfindex search --backend es ...</code></li></ol>
+<ol><li><strong>CLI 入队</strong> mode: <code>pdfindex enqueue /docs/* --queue redis://...</code> 把文件路径推到 queue</li><li><strong>Worker fleet</strong>: <code>pdfindex worker --queue redis://... --concurrency 4</code> 跑在 K8s</li><li><strong>Status DB</strong>: Postgres 表 <code>(file_hash, status, output_path, processed_at, error)</code></li><li><strong>Output</strong>: 直接写 GCS + 灌 Elasticsearch</li><li><strong>CLI 仍然能 query</strong>: <code>pdfindex search --backend es ...</code></li></ol>
 <p><strong>Q2</strong>: "LLM 给的 entity 含 hallucination 你怎么办?"</p>
 <p>A: 多层防御:</p>
 <ol><li><strong>Post-hoc verify</strong>: 提取后, regex / string-match 验证每个 entity 真在原文里出现 — 没出现的丢弃</li><li><strong>Self-consistency</strong>: 同 chunk 跑 3 次, 取共识 (代价 3x)</li><li><strong>Lower temperature</strong>: <code>temperature=0.0</code>, <code>seed=42</code></li><li><strong>Structured output</strong>: <code>response_format=json_schema</code> (OpenAI) 或 <code>tool_use</code> (Anthropic)</li><li><strong>Specific prompt</strong>: "Only extract entities that appear verbatim in the text"</li></ol>
@@ -1678,7 +1678,7 @@ if __name__ == '__main__':
 
 | 问题 | 解法 |
 |------|------|
-| 1M PDFs, 单机跑不完 | Queue (SQS / Redis) + worker fleet; 每个 worker 处理一个 |
+| 1M PDFs, 单机跑不完 | Queue (Cloud Tasks / Redis) + worker fleet; 每个 worker 处理一个 |
 | 中途崩了 | resume via `file_hash in master` (本地) — 分布式用 status row |
 | Cost runaway | per-doc budget + per-batch budget + Slack alert at 80% |
 | LLM 不稳定 | spaCy 默认 + `--use-llm-only-if-confidence-low` |
@@ -1701,9 +1701,9 @@ Multi-worker:
   ProcessPoolExecutor — 8 cores, 8x throughput
 
 Distributed:
-  Queue (Redis / SQS) — workers pick pdfs from queue
+  Queue (Redis / Cloud Tasks) — workers pick pdfs from queue
   Status DB (Postgres) — record processed file_hash
-  S3 — store PDFs + output JSON
+  GCS — store PDFs + output JSON
 
 Pipeline-y:
   Airflow / Prefect DAG: scan → batch (100) → extract → entity → load
@@ -1775,7 +1775,7 @@ A: CLI 设计基本不变, 但 runtime 不是单机:
 1. **CLI 入队** mode: `pdfindex enqueue /docs/* --queue redis://...` 把文件路径推到 queue
 2. **Worker fleet**: `pdfindex worker --queue redis://... --concurrency 4` 跑在 K8s
 3. **Status DB**: Postgres 表 `(file_hash, status, output_path, processed_at, error)`
-4. **Output**: 直接写 S3 + 灌 Elasticsearch
+4. **Output**: 直接写 GCS + 灌 Elasticsearch
 5. **CLI 仍然能 query**: `pdfindex search --backend es ...`
 
 **Q2**: "LLM 给的 entity 含 hallucination 你怎么办?"

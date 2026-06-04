@@ -18,7 +18,7 @@
 | 3 | Gateway 6 责任 | 3 min | (1) Discovery (RAG over tool catalog) (2) Auth + OBO token exchange (3) Rate limit per tool/tenant (4) Observability trace propagate (5) Result cache (6) Schema versioning | "Gateway 不只是 proxy — 它承担 6 个明确责任, 我逐个讲..." |
 | 4 | 500-tool discovery | 3 min | LLM context 装不下 500 tool. RAG over tool descriptions: embed tool description → top-K=5 tool 进 system prompt → 92% selection accuracy (Internal Agent Platform 实测) | "At 500 tools, 你不能全 dump 到 prompt — 用 RAG over tool catalog, top-5 进 context, 92% accuracy..." |
 | 5 | OBO auth flow | 2 min | OAuth 2.0 Token Exchange (RFC 8693). User → agent → gateway 用 user JWT 换 service-specific token, scope ≤ user. **Agent 永远不能拥有比 user 更高权限** 是 enterprise 红线 | "OBO 是 enterprise 红线 — agent 拿 user JWT 换 service token, scope strictly ≤ user. RFC 8693 Token Exchange..." |
-| 6 | Legacy integration | 90s | 不是所有 service 都 expose REST. SOAP / 数据库直查 / 屏幕爬 (Playwright) / 文件落地 (S3 watcher). MCP server 是 adapter, 把这些封装统一 | "Not all 50 services 是 REST — SOAP / DB direct / screen scrape via Playwright / file drop. MCP server is the adapter layer..." |
+| 6 | Legacy integration | 90s | 不是所有 service 都 expose REST. SOAP / 数据库直查 / 屏幕爬 (Playwright) / 文件落地 (GCS watcher). MCP server 是 adapter, 把这些封装统一 | "Not all 50 services 是 REST — SOAP / DB direct / screen scrape via Playwright / file drop. MCP server is the adapter layer..." |
 | 7 | Schema versioning | 90s | Customer API 季度升级. MCP server 持 multi-version schema (`tool@v1`, `tool@v2`), gateway 支持 canary route. Eval gate: 新 schema 对 100 个 historical task 跑通才推 | "Schema drift — quarterly upgrade is real. MCP server 持 multi-version, canary 10% traffic, eval gate before full rollout..." |
 | 8 | 简历 resume hook | 90s | "Internal Agent Platform (ByteDance) — 50+ internal tool MCP gateway, OBO + RAG-over-tools 92% selection accuracy, schema versioning canary 10%" | "On ByteDance Internal Agent Platform, we built exactly this — 50+ tool MCP gateway with OBO..." |
 
@@ -28,7 +28,7 @@
 
 ### 🔥 哪一层最容易被追问 deeper
 
-**Layer 4 (RAG over tools)** — 追问 "怎么 embed tool description?". 回答: tool name + 1 句话描述 + 5 个 example query 拼接 → text-embedding-3-large → Pinecone 索引. Query 来时 retrieve top-5, 加 LLM-rerank precision boost. **Layer 5 (OBO)** 次之, 问 "token 怎么传?" — gateway 在 request header 验 user JWT → 调 IdP token exchange endpoint (Okta / Auth0) → 拿 service-specific access token (scope claim 限制) → 注入到 downstream call header. Token 不进 LLM prompt, 不进 log.
+**Layer 4 (RAG over tools)** — 追问 "怎么 embed tool description?". 回答: tool name + 1 句话描述 + 5 个 example query 拼接 → text-embedding-3-large → Vertex AI Vector Search 索引. Query 来时 retrieve top-5, 加 LLM-rerank precision boost. **Layer 5 (OBO)** 次之, 问 "token 怎么传?" — gateway 在 request header 验 user JWT → 调 IdP token exchange endpoint (Okta / Auth0) → 拿 service-specific access token (scope claim 限制) → 注入到 downstream call header. Token 不进 LLM prompt, 不进 log.
 
 ### ⏱ 时间压缩版 (30 min round)
 
@@ -80,7 +80,7 @@ MCP 是 **vendor-neutral JSON-RPC 协议** (Resources/Tools/Prompts 三原语), 
 - When: 任何 enterprise > 20 tools
 - Algorithm: embed tool descriptions + RAG top-20 + RBAC filter + RRF (dense+BM25)
 - Trade-off: RAG miss rate vs prompt 装满
-- Tools: Pinecone / Qdrant + sentence-transformers embedding, hand-curated descriptions
+- Tools: Vertex AI Vector Search / Vertex AI Vector Search + sentence-transformers embedding, hand-curated descriptions
 
 **Responsibility 2: Auth + OBO**
 - When: enterprise + multi-tenant
@@ -104,7 +104,7 @@ MCP 是 **vendor-neutral JSON-RPC 协议** (Resources/Tools/Prompts 三原语), 
 - When: read-only tools, fuzzy queries
 - Algorithm: per-tool TTL (get_balance 5s, static 24h), per-user isolation, semantic for fuzzy
 - Trade-off: stale data vs cost saving
-- Tools: Redis + Pinecone (semantic), per-tool config
+- Tools: Redis + Vertex AI Vector Search (semantic), per-tool config
 
 **Responsibility 6: Versioning + Adapter Chain**
 - When: customer API quarterly upgrade
@@ -183,7 +183,7 @@ Boost: tool usage history (recent / popular) re-rank
 ```
 - 实测数据 (ByteDance Internal Agent Platform): tool selection accuracy 70% → 92% after RAG discovery
 - Top 3 gotchas: (1) auto-gen from OpenAPI (description 不到位 → RAG miss) (2) 不 hand-curate description (3) 不 boost by usage history
-- Tools: Pinecone / Qdrant, sentence-transformers / bge-large, hybrid retrieval RRF
+- Tools: Vertex AI Vector Search / Vertex AI Vector Search, sentence-transformers / bge-large, hybrid retrieval RRF
 
 **Problem 4: Versioning + Schema Evolution**
 
@@ -209,7 +209,7 @@ Customer notification:
 |---|---|---|---|
 | REST API | Adapter wrap, hand-curate desc | 1 day/service | 现代 internal API |
 | Mainframe (COBOL) | Screen scrape (3270 terminal) | 1 week | read-only legacy |
-| Batch-only | File drop S3 + polling | 1 day | overnight ETL |
+| Batch-only | File drop GCS + polling | 1 day | overnight ETL |
 | SOAP/XML | Adapter + XSL transform | 2 day | enterprise legacy |
 
 Graceful degradation tier:
@@ -219,7 +219,7 @@ Graceful degradation tier:
 - T4 sustained outage → user message "service temporarily unavailable"
 
 - Top 3 gotchas: (1) auto-gen MCP from OpenAPI (description 不足 → tool select 错) (2) screen scrape 不 handle screen redesign (3) file drop 不 idempotent
-- Tools: Anthropic MCP SDK, py3270 (mainframe), boto3 S3, hand-written adapter
+- Tools: Anthropic MCP SDK, py3270 (mainframe), boto3 GCS, hand-written adapter
 
 ### 🔥 Production gotchas (top 15)
 
@@ -244,7 +244,7 @@ Graceful degradation tier:
 | 题考点 | 你的项目 | 1-line story |
 |---|---|---|
 | MCP gateway design | Internal Agent Platform | "50+ MCP server, unified gateway 6 责任, 200+ agent 用同套 SDK" |
-| Tool discovery RAG | Internal Agent Platform | "Pinecone embedding tool desc + RRF, accuracy 70% → 92%" |
+| Tool discovery RAG | Internal Agent Platform | "Vertex AI Vector Search embedding tool desc + RRF, accuracy 70% → 92%" |
 | OBO scope exchange | Voice agent 7 markets | "per-tenant OBO, agent token scope ≤ user, audit log immutable" |
 | Versioning + adapter | BNPL chatbot intent | "intent → tool route, semver schema, daily eval golden 0 drift" |
 | Legacy integration | ConvFinQA legacy bank API | "SOAP → adapter + hand-curated desc, 3 day to integrate" |
@@ -282,7 +282,7 @@ Graceful degradation tier:
 | MCP SDK | Anthropic MCP Python/TS | — | ✅ |
 | Gateway | Envoy + custom filters | Kong, Apigee | Envoy |
 | Token exchange | Auth0 / Okta | Keycloak | Auth0 |
-| Vector DB (discovery) | Pinecone | Qdrant, Milvus, Weaviate | Pinecone |
+| Vector DB (discovery) | Vertex AI Vector Search | Vertex AI Vector Search, Milvus, Weaviate | Vertex AI Vector Search |
 | Embedding model | bge-large / nomic-embed | text-embedding-3 | bge-large |
 | Rate limit | Envoy filter + Redis Lua | Kong rate-limit | Envoy |
 | Trace | OpenTelemetry → Honeycomb | Datadog, Tempo | OTel |

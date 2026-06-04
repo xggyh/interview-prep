@@ -18,7 +18,7 @@
 | 2 | Idempotency key 双层 | 1.5 min | 每 webhook 带 event_id (UUID v4 or composite tenant_id+resource_id+version). 客户端 dedup 双层: (a) Redis NX SET event_id with TTL 24h (hot path fast O(1)), (b) DB unique index on event_id (cold path durable). Provider also stamp X-Webhook-Id header | "Idempotency key — event_id in body + X-Webhook-Id header, Redis NX + DB unique index dual-layer…" |
 | 3 | Retry policy: exp backoff + jitter | 1.5 min | Exponential backoff base 2s, ±20% jitter (avoid thundering herd), max 7 attempts, 36h window. Attempt schedule: 2s, 4s, 8s, 30s, 5min, 1h, 6h, 24h. After 7 fails → DLQ | "Retry — exponential backoff 2^n with ±20% jitter, 7 attempts, 36h window…" |
 | 4 | Retry budget + per-client backpressure | 2 min | Global retry budget = 20% of new event rate (不让 retry 把 fresh event 挤掉). Per-client backpressure: (a) per-client queue cap 10k events (overflow → DLQ + alert), (b) per-client concurrency cap 10 in-flight, (c) EMA error rate 5xx > 30% over 1 min → circuit breaker half-open, (d) full circuit breaker if 5xx > 70% for 5 min — pause delivery 5 min, notify customer | "Backpressure — retry budget 20% + per-client queue/concurrency/EMA/circuit breaker…" |
-| 5 | DLQ + replay UI | 1.5 min | After 7 fail → DLQ to S3 cold storage 30 day retention. Self-serve replay UI per customer: filter by event_id / date / type, replay single or bulk. Replay re-enters queue, preserves event_id (consumer dedup catches re-replays). Operator audit on bulk replay | "DLQ — S3 cold 30 day, self-serve replay UI per customer, audited bulk replay…" |
+| 5 | DLQ + replay UI | 1.5 min | After 7 fail → DLQ to GCS cold storage 30 day retention. Self-serve replay UI per customer: filter by event_id / date / type, replay single or bulk. Replay re-enters queue, preserves event_id (consumer dedup catches re-replays). Operator audit on bulk replay | "DLQ — GCS cold 30 day, self-serve replay UI per customer, audited bulk replay…" |
 | 6 | Ordering: Kafka per-entity partition | 1.5 min | Within same entity (same user_id / order_id), order matters. Use Kafka partition key = entity_id, single consumer per partition, FIFO within partition. Cross-entity ordering NOT guaranteed — explicit in customer-facing doc | "Ordering — per-entity Kafka partition + single consumer, cross-entity not guaranteed by design…" |
 | 7 | Security: HMAC-SHA256 + replay window | 1 min | X-Signature header = HMAC-SHA256(body, secret). Consumer recompute + constant-time compare. X-Timestamp + reject if > 5 min skew (replay protection). Rotate signing secret quarterly, support 2 active simultaneously during rotation | "Security — HMAC-SHA256 with 5min timestamp window + dual-secret rotation…" |
 | 8 | Resume hook | 1 min | "Concrete: BNPL platform → 50+ merchant webhook for payment events. At-least-once + per-merchant idempotency + Kafka partition by merchant+order. 1 merchant endpoint down 48h, queue 80k event, no loss, automatic replay on recovery. 5 layer 缺一不可 — 之前少 backpressure 一次 cascade 把整个 fleet 拖慢" | "Real example — BNPL 50+ merchant webhook, 48h merchant outage zero loss…" |
@@ -56,7 +56,7 @@ At-least-once 在第 1 层 set expectation — 不 over-promise. Idempotency key
 
 ### 核心心智模型 (1 sentence)
 
-Reliable webhook = "at-least-once delivery (exactly-once is fiction) + 客户端 idempotent by event_id (Redis NX + DB unique 双层) + retry exponential backoff with ±20% jitter 7 attempts 36h window + retry budget 20% cap + DLQ S3 cold 30 day + per-client backpressure (queue cap / concurrency / EMA error rate / circuit breaker) + per-entity Kafka partition ordering + HMAC-SHA256 + self-serve replay UI", 5 layer 缺一不可.
+Reliable webhook = "at-least-once delivery (exactly-once is fiction) + 客户端 idempotent by event_id (Redis NX + DB unique 双层) + retry exponential backoff with ±20% jitter 7 attempts 36h window + retry budget 20% cap + DLQ GCS cold 30 day + per-client backpressure (queue cap / concurrency / EMA error rate / circuit breaker) + per-entity Kafka partition ordering + HMAC-SHA256 + self-serve replay UI", 5 layer 缺一不可.
 
 ### 术语全表
 
@@ -70,7 +70,7 @@ Reliable webhook = "at-least-once delivery (exactly-once is fiction) + 客户端
 | Event ID | UUID 永久, X-Event-Id header | dedup key |
 | HMAC-SHA256 | webhook 签名 with client_secret | 防伪造 |
 | Timestamp | X-Timestamp header, 5 min 容差 | 防 replay attack |
-| DLQ (Dead Letter Queue) | retry N 次失败的 event, S3 cold 30d | tier 兜底 |
+| DLQ (Dead Letter Queue) | retry N 次失败的 event, GCS cold 30d | tier 兜底 |
 | Backoff with jitter | base × 2^attempt × (1 + random(-0.2, 0.2)) | 防 thundering herd retry |
 | Retry budget | retry 占 < 20% 总流量 | 防 retry storm |
 | Per-entity partition | Kafka hash(client_id, entity_id) | per-entity FIFO |
@@ -107,9 +107,9 @@ Reliable webhook = "at-least-once delivery (exactly-once is fiction) + 客户端
 
 **Framework 5**: DLQ + Observability + Self-serve replay
 - When: 真正挂掉的 event
-- Algorithm: S3 cold + Postgres index (DLQEntry metadata), customer UI 选 (client, time-range, event-type, status), dry-run 预估, audit log, 保留原 event_id (still dedup-able)
+- Algorithm: GCS cold + Postgres index (DLQEntry metadata), customer UI 选 (client, time-range, event-type, status), dry-run 预估, audit log, 保留原 event_id (still dedup-able)
 - Trade-off: DLQ 30d 存储成本 vs 客户撑腰
-- Tools: S3 Glacier cold, customer dashboard, replay rate-limited respect downstream
+- Tools: GCS Glacier cold, customer dashboard, replay rate-limited respect downstream
 
 ### 关键决策树 (ASCII)
 
@@ -171,7 +171,7 @@ Option 3: Customer-hosted gateway (AWS EventBridge in their VPC)
 - Tools: defaultdict(Semaphore), AdaptiveDelivery EMA tracker, CircuitBreaker
 
 **Problem 5: DLQ + observability + replay**
-- 核心解法: DLQEntry (event_id, client, payload, reason, response, attempts, ts), S3 cold + Postgres index, customer self-serve UI (time range + event-type + status), dry-run, audit
+- 核心解法: DLQEntry (event_id, client, payload, reason, response, attempts, ts), GCS cold + Postgres index, customer self-serve UI (time range + event-type + status), dry-run, audit
 - Top 3 gotchas: DLQ retention 30d 不够 customer 抱怨 / replay 保留原 event_id 让 client 仍 dedup / audit log redact PII
 - Tools: customer dashboard, dispute window 60d, rate-limited replay
 
@@ -198,8 +198,8 @@ Option 3: Customer-hosted gateway (AWS EventBridge in their VPC)
 | 题考点 | 你的项目 | 1-line story |
 |---|---|---|
 | At-least-once + dedup | ConvFinQA agent retry | client_msg_id idempotency key |
-| Exponential backoff + jitter | Voice agent ASR/TTS retry pipeline | 7 attempts capped 36h with DLQ to S3 |
-| DLQ pattern | Voice agent failed calls 上报 | S3 cold + ops review |
+| Exponential backoff + jitter | Voice agent ASR/TTS retry pipeline | 7 attempts capped 36h with DLQ to GCS |
+| DLQ pattern | Voice agent failed calls 上报 | GCS cold + ops review |
 | HMAC signing | Voice agent multi-tenant auth | per-customer secret + rotation |
 | Per-client backpressure | 7 markets traffic asymmetry | per-market concurrency cap |
 | Adaptive per-client | Voice agent 5% bad-network | 自动降低 retry frequency |

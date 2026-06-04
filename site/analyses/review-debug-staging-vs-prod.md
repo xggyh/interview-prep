@@ -71,7 +71,7 @@ Staging vs prod inconsistency debug = "先 clarify 'wrong / different / slower' 
 | Golden trace | 200-500 case CI gate eval | 防 regression |
 | Shadow mode | 1-10% 流量 fork 到 staging, async compare | drift visibility |
 | Canary deploy | 1% → 10% → 50% → 100% with auto-rollback | 防全量伤害 |
-| Snapshot | failure 时存 full reproduce context (S3 30d) | 后续 replay 用 |
+| Snapshot | failure 时存 full reproduce context (GCS 30d) | 后续 replay 用 |
 | PSI | Population Stability Index, 衡量 distribution drift | D1 数据 drift |
 | KS test | Kolmogorov-Smirnov 累积分布最大差 | D1 detection |
 | Singleflight | dlock + cache 防 thundering herd refresh | D7 token expire |
@@ -88,9 +88,9 @@ Staging vs prod inconsistency debug = "先 clarify 'wrong / different / slower' 
 
 **Framework 2**: Reproducibility 三件套 (trace + snapshot + replay)
 - When: prod failure debugging
-- Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot S3 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare
+- Algorithm: 1) trace_id OpenTelemetry propagation 端到端 / 2) Per-request snapshot GCS 30d (100% failure + 1% success) / 3) Replay tool — prod trace → staging run + override config + override seed + compare
 - Trade-off: snapshot 存储 vs forensic 能力
-- Tools: opentelemetry SDK, structlog with trace_id, S3 30d retention bucket
+- Tools: opentelemetry SDK, structlog with trace_id, GCS 30d retention bucket
 
 **Framework 3**: Environment parity (Golden + Shadow + Canary)
 - When: 防 future drift
@@ -163,7 +163,7 @@ Fix + Prevent:
 **Problem 2: Reproducibility instrumentation (trace + snapshot + replay)**
 - 核心解法: OpenTelemetry trace_id 端到端 (LLM metadata + response header + audit) / RequestSnapshot dataclass (trace_id, model_id, model_sha, image_sha, pod_id, seed, temperature, feature_flags, result) / ReplayTool prod-trace → staging-run + compare
 - Top 3 gotchas: trace_id 进 LLM API metadata 字段 (OpenAI / Anthropic dashboard 才能查) / snapshot 必含 model_sha 不仅 model_id / replay 要 override seed 才 deterministic
-- Tools: opentelemetry-sdk, structlog, S3 snapshots bucket 30d retention
+- Tools: opentelemetry-sdk, structlog, GCS snapshots bucket 30d retention
 
 **Problem 3: Environment parity (Golden / Shadow / Canary)**
 - 核心解法: Golden 200-500 case CI gate (每 incident 加 1 防 regression) + Shadow 1-10% async fork + Canary Argo Rollouts 1→10→50→100% auto-rollback (error rate / latency / agent success rate)
@@ -277,7 +277,7 @@ Fix + Prevent:
 | Trace | OpenTelemetry + Tempo/Jaeger |
 | Log | structlog + Loki / Datadog |
 | Metric | Prometheus + Grafana / Datadog |
-| Snapshot store | S3 30d retention |
+| Snapshot store | GCS 30d retention |
 | Canary | Argo Rollouts / Flagger |
 | Shadow proxy | Envoy / custom Lua filter |
 | Replay tool | custom CLI on snapshots |

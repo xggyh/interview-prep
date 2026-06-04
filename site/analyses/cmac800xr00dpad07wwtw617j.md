@@ -374,7 +374,7 @@ When AirTag is "lost":
 **A**：
 - Sharded by `pseudo_id[:n]` prefix → 1000 shards
 - Each report ~200 B encrypted + 32 B metadata = 232 B → 5B × 232 B = 1.1 TB/day raw
-- 7-day retention → 7.7 TB hot in S3 / Cassandra
+- 7-day retention → 7.7 TB hot in GCS / Cassandra
 - TTL deletion automatic at 7d
 
 ### Q6: "Rural area coverage 差，怎么改善？"

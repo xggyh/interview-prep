@@ -468,7 +468,7 @@ agent = workflow.compile()
 │  - Business data (subscription tier, credit limit)         │
 │  - Last-known state (last interaction, last balance)       │
 │  - Lifetime: across sessions                               │
-│  - Storage: Postgres / DynamoDB / Redis                    │
+│  - Storage: Postgres / Firestore / Bigtable / Redis                    │
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
@@ -477,7 +477,7 @@ agent = workflow.compile()
 │  - Knowledge corpus (FAQ, policy)                          │
 │  - Similar successful task examples                        │
 │  - Lifetime: months-years                                  │
-│  - Storage: Qdrant / Pinecone / Vespa                      │
+│  - Storage: Vertex AI Vector Search / Vertex AI Vector Search / Vespa                      │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -529,7 +529,7 @@ class MemorySystem:
 ```
 Working: free (in context)
 Structured KV: $0.0001 per get/set (Redis)
-Vector: $0.001 per search (Qdrant)
+Vector: $0.001 per search (Vertex AI Vector Search)
 Embed cost: $0.0001 per chunk (text-embedding-3-large)
 
 100k agent invocations/day:
@@ -824,8 +824,8 @@ Observability:
   Helicone — proxy-based, easy setup
 
 Vector stores:
-  Qdrant — open-source, fast, mature
-  Pinecone — managed, easy
+  Vertex AI Vector Search — open-source, fast, mature
+  Vertex AI Vector Search — managed, easy
   Weaviate — open-source, schema-aware
   Vespa — Yahoo's, hybrid search
   Milvus — open-source, scale
@@ -834,7 +834,7 @@ Vector stores:
 Memory frameworks:
   Mem0 — agent memory abstraction
   LangChain memory — built-in modules
-  Custom (Redis + Qdrant + Postgres) — best control
+  Custom (Redis + Vertex AI Vector Search + Postgres) — best control
 ```
 
 ### Step 8: Production checklist (week-by-week)
@@ -1317,7 +1317,7 @@ Resilience patterns:
   Protocol: MCP (Anthropic standard)
   Durable: Temporal, Inngest, Restate
   Observability: LangSmith, Phoenix, Langfuse, Helicone
-  Vector: Qdrant, Pinecone, Weaviate
+  Vector: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
   Memory: Mem0, custom
 
 Eval pipeline:

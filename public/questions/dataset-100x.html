@@ -47,7 +47,7 @@
 <hr />
 <h3>这道题在考什么</h3>
 <p>考你 <strong>scaling 思维</strong> —— take-home 是 toy problem, production 是另一回事:</p>
-<ol><li><strong>What breaks first at 100x</strong> — bottleneck 识别能力</li><li><strong>5 维度 of scale</strong> — ingest / storage / training / serving / eval / cost</li><li><strong>Trade-offs at scale</strong> — precision vs latency vs cost vs labeling-budget</li><li><strong>Graceful degradation</strong> — 哪些 feature 在 scale 下牺牲</li><li><strong>Migration strategy</strong> — 不是 big-bang, 是 dual-system + cutover</li><li><strong>Knowing platform limits</strong> — Spark / Ray / Dask / Pinecone / Vertex AI 的特性</li></ol>
+<ol><li><strong>What breaks first at 100x</strong> — bottleneck 识别能力</li><li><strong>5 维度 of scale</strong> — ingest / storage / training / serving / eval / cost</li><li><strong>Trade-offs at scale</strong> — precision vs latency vs cost vs labeling-budget</li><li><strong>Graceful degradation</strong> — 哪些 feature 在 scale 下牺牲</li><li><strong>Migration strategy</strong> — 不是 big-bang, 是 dual-system + cutover</li><li><strong>Knowing platform limits</strong> — Spark / Ray / Dask / Vertex AI Vector Search / Vertex AI 的特性</li></ol>
 <p>不考「100x 就是 100 倍」, 考「100x 时<strong>架构会换、成本结构会变、组织 / process 会变</strong>, 你能不能识别这些拐点」.</p>
 <hr />
 <h1>Part 1 · 教学讲解 — 先把概念讲透</h1>
@@ -81,7 +81,7 @@
 <p><strong>100x 解法核心</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">数据层:        Spark / Ray ETL pipeline, 持久 + 可断点
 训练层:        分布式训练 (DDP / FSDP / DeepSpeed), 数据并行 + 模型并行
-存储层:        分片 + 冷热分层 (S3 cold + Redis hot), 量化压缩
+存储层:        分片 + 冷热分层 (GCS cold + Redis hot), 量化压缩
 serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 标注层:        weak supervision + active learning (人工只标边界)
 评估层:        sampling-based + statistical power 验证
@@ -96,7 +96,7 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
         │           │           │           │             │
         ▼           ▼           ▼           ▼             ▼
     Notebook   单机 Python   Spark/Ray    Spark         BigQuery /
-    Pandas     + Postgres    + Postgres   + Vespa /     Snowflake /
+    Pandas     + Postgres    + Postgres   + Vespa /     BigQuery /
     + SQLite                 + HNSW       Milvus        Iceberg
                                                         分区
         │           │           │           │             │
@@ -114,7 +114,7 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 <ul><li>10k → 1M (我们 take-home 是这个 case): <strong>批处理 → 分布式批处理</strong></li><li>1M → 100M: <strong>单节点 vector DB → 分片 vector DB</strong>, <strong>单 GPU → 多 GPU</strong></li><li>100M → 10B: <strong>batch → streaming</strong>, <strong>HNSW → IVF/disk-based</strong>, <strong>manual eval → sampling-eval</strong></li><li>10B+: <strong>集中存储 → 分布式 lakehouse</strong>, <strong>per-batch train → continuous learning</strong></li></ul>
 <hr />
 <h3>4. 5 维度 × 100x impact 对比表</h3>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>1k baseline</th><th>100k (100x)</th><th>10M (10000x)</th><th>What breaks first</th></tr></thead><tbody><tr><td><strong>Ingest</strong></td><td>Single script 5min</td><td>Distributed ETL 1h</td><td>Streaming + Spark cluster 24/7</td><td>Embedding API rate limit / cost</td></tr><tr><td><strong>Storage</strong></td><td>100MB local</td><td>10GB Postgres + S3</td><td>1TB sharded vector DB</td><td>RAM budget, index rebuild time</td></tr><tr><td><strong>Indexing</strong></td><td>HNSW in-memory</td><td>Multi-node HNSW</td><td>DiskANN / IVF-Disk</td><td>Single-node index build time</td></tr><tr><td><strong>Training</strong></td><td>Single GPU 30min</td><td>DDP 4 GPU 2h</td><td>FSDP 32 GPU 1 day</td><td>GPU memory for batch size</td></tr><tr><td><strong>Inference</strong></td><td>Single GPU &lt; 100ms</td><td>Multi-replica 50ms</td><td>Tiered cache + distributed 80ms</td><td>KV cache pressure, hot shard</td></tr><tr><td><strong>Labeling</strong></td><td>100% manual 1 day</td><td>10% manual + weak sup 1 week</td><td>&lt; 1% manual + active learning</td><td>Human attention budget</td></tr><tr><td><strong>Eval</strong></td><td>Run all in notebook</td><td>Stratified sample 5k</td><td>Sampled + statistical power</td><td>Eval compute cost</td></tr><tr><td><strong>Cost</strong></td><td>$5 total</td><td>$500/month</td><td>$50k/month</td><td>Embedding + GPU + storage</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>1k baseline</th><th>100k (100x)</th><th>10M (10000x)</th><th>What breaks first</th></tr></thead><tbody><tr><td><strong>Ingest</strong></td><td>Single script 5min</td><td>Distributed ETL 1h</td><td>Streaming + Spark cluster 24/7</td><td>Embedding API rate limit / cost</td></tr><tr><td><strong>Storage</strong></td><td>100MB local</td><td>10GB Postgres + GCS</td><td>1TB sharded vector DB</td><td>RAM budget, index rebuild time</td></tr><tr><td><strong>Indexing</strong></td><td>HNSW in-memory</td><td>Multi-node HNSW</td><td>DiskANN / IVF-Disk</td><td>Single-node index build time</td></tr><tr><td><strong>Training</strong></td><td>Single GPU 30min</td><td>DDP 4 GPU 2h</td><td>FSDP 32 GPU 1 day</td><td>GPU memory for batch size</td></tr><tr><td><strong>Inference</strong></td><td>Single GPU &lt; 100ms</td><td>Multi-replica 50ms</td><td>Tiered cache + distributed 80ms</td><td>KV cache pressure, hot shard</td></tr><tr><td><strong>Labeling</strong></td><td>100% manual 1 day</td><td>10% manual + weak sup 1 week</td><td>&lt; 1% manual + active learning</td><td>Human attention budget</td></tr><tr><td><strong>Eval</strong></td><td>Run all in notebook</td><td>Stratified sample 5k</td><td>Sampled + statistical power</td><td>Eval compute cost</td></tr><tr><td><strong>Cost</strong></td><td>$5 total</td><td>$500/month</td><td>$50k/month</td><td>Embedding + GPU + storage</td></tr></tbody></table></div>
 <hr />
 <h3>5. 具体业务场景 (4 类 100x 实战)</h3>
 <h4>场景 A: TikTok BNPL 7-market voice agent 扩展到 30+ market (你的工作背景)</h4>
@@ -122,8 +122,8 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 <p><strong>100x</strong>: 假设拓展到 30 个市场, 每市场 5M 用户, 总 ~150M 对话 / 月, 20+ 语言.</p>
 <p><strong>架构变化</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">数据层:
-  - ASR / TTS recording 存储: S3 per-region (合规 + 延迟)
-  - 训练数据 lakehouse: Iceberg on S3
+  - ASR / TTS recording 存储: GCS per-region (合规 + 延迟)
+  - 训练数据 lakehouse: Iceberg on GCS
   - PII redaction pipeline: 每条 inbound 都跑
 
 训练层:
@@ -146,7 +146,7 @@ eval:
 <p><strong>100x</strong>: 100k FAQ + 实时更新, 多产品 line (PayLater / Pay-in-4 / 商家贷 / 转账).</p>
 <p><strong>架构变化</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Storage:
-  - pgvector → Qdrant / Pinecone (cluster mode)
+  - pgvector → Vertex AI Vector Search / Vertex AI Vector Search (cluster mode)
   - 按 product_line + language sharding
   - 冷热分层: 最近 30 天 FAQ in Redis (查询 90% 命中), 其他 in vector DB
 
@@ -173,7 +173,7 @@ Eval:
   - 增量 ingest: SEC EDGAR webhook, 新 filing 1h 内 indexed
 
 Storage:
-  - 文档 in S3 (raw + parsed)
+  - 文档 in GCS (raw + parsed)
   - Chunks 中 hot 1 年 in vector DB, 老 in DiskANN on EBS
   - Tabular numbers separate columnar store (DuckDB / ClickHouse)
 
@@ -251,9 +251,9 @@ Week 6:    Sunset old, keep readable for rollback (30 day)</code></pre>
 <h3>⚙️ Problem 1: Data Infrastructure — Storage + Distributed Processing</h3>
 <h4>1.1 Storage 选型 (按规模)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">&lt; 10 GB:     SQLite / local Parquet           (笔记本就够)
-10 GB-1 TB:  Postgres + S3 backup            (单机管理)
-1-100 TB:    Iceberg / Delta Lake on S3       (lakehouse)
-&gt; 100 TB:    BigQuery / Snowflake / Databricks (managed warehouse)</code></pre>
+10 GB-1 TB:  Postgres + GCS backup            (单机管理)
+1-100 TB:    Iceberg / Delta Lake on GCS       (lakehouse)
+&gt; 100 TB:    BigQuery / BigQuery / Databricks (managed warehouse)</code></pre>
 <p><strong>Take-home (1k docs ≈ 50MB)</strong> vs <strong>100x (5GB)</strong> — 还在「单机管理」区间, 不需要 lakehouse.</p>
 <p><strong>1000x (50GB)</strong> → 进入「需要 partitioning」区间. <strong>10000x (500GB)</strong> → 必须 lakehouse.</p>
 <h4>1.2 Spark vs Ray vs Dask — 选哪个</h4>
@@ -267,7 +267,7 @@ Week 6:    Sunset old, keep readable for rollback (30 day)</code></pre>
     if workload_type == 'data_science_exploration':
         return 'Dask'  # Lowest barrier
     if team_skill == 'sql_only':
-        return 'BigQuery / Snowflake'  # No code
+        return 'BigQuery / BigQuery'  # No code
     return 'Spark'  # Safe default</code></pre>
 <h4>1.3 实操: Spark Pipeline for 100M docs ingest</h4>
 <pre class="language-python"><code class="language-python">from pyspark.sql import SparkSession
@@ -323,7 +323,7 @@ Streaming (适合实时变化, e.g., user-generated):
   → daily Silver job (PII redaction + chunking)
   → daily Gold job (embedding + index update)</code></pre>
 <h4>1.5 Backup + DR</h4>
-<ul><li>S3 cross-region replication (Asia + US)</li><li>Iceberg snapshots: keep 30 day, point-in-time recovery</li><li>Vector DB: incremental snapshot 每 6h to S3</li><li>Test restore quarterly (90% 公司没做, 真实事故时崩)</li></ul>
+<ul><li>GCS cross-region replication (Asia + US)</li><li>Iceberg snapshots: keep 30 day, point-in-time recovery</li><li>Vector DB: incremental snapshot 每 6h to GCS</li><li>Test restore quarterly (90% 公司没做, 真实事故时崩)</li></ul>
 <hr />
 <h3>⚙️ Problem 2: Training &amp; Serving Impact — Batch Size, Sharding, Distributed</h3>
 <h4>2.1 单 GPU → 多 GPU → 多节点 拐点</h4>
@@ -820,7 +820,7 @@ class BatchedJudge:
 <ul><li>1s embed feasible for single doc: 50ms embed + 100ms HNSW add + 100ms commit + 200ms cache invalidate ≈ 450ms</li><li>Batch ingest &gt; 100 docs/s saturates single-node ingest. Mitigation:</li><li><strong>Write-ahead log</strong> (Kafka, 1 partition per shard)</li><li><strong>Multi-shard parallel ingest</strong></li><li><strong>Tiered ingest priority</strong> — VIP / paid customers ingested first</li><li><strong>Index lag SLO</strong>: 99% of uploads searchable within 30s</li><li>Trade-off: 真正实时索引 cost 3-5x normal batch indexing. Often <strong>5-min batch is fine for 90%, real-time on opt-in</strong>.</li></ul>
 <hr />
 <h3>❌ 易错点 (top 10)</h3>
-<ol><li><strong>"Just use Pinecone scaling"</strong> — vendor lock-in, no architectural thinking</li><li><strong>Same architecture for 100x</strong> — 1M vs 100M needs different design</li><li><strong>Ignore cost</strong> — 100x docs = 100x embed cost = $$$ migration each model upgrade</li><li><strong>Reranking 不 scale assumption</strong> — actually reranks scale fine</li><li><strong>Single-node HNSW for 100M</strong> — won't fit, need sharded / DiskANN</li><li><strong>No graceful degradation</strong> — fail loud &gt; degrade silent</li><li><strong>Forget operational</strong> (rate limits, batch APIs, monitoring)</li><li><strong>Linear projection</strong> — bigger N = breakpoints, not just multiplication</li><li><strong>No statistical power thinking</strong> — 100M dataset ≠ 100M eval samples</li><li><strong>Manual labeling assumption</strong> — 100x labels = 100x people = impossible</li></ol>
+<ol><li><strong>"Just use Vertex AI Vector Search scaling"</strong> — vendor lock-in, no architectural thinking</li><li><strong>Same architecture for 100x</strong> — 1M vs 100M needs different design</li><li><strong>Ignore cost</strong> — 100x docs = 100x embed cost = $$$ migration each model upgrade</li><li><strong>Reranking 不 scale assumption</strong> — actually reranks scale fine</li><li><strong>Single-node HNSW for 100M</strong> — won't fit, need sharded / DiskANN</li><li><strong>No graceful degradation</strong> — fail loud &gt; degrade silent</li><li><strong>Forget operational</strong> (rate limits, batch APIs, monitoring)</li><li><strong>Linear projection</strong> — bigger N = breakpoints, not just multiplication</li><li><strong>No statistical power thinking</strong> — 100M dataset ≠ 100M eval samples</li><li><strong>Manual labeling assumption</strong> — 100x labels = 100x people = impossible</li></ol>
 <hr />
 <h3>✅ 加分项 (top 10)</h3>
 <ol><li><strong>5-dimension scale framework</strong> (ingest/storage/train/serve/label/eval)</li><li><strong>Different architecture for 100k vs 100M</strong> (拐点意识)</li><li><strong>Embedding cost + migration as #1 concern</strong></li><li><strong>Dual-index migration pattern</strong> (no downtime)</li><li><strong>PQ quantization + distilled embed</strong> for cost</li><li><strong>Weak supervision + active learning</strong> for labels</li><li><strong>Statistical power</strong> for eval sizing</li><li><strong>Graceful degradation</strong> (partial results)</li><li><strong>Cost-Quality Pareto</strong> thinking</li><li><strong>Quote TikTok 7-market scaling experience</strong></li></ol>
@@ -935,7 +935,7 @@ Tradeoffs acceptable at 100x:
 3. **Trade-offs at scale** — precision vs latency vs cost vs labeling-budget
 4. **Graceful degradation** — 哪些 feature 在 scale 下牺牲
 5. **Migration strategy** — 不是 big-bang, 是 dual-system + cutover
-6. **Knowing platform limits** — Spark / Ray / Dask / Pinecone / Vertex AI 的特性
+6. **Knowing platform limits** — Spark / Ray / Dask / Vertex AI Vector Search / Vertex AI 的特性
 
 不考「100x 就是 100 倍」, 考「100x 时**架构会换、成本结构会变、组织 / process 会变**, 你能不能识别这些拐点」.
 
@@ -996,7 +996,7 @@ Take-home (1k docs):
 ```
 数据层:        Spark / Ray ETL pipeline, 持久 + 可断点
 训练层:        分布式训练 (DDP / FSDP / DeepSpeed), 数据并行 + 模型并行
-存储层:        分片 + 冷热分层 (S3 cold + Redis hot), 量化压缩
+存储层:        分片 + 冷热分层 (GCS cold + Redis hot), 量化压缩
 serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 标注层:        weak supervision + active learning (人工只标边界)
 评估层:        sampling-based + statistical power 验证
@@ -1016,7 +1016,7 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
         │           │           │           │             │
         ▼           ▼           ▼           ▼             ▼
     Notebook   单机 Python   Spark/Ray    Spark         BigQuery /
-    Pandas     + Postgres    + Postgres   + Vespa /     Snowflake /
+    Pandas     + Postgres    + Postgres   + Vespa /     BigQuery /
     + SQLite                 + HNSW       Milvus        Iceberg
                                                         分区
         │           │           │           │             │
@@ -1046,7 +1046,7 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 | 维度 | 1k baseline | 100k (100x) | 10M (10000x) | What breaks first |
 |---|---|---|---|---|
 | **Ingest** | Single script 5min | Distributed ETL 1h | Streaming + Spark cluster 24/7 | Embedding API rate limit / cost |
-| **Storage** | 100MB local | 10GB Postgres + S3 | 1TB sharded vector DB | RAM budget, index rebuild time |
+| **Storage** | 100MB local | 10GB Postgres + GCS | 1TB sharded vector DB | RAM budget, index rebuild time |
 | **Indexing** | HNSW in-memory | Multi-node HNSW | DiskANN / IVF-Disk | Single-node index build time |
 | **Training** | Single GPU 30min | DDP 4 GPU 2h | FSDP 32 GPU 1 day | GPU memory for batch size |
 | **Inference** | Single GPU < 100ms | Multi-replica 50ms | Tiered cache + distributed 80ms | KV cache pressure, hot shard |
@@ -1068,8 +1068,8 @@ serving 层:    多 region + cache + 渐进式更新 (no big-bang reload)
 
 ```
 数据层:
-  - ASR / TTS recording 存储: S3 per-region (合规 + 延迟)
-  - 训练数据 lakehouse: Iceberg on S3
+  - ASR / TTS recording 存储: GCS per-region (合规 + 延迟)
+  - 训练数据 lakehouse: Iceberg on GCS
   - PII redaction pipeline: 每条 inbound 都跑
 
 训练层:
@@ -1100,7 +1100,7 @@ eval:
 
 ```
 Storage:
-  - pgvector → Qdrant / Pinecone (cluster mode)
+  - pgvector → Vertex AI Vector Search / Vertex AI Vector Search (cluster mode)
   - 按 product_line + language sharding
   - 冷热分层: 最近 30 天 FAQ in Redis (查询 90% 命中), 其他 in vector DB
 
@@ -1134,7 +1134,7 @@ Ingest:
   - 增量 ingest: SEC EDGAR webhook, 新 filing 1h 内 indexed
 
 Storage:
-  - 文档 in S3 (raw + parsed)
+  - 文档 in GCS (raw + parsed)
   - Chunks 中 hot 1 年 in vector DB, 老 in DiskANN on EBS
   - Tabular numbers separate columnar store (DuckDB / ClickHouse)
 
@@ -1265,9 +1265,9 @@ Week 6:    Sunset old, keep readable for rollback (30 day)
 
 ```
 < 10 GB:     SQLite / local Parquet           (笔记本就够)
-10 GB-1 TB:  Postgres + S3 backup            (单机管理)
-1-100 TB:    Iceberg / Delta Lake on S3       (lakehouse)
-> 100 TB:    BigQuery / Snowflake / Databricks (managed warehouse)
+10 GB-1 TB:  Postgres + GCS backup            (单机管理)
+1-100 TB:    Iceberg / Delta Lake on GCS       (lakehouse)
+> 100 TB:    BigQuery / BigQuery / Databricks (managed warehouse)
 ```
 
 **Take-home (1k docs ≈ 50MB)** vs **100x (5GB)** — 还在「单机管理」区间, 不需要 lakehouse.
@@ -1293,7 +1293,7 @@ def choose_framework(workload_type, scale, team_skill):
     if workload_type == 'data_science_exploration':
         return 'Dask'  # Lowest barrier
     if team_skill == 'sql_only':
-        return 'BigQuery / Snowflake'  # No code
+        return 'BigQuery / BigQuery'  # No code
     return 'Spark'  # Safe default
 ```
 
@@ -1367,9 +1367,9 @@ Kafka → Spark Structured Streaming (micro-batch 1 min)
 
 ### 1.5 Backup + DR
 
-- S3 cross-region replication (Asia + US)
+- GCS cross-region replication (Asia + US)
 - Iceberg snapshots: keep 30 day, point-in-time recovery
-- Vector DB: incremental snapshot 每 6h to S3
+- Vector DB: incremental snapshot 每 6h to GCS
 - Test restore quarterly (90% 公司没做, 真实事故时崩)
 
 ---
@@ -2099,7 +2099,7 @@ def detect_regression(current_eval, baseline_eval, slices):
 
 ## ❌ 易错点 (top 10)
 
-1. **"Just use Pinecone scaling"** — vendor lock-in, no architectural thinking
+1. **"Just use Vertex AI Vector Search scaling"** — vendor lock-in, no architectural thinking
 2. **Same architecture for 100x** — 1M vs 100M needs different design
 3. **Ignore cost** — 100x docs = 100x embed cost = $$$ migration each model upgrade
 4. **Reranking 不 scale assumption** — actually reranks scale fine

@@ -9,7 +9,7 @@
 | **Kafka** | 高吞吐消息队列，常作 log pipeline 中转 | 高速传送带 |
 | **Elasticsearch (ES)** | 全文搜索 + 时序数据的 NoSQL DB，业界 log 主存 | 图书馆全文索引 |
 | **Parquet** | 列式压缩文件格式，适合大数据 | 高效压缩档案 |
-| **S3** | 对象存储，便宜但查询慢 | 仓库 |
+| **GCS** | 对象存储，便宜但查询慢 | 仓库 |
 | **Hot / Warm / Cold tier** | 数据分层 —— 热的快但贵，冷的便宜但慢 | 桌面 / 抽屉 / 仓库 |
 | **Live tail** | 实时 streaming log（如 `tail -f` 但跨集群） | 直播 |
 | **PII** | Personally Identifiable Info，敏感个人数据 | 身份证号 |
@@ -127,12 +127,12 @@ DEBUG 1% → 5% of total → 1k$
 Total ~70-80% reduction → 1 PB hot/month → 30 ES nodes
 ```
 
-### 3.4 Cold tier (S3 Parquet)
+### 3.4 Cold tier (GCS Parquet)
 
-冷数据存 S3 Parquet (列存，压缩 5x)：
+冷数据存 GCS Parquet (列存，压缩 5x)：
 
 ```
-1 PB compressed → 200 TB on S3 = $5k/month storage
+1 PB compressed → 200 TB on GCS = $5k/month storage
 ```
 
 便宜 50x。代价：query 需要 Athena / Presto，分钟级响应。
@@ -214,7 +214,7 @@ def process(event):
     if keep:
         es_write(parsed)
     
-    # 5. ALL events 都进 cold S3 (满足 audit 需求)
+    # 5. ALL events 都进 cold GCS (满足 audit 需求)
     s3_archive(event)
 ```
 
@@ -227,18 +227,18 @@ def process(event):
      - 索引齐全，秒级 query
      - 适合 debugging、recent alert
      
-   Warm (S3 Parquet, 30-90d):
+   Warm (GCS Parquet, 30-90d):
      - 列存压缩 5x
      - 通过 Athena query，分钟级
      - 适合趋势分析
      
-   Cold (S3 Glacier, 90d-1y):
+   Cold (GCS Glacier, 90d-1y):
      - 极便宜
      - Retrieve 几小时
      - 合规审计用
 ```
 
-每天定时 job：30 天前数据从 ES export → S3 Parquet + delete ES index。
+每天定时 job：30 天前数据从 ES export → GCS Parquet + delete ES index。
 
 ### 4.5 第 4 步：Alert + 实时分析
 
@@ -298,12 +298,12 @@ Alert rule 例：
           │ daily export
           ▼
    ┌──────────────┐
-   │ S3 Parquet   │  ← warm 90d / cold 1y
+   │ GCS Parquet   │  ← warm 90d / cold 1y
    └──────────────┘
 
    Query UI (Kibana / custom):
        - <30 day: ES
-       - >30 day: Athena → S3 Parquet
+       - >30 day: Athena → GCS Parquet
 ```
 
 ---
@@ -394,13 +394,13 @@ Refresh interval: 5 sec
 
 **Refresh interval** 是 log 系统的关键 tuning：1s 实时但写慢；5-30s 写快但 query lag。
 
-### 5.4 Cold Tier (S3 Parquet)
+### 5.4 Cold Tier (GCS Parquet)
 
 ```python
 # Daily export job
 def archive_day(date):
     index = f"logs-{date}"
-    # Stream from ES, write Parquet to S3
+    # Stream from ES, write Parquet to GCS
     for batch in es.scroll(index):
         write_parquet(batch, f"s3://logs-archive/{date}.parquet")
     # Delete ES index
@@ -500,7 +500,7 @@ UI 显示"超过 30 天的数据查询可能需要 1-5 分钟"提醒用户。
 0:10 - 0:15  High-Level Architecture
   - Agent → Kafka → Indexer → ES
   - Stream processor for alerts
-  - S3 cold tier
+  - GCS cold tier
 
 0:15 - 0:30  Deep Dive
   ★ Agent (Fluent Bit), sampling
@@ -523,7 +523,7 @@ UI 显示"超过 30 天的数据查询可能需要 1-5 分钟"提醒用户。
 
 > "OK 这是 logger system。先估算：1M events/sec × 500 byte = 4 Gbps，每天 43 TB raw。30 天全 ES 存 1 PB 是 $1M/month —— **不可行**，必须 sample + tier。
 > 
-> 整体设计：每 host 装 Log Agent (Fluent Bit) → Kafka buffer → indexer → ES (hot 30 day) → S3 Parquet (cold)。
+> 整体设计：每 host 装 Log Agent (Fluent Bit) → Kafka buffer → indexer → ES (hot 30 day) → GCS Parquet (cold)。
 > 
 > Agent 是关键 —— **不能同步阻塞 app log call**。Agent tail 本地文件，async batch + compress 推 Kafka。Kafka buffer 让下游慢或挂时不丢 log。
 > 
@@ -531,7 +531,7 @@ UI 显示"超过 30 天的数据查询可能需要 1-5 分钟"提醒用户。
 > 
 > ES：每天一个 index `logs-YYYY-MM-DD`，10 primary shard × 1 replica。Refresh interval 5 秒（trade search lag for indexing throughput）。Field type keyword (service/host/level) vs text (message)。
 > 
-> Cold tier：每天 export 30 天前数据到 S3 Parquet。Athena query。比 ES 便宜 50x。
+> Cold tier：每天 export 30 天前数据到 GCS Parquet。Athena query。比 ES 便宜 50x。
 > 
 > Alert：Flink job 实时 sliding window，超阈值触发 PagerDuty。`for: 5m` 防 spike 误报。
 > 
@@ -577,7 +577,7 @@ UI 显示"超过 30 天的数据查询可能需要 1-5 分钟"提醒用户。
 
 ### Q7: GDPR 删除 user 数据？
 
-**答**：用 trace_id 找 user 所有 log → ES `_delete_by_query` (慢) 或下次 reindex 时 strip。S3 Parquet 用 partition rewrite。**最佳实践**：log 不直接存 user_id，存 hash 或 reference id。
+**答**：用 trace_id 找 user 所有 log → ES `_delete_by_query` (慢) 或下次 reindex 时 strip。GCS Parquet 用 partition rewrite。**最佳实践**：log 不直接存 user_id，存 hash 或 reference id。
 
 ---
 
@@ -616,4 +616,4 @@ UI 显示"超过 30 天的数据查询可能需要 1-5 分钟"提醒用户。
 3. **High-cardinality 是 ES 杀手**。任何 unique-per-request 的字段（trace_id, request_id）不要 index 当 keyword。
 
 > [!followup]
-> **学习推荐**：(a) 跑通本机 ELK stack quickstart；(b) 读 Drain 算法 paper（log template extraction）；(c) 看 Datadog / Honeycomb 工程博客；(d) 思考"如果不用 ES，能用什么替代"（Loki + S3 + chunk index 也是新趋势）；(e) 学 OpenTelemetry 标准。
+> **学习推荐**：(a) 跑通本机 ELK stack quickstart；(b) 读 Drain 算法 paper（log template extraction）；(c) 看 Datadog / Honeycomb 工程博客；(d) 思考"如果不用 ES，能用什么替代"（Loki + GCS + chunk index 也是新趋势）；(e) 学 OpenTelemetry 标准。

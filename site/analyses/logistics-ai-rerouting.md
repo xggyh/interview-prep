@@ -289,7 +289,7 @@ def cadr(period, lambda_=0.5):
     return delivery_rate - lambda_ * cost_over_baseline
 ```
 
-**Lambda 调节**: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.
+**Cloud Functions 调节**: λ=0 完全无视 cost, λ=∞ 完全无视 delivery. 实际跟 stakeholder 谈, 一般 λ=0.3-0.8.
 
 **Why CADR not separate metrics**: agent 训练 / RL reward 必须有 single scalar. 多 metric 会导致 Pareto front 选不出.
 

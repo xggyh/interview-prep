@@ -106,7 +106,7 @@ LLM system 是「30s/req + $0.01-1/req + 非确定输出 + 1 req → N downstrea
 - When: 100K+ QPS / multi-tenant / cost runaway risk
 - Algorithm: cache → priority queue → token bucket rate → cost-aware route
 - Trade-off: 8-12x cost ↓ blended, 但 cache wrong-hit 是 silent kill
-- Tools: Redis Lua atomic, Pinecone semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router
+- Tools: Redis Lua atomic, Vertex AI Vector Search semantic cache (0.95-0.97 threshold), Envoy rate limit, LiteLLM router
 
 **Sub-topic 6: Eventual Consistency (3 patterns)**
 - When: agent multi-step 跨 vendor 副作用
@@ -160,7 +160,7 @@ TP=8 needed when model > 80GB FP8
 **Framework 3: 4-Layer Cost Defense**
 | Layer | Saving | Mechanism |
 |---|---|---|
-| L1 Cache (exact + semantic + prefix) | 30-50% | Pinecone 0.95 + vLLM block share |
+| L1 Cache (exact + semantic + prefix) | 30-50% | Vertex AI Vector Search 0.95 + vLLM block share |
 | L2 Queue (priority/tenant) | 0% (SLA保) | Redis sorted set, gold = score×1e10 |
 | L3 Rate limit | 0% (防滥用) | Token bucket per user/tenant/model |
 | L4 Cost-aware routing | 5-6x | 70% Flash + 25% Pro + 5% Opus |
@@ -262,7 +262,7 @@ TP=8 needed when model > 80GB FP8
 | Workflow engine | Temporal | DBOS, Inngest | ✅ Temporal |
 | Observability (trace) | OpenTelemetry → Honeycomb/Datadog | Tempo, Jaeger | ✅ OTel |
 | LLM-specific obs | LangSmith | Phoenix, Helicone, Langfuse, Braintrust | ✅ LangSmith |
-| Vector DB | Pinecone | Qdrant, Milvus, Weaviate | ✅ Pinecone |
+| Vector DB | Vertex AI Vector Search | Vertex AI Vector Search, Milvus, Weaviate | ✅ Vertex AI Vector Search |
 | Cache | Redis Cluster | DragonFly, KeyDB | ✅ Redis |
 | Queue | Kafka | NATS, RabbitMQ | ✅ Kafka |
 | Service mesh | Envoy | Istio, Linkerd | ✅ Envoy |

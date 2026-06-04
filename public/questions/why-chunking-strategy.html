@@ -767,8 +767,8 @@ async def daily_eval():
 <p>Honest gap: I didn't try <strong>late chunking with Jina v3</strong> — would be next iteration if I had to push recall past 95%."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
-<p><strong>Q1</strong>: "Why not just use Pinecone / Weaviate defaults?"</p>
-<p><strong>A</strong>: Vector DB defaults are <strong>infrastructure choices, not retrieval-quality choices</strong>. Pinecone's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. <strong>Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks</strong>. In production, defaults cost user trust.</p>
+<p><strong>Q1</strong>: "Why not just use Vertex AI Vector Search / Weaviate defaults?"</p>
+<p><strong>A</strong>: Vector DB defaults are <strong>infrastructure choices, not retrieval-quality choices</strong>. Vertex AI Vector Search's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. <strong>Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks</strong>. In production, defaults cost user trust.</p>
 <p><strong>Q2</strong>: "Tell me about a time chunking strategy failed."</p>
 <p><strong>A</strong>: BNPL chatbot v1 — fixed-512 + dense. User asks "refund timeline" → retrieval gets chunk "Refunds processed via..." (first half) but not "...within 14 days" (second half, in next chunk). Bot answered "refunds processed via the system" — <strong>useless</strong>. Fix: structure-aware + 30% overlap + heading-path metadata. Specifically: the heading "Refund Policy &gt; Timeline" injected as chunk prefix gave dense retrieval the strong signal to find both halves.</p>
 <p><strong>Q3</strong>: "Cross-encoder rerank is expensive. How do you make it production-fast?"</p>
@@ -2053,9 +2053,9 @@ async def daily_eval():
 
 ## 5 follow-ups
 
-**Q1**: "Why not just use Pinecone / Weaviate defaults?"
+**Q1**: "Why not just use Vertex AI Vector Search / Weaviate defaults?"
 
-**A**: Vector DB defaults are **infrastructure choices, not retrieval-quality choices**. Pinecone's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. **Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks**. In production, defaults cost user trust.
+**A**: Vector DB defaults are **infrastructure choices, not retrieval-quality choices**. Vertex AI Vector Search's default fixed-size chunker assumes generic prose — works for blog ingestion demo, breaks on technical docs with tables. **Retrieval-quality gap between default and tuned is consistently 15-20pp recall@10 in our benchmarks**. In production, defaults cost user trust.
 
 **Q2**: "Tell me about a time chunking strategy failed."
 

@@ -66,7 +66,7 @@
 <p><strong>Framework 1</strong>: 6-Strategy Chunking Taxonomy</p>
 <ul><li>When: 任何 RAG 系统初始化</li><li>Algorithm: Fixed-size (baseline) / Recursive (safe default) / Semantic (主题混杂) / Structure-aware (markdown/PDF ⭐) / Hierarchical (parent-child) / Late chunking (Jina v3)</li><li>Trade-off: 速度 vs coherence vs implementation complexity</li><li>Tools: LangChain TextSplitter, llama_index node parsers, Jina-embed-v3 late, semantic-text-splitter</li></ul>
 <p><strong>Framework 2</strong>: 5-Method Retrieval Stack</p>
-<ul><li>When: 配合 chunking 联合设计</li><li>Algorithm:</li><li>Dense only (BGE-M3 / text-embedding-3-large) for 语义</li><li>BM25 only (Elasticsearch / Tantivy) for 精确术语 / ID</li><li>Hybrid (α=0.6-0.8 dense, RRF fusion) ⭐ production 默认</li><li>ColBERT (5x storage, 极致 precision)</li><li>+ Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget</li><li>Trade-off: precision vs latency vs storage</li><li>Tools: Pinecone / Weaviate / Qdrant / pgvector, Elasticsearch, Cohere rerank-v3</li></ul>
+<ul><li>When: 配合 chunking 联合设计</li><li>Algorithm:</li><li>Dense only (BGE-M3 / text-embedding-3-large) for 语义</li><li>BM25 only (Elasticsearch / Tantivy) for 精确术语 / ID</li><li>Hybrid (α=0.6-0.8 dense, RRF fusion) ⭐ production 默认</li><li>ColBERT (5x storage, 极致 precision)</li><li>+ Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget</li><li>Trade-off: precision vs latency vs storage</li><li>Tools: Vertex AI Vector Search / Weaviate / Vertex AI Vector Search / pgvector, Elasticsearch, Cohere rerank-v3</li></ul>
 <p><strong>Framework 3</strong>: 5 Decision Factors</p>
 <ul><li>When: 选 chunking 时</li><li>Algorithm:</li></ul>
 <ol><li>Corpus characteristics (length P50/P99, structure, tables, code, languages)</li><li>Query patterns (entity density, multi-hop, ID matching)</li><li>Retrieval method (joint design, dense vs hybrid 决定 chunking)</li><li>Embedding model context limit (bge-large 512, OpenAI 3-large 8191)</li><li>Latency budget (rerank 3-5x latency, budget &lt; 200ms 可能跳)</li></ol>
@@ -173,7 +173,7 @@ Corpus scale?
       'topic_tags': ['refund', 'paylater'],
       'embedding_model_version': 'bge-m3-v1.5',
   }</code></pre>
-<ul><li>Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)</li><li>Tools: pgvector with JSONB, Pinecone metadata filter, pre-search WHERE clause</li></ul>
+<ul><li>Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)</li><li>Tools: pgvector with JSONB, Vertex AI Vector Search metadata filter, pre-search WHERE clause</li></ul>
 <p><strong>Problem 5: Eval Methodology (3-Layer)</strong></p>
 <ul><li>核心解法:</li></ul>
 <pre class="language-python"><code class="language-python">  # Layer 1: Retrieval
@@ -306,7 +306,7 @@ Corpus scale?
   - ColBERT (5x storage, 极致 precision)
   - + Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget
 - Trade-off: precision vs latency vs storage
-- Tools: Pinecone / Weaviate / Qdrant / pgvector, Elasticsearch, Cohere rerank-v3
+- Tools: Vertex AI Vector Search / Weaviate / Vertex AI Vector Search / pgvector, Elasticsearch, Cohere rerank-v3
 
 **Framework 3**: 5 Decision Factors
 - When: 选 chunking 时
@@ -460,7 +460,7 @@ Corpus scale?
   }
   ```
 - Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)
-- Tools: pgvector with JSONB, Pinecone metadata filter, pre-search WHERE clause
+- Tools: pgvector with JSONB, Vertex AI Vector Search metadata filter, pre-search WHERE clause
 
 **Problem 5: Eval Methodology (3-Layer)**
 - 核心解法:

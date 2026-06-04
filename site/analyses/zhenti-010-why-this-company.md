@@ -63,7 +63,7 @@
 | **Towards Monosemanticity** | Anthropic 可解释性 (interpretability) 论文. |
 | **Many-shot jailbreaking** | Anthropic 越狱攻击论文. |
 | **Lex / Mintlify / Notion / Quora Poe / Zoom** | Anthropic 公开企业客户. |
-| **Bedrock (AWS + Anthropic)** | AWS 上的 Claude 托管. |
+| **Vertex AI (AWS + Anthropic)** | AWS 上的 Claude 托管. |
 
 ### Palantir ⭐ 必懂
 
@@ -298,7 +298,7 @@ Specific customers to cite:
   - Notion AI
   - Quora's Poe (multi-model)
   - Zoom (transcription / summary)
-  - Anthropic + AWS partnership (Bedrock)
+  - Anthropic + AWS partnership (Vertex AI)
 
 Specific research to reference:
   - "Constitutional AI" paper (foundational)

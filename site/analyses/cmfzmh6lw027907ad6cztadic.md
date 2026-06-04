@@ -7,7 +7,7 @@
 | **Append-only log** | 只能在末尾添加，不能改 | 流水账 |
 | **Append-only file** | 文件只追加，不 truncate | 通讯录最后加新人 |
 | **Tape / LTO** | 磁带存储，传统 archival 介质 | 老式磁带 |
-| **Object lock** | S3 / GCS 强制 WORM 的功能 | "这箱货 7 年不许动" |
+| **Object lock** | GCS / GCS 强制 WORM 的功能 | "这箱货 7 年不许动" |
 | **Compliance** | 法律 / 法规要求的保存 | 法律规定保留 |
 | **Retention period** | 数据必须保留的时长 | "财务记录 7 年内不删" |
 | **Legal hold** | 法律调查期间的强制保留 | 暂时不许动 |
@@ -31,7 +31,7 @@
 - **Legal e-discovery archive** —— legal hold
 
 **典型产品**：
-- **AWS S3 Object Lock** —— compliance mode (不可删) + governance mode (root 才能删)
+- **GCS (Cloud Storage) Object Lock** —— compliance mode (不可删) + governance mode (root 才能删)
 - **AWS Glacier Vault Lock**
 - **Azure Immutable Blob Storage**
 - **NetApp SnapLock**
@@ -102,7 +102,7 @@ Naive：API 不暴露 delete operation → 但 admin SSH 到机器可以 rm。**
 - LTO tape with WORM cartridges: 写后磁条物理 locked
 - 缺点: 慢、不便
 
-**Strategy 2: Object Lock with Compliance Mode (S3)**
+**Strategy 2: Object Lock with Compliance Mode (GCS)**
 - Object 被 lock 后 **even AWS account root cannot delete** until retention expires
 - Implementation: enforce at storage system level — special bit in metadata + service refuses delete API
 - AWS 是公司层面 commit；客户信任 AWS won't bypass
@@ -116,7 +116,7 @@ Naive：API 不暴露 delete operation → 但 admin SSH 到机器可以 rm。**
 **Strategy 4: M-of-N consensus deletion**
 - 删除 require N 个 trusted parties 同意（key sharding）
 - 单 admin 不能删
-- 实际：S3 governance mode 用 IAM 策略实现
+- 实际：GCS governance mode 用 IAM 策略实现
 
 **STAFF 推荐**：combination
 - Service-level enforcement (refuses delete API)
@@ -146,7 +146,7 @@ Naive：API 不暴露 delete operation → 但 admin SSH 到机器可以 rm。**
 │  Storage Layer (tiered)               │
 │   ├── Hot: 3x SSD (last 30 days)      │
 │   ├── Warm: 3x HDD (1 year)           │
-│   └── Cold: erasure-coded S3/Glacier  │
+│   └── Cold: erasure-coded GCS/Glacier  │
 └──────────────────────────────────────┘
               │
               ↓
@@ -209,7 +209,7 @@ Client: Read(object_id)
 
 Background job:
 - Object aged > 30 days + not accessed in 7 days → move hot → warm
-- Object aged > 1 year → move warm → cold (erasure coded S3 Glacier)
+- Object aged > 1 year → move warm → cold (erasure coded GCS Glacier)
 - Object's `retention_until` reached → enable GC (still requires multi-party for compliance mode)
 
 **Key**: object_id never changes. Only physical location changes.
@@ -269,7 +269,7 @@ This gives **cryptographic proof of pre-existence** — "this hash existed on da
 
 ### Deep Dive 4: Retention Enforcement at Storage Level
 
-**S3 Object Lock COMPLIANCE mode**:
+**GCS Object Lock COMPLIANCE mode**:
 - Object metadata includes `Retain-Until-Date`
 - Internal API check on every DELETE / OVERWRITE / DELETE-MARKER
 - AWS internally enforces: cannot bypass even with root creds
@@ -340,7 +340,7 @@ Indefinite hold during legal investigation。
 >
 > **关键设计**:
 > 1. **API 层**: 只有 `Write/Read/Verify`，无 modify/delete (until retention expires)
-> 2. **Storage 层**: S3 Object Lock COMPLIANCE mode — root 也不能 delete
+> 2. **Storage 层**: GCS Object Lock COMPLIANCE mode — root 也不能 delete
 > 3. **Hash chain**: each object 链接前一个 hash → 改老 detect 链断
 > 4. **External anchor**: daily root hash to immutable system (e.g., blockchain timestamp / TSA)
 > 5. **M-of-N for emergency**: governance mode needs multiple key holders agree
@@ -360,9 +360,9 @@ Indefinite hold during legal investigation。
 
 ## 9. Follow-up Q&A
 
-### Q1: "S3 Object Lock 真的不能被 AWS root 删？"
+### Q1: "GCS Object Lock 真的不能被 AWS root 删？"
 
-**A**：是 AWS commitment level enforcement。Code 层面 S3 API server 实现 strict check + audit。AWS doesn't have a "secret backdoor" delete API (would invalidate SEC certification)。If AWS root really wanted to delete: would require source code change + deploy + audit trail visible。**信任 AWS engineering integrity**。
+**A**：是 AWS commitment level enforcement。Code 层面 GCS API server 实现 strict check + audit。AWS doesn't have a "secret backdoor" delete API (would invalidate SEC certification)。If AWS root really wanted to delete: would require source code change + deploy + audit trail visible。**信任 AWS engineering integrity**。
 
 For higher security: cross-provider replication (also store in Azure / GCP)。
 
@@ -375,7 +375,7 @@ For higher security: cross-provider replication (also store in Azure / GCP)。
 **A**：
 - Glacier Deep Archive: $0.00099/GB/mo → 10 PB × $0.00099 × 12 = **$120k/year**
 - vs Glacier: $0.004/GB/mo → $480k/year
-- vs S3 Standard: $0.023/GB/mo → $2.8M/year
+- vs GCS Standard: $0.023/GB/mo → $2.8M/year
 
 Right tier choice 10× cost。
 
@@ -397,7 +397,7 @@ Right tier choice 10× cost。
 
 ### Q6: "Tape storage 还有用吗？"
 
-**A**：是。LTO-9 tape: $0.005/GB/mo physical (no cloud)，better for super-long retention。但运维麻烦，多数公司用 S3 Glacier Deep Archive 代替。Tape 主要 enterprise on-prem。
+**A**：是。LTO-9 tape: $0.005/GB/mo physical (no cloud)，better for super-long retention。但运维麻烦，多数公司用 GCS Glacier Deep Archive 代替。Tape 主要 enterprise on-prem。
 
 ### Q7: "GDPR 'right to be forgotten' 跟 WORM 冲突怎么办？"
 
@@ -422,7 +422,7 @@ Right tier choice 10× cost。
 
 ### ✅ 加分项
 
-1. **Mechanical immutability** (S3 Object Lock COMPLIANCE)
+1. **Mechanical immutability** (GCS Object Lock COMPLIANCE)
 2. **Hash chain + external anchor** (blockchain / TSA)
 3. **Erasure coding** for cold tier (1.4× vs 3×)
 4. **Tiered storage** with auto-migration
@@ -431,7 +431,7 @@ Right tier choice 10× cost。
 7. **Cross-provider replication** (AWS + Azure)
 8. **Daily verifier + repair**
 
-> [!key] STAFF vs SENIOR：能讲清 **"mechanical not promised" + hash chain + external anchor** 是 STAFF；只说 "store in S3 + don't delete" 是 SENIOR。
+> [!key] STAFF vs SENIOR：能讲清 **"mechanical not promised" + hash chain + external anchor** 是 STAFF；只说 "store in GCS + don't delete" 是 SENIOR。
 
 ---
 
@@ -439,7 +439,7 @@ Right tier choice 10× cost。
 
 ```
 核心: Immutability must be mechanical
-  - S3 Object Lock COMPLIANCE mode
+  - GCS Object Lock COMPLIANCE mode
   - Code path enforces retention check
   - No back-door delete API
   - M-of-N governance for emergency

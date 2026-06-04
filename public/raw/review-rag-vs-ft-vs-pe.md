@@ -87,7 +87,7 @@
   - RAG: changes input + retrieved context. $1-5k setup. +30-200ms latency. Citations.
   - FT: changes model weights. $25-100k setup. Days-weeks iterate. Black-box.
 - Trade-off: 3 个不互斥, 但起步选错 = 浪费时间金钱
-- Tools: LangSmith for PE iteration, Pinecone/Qdrant for RAG, OpenAI fine-tuning API / unsloth for FT
+- Tools: LangSmith for PE iteration, Vertex AI Vector Search/Vertex AI Vector Search for RAG, OpenAI fine-tuning API / unsloth for FT
 
 **Framework 2**: 6-Decision Dimensions
 - When: 不知道哪个起步
@@ -274,7 +274,7 @@ Customer 问题本质?
   ```
   BNPL chatbot (all 3):
     1. PE intent classify (Haiku 4.5, few-shot)
-    2. RAG retrieve policy (Qdrant, hybrid)
+    2. RAG retrieve policy (Vertex AI Vector Search, hybrid)
     3. FT SFT Sonnet 4.6 multilingual response
     4. PE structured output (JSON enforce)
     5. Cascade: 90% Haiku, 9% Sonnet, 1% Opus 4.7

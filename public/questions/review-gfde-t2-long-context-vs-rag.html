@@ -64,15 +64,15 @@
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td><strong>Context window</strong></td><td>LLM 单次输入容量</td><td>Gemini 3 Pro 2M, Flash 1M, Claude 200K, GPT-5.5 256K</td></tr><tr><td><strong>Effective context</strong></td><td>Attention 真正 work 的区域</td><td>中部 30-40% 衰减</td></tr><tr><td><strong>Long-context mode</strong></td><td>整 corpus 塞 LLM 不 RAG</td><td>小 corpus + multi-hop + low QPS</td></tr><tr><td><strong>RAG</strong></td><td>Retrieval (BM25/dense/hybrid) → top-K chunk</td><td>大 corpus + 实时 + 高 QPS</td></tr><tr><td><strong>Hybrid</strong></td><td>RAG narrow → long-ctx within</td><td>多数 production</td></tr><tr><td><strong>Prefix cache</strong></td><td>Anthropic 5min, Gemini 1h, hit 0.10x in</td><td>Long prefix reuse</td></tr><tr><td><strong>Cache write surcharge</strong></td><td>1.25-2x in 价</td><td>写入一次</td></tr><tr><td><strong>Cache hit</strong></td><td>0.10x in 价</td><td>后续读</td></tr><tr><td><strong>Lost-in-middle</strong></td><td>Liu 2023, 中部 30-40% gap</td><td>Long ctx 通用</td></tr><tr><td><strong>Multi-hop</strong></td><td>跨 doc/chunk 推理 (A→B→C)</td><td>Long-ctx 强, RAG 弱</td></tr><tr><td><strong>Vendor lock-in</strong></td><td>1M+ ctx 只 Gemini/Claude</td><td>长 ctx 高 lock-in</td></tr><tr><td><strong>Hot + warm + cold</strong></td><td>24h in-mem / month batch / archive</td><td>实时 + 成本平衡</td></tr><tr><td><strong>Cache invalidation</strong></td><td>1 token 改全失效</td><td>Long-ctx 更新难</td></tr><tr><td><strong>Citation provenance</strong></td><td>RAG chunk_id 自然 / long-ctx prompt 验</td><td>Audit / 防 hallucinate</td></tr><tr><td><strong>Per-query cost math</strong></td><td>input × in price + output × out price</td><td>FDE 必算</td></tr></tbody></table></div>
 <h4>🎯 5 个核心 framework</h4>
 <p><strong>Framework 1</strong>: Decision Tree (Corpus × Cost × Multi-hop × Freshness)</p>
-<ul><li>When: 系统设计开始</li><li>Algorithm: corpus &lt; 200K + static + low-vol → long-ctx + cache ⭐; 200K-2M single tenant → Pure Pro 2M; 200K-2M multi-tenant → Hybrid; &gt; 2M → Pure RAG (default)</li><li>Trade-off: 同 corpus 不同 cost / freshness 走不同分支</li><li>Tools: Gemini 3 Pro 2M, Claude 200K, Qdrant, Pinecone</li></ul>
+<ul><li>When: 系统设计开始</li><li>Algorithm: corpus &lt; 200K + static + low-vol → long-ctx + cache ⭐; 200K-2M single tenant → Pure Pro 2M; 200K-2M multi-tenant → Hybrid; &gt; 2M → Pure RAG (default)</li><li>Trade-off: 同 corpus 不同 cost / freshness 走不同分支</li><li>Tools: Gemini 3 Pro 2M, Claude 200K, Vertex AI Vector Search, Vertex AI Vector Search</li></ul>
 <p><strong>Framework 2</strong>: Cost Math (2026 pricing)</p>
 <ul><li>When: 任何 architecture 决策</li><li>Algorithm: Gemini 3 Pro $2 (≤200K)/$4 (&gt;200K)/$12 out; Flash $0.50/$3; Opus 4.7 $5/$25; Sonnet 4.6 $3/$15; Haiku 4.5 $1/$5; GPT-5.5 $5/$30</li><li>Trade-off: 100 q/day pure long-ctx OK ($400/day), 100K q/day RAG must</li><li>Tools: 自实现 cost calculator, OTel cost attribute</li></ul>
 <p><strong>Framework 3</strong>: Hybrid Pattern (RAG narrow → long-ctx within)</p>
-<ul><li>When: 大 corpus + 多 hop</li><li>Algorithm: RAG retrieve top-10 docs (doc-level not chunk) → 500K total → Gemini 3 Pro 2M → multi-hop within</li><li>Trade-off: 双层架构 + RAG infra + LLM 调用, 但 quality + cost 折中</li><li>Tools: Qdrant for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache</li></ul>
+<ul><li>When: 大 corpus + 多 hop</li><li>Algorithm: RAG retrieve top-10 docs (doc-level not chunk) → 500K total → Gemini 3 Pro 2M → multi-hop within</li><li>Trade-off: 双层架构 + RAG infra + LLM 调用, 但 quality + cost 折中</li><li>Tools: Vertex AI Vector Search for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache</li></ul>
 <p><strong>Framework 4</strong>: Citation Strategy</p>
 <ul><li>When: 始终 (audit / 防 hallucinate)</li><li>Algorithm: RAG cite chunk_id 天然 / long-ctx 靠 prompt+post-validate 易 hallucinate / hybrid 最佳 (doc/section + post-validate)</li><li>Trade-off: post-validate 多 LLM 调用, 但 hallucinate cite 杀掉</li><li>Tools: regex citation validator, Flash self-consistency check</li></ul>
 <p><strong>Framework 5</strong>: Update Frequency + Freshness</p>
-<ul><li>When: 数据动态 / 多源混合</li><li>Algorithm: static (年级) → long-ctx + permanent cache; daily → hybrid + nightly cache rebuild; hourly → hybrid + cache invalidate; real-time → pure RAG (hot index)</li><li>Trade-off: 实时数据 long-ctx 不可</li><li>Tools: Qdrant snapshot, freshness decay metadata, cache key versioning</li></ul>
+<ul><li>When: 数据动态 / 多源混合</li><li>Algorithm: static (年级) → long-ctx + permanent cache; daily → hybrid + nightly cache rebuild; hourly → hybrid + cache invalidate; real-time → pure RAG (hot index)</li><li>Trade-off: 实时数据 long-ctx 不可</li><li>Tools: Vertex AI Vector Search snapshot, freshness decay metadata, cache key versioning</li></ul>
 <h4>🌳 关键决策树 (ASCII)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">Q: Corpus 大小?
 ├── &lt; 200K, static, low-vol (1-10 用户/day)
@@ -112,15 +112,15 @@ Q: Citation 严格度?
 <p><strong>Problem 2: Cost Math — Per-query 1M vs RAG</strong></p>
 <ul><li>2026 pricing: Gemini 3 Pro $2 (≤200K) / $4 (&gt;200K) / $12 out per 1M; Flash $0.50/$3; Opus 4.7 $5/$25; Sonnet 4.6 $3/$15; Haiku 4.5 $1/$5; GPT-5.5 $5/$30</li><li>500K corpus per-query: Long-ctx Pure $1.00 (no cache) → $0.10 (cache hit); Pure RAG $0.011; Hybrid $0.25 (RAG narrow 500K → Pro within)</li><li>Volume scaling 100 q/day: long-ctx $400, RAG $0.50, hybrid $25</li><li>100K q/day: long-ctx $400K (不可行), RAG $500, hybrid $25K</li><li>1M q/day: long-ctx 不可, RAG $5K, hybrid $250K (仍贵)</li><li>Prefix cache mechanics: write 1.25-2x once, hit 0.10x; Anthropic 5min / Gemini 1h; 50K project ctx hit 80% 节省 80%</li><li>Top 3 gotchas: 不算 cost / 忽略 &gt;200K Pro tier 涨价 / 不用 cache</li><li>Tools: 自实现 cost dashboard, OTel cost attrib per query</li></ul>
 <p><strong>Problem 3: Hybrid Pattern (RAG narrow → Long-ctx within)</strong></p>
-<ul><li>标准架构: RAG (Qdrant + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation</li><li>关键设计: doc-level not chunk (避免 chunk 切碎); top-10 not 100 (cost); 加 prefix cache 5-min reuse</li><li>Caching: 同 user session 内 prefix 同; cross-session 不 reuse; 关键: cache key 含 RAG candidates set</li><li>失效场景: 跨 turn corpus 不同 → cache miss; doc 更新 → cache invalidate</li><li>Top 3 gotchas: chunk-level not doc-level / 没 cache / 跨 user mix cache</li><li>Tools: Qdrant retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key</li></ul>
+<ul><li>标准架构: RAG (Vertex AI Vector Search + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation</li><li>关键设计: doc-level not chunk (避免 chunk 切碎); top-10 not 100 (cost); 加 prefix cache 5-min reuse</li><li>Caching: 同 user session 内 prefix 同; cross-session 不 reuse; 关键: cache key 含 RAG candidates set</li><li>失效场景: 跨 turn corpus 不同 → cache miss; doc 更新 → cache invalidate</li><li>Top 3 gotchas: chunk-level not doc-level / 没 cache / 跨 user mix cache</li><li>Tools: Vertex AI Vector Search retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key</li></ul>
 <p><strong>Problem 4: Citation + Provenance Comparison</strong></p>
 <ul><li>RAG citation 天然: 每 chunk 有 chunk_id, system prompt 要求引用, post-LLM regex validate</li><li>Long-ctx citation 挑战: prompt 内 source 标 (e.g., [doc-A], [doc-B]) → LLM 易 hallucinate cite (8% 编不存在的 [doc-X])</li><li>Hybrid citation 最佳: RAG 拿 doc/section ref, long-ctx 内 multi-hop, citation 仍能 trace 到 doc + section</li><li>验证 framework: regex 抓 [doc-N] → 比对 retrieved list / 比对 ctx 内 source tag → mismatch flag → Flash self-consistency check → retry / escalate</li><li>UI: 用户能 click citation → 跳 source doc + highlight</li><li>Top 3 gotchas: 没 post-validate / hallucinate cite 不抓 / 没 self-consistency</li><li>Tools: 自实现 regex validator, Flash for SC, UI link-back</li></ul>
 <p><strong>Problem 5: Update Frequency + Freshness</strong></p>
-<ul><li>Update mode: static / daily / hourly / real-time</li><li>Long-ctx update 难: 1 token 改, prefix cache 全失效, 必须 reload + re-cache</li><li>Hybrid update: RAG 实时 (delta indexing), long-ctx prefix 半静态 (nightly rebuild)</li><li>Freshness signal: chunk metadata <code>updated_at</code>, <code>score *= exp(-Δt / λ)</code> λ=30 days news, 365 policy</li><li>Mixing static + dynamic corpus: 静态部分 long-ctx + cache, 动态部分 RAG, RRF merge</li><li>Cache invalidation patterns: TTL-based (5min/1h) / version-based (doc hash) / event-based (Kafka invalidate)</li><li>Update cost analysis: full reload 500K tokens × $2 = $1; delta RAG index 0.001</li><li>Top 3 gotchas: long-ctx for real-time / cache 不 invalidate / 没 freshness decay</li><li>Tools: Qdrant snapshots, Anthropic cache headers, Kafka event invalidate</li></ul>
+<ul><li>Update mode: static / daily / hourly / real-time</li><li>Long-ctx update 难: 1 token 改, prefix cache 全失效, 必须 reload + re-cache</li><li>Hybrid update: RAG 实时 (delta indexing), long-ctx prefix 半静态 (nightly rebuild)</li><li>Freshness signal: chunk metadata <code>updated_at</code>, <code>score *= exp(-Δt / λ)</code> λ=30 days news, 365 policy</li><li>Mixing static + dynamic corpus: 静态部分 long-ctx + cache, 动态部分 RAG, RRF merge</li><li>Cache invalidation patterns: TTL-based (5min/1h) / version-based (doc hash) / event-based (Kafka invalidate)</li><li>Update cost analysis: full reload 500K tokens × $2 = $1; delta RAG index 0.001</li><li>Top 3 gotchas: long-ctx for real-time / cache 不 invalidate / 没 freshness decay</li><li>Tools: Vertex AI Vector Search snapshots, Anthropic cache headers, Kafka event invalidate</li></ul>
 <h4>🔥 Production gotchas (top 15)</h4>
 <ol><li>"Long-context killed RAG" (2024 hype, 2026 共识 hybrid)</li><li>Pure long-ctx for &gt; 2M corpus (装不下 / cost 自爆)</li><li>Pure RAG for multi-hop (chunk 分散漏关系)</li><li>不算 cost math (FDE 必扣分)</li><li>不用 prefix cache (90% off cached 大省)</li><li>Cache key 不含 RAG candidate set → cross-query 混</li><li>多租户 long-ctx 直接 (cross-tenant leak)</li><li>没 citation 验证 (hallucinated [doc-X])</li><li>Real-time data 走 long-ctx (cache 不停失效)</li><li>单租户 cache 跨 user 共用 (隐私)</li><li>不分 single-shot vs multi-turn (multi-turn 必加 cache)</li><li>Vendor lock-in 不察觉 (2M+ 主 Gemini/Claude)</li><li>Doc-level vs chunk-level 混 (hybrid 应 doc-level)</li><li>不区分 trusted vs untrusted corpus (long-ctx 注入)</li><li>Long-ctx 中部 lost (2M middle 30-40% gap 仍真)</li></ol>
 <h4>💬 简历 reframe 索引</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Decision tree</td><td>ConvFinQA 多财报</td><td>corpus 1000+ 财报 / customer, multi-tenant → RAG narrow → Claude 200K within</td></tr><tr><td>Cost math</td><td>TikTok PayLater</td><td>Per-query $0.5 long-ctx vs $0.005 RAG, 10万 q/day 算清 RAG 必</td></tr><tr><td>Hybrid pattern</td><td>BNPL chatbot</td><td>RAG top-10 doc → 500K → Gemini 3 Pro within, multi-hop 推理</td></tr><tr><td>Prefix cache</td><td>BNPL system prompt</td><td>30K system + 50K project ctx, hit 70%+, $ 80% off</td></tr><tr><td>Citation validate</td><td>ConvFinQA</td><td>post-LLM regex + Flash SC, hallucinate cite -60%</td></tr><tr><td>Hot + warm</td><td>BNPL ticket index</td><td>hot 24h in-mem 5min, warm month batch, cold archive</td></tr><tr><td>Multi-tenant</td><td>BNPL 7 markets</td><td>Per-tenant Qdrant shard, no cross-tenant cache</td></tr><tr><td>Long-ctx middle</td><td>Voice agent</td><td>重要 turn 在 start AND end, periodic recap 每 10 turn</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Decision tree</td><td>ConvFinQA 多财报</td><td>corpus 1000+ 财报 / customer, multi-tenant → RAG narrow → Claude 200K within</td></tr><tr><td>Cost math</td><td>TikTok PayLater</td><td>Per-query $0.5 long-ctx vs $0.005 RAG, 10万 q/day 算清 RAG 必</td></tr><tr><td>Hybrid pattern</td><td>BNPL chatbot</td><td>RAG top-10 doc → 500K → Gemini 3 Pro within, multi-hop 推理</td></tr><tr><td>Prefix cache</td><td>BNPL system prompt</td><td>30K system + 50K project ctx, hit 70%+, $ 80% off</td></tr><tr><td>Citation validate</td><td>ConvFinQA</td><td>post-LLM regex + Flash SC, hallucinate cite -60%</td></tr><tr><td>Hot + warm</td><td>BNPL ticket index</td><td>hot 24h in-mem 5min, warm month batch, cold archive</td></tr><tr><td>Multi-tenant</td><td>BNPL 7 markets</td><td>Per-tenant Vertex AI Vector Search shard, no cross-tenant cache</td></tr><tr><td>Long-ctx middle</td><td>Voice agent</td><td>重要 turn 在 start AND end, periodic recap 每 10 turn</td></tr></tbody></table></div>
 <h4>🎤 面试现场 quotables (top 8)</h4>
 <blockquote><p>"Long-context didn't kill RAG — it changed the boundary. Below 200K static low-vol, long-context + cache wins. Above 2M, RAG is mandatory. In between, hybrid."</p></blockquote>
 <blockquote><p>"Hybrid pattern is RAG narrow to 500K, then Gemini 3 Pro 2M for multi-hop within. Cost lands around $0.25/query vs $1 pure long-context, $0.011 pure RAG."</p></blockquote>
@@ -133,7 +133,7 @@ Q: Citation 严格度?
 <h4>🚨 红线 (top 10 anti-patterns)</h4>
 <ol><li>"Long-context killed RAG" (2022 narrative)</li><li>Pure long-context for &gt; 2M corpus</li><li>Pure RAG for multi-hop reasoning</li><li>Ignore per-query cost math</li><li>No citation strategy / no post-validate</li><li>No prefix caching</li><li>One-size all queries (no router)</li><li>Multi-tenant prefix cache shared</li><li>Real-time data → long-ctx (cache 不停失效)</li><li>Vendor lock-in 不察觉 (1M+ ctx 主 Gemini/Claude)</li></ol>
 <h4>🛠️ Tool zoo (2026)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>Tool</th><th>一句话</th></tr></thead><tbody><tr><td>Long-ctx LLM</td><td>Gemini 3 Pro 2M, Flash 1M, Claude 200K, GPT-5.5 256K</td><td>Pro 2M 最大</td></tr><tr><td>Vector DB</td><td>Qdrant, Pinecone, Weaviate, Milvus</td><td>RAG 索引</td></tr><tr><td>Sparse</td><td>OpenSearch, Elasticsearch</td><td>Hybrid 必须</td></tr><tr><td>Prefix cache</td><td>Anthropic 5min, Gemini context cache 1h</td><td>90% off cached</td></tr><tr><td>Tracing</td><td>Phoenix (Arize), LangSmith, Langfuse</td><td>Per-query cost</td></tr><tr><td>Citation validate</td><td>自实现 regex + Flash SC</td><td>Hallucinate cite</td></tr><tr><td>Router</td><td>DSPy, LiteLLM, Portkey</td><td>Query → strategy</td></tr><tr><td>Cost dashboard</td><td>OTel + Grafana</td><td>Per-tenant $</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>Tool</th><th>一句话</th></tr></thead><tbody><tr><td>Long-ctx LLM</td><td>Gemini 3 Pro 2M, Flash 1M, Claude 200K, GPT-5.5 256K</td><td>Pro 2M 最大</td></tr><tr><td>Vector DB</td><td>Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus</td><td>RAG 索引</td></tr><tr><td>Sparse</td><td>Vertex AI Vector Search, Elasticsearch</td><td>Hybrid 必须</td></tr><tr><td>Prefix cache</td><td>Anthropic 5min, Gemini context cache 1h</td><td>90% off cached</td></tr><tr><td>Tracing</td><td>Phoenix (Arize), LangSmith, Langfuse</td><td>Per-query cost</td></tr><tr><td>Citation validate</td><td>自实现 regex + Flash SC</td><td>Hallucinate cite</td></tr><tr><td>Router</td><td>DSPy, LiteLLM, Portkey</td><td>Query → strategy</td></tr><tr><td>Cost dashboard</td><td>OTel + Grafana</td><td>Per-tenant $</td></tr></tbody></table></div>
 <h4>📊 Per-query cost matrix (500K corpus)</h4>
 <pre class="language-plaintext"><code class="language-plaintext">                     Cost / query    Latency    Multi-tenant   Multi-hop
 Pure long-ctx        $1.00           30-60s     ❌ shared cache ⭐ free
@@ -294,7 +294,7 @@ Citation regulated            → RAG / Hybrid (chunk_id 天然)</code></pre>
 - When: 系统设计开始
 - Algorithm: corpus < 200K + static + low-vol → long-ctx + cache ⭐; 200K-2M single tenant → Pure Pro 2M; 200K-2M multi-tenant → Hybrid; > 2M → Pure RAG (default)
 - Trade-off: 同 corpus 不同 cost / freshness 走不同分支
-- Tools: Gemini 3 Pro 2M, Claude 200K, Qdrant, Pinecone
+- Tools: Gemini 3 Pro 2M, Claude 200K, Vertex AI Vector Search, Vertex AI Vector Search
 
 **Framework 2**: Cost Math (2026 pricing)
 - When: 任何 architecture 决策
@@ -306,7 +306,7 @@ Citation regulated            → RAG / Hybrid (chunk_id 天然)</code></pre>
 - When: 大 corpus + 多 hop
 - Algorithm: RAG retrieve top-10 docs (doc-level not chunk) → 500K total → Gemini 3 Pro 2M → multi-hop within
 - Trade-off: 双层架构 + RAG infra + LLM 调用, 但 quality + cost 折中
-- Tools: Qdrant for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache
+- Tools: Vertex AI Vector Search for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache
 
 **Framework 4**: Citation Strategy
 - When: 始终 (audit / 防 hallucinate)
@@ -318,7 +318,7 @@ Citation regulated            → RAG / Hybrid (chunk_id 天然)</code></pre>
 - When: 数据动态 / 多源混合
 - Algorithm: static (年级) → long-ctx + permanent cache; daily → hybrid + nightly cache rebuild; hourly → hybrid + cache invalidate; real-time → pure RAG (hot index)
 - Trade-off: 实时数据 long-ctx 不可
-- Tools: Qdrant snapshot, freshness decay metadata, cache key versioning
+- Tools: Vertex AI Vector Search snapshot, freshness decay metadata, cache key versioning
 
 ### 🌳 关键决策树 (ASCII)
 
@@ -376,12 +376,12 @@ Q: Citation 严格度?
 - Tools: 自实现 cost dashboard, OTel cost attrib per query
 
 **Problem 3: Hybrid Pattern (RAG narrow → Long-ctx within)**
-- 标准架构: RAG (Qdrant + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation
+- 标准架构: RAG (Vertex AI Vector Search + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation
 - 关键设计: doc-level not chunk (避免 chunk 切碎); top-10 not 100 (cost); 加 prefix cache 5-min reuse
 - Caching: 同 user session 内 prefix 同; cross-session 不 reuse; 关键: cache key 含 RAG candidates set
 - 失效场景: 跨 turn corpus 不同 → cache miss; doc 更新 → cache invalidate
 - Top 3 gotchas: chunk-level not doc-level / 没 cache / 跨 user mix cache
-- Tools: Qdrant retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key
+- Tools: Vertex AI Vector Search retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key
 
 **Problem 4: Citation + Provenance Comparison**
 - RAG citation 天然: 每 chunk 有 chunk_id, system prompt 要求引用, post-LLM regex validate
@@ -401,7 +401,7 @@ Q: Citation 严格度?
 - Cache invalidation patterns: TTL-based (5min/1h) / version-based (doc hash) / event-based (Kafka invalidate)
 - Update cost analysis: full reload 500K tokens × $2 = $1; delta RAG index 0.001
 - Top 3 gotchas: long-ctx for real-time / cache 不 invalidate / 没 freshness decay
-- Tools: Qdrant snapshots, Anthropic cache headers, Kafka event invalidate
+- Tools: Vertex AI Vector Search snapshots, Anthropic cache headers, Kafka event invalidate
 
 ### 🔥 Production gotchas (top 15)
 
@@ -431,7 +431,7 @@ Q: Citation 严格度?
 | Prefix cache | BNPL system prompt | 30K system + 50K project ctx, hit 70%+, $ 80% off |
 | Citation validate | ConvFinQA | post-LLM regex + Flash SC, hallucinate cite -60% |
 | Hot + warm | BNPL ticket index | hot 24h in-mem 5min, warm month batch, cold archive |
-| Multi-tenant | BNPL 7 markets | Per-tenant Qdrant shard, no cross-tenant cache |
+| Multi-tenant | BNPL 7 markets | Per-tenant Vertex AI Vector Search shard, no cross-tenant cache |
 | Long-ctx middle | Voice agent | 重要 turn 在 start AND end, periodic recap 每 10 turn |
 
 ### 🎤 面试现场 quotables (top 8)
@@ -470,8 +470,8 @@ Q: Citation 严格度?
 | 类别 | Tool | 一句话 |
 |---|---|---|
 | Long-ctx LLM | Gemini 3 Pro 2M, Flash 1M, Claude 200K, GPT-5.5 256K | Pro 2M 最大 |
-| Vector DB | Qdrant, Pinecone, Weaviate, Milvus | RAG 索引 |
-| Sparse | OpenSearch, Elasticsearch | Hybrid 必须 |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus | RAG 索引 |
+| Sparse | Vertex AI Vector Search, Elasticsearch | Hybrid 必须 |
 | Prefix cache | Anthropic 5min, Gemini context cache 1h | 90% off cached |
 | Tracing | Phoenix (Arize), LangSmith, Langfuse | Per-query cost |
 | Citation validate | 自实现 regex + Flash SC | Hallucinate cite |

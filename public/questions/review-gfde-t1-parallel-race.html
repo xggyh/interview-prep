@@ -68,7 +68,7 @@
 <p><strong>Framework 2: DAG + Topological Wave Scheduling</strong></p>
 <ul><li>When: LLM emit 多 tool 一 turn</li><li>Algorithm: build DAG by resource conflict (WAW/RAW/WAR edge, RAR/disjoint none) → topological sort → group into waves</li><li>Trade-off: LLM emit order vs scheduler reorder (要保留 LLM 显式意图)</li><li>Tools: networkx (Python), gonum graph (Go), Temporal / Airflow / Prefect workflow DAG</li></ul>
 <p><strong>Framework 3: Per-Resource Distributed Lock</strong></p>
-<ul><li>When: WAW / write-shared-resource</li><li>Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)</li><li>Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性</li><li>Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, AWS DynamoDB conditional write</li></ul>
+<ul><li>When: WAW / write-shared-resource</li><li>Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)</li><li>Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性</li><li>Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, Firestore / Bigtable conditional write</li></ul>
 <p><strong>Framework 4: Failure Isolation + Cancellation</strong></p>
 <ul><li>When: wave 执行</li><li>Algorithm: <code>asyncio.gather(return_exceptions=True)</code> → partial success; critical tool fail → abort wave; cancellation via CallContext.cancel_event + asyncio.shield</li><li>Trade-off: 1 fail abort all (strict) vs 部分 success 给 LLM (灵活)</li><li>Tools: asyncio.gather/wait_for/shield, anyio (cross-framework cancellation), trio cancel scope tree</li></ul>
 <p><strong>Framework 5: Observability for Race Debug</strong></p>
@@ -323,7 +323,7 @@ Parallel tool execution = 「tool annotation (safety/resources/side_effects) →
 - When: WAW / write-shared-resource
 - Algorithm: Redis SETNX with token (UUID) + Lua DEL check token + TTL 30s + heartbeat extend; sort keys before acquire (anti AB-BA)
 - Trade-off: Redis (AP) 不安全场景 → ZooKeeper / etcd (CP); 性能 vs 正确性
-- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, AWS DynamoDB conditional write
+- Tools: redis-py SET NX EX + Lua, Redlock library, ZooKeeper kazoo, etcd3, Postgres pg_advisory_lock, Firestore / Bigtable conditional write
 
 **Framework 4: Failure Isolation + Cancellation**
 - When: wave 执行

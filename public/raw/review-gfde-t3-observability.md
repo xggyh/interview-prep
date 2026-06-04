@@ -28,7 +28,7 @@
 
 ### 🔥 哪一层最容易被追问 deeper
 
-**Layer 6 (eval-in-prod)** — 追问 "LLM-judge 怎么知道判断准?". 回答: weekly 抽 100 条人工 label → 算 LLM-judge agreement (Cohen's kappa > 0.6 acceptable), drift 时 re-prompt judge or 换 model. **Layer 4 (LangSmith)** 追问 "100K QPS 全 log prompt 哪里存得下". 回答: tail-based + PII redact + tier storage (hot 7 day → cold S3 90 day → glacier), 加 prompt content hash dedup. **Layer 3 (cost)** 追问 "cached input 怎么算". 回答: Anthropic / OpenAI / Google response 里都返回 cached_tokens, 单价 90% off (Anthropic) / 50% off (OpenAI) / 75% off (Google), 用 provider 返回值不自己估.
+**Layer 6 (eval-in-prod)** — 追问 "LLM-judge 怎么知道判断准?". 回答: weekly 抽 100 条人工 label → 算 LLM-judge agreement (Cohen's kappa > 0.6 acceptable), drift 时 re-prompt judge or 换 model. **Layer 4 (LangSmith)** 追问 "100K QPS 全 log prompt 哪里存得下". 回答: tail-based + PII redact + tier storage (hot 7 day → cold GCS 90 day → glacier), 加 prompt content hash dedup. **Layer 3 (cost)** 追问 "cached input 怎么算". 回答: Anthropic / OpenAI / Google response 里都返回 cached_tokens, 单价 90% off (Anthropic) / 50% off (OpenAI) / 75% off (Google), 用 provider 返回值不自己估.
 
 ### ⏱ 时间压缩版 (30 min round)
 
@@ -203,7 +203,7 @@ def gdpr_delete(user_id):
     log_db.delete(where=user_hashes)
 ```
 - Top 3 gotchas: (1) redact at log-write time, not at read (太晚) (2) hash 无 salt → rainbow table risk (3) GDPR delete 不 cover backup
-- Tools: Microsoft Presidio (spaCy NER + custom), AWS Macie, AWS Comprehend PII
+- Tools: Microsoft Presidio (spaCy NER + custom), AWS Macie, Cloud DLP / Healthcare NLP PII
 
 **Problem 4: Eval-in-Prod — LLM-as-Judge, Drift Detection**
 
@@ -351,7 +351,7 @@ user.tier                        gold
 | Metric | Prometheus + Mimir | Datadog, Grafana Cloud | Prometheus |
 | Eval suite | Braintrust | OpenAI Evals, Anthropic Evals | Braintrust |
 | LLM judge | Claude Sonnet 4.6 | Gemini 3 Pro | Sonnet |
-| PII | Presidio | AWS Macie, AWS Comprehend | Presidio ✅ |
+| PII | Presidio | AWS Macie, Cloud DLP / Healthcare NLP | Presidio ✅ |
 | GPU monitor | NVIDIA DCGM | Datadog GPU | DCGM |
 | Sampling | OTel Collector tail | Honeycomb Refinery | OTel |
 | Drift | MMD / KS test custom | Evidently AI, Arize | MMD custom |

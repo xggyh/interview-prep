@@ -105,7 +105,7 @@ new / weird → A + D fallback</code></pre>
 <p><strong>Problem 1: 4 pattern coexisting</strong></p>
 <ul><li>核心解法: 顺序 D &gt; B &gt; A &gt; C 在 same handler, 不是选一个 必须四个 coexist</li><li>Top 3 gotchas: D 别 gate ("let me try again" = bad UX) / B 大额必 type 'confirm' or 2FA / C 5% sample stratified per query type</li><li>Tools: matches_human_request regex incl. 中文 "人工/转人工", confirm UI out-of-band</li></ul>
 <p><strong>Problem 2: Composite confidence calibration</strong></p>
-<ul><li>核心解法: 7 signal (logprob + self-consistency 3run + citation + schema + OOD + complexity + refusal); weights 用 eval set 跑</li><li>Top 3 gotchas: raw LLM logprob 通常 overconfident (0.8 报为 60% 实际) / OOD distance 用 embedding nearest neighbor / refusal detected → override score 0</li><li>Tools: sentence-transformers OOD, BPE token logprob, Pinecone vector OOD</li></ul>
+<ul><li>核心解法: 7 signal (logprob + self-consistency 3run + citation + schema + OOD + complexity + refusal); weights 用 eval set 跑</li><li>Top 3 gotchas: raw LLM logprob 通常 overconfident (0.8 报为 60% 实际) / OOD distance 用 embedding nearest neighbor / refusal detected → override score 0</li><li>Tools: sentence-transformers OOD, BPE token logprob, Vertex AI Vector Search vector OOD</li></ul>
 <p><strong>Problem 3: Threshold tuning + tiered response</strong></p>
 <ul><li>核心解法: cost-sensitive optimization (auto_correct 0 / auto_wrong 100 / esc_correct 10 / esc_wrong 30 → min cost), 三 tier &gt; binary, per-query-type override</li><li>Top 3 gotchas: 不同 query type 不同 threshold / monthly A/B test (0.85 vs 0.80) / vanity threshold "low p99" 不 reflect true cost</li><li>Tools: per-intent THRESHOLDS dict, cost_matrix grid search</li></ul>
 <p><strong>Problem 4: Smooth handoff no re-explain</strong></p>
@@ -299,7 +299,7 @@ new / weird → A + D fallback
 **Problem 2: Composite confidence calibration**
 - 核心解法: 7 signal (logprob + self-consistency 3run + citation + schema + OOD + complexity + refusal); weights 用 eval set 跑
 - Top 3 gotchas: raw LLM logprob 通常 overconfident (0.8 报为 60% 实际) / OOD distance 用 embedding nearest neighbor / refusal detected → override score 0
-- Tools: sentence-transformers OOD, BPE token logprob, Pinecone vector OOD
+- Tools: sentence-transformers OOD, BPE token logprob, Vertex AI Vector Search vector OOD
 
 **Problem 3: Threshold tuning + tiered response**
 - 核心解法: cost-sensitive optimization (auto_correct 0 / auto_wrong 100 / esc_correct 10 / esc_wrong 30 → min cost), 三 tier > binary, per-query-type override

@@ -66,7 +66,7 @@
 
 | 术语 | 解释 |
 |---|---|
-| **LiteLLM** ⭐ | 开源 LLM 路由层 (BerriAI/LiteLLM). 统一 OpenAI 格式 API, 后端可路由到 OpenAI / Gemini / Claude / Bedrock / 100+ models. **不是迁移工具, 是长期 abstraction**. |
+| **LiteLLM** ⭐ | 开源 LLM 路由层 (BerriAI/LiteLLM). 统一 OpenAI 格式 API, 后端可路由到 OpenAI / Gemini / Claude / Vertex AI / 100+ models. **不是迁移工具, 是长期 abstraction**. |
 | **OpenRouter** | 商业 LLM 路由 SaaS. 类似 LiteLLM 但托管. 适合不想 self-host gateway 的客户. |
 | **Abstraction layer** | 抽象层. 应用代码不直接调 OpenAI SDK, 而是调内部 gateway, 由 gateway 决定走哪个模型. 一次写, 多 vendor 跑. |
 | **Kill switch** ⭐ | 一键回滚. 新模型出问题, 30s 内全流量切回 OpenAI. 这是 enterprise migration 的标配, 没 kill switch 没人敢上. |
@@ -374,7 +374,7 @@ For each app, slice by:
    └────────────────────┬────────────────────────────────┘
                         ▼
    ┌─────────────────────────────────────────────────────┐
-   │  LLM-as-judge (Claude Opus 4.7 via Bedrock)         │
+   │  LLM-as-judge (Claude Opus 4.7 via Vertex AI)         │
    │   for each pair: A wins / B wins / Tie + reasoning  │
    └────────────────────┬────────────────────────────────┘
                         ▼

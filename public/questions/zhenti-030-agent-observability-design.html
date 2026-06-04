@@ -68,7 +68,7 @@
 <h4>Agent 框架</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>LangGraph</strong></td><td>LangChain 的 stateful agent 框架.</td></tr><tr><td><strong>AutoGen</strong></td><td>Microsoft 的 multi-agent 框架.</td></tr><tr><td><strong>Plan-act-reflect loop</strong></td><td>agent 标准 3 步循环.</td></tr><tr><td><strong>Tool calling / MCP</strong></td><td>LLM 调外部 function 的协议.</td></tr><tr><td><strong>Multi-step agent</strong></td><td>多步 agent (不是单次 LLM call).</td></tr><tr><td><strong>Multi-turn</strong></td><td>多轮对话 — agent 有 conversation history.</td></tr><tr><td><strong>Multi-tenant</strong></td><td>多租户 — 服务多个 customer.</td></tr></tbody></table></div>
 <h4>部署 / 数据</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Iceberg lake</strong></td><td>数据湖表格式 — 用于 cold telemetry 存储.</td></tr><tr><td><strong>Snowflake</strong></td><td>数据仓库 — cost dashboard 源数据.</td></tr><tr><td><strong>FINRA / SOC 2 / HIPAA</strong></td><td>合规框架.</td></tr><tr><td><strong>RBAC</strong></td><td>角色 / 行级访问控制.</td></tr><tr><td><strong>Sankey diagram</strong></td><td>桑基图 — 显示 tool 调用顺序流.</td></tr><tr><td><strong>PSI (Population Stability Index)</strong></td><td>分布漂移度量.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Iceberg lake</strong></td><td>数据湖表格式 — 用于 cold telemetry 存储.</td></tr><tr><td><strong>BigQuery</strong></td><td>数据仓库 — cost dashboard 源数据.</td></tr><tr><td><strong>FINRA / SOC 2 / HIPAA</strong></td><td>合规框架.</td></tr><tr><td><strong>RBAC</strong></td><td>角色 / 行级访问控制.</td></tr><tr><td><strong>Sankey diagram</strong></td><td>桑基图 — 显示 tool 调用顺序流.</td></tr><tr><td><strong>PSI (Population Stability Index)</strong></td><td>分布漂移度量.</td></tr></tbody></table></div>
 <hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 Datadog, 是考你<strong>真正 debug 过 agent production incident 的人才会想到</strong>:</p>
@@ -116,7 +116,7 @@
    │     ▸ Metrics → Prometheus / Datadog Metrics                                   │
    │     ▸ Logs → Loki / Datadog Logs                                               │
    │     ▸ Evals → LangSmith / custom store                                         │
-   │     ▸ Costs → Iceberg lake → Snowflake → Datadog                               │
+   │     ▸ Costs → Iceberg lake → BigQuery → Datadog                               │
    └─────────┬─────────────┬─────────────────┬───────────────┬──────────────────────┘
              │             │                 │               │
              ▼             ▼                 ▼               ▼
@@ -195,7 +195,7 @@
 <p>每个 span 自动 attributes + 业务 attributes.</p>
 <p><strong>2.3 Trace context propagation</strong></p>
 <p>W3C TraceContext (<code>traceparent</code> header). 跨 service:</p>
-<ul><li>Agent → MCP gateway: pass traceparent</li><li>MCP gateway → tool server: pass traceparent</li><li>Tool server → external API (Snowflake/SAP): pass if supported (otherwise audit only)</li></ul>
+<ul><li>Agent → MCP gateway: pass traceparent</li><li>MCP gateway → tool server: pass traceparent</li><li>Tool server → external API (BigQuery/SAP): pass if supported (otherwise audit only)</li></ul>
 <p>Result: 单一 trace view 跨整个 agent + 所有 tool + LLM call.</p>
 <p><strong>2.4 Agent-specific span attributes</strong></p>
 <p>不仅 GenAI standard, 我们 add:</p>
@@ -394,7 +394,7 @@ Tool distribution Week 4: {sap_get_customer: 50%, sfdc_get_account: 10%, ...}
 <p><strong>Volumes</strong>:</p>
 <ul><li>200M agent runs/day, avg 5 LLM call + 3 tool call = ~1.5B spans/day</li><li>1% baseline sample → 15M spans hot retain</li><li>100% errors (5%) → 75M spans full → ~75GB/day traces</li></ul>
 <p><strong>Storage</strong>:</p>
-<ul><li>Tempo / Datadog traces: 75GB × 30 day = 2.2TB hot, $50/GB-month = $110K/month — too high</li><li>Cost-control: 30 day for tier-1 only, 7 day others, S3 cold for 90 day</li></ul>
+<ul><li>Tempo / Datadog traces: 75GB × 30 day = 2.2TB hot, $50/GB-month = $110K/month — too high</li><li>Cost-control: 30 day for tier-1 only, 7 day others, GCS cold for 90 day</li></ul>
 <p><strong>Logs</strong>:</p>
 <ul><li>1TB/day at 5 log lines / run × 1KB = $1200/day Datadog = $36K/month</li></ul>
 <p><strong>Eval cost</strong>:</p>
@@ -416,7 +416,7 @@ Tool distribution Week 4: {sap_get_customer: 50%, sfdc_get_account: 10%, ...}
 <hr />
 <h3>5 个 Follow-ups</h3>
 <ol><li><strong>"如果 LLM provider (Anthropic) 没 OTel native, 怎么集成?"</strong> — 答: (a) Anthropic Python SDK 2026 自带 OTel hook (PostHogAI / Helicone proxy 也 OK); (b) 自己 wrap SDK 在 trace span 里; (c) 用 LangChain / LangGraph (有 OTel built-in); (d) Helicone proxy on top of Anthropic — adds tracing layer.</li></ol>
-<ol><li><strong>"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"</strong> — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold S3); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + S3 backend) 比 Datadog cheaper.</li></ol>
+<ol><li><strong>"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"</strong> — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold GCS); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + GCS backend) 比 Datadog cheaper.</li></ol>
 <ol><li><strong>"customer 想看自己 trace 但不能看到 prompt 内容 (他们 PII), how?"</strong> — 答: PII redact 后给 customer trace. 自身 PII 已经 redact (因为 own VPC 部署 redact happen 在 source). 同时给 customer "request raw" 按钮, 走 break-glass: customer DPO 审批 + 24h time-bound access.</li></ol>
 <ol><li><strong>"agent hallucinate 但 NLI 没 catch, 怎么 improve?"</strong> — 答: (a) NLI 阈值调严 (0.85 not 0.7); (b) Add LLM-judge "fact-check" specifically; (c) External fact source (Wikipedia/Google) for entity verify; (d) Active learning: human-labeled hallucinations train better detector; (e) Force citation in response, missing citation = flag.</li></ol>
 <ol><li><strong>"如果 P1 alert 误触 (false positive) 多, on-call 疲劳, 怎么 reduce?"</strong> — 答: (a) Compound conditions (error rate AND latency, not just one); (b) Per-tenant baseline (some tenant naturally noisy); (c) Anomaly detection (z-score / EWMA) not fixed threshold; (d) Suppression: post-deploy 30 min skip alert (deploy causes brief spike); (e) Alert review weekly: kill alerts firing &gt; 5× without action.</li></ol>
@@ -674,7 +674,7 @@ SLO:
 | 术语 | 解释 |
 |---|---|
 | **Iceberg lake** | 数据湖表格式 — 用于 cold telemetry 存储. |
-| **Snowflake** | 数据仓库 — cost dashboard 源数据. |
+| **BigQuery** | 数据仓库 — cost dashboard 源数据. |
 | **FINRA / SOC 2 / HIPAA** | 合规框架. |
 | **RBAC** | 角色 / 行级访问控制. |
 | **Sankey diagram** | 桑基图 — 显示 tool 调用顺序流. |
@@ -764,7 +764,7 @@ SLO:
    │     ▸ Metrics → Prometheus / Datadog Metrics                                   │
    │     ▸ Logs → Loki / Datadog Logs                                               │
    │     ▸ Evals → LangSmith / custom store                                         │
-   │     ▸ Costs → Iceberg lake → Snowflake → Datadog                               │
+   │     ▸ Costs → Iceberg lake → BigQuery → Datadog                               │
    └─────────┬─────────────┬─────────────────┬───────────────┬──────────────────────┘
              │             │                 │               │
              ▼             ▼                 ▼               ▼
@@ -879,7 +879,7 @@ agent.run (root span)
 W3C TraceContext (`traceparent` header). 跨 service:
 - Agent → MCP gateway: pass traceparent
 - MCP gateway → tool server: pass traceparent
-- Tool server → external API (Snowflake/SAP): pass if supported (otherwise audit only)
+- Tool server → external API (BigQuery/SAP): pass if supported (otherwise audit only)
 
 Result: 单一 trace view 跨整个 agent + 所有 tool + LLM call.
 
@@ -1294,7 +1294,7 @@ I推 hybrid:
 
 **Storage**:
 - Tempo / Datadog traces: 75GB × 30 day = 2.2TB hot, $50/GB-month = $110K/month — too high
-- Cost-control: 30 day for tier-1 only, 7 day others, S3 cold for 90 day
+- Cost-control: 30 day for tier-1 only, 7 day others, GCS cold for 90 day
 
 **Logs**:
 - 1TB/day at 5 log lines / run × 1KB = $1200/day Datadog = $36K/month
@@ -1343,7 +1343,7 @@ reframe: "我做 PayLater agent 时直接面对这道题. Stack 是 OTel + LangS
 
 1. **"如果 LLM provider (Anthropic) 没 OTel native, 怎么集成?"** — 答: (a) Anthropic Python SDK 2026 自带 OTel hook (PostHogAI / Helicone proxy 也 OK); (b) 自己 wrap SDK 在 trace span 里; (c) 用 LangChain / LangGraph (有 OTel built-in); (d) Helicone proxy on top of Anthropic — adds tracing layer.
 
-2. **"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"** — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold S3); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + S3 backend) 比 Datadog cheaper.
+2. **"trace data 太多, $80K/month 太贵, 怎么 cut 50%?"** — 答: (a) 严格 tail sampling (errors only + 0.1% baseline); (b) Shorter retention (7 day hot, 30 day cold GCS); (c) Drop full prompt/response in trace (already hashed); (d) Pre-aggregate trace metrics, drop raw spans for old data; (e) 自建 (Tempo + GCS backend) 比 Datadog cheaper.
 
 3. **"customer 想看自己 trace 但不能看到 prompt 内容 (他们 PII), how?"** — 答: PII redact 后给 customer trace. 自身 PII 已经 redact (因为 own VPC 部署 redact happen 在 source). 同时给 customer "request raw" 按钮, 走 break-glass: customer DPO 审批 + 24h time-bound access.
 

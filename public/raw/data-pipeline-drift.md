@@ -2,7 +2,7 @@
 
 > "Build a **detection system for data pipeline quality degradation** on specific days. Cover metrics, thresholds, alerting, and root-cause routing."
 
-**出处**: fde.academy 技术 round 经典. Databricks / Salesforce / Snowflake FDE 都问过.
+**出处**: fde.academy 技术 round 经典. Databricks / Salesforce / BigQuery FDE 都问过.
 
 **Round**: Technical Integration (45-60 min)
 

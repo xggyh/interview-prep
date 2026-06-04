@@ -152,22 +152,22 @@ Q: chunk size?
 - Tools: LlamaParse, unstructured, tree-sitter, jina-embeddings-v3
 
 **Problem 2: Multi-modal Handling**
-- Tables: atomic + Markdown serialize ("| col1 | col2 |") + caption embed; Camelot/Tabula/Textract 解析
+- Tables: atomic + Markdown serialize ("| col1 | col2 |") + caption embed; Camelot/Tabula/Document AI 解析
 - Code: atomic + tree-sitter + lang annotation + symbol metadata
 - Formulas: LaTeX + textual description ("二次方程 x² = ...")
 - Figures: caption embed + alt text + 可选 vision multi-modal
 - Lists: 短 atomic, 长 split at item boundary
 - Top 3 gotchas: 表格切半 / 代码切函数 / 公式当 garbage text
-- Tools: Camelot, Tabula, AWS Textract, tree-sitter, CLIP for vision
+- Tools: Camelot, Tabula, Document AI, tree-sitter, CLIP for vision
 
 **Problem 3: Metadata Enrichment**
 - Schema: identity (chunk_id, doc_id, idx) + source (title, type, system) + structure (heading_path, page, is_table/code/figure) + time (created, updated, effective) + access (tenant_id, visibility, acl, pii_level) + quality (score, view_count, feedback, is_canonical) + tags (tags, lang, product)
 - Embed text = `' > '.join(heading_path) + '\n\n' + chunk.text`
 - Freshness: `score *= exp(-Δt / λ)` λ=30 days news, λ=365 policy
-- Perms: 必须 retrieval-time filter (Qdrant query_filter)
+- Perms: 必须 retrieval-time filter (Vertex AI Vector Search query_filter)
 - PII: presidio scan, tag pii_level 0-5
 - Top 3 gotchas: 没 heading 在 embed text / post-rank perms / 没 PII tag
-- Tools: presidio, Qdrant payload index, pgvector metadata
+- Tools: presidio, Vertex AI Vector Search payload index, pgvector metadata
 
 **Problem 4: Index Update Strategy**
 - Full reindex 不可行 (10K doc × 5min embed = 35 days)
@@ -177,7 +177,7 @@ Q: chunk size?
 - Hot + warm: hot (24h) in-mem 5min refresh, warm async daily; RRF merge
 - Cost (10K doc): full $50 + 5h; delta $0.5 + 5min
 - Top 3 gotchas: 没 deterministic chunk_id / 同步 reindex 阻塞 / 没 blue-green
-- Tools: Kafka, Qdrant snapshots, embedding batch worker
+- Tools: Kafka, Vertex AI Vector Search snapshots, embedding batch worker
 
 **Problem 5: Eval Methodology (Sweep)**
 - Eval set: 200 human + 1000 LLM synthetic calibrated
@@ -256,12 +256,12 @@ Q: chunk size?
 | 类别 | Tool | 一句话 |
 |---|---|---|
 | PDF parse | LlamaParse, unstructured, pymupdf, Azure Doc Intelligence, Adobe Extract | LlamaParse 表格 ⭐ |
-| Tables | Camelot, Tabula, AWS Textract | Textract 高准 |
+| Tables | Camelot, Tabula, Document AI | Document AI 高准 |
 | Code AST | tree-sitter | 必备 |
 | PII | presidio (Microsoft) | 自实现 mask 兜底 |
 | Embedding | gemini-embedding-001, text-embedding-3-large, bge-large, jina-embeddings-v3 | jina v3 late chunking |
-| Vector DB | Qdrant, Pinecone, Weaviate, Milvus, pgvector | Qdrant payload index 富 metadata |
-| Sparse | OpenSearch, Elasticsearch | 同 chunk 同步 |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus, pgvector | Vertex AI Vector Search payload index 富 metadata |
+| Sparse | Vertex AI Vector Search, Elasticsearch | 同 chunk 同步 |
 | Chunkers | LangChain RecursiveCharacterTextSplitter, LlamaIndex SemanticSplitterNodeParser | 起步 |
 | Late chunking | jina-embeddings-v3, voyage-3, cohere-v4 | 2026 hot |
 | Streaming | Kafka + delta indexing worker | 增量 |

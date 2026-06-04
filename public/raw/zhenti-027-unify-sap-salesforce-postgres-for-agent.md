@@ -41,7 +41,7 @@
 | **Subject token** | 被代理的 user 的 token. |
 | **Service account** | 服务账号 — 不依赖具体 user 的身份. 这题尽量不用. |
 | **Permission flattening** | 权限拍平 — ETL 后 source 端 RLS 丢失, 风险. |
-| **RLS (Row-Level Security)** | 行级安全 — Postgres / Snowflake 按 user 过滤行. |
+| **RLS (Row-Level Security)** | 行级安全 — Postgres / BigQuery 按 user 过滤行. |
 | **IdP (Identity Provider)** | 身份提供商 — Okta / Azure AD. |
 | **Okta** | 头部 SSO SaaS. |
 | **SAML / OIDC** | 两种企业身份联合协议. |
@@ -68,7 +68,7 @@
 | 术语 | 解释 |
 |---|---|
 | **ETL / ELT** | Extract-Transform-Load — 数据仓库经典. 这题不能用. |
-| **Data warehouse / Snowflake** | 列式分析仓. |
+| **Data warehouse / BigQuery** | 列式分析仓. |
 | **Staleness** | 数据陈旧度 — ETL 通常 30min-6h 滞后. |
 | **Federated query** | 联邦查询 — Trino / Presto 跨 source 直查. 慢但 real-time. |
 | **Trino / Presto** | 联邦 SQL 引擎. |
@@ -92,7 +92,7 @@
 |---|---|
 | **Schema registry / Tool catalog** | 工具元数据中心. |
 | **RAG over tool catalog** ⭐ | 用 vector search 从 1500 tool 里找 top-20 给 LLM. |
-| **Vector DB (PGvector / Pinecone / Qdrant)** | 向量数据库. |
+| **Vector DB (PGvector / Vertex AI Vector Search / Vertex AI Vector Search)** | 向量数据库. |
 | **Embedding** | 把 query / tool description 转成向量. |
 | **Tool eval suite** | 工具评估套件 — golden Q × expected tool sequence. |
 | **Identifier mapping** | ID 映射 — SAP customer_id ↔ SFDC account_id. |
@@ -113,7 +113,7 @@
 | 术语 | 解释 |
 |---|---|
 | **VPC** | AWS 私有网络. |
-| **Bedrock** | AWS 托管 LLM 服务. |
+| **Vertex AI** | AWS 托管 LLM 服务. |
 | **OTel span chain** | 跨 service 的 trace 链. |
 | **Dual-confirm UX** | 双重确认界面 — 写操作前 user 显式 confirm. |
 | **Eval suite daily run** | 每日跑评估 — 检测 regression. |
@@ -143,7 +143,7 @@
 5. **Cross-source composition** — agent 要 join SAP order with SFDC contact, 这个 join 在 agent 端不是 DB
 6. **Caching per source** — SAP 查询慢, Salesforce 有 governor limits, 必须 cache
 7. **Schema discovery** — agent 怎么知道有哪些 table / field 可查
-8. **菜鸟答案失败点**: "ETL 到 Snowflake" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.
+8. **菜鸟答案失败点**: "ETL 到 BigQuery" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.
 
 ---
 
@@ -252,7 +252,7 @@
 - "Real-time: 1 min latency OK? 我假设是, SAP 1min cache OK, SFDC 30s, PG 5s"
 - "Per-user permission preserved? — 假设是, agent run as user, OBO 流"
 
-明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 Snowflake, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."
+明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 BigQuery, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."
 
 KPI:
 - **Latency p99**: < 5s for single-source query, < 15s for cross-source (3 source compose)
@@ -622,7 +622,7 @@ Parallel execution is key. Agent framework (LangGraph) supports parallel tool ca
 |---|---|---|---|---|---|
 | Tool-per-source (我推) | 1-5s | Yes | Medium | Preserved (OBO) | Most cases |
 | Federated query (Trino + connectors) | 5-30s | Yes | High | Hard | Heavy analytics |
-| Cached ETL (Snowflake + sync) | <1s | No (30min stale) | High | Often flatten | BI dashboards only |
+| Cached ETL (BigQuery + sync) | <1s | No (30min stale) | High | Often flatten | BI dashboards only |
 | Hybrid (cache common queries) | 0.5-3s | Mixed | High | Mixed | High volume |
 
 Hybrid 是 staff-level — cache 常 queries 答案 in Redis (e.g., daily revenue), 不常 queries 现查. 但 cache invalidation 复杂.
@@ -712,7 +712,7 @@ Daily golden:
 **Gateway**:
 - 4 gateway pods × m6i.xlarge = $800/month
 
-**LLM cost** (Claude Sonnet 4.6 in customer Bedrock):
+**LLM cost** (Claude Sonnet 4.6 in customer Vertex AI):
 - 50K queries/day × avg 4K in + 500 out = 200M in + 25M out / day
 - Per day: $0.6 in + $0.375 out = ~$1/day per user
 - 1000 users × $1 × 30 = $30K/month — main cost driver
@@ -759,13 +759,13 @@ reframe: "我在字节做 Agent Platform 接 50+ service, 这道题 3 个 source
 
 4. **"SFDC governor 100K 24h cap, 大 customer 1 day 用完, 怎么 protect?"** — 答: (a) Per-tenant rate limit at gateway, paid > free; (b) Cache aggressive (1h account, 24h customer master); (c) Bulk API for batch operations (1 API call returns 10K records); (d) 预先 schedule heavy analytics overnight; (e) Premium SFDC tier $3K/month gets 5M cap; (f) Track per-user API usage in dashboard, alert at 80% of 24h cap.
 
-5. **"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + Snowflake DWH + 5 more sources, 我们怎么 scale tool catalog?"** — 答: (a) Tool catalog 用 vector DB (Pinecone/Qdrant/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.
+5. **"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + BigQuery DWH + 5 more sources, 我们怎么 scale tool catalog?"** — 答: (a) Tool catalog 用 vector DB (Vertex AI Vector Search/Vertex AI Vector Search/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.
 
 ---
 
 ## ❌ 死路答法
 
-1. **"ETL 到 Snowflake"** — 题目明说不要, 直接挂.
+1. **"ETL 到 BigQuery"** — 题目明说不要, 直接挂.
 2. **"50 个 OpenAI function 在 prompt 里"** — token cost 爆炸 + tool 误选高.
 3. **"Text-to-SQL 跨 3 个 source"** — federated SQL 慢复杂.
 4. **"Service account (admin) 给 agent, simple"** — 失去 permission preservation, 违反客户 SOC 2.
@@ -834,7 +834,7 @@ Volumes:
 SFDC governor:
   100K cap × 60% cache hit + bulk API → 24K actual ≪ 100K ✓
 
-LLM cost (Claude Sonnet 4.6 via Bedrock):
+LLM cost (Claude Sonnet 4.6 via Vertex AI):
   50K queries × 4K in + 500 out = $30K/month
   Total all-in: ~$32K/month
   Per query: $0.02

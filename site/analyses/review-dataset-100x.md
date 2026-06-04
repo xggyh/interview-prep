@@ -85,11 +85,11 @@
 - When: 拿到 100x 题第一刻
 - Algorithm:
   - 10k → 1M: 单机 Pandas → Spark / Ray distributed batch
-  - 1M → 100M: 单节点 vector DB → Qdrant / Pinecone cluster sharded, 单 GPU → multi-GPU DDP
+  - 1M → 100M: 单节点 vector DB → Vertex AI Vector Search / Vertex AI Vector Search cluster sharded, 单 GPU → multi-GPU DDP
   - 100M → 10B: batch → streaming + Kafka, HNSW → DiskANN / IVF-Disk
   - 10B+: 集中 → Iceberg lakehouse, per-batch → continual learning
 - Trade-off: 早换太复杂, 晚换炸
-- Tools: Spark / Ray / Dask, Qdrant / Pinecone / Milvus / Vespa, DDP / FSDP / DeepSpeed
+- Tools: Spark / Ray / Dask, Vertex AI Vector Search / Vertex AI Vector Search / Milvus / Vespa, DDP / FSDP / DeepSpeed
 
 **Framework 2**: Distributed Training Picks
 - When: model + data 不装单卡
@@ -142,7 +142,7 @@
 ├── 10k-1M → Single Python + Postgres + Single GPU + LoRA + LLM-judge
 ├── 1M-100M → Spark/Ray + Sharded vector DB + DDP multi-GPU + stratified sample
 ├── 100M-10B → Spark + Vespa/Milvus + Multi-node FSDP + sampled eval + streaming
-└── > 10B → BigQuery/Snowflake/Iceberg + continual training + sampled+streaming eval
+└── > 10B → BigQuery/BigQuery/Iceberg + continual training + sampled+streaming eval
 
 Model 大小 vs Memory?
 ├── 7B fits A100 80GB → LoRA single GPU
@@ -158,8 +158,8 @@ Labeling budget?
 
 Storage budget?
 ├── < 1M docs → Postgres + pgvector
-├── 1M-100M → Qdrant/Pinecone cluster mode + hot/cold tier
-├── 100M-1B → DiskANN + S3 cold + Redis hot
+├── 1M-100M → Vertex AI Vector Search/Vertex AI Vector Search cluster mode + hot/cold tier
+├── 100M-1B → DiskANN + GCS cold + Redis hot
 └── > 1B → Iceberg lakehouse + Iceberg+Vespa hybrid
 ```
 
@@ -176,15 +176,15 @@ Storage budget?
   ds.map_batches(embed_fn, num_gpus=1).write_parquet(out)
   
   # Storage tier
-  hot (last 30d): Redis + Pinecone HNSW
-  warm (30d-1yr): Qdrant cluster
-  cold (> 1yr): DiskANN on EBS / S3
+  hot (last 30d): Redis + Vertex AI Vector Search HNSW
+  warm (30d-1yr): Vertex AI Vector Search cluster
+  cold (> 1yr): DiskANN on EBS / GCS
   
   # Sharding (region + language) 我们 TikTok 用
   shard_key = f"{region}_{language}"
   ```
 - Top 3 gotchas: hash(user_id) 失 locality compliance / 单节点 HNSW > 10M / 没断点续跑
-- Tools: Spark / Ray, Iceberg, Pinecone / Qdrant cluster, DiskANN
+- Tools: Spark / Ray, Iceberg, Vertex AI Vector Search / Vertex AI Vector Search cluster, DiskANN
 
 **Problem 2: Training & Serving Impact**
 - 核心解法:

@@ -836,7 +836,7 @@ if __name__ == '__main__':
 
 | 问题 | 解法 |
 |------|------|
-| 1M PDFs, 单机跑不完 | Queue (SQS / Redis) + worker fleet; 每个 worker 处理一个 |
+| 1M PDFs, 单机跑不完 | Queue (Cloud Tasks / Redis) + worker fleet; 每个 worker 处理一个 |
 | 中途崩了 | resume via `file_hash in master` (本地) — 分布式用 status row |
 | Cost runaway | per-doc budget + per-batch budget + Slack alert at 80% |
 | LLM 不稳定 | spaCy 默认 + `--use-llm-only-if-confidence-low` |
@@ -859,9 +859,9 @@ Multi-worker:
   ProcessPoolExecutor — 8 cores, 8x throughput
 
 Distributed:
-  Queue (Redis / SQS) — workers pick pdfs from queue
+  Queue (Redis / Cloud Tasks) — workers pick pdfs from queue
   Status DB (Postgres) — record processed file_hash
-  S3 — store PDFs + output JSON
+  GCS — store PDFs + output JSON
 
 Pipeline-y:
   Airflow / Prefect DAG: scan → batch (100) → extract → entity → load
@@ -933,7 +933,7 @@ A: CLI 设计基本不变, 但 runtime 不是单机:
 1. **CLI 入队** mode: `pdfindex enqueue /docs/* --queue redis://...` 把文件路径推到 queue
 2. **Worker fleet**: `pdfindex worker --queue redis://... --concurrency 4` 跑在 K8s
 3. **Status DB**: Postgres 表 `(file_hash, status, output_path, processed_at, error)`
-4. **Output**: 直接写 S3 + 灌 Elasticsearch
+4. **Output**: 直接写 GCS + 灌 Elasticsearch
 5. **CLI 仍然能 query**: `pdfindex search --backend es ...`
 
 **Q2**: "LLM 给的 entity 含 hallucination 你怎么办?"

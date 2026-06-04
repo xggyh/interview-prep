@@ -195,7 +195,7 @@ ML 模型可以学习权重。
 
 - **H3 hex 比 geohash 更均匀**：Uber 开源的 H3 把地球分成六边形格子，相邻 cell 距离一致（geohash 有矩形边界问题）。生产可选
 - **CDN 缓存 hot business**：商家详情 + photos 走 CDN
-- **Photo storage**：S3 + 多分辨率（thumb / medium / large）
+- **Photo storage**：GCS + 多分辨率（thumb / medium / large）
 - **Stale rating**：avg_rating 异步更新可能 ms 级 stale，业务可接受
 
 > [!key]

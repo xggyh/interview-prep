@@ -65,7 +65,7 @@
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>FDE</td><td>half-engineer half-PM half-CS, 坐客户现场 ship 端到端</td><td>T4 round 自我定位</td></tr><tr><td>Discovery</td><td>week 0 不写代码只 interview + shadow</td><td>Day 1-3</td></tr><tr><td>MVP</td><td>"1 真实 user 走完端到端 happy path 获得真实价值" 的最小切片</td><td>week 1-3 ship</td></tr><tr><td>Vertical slice</td><td>纵切 1 sub-step 端到端, 不是横切 N steps 半成品</td><td>MVP 选型</td></tr><tr><td>Stakeholder map</td><td>5-7 role × 关心啥 × quote × 项目态度</td><td>discovery 产出</td></tr><tr><td>D·K·D·M·P</td><td>Discovery/KPI lock/Decomposition/MVP/Pilot 主框架</td><td>整体 12-week 路线</td></tr><tr><td>Trust ladder</td><td>suggest → confirm → auto-routine → autonomous 4 phase</td><td>反 "100% auto" push back</td></tr><tr><td>Roadmap doc</td><td>Live doc 接所有 scope creep 提议, 推 phase 2+</td><td>客户加需求时</td></tr><tr><td>KPI lock</td><td>primary metric + baseline + target + measure + attribution + confounders</td><td>day 3-4 必签</td></tr><tr><td>Vanity metric</td><td>"agent usage rate" 而非 "time saved"</td><td>反例</td></tr><tr><td>Anti-perfection rule</td><td>MVP 阶段必须 hardcode / single-user / no observability</td><td>week 1-3 纪律</td></tr><tr><td>ICP</td><td>Ideal Customer Profile (sales 用语)</td><td>qualification 切片</td></tr><tr><td>Champion</td><td>客户内部熟人, 帮你穿针引线 + 内部沟通</td><td>discovery 必锁</td></tr><tr><td>Shadow (动词)</td><td>跟 rep 一天观察 vs 30-min interview</td><td>rep 不愿意 interview 的 fallback</td></tr><tr><td>Phase advance gate</td><td>当前 phase 指标稳定 + 客户 sign-off 才能 advance</td><td>pilot 路线</td></tr></tbody></table></div>
 <h4>5 个核心 framework / pattern</h4>
 <p><strong>Framework 1</strong>: D·K·D·M·P (5 letter 时间线)</p>
-<ul><li>When: 任何 vague request</li><li>Algorithm: D(day1-3 interview) → K(day3-4 ONE KPI 签字) → D(day4-5 workflow N steps 评分) → M(week1-3 vertical slice ship) → P(week4-12 pilot 3 rep A/B → expand)</li><li>Trade-off: 强纪律, 不接 "let me just code first"</li><li>Tools: Streamlit / Pinecone / Gemini 3 Pro / Salesforce read API (MVP 默认栈)</li></ul>
+<ul><li>When: 任何 vague request</li><li>Algorithm: D(day1-3 interview) → K(day3-4 ONE KPI 签字) → D(day4-5 workflow N steps 评分) → M(week1-3 vertical slice ship) → P(week4-12 pilot 3 rep A/B → expand)</li><li>Trade-off: 强纪律, 不接 "let me just code first"</li><li>Tools: Streamlit / Vertex AI Vector Search / Gemini 3 Pro / Salesforce read API (MVP 默认栈)</li></ul>
 <p><strong>Framework 2</strong>: 7-role stakeholder interview (per-role 5 questions, 30 min each)</p>
 <ul><li>When: D 阶段 day 1-3</li><li>Algorithm: Buyer (KPI / 预算 / 决策) + Process owner (workflow) + 2 reps (用户痛) + IT (API / SSO) + CFO (ROI) + Champion + 自家 CS</li><li>Trade-off: 7 个 interview 占 2.5 day, vs 直接 build 看似快但 90% return 不上</li><li>Tools: verbatim quote, async fallback (1-pager / shadow / public data)</li></ul>
 <p><strong>Framework 3</strong>: ONE KPI lock template</p>
@@ -108,13 +108,13 @@ change of mind → real-pivot vs shiny-toy
 "100% auto" → 4-phase trust ladder</code></pre>
 <h4>Part 2 五个深度问题速查</h4>
 <p><strong>Problem 1: D·K·D·M·P 5 letter 深度拆解</strong></p>
-<ul><li>核心解法: D (day1-3, 5-7 interview verbatim) → K (day3-4 ONE metric signed doc) → D (day4-5 score matrix) → M (week1-3 anti-perfection vertical slice) → P (week4-12 phased rollout)</li><li>Top 3 gotchas: 用 verbatim quote 不改述 / KPI sign-off doc 强制签 / 不允许 "all of them" 平行 KPI</li><li>Tools: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API (MVP), Notion sign-off doc</li></ul>
+<ul><li>核心解法: D (day1-3, 5-7 interview verbatim) → K (day3-4 ONE metric signed doc) → D (day4-5 score matrix) → M (week1-3 anti-perfection vertical slice) → P (week4-12 phased rollout)</li><li>Top 3 gotchas: 用 verbatim quote 不改述 / KPI sign-off doc 强制签 / 不允许 "all of them" 平行 KPI</li><li>Tools: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API (MVP), Notion sign-off doc</li></ul>
 <p><strong>Problem 2: 5-role × 5-question interview 矩阵</strong></p>
 <ul><li>核心解法: per-role tailored question, 30 min standard 节奏 (0-2 开场 / 2-15 开放 / 15-25 收敛 / 25-28 验证 / 28-30 next step), verbatim quote 笔记</li><li>Top 3 gotchas: rep 1 个 anecdote 2 个 pattern / shadow &gt; interview / VP 答 "all good" → 不是真 buyer</li><li>Tools: async fallback (1-pager 5题 10min) / shadow 1 day / champion 转交 / public data (job posts / 财报 / 新闻)</li></ul>
 <p><strong>Problem 3: KPI lock — force ONE number</strong></p>
 <ul><li>核心解法: "bet your bonus on ONE number" 强迫表态, sign-off doc 6 字段 (metric / def / baseline / target / measure / attribution / confounders), reject vague language</li><li>Top 3 gotchas: vanity metric (AI usage rate) vs outcome (revenue / time saved) / KPI 多个就没 KPI / "stay flexible" 必给 fallback "lock 但 week 3 可重评"</li><li>Tools: signed Notion doc, KPI dashboard live demo day, 反 vanity test "客户的客户有没有更好?"</li></ul>
 <p><strong>Problem 4: MVP anti-perfection rules (说 NO 的艺术)</strong></p>
-<ul><li>核心解法: IN 列 (1 happy path + Streamlit + Pinecone + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)</li><li>Top 3 gotchas: hardcode demo 数据假装真 (诚信问题) / hardcode KPI 计算 / 不写到 customer 的 expected scope</li><li>Tools: Demo Day 30-min storyboard (0-3 recap / 3-15 live demo / 15-22 数据 / 22-27 phase 2 roadmap / 27-30 Q&amp;A), stopwatch vs baseline</li></ul>
+<ul><li>核心解法: IN 列 (1 happy path + Streamlit + Vertex AI Vector Search + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)</li><li>Top 3 gotchas: hardcode demo 数据假装真 (诚信问题) / hardcode KPI 计算 / 不写到 customer 的 expected scope</li><li>Tools: Demo Day 30-min storyboard (0-3 recap / 3-15 live demo / 15-22 数据 / 22-27 phase 2 roadmap / 27-30 Q&amp;A), stopwatch vs baseline</li></ul>
 <p><strong>Problem 5: Customer 管理 (scope creep / 改主意 / "faster" / "100% auto")</strong></p>
 <ul><li>核心解法 (dialog 模板):</li><li>Scope creep: "Great idea, into phase 2 roadmap (live doc). Now: stay on MVP or delay 2 weeks?"</li><li>Change of mind: "Based on rep feedback or shiny LinkedIn article?" 分 real-pivot vs shiny-toy</li><li>"Faster": 3 options (1-wk PoC hardcode / 3-wk MVP integration / both stage)</li><li>"100% auto": Phase 1-3 trust ladder, "Phase 1 mistake $0, Phase 4 mistake $$$$, net 5 month vs 8+ month reset"</li><li>Top 3 gotchas: 不在 meeting 当场 decide / roadmap doc 让 customer 看到 item 被记 / 多 choice 让 customer 选不让你拒</li><li>Tools: live roadmap doc, scope creep ratio chart, sponsor 替你 enforce</li></ul>
 <h4>Production gotchas (top 15)</h4>
@@ -126,7 +126,7 @@ change of mind → real-pivot vs shiny-toy
 <h4>红线 (top 10 anti-patterns)</h4>
 <ol><li>Code in week 1 before any interview</li><li>Accept "all of them" multiple-KPI answer</li><li>Promise 100% automation day 1</li><li>Build multi-tenant / observability / CI/CD in MVP</li><li>Demo without before/after baseline numbers</li><li>Say YES to every scope creep ask</li><li>Skip IT / Security alignment (week 3 demo blocked)</li><li>Hardcode customer's data and pretend it's real</li><li>No champion identified (no internal eyes/ears)</li><li>Decide pivot in-meeting (must defer to next sync with data)</li></ol>
 <h4>工具栈 cheat (2026 pricing)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>阶段</th><th>Tool</th><th>2026 pricing</th><th>用途</th></tr></thead><tbody><tr><td>MVP LLM reasoning</td><td>Gemini 3 Pro</td><td>$2 in / $12 out per 1M</td><td>主对话 + 复杂推理</td></tr><tr><td>MVP cheap ops</td><td>Gemini 3 Flash</td><td>$0.50 / $3</td><td>parse / format / classify</td></tr><tr><td>MVP reflection</td><td>Claude Opus 4.5</td><td>$15 / $75</td><td>high-stakes 复核</td></tr><tr><td>Vector DB</td><td>Pinecone Serverless</td><td>$25/mo starter, $0.40/1M query</td><td>managed, 几分钟 setup</td></tr><tr><td>Frontend</td><td>Streamlit Cloud</td><td>free tier OK for MVP demo</td><td>Python 1 天起页</td></tr><tr><td>Frontend prod</td><td>Next.js + Vercel</td><td>free tier</td><td>Phase 2+</td></tr><tr><td>Backend deploy</td><td>GCP Cloud Run</td><td>pay-per-request</td><td>serverless, 不上 K8s</td></tr><tr><td>Storage</td><td>Supabase</td><td>free tier</td><td>Postgres-as-a-service</td></tr><tr><td>Auth (later)</td><td>Auth0</td><td>$35-/mo</td><td>proper SSO Phase 2</td></tr><tr><td>Observability</td><td>Sentry</td><td>free tier</td><td>error tracking only</td></tr><tr><td>Workflow engine</td><td>Temporal Cloud</td><td>$200/mo+</td><td>Phase 2 onward</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>阶段</th><th>Tool</th><th>2026 pricing</th><th>用途</th></tr></thead><tbody><tr><td>MVP LLM reasoning</td><td>Gemini 3 Pro</td><td>$2 in / $12 out per 1M</td><td>主对话 + 复杂推理</td></tr><tr><td>MVP cheap ops</td><td>Gemini 3 Flash</td><td>$0.50 / $3</td><td>parse / format / classify</td></tr><tr><td>MVP reflection</td><td>Claude Opus 4.5</td><td>$15 / $75</td><td>high-stakes 复核</td></tr><tr><td>Vector DB</td><td>Vertex AI Vector Search Serverless</td><td>$25/mo starter, $0.40/1M query</td><td>managed, 几分钟 setup</td></tr><tr><td>Frontend</td><td>Streamlit Cloud</td><td>free tier OK for MVP demo</td><td>Python 1 天起页</td></tr><tr><td>Frontend prod</td><td>Next.js + Vercel</td><td>free tier</td><td>Phase 2+</td></tr><tr><td>Backend deploy</td><td>GCP Cloud Run</td><td>pay-per-request</td><td>serverless, 不上 K8s</td></tr><tr><td>Storage</td><td>Supabase</td><td>free tier</td><td>Postgres-as-a-service</td></tr><tr><td>Auth (later)</td><td>Auth0</td><td>$35-/mo</td><td>proper SSO Phase 2</td></tr><tr><td>Observability</td><td>Sentry</td><td>free tier</td><td>error tracking only</td></tr><tr><td>Workflow engine</td><td>Temporal Cloud</td><td>$200/mo+</td><td>Phase 2 onward</td></tr></tbody></table></div>
 <h4>4-phase trust ladder timing (per phase advance gate)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Phase</th><th>Week</th><th>What</th><th>Advance criteria</th></tr></thead><tbody><tr><td>0 Baseline</td><td>0</td><td>全人工</td><td>Discovery + KPI lock</td></tr><tr><td>1 Suggest only</td><td>1-8</td><td>Agent generate, human review + edit</td><td>Override &lt; 10% / time saved &gt; 20% / 客户 sign-off</td></tr><tr><td>2 Auto deterministic</td><td>8-16</td><td>Agent auto on safe steps, human review judgment</td><td>Auto-step error &lt; 1% / time saved &gt; 40%</td></tr><tr><td>3 Auto + escalate</td><td>16-32</td><td>Auto on routine, escalate outlier</td><td>Escalation &lt; 5% / customer satisfaction OK</td></tr><tr><td>4 Autonomous routine</td><td>32+</td><td>Within bounds (e.g., refund &lt; $X) auto-full</td><td>Audit 10% sample / customer sign-off</td></tr></tbody></table></div>
 <h4>7-role discovery interview 30-min 节奏 (template)</h4>
@@ -233,7 +233,7 @@ FDE T4 scoping = "客户说一句 vague 话 (week 0) → 用 D·K·D·M·P 把�
 - When: 任何 vague request
 - Algorithm: D(day1-3 interview) → K(day3-4 ONE KPI 签字) → D(day4-5 workflow N steps 评分) → M(week1-3 vertical slice ship) → P(week4-12 pilot 3 rep A/B → expand)
 - Trade-off: 强纪律, 不接 "let me just code first"
-- Tools: Streamlit / Pinecone / Gemini 3 Pro / Salesforce read API (MVP 默认栈)
+- Tools: Streamlit / Vertex AI Vector Search / Gemini 3 Pro / Salesforce read API (MVP 默认栈)
 
 **Framework 2**: 7-role stakeholder interview (per-role 5 questions, 30 min each)
 - When: D 阶段 day 1-3
@@ -303,7 +303,7 @@ change of mind → real-pivot vs shiny-toy
 **Problem 1: D·K·D·M·P 5 letter 深度拆解**
 - 核心解法: D (day1-3, 5-7 interview verbatim) → K (day3-4 ONE metric signed doc) → D (day4-5 score matrix) → M (week1-3 anti-perfection vertical slice) → P (week4-12 phased rollout)
 - Top 3 gotchas: 用 verbatim quote 不改述 / KPI sign-off doc 强制签 / 不允许 "all of them" 平行 KPI
-- Tools: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API (MVP), Notion sign-off doc
+- Tools: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API (MVP), Notion sign-off doc
 
 **Problem 2: 5-role × 5-question interview 矩阵**
 - 核心解法: per-role tailored question, 30 min standard 节奏 (0-2 开场 / 2-15 开放 / 15-25 收敛 / 25-28 验证 / 28-30 next step), verbatim quote 笔记
@@ -316,7 +316,7 @@ change of mind → real-pivot vs shiny-toy
 - Tools: signed Notion doc, KPI dashboard live demo day, 反 vanity test "客户的客户有没有更好?"
 
 **Problem 4: MVP anti-perfection rules (说 NO 的艺术)**
-- 核心解法: IN 列 (1 happy path + Streamlit + Pinecone + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)
+- 核心解法: IN 列 (1 happy path + Streamlit + Vertex AI Vector Search + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)
 - Top 3 gotchas: hardcode demo 数据假装真 (诚信问题) / hardcode KPI 计算 / 不写到 customer 的 expected scope
 - Tools: Demo Day 30-min storyboard (0-3 recap / 3-15 live demo / 15-22 数据 / 22-27 phase 2 roadmap / 27-30 Q&A), stopwatch vs baseline
 
@@ -392,7 +392,7 @@ change of mind → real-pivot vs shiny-toy
 | MVP LLM reasoning | Gemini 3 Pro | $2 in / $12 out per 1M | 主对话 + 复杂推理 |
 | MVP cheap ops | Gemini 3 Flash | $0.50 / $3 | parse / format / classify |
 | MVP reflection | Claude Opus 4.5 | $15 / $75 | high-stakes 复核 |
-| Vector DB | Pinecone Serverless | $25/mo starter, $0.40/1M query | managed, 几分钟 setup |
+| Vector DB | Vertex AI Vector Search Serverless | $25/mo starter, $0.40/1M query | managed, 几分钟 setup |
 | Frontend | Streamlit Cloud | free tier OK for MVP demo | Python 1 天起页 |
 | Frontend prod | Next.js + Vercel | free tier | Phase 2+ |
 | Backend deploy | GCP Cloud Run | pay-per-request | serverless, 不上 K8s |

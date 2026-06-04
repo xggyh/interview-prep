@@ -51,7 +51,7 @@
           ▼         ▼
    ┌──────────┐  ┌──────────────┐
    │ Log      │  │ Artifact     │
-   │ Stream   │  │ Store (S3)   │
+   │ Stream   │  │ Store (GCS)   │
    │ (Kafka)  │  │              │
    └────┬─────┘  └──────────────┘
         │
@@ -127,7 +127,7 @@ class TaskRun:
     started_at: datetime | None
     completed_at: datetime | None
     exit_code: int | None
-    log_url: str  # S3 / Kafka topic ref
+    log_url: str  # GCS / Kafka topic ref
 ```
 
 Orchestrator 维护 finite state machine —— task done 事件触发"是否本 stage 都好了 → 启动下 stage"。
@@ -152,14 +152,14 @@ fluent-bit sidecar
 Kafka topic: pipeline.{runId}.{taskId}
     │
     ├── 实时推送 → SSE → frontend
-    └── 归档 → S3 (cold storage 30d)
+    └── 归档 → GCS (cold storage 30d)
 ```
 
-前端调 `GET /runs/{id}/tasks/{tid}/logs/stream` → SSE 持续 push。完成后切到 S3 静态。
+前端调 `GET /runs/{id}/tasks/{tid}/logs/stream` → SSE 持续 push。完成后切到 GCS 静态。
 
 ### 5. Artifact 在 stage 间传递
 
-每个 task 声明 `outputs: [./dist, target/release]` → worker 把目录 tar + 上传 S3 → 下个 task 启动前 worker 拉对应 artifact 解压到 `./inputs/`。
+每个 task 声明 `outputs: [./dist, target/release]` → worker 把目录 tar + 上传 GCS → 下个 task 启动前 worker 拉对应 artifact 解压到 `./inputs/`。
 
 ### 6. 重试 / 重启
 
@@ -172,7 +172,7 @@ Kafka topic: pipeline.{runId}.{taskId}
 |---|---|---|
 | 调度单位 | Pod per task | Long-running worker：状态污染 |
 | 队列 | Redis Stream（per stage） | RabbitMQ：太重 |
-| 日志 | Kafka 实时 + S3 归档 | 直接 DB：写吞吐撑不住 |
+| 日志 | Kafka 实时 + GCS 归档 | 直接 DB：写吞吐撑不住 |
 | Orchestrator | Stateful service + Postgres | Workflow engine（Temporal）：可作为替代，免费版功能受限 |
 
 ## 关键技术细节
@@ -183,7 +183,7 @@ Kafka topic: pipeline.{runId}.{taskId}
 - **secrets 注入**：worker 启动前从 Vault 拉，环境变量注入，task 结束销毁
 
 > [!key]
-> 这题核心是**DAG + 分布式 worker + 状态机**。亮点：(1) per-task 容器隔离；(2) 日志走 Kafka 流；(3) artifact 用 S3 中转；(4) state machine 驱动 stage 切换。
+> 这题核心是**DAG + 分布式 worker + 状态机**。亮点：(1) per-task 容器隔离；(2) 日志走 Kafka 流；(3) artifact 用 GCS 中转；(4) state machine 驱动 stage 切换。
 
 > [!pitfall]
 > ❌ 一个 long-running worker 跑多 task —— 状态污染、清理麻烦；

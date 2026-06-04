@@ -93,7 +93,7 @@
   - ColBERT (5x storage, 极致 precision)
   - + Cross-encoder rerank top-50 → top-10 (bge-reranker-v2-m3, 3-5x latency) ⭐ if budget
 - Trade-off: precision vs latency vs storage
-- Tools: Pinecone / Weaviate / Qdrant / pgvector, Elasticsearch, Cohere rerank-v3
+- Tools: Vertex AI Vector Search / Weaviate / Vertex AI Vector Search / pgvector, Elasticsearch, Cohere rerank-v3
 
 **Framework 3**: 5 Decision Factors
 - When: 选 chunking 时
@@ -247,7 +247,7 @@ Corpus scale?
   }
   ```
 - Top 3 gotchas: 没 ACL 硬过滤 (越权检索) / 没 freshness (旧政策被检) / 没 embedding_model_version (model 升级混淆)
-- Tools: pgvector with JSONB, Pinecone metadata filter, pre-search WHERE clause
+- Tools: pgvector with JSONB, Vertex AI Vector Search metadata filter, pre-search WHERE clause
 
 **Problem 5: Eval Methodology (3-Layer)**
 - 核心解法:

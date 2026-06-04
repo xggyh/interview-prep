@@ -96,7 +96,7 @@
                     │                ↓
                     │              重新 Worker 取出 → POST
                     │                ↓ (失败累计 8 次)
-                    │              DLQ (S3 cold storage)
+                    │              DLQ (GCS cold storage)
                     │                ↓
                     │              Ops dashboard + 客户 alert
                   done              ↓
@@ -148,7 +148,7 @@
 <p><strong>作为 Producer 方</strong> (你推 webhook 给客户):</p>
 <ol><li><strong>持久化事件</strong>: 事件先入 Kafka / 持久 queue, 不要直接发 — 防 worker crash 丢事件</li><li><strong>Worker pool</strong>: per-partition / per-client 各 1 个 consumer, 控制并发</li><li><strong>HTTP POST 客户端 URL</strong>, timeout 30s</li><li><strong>结果处理</strong>:</li></ol>
 <ul><li>2xx: ACK</li><li>5xx / 408 / 429 / network err: 入重试队列</li><li>其他 4xx: 直 DLQ (不可重试)</li></ul>
-<ol><li><strong>签名</strong>: HMAC-SHA256 + <code>client_secret</code>, 写 <code>X-Signature</code> header</li><li><strong>Event_id</strong>: UUID, 写 <code>X-Event-Id</code></li><li><strong>Timestamp</strong>: 当前时间, 写 <code>X-Timestamp</code> (用于 client 防 replay)</li><li><strong>DLQ</strong>: 7-8 次重试仍失败 → S3 cold storage, dashboard 可见</li><li><strong>Self-serve replay</strong>: 客户 UI 可选时间窗 replay</li><li><strong>Documentation</strong>: 给 customer 一份 spec 含: dedup-by-event-id, signature 验证代码, retry schedule</li></ol>
+<ol><li><strong>签名</strong>: HMAC-SHA256 + <code>client_secret</code>, 写 <code>X-Signature</code> header</li><li><strong>Event_id</strong>: UUID, 写 <code>X-Event-Id</code></li><li><strong>Timestamp</strong>: 当前时间, 写 <code>X-Timestamp</code> (用于 client 防 replay)</li><li><strong>DLQ</strong>: 7-8 次重试仍失败 → GCS cold storage, dashboard 可见</li><li><strong>Self-serve replay</strong>: 客户 UI 可选时间窗 replay</li><li><strong>Documentation</strong>: 给 customer 一份 spec 含: dedup-by-event-id, signature 验证代码, retry schedule</li></ol>
 <p><strong>作为 Consumer 方</strong> (你接 webhook):</p>
 <ol><li><strong>HTTPS endpoint</strong> + WAF</li><li><strong>签名验证</strong>: 不验签的 endpoint 是公开攻击面</li><li><strong>Idempotency</strong>: dedup by <code>event_id</code> (Redis 1h TTL + DB unique constraint)</li><li><strong>快速 ACK</strong>: 收到先返 200, 后台 async 处理 — 防 producer 重试压垮你</li><li><strong>Async processing</strong>: 入自己的 queue, 慢慢消费</li><li><strong>错误隔离</strong>: 单个事件处理失败不影响其他</li></ol>
 <hr />
@@ -380,7 +380,7 @@ def deliver(event):
     attempt_count: int
     sent_to_dlq_at: datetime
     can_replay: bool             # 是否允许 self-serve replay</code></pre>
-<p><strong>存储</strong>: S3 (cold storage) + 索引 entries in Postgres for query</p>
+<p><strong>存储</strong>: GCS (cold storage) + 索引 entries in Postgres for query</p>
 <h4>5.2 Observability (4 维度)</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Metric</th><th>Alert 条件</th></tr></thead><tbody><tr><td><strong>Per-client delivery rate</strong></td><td>Success/min by client</td><td>&lt; 50% for &gt; 10 min → alert</td></tr><tr><td><strong>DLQ growth rate</strong></td><td>DLQ entries/min</td><td>&gt; 100/min sustained → page</td></tr><tr><td><strong>Queue depth</strong></td><td>Per-client in-flight</td><td>&gt; 80% of max → warn</td></tr><tr><td><strong>Latency p99</strong></td><td>First-attempt to ACK</td><td>&gt; 5s → investigate</td></tr></tbody></table></div>
 <p><strong>Dashboard 必备页面</strong>:</p>
@@ -458,7 +458,7 @@ def deliver(event):
 <p>你的 <strong>voice agent multi-region</strong> + <strong>BNPL chatbot retry logic</strong> 都涉及类似:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>题</th><th>你做过</th></tr></thead><tbody><tr><td>At-least-once + dedup</td><td>ConvFinQA agent retry with idempotency key (<code>client_msg_id</code>)</td></tr><tr><td>Exponential backoff + jitter</td><td>Voice agent ASR/TTS retry pipeline</td></tr><tr><td>DLQ pattern</td><td>Voice agent failed calls 上报系统</td></tr><tr><td>HMAC signing</td><td>Voice agent multi-tenant auth (类似)</td></tr><tr><td>Per-client backpressure</td><td>7 markets traffic asymmetry handling</td></tr><tr><td>Adaptive per-client</td><td>Voice agent 5% bad-network 客户自动降频</td></tr></tbody></table></div>
 <p><strong>主动 quote</strong>:</p>
-<blockquote><p>"On the voice agent retry pipeline I built, we used <strong>exponential backoff with jitter + 7 retry attempts capped at 36h</strong> with DLQ to S3. The thing that surprised me was <strong>per-client behavioral fingerprinting</strong> — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: <strong>don't retry the same way for all clients</strong>, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."</p></blockquote>
+<blockquote><p>"On the voice agent retry pipeline I built, we used <strong>exponential backoff with jitter + 7 retry attempts capped at 36h</strong> with DLQ to GCS. The thing that surprised me was <strong>per-client behavioral fingerprinting</strong> — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: <strong>don't retry the same way for all clients</strong>, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Customer says they need 99.99% delivery. Possible?"</p>
@@ -524,7 +524,7 @@ Idempotency consumer side:
   快速 ACK 200, async 处理业务
 
 DLQ:
-  S3 cold + Postgres index
+  GCS cold + Postgres index
   保留 30 天 (custom 可配)
   Metadata: failure_reason, attempts, last_response
 
@@ -660,7 +660,7 @@ Security:
                     │                ↓
                     │              重新 Worker 取出 → POST
                     │                ↓ (失败累计 8 次)
-                    │              DLQ (S3 cold storage)
+                    │              DLQ (GCS cold storage)
                     │                ↓
                     │              Ops dashboard + 客户 alert
                   done              ↓
@@ -765,7 +765,7 @@ Stripe 是 producer, 你是 consumer:
 5. **签名**: HMAC-SHA256 + `client_secret`, 写 `X-Signature` header
 6. **Event_id**: UUID, 写 `X-Event-Id`
 7. **Timestamp**: 当前时间, 写 `X-Timestamp` (用于 client 防 replay)
-8. **DLQ**: 7-8 次重试仍失败 → S3 cold storage, dashboard 可见
+8. **DLQ**: 7-8 次重试仍失败 → GCS cold storage, dashboard 可见
 9. **Self-serve replay**: 客户 UI 可选时间窗 replay
 10. **Documentation**: 给 customer 一份 spec 含: dedup-by-event-id, signature 验证代码, retry schedule
 
@@ -1157,7 +1157,7 @@ class DLQEntry:
     can_replay: bool             # 是否允许 self-serve replay
 ```
 
-**存储**: S3 (cold storage) + 索引 entries in Postgres for query
+**存储**: GCS (cold storage) + 索引 entries in Postgres for query
 
 ### 5.2 Observability (4 维度)
 
@@ -1304,7 +1304,7 @@ def replay(client_id, time_range, event_types, dry_run=False):
 
 **主动 quote**:
 
-> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to S3. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."
+> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to GCS. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."
 
 ---
 
@@ -1426,7 +1426,7 @@ Idempotency consumer side:
   快速 ACK 200, async 处理业务
 
 DLQ:
-  S3 cold + Postgres index
+  GCS cold + Postgres index
   保留 30 天 (custom 可配)
   Metadata: failure_reason, attempts, last_response
 

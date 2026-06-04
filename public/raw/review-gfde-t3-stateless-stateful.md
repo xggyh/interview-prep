@@ -15,7 +15,7 @@
 |---|---|---|---|---|
 | 1 | 4-axis 比较框架 | 90s | latency / scale / failover / cost 四维度, 不是 yes/no 选择. Stateless: ∞ scale + simple FO + 30 wire重传 vs Stateful: TTFT 280ms + sticky FO 复杂 | "Stateless vs stateful 不是二选一, 我用 4-axis 框架 — latency, scale, failover, cost..." |
 | 2 | 默认 stance | 30s | **默认 stateless 95% 场景** (OpenAI / Anthropic API 都是这样), voice / sub-500ms 才例外. 这是 industry 默认 | "Default position: stateless. OpenAI / Anthropic 公开 API 都 stateless 是有原因的..." |
-| 3 | 3 use-case 决策 | 3 min | (a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 S3 — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable | "Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..." |
+| 3 | 3 use-case 决策 | 3 min | (a) chatbot stateless REST + Redis blob — 任意 pod, 2-5s p99 OK; (b) coding agent stateless + workspace 落 GCS — node 死 user resume; (c) voice stateful WebSocket + sticky LB, 200ms re-warm 是 acceptable | "Per use-case: chatbot stateless, coding stateless with workspace persistence, voice stateful — let me explain why each..." |
 | 4 | Hybrid pattern 揭示 | 2 min | "Stateless" 是 API 语义, server 内部其实 implicitly stateful — in-process LRU + Redis + DB + GPU KV cache. 4 tier hierarchy | "Now the dirty secret — 'stateless' is API semantics, server is implicitly stateful via 4-tier cache hierarchy..." |
 | 5 | KV cache 复用 mechanics | 3 min | vLLM PagedAttention 自动 prefix 复用. Client 传 conversation_id hint → sticky route → 80-85% prefix cache hit rate. SGLang RadixAttention multi-turn 多 20-30% | "The hidden stateful layer is GPU KV cache — vLLM PagedAttention 自动 share prefix, hit rate 80-85% with sticky..." |
 | 6 | Failover edge cases | 2 min | Stateless: any pod takes over, 0 user impact, but 30K token re-prefill cost. Stateful: pod dies → reconnect to any pod, 200ms re-warm acceptable for voice. 跨 region < 1s FO 要 Redis cross-region replicate | "Failover differs sharply — stateless free but expensive re-prefill, stateful needs warm-up budget..." |
@@ -129,7 +129,7 @@ Stateful AA:      p99 150-350ms, 100K+, wire 1x, < 1s failover 3x cost
 ```
 - 核心: 没有银弹, latency 想要 stateful, scale 想要 stateless, cost 看流量, failover 看 SLA
 - Top 3 gotchas: (1) 算 wire cost 时忘 LLM token 等价 (2) failover RTO ≠ RPO (3) AA 复制冲突 last-write-wins 数据丢
-- Tools: Locust / k6 latency benchmark, AWS CloudWatch RTO/RPO, Envoy active-active
+- Tools: Locust / k6 latency benchmark, Cloud Monitoring RTO/RPO, Envoy active-active
 
 **Problem 2: Hybrid Pattern — Logically Stateless + 4-Tier Cache**
 
@@ -195,7 +195,7 @@ Stateless full flow:
   → 0 message loss
 
 Stateful single:
-  - Checkpoint 5-30s interval (snapshot to S3)
+  - Checkpoint 5-30s interval (snapshot to GCS)
   - Pod die → spare pod load snapshot + replay WAL
   - Lose 5-30s data + 200-500ms TTFT cold start
 
@@ -205,7 +205,7 @@ Active-Active:
   - 3x cost for replicas
 ```
 - Top 3 gotchas: (1) checkpoint 太长 lose data (2) replay WAL slow (3) AA split-brain 时双写
-- Tools: AWS S3 for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey
+- Tools: GCS (Cloud Storage) for checkpoint, Postgres logical replication, Redis Streams for replay, chaos-monkey
 
 ### 🔥 Production gotchas (top 15)
 
@@ -290,7 +290,7 @@ vLLM prefix cache hit rate (production 实测):
 | Stateless API framework | FastAPI / Express | Go Gin, Rust Axum | FastAPI |
 | L1 in-process cache | Caffeine / Guava | LRU dict | Caffeine |
 | L2 warm cache | Redis Cluster | DragonFly, KeyDB | Redis |
-| L3 cold store | Postgres | DynamoDB, Cassandra | Postgres |
+| L3 cold store | Postgres | Firestore / Bigtable, Cassandra | Postgres |
 | L4 KV cache (LLM) | vLLM PagedAttn | SGLang RadixAttn, TensorRT-LLM | vLLM + SGLang ✅ |
 | Sticky LB | Envoy hash | HAProxy, NGINX consistent hash | Envoy |
 | WebSocket | Envoy WS / Socket.io | uWebSockets | Envoy |

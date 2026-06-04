@@ -137,9 +137,9 @@ nav.toc a:hover { background: #f59e0b; color: white; border-color: #f59e0b; }
     <tr><td><strong>Postgres</strong></td><td class="num">5-10K read / 1-5K write</td><td>1-10TB disk</td><td>再大要 partition / 分库</td></tr>
     <tr><td><strong>MySQL</strong></td><td class="num">类似 Postgres</td><td>同上</td><td>InnoDB 同量级</td></tr>
     <tr><td><strong>MongoDB</strong></td><td class="num">类似 Postgres</td><td>同上</td><td>sharding 早做</td></tr>
-    <tr><td><strong>Elasticsearch / node</strong></td><td class="num">1-5K</td><td>64GB heap, 1TB 索引</td><td>OpenSearch 同量级</td></tr>
+    <tr><td><strong>Elasticsearch / node</strong></td><td class="num">1-5K</td><td>64GB heap, 1TB 索引</td><td>Vertex AI Vector Search 同量级</td></tr>
     <tr><td><strong>Kafka broker</strong></td><td class="num">100K msg/s</td><td>10MB/s per partition</td><td>分区是核心限制</td></tr>
-    <tr><td><strong>OpenSearch ANN (HNSW)</strong></td><td class="num">1-10K</td><td>= N × dim × 4B</td><td>内存吃满</td></tr>
+    <tr><td><strong>Vertex AI Vector Search ANN (HNSW)</strong></td><td class="num">1-10K</td><td>= N × dim × 4B</td><td>内存吃满</td></tr>
     <tr><td><strong>FAISS IVF-PQ</strong></td><td class="num">1K</td><td>1B vector / TB RAM</td><td>PQ 压 30x, 自部署最便宜</td></tr>
     <tr><td><strong>vLLM Llama 3 8B (H100)</strong></td><td class="num">5-10K tok/s decode</td><td>80GB VRAM</td><td>speculative decode 再 ×2</td></tr>
     <tr><td><strong>vLLM Llama 3 70B (2×H100)</strong></td><td class="num">1-2K tok/s decode</td><td>160GB VRAM</td><td>self-host 性价比甜点</td></tr>
@@ -199,7 +199,7 @@ nav.toc a:hover { background: #f59e0b; color: white; border-color: #f59e0b; }
     <tr><td><strong>LLM Flash 200 out tok</strong></td><td class="num">300ms</td></tr>
     <tr><td><strong>LLM Pro 500 out tok</strong></td><td class="num">800ms-2s</td></tr>
     <tr><td><strong>LLM Pro 2M context (10K out)</strong></td><td class="num">8-15s</td></tr>
-    <tr><td>S3 GetObject (1MB)</td><td class="num">30-100ms</td></tr>
+    <tr><td>GCS GetObject (1MB)</td><td class="num">30-100ms</td></tr>
     <tr><td>HTTPS 握手 (cold)</td><td class="num">50-200ms</td></tr>
   </table>
 </section>
@@ -229,8 +229,8 @@ PQ 压缩后 ≈ 上面 / 30</div>
   DB pool size = 200 × 1.25 buffer = 250 connections</div>
 
   <h3>4. Storage 月成本</h3>
-  <div class="formula">$/月 = GB × $0.023 (S3 standard)
-       OR  GB × $0.004 (S3 Glacier)
+  <div class="formula">$/月 = GB × $0.023 (GCS standard)
+       OR  GB × $0.004 (GCS Glacier)
    + egress: GB out × $0.09 (AWS to internet)
             GB cross-region × $0.02</div>
 </section>
@@ -268,18 +268,18 @@ Memory (向量库) = N × dim × 4 bytes / 30 (PQ 压缩后)</div>
   <strong>5000 万医疗文档 HIPAA RAG (Q21)</strong><br>
   <strong>Step 1 — Chunk 计算</strong>: 5000万 × 10 chunk/doc = 5 亿 chunks<br>
   <strong>Step 2 — Storage 拆分</strong>:<br>
-  &nbsp;&nbsp;• Text (raw): 5亿 × 2KB = <strong>1TB</strong> (S3 = $23/月)<br>
-  &nbsp;&nbsp;• Embedding float32: 5亿 × 4KB = <strong>2TB</strong> (S3 = $46/月)<br>
+  &nbsp;&nbsp;• Text (raw): 5亿 × 2KB = <strong>1TB</strong> (GCS = $23/月)<br>
+  &nbsp;&nbsp;• Embedding float32: 5亿 × 4KB = <strong>2TB</strong> (GCS = $46/月)<br>
   &nbsp;&nbsp;• Embedding PQ 压缩: 5亿 × 100B = <strong>50GB</strong> (in-memory)<br>
-  &nbsp;&nbsp;• OpenSearch index 含 metadata: ~3-4TB<br>
+  &nbsp;&nbsp;• Vertex AI Vector Search index 含 metadata: ~3-4TB<br>
   <strong>Step 3 — Memory 实际能装</strong>: PQ 后 50GB → 单 64GB r6g.4xlarge 装下, 但生产留 3 节点 (HA + 增长)<br>
-  <strong>Step 4 — 月成本</strong>: OpenSearch m5.4xlarge × 3 = $3K/月 + S3 + cross-region replication ≈ <strong>$5K-10K/月 储存</strong>
+  <strong>Step 4 — 月成本</strong>: Vertex AI Vector Search m5.4xlarge × 3 = $3K/月 + GCS + cross-region replication ≈ <strong>$5K-10K/月 储存</strong>
   </div>
 
   <h3>⑤ 常见坑</h3>
   <div class="trap">
   <strong>Trap 1</strong>: 只算 raw byte, 忘了 metadata / index / WAL 倍数 (实际 ×1.5-2)<br>
-  <strong>Trap 2</strong>: 忘 replication factor (S3 默认 3 副本已含, 但 DB / ES 是额外的)<br>
+  <strong>Trap 2</strong>: 忘 replication factor (GCS 默认 3 副本已含, 但 DB / ES 是额外的)<br>
   <strong>Trap 3</strong>: 算了 storage 不算 memory (vector search 是 RAM-bound)<br>
   <strong>Trap 4</strong>: 假设 chunk 数 = doc 数 (实际 10-50x)
   </div>

@@ -253,7 +253,7 @@ OTel trace:
     └── Post-process:   30ms
 
 vector search 800ms 异常 (baseline 50ms):
-  Qdrant metric: shard rebalancing in progress
+  Vertex AI Vector Search metric: shard rebalancing in progress
   Fix: 等 rebalance 完, latency 回到 50ms
 ```
 
@@ -426,7 +426,7 @@ Fix: 增加 vector DB instance memory / 加 replica
 # Before:
 TTFT p99 = 2300ms
 
-# Apply: increase Qdrant memory, enable better caching
+# Apply: increase Vertex AI Vector Search memory, enable better caching
 
 # After (1h after deploy):
 TTFT p99 = 600ms ✓
@@ -452,7 +452,7 @@ canary_test.run_every_5_min()
 
 ```
 Incident postmortem:
-  - Root cause:       Qdrant memory pressure under load growth
+  - Root cause:       Vertex AI Vector Search memory pressure under load growth
   - Detection time:   45 min (users complained)
   - Resolution time:  2h (after diagnosis)
   - Action items:
@@ -1063,7 +1063,7 @@ User query
    ↓
 [2. Query rewriting] (Sonnet 4.6, 200ms)
    ↓
-[3. RAG retrieve] (Qdrant, 50ms)
+[3. RAG retrieve] (Vertex AI Vector Search, 50ms)
    ↓
 [4. Rerank] (bge-reranker-v2, 200ms)
    ↓
@@ -1254,7 +1254,7 @@ User perception: 50ms TTFT (vs 2500ms naive).
 4. **System bottlenecks** 让你能说「我知道 GPU / 网络 / KV cache 的限制」
 5. **Multi-stage pipeline** 让你能说「我处理过 agentic system 的 end-to-end latency」
 
-面试场把这 5 层都讲出来, 加上「我自己 production 踩过 X 坑 (vLLM 升级 / Qdrant memory 等)」, 就是 staff-level inference engineer 水准.
+面试场把这 5 层都讲出来, 加上「我自己 production 踩过 X 坑 (vLLM 升级 / Vertex AI Vector Search memory 等)」, 就是 staff-level inference engineer 水准.
 
 ---
 
@@ -1324,7 +1324,7 @@ User perception: 50ms TTFT (vs 2500ms naive).
 >
 > The pattern I'd recommend: **never assume your infra config is what you think — always diff against actual runtime config before each diagnosis**.
 >
-> For agentic multi-stage pipeline at BNPL, I learned to **budget latency per stage** with SLO alerts. When RAG retrieve started taking 800ms (Qdrant rebalance), we caught it in 5 min, not after users complained. Per-stage SLO + canary = sleep at night."
+> For agentic multi-stage pipeline at BNPL, I learned to **budget latency per stage** with SLO alerts. When RAG retrieve started taking 800ms (Vertex AI Vector Search rebalance), we caught it in 5 min, not after users complained. Per-stage SLO + canary = sleep at night."
 
 → 这是你简历最强 match 的题, 一定 ace.
 

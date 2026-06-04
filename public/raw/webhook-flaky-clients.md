@@ -94,7 +94,7 @@
                     │                ↓
                     │              重新 Worker 取出 → POST
                     │                ↓ (失败累计 8 次)
-                    │              DLQ (S3 cold storage)
+                    │              DLQ (GCS cold storage)
                     │                ↓
                     │              Ops dashboard + 客户 alert
                   done              ↓
@@ -199,7 +199,7 @@ Stripe 是 producer, 你是 consumer:
 5. **签名**: HMAC-SHA256 + `client_secret`, 写 `X-Signature` header
 6. **Event_id**: UUID, 写 `X-Event-Id`
 7. **Timestamp**: 当前时间, 写 `X-Timestamp` (用于 client 防 replay)
-8. **DLQ**: 7-8 次重试仍失败 → S3 cold storage, dashboard 可见
+8. **DLQ**: 7-8 次重试仍失败 → GCS cold storage, dashboard 可见
 9. **Self-serve replay**: 客户 UI 可选时间窗 replay
 10. **Documentation**: 给 customer 一份 spec 含: dedup-by-event-id, signature 验证代码, retry schedule
 
@@ -591,7 +591,7 @@ class DLQEntry:
     can_replay: bool             # 是否允许 self-serve replay
 ```
 
-**存储**: S3 (cold storage) + 索引 entries in Postgres for query
+**存储**: GCS (cold storage) + 索引 entries in Postgres for query
 
 ### 5.2 Observability (4 维度)
 
@@ -738,7 +738,7 @@ def replay(client_id, time_range, event_types, dry_run=False):
 
 **主动 quote**:
 
-> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to S3. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."
+> "On the voice agent retry pipeline I built, we used **exponential backoff with jitter + 7 retry attempts capped at 36h** with DLQ to GCS. The thing that surprised me was **per-client behavioral fingerprinting** — 5% of customer phones were on bad networks; we auto-detected and shifted those to lower-frequency retries to avoid wasting compute. I'd apply the same lesson to webhook delivery: **don't retry the same way for all clients**, adapt to their pattern. We also built a self-serve replay UI — customers love being able to rescue events themselves instead of paging us."
 
 ---
 
@@ -860,7 +860,7 @@ Idempotency consumer side:
   快速 ACK 200, async 处理业务
 
 DLQ:
-  S3 cold + Postgres index
+  GCS cold + Postgres index
   保留 30 天 (custom 可配)
   Metadata: failure_reason, attempts, last_response
 

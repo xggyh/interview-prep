@@ -64,7 +64,7 @@
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td>PE (Prompt Engineering)</td><td>改 input format, system prompt / few-shot / CoT / schema</td><td>起步必选</td></tr><tr><td>RAG</td><td>动态注入 retrieved context, 带资料答</td><td>facts 频繁更新</td></tr><tr><td>FT (Fine-Tuning)</td><td>改 model weights, learn pattern</td><td>style 一致性 / cost 降</td></tr><tr><td>SFT</td><td>Supervised, (input, output) labeled</td><td>标准 FT, $25k typical</td></tr><tr><td>DPO</td><td>(chosen, rejected) 偏好对, no reward model</td><td>style 学习</td></tr><tr><td>RLHF</td><td>reward model + PPO</td><td>quality max, $115k+</td></tr><tr><td>Constitutional AI</td><td>Anthropic 用 AI 自我 critique</td><td>RLHF 变种</td></tr><tr><td>LoRA / QLoRA</td><td>low-rank adapter, base frozen</td><td>cheaper FT</td></tr><tr><td>CoT</td><td>Chain-of-Thought "step by step"</td><td>reasoning PE</td></tr><tr><td>Few-shot</td><td>2-5 example in prompt</td><td>learn pattern</td></tr><tr><td>ReAct</td><td>Reasoning + Acting loop</td><td>tool-using agent</td></tr><tr><td>Self-consistency</td><td>sample N + vote</td><td>quality &gt; latency</td></tr><tr><td>HyDE</td><td>Hypothetical Document Embedding</td><td>RAG query rewrite</td></tr><tr><td>Multi-query</td><td>1 query → N rephrased</td><td>recall boost</td></tr><tr><td>Self-RAG</td><td>model decides 何时 retrieve</td><td>adaptive</td></tr><tr><td>RRF</td><td>Reciprocal Rank Fusion</td><td>hybrid dense+BM25</td></tr><tr><td>Faithfulness</td><td>answer 是否 grounded in context</td><td>RAG eval metric</td></tr><tr><td>Hallucination rate</td><td>编造率, RAG critical</td><td>RAG eval</td></tr><tr><td>Catastrophic forgetting</td><td>FT 后丢失 general ability</td><td>mix 20% general data</td></tr><tr><td>Prompt caching</td><td>Anthropic/OpenAI 输入复用</td><td>90% input save</td></tr></tbody></table></div>
 <h4>🎯 5 个核心 framework</h4>
 <p><strong>Framework 1</strong>: 3-Technique Distinction</p>
-<ul><li>When: 任何 AI deployment 决策</li><li>Algorithm:</li><li>PE: changes input format. $0 setup. fast iterate (mins). Easy compliance.</li><li>RAG: changes input + retrieved context. $1-5k setup. +30-200ms latency. Citations.</li><li>FT: changes model weights. $25-100k setup. Days-weeks iterate. Black-box.</li><li>Trade-off: 3 个不互斥, 但起步选错 = 浪费时间金钱</li><li>Tools: LangSmith for PE iteration, Pinecone/Qdrant for RAG, OpenAI fine-tuning API / unsloth for FT</li></ul>
+<ul><li>When: 任何 AI deployment 决策</li><li>Algorithm:</li><li>PE: changes input format. $0 setup. fast iterate (mins). Easy compliance.</li><li>RAG: changes input + retrieved context. $1-5k setup. +30-200ms latency. Citations.</li><li>FT: changes model weights. $25-100k setup. Days-weeks iterate. Black-box.</li><li>Trade-off: 3 个不互斥, 但起步选错 = 浪费时间金钱</li><li>Tools: LangSmith for PE iteration, Vertex AI Vector Search/Vertex AI Vector Search for RAG, OpenAI fine-tuning API / unsloth for FT</li></ul>
 <p><strong>Framework 2</strong>: 6-Decision Dimensions</p>
 <ul><li>When: 不知道哪个起步</li><li>Algorithm:</li></ul>
 <ol><li>Data freshness: static → PE/FT, dynamic → RAG</li><li>Knowledge size: small → PE in prompt, large → RAG, huge → tiered (long-context narrow + RAG wide)</li><li>Customization: per-tenant → RAG metadata filter, per-team → PE persona</li><li>Quality bar: &gt; 90% → all 3, &lt; 80% → PE only</li><li>Latency budget: &lt; 100ms → PE, &gt; 500ms OK → all</li><li>Cost budget: cheap → small + PE, expensive OK → all</li></ol>
@@ -195,7 +195,7 @@
 <ul><li>核心解法:</li></ul>
 <pre class="language-plaintext"><code class="language-plaintext">  BNPL chatbot (all 3):
     1. PE intent classify (Haiku 4.5, few-shot)
-    2. RAG retrieve policy (Qdrant, hybrid)
+    2. RAG retrieve policy (Vertex AI Vector Search, hybrid)
     3. FT SFT Sonnet 4.6 multilingual response
     4. PE structured output (JSON enforce)
     5. Cascade: 90% Haiku, 9% Sonnet, 1% Opus 4.7
@@ -320,7 +320,7 @@
   - RAG: changes input + retrieved context. $1-5k setup. +30-200ms latency. Citations.
   - FT: changes model weights. $25-100k setup. Days-weeks iterate. Black-box.
 - Trade-off: 3 个不互斥, 但起步选错 = 浪费时间金钱
-- Tools: LangSmith for PE iteration, Pinecone/Qdrant for RAG, OpenAI fine-tuning API / unsloth for FT
+- Tools: LangSmith for PE iteration, Vertex AI Vector Search/Vertex AI Vector Search for RAG, OpenAI fine-tuning API / unsloth for FT
 
 **Framework 2**: 6-Decision Dimensions
 - When: 不知道哪个起步
@@ -507,7 +507,7 @@ Customer 问题本质?
   ```
   BNPL chatbot (all 3):
     1. PE intent classify (Haiku 4.5, few-shot)
-    2. RAG retrieve policy (Qdrant, hybrid)
+    2. RAG retrieve policy (Vertex AI Vector Search, hybrid)
     3. FT SFT Sonnet 4.6 multilingual response
     4. PE structured output (JSON enforce)
     5. Cascade: 90% Haiku, 9% Sonnet, 1% Opus 4.7

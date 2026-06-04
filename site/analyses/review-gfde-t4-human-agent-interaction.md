@@ -152,7 +152,7 @@ new / weird → A + D fallback
 **Problem 2: Composite confidence calibration**
 - 核心解法: 7 signal (logprob + self-consistency 3run + citation + schema + OOD + complexity + refusal); weights 用 eval set 跑
 - Top 3 gotchas: raw LLM logprob 通常 overconfident (0.8 报为 60% 实际) / OOD distance 用 embedding nearest neighbor / refusal detected → override score 0
-- Tools: sentence-transformers OOD, BPE token logprob, Pinecone vector OOD
+- Tools: sentence-transformers OOD, BPE token logprob, Vertex AI Vector Search vector OOD
 
 **Problem 3: Threshold tuning + tiered response**
 - 核心解法: cost-sensitive optimization (auto_correct 0 / auto_wrong 100 / esc_correct 10 / esc_wrong 30 → min cost), 三 tier > binary, per-query-type override

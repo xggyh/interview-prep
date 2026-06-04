@@ -32,10 +32,10 @@
                   ┌──────┼────────┐
                   ▼      ▼        ▼
             ┌─────────┐ ┌──────────────┐
-            │ Result  │ │ Job Queue    │  ◀── Redis Stream / SQS
+            │ Result  │ │ Job Queue    │  ◀── Redis Stream / Cloud Tasks
             │ Cache   │ │ (priority)   │
             │ (Redis  │ └──────┬───────┘
-            │  +S3)   │        │
+            │  +GCS)   │        │
             └─────────┘        ▼
                        ┌──────────────┐
                        │ Worker Pool  │  K8s deployment
@@ -101,7 +101,7 @@ def solve_crossword(grid, words):
 
 ### 2. Job Queue 模式
 
-- 用 Redis Stream / SQS / Kafka 作为持久化队列
+- 用 Redis Stream / Cloud Tasks / Kafka 作为持久化队列
 - 队列里的 job 是 `{jobId, gridHash, priority, submittedAt}`
 - Worker pull job → 求解 → 写 result store → ack
 
@@ -131,13 +131,13 @@ class Job:
     submitted_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
-    result_url: str | None    # S3 link 存大结果
+    result_url: str | None    # GCS link 存大结果
 
 class WordList:
     id: UUID
     name: str          # 'english-standard', 'nyt-dict'
     size: int
-    storage_url: str   # S3
+    storage_url: str   # GCS
 ```
 
 ## 取舍

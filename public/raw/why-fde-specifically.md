@@ -172,7 +172,7 @@ Total: ~80 秒. 短不过 60, 长不过 100.
 - Frontier proximity: **低** — Palantir 不做 frontier model
 - 你的 framing: **不要把 Palantir FDE 当成 LLM FDE** — 这里 LLM 是工具, ops + data 是主线. 你要 lean on TikTok PayLater 支付业务的 ops & compliance 经验
 
-**Databricks / Snowflake FDE**:
+**Databricks / BigQuery FDE**:
 - 公司位置: SF / Boston / 全球
 - 客户类型: data-heavy enterprise (传统行业数据团队)
 - 工作内容: 数据平台 + 模型 + serving 一体化

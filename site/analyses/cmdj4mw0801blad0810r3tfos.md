@@ -271,7 +271,7 @@ class HDRHistogram:
 
    Cold:
    ┌──────────────┐
-   │ S3 Parquet   │  raw sampled records，历史回放
+   │ GCS Parquet   │  raw sampled records，历史回放
    └──────────────┘
 ```
 
@@ -416,7 +416,7 @@ def detect_regression(today_top_k, last_week_top_k):
 ### 5.7 Cold Storage (history)
 
 ```
-Sample records → daily → S3 Parquet (compressed columnar)
+Sample records → daily → GCS Parquet (compressed columnar)
 
 Schema:
   - ts, query (string), template, latency, region, version, device, user_seg
@@ -495,7 +495,7 @@ Dashboard:
 > 
 > **Stratified sampling**: 不只 uniform 10%，加入 latency > 500ms 100% + 新 deploy 第一小时 100% → capture rare 但重要的事件。
 > 
-> Cold tier：sample records 每天 export S3 Parquet，Athena query 用于历史 deep dive。
+> Cold tier：sample records 每天 export GCS Parquet，Athena query 用于历史 deep dive。
 > 
 > 想 deep dive HDR Histogram 还是 regression detection？"
 
@@ -538,7 +538,7 @@ Dashboard:
 **答**：
 - 10% sample （不是 100%）
 - Flink HDR aggregation 内存常量 cost
-- Cold storage S3 Parquet 比 TSDB 便宜 50x
+- Cold storage GCS Parquet 比 TSDB 便宜 50x
 - Dashboard query 限速 + cache 5 min
 
 ### Q7: 如何 measure 优化效果？

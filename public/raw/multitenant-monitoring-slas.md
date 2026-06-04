@@ -2,7 +2,7 @@
 
 > "Design **multi-tenant SaaS monitoring** with **varying client SLA requirements**. Per-tenant quotas, noisy-neighbor isolation, billable signal aggregation."
 
-**出处**: fde.academy 技术 round. Databricks / Snowflake / Datadog / Cloudflare 都问过.
+**出处**: fde.academy 技术 round. Databricks / BigQuery / Datadog / Cloudflare 都问过.
 
 **Round**: Technical Integration (45-60 min)
 
@@ -1039,7 +1039,7 @@ def public_status():
 **Q3**: "1B events/day storage cost — how reduce?"
 
 **A**:
-- **Tiered storage**: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in S3
+- **Tiered storage**: hot 7d in RAM/SSD, warm 30-90d in SSD, cold 1y+ in GCS
 - **Aggregate-first**: raw events 7d, 1-min rollups 90d, 1-hour 1y, daily 3y
 - **Sampling** for non-critical metrics (debug traces 1/100), but **never for billing**
 - **Per-tenant retention**: Bronze 30d, Silver 90d, Gold 1y

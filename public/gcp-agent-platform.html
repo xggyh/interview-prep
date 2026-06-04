@@ -146,7 +146,7 @@ result = Runner(agent=support_agent).run("Where is order #1234?")</code></pre>
 
   <div class="product-card">
     <div><span class="name">Agent Runtime</span><span class="tag new-2026">2026</span></div>
-    <div class="what"><strong>What</strong>: Managed serverless host for ADK agents. 部署一次得 HTTPS endpoint + auto-scale + session state + observability. 类比 AWS Bedrock Agents runtime / Lambda for agents.</div>
+    <div class="what"><strong>What</strong>: Managed serverless host for ADK agents. 部署一次得 HTTPS endpoint + auto-scale + session state + observability. 类比 Vertex AI Agents runtime / Cloud Functions for agents.</div>
     <div class="when"><strong>When to use</strong>: production deploy. 别自己起 GKE 跑 agent. Runtime 自动接 Cloud Logging / Trace / Audit.</div>
     <pre><code># Deploy
 $ gcloud agents deploy support \
@@ -179,7 +179,7 @@ $ gcloud agents invoke support --message "where is order 1234"</code></pre>
 
   <div class="product-card">
     <div><span class="name">RAG Engine</span><span class="tag new-2026">2026 GA</span></div>
-    <div class="what"><strong>What</strong>: Managed end-to-end RAG pipeline. 你给文档 (GCS / Drive / SharePoint), 它做: parse → chunk → embed → store → retrieve → rerank. 一个 API <code>create_corpus + query</code> 搞定. 类比 AWS Bedrock Knowledge Bases.</div>
+    <div class="what"><strong>What</strong>: Managed end-to-end RAG pipeline. 你给文档 (GCS / Drive / SharePoint), 它做: parse → chunk → embed → store → retrieve → rerank. 一个 API <code>create_corpus + query</code> 搞定. 类比 Vertex AI Knowledge Bases.</div>
     <div class="when"><strong>When to use</strong>: 95% RAG 场景默认它. 不要手撸 embed + Vector Search + rerank 三步 — 客户 maintain 不动.</div>
     <pre><code>from google.cloud import rag
 
@@ -257,7 +257,7 @@ GET /a2a/tasks/task-1/stream → event: status / artifact / done</code></pre>
   <div class="product-card">
     <div><span class="name">Model Armor</span><span class="tag new-2026">GA</span></div>
     <div class="what"><strong>What</strong>: Managed safety layer — prompt-injection detection, PII redaction, jailbreak filtering, malicious URL block, sensitive content classification. 直接挂在 agent 入/出方向, 不用客户写 regex.</div>
-    <div class="when"><strong>When to use</strong>: 任何 prod agent 都该有. 类比 AWS Bedrock Guardrails / OpenAI Moderation, 但 GCP-native + BAA-covered.</div>
+    <div class="when"><strong>When to use</strong>: 任何 prod agent 都该有. 类比 Vertex AI Guardrails / OpenAI Moderation, 但 GCP-native + BAA-covered.</div>
     <pre><code>from google.cloud import modelarmor
 
 template = modelarmor.create_template(

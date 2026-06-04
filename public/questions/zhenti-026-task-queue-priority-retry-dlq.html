@@ -52,11 +52,11 @@
 <h4>语义 / 可靠性</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>At-least-once</strong> ⭐</td><td>至少一次 — 可能重复发, 必须配 idempotency. 业界默认.</td></tr><tr><td><strong>Exactly-once</strong></td><td>恰好一次 — 分布式系统严格意义不可能, 只能 effectively-once.</td></tr><tr><td><strong>At-most-once</strong></td><td>最多一次 — 可能丢, 不重复.</td></tr><tr><td><strong>Idempotency / Idempotency key</strong> ⭐</td><td>幂等 / 幂等键 — 同 key 多次提交结果一样. Stripe 标配.</td></tr><tr><td><strong>Dedup window</strong></td><td>去重窗口 — 24h 内同 idem key 视为同一 task.</td></tr><tr><td><strong>Effectively-once</strong></td><td>实际一次 — at-least-once + idempotent processor.</td></tr><tr><td><strong>FIFO</strong></td><td>First-In-First-Out 顺序.</td></tr></tbody></table></div>
 <h4>重试 / 失败处理</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Retry with backoff</strong> ⭐</td><td>带退避的重试 — 失败后等一段时间再试.</td></tr><tr><td><strong>Exponential backoff</strong></td><td>指数退避 — 1s / 2s / 4s / 8s ...</td></tr><tr><td><strong>Jitter</strong></td><td>抖动 — 在退避时间上加随机扰动, 避免 thundering herd.</td></tr><tr><td><strong>Stripe-style 阶梯 backoff</strong> ⭐</td><td>Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式.</td></tr><tr><td><strong>Thundering herd</strong></td><td>雷暴 — 多 worker 同时重试导致瞬间洪峰.</td></tr><tr><td><strong>Circuit breaker</strong></td><td>熔断器 — 错误率高时直接拒绝, 给下游恢复时间.</td></tr><tr><td><strong>Visibility timeout</strong> ⭐</td><td>不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念.</td></tr><tr><td><strong>Lease / Leased</strong></td><td>租约 — task 被 worker 持有的状态.</td></tr><tr><td><strong>Heartbeat</strong> ⭐</td><td>心跳 — long-running worker 定期续 lease, 防 spurious retry.</td></tr><tr><td><strong>ack / nack</strong></td><td>acknowledge / negative ack — 任务完成 / 失败的通知.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Retry with backoff</strong> ⭐</td><td>带退避的重试 — 失败后等一段时间再试.</td></tr><tr><td><strong>Exponential backoff</strong></td><td>指数退避 — 1s / 2s / 4s / 8s ...</td></tr><tr><td><strong>Jitter</strong></td><td>抖动 — 在退避时间上加随机扰动, 避免 thundering herd.</td></tr><tr><td><strong>Stripe-style 阶梯 backoff</strong> ⭐</td><td>Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式.</td></tr><tr><td><strong>Thundering herd</strong></td><td>雷暴 — 多 worker 同时重试导致瞬间洪峰.</td></tr><tr><td><strong>Circuit breaker</strong></td><td>熔断器 — 错误率高时直接拒绝, 给下游恢复时间.</td></tr><tr><td><strong>Visibility timeout</strong> ⭐</td><td>不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. Cloud Tasks 概念.</td></tr><tr><td><strong>Lease / Leased</strong></td><td>租约 — task 被 worker 持有的状态.</td></tr><tr><td><strong>Heartbeat</strong> ⭐</td><td>心跳 — long-running worker 定期续 lease, 防 spurious retry.</td></tr><tr><td><strong>ack / nack</strong></td><td>acknowledge / negative ack — 任务完成 / 失败的通知.</td></tr></tbody></table></div>
 <h4>公平性 / 优先级</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Priority queue</strong></td><td>优先级队列 — paid &gt; free.</td></tr><tr><td><strong>Per-tenant fair scheduling</strong> ⭐</td><td>多租户公平调度 — 一个大客户不能 starve 别人.</td></tr><tr><td><strong>Starvation</strong></td><td>饥饿 — 低优先 task 永远拿不到 worker.</td></tr><tr><td><strong>WFQ (Weighted Fair Queueing)</strong> ⭐</td><td>加权公平队列 — 按 weight 分配份额.</td></tr><tr><td><strong>DRR (Deficit Round Robin)</strong></td><td>亏空轮询 — WFQ 的具体实现.</td></tr><tr><td><strong>Token bucket</strong></td><td>令牌桶 — 经典 rate limiting 算法.</td></tr><tr><td><strong>Min-share guarantee</strong></td><td>最低份额保证 — 任何 tenant 至少分到 5%.</td></tr><tr><td><strong>Burst</strong></td><td>突发 — 短时间内大量请求.</td></tr><tr><td><strong>Quota / In-flight quota</strong></td><td>配额 — 同时 leased 上限.</td></tr></tbody></table></div>
 <h4>Backing Store 选型</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Kafka</strong> ⭐</td><td>高吞吐流式日志, 1M+ TPS 但 long task HOL block.</td></tr><tr><td><strong>Redis Streams</strong></td><td>Redis 5+ 的 stream 数据结构, 100K TPS 量级.</td></tr><tr><td><strong>RabbitMQ</strong></td><td>经典 AMQP 队列, Erlang 实现.</td></tr><tr><td><strong>Postgres SKIP LOCKED</strong> ⭐</td><td>Postgres 9.5+ 的特性 — <code>FOR UPDATE SKIP LOCKED</code> 让多 worker 跳过已锁行.</td></tr><tr><td><strong>SQS (Simple Queue Service)</strong></td><td>AWS 托管队列.</td></tr><tr><td><strong>Temporal</strong> ⭐</td><td>工作流编排引擎 (不仅是队列). 长 workflow + state 适合.</td></tr><tr><td><strong>Celery</strong></td><td>Python 经典任务队列库.</td></tr><tr><td><strong>Outbox pattern</strong></td><td>任务和业务 state 在同一 DB transaction, 后异步 publish.</td></tr><tr><td><strong>Saga</strong></td><td>长流程补偿模式.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Kafka</strong> ⭐</td><td>高吞吐流式日志, 1M+ TPS 但 long task HOL block.</td></tr><tr><td><strong>Redis Streams</strong></td><td>Redis 5+ 的 stream 数据结构, 100K TPS 量级.</td></tr><tr><td><strong>RabbitMQ</strong></td><td>经典 AMQP 队列, Erlang 实现.</td></tr><tr><td><strong>Postgres SKIP LOCKED</strong> ⭐</td><td>Postgres 9.5+ 的特性 — <code>FOR UPDATE SKIP LOCKED</code> 让多 worker 跳过已锁行.</td></tr><tr><td><strong>Cloud Tasks (Simple Queue Service)</strong></td><td>AWS 托管队列.</td></tr><tr><td><strong>Temporal</strong> ⭐</td><td>工作流编排引擎 (不仅是队列). 长 workflow + state 适合.</td></tr><tr><td><strong>Celery</strong></td><td>Python 经典任务队列库.</td></tr><tr><td><strong>Outbox pattern</strong></td><td>任务和业务 state 在同一 DB transaction, 后异步 publish.</td></tr><tr><td><strong>Saga</strong></td><td>长流程补偿模式.</td></tr></tbody></table></div>
 <h4>数据结构 / 操作</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Sorted set (ZADD)</strong></td><td>Redis 有序集合 — 按 score 排序, 快速 peek top.</td></tr><tr><td><strong>SET NX / EX</strong></td><td>Redis 命令 — NX = if Not eXists; EX = expiry seconds.</td></tr><tr><td><strong>JSONB</strong></td><td>Postgres 二进制 JSON 列.</td></tr><tr><td><strong>Partial index</strong></td><td>Postgres 部分索引 — WHERE 条件下才建索引.</td></tr><tr><td><strong>FOR UPDATE SKIP LOCKED</strong></td><td>Postgres 行锁 + 跳过已锁.</td></tr><tr><td><strong>Materialized view</strong></td><td>物化视图 — 预聚合结果, 定时刷新.</td></tr><tr><td><strong>PARTITION BY RANGE</strong></td><td>Postgres 表分区.</td></tr></tbody></table></div>
 <h4>部署 / Scale</h4>
@@ -66,13 +66,13 @@
 <hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 Celery + Redis, 是考你<strong>真正在 production 用过分布式 queue, 知道这些 trade-off</strong>:</p>
-<ol><li><strong>Queue backend 选型</strong> — Kafka / Redis Streams / Postgres SKIP LOCKED / RabbitMQ / Temporal, 每个有真实 sweet spot</li><li><strong>优先级实现</strong> — multi-topic vs sorted set vs priority queue (Kafka 不原生支持)</li><li><strong>Retry strategy</strong> — Stripe-style 阶梯 (30s/2m/10m/1h/6h/24h) + jitter, 不是 simple exponential</li><li><strong>Idempotency</strong> — 同一 task 不能跑两次, idempotency key + dedup window</li><li><strong>Per-tenant fair scheduling</strong> — token bucket / weighted fair queueing / per-tenant topic</li><li><strong>Visibility timeout</strong> — worker pick task 后多久没 ack 就 re-deliver, 是 SQS / DLQ 关键</li><li><strong>Worker heartbeat</strong> — long-running task 怎么续期 visibility, 不被 spurious retry</li><li><strong>Observability</strong> — 卡 task 怎么 debug, lineage 怎么 trace</li><li><strong>菜鸟答案失败点</strong>: "Celery + Redis + retry decorator" — 完全没回答 fairness / priority / DLQ / visibility timeout 这些 真正 production 痛点.</li></ol>
+<ol><li><strong>Queue backend 选型</strong> — Kafka / Redis Streams / Postgres SKIP LOCKED / RabbitMQ / Temporal, 每个有真实 sweet spot</li><li><strong>优先级实现</strong> — multi-topic vs sorted set vs priority queue (Kafka 不原生支持)</li><li><strong>Retry strategy</strong> — Stripe-style 阶梯 (30s/2m/10m/1h/6h/24h) + jitter, 不是 simple exponential</li><li><strong>Idempotency</strong> — 同一 task 不能跑两次, idempotency key + dedup window</li><li><strong>Per-tenant fair scheduling</strong> — token bucket / weighted fair queueing / per-tenant topic</li><li><strong>Visibility timeout</strong> — worker pick task 后多久没 ack 就 re-deliver, 是 Cloud Tasks / DLQ 关键</li><li><strong>Worker heartbeat</strong> — long-running task 怎么续期 visibility, 不被 spurious retry</li><li><strong>Observability</strong> — 卡 task 怎么 debug, lineage 怎么 trace</li><li><strong>菜鸟答案失败点</strong>: "Celery + Redis + retry decorator" — 完全没回答 fairness / priority / DLQ / visibility timeout 这些 真正 production 痛点.</li></ol>
 <hr />
 <h3>必问 clarifying questions</h3>
 <ol><li><strong>Task duration distribution</strong>: 100ms - 10min 是 uniform 还是 90% &lt; 1s + 10% &gt; 1min? 完全不同选型</li><li><strong>Failure semantics</strong>: exactly-once required (financial)? at-least-once OK (analytics)?</li><li><strong>Order matters?</strong>: per-tenant FIFO 还是 unordered? 影响 partition strategy</li><li><strong>Latency-sensitive?</strong>: task 入队到开始执行 &lt; 100ms 还是 &lt; 10s 都 OK?</li><li><strong>Workers homogeneous?</strong>: 所有 worker 一样 还是 specialized (CPU vs GPU)?</li><li><strong>Tenant count</strong>: 10 tenant 还是 10K? 影响 isolation 策略</li><li><strong>Persistence requirement</strong>: crash 后 task 不能丢, 多严? RPO 0 vs 1 min</li><li><strong>Existing infra</strong>: Kafka 已有? Redis 已有? Postgres 已有? 影响 build-vs-buy</li></ol>
 <hr />
 <h3>完美答案架构 (Layered Response)</h3>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify</td><td>5 min</td><td>duration / failure semantic / fairness / scale</td><td>"三件事先锁: task duration 主分布, exactly-once 要不要, tenant 数"</td></tr><tr><td>2</td><td>Requirements + KPI</td><td>4 min</td><td>functional + non-functional + observability</td><td>"我先列 8 个能力: prio / retry / DLQ / idem / fair / vis / heart / obs"</td></tr><tr><td>3</td><td>Backend selection</td><td>8 min</td><td>Kafka / Redis / Postgres / Temporal trade matrix</td><td>"10K TPS + 10min 长 task + fairness → Redis Streams 或 Postgres"</td></tr><tr><td>4</td><td>Architecture</td><td>12 min</td><td>Topology + topic/queue design + worker model</td><td>"我画 producer → queue → worker → DLQ, fairness 在 dispatcher"</td></tr><tr><td>5</td><td>Retry + DLQ</td><td>10 min</td><td>Stripe-style backoff + DLQ structure + manual replay</td><td>"Exponential 不够, Stripe 阶梯 + jitter, 8 attempts → DLQ"</td></tr><tr><td>6</td><td>Idempotency + visibility</td><td>8 min</td><td>Idempotency key + visibility timeout + heartbeat</td><td>"Idempotency key in payload, visibility 5min default, heartbeat for long"</td></tr><tr><td>7</td><td>Multi-tenant fairness</td><td>6 min</td><td>Per-tenant queue + weighted fair scheduling</td><td>"Per-tenant topic + WFQ dispatcher"</td></tr><tr><td>8</td><td>Trade-offs + close</td><td>7 min</td><td>Build vs Temporal / SQS / Cloud queue</td><td>"10K TPS 我们自建 OK, &gt; 100K 就 Kafka. Temporal 是补充不是替代"</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>层</th><th>时间</th><th>干什么</th><th>开口句</th></tr></thead><tbody><tr><td>1</td><td>Clarify</td><td>5 min</td><td>duration / failure semantic / fairness / scale</td><td>"三件事先锁: task duration 主分布, exactly-once 要不要, tenant 数"</td></tr><tr><td>2</td><td>Requirements + KPI</td><td>4 min</td><td>functional + non-functional + observability</td><td>"我先列 8 个能力: prio / retry / DLQ / idem / fair / vis / heart / obs"</td></tr><tr><td>3</td><td>Backend selection</td><td>8 min</td><td>Kafka / Redis / Postgres / Temporal trade matrix</td><td>"10K TPS + 10min 长 task + fairness → Redis Streams 或 Postgres"</td></tr><tr><td>4</td><td>Architecture</td><td>12 min</td><td>Topology + topic/queue design + worker model</td><td>"我画 producer → queue → worker → DLQ, fairness 在 dispatcher"</td></tr><tr><td>5</td><td>Retry + DLQ</td><td>10 min</td><td>Stripe-style backoff + DLQ structure + manual replay</td><td>"Exponential 不够, Stripe 阶梯 + jitter, 8 attempts → DLQ"</td></tr><tr><td>6</td><td>Idempotency + visibility</td><td>8 min</td><td>Idempotency key + visibility timeout + heartbeat</td><td>"Idempotency key in payload, visibility 5min default, heartbeat for long"</td></tr><tr><td>7</td><td>Multi-tenant fairness</td><td>6 min</td><td>Per-tenant queue + weighted fair scheduling</td><td>"Per-tenant topic + WFQ dispatcher"</td></tr><tr><td>8</td><td>Trade-offs + close</td><td>7 min</td><td>Build vs Temporal / Cloud Tasks / Cloud queue</td><td>"10K TPS 我们自建 OK, &gt; 100K 就 Kafka. Temporal 是补充不是替代"</td></tr></tbody></table></div>
 <hr />
 <h3>端到端架构图 (ASCII)</h3>
 <pre class="language-plaintext"><code class="language-plaintext">┌──────────────────────────────────────────────────────────────────────────────────────────┐
@@ -179,7 +179,7 @@
 <ul><li>HA: backing store 主从 + automatic failover</li><li>DR: cross-region snapshot every 1h</li><li>Backpressure: enqueue rejects with 429 if backing store &gt; 90% capacity</li><li>Audit: state transition log for forensics</li></ul>
 <h4>Phase 3: Backend selection (后端存储选型) (8 min)</h4>
 <p><strong>Decision matrix</strong>:</p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Throughput</th><th>Long task</th><th>Priority</th><th>Fairness</th><th>Ops cost</th><th>Trade-off</th></tr></thead><tbody><tr><td>Kafka</td><td>1M TPS</td><td>Bad (commit lag)</td><td>Multi-topic hack</td><td>Hard</td><td>High</td><td>Good for short stream, bad for leased work</td></tr><tr><td>RabbitMQ</td><td>50K TPS</td><td>OK</td><td>Native</td><td>OK</td><td>Medium</td><td>Classic but aging</td></tr><tr><td>Redis Streams</td><td>100K TPS</td><td>OK</td><td>Sorted set</td><td>OK</td><td>Low</td><td>New-ish, Redis 6+</td></tr><tr><td>Postgres SKIP LOCKED</td><td>10-30K TPS</td><td>Great</td><td>SQL ORDER BY</td><td>Easy (group by tenant)</td><td>Low</td><td>DB-coupled, simple</td></tr><tr><td>AWS SQS</td><td>30K TPS</td><td>OK</td><td>Multi-queue + priority pattern</td><td>Per-queue</td><td>None</td><td>Managed, vendor lock</td></tr><tr><td>Temporal</td><td>10K TPS</td><td>Excellent (durable workflow)</td><td>Built-in</td><td>Built-in</td><td>Medium</td><td>Workflow not queue</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Throughput</th><th>Long task</th><th>Priority</th><th>Fairness</th><th>Ops cost</th><th>Trade-off</th></tr></thead><tbody><tr><td>Kafka</td><td>1M TPS</td><td>Bad (commit lag)</td><td>Multi-topic hack</td><td>Hard</td><td>High</td><td>Good for short stream, bad for leased work</td></tr><tr><td>RabbitMQ</td><td>50K TPS</td><td>OK</td><td>Native</td><td>OK</td><td>Medium</td><td>Classic but aging</td></tr><tr><td>Redis Streams</td><td>100K TPS</td><td>OK</td><td>Sorted set</td><td>OK</td><td>Low</td><td>New-ish, Redis 6+</td></tr><tr><td>Postgres SKIP LOCKED</td><td>10-30K TPS</td><td>Great</td><td>SQL ORDER BY</td><td>Easy (group by tenant)</td><td>Low</td><td>DB-coupled, simple</td></tr><tr><td>Cloud Tasks / Pub/Sub</td><td>30K TPS</td><td>OK</td><td>Multi-queue + priority pattern</td><td>Per-queue</td><td>None</td><td>Managed, vendor lock</td></tr><tr><td>Temporal</td><td>10K TPS</td><td>Excellent (durable workflow)</td><td>Built-in</td><td>Built-in</td><td>Medium</td><td>Workflow not queue</td></tr></tbody></table></div>
 <p><strong>我推</strong>: Postgres SKIP LOCKED + Redis (sorted set for fast peek) hybrid.</p>
 <p>理由:</p>
 <ul><li>Postgres SKIP LOCKED durable, ACID, indices 强, 10K TPS 够 (单 Aurora db.r6g.4xlarge)</li><li>Redis sorted set 加速 peek (Postgres SELECT 在大 queue 可能慢)</li><li>团队已有 PG + Redis, 不引入新 dependency</li><li>没用 Kafka 因为 long-running task (10min) commit lag 痛</li><li>没用 Temporal 因为这是 generic task queue 不是 workflow orchestration</li></ul>
@@ -187,8 +187,8 @@
 <ul><li>Kafka 是 log, 不是 queue. 任务 ack 是 commit offset, 任务在 consumer crash 时 by-default at-least-once 但 没 native visibility timeout</li><li>10min task: consumer 拿到任务后 commit offset 拖 10min → 同 partition 后续 task 全卡 (HOL blocking)</li><li>Priority: Kafka 不原生支持, hack 是 multi-topic + 消费时 round-robin, 复杂</li></ul>
 <p><strong>Why not RabbitMQ</strong>:</p>
 <ul><li>可以, 但 RabbitMQ 在 Erlang VM ops 相对 PG/Redis 重</li><li>没有 native idempotency</li><li>Cluster failover 历史上 painful</li></ul>
-<p><strong>Why not SQS</strong>:</p>
-<ul><li>如果客户用 AWS 唯一, SQS 是好选项</li><li>但 visibility timeout max 12h 限制</li><li>没有 native per-tenant fairness (需要 multi-queue)</li><li>不 portable</li></ul>
+<p><strong>Why not Cloud Tasks</strong>:</p>
+<ul><li>如果客户用 AWS 唯一, Cloud Tasks 是好选项</li><li>但 visibility timeout max 12h 限制</li><li>没有 native per-tenant fairness (需要 multi-queue)</li><li>不 portable</li></ul>
 <p><strong>Why Temporal might fit</strong>:</p>
 <ul><li>如果 task 是 workflow (multi-step + state), Temporal 完爆 queue</li><li>但纯 queue (single-step task), Temporal overkill</li><li>推荐 combo: queue 做 short / stateless task, Temporal 做 workflow</li></ul>
 <h4>Phase 4: Architecture deep dive (架构深度剖析) (12 min)</h4>
@@ -488,9 +488,9 @@ WHERE state = 'leased' AND leased_until &lt; NOW();</code></pre>
 <p><strong>Decision 8.2 — vs Temporal</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Our queue</th><th>Temporal</th></tr></thead><tbody><tr><td>Use case</td><td>Generic single-step task</td><td>Multi-step workflow with state</td></tr><tr><td>Complexity</td><td>Medium</td><td>High (workflow code patterns)</td></tr><tr><td>Throughput</td><td>10K</td><td>10K (similar)</td></tr><tr><td>Long-running</td><td>OK with heartbeat</td><td>Excellent (workers can crash, workflow continues)</td></tr><tr><td>Versioning</td><td>Manual</td><td>Built-in workflow version</td></tr><tr><td>Visibility</td><td>Custom dashboards</td><td>Temporal UI</td></tr></tbody></table></div>
 <p>我推: queue 做 stateless task (90% case), Temporal 做 long workflow (10%). Two systems coexist.</p>
-<p><strong>Decision 8.3 — vs SQS / Cloud Tasks</strong></p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Self-host</th><th>SQS</th></tr></thead><tbody><tr><td>Ops</td><td>We run</td><td>Managed</td></tr><tr><td>Cost @ 10K TPS</td><td>Postgres $1K/m + Redis $500/m + ops</td><td>SQS $4K/m</td></tr><tr><td>Customization</td><td>Full</td><td>Limited (priority is hack)</td></tr><tr><td>Vendor</td><td>None</td><td>AWS</td></tr></tbody></table></div>
-<p>If on AWS and &lt; 50K TPS, SQS is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.</p>
+<p><strong>Decision 8.3 — vs Cloud Tasks / Cloud Tasks</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Self-host</th><th>Cloud Tasks</th></tr></thead><tbody><tr><td>Ops</td><td>We run</td><td>Managed</td></tr><tr><td>Cost @ 10K TPS</td><td>Postgres $1K/m + Redis $500/m + ops</td><td>Cloud Tasks $4K/m</td></tr><tr><td>Customization</td><td>Full</td><td>Limited (priority is hack)</td></tr><tr><td>Vendor</td><td>None</td><td>AWS</td></tr></tbody></table></div>
+<p>If on AWS and &lt; 50K TPS, Cloud Tasks is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.</p>
 <p><strong>Decision 8.4 — Visibility timeout strategy</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Strategy</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Fixed 5 min</td><td>Simple</td><td>Bad for variable duration</td></tr><tr><td>Per-task type</td><td>Tuned</td><td>More config</td></tr><tr><td>Adaptive (worker reports estimated time)</td><td>Best</td><td>Complex</td></tr><tr><td>Per-task user-specified</td><td>Flexible</td><td>Trust users?</td></tr></tbody></table></div>
 <p>我推 per-task-type + user override. Default by task type sane.</p>
@@ -511,7 +511,7 @@ WHERE state = 'leased' AND leased_until &lt; NOW();</code></pre>
 <p><strong>Storage</strong>:</p>
 <ul><li>10K TPS × 86400s × 7 day = 6 billion task rows (with 7d retention)</li><li>Each row ~2KB (payload + meta) = 12 TB</li><li>Partition monthly + drop after 30d → ~52GB hot</li><li>Postgres Aurora cluster: db.r6g.4xlarge primary + 2 reader, ~$2K/month</li></ul>
 <p><strong>Redis</strong> (sorted sets per tenant):</p>
-<ul><li>200 tenant × avg 10K ready tasks × 100B per entry = 200MB hot</li><li>ElastiCache cache.r6g.large × 2 (HA): $250/month</li></ul>
+<ul><li>200 tenant × avg 10K ready tasks × 100B per entry = 200MB hot</li><li>Memorystore cache.r6g.large × 2 (HA): $250/month</li></ul>
 <p><strong>Workers</strong>:</p>
 <ul><li>Avg task 1s, 10K TPS → 10K workers concurrent</li><li>m6i.large (2 vCPU, 8GB) handles ~50 tasks/sec (Python async)</li><li>10K / 50 = 200 workers × $100/month = $20K/month</li><li>Autoscale to 50 idle off-peak</li></ul>
 <p><strong>Dispatcher</strong>:</p>
@@ -552,7 +552,7 @@ WHERE state = 'leased' AND leased_until &lt; NOW();</code></pre>
 <h3>Cheat Sheet</h3>
 <pre class="language-plaintext"><code class="language-plaintext">Backing store: Postgres SKIP LOCKED + Redis (sorted set, dedup)
               Aurora db.r6g.4xlarge × 3 = $2K/m
-              ElastiCache r6g.large × 2 = $250/m
+              Memorystore r6g.large × 2 = $250/m
 
 Capability mapping:
   Priority:     ORDER BY priority, scheduled_at
@@ -591,7 +591,7 @@ vs alternatives:
   Kafka: 100K+ TPS but bad for 10min tasks (HOL block)
   Redis Streams: 100K TPS, less durable
   Temporal: workflow &gt; queue, use for multi-step
-  SQS: managed but no native priority/fairness
+  Cloud Tasks: managed but no native priority/fairness
 
 SLO:
   99.95% availability
@@ -662,7 +662,7 @@ SLO:
 | **Stripe-style 阶梯 backoff** ⭐ | Stripe 公开的退避策略: 30s/2m/10m/1h/6h/24h/3d/7d. 适应真实失败模式. |
 | **Thundering herd** | 雷暴 — 多 worker 同时重试导致瞬间洪峰. |
 | **Circuit breaker** | 熔断器 — 错误率高时直接拒绝, 给下游恢复时间. |
-| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. SQS 概念. |
+| **Visibility timeout** ⭐ | 不可见超时 — worker 拿到任务后多久没 ack 就 re-deliver. Cloud Tasks 概念. |
 | **Lease / Leased** | 租约 — task 被 worker 持有的状态. |
 | **Heartbeat** ⭐ | 心跳 — long-running worker 定期续 lease, 防 spurious retry. |
 | **ack / nack** | acknowledge / negative ack — 任务完成 / 失败的通知. |
@@ -689,7 +689,7 @@ SLO:
 | **Redis Streams** | Redis 5+ 的 stream 数据结构, 100K TPS 量级. |
 | **RabbitMQ** | 经典 AMQP 队列, Erlang 实现. |
 | **Postgres SKIP LOCKED** ⭐ | Postgres 9.5+ 的特性 — `FOR UPDATE SKIP LOCKED` 让多 worker 跳过已锁行. |
-| **SQS (Simple Queue Service)** | AWS 托管队列. |
+| **Cloud Tasks (Simple Queue Service)** | AWS 托管队列. |
 | **Temporal** ⭐ | 工作流编排引擎 (不仅是队列). 长 workflow + state 适合. |
 | **Celery** | Python 经典任务队列库. |
 | **Outbox pattern** | 任务和业务 state 在同一 DB transaction, 后异步 publish. |
@@ -742,7 +742,7 @@ SLO:
 3. **Retry strategy** — Stripe-style 阶梯 (30s/2m/10m/1h/6h/24h) + jitter, 不是 simple exponential
 4. **Idempotency** — 同一 task 不能跑两次, idempotency key + dedup window
 5. **Per-tenant fair scheduling** — token bucket / weighted fair queueing / per-tenant topic
-6. **Visibility timeout** — worker pick task 后多久没 ack 就 re-deliver, 是 SQS / DLQ 关键
+6. **Visibility timeout** — worker pick task 后多久没 ack 就 re-deliver, 是 Cloud Tasks / DLQ 关键
 7. **Worker heartbeat** — long-running task 怎么续期 visibility, 不被 spurious retry
 8. **Observability** — 卡 task 怎么 debug, lineage 怎么 trace
 9. **菜鸟答案失败点**: "Celery + Redis + retry decorator" — 完全没回答 fairness / priority / DLQ / visibility timeout 这些 真正 production 痛点.
@@ -773,7 +773,7 @@ SLO:
 | 5 | Retry + DLQ | 10 min | Stripe-style backoff + DLQ structure + manual replay | "Exponential 不够, Stripe 阶梯 + jitter, 8 attempts → DLQ" |
 | 6 | Idempotency + visibility | 8 min | Idempotency key + visibility timeout + heartbeat | "Idempotency key in payload, visibility 5min default, heartbeat for long" |
 | 7 | Multi-tenant fairness | 6 min | Per-tenant queue + weighted fair scheduling | "Per-tenant topic + WFQ dispatcher" |
-| 8 | Trade-offs + close | 7 min | Build vs Temporal / SQS / Cloud queue | "10K TPS 我们自建 OK, > 100K 就 Kafka. Temporal 是补充不是替代" |
+| 8 | Trade-offs + close | 7 min | Build vs Temporal / Cloud Tasks / Cloud queue | "10K TPS 我们自建 OK, > 100K 就 Kafka. Temporal 是补充不是替代" |
 
 ---
 
@@ -920,7 +920,7 @@ Non-functional:
 | RabbitMQ | 50K TPS | OK | Native | OK | Medium | Classic but aging |
 | Redis Streams | 100K TPS | OK | Sorted set | OK | Low | New-ish, Redis 6+ |
 | Postgres SKIP LOCKED | 10-30K TPS | Great | SQL ORDER BY | Easy (group by tenant) | Low | DB-coupled, simple |
-| AWS SQS | 30K TPS | OK | Multi-queue + priority pattern | Per-queue | None | Managed, vendor lock |
+| Cloud Tasks / Pub/Sub | 30K TPS | OK | Multi-queue + priority pattern | Per-queue | None | Managed, vendor lock |
 | Temporal | 10K TPS | Excellent (durable workflow) | Built-in | Built-in | Medium | Workflow not queue |
 
 **我推**: Postgres SKIP LOCKED + Redis (sorted set for fast peek) hybrid.
@@ -942,8 +942,8 @@ Non-functional:
 - 没有 native idempotency
 - Cluster failover 历史上 painful
 
-**Why not SQS**:
-- 如果客户用 AWS 唯一, SQS 是好选项
+**Why not Cloud Tasks**:
+- 如果客户用 AWS 唯一, Cloud Tasks 是好选项
 - 但 visibility timeout max 12h 限制
 - 没有 native per-tenant fairness (需要 multi-queue)
 - 不 portable
@@ -1371,16 +1371,16 @@ VIP 客户可能要 dedicated worker pool:
 
 我推: queue 做 stateless task (90% case), Temporal 做 long workflow (10%). Two systems coexist.
 
-**Decision 8.3 — vs SQS / Cloud Tasks**
+**Decision 8.3 — vs Cloud Tasks / Cloud Tasks**
 
-| 维度 | Self-host | SQS |
+| 维度 | Self-host | Cloud Tasks |
 |---|---|---|
 | Ops | We run | Managed |
-| Cost @ 10K TPS | Postgres $1K/m + Redis $500/m + ops | SQS $4K/m |
+| Cost @ 10K TPS | Postgres $1K/m + Redis $500/m + ops | Cloud Tasks $4K/m |
 | Customization | Full | Limited (priority is hack) |
 | Vendor | None | AWS |
 
-If on AWS and < 50K TPS, SQS is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.
+If on AWS and < 50K TPS, Cloud Tasks is no-brainer. 我们 self-host because cross-cloud + priority + per-tenant fairness customization.
 
 **Decision 8.4 — Visibility timeout strategy**
 
@@ -1429,7 +1429,7 @@ If on AWS and < 50K TPS, SQS is no-brainer. 我们 self-host because cross-cloud
 
 **Redis** (sorted sets per tenant):
 - 200 tenant × avg 10K ready tasks × 100B per entry = 200MB hot
-- ElastiCache cache.r6g.large × 2 (HA): $250/month
+- Memorystore cache.r6g.large × 2 (HA): $250/month
 
 **Workers**:
 - Avg task 1s, 10K TPS → 10K workers concurrent
@@ -1531,7 +1531,7 @@ reframe: "我在字节做 BNPL refund 时本质就是 task queue + retry + DLQ +
 ```
 Backing store: Postgres SKIP LOCKED + Redis (sorted set, dedup)
               Aurora db.r6g.4xlarge × 3 = $2K/m
-              ElastiCache r6g.large × 2 = $250/m
+              Memorystore r6g.large × 2 = $250/m
 
 Capability mapping:
   Priority:     ORDER BY priority, scheduled_at
@@ -1570,7 +1570,7 @@ vs alternatives:
   Kafka: 100K+ TPS but bad for 10min tasks (HOL block)
   Redis Streams: 100K TPS, less durable
   Temporal: workflow > queue, use for multi-step
-  SQS: managed but no native priority/fairness
+  Cloud Tasks: managed but no native priority/fairness
 
 SLO:
   99.95% availability

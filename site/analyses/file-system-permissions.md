@@ -1002,7 +1002,7 @@ def can_user(user, perm, file, ts):
 - Append to per-node grant list anyway
 - **Re-sort** the affected list after insert (O(N log N) but rare for delayed events)
 - Or use **sorted insert** (`bisect.insort`) per event — O(N) insert but O(log N) lookup
-- For high-volume, use **immutable event log + periodic reconcile** (Lambda architecture style)
+- For high-volume, use **immutable event log + periodic reconcile** (Cloud Functions architecture style)
 - **Invalidate** materialized view for affected (user, file, perm) tuples
 
 **Q4**: "What about deletions of files?"

@@ -121,7 +121,7 @@ WebSocket 每秒 push N comments。客户端 buffer + render at 30fps，不让 U
 > ❌ Reply 不存 timestamp → 录播时 comment 错位。
 
 > [!key]
-> 三大要点：(1) **Per-stream Kafka partition + multi-tier fan-out**；(2) **Sync 简单 mod + async ML mod**；(3) **Snowflake comment_id + 持久化 enable replay**。
+> 三大要点：(1) **Per-stream Kafka partition + multi-tier fan-out**；(2) **Sync 简单 mod + async ML mod**；(3) **BigQuery comment_id + 持久化 enable replay**。
 
 ## 类似系统
 

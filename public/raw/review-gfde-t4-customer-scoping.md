@@ -83,7 +83,7 @@ FDE T4 scoping = "客户说一句 vague 话 (week 0) → 用 D·K·D·M·P 把�
 - When: 任何 vague request
 - Algorithm: D(day1-3 interview) → K(day3-4 ONE KPI 签字) → D(day4-5 workflow N steps 评分) → M(week1-3 vertical slice ship) → P(week4-12 pilot 3 rep A/B → expand)
 - Trade-off: 强纪律, 不接 "let me just code first"
-- Tools: Streamlit / Pinecone / Gemini 3 Pro / Salesforce read API (MVP 默认栈)
+- Tools: Streamlit / Vertex AI Vector Search / Gemini 3 Pro / Salesforce read API (MVP 默认栈)
 
 **Framework 2**: 7-role stakeholder interview (per-role 5 questions, 30 min each)
 - When: D 阶段 day 1-3
@@ -153,7 +153,7 @@ change of mind → real-pivot vs shiny-toy
 **Problem 1: D·K·D·M·P 5 letter 深度拆解**
 - 核心解法: D (day1-3, 5-7 interview verbatim) → K (day3-4 ONE metric signed doc) → D (day4-5 score matrix) → M (week1-3 anti-perfection vertical slice) → P (week4-12 phased rollout)
 - Top 3 gotchas: 用 verbatim quote 不改述 / KPI sign-off doc 强制签 / 不允许 "all of them" 平行 KPI
-- Tools: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API (MVP), Notion sign-off doc
+- Tools: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API (MVP), Notion sign-off doc
 
 **Problem 2: 5-role × 5-question interview 矩阵**
 - 核心解法: per-role tailored question, 30 min standard 节奏 (0-2 开场 / 2-15 开放 / 15-25 收敛 / 25-28 验证 / 28-30 next step), verbatim quote 笔记
@@ -166,7 +166,7 @@ change of mind → real-pivot vs shiny-toy
 - Tools: signed Notion doc, KPI dashboard live demo day, 反 vanity test "客户的客户有没有更好?"
 
 **Problem 4: MVP anti-perfection rules (说 NO 的艺术)**
-- 核心解法: IN 列 (1 happy path + Streamlit + Pinecone + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)
+- 核心解法: IN 列 (1 happy path + Streamlit + Vertex AI Vector Search + Salesforce read + 1 rep), OUT 列 (multi-tenant / proper auth / observability / CI/CD / edge case / mobile / multi-lang)
 - Top 3 gotchas: hardcode demo 数据假装真 (诚信问题) / hardcode KPI 计算 / 不写到 customer 的 expected scope
 - Tools: Demo Day 30-min storyboard (0-3 recap / 3-15 live demo / 15-22 数据 / 22-27 phase 2 roadmap / 27-30 Q&A), stopwatch vs baseline
 
@@ -242,7 +242,7 @@ change of mind → real-pivot vs shiny-toy
 | MVP LLM reasoning | Gemini 3 Pro | $2 in / $12 out per 1M | 主对话 + 复杂推理 |
 | MVP cheap ops | Gemini 3 Flash | $0.50 / $3 | parse / format / classify |
 | MVP reflection | Claude Opus 4.5 | $15 / $75 | high-stakes 复核 |
-| Vector DB | Pinecone Serverless | $25/mo starter, $0.40/1M query | managed, 几分钟 setup |
+| Vector DB | Vertex AI Vector Search Serverless | $25/mo starter, $0.40/1M query | managed, 几分钟 setup |
 | Frontend | Streamlit Cloud | free tier OK for MVP demo | Python 1 天起页 |
 | Frontend prod | Next.js + Vercel | free tier | Phase 2+ |
 | Backend deploy | GCP Cloud Run | pay-per-request | serverless, 不上 K8s |

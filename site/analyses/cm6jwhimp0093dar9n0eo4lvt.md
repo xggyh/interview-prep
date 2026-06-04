@@ -283,7 +283,7 @@ Series 数 = 5 × 100 × 20 × 1B = 10^13 → TSDB 崩溃
 |---|---|---|
 | **Prometheus** (单机) | 标准、简单 | scale 不到 100k+ series |
 | **VictoriaMetrics** | 高写入 / 低存储 / Prom-compat | 较新 |
-| **Thanos** | Prometheus + S3 长期存储 | 复杂 |
+| **Thanos** | Prometheus + GCS 长期存储 | 复杂 |
 | **InfluxDB** | SQL-like，商业版强 | open source 写慢 |
 | **TimescaleDB** | Postgres extension，SQL 友好 | scale 受 Postgres 限 |
 | **Datadog / 商业 SaaS** | 不操心，包邮 | $$$$ |
@@ -407,7 +407,7 @@ Burn rate alert：
      Global Grafana
 ```
 
-Pull 模式天然适合 local —— 每 region Prometheus 只 scrape 本 region server，跨洋 latency 不存在。Long-term storage via S3 (Thanos)。
+Pull 模式天然适合 local —— 每 region Prometheus 只 scrape 本 region server，跨洋 latency 不存在。Long-term storage via GCS (Thanos)。
 
 ### 5.8 Cardinality 控制
 

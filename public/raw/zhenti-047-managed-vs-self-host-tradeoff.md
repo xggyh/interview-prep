@@ -383,7 +383,7 @@ Total "hidden" TCO: often 2-3x raw compute cost
    - Self-host only
 
 4. Specific compliance with no BAA available
-   - HIPAA: BAA available from Anthropic / OpenAI / AWS Bedrock — but verify
+   - HIPAA: BAA available from Anthropic / OpenAI / Vertex AI — but verify
    - PCI: stricter, often self-host
    - FedRAMP High: limited managed options
 ```
@@ -394,7 +394,7 @@ Total "hidden" TCO: often 2-3x raw compute cost
 HIPAA with BAA:
   - Anthropic offers BAA for Claude API
   - OpenAI offers BAA for Enterprise plans
-  - AWS Bedrock HIPAA-eligible regions
+  - Vertex AI HIPAA-eligible regions
   - Verify zero-retention (training opt-out)
 
 GDPR / EU data:
@@ -465,7 +465,7 @@ Specialized:
 
 ```
 Customer embed text → in-house embedding model (BGE-M3 or open)
-                   → in-house Qdrant / Pinecone (self-host)
+                   → in-house Vertex AI Vector Search / Vertex AI Vector Search (self-host)
                    → retrieve chunks
                    → Claude Sonnet 4.6 API for generation
                    
@@ -845,7 +845,7 @@ print(recommend(bnpl_workload))
                        ┌────────────────────────┐
                        │  Common Embedding /    │
                        │  Vector store          │
-                       │  (BGE-M3 + Qdrant      │
+                       │  (BGE-M3 + Vertex AI Vector Search      │
                        │   self-host)           │
                        └────────────────────────┘
                                    │
@@ -954,7 +954,7 @@ print(recommend(bnpl_workload))
 **Q3**: "Customer is in healthcare. Can they use managed API?"
 
 **A**: Depends:
-- **Yes if**: BAA in place with provider (Anthropic, OpenAI Enterprise, AWS Bedrock HIPAA-eligible)
+- **Yes if**: BAA in place with provider (Anthropic, OpenAI Enterprise, Vertex AI HIPAA-eligible)
 - **Verify**: zero-retention (no training on customer data), audit log access, data residency (HIPAA-eligible regions)
 - **No if**: contract / regulator forbids cloud, or specific data must stay on-prem (e.g., DEA controlled substance data, certain VA contracts)
 - **Hybrid common**: PHI redaction at client + managed for cleaned queries
@@ -1064,7 +1064,7 @@ Total hidden TCO: often 2-3x raw compute
 
 Data residency:
   On-prem / air-gap: self-host only
-  HIPAA: managed OK with BAA (Anthropic, OpenAI, AWS Bedrock)
+  HIPAA: managed OK with BAA (Anthropic, OpenAI, Vertex AI)
   EU GDPR: managed OK with EU residency (Anthropic Frankfurt, OpenAI Azure EU)
   China: self-host or managed CN (Aliyun)
   Sovereign cloud: usually self-host

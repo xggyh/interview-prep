@@ -30,7 +30,7 @@
          │ fire
          ▼
   ┌──────────────┐
-  │ Job Queue    │  Kafka / SQS
+  │ Job Queue    │  Kafka / Cloud Tasks
   └──────┬───────┘
          │
          ▼
@@ -79,7 +79,7 @@ Worker pull job from queue → execute → ack。
 
 - **Direct call**: simple HTTP / RPC call
 - **Container**: spawn ephemeral container with code
-- **Lambda function**: invoke serverless
+- **Cloud Functions function**: invoke serverless
 - **Workflow**: trigger DAG of sub-jobs (Airflow-style)
 
 ### 6. Idempotency

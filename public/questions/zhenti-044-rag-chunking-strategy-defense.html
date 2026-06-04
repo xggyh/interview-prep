@@ -52,7 +52,7 @@
 <h4>Embedding / 检索 ⭐</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Embedding</strong> ⭐</td><td><strong>Text → 高维向量</strong> (1024 / 1536 / 3072 维). Cosine 距离 = semantic 相似度.</td></tr><tr><td><strong>Embedder / Embedding model</strong></td><td>生成 embedding 的模型. 2026 主流: text-embedding-3-large (OpenAI) / Voyage-3 (Anthropic) / BGE-M3 (BAAI) / Cohere embed-v4.</td></tr><tr><td><strong>Dense retrieval</strong></td><td>用 embedding 找相似 — semantic match 强 (paraphrase). 但抓不到 exact SKU / 人名.</td></tr><tr><td><strong>Sparse retrieval / BM25</strong></td><td>关键词匹配算法. 跟 dense 互补 — exact match 强.</td></tr><tr><td><strong>Hybrid retrieval</strong> ⭐</td><td><strong>Dense + BM25 同时跑, RRF/weighted 合并</strong>. 标准 production-grade, 比单一 +10pp recall.</td></tr><tr><td><strong>Reranker / cross-encoder</strong> ⭐</td><td>第二阶段精排. Top-50 候选 → cross-encoder 重新打分 → top-10. 比 bi-encoder 准但贵.</td></tr><tr><td><strong>bge-reranker</strong></td><td>BAAI 开源 reranker. Self-host.</td></tr><tr><td><strong>Cohere Rerank</strong></td><td>Cohere 商业 reranker API.</td></tr><tr><td><strong>Cross-encoder vs Bi-encoder</strong></td><td>Bi-encoder: query / doc 分别 embed, 比较 (快但糙). Cross-encoder: query + doc 一起进 model, 共同评分 (准但慢).</td></tr><tr><td><strong>HyDE (Hypothetical Document Embeddings)</strong></td><td>LLM 先生成"假想答案", 用其 embedding 检索. 对模糊 query 有效.</td></tr><tr><td><strong>Query rewriting</strong></td><td>LLM 把 user query 改写更搜索友好 — "我退款多久" → "BNPL refund processing timeline".</td></tr><tr><td><strong>MMR (Maximal Marginal Relevance)</strong></td><td>检索去重 — 不只取最相关, 还兼顾 diversity. 避免 top-10 都讲同一件事.</td></tr><tr><td><strong>Multi-vector retrieval</strong></td><td>一个 doc 生成多个 embedding (按 aspect / 段). ColBERT 是代表.</td></tr><tr><td><strong>CLIP embedding</strong></td><td>图文共享 embedding 空间 — 图查文 / 文查图. Multimodal RAG 用.</td></tr></tbody></table></div>
 <h4>Vector DB / 索引</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vector DB</strong></td><td>存 embedding + 支持 ANN 搜索的 DB.</td></tr><tr><td><strong>Qdrant</strong></td><td>Rust 写的开源 vector DB. Production 流行选择.</td></tr><tr><td><strong>Pinecone</strong></td><td>商业 managed vector DB. 起步快.</td></tr><tr><td><strong>Weaviate</strong></td><td>开源 vector DB, GraphQL API.</td></tr><tr><td><strong>Milvus</strong></td><td>开源 vector DB. 大规模 production.</td></tr><tr><td><strong>ANN (Approximate Nearest Neighbor)</strong></td><td>近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次.</td></tr><tr><td><strong>HNSW (Hierarchical Navigable Small World)</strong></td><td>ANN 算法, 多层图结构. 速度准度好平衡.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vector DB</strong></td><td>存 embedding + 支持 ANN 搜索的 DB.</td></tr><tr><td><strong>Vertex AI Vector Search</strong></td><td>Rust 写的开源 vector DB. Production 流行选择.</td></tr><tr><td><strong>Vertex AI Vector Search</strong></td><td>商业 managed vector DB. 起步快.</td></tr><tr><td><strong>Weaviate</strong></td><td>开源 vector DB, GraphQL API.</td></tr><tr><td><strong>Milvus</strong></td><td>开源 vector DB. 大规模 production.</td></tr><tr><td><strong>ANN (Approximate Nearest Neighbor)</strong></td><td>近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次.</td></tr><tr><td><strong>HNSW (Hierarchical Navigable Small World)</strong></td><td>ANN 算法, 多层图结构. 速度准度好平衡.</td></tr></tbody></table></div>
 <h4>Retrieval Metrics ⭐</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Recall@K</strong> ⭐</td><td><strong>正确文档在 top-K 检索结果中的比例</strong>. K=10 是 RAG 标准.</td></tr><tr><td><strong>NDCG@K (Normalized Discounted Cumulative Gain)</strong> ⭐</td><td>加权排名好坏 — 正确答案靠前 score 高. 0-1 scale.</td></tr><tr><td><strong>MRR (Mean Reciprocal Rank)</strong></td><td>第一个正确答案的倒数排名平均. 适合 "找到第一个对的就行" 场景.</td></tr><tr><td><strong>Precision@K</strong></td><td>Top-K 中相关的比例. 跟 recall 搭配看.</td></tr><tr><td><strong>Answer accuracy</strong></td><td>端到端 — RAG 找对了 + LLM 生成对了. 真目标.</td></tr><tr><td><strong>Faithfulness</strong></td><td>LLM 输出是否 grounded 在 retrieved chunks. Hallucination 的反指标.</td></tr></tbody></table></div>
 <h4>文档处理工具</h4>
@@ -670,7 +670,7 @@ class ChunkingPipeline:
                                      ▼
                     ┌──────────────────────────────────────┐
                     │   STORAGE                            │
-                    │  Vector DB (Qdrant / Pinecone)       │
+                    │  Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)       │
                     │  + Metadata DB (Postgres)            │
                     │  + BM25 index (Elasticsearch)        │
                     └──────────────────────────────────────┘</code></pre>
@@ -876,8 +876,8 @@ Quotes for interview:
 | 术语 | 解释 |
 |---|---|
 | **Vector DB** | 存 embedding + 支持 ANN 搜索的 DB. |
-| **Qdrant** | Rust 写的开源 vector DB. Production 流行选择. |
-| **Pinecone** | 商业 managed vector DB. 起步快. |
+| **Vertex AI Vector Search** | Rust 写的开源 vector DB. Production 流行选择. |
+| **Vertex AI Vector Search** | 商业 managed vector DB. 起步快. |
 | **Weaviate** | 开源 vector DB, GraphQL API. |
 | **Milvus** | 开源 vector DB. 大规模 production. |
 | **ANN (Approximate Nearest Neighbor)** | 近似最近邻搜索算法 — HNSW / IVF 是常见. 没 ANN, 10M 向量比 cosine 要算 10M 次. |
@@ -1683,7 +1683,7 @@ async def retrieve_with_type_aware_rerank(query, tenant_id, top_k=10):
                                      ▼
                     ┌──────────────────────────────────────┐
                     │   STORAGE                            │
-                    │  Vector DB (Qdrant / Pinecone)       │
+                    │  Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)       │
                     │  + Metadata DB (Postgres)            │
                     │  + BM25 index (Elasticsearch)        │
                     └──────────────────────────────────────┘

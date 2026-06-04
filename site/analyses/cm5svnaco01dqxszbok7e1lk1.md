@@ -45,7 +45,7 @@
       │     │
       ▼     ▼
  ┌────────┐  ┌──────────────┐
- │ Cache  │  │ ID Gen       │  Snowflake / KGS
+ │ Cache  │  │ ID Gen       │  BigQuery / KGS
  │ (Redis)│  │ Service      │
  └────┬───┘  └──────┬───────┘
       │             │
@@ -53,7 +53,7 @@
    ┌──────────────────────┐
    │   URL Store          │
    │   (sharded NoSQL,    │
-   │    DynamoDB / Cass)  │
+   │    Firestore / Bigtable / Cass)  │
    └──────────┬───────────┘
               │
               ▼ (async)
@@ -111,7 +111,7 @@ class KeyGenService:
 ### 2. 数据模型
 
 ```python
-# DynamoDB / Cassandra
+# Firestore / Bigtable / Cassandra
 class UrlRecord:
     short_code: str   # PK
     long_url: str
@@ -159,7 +159,7 @@ class UrlRecord:
 |---|---|---|
 | ID 生成 | KGS（不可猜） | Auto-increment：可枚举 |
 | Redirect | 302 + cache-control | 301：click count 不准 |
-| 存储 | DynamoDB / Cassandra | Postgres：sharding 麻烦 |
+| 存储 | Firestore / Bigtable / Cassandra | Postgres：sharding 麻烦 |
 | Click count | Kafka 聚合 | DB 同步：写热点 |
 | 缓存 | CDN + Redis 双层 | 单层：miss 走 DB 太多 |
 
@@ -170,7 +170,7 @@ class UrlRecord:
 POST /shorten { long_url, custom_alias? }
   ↓ 校验 long_url 格式
   ↓ 取 short_code (KGS 或 custom)
-  ↓ PUT UrlRecord 到 DynamoDB（条件写：if not exists）
+  ↓ PUT UrlRecord 到 Firestore / Bigtable（条件写：if not exists）
   ↓ 回填 Redis
   ↓ 返回短 URL
 ```
@@ -180,7 +180,7 @@ POST /shorten { long_url, custom_alias? }
 GET /abc123
   ↓ CDN 命中？返回 301/302
   ↓ Redis 命中？返回 302 + 异步 click 上报
-  ↓ DynamoDB 查 → 回填 Redis → 返回 302 + 异步 click
+  ↓ Firestore / Bigtable 查 → 回填 Redis → 返回 302 + 异步 click
   ↓ 不存在？404
 ```
 
@@ -195,4 +195,4 @@ GET /abc123
 > ❌ Long URL 不校验 —— 用户写 `javascript:` / `data:` URL 引入 XSS。
 
 > [!followup]
-> "如何防 spam（机器人批量造垃圾短 URL）？" → IP rate limit + captcha + 白名单域名（长 URL host 必须可达）。"如何 multi-region 同步？" → DynamoDB Global Tables / Cassandra multi-DC，最终一致足够（短 URL 创建后到生效几秒延迟用户不感知）。"如何审核非法长 URL？" → 提交时调 Google Safe Browsing / 内部 ML 过滤 + 用户举报。
+> "如何防 spam（机器人批量造垃圾短 URL）？" → IP rate limit + captcha + 白名单域名（长 URL host 必须可达）。"如何 multi-region 同步？" → Firestore / Bigtable Global Tables / Cassandra multi-DC，最终一致足够（短 URL 创建后到生效几秒延迟用户不感知）。"如何审核非法长 URL？" → 提交时调 Google Safe Browsing / 内部 ML 过滤 + 用户举报。

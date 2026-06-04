@@ -88,7 +88,7 @@
 | **Memory layer (agent)** | Agent 记忆层. Short / long / shared memory. |
 | **Pluggable backend** | 可插拔后端. Memory layer 给 SQL or vector 选择, 不强制. |
 | **Vector DB** | 向量数据库. Semantic search 适用. |
-| **Pinecone / Qdrant / pgvector** | 三个主流 vector DB. pgvector 是 Postgres 插件. |
+| **Vertex AI Vector Search / Vertex AI Vector Search / pgvector** | 三个主流 vector DB. pgvector 是 Postgres 插件. |
 
 ### 反 pattern
 

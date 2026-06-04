@@ -9,7 +9,7 @@
 **Round**: System Design (60 min)
 **出处**: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合)
 **行业 / 约束**: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX
-**Distinguishing**: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 **Google primitives + 整合 + HIPAA**, 标准 FDE "pick right Google product" 题. 不能再答 OpenSearch / pgvector — 客户要求 Google-native.
+**Distinguishing**: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 **Google primitives + 整合 + HIPAA**, 标准 FDE "pick right Google product" 题. 不能再答 Vertex AI Vector Search / pgvector — 客户要求 Google-native.
 
 ---
 
@@ -22,7 +22,7 @@
 | 术语 | 解释 |
 |---|---|
 | **Vertex AI** ⭐ | Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场. |
-| **Vertex AI Search** ⭐ | Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. **不需要你自己装 OpenSearch / pgvector**. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高. |
+| **Vertex AI Search** ⭐ | Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. **不需要你自己装 Vertex AI Vector Search / pgvector**. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高. |
 | **Vertex AI Agent Builder** | 上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage. |
 | **Gemini 3 Pro** ⭐ | Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens. |
 | **Gemini 3 Flash** ⭐ | 轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro. |
@@ -92,7 +92,7 @@
 
 4 个 signal:
 
-1. **Don't re-invent what Vertex AI Search already does** (不要重复造轮子) — 90% 候选人答 "我自己装 OpenSearch + 自训 embedding". 错. Google FDE 面试 = 用 **Vertex AI Search managed retrieval**. 自己装 = 显示你不懂 Google ecosystem.
+1. **Don't re-invent what Vertex AI Search already does** (不要重复造轮子) — 90% 候选人答 "我自己装 Vertex AI Vector Search + 自训 embedding". 错. Google FDE 面试 = 用 **Vertex AI Search managed retrieval**. 自己装 = 显示你不懂 Google ecosystem.
 
 2. **Grounding ≠ prompt-engineered citation** (Gemini grounding 是 native API feature) — 这是 Google 跟 OpenAI/Anthropic 最大的差异化能力. 必须提到 grounding API + grounding confidence score. 否则你"不像懂 Gemini".
 
@@ -504,7 +504,7 @@ import_documents_request = ImportDocumentsRequest(
 - Auto-reranking (semantic ranker)
 - ACL via `structData` filters at query time
 
-**Why this is the "FDE answer"**: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting OpenSearch = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.
+**Why this is the "FDE answer"**: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting Vertex AI Vector Search = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.
 
 **Throughput**:
 - Backfill 60M chunks: Discovery Engine bulk import handles ~10K docs/sec → 60M / 10K = 6000s = ~2 hours per dept (cardiology subset ~3M chunks = 5 min)
@@ -799,9 +799,9 @@ ORDER BY
 
 ### Phase 9: Trade-offs + close (6 min)
 
-**Decision 9.1 — Vertex AI Search vs self-host OpenSearch / Vespa**:
+**Decision 9.1 — Vertex AI Search vs self-host Vertex AI Vector Search / Vespa**:
 
-| 维度 | Vertex AI Search | Self-host OpenSearch on GKE |
+| 维度 | Vertex AI Search | Self-host Vertex AI Vector Search on GKE |
 |---|---|---|
 | Build time (MVP) | 1-2 weeks | 4-6 weeks |
 | HIPAA BAA | Yes (Google native) | Need to add to BAA chain |
@@ -1007,8 +1007,8 @@ I chose **1 dept full-stack** over **all depts thin slice** because:
 
 ## ❌ 死路答法 (top 7)
 
-1. **冲 "I'd use OpenAI embeddings + Pinecone"** — 直接挂. 不是 Google native, 不在客户 BAA.
-2. **不用 Vertex AI Search, 自己装 OpenSearch on GKE** — 重复造轮子, 90 天做不完.
+1. **冲 "I'd use OpenAI embeddings + Vertex AI Vector Search"** — 直接挂. 不是 Google native, 不在客户 BAA.
+2. **不用 Vertex AI Search, 自己装 Vertex AI Vector Search on GKE** — 重复造轮子, 90 天做不完.
 3. **Citation 用 prompt "Always cite sources"** — 不用 Gemini grounding API = 暴露不懂 Gemini.
 4. **PHI redaction 用自托管 Presidio** — 不加分, 应该用 Cloud DLP.
 5. **接受 90 天做 20M + 全部 intent** — 不 push back = 失败.
@@ -1075,7 +1075,7 @@ G·O·O·D-F·T Clarify 10 Q:
 
 死路:
   - OpenAI embeddings (PHI leak)
-  - Self-host OpenSearch (重复造)
+  - Self-host Vertex AI Vector Search (重复造)
   - Prompt citation (不用 grounding)
   - Self-host Presidio (不用 DLP)
   - 接 90 天 20M (不 push back)

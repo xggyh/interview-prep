@@ -274,14 +274,14 @@ Total "hidden" TCO: often 2-3x raw compute cost</code></pre>
    - Self-host only
 
 4. Specific compliance with no BAA available
-   - HIPAA: BAA available from Anthropic / OpenAI / AWS Bedrock — but verify
+   - HIPAA: BAA available from Anthropic / OpenAI / Vertex AI — but verify
    - PCI: stricter, often self-host
    - FedRAMP High: limited managed options</code></pre>
 <p><strong>When managed works with care</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">HIPAA with BAA:
   - Anthropic offers BAA for Claude API
   - OpenAI offers BAA for Enterprise plans
-  - AWS Bedrock HIPAA-eligible regions
+  - Vertex AI HIPAA-eligible regions
   - Verify zero-retention (training opt-out)
 
 GDPR / EU data:
@@ -335,7 +335,7 @@ Specialized:
 <h4>Step 7: 5 Hybrid patterns (most production)</h4>
 <p><strong>Pattern A: Embedding self-host + LLM managed (most common)</strong></p>
 <pre class="language-plaintext"><code class="language-plaintext">Customer embed text → in-house embedding model (BGE-M3 or open)
-                   → in-house Qdrant / Pinecone (self-host)
+                   → in-house Vertex AI Vector Search / Vertex AI Vector Search (self-host)
                    → retrieve chunks
                    → Claude Sonnet 4.6 API for generation
                    
@@ -667,7 +667,7 @@ print(recommend(bnpl_workload))</code></pre>
                        ┌────────────────────────┐
                        │  Common Embedding /    │
                        │  Vector store          │
-                       │  (BGE-M3 + Qdrant      │
+                       │  (BGE-M3 + Vertex AI Vector Search      │
                        │   self-host)           │
                        └────────────────────────┘
                                    │
@@ -718,7 +718,7 @@ print(recommend(bnpl_workload))</code></pre>
 <p><strong>Reality</strong>: for production use cases, often "good enough" is the right bar, not "best."</p>
 <p><strong>Q3</strong>: "Customer is in healthcare. Can they use managed API?"</p>
 <p><strong>A</strong>: Depends:</p>
-<ul><li><strong>Yes if</strong>: BAA in place with provider (Anthropic, OpenAI Enterprise, AWS Bedrock HIPAA-eligible)</li><li><strong>Verify</strong>: zero-retention (no training on customer data), audit log access, data residency (HIPAA-eligible regions)</li><li><strong>No if</strong>: contract / regulator forbids cloud, or specific data must stay on-prem (e.g., DEA controlled substance data, certain VA contracts)</li><li><strong>Hybrid common</strong>: PHI redaction at client + managed for cleaned queries</li></ul>
+<ul><li><strong>Yes if</strong>: BAA in place with provider (Anthropic, OpenAI Enterprise, Vertex AI HIPAA-eligible)</li><li><strong>Verify</strong>: zero-retention (no training on customer data), audit log access, data residency (HIPAA-eligible regions)</li><li><strong>No if</strong>: contract / regulator forbids cloud, or specific data must stay on-prem (e.g., DEA controlled substance data, certain VA contracts)</li><li><strong>Hybrid common</strong>: PHI redaction at client + managed for cleaned queries</li></ul>
 <p>Bottom line: HIPAA-compliant managed is achievable, but requires legal review of DPA + BAA + zero-retention + audit access. Not "no" by default in 2026.</p>
 <p><strong>Q4</strong>: "Self-host but want to use the latest models. How?"</p>
 <p><strong>A</strong>:</p>
@@ -780,7 +780,7 @@ Total hidden TCO: often 2-3x raw compute
 
 Data residency:
   On-prem / air-gap: self-host only
-  HIPAA: managed OK with BAA (Anthropic, OpenAI, AWS Bedrock)
+  HIPAA: managed OK with BAA (Anthropic, OpenAI, Vertex AI)
   EU GDPR: managed OK with EU residency (Anthropic Frankfurt, OpenAI Azure EU)
   China: self-host or managed CN (Aliyun)
   Sovereign cloud: usually self-host
@@ -1234,7 +1234,7 @@ Total "hidden" TCO: often 2-3x raw compute cost
    - Self-host only
 
 4. Specific compliance with no BAA available
-   - HIPAA: BAA available from Anthropic / OpenAI / AWS Bedrock — but verify
+   - HIPAA: BAA available from Anthropic / OpenAI / Vertex AI — but verify
    - PCI: stricter, often self-host
    - FedRAMP High: limited managed options
 ```
@@ -1245,7 +1245,7 @@ Total "hidden" TCO: often 2-3x raw compute cost
 HIPAA with BAA:
   - Anthropic offers BAA for Claude API
   - OpenAI offers BAA for Enterprise plans
-  - AWS Bedrock HIPAA-eligible regions
+  - Vertex AI HIPAA-eligible regions
   - Verify zero-retention (training opt-out)
 
 GDPR / EU data:
@@ -1316,7 +1316,7 @@ Specialized:
 
 ```
 Customer embed text → in-house embedding model (BGE-M3 or open)
-                   → in-house Qdrant / Pinecone (self-host)
+                   → in-house Vertex AI Vector Search / Vertex AI Vector Search (self-host)
                    → retrieve chunks
                    → Claude Sonnet 4.6 API for generation
                    
@@ -1696,7 +1696,7 @@ print(recommend(bnpl_workload))
                        ┌────────────────────────┐
                        │  Common Embedding /    │
                        │  Vector store          │
-                       │  (BGE-M3 + Qdrant      │
+                       │  (BGE-M3 + Vertex AI Vector Search      │
                        │   self-host)           │
                        └────────────────────────┘
                                    │
@@ -1805,7 +1805,7 @@ print(recommend(bnpl_workload))
 **Q3**: "Customer is in healthcare. Can they use managed API?"
 
 **A**: Depends:
-- **Yes if**: BAA in place with provider (Anthropic, OpenAI Enterprise, AWS Bedrock HIPAA-eligible)
+- **Yes if**: BAA in place with provider (Anthropic, OpenAI Enterprise, Vertex AI HIPAA-eligible)
 - **Verify**: zero-retention (no training on customer data), audit log access, data residency (HIPAA-eligible regions)
 - **No if**: contract / regulator forbids cloud, or specific data must stay on-prem (e.g., DEA controlled substance data, certain VA contracts)
 - **Hybrid common**: PHI redaction at client + managed for cleaned queries
@@ -1915,7 +1915,7 @@ Total hidden TCO: often 2-3x raw compute
 
 Data residency:
   On-prem / air-gap: self-host only
-  HIPAA: managed OK with BAA (Anthropic, OpenAI, AWS Bedrock)
+  HIPAA: managed OK with BAA (Anthropic, OpenAI, Vertex AI)
   EU GDPR: managed OK with EU residency (Anthropic Frankfurt, OpenAI Azure EU)
   China: self-host or managed CN (Aliyun)
   Sovereign cloud: usually self-host

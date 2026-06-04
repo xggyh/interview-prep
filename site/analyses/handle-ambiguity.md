@@ -41,7 +41,7 @@ FDE 工作 **90% 时间在 ambiguity 里**. Recruiter / HM 想验证 5 件事:
 | Type | 含义 | 典型 trigger | 应对原则 |
 |---|---|---|---|
 | **Goal ambiguity** | 客户不知道想要什么 | "我想要 AI" / "make it better" | 用 discovery 帮客户决定 |
-| **Technical ambiguity** | 多个 viable 架构都能做 | "VectorDB 选 Pinecone 还是 Qdrant?" | 用 trade-off matrix + reversibility |
+| **Technical ambiguity** | 多个 viable 架构都能做 | "VectorDB 选 Vertex AI Vector Search 还是 Vertex AI Vector Search?" | 用 trade-off matrix + reversibility |
 | **Data ambiguity** | 数据稀疏 / 矛盾 / 噪声 | "我们的 retention 数据有 3 个 source 对不上" | 用 hypothesis-driven exploration |
 | **Organizational ambiguity** | 多 stakeholder 优先级冲突 | "Ops 想自动化, Legal 想 audit, Product 要速度" | 用 stakeholder map + escalation |
 | **Outcome / metric ambiguity** | 成功标准没定义 | "增加 efficiency" | 用 KPI lock framework |
@@ -371,7 +371,7 @@ FDE 改造 (加 2 个 axis):
 
 ### 2.1 这种 ambiguity 长什么样
 
-- "VectorDB 选 Pinecone 还是 Qdrant 还是 pgvector?"
+- "VectorDB 选 Vertex AI Vector Search 还是 Vertex AI Vector Search 还是 pgvector?"
 - "Streaming 用 Kafka 还是 Pulsar?"
 - "Voice agent ASR 选 Azure 还是 Google?"
 - "Agent orchestration 用 LangGraph 还是自研?"

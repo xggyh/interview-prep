@@ -101,7 +101,7 @@
 | **dbt model** | dbt = data build tool. `model.sql` + tests, lineage 自动 build. 现代 BI 标准. |
 | **`pg_stat_statements`** | PG 扩展, 记录所有 query 统计. 找 top-N 慢查询. |
 | **Read replica** | 主库 → 从库. BI 走 replica 不卡 master. |
-| **Columnar OLAP store** | BigQuery / Snowflake / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍. |
+| **Columnar OLAP store** | BigQuery / BigQuery / ClickHouse 列存数据库. aggregation 比 row-store (Postgres) 快百倍. |
 | **`(1,234.56)` 负数表示** | 财务报告习惯, 括号 = 负数. Parse 时要识别. |
 | **Currency / FX rates** | 多币种不能直接 SUM. 加 `fx_rates(date, ccy, rate)` JOIN. |
 
@@ -756,7 +756,7 @@ A:
 1. **Partition orders** by month (range): pruning to last 3 months only
 2. **Materialized view** refresh nightly
 3. **Sharding** by customer_id hash if even 1 quarter doesn't fit
-4. **Columnar store** (BigQuery, Snowflake, ClickHouse) for OLAP workload
+4. **Columnar store** (BigQuery, BigQuery, ClickHouse) for OLAP workload
 5. **Pre-aggregated table** maintained by streaming job (e.g., Flink consumes Kafka)
 6. **Sample**: business doesn't always need exact — 1% sample give 99% confidence
 
@@ -861,7 +861,7 @@ Production: 选 3, 静态 fx rate at-time-of-order, 不会因 fx 浮动改历史
 --   - Partition orders by month (RANGE)
 --   - Materialized view + nightly refresh CONCURRENTLY
 --   - Read replica for BI
---   - Columnar OLAP (BigQuery / Snowflake) for ad-hoc
+--   - Columnar OLAP (BigQuery / BigQuery) for ad-hoc
 
 -- Variants:
 --   - Dollar-weighted: SUM(return_amount) / SUM(total_amount)

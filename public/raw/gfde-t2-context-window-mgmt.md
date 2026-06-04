@@ -558,7 +558,7 @@ def manage_context(
 ```python
 class BlobMemory:
     def __init__(self, bucket='agent-blobs'):
-        self.s3 = boto3.client('s3')
+        self.s3 = storage.Client()
         self.bucket = bucket
 
     def put(self, content: str, ttl_hours=24) -> str:

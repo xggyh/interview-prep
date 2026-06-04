@@ -5,7 +5,7 @@
 | **LLM model file** | 训练完的语言模型权重文件，几 GB 到上 TB | 一本超厚的字典 |
 | **GPU node** | 装 GPU 的服务器，跑 ML 训练 / 推理 | 厨房里的炒锅 |
 | **Inference / Serving** | 用训练好的 model 给用户生成回复 (vs 训练) | 跟厨师点单 |
-| **S3 / GCS** | 云存储，存大文件靠谱但带宽 egress 收费 | 全球仓库 |
+| **GCS / GCS** | 云存储，存大文件靠谱但带宽 egress 收费 | 全球仓库 |
 | **Egress** | 从云出去的流量。**云厂商收费的大头** | 仓库到外面的运输费 |
 | **CDN** | 把数据缓存到全球 edge，加速分发 | 全球连锁店 |
 | **Peer-to-peer (P2P)** | 节点之间互相传数据，不只从中央拉 | BT 下载（电骡时代） |
@@ -32,7 +32,7 @@
 1. **文件大**（70B param × 2 bytes = 140 GB；万亿参数模型 2-4 TB）
 2. **目标节点多** —— 1000+ GPU node 同时要这个模型
 3. **下载时间 = 节点不可用时间**。GPU 一台一小时 $5+，1000 台等模型 1 小时 = $5000 浪费
-4. **Egress 费用**：1000 节点 × 100 GB = 100 TB egress，AWS S3 egress $0.09/GB → **$9000 一次部署**
+4. **Egress 费用**：1000 节点 × 100 GB = 100 TB egress，GCS (Cloud Storage) egress $0.09/GB → **$9000 一次部署**
 5. **版本快速迭代**：模型每周更新一版，差异部分要 detect 增量下载
 
 OpenAI / Google AI 内部都有类似系统。这是 LLM infra 工程师的 daily concern。
@@ -90,7 +90,7 @@ OpenAI / Google AI 内部都有类似系统。这是 LLM infra 工程师的 dail
 ```
 
 > [!key]
-> 关键洞察：**1000 node 同时从 S3 拉 = 1000x egress 费 + 受 S3 limit**。这道题的灵魂是 **"如何避免中心 S3 成瓶颈"** —— 答案就是 P2P。
+> 关键洞察：**1000 node 同时从 GCS 拉 = 1000x egress 费 + 受 GCS limit**。这道题的灵魂是 **"如何避免中心 GCS 成瓶颈"** —— 答案就是 P2P。
 
 ---
 
@@ -99,11 +99,11 @@ OpenAI / Google AI 内部都有类似系统。这是 LLM infra 工程师的 dail
 ### 3.1 朴素方案 cost
 
 ```
-1000 nodes 全从 S3 拉 100 GB model:
+1000 nodes 全从 GCS 拉 100 GB model:
   Egress: 1000 × 100 GB × $0.09/GB = $9000 / deploy
   Bandwidth: 100 TB total
-  Time: 假设 S3 limit 100 Gbps per region = 1000 sec = 17 min (但单 region 撑不住)
-  → 实际 S3 把你 throttle，慢，可能 1 小时不够
+  Time: 假设 GCS limit 100 Gbps per region = 1000 sec = 17 min (但单 region 撑不住)
+  → 实际 GCS 把你 throttle，慢，可能 1 小时不够
 ```
 
 → **不可行**。
@@ -111,7 +111,7 @@ OpenAI / Google AI 内部都有类似系统。这是 LLM infra 工程师的 dail
 ### 3.2 用 P2P 的 cost
 
 ```
-第一批 10 nodes 从 S3 拉 (seed):
+第一批 10 nodes 从 GCS 拉 (seed):
   Egress: 10 × 100 GB × $0.09 = $90
 其他 990 nodes 从 peers 拉:
   Egress (内 cloud free): 0
@@ -151,18 +151,18 @@ Increm with P2P: $27 / deploy (新版只 30% 变)
         │
         ▼
    ┌──────────────┐
-   │ S3           │
+   │ GCS           │
    └──────┬───────┘
           │
    ┌──────┼──────┬──────┬─────┐
    ▼      ▼      ▼      ▼     ▼
   N1     N2     N3     ...   N1000
-  (all download from S3 simultaneously)
+  (all download from GCS simultaneously)
 ```
 
 **问题**：
 - 1000 node × 100 GB = 100 TB egress = $9000
-- S3 egress bandwidth throttle → 1000 node 同时拉 → 慢死
+- GCS egress bandwidth throttle → 1000 node 同时拉 → 慢死
 
 ### 4.2 第 1 步：Chunking + Content-Addressable
 
@@ -202,16 +202,16 @@ Manifest:
 
 ### 4.3 第 2 步：P2P 分发（核心 idea）
 
-第一批 N nodes 从 S3 拉（seed），完成后**它们成为新 source**，其他 nodes 从 peers 拉。
+第一批 N nodes 从 GCS 拉（seed），完成后**它们成为新 source**，其他 nodes 从 peers 拉。
 
 ```ascii
 T=0:
-  S3 has model
-  10 seed nodes start pulling from S3
+  GCS has model
+  10 seed nodes start pulling from GCS
   
 T=5 min:
   10 seed nodes finished
-  Now 11 sources (S3 + 10 nodes)
+  Now 11 sources (GCS + 10 nodes)
   
 T=10 min:
   More nodes finished, become sources
@@ -219,7 +219,7 @@ T=10 min:
   
 T=30 min:
   All 1000 nodes finished
-  S3 egress only ~10 × 100 GB = 1 TB (vs 100 TB)
+  GCS egress only ~10 × 100 GB = 1 TB (vs 100 TB)
 ```
 
 **Swarm 增长**：classic BitTorrent。每完成一个 node 都成 source，并发能力指数增加。
@@ -256,7 +256,7 @@ T=30 min:
           │
           ▼
    ┌──────────────┐
-   │ S3           │  store chunks (origin)
+   │ GCS           │  store chunks (origin)
    └──────┬───────┘
           │
           ▼
@@ -278,7 +278,7 @@ T=30 min:
    │  │ For each chunk:          │   │
    │  │   Ask tracker for peers  │   │
    │  │   Try peer first         │   │
-   │  │   Fallback to S3         │   │
+   │  │   Fallback to GCS         │   │
    │  │   Verify SHA256          │   │
    │  │   Store + 通知 tracker   │   │
    │  └──────────────────────────┘   │
@@ -356,14 +356,14 @@ def chunk_model(file_path: str) -> dict:
                 'offset': offset,
                 'size': len(chunk),
             })
-            # Upload to S3 with chunk_id as key
+            # Upload to GCS with chunk_id as key
             s3.put(f'chunks/{chunk_id}', chunk)
             offset += len(chunk)
     
     return manifest
 ```
 
-**关键观察**：S3 上**每个 chunk 用 hash 作 key**。如果两个 model version 共享 chunk（layer 一样），它们的 chunk_id 相同 → S3 只存一份 → **自动 dedup**。
+**关键观察**：GCS 上**每个 chunk 用 hash 作 key**。如果两个 model version 共享 chunk（layer 一样），它们的 chunk_id 相同 → GCS 只存一份 → **自动 dedup**。
 
 ### 5.3 P2P Download Worker
 
@@ -380,7 +380,7 @@ class P2PDownloader:
         self.local_chunks = set()
     
     async def download(self):
-        """Download all chunks (parallel + P2P first, S3 fallback)."""
+        """Download all chunks (parallel + P2P first, GCS fallback)."""
         sem = asyncio.Semaphore(self.max_concurrent)
         tasks = [self._download_chunk(c, sem) for c in self.manifest['chunks']]
         await asyncio.gather(*tasks)
@@ -402,9 +402,9 @@ class P2PDownloader:
                     await self._notify_tracker_have(chunk_id)
                     return
             
-            # 3. Fallback to S3
+            # 3. Fallback to GCS
             data = await self._fetch_from_s3(chunk_id)
-            assert self._verify(data, chunk_id), "S3 corrupt!"
+            assert self._verify(data, chunk_id), "GCS corrupt!"
             await self._store(chunk_id, data)
             await self._notify_tracker_have(chunk_id)
     
@@ -419,7 +419,7 @@ class P2PDownloader:
 1. **并发**：16 chunk 同时下载（多个 peer source 并发）
 2. **Verify after download**：每 chunk SHA256 校验，corrupt 重试
 3. **完成后 notify tracker**：变成新 source 供其他 node 拉
-4. **Fallback to S3**：peer 都失败时仍 reliable
+4. **Fallback to GCS**：peer 都失败时仍 reliable
 
 ### 5.4 Tracker 设计
 
@@ -472,7 +472,7 @@ MAX_DOWNLOAD_BW_GBPS = 10
 ```python
 # 用 Stargz / eStargz format
 - Layer 0-10: pulled, on GPU
-- Layer 11-30: still in S3, lazy loaded when forward pass reaches
+- Layer 11-30: still in GCS, lazy loaded when forward pass reaches
 ```
 
 适合：
@@ -519,7 +519,7 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 
 0:10 - 0:15  High-Level Architecture
   - Chunking + content addressable
-  - S3 origin + P2P swarm + tracker
+  - GCS origin + P2P swarm + tracker
   - Worker pull manifest + chunk
 
 0:15 - 0:30  Deep Dive
@@ -541,11 +541,11 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 
 ## 7. 面试样板讲解
 
-> "OK 这是 large model file distribution。我估算几件事：1000 nodes × 100 GB = 100 TB egress。如果都从 S3 拉，AWS egress $0.09/GB 是 $9000 一次，还会被 throttle。**朴素方案不可行**，需要 P2P。
+> "OK 这是 large model file distribution。我估算几件事：1000 nodes × 100 GB = 100 TB egress。如果都从 GCS 拉，AWS egress $0.09/GB 是 $9000 一次，还会被 throttle。**朴素方案不可行**，需要 P2P。
 > 
 > 设计 idea: BitTorrent-style。把 model 切 64 MB chunk，每 chunk 用 SHA256 hash 作 ID（**content-addressable**）。这有 3 个好处：(1) verify integrity；(2) 不同 model version 共享 chunk → 增量 update；(3) 多 peer 并发 download。
 > 
-> 第一批 10 个 seed node 从 S3 拉。完成后它们成为 source。其他 990 节点优先从 peer 拉，S3 fallback。Swarm 指数增长，5 分钟内大部分 node 都能 serve chunks。
+> 第一批 10 个 seed node 从 GCS 拉。完成后它们成为 source。其他 990 节点优先从 peer 拉，GCS fallback。Swarm 指数增长，5 分钟内大部分 node 都能 serve chunks。
 > 
 > Tracker 维护 chunk → owners 映射。Node 来问 'chunk X 谁有'，tracker 返回 5 个 peer（优先同 region）。中心 tracker 简单，1000 node QPS 完全撑得住，不用 DHT。
 > 
@@ -553,7 +553,7 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 > 
 > 增量 update 关键：v1.2.4 比 v1.2.3 改 2 个 chunk，节点对比 manifest 只 download 2 chunk = 128 MB，1 分钟完成。这就是 content addressable 的力量。
 > 
-> 成本：朴素 $9000 → P2P $90 → 增量 $27。Time 17 min S3 throttled → 30 min P2P → 5 min 增量。
+> 成本：朴素 $9000 → P2P $90 → 增量 $27。Time 17 min GCS throttled → 30 min P2P → 5 min 增量。
 > 
 > Deep dive 想讲 tracker design 还是 bandwidth scheduling？"
 
@@ -565,7 +565,7 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 
 **答**：
 - Hot standby：另一台 tracker 同步 state，failover < 30 sec
-- Fallback：node 直接 S3 拉（不优雅但 work）
+- Fallback：node 直接 GCS 拉（不优雅但 work）
 
 ### Q2: 怎么 detect 恶意 peer 篡改 chunk？
 
@@ -586,19 +586,19 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 **答**：
 - 每 region 一个 sub-tracker
 - Cross-region 流量贵 → only first seed 跨 region，之后 region 内 P2P
-- 大模型可以 region-specific S3 镜像
+- 大模型可以 region-specific GCS 镜像
 
 ### Q5: 怎么处理 node 频繁 join/leave？
 
 **答**：
 - Tracker heartbeat 60s 超时移除
-- Node download 时如果 peer 不响应 → 立即 fallback 其他 peer or S3
+- Node download 时如果 peer 不响应 → 立即 fallback 其他 peer or GCS
 - Swarm 中 node 数动态变化 BT 协议天然处理
 
 ### Q6: 如果 model 是 sensitive (商业秘密 / 用户数据)？
 
 **答**：
-- Chunks 加密存 S3（AES-256）
+- Chunks 加密存 GCS（AES-256）
 - 每 node 用 KMS 取 decryption key
 - Tracker / peers 只传密文，本地 decrypt
 - 完整性 verify 在 plaintext 上
@@ -615,7 +615,7 @@ v1.2.4 manifest → chunks [A, B, X, D, Y, F, G]  (只改了 2 chunk)
 ## 9. 常见易错点
 
 > [!pitfall]
-> ❌ **朴素全节点拉 S3** —— $9000 + 慢 + throttle；  
+> ❌ **朴素全节点拉 GCS** —— $9000 + 慢 + throttle；  
 > ❌ **不 chunk** —— 一处 fail 全重传；  
 > ❌ **不 verify SHA256** —— Corrupt chunk 不察觉 → model output garbage；  
 > ❌ **不限制 P2P upload bw** —— 抢 inference 带宽，GPU 闲；  

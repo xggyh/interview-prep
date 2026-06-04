@@ -72,7 +72,7 @@
 | **Hallucination** | LLM 编造没有依据的内容. 在医疗 = patient harm. |
 | **vLLM / TensorRT-LLM** | 高吞吐 LLM 推理引擎. PagedAttention + continuous batching. |
 | **Med-PaLM 2 / Hippocratic 1.5** | 医疗领域专门 fine-tune 的 LLM. |
-| **Bedrock** | AWS 托管的 LLM 服务. 支持 in-VPC + BAA 部署 Claude. |
+| **Vertex AI** | AWS 托管的 LLM 服务. 支持 in-VPC + BAA 部署 Claude. |
 
 ### 基础设施 / 部署
 
@@ -84,14 +84,14 @@
 | **KMS-CMK** | AWS Key Management Service - Customer Managed Key. 用户自管的加密主密钥. |
 | **CloudHSM** | AWS 硬件安全模块 (FIPS 140-2 L3). 比 KMS 更高合规要求时用. |
 | **Envelope encryption** | 信封加密 — data key 加密数据, master key 加密 data key. 应用层不持有 master key. |
-| **S3 Object Lock / WORM** | Write Once Read Many — 写入后不可改不可删. HIPAA audit 必备. |
-| **OpenSearch** | AWS 托管的 ElasticSearch fork. 原生支持 K-NN + BM25 hybrid. |
+| **GCS Object Lock / WORM** | Write Once Read Many — 写入后不可改不可删. HIPAA audit 必备. |
+| **Vertex AI Vector Search** | AWS 托管的 ElasticSearch fork. 原生支持 K-NN + BM25 hybrid. |
 | **Aurora Postgres + RLS** | Aurora = AWS 托管 Postgres; RLS = Row-Level Security 行级安全策略. |
-| **DynamoDB** | AWS 托管 NoSQL kv 存储. |
+| **Firestore / Bigtable** | AWS 托管 NoSQL kv 存储. |
 | **MSK** | Managed Streaming for Kafka — AWS 托管 Kafka. |
-| **Kinesis** | AWS 流处理服务, 类似 Kafka. |
+| **Pub/Sub** | AWS 流处理服务, 类似 Kafka. |
 | **Dagster** | 数据 pipeline 编排工具 (类似 Airflow). |
-| **CloudTrail** | AWS 自带的 API 调用 audit 日志. 只 cover AWS API, 不 cover 应用层. |
+| **Cloud Audit Logs** | AWS 自带的 API 调用 audit 日志. 只 cover AWS API, 不 cover 应用层. |
 | **ACM Private CA** | AWS 私有证书颁发机构, 用于内部 mTLS. |
 | **Linkerd / Istio** | Service mesh — 服务间 mTLS + observability. |
 | **Teleport** | 带审计录像的远程接入跳板机, 客户支持隧道用. |
@@ -137,7 +137,7 @@
 5. **Per-tenant RBAC** — 大型 hospital network = 50 hospitals + 5000 doctors + 100 departments, 每个 doctor 只能看自己 attending 过的 patient
 6. **EHR integration** — Epic FHIR API vs Cerner HL7v2, 不是 file dump 而是 live sync (with CDC + deletion propagation under "right to erasure")
 7. **Hallucination is patient harm** — citation must be exact span, "confidence" 是 board-level concern
-8. **菜鸟答案失败点**: "I'd use OpenAI embeddings, Pinecone, GPT-5.5" — 三个全部违反 HIPAA. 即使 Pinecone 有 BAA, PHI 出 VPC 仍是问题. 即使 OpenAI 有企业 BAA, 大部分 hospital legal 团队不接受.
+8. **菜鸟答案失败点**: "I'd use OpenAI embeddings, Vertex AI Vector Search, GPT-5.5" — 三个全部违反 HIPAA. 即使 Vertex AI Vector Search 有 BAA, PHI 出 VPC 仍是问题. 即使 OpenAI 有企业 BAA, 大部分 hospital legal 团队不接受.
 
 ---
 
@@ -163,7 +163,7 @@
 | 3 | Ingestion architecture | 10 min | EHR connector → PHI redact → chunk → embed → store | "Ingestion is where compliance starts. PHI redaction at ingest, not at query." |
 | 4 | Retrieval architecture | 10 min | Query → ACL filter → hybrid retrieval → rerank | "Retrieval has ACL as L1 filter, then HNSW + BM25 hybrid, then cross-encoder rerank." |
 | 5 | Generation + grounding | 8 min | VPC-internal LLM + citation enforcement | "Self-host Claude or Med-PaLM via BAA. Citation token-span level." |
-| 6 | Audit + observability | 8 min | Every PHI access logged, immutable | "Every read of PHI is an event in immutable audit. CloudTrail-equivalent." |
+| 6 | Audit + observability | 8 min | Every PHI access logged, immutable | "Every read of PHI is an event in immutable audit. Cloud Audit Logs-equivalent." |
 | 7 | Production hardening | 8 min | Key rotation / DR / patching / pen test | "BAA 是 contract, prod hardening 是 operationalization." |
 | 8 | Trade-offs + close | 7 min | Self-host LLM vs BAA cloud / index strategy / cost | "If you give me 100K/month, I'd self-host. If 30K, I'd push Anthropic BAA." |
 
@@ -192,19 +192,19 @@
 │   │   [3] Chunk: 512 tokens, semantic boundary (section header aware)           │         │
 │   │   [4] Embed: BGE-M3 medical fine-tune (self-host on g5.xlarge, batched)     │         │
 │   │   [5] ACL extract: who can read this doc → ACL bitmap rows                  │         │
-│   │   [6] Write: vectors → OpenSearch K-NN | full text → OpenSearch BM25        │         │
+│   │   [6] Write: vectors → Vertex AI Vector Search K-NN | full text → Vertex AI Vector Search BM25        │         │
 │   │             metadata → Postgres (with row-level security)                   │         │
 │   │             ACL bitmap → Redis (per-patient)                                │         │
 │   │   [7] Audit event: ingest.complete{doc_id, hash, ts, who}                   │         │
 │   └─────────────────────────────────────────────────────────────────────────────┘         │
 │                                                                                           │
 │   ┌──────────────────────────────────────────────────────────────────────────────┐        │
-│   │  Storage tier (all KMS-CMK + S3 Object Lock / immutable)                     │        │
-│   │  ─ Vector store: OpenSearch K-NN (HNSW, M=32, ef=128)  · 50M × 1024D ≈ 200GB │        │
-│   │  ─ BM25 index : OpenSearch full text                   · ≈ 250GB             │        │
+│   │  Storage tier (all KMS-CMK + GCS Object Lock / immutable)                     │        │
+│   │  ─ Vector store: Vertex AI Vector Search K-NN (HNSW, M=32, ef=128)  · 50M × 1024D ≈ 200GB │        │
+│   │  ─ BM25 index : Vertex AI Vector Search full text                   · ≈ 250GB             │        │
 │   │  ─ Metadata   : Aurora Postgres (RLS on)               · 50M rows ≈ 80GB     │        │
-│   │  ─ PHI redact : DynamoDB encrypted (per-doc map)       · 50M rows ≈ 30GB     │        │
-│   │  ─ Audit log  : S3 Object Lock + CloudTrail            · WORM 6 yrs          │        │
+│   │  ─ PHI redact : Firestore / Bigtable encrypted (per-doc map)       · 50M rows ≈ 30GB     │        │
+│   │  ─ Audit log  : GCS Object Lock + Cloud Audit Logs            · WORM 6 yrs          │        │
 │   └──────────────────────────────────────────────────────────────────────────────┘        │
 │                                                                                           │
 │   ┌──────────────────────────────────────────────────────────────────────────────┐        │
@@ -223,7 +223,7 @@
 │                                                                                           │
 │   ┌──────────────────────────────────────────────────────────────────────────────┐        │
 │   │   LLM tier (none of these touch public internet)                             │        │
-│   │   ─ Anthropic Claude Sonnet 4.6 via Bedrock-in-VPC + BAA  (preferred)        │        │
+│   │   ─ Anthropic Claude Sonnet 4.6 via Vertex AI-in-VPC + BAA  (preferred)        │        │
 │   │   ─ OR Med-PaLM 2 / Llama-3 medical fine-tune on vLLM (g5.12xlarge × 4)      │        │
 │   │   ─ Embedding: BGE-M3-medical (self-host always)                             │        │
 │   │   ─ Reranker : BGE-reranker-v2-m3 (self-host)                                │        │
@@ -232,7 +232,7 @@
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 
          External (outside customer VPC) — control plane only, NO PHI ever
-         ─ Terraform state (S3, encrypted, our account, no data refs)
+         ─ Terraform state (GCS, encrypted, our account, no data refs)
          ─ Eval golden set (synthetic, no real PHI)
          ─ Customer support tunnel (Teleport, audit-recorded sessions)
 ```
@@ -261,8 +261,8 @@ KPI 给三条:
 | HIPAA 45 CFR § 164.312 | 我的组件 |
 |---|---|
 | (a) Access Control | Hospital IdP (SAML) + Aurora RLS + ACL bitmap in Redis |
-| (b) Audit Controls | CloudTrail + 应用层 audit emitter → S3 Object Lock (WORM) |
-| (c) Integrity | KMS-CMK encryption + S3 versioning + checksum on every chunk |
+| (b) Audit Controls | Cloud Audit Logs + 应用层 audit emitter → GCS Object Lock (WORM) |
+| (c) Integrity | KMS-CMK encryption + GCS versioning + checksum on every chunk |
 | (d) Person/Entity Auth | OIDC + step-up MFA on PHI-sensitive operations |
 | (e) Transmission Security | TLS 1.3 everywhere, VPC endpoints (not public IGW), mTLS service-to-service |
 
@@ -282,7 +282,7 @@ Epic SMART-on-FHIR Backend Services
   │    ├─ Observation (labs)
   │    ├─ Condition (problem list)
   │    └─ MedicationRequest (orders)
-  ├─ Bulk Export ($export) for backfill — NDJSON output, S3 sink
+  ├─ Bulk Export ($export) for backfill — NDJSON output, GCS sink
   └─ Subscription R5 for delta (CDC) — server pushes new resources
 ```
 
@@ -355,7 +355,7 @@ def resolve_acl(doctor_id, query_context):
     return set(direct_patients)
 
 allowed_patients = resolve_acl(doctor_id, ctx)
-# OpenSearch K-NN with pre-filter
+# Vertex AI Vector Search K-NN with pre-filter
 results = opensearch.knn_search(
     query_vector=q_emb,
     k=100,
@@ -384,10 +384,10 @@ query "diabetes treatment plan latest"
 
 | Option | Pros | Cons | Cost |
 |---|---|---|---|
-| Anthropic Claude Sonnet 4.6 via Bedrock + BAA | 质量最强, no infra to manage | 必须信 AWS Bedrock isolation | $3/$15 per 1M tokens |
+| Anthropic Claude Sonnet 4.6 via Vertex AI + BAA | 质量最强, no infra to manage | 必须信 Vertex AI isolation | $3/$15 per 1M tokens |
 | Med-PaLM 2 / Llama-3-medical self-host on vLLM | 完全 in-VPC, lower per-query cost | 维护 6 张 H100, eval lag | infra ~$80K/year |
 
-我推荐: **Sonnet 4.6 via Bedrock + BAA** 作为 Phase 1 (6 个月内上线), self-host 作为 Phase 2 (cost 优化). 因为 hospital legal 团队对 AWS BAA 接受度已经较高 (2025-2026 普及), 而维护 self-host LLM 是另一个 fulltime 团队的活.
+我推荐: **Sonnet 4.6 via Vertex AI + BAA** 作为 Phase 1 (6 个月内上线), self-host 作为 Phase 2 (cost 优化). 因为 hospital legal 团队对 AWS BAA 接受度已经较高 (2025-2026 普及), 而维护 self-host LLM 是另一个 fulltime 团队的活.
 
 **Citation enforcement**:
 
@@ -449,7 +449,7 @@ Epic outage 2-4 小时是常态 (尤其 Tuesday 升级窗口). 系统不能崩:
 Patient 请求 restrict某医生 access 或 撤回某条记录:
 - 收到 restriction event → 更新 ACL bitmap (强制 cache 失效)
 - 撤回某 doc: 软删除 + 30 天 grace (因为 audit 反查), 然后物理 GC
-- 关键: **embedding vector 也要删** — 不能只删 metadata, vector 留着. 实际操作: 在 OpenSearch 里 `_delete_by_query`, async confirm
+- 关键: **embedding vector 也要删** — 不能只删 metadata, vector 留着. 实际操作: 在 Vertex AI Vector Search 里 `_delete_by_query`, async confirm
 
 ### Phase 6: Production hardening (生产硬化) (10 min)
 
@@ -460,7 +460,7 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 - 应用层永不持有 master key plaintext, KMS Decrypt API call
 
 **6.2 Networking**:
-- VPC endpoints (Interface) for S3 / DynamoDB / KMS / Bedrock — NO IGW, NO NAT
+- VPC endpoints (Interface) for GCS / Firestore / Bigtable / KMS / Vertex AI — NO IGW, NO NAT
 - 私网 only, even outbound update apt/yum 都要走 customer-approved mirror
 - TLS 1.3 mandatory, certificate via ACM Private CA
 - Service mesh: linkerd / istio for mTLS pod-to-pod
@@ -471,7 +471,7 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 - AMI immutable, rebuild not patch-in-place
 
 **6.4 Disaster Recovery**:
-- RPO 15 min (S3 cross-region replication for audit + vector store)
+- RPO 15 min (GCS cross-region replication for audit + vector store)
 - RTO 4 hour (warm standby in another AZ, cold in another region)
 - Tabletop DR drill 每季度, audit log 验证 chain of custody not broken
 
@@ -484,9 +484,9 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 
 **Decision 7.1 — Self-host LLM vs BAA cloud LLM**
 
-| 维度 | Self-host (vLLM + Llama-3-medical) | BAA cloud (Claude on Bedrock) |
+| 维度 | Self-host (vLLM + Llama-3-medical) | BAA cloud (Claude on Vertex AI) |
 |---|---|---|
-| Compliance | 最强 (零 egress) | 接受 (BAA + Bedrock VPC endpoint) |
+| Compliance | 最强 (零 egress) | 接受 (BAA + Vertex AI VPC endpoint) |
 | Quality | Llama-3-medical < Claude 4.6 on Med-MCQA by ~8 pts | 最强 |
 | Cost (1M queries/month, avg 4K tokens in / 500 out) | infra ~$8K/month | ~$15K/month |
 | Operational | 维护 H100 cluster, ML on-call | none |
@@ -494,16 +494,16 @@ Patient 请求 restrict某医生 access 或 撤回某条记录:
 
 我推: Phase 1 BAA cloud (上线快, 质量保证), Phase 2 self-host (cost + sovereignty), Phase 3 dual-track (BAA cloud for complex, self-host for routine queries 70%).
 
-**Decision 7.2 — pgvector vs OpenSearch K-NN vs Vespa**
+**Decision 7.2 — pgvector vs Vertex AI Vector Search K-NN vs Vespa**
 
 | 选项 | 50M docs 表现 | Pros | Cons |
 |---|---|---|---|
 | pgvector | 慢 (50M 时 query > 2s) | 同 PG, 简单 | scale 上限 ~5M docs |
-| OpenSearch K-NN (HNSW) | 100ms p99 | hybrid (BM25+HNSW) 原生, AWS native | 内存大 |
+| Vertex AI Vector Search K-NN (HNSW) | 100ms p99 | hybrid (BM25+HNSW) 原生, AWS native | 内存大 |
 | Vespa | 50ms p99 | hybrid + reranker 一体, 最强 | 学习成本高, ops 复杂 |
-| Qdrant Cloud | not applicable | — | Qdrant Cloud 不能 in-VPC (only QC enterprise on-prem) |
+| Vertex AI Vector Search Cloud | not applicable | — | Vertex AI Vector Search Cloud 不能 in-VPC (only QC enterprise on-prem) |
 
-我选 **OpenSearch K-NN** — VPC-native + hybrid 原生 + AWS BAA 已 cover, 50M scale ok.
+我选 **Vertex AI Vector Search K-NN** — VPC-native + hybrid 原生 + AWS BAA 已 cover, 50M scale ok.
 
 **Decision 7.3 — Embedding model**
 
@@ -526,7 +526,7 @@ BGE-M3 medical > OpenAI text-embedding-3-large 的原因:
 
 1. **PHI redaction at ingestion, not query** — 因为 redaction 是 CPU + GPU 昂贵 operation (medspaCy + custom NER 一次 doc ~200ms), 不能在 doctor query 时实时跑. 一次性付出, 50M docs × 200ms / 16 cores = ~7 天. 之后 query 不再需要.
 
-2. **ACL pre-filter, not post-filter** — HIPAA "minimum necessary": doctor 不应"看见过"再被拒. 实现是把 patient_id whitelist 作为 OpenSearch filter, K-NN 在 filtered subset 上跑.
+2. **ACL pre-filter, not post-filter** — HIPAA "minimum necessary": doctor 不应"看见过"再被拒. 实现是把 patient_id whitelist 作为 Vertex AI Vector Search filter, K-NN 在 filtered subset 上跑.
 
 3. **Cross-encoder rerank over more candidates** — Bi-encoder (HNSW) 召回 top-100, cross-encoder rerank 出 top-10 给 LLM. 因为医疗 query "diabetes treatment plan" 召回时同义改写多, rerank 排版 critical.
 
@@ -534,7 +534,7 @@ BGE-M3 medical > OpenAI text-embedding-3-large 的原因:
 
 5. **Self-host embedding + reranker, BAA cloud generation** — 拆 trust boundary: embedding/reranker 是确定性算子可 audit, generation 是黑盒可 BAA-covered. cost 也 ok (embedding 模型小, gen 模型大).
 
-6. **Audit log as event stream, not application log** — CloudTrail 不够 (它只 cover AWS API). 应用层每个 PHI access 都 emit 到 Kinesis → S3 Object Lock, schema 包含 (who, what doc_ids, when, why query, success). 6 年 WORM. 这是 OCR audit 必看的.
+6. **Audit log as event stream, not application log** — Cloud Audit Logs 不够 (它只 cover AWS API). 应用层每个 PHI access 都 emit 到 Pub/Sub → GCS Object Lock, schema 包含 (who, what doc_ids, when, why query, success). 6 年 WORM. 这是 OCR audit 必看的.
 
 7. **Citation token-span + NLI verify** — claim 级别保真. NLI threshold 0.8 是经验值 (太严 false negative 多, 太松幻觉漏掉). 不达标的 claim 标灰 + 显示原文 chunk 让 doctor 自己看.
 
@@ -547,8 +547,8 @@ BGE-M3 medical > OpenAI text-embedding-3-large 的原因:
 - + Embedding 50M × 1024D × 4B = 200GB
 - + HNSW 内存 overhead 1.5× = 300GB
 - + BM25 inverted index ≈ 200GB
-- + Audit 6 年 × 1M queries/year × 2KB = 12GB (compressed S3)
-- Total: ~1TB hot + cold S3 Object Lock
+- + Audit 6 年 × 1M queries/year × 2KB = 12GB (compressed GCS)
+- Total: ~1TB hot + cold GCS Object Lock
 
 **Throughput**:
 - Doctor queries: 5000 doctors × 20 queries/day × 250 work days = 25M/year, peak QPS ~30
@@ -559,16 +559,16 @@ BGE-M3 medical > OpenAI text-embedding-3-large 的原因:
 |---|---|---|
 | Auth + ACL resolve | 50ms | Redis ACL lookup + JWT verify |
 | Query embed | 80ms | BGE-M3 GPU + network |
-| Hybrid retrieve | 200ms | OpenSearch parallel HNSW+BM25 |
+| Hybrid retrieve | 200ms | Vertex AI Vector Search parallel HNSW+BM25 |
 | Rerank | 150ms | cross-encoder 100 candidates |
 | LLM gen | 2000ms | Claude Sonnet 4.6, ~500 tokens out streaming |
 | Citation verify | 300ms | NLI model on claims |
-| Audit emit | 20ms | async to Kinesis |
+| Audit emit | 20ms | async to Pub/Sub |
 
 **Cost**:
 - Compute (g5/r6i mix): ~$80K/year
-- OpenSearch managed: ~$40K/year
-- Aurora + DynamoDB + S3: ~$30K/year
+- Vertex AI Vector Search managed: ~$40K/year
+- Aurora + Firestore / Bigtable + GCS: ~$30K/year
 - Claude Sonnet 4.6 (1M queries × 4K in / 500 out @ BAA): $3/M in + $15/M out → 1M × ($0.012 + $0.0075) = $19.5K/month → $234K/year
 - 总: ~$400K/year for 5000-doctor network — ~$80/doctor/year, very acceptable vs $200K/hospital saved chart-review time
 
@@ -605,12 +605,12 @@ BGE-M3 medical > OpenAI text-embedding-3-large 的原因:
 ## ❌ 死路答法
 
 1. **"用 OpenAI embedding API"** — 直接挂. PHI 出 VPC violation.
-2. **"用 Pinecone vector DB"** — 即使有 BAA, customer legal 通常 reject, 因为 vector 本身可被 inverse 出 PHI.
-3. **"用 OpenAI GPT-5.5"** — 同上, BAA 有但 hospital legal 不接受 default. 必须 BAA cloud BUT in customer's own VPC (Bedrock).
+2. **"用 Vertex AI Vector Search vector DB"** — 即使有 BAA, customer legal 通常 reject, 因为 vector 本身可被 inverse 出 PHI.
+3. **"用 OpenAI GPT-5.5"** — 同上, BAA 有但 hospital legal 不接受 default. 必须 BAA cloud BUT in customer's own VPC (Vertex AI).
 4. **"裸 HNSW, 不要 BM25"** — 医疗 query keyword-heavy, miss 30% recall.
 5. **"PHI 留着, query 时 redact"** — 性能爆炸 + 每次 query 都得 PHI scan + 失败 PHI 漏出风险.
 6. **"chunk size 256 fixed"** — 切断 clinical section semantic boundary, retrieval 质量大跌.
-7. **"audit 写应用日志 (CloudWatch Logs)"** — 不 immutable, 不 WORM, OCR 不认.
+7. **"audit 写应用日志 (Cloud Monitoring Logs)"** — 不 immutable, 不 WORM, OCR 不认.
 8. **"用 RBAC role-based 不做 patient-level ACL"** — Cardinality 5K doctor × 1M patient ACL 不能用 role 解决, 必须 patient 粒度.
 9. **"index 全量重建一次就好"** — 50M scale 不可行, 必须 incremental + blue/green.
 10. **"citation 显示 doc title 就行"** — doctor 不信任, faithfulness 验证缺失.
@@ -647,15 +647,15 @@ EHR connector          Epic FHIR R4 + Subscription R5    100 docs/sec backfill, 
 PHI redactor           Presidio + medspaCy + custom NER  200ms/doc, 3 layers
 Chunking               Section-aware, 512 tokens         50M chunks ≈ 50M docs
 Embedding              BGE-M3 medical, self-host         g5.xlarge × 8, 5K embs/sec
-Vector store           OpenSearch K-NN HNSW M=32         200GB raw, 300GB RAM
-BM25 + Hybrid          OpenSearch native + RRF           BM25 250GB, +0.08 nDCG vs pure HNSW
+Vector store           Vertex AI Vector Search K-NN HNSW M=32         200GB raw, 300GB RAM
+BM25 + Hybrid          Vertex AI Vector Search native + RRF           BM25 250GB, +0.08 nDCG vs pure HNSW
 Reranker               BGE-reranker-v2-m3 cross-encoder  50ms / 10 candidates
-LLM (Phase 1)          Claude Sonnet 4.6 via Bedrock+BAA $3/$15 per 1M tokens
+LLM (Phase 1)          Claude Sonnet 4.6 via Vertex AI+BAA $3/$15 per 1M tokens
 LLM (Phase 2)          Llama-3-medical on vLLM           4× H100, $80K/yr
 ACL                    Aurora RLS + Redis bitmap         pre-filter, not post
-Audit                  Kinesis → S3 Object Lock          6yr WORM, immutable
+Audit                  Pub/Sub → GCS Object Lock          6yr WORM, immutable
 Key mgmt               KMS-CMK per tenant + rotate 365d  envelope encryption
 Network                VPC endpoints only, mTLS, no IGW  TLS 1.3 mandatory
-DR                     RPO 15min, RTO 4h                 cross-region S3, AZ standby
+DR                     RPO 15min, RTO 4h                 cross-region GCS, AZ standby
 Cost (5K doctors)      ~$400K/year                       $80/doctor/yr
 ```

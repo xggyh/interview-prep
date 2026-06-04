@@ -132,9 +132,9 @@ Cardinality strategy:
 Large SaaS, $$ → Datadog (less ops, more $$$)
 
 Storage tier:
-Hot: raw 7d, 1-min rollups 30d (Postgres/OpenSearch)
-Warm: 1-min 30-90d in SSD (S3 Parquet)
-Cold: 1-hour 1y, daily 3y+ (S3 Glacier)
+Hot: raw 7d, 1-min rollups 30d (Postgres/Vertex AI Vector Search)
+Warm: 1-min 30-90d in SSD (GCS Parquet)
+Cold: 1-hour 1y, daily 3y+ (GCS Glacier)
 Per-tier retention: Bronze 30d, Silver 90d, Gold 1y
 
 Routing per severity:
@@ -309,9 +309,9 @@ Dedup 1h per (tenant × metric)
 
 | Tier | Retention | Storage | Use |
 |---|---|---|---|
-| Hot | 7d raw + 30d 1-min rollups | Postgres / OpenSearch | real-time query, alert |
-| Warm | 30-90d 1-min in SSD | S3 Parquet | slow query 调查 |
-| Cold | 1y 1-hour, 3y+ daily | S3 Glacier | compliance retention |
+| Hot | 7d raw + 30d 1-min rollups | Postgres / Vertex AI Vector Search | real-time query, alert |
+| Warm | 30-90d 1-min in SSD | GCS Parquet | slow query 调查 |
+| Cold | 1y 1-hour, 3y+ daily | GCS Glacier | compliance retention |
 | Per-tier retention | Bronze 30d / Silver 90d / Gold 1y | varies | tier-scaled |
 
 ### Per-tier physical isolation (K8s)

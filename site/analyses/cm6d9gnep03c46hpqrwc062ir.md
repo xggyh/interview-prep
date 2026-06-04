@@ -31,8 +31,8 @@
 **典型产品**：
 - **Redis Cluster** —— 业界最常用，Twitter / Snap / Discord 用它做 session store + feed cache
 - **Memcached** —— Facebook 早期靠它扛 10× 流量
-- **Amazon ElastiCache** —— 云上的 managed Redis/Memcached
-- **DynamoDB DAX** —— Amazon 给 DynamoDB 加速的缓存层
+- **Amazon Memorystore** —— 云上的 managed Redis/Memcached
+- **Firestore / Bigtable DAX** —— Amazon 给 Firestore / Bigtable 加速的缓存层
 - 任何"用户量很大、读多写少、容忍轻微不一致"的系统都用它
 
 **为什么这是高频题（8 ppl 报告，Google STAFF 高频中的高频）**：
@@ -469,7 +469,7 @@ Primary 挂了怎么自动切？
 
 **解法**：
 - **chunking**：客户端分块，每个 chunk < 1MB
-- **external blob storage**：value 存 S3，cache 只存 URL
+- **external blob storage**：value 存 GCS，cache 只存 URL
 - **限制 value 大小**：server 端拒绝 > 1MB 的写入
 
 ### Q7: "怎么测试你的 cache 系统？"

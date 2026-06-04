@@ -392,7 +392,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
       <li><strong>Q: 为啥不 OpenAI?</strong><br>OpenAI 强在 model frontier 但 enterprise 工具链 (audit, SSO, VPC) 还在追 Google。我未来 5 年想做的是 enterprise FDE, 不是 frontier research, 这个 path 在 Google 更顺。</li>
-      <li><strong>Q: 为啥不 AWS?</strong><br>AWS Bedrock 是 model marketplace, FDE 的 leverage 在 model + 上层工具的整合度。Bedrock 没有 Workspace 这种 final-mile distribution, 也没有 self-owned frontier model (Claude 是租的)。</li>
+      <li><strong>Q: 为啥不 AWS?</strong><br>Vertex AI 是 model marketplace, FDE 的 leverage 在 model + 上层工具的整合度。Vertex AI 没有 Workspace 这种 final-mile distribution, 也没有 self-owned frontier model (Claude 是租的)。</li>
       <li><strong>Q: 听过具体哪个 talk?</strong><br>Mason Mirin 的 Google FDE Overview (4 部分, T1-T4) 我每集都看过。最影响我的是 T2 那集讲 long-context vs RAG 的取舍 — 2M token 改变了我对 chunking 必要性的判断。</li>
       <li><strong>Q: 公司文化你担心啥?</strong><br>Google 内部跨部门协调 famously 重。FDE 角色其实跨 GCP / Workspace / DeepMind 都会接触, 我担心是不是会被 &#x27;sandbox&#x27; 在一个产品里出不去。这个我想面试时问 hiring manager。</li>
   </ul>
@@ -483,7 +483,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 
   <h3><span class="step-n">2</span>3 个子问题</h3>
   <ul>
-      <li><strong>PDF 文本提取</strong>: text-based 用 pdfplumber, scanned 用 OCR (Tesseract / AWS Textract)</li>
+      <li><strong>PDF 文本提取</strong>: text-based 用 pdfplumber, scanned 用 OCR (Tesseract / Document AI)</li>
       <li><strong>实体抽取</strong>: LLM (Gemini Flash, $0.50/1M) 一次性 prompt-based 抽; 或 spaCy NER 本地</li>
       <li><strong>输出 + 错误处理</strong>: 每文档输出 JSON, 失败的进 errors.log</li>
   </ul>
@@ -508,7 +508,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 
   <h3><span class="step-n">1</span>5 个澄清问题</h3>
   <ol>
-      <li>上游 source — Kafka / SQS / WebSocket / HTTP poll</li>
+      <li>上游 source — Kafka / Cloud Tasks / WebSocket / HTTP poll</li>
       <li>下游 sink — DB / 另一个 service / batch processor</li>
       <li>&#x27;变慢&#x27; 阈值 — 多慢算变慢 (latency p99 / queue depth)</li>
       <li>数据丢失 ok? 还是必须 at-least-once</li>
@@ -663,7 +663,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
-      <li><strong>Q: FAISS vs Qdrant?</strong><br>Qdrant 是 server, 提供 metadata filter + REST API; FAISS 是 lib, 嵌入自己 service。如果 query 简单只要 top-k, FAISS 自己写 wrapper 最 lean。要 hybrid (向量 + filter)、要 cluster、要 持久化, Qdrant 香。</li>
+      <li><strong>Q: FAISS vs Vertex AI Vector Search?</strong><br>Vertex AI Vector Search 是 server, 提供 metadata filter + REST API; FAISS 是 lib, 嵌入自己 service。如果 query 简单只要 top-k, FAISS 自己写 wrapper 最 lean。要 hybrid (向量 + filter)、要 cluster、要 持久化, Vertex AI Vector Search 香。</li>
       <li><strong>Q: recall vs latency 怎么调?</strong><br>FAISS IVF nprobe 是钮 — nprobe=1 最快但 recall 70%, nprobe=64 慢 32x 但 recall 99%。我会画一条 nprobe vs recall@10 vs p99 latency 曲线, 选 SLA 允许下 recall 最高的 nprobe。</li>
       <li><strong>Q: 怎么 shard?</strong><br>按 cluster_id mod N 分到 N 个 shard, query 广播到所有 shard, 拿回 top-k * 2 再 merge top-k。或者按 metadata (例如 tenant_id) 分, 优先在 tenant 内 search。</li>
       <li><strong>Q: 实时更新?</strong><br>FAISS IVF 支持 add, 但 cluster 不会重平衡 — 加多了某些 cluster 巨大 recall 下降。我会每天 rebuild 一次 (cron), incremental add 用临时 &#x27;delta&#x27; index, query 时双查 merge。</li>
@@ -699,7 +699,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   <ul>
       <li><strong>Q: 如果 returns 表里没 order_id 怎么 join?</strong><br>通过 customer_id + 时间窗口 join, 但精度差。我会先问 schema, 没 order_id 是 schema bug, 要先修。</li>
       <li><strong>Q: 按金额算退货率不是订单数?</strong><br>WHERE 改成 `SUM(r.amount) / SUM(o.amount)`。退货表通常有 returned_amount 字段 (退一部分 vs 退全部), 实际业务中按金额更对齐财务口径。</li>
-      <li><strong>Q: 性能?</strong><br>orders 千万级 + returns 百万级, 单机 Postgres 30s 内出。加索引 orders(customer_id, order_date), returns(order_id)。过 1 亿可能要 partition by month 或用 BigQuery / Snowflake。</li>
+      <li><strong>Q: 性能?</strong><br>orders 千万级 + returns 百万级, 单机 Postgres 30s 内出。加索引 orders(customer_id, order_date), returns(order_id)。过 1 亿可能要 partition by month 或用 BigQuery / BigQuery。</li>
       <li><strong>Q: 上季度无订单的 customer 算啥?</strong><br>不在结果里 (LEFT JOIN 从 orders 开始, 没 order 就不出现)。如果要包含 (展示 NaN), 改成 FROM customers 表 LEFT JOIN orders LEFT JOIN returns。</li>
   </ul>
 
@@ -712,7 +712,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 
   <h3><span class="step-n">1</span>5 个澄清问题</h3>
   <ol>
-      <li>数据库 — Postgres / MySQL / Snowflake — EXPLAIN 语法不同</li>
+      <li>数据库 — Postgres / MySQL / BigQuery — EXPLAIN 语法不同</li>
       <li>数据量 — 表 row count, 现在多慢 (1s / 10s / 10min)</li>
       <li>已经做过哪些 — 有现成索引吗, 加过吗</li>
       <li>SLA — 这条 query 的目标 latency</li>
@@ -727,7 +727,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>流程: (1) EXPLAIN ANALYZE 跑 query, 看 plan tree。重点找: (a) Seq Scan on 大表 (千万级 scan 必慢) → 加索引; (b) Nested Loop join 在两个大表 (应该 Hash Join 或 Merge Join) → join key 没索引或 statistics 过期 (ANALYZE); (c) Sort spill to disk (work_mem 太小) → 调 work_mem 或加合适 order by 列的索引; (d) &#x27;Filter&#x27; 行数差异 (planned 100 actual 1M) → statistics 不准, ANALYZE 强刷; (2) 加索引 — composite 索引 (a, b, c) 顺序按 WHERE 等值优先 + range 列在后 + ORDER BY 同向; covering index 把 SELECT 列也放进去避免回表; (3) 如果加索引不够, 上 partition (按时间 / tenant) 或 materialized view (聚合预算); (4) 如果是 OLAP / 千万级聚合, 别在 OLTP db 上做, 移到 ClickHouse / BigQuery / Snowflake。</blockquote>
+  <blockquote>流程: (1) EXPLAIN ANALYZE 跑 query, 看 plan tree。重点找: (a) Seq Scan on 大表 (千万级 scan 必慢) → 加索引; (b) Nested Loop join 在两个大表 (应该 Hash Join 或 Merge Join) → join key 没索引或 statistics 过期 (ANALYZE); (c) Sort spill to disk (work_mem 太小) → 调 work_mem 或加合适 order by 列的索引; (d) &#x27;Filter&#x27; 行数差异 (planned 100 actual 1M) → statistics 不准, ANALYZE 强刷; (2) 加索引 — composite 索引 (a, b, c) 顺序按 WHERE 等值优先 + range 列在后 + ORDER BY 同向; covering index 把 SELECT 列也放进去避免回表; (3) 如果加索引不够, 上 partition (按时间 / tenant) 或 materialized view (聚合预算); (4) 如果是 OLAP / 千万级聚合, 别在 OLTP db 上做, 移到 ClickHouse / BigQuery / BigQuery。</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
@@ -765,7 +765,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
-      <li><strong>Q: 为啥 Vertex AI 不是 OpenAI / Bedrock?</strong><br>OpenAI 2026 没有覆盖全产品 BAA + 没有 in-tenant deploy 选项, 直接 API 法务一般不签。Bedrock 也 BAA 但 multi-tenant managed, Vertex AI 跑在 customer 自己的 GCP project, Gemini in-project 不出 perimeter, BAA 自动覆盖 (Vertex AI / Document AI / Healthcare API / GCS / BigQuery / Cloud DLP 全在 Google BAA list)。</li>
+      <li><strong>Q: 为啥 Vertex AI 不是 OpenAI / Vertex AI?</strong><br>OpenAI 2026 没有覆盖全产品 BAA + 没有 in-tenant deploy 选项, 直接 API 法务一般不签。Vertex AI 也 BAA 但 multi-tenant managed, Vertex AI 跑在 customer 自己的 GCP project, Gemini in-project 不出 perimeter, BAA 自动覆盖 (Vertex AI / Document AI / Healthcare API / GCS / BigQuery / Cloud DLP 全在 Google BAA list)。</li>
       <li><strong>Q: 数据 update 实时怎么处理?</strong><br>HL7/FHIR feed → Pub/Sub → Cloud Functions / Cloud Run 做 de-identify (调 Cloud DLP) → 写 Vertex AI Vector Search with version metadata。新版本写入旧版本不删 (HIPAA 审计要求), 用 timestamp filter 查最新。delete = soft delete + tombstone。</li>
       <li><strong>Q: 如何 measure PHI leak?</strong><br>三层防御: (1) ingest 时用 Cloud DLP healthcare profile, 再叠加 Healthcare NLP API 抽实体二次校验, 漏的进 quarantine; (2) generation 时 prompt 强制 &#x27;do not include patient identifiers in output&#x27;; (3) output 后再跑 Cloud DLP 二次扫, 检测到 redact + alert (Eventarc → PagerDuty)。每月人工抽 100 response 审。</li>
       <li><strong>Q: citation 必须吗?</strong><br>HIPAA 不强制但临床必须 — 医生要看 source 原文。强制 Gemini output 格式 `{answer, citations: [{chunk_id, doc_id, page, span}]}`, 用 Gemini structured output mode 保 schema。前端高亮显示, 无 citation 不展示。</li>
@@ -796,11 +796,11 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>架构 (GCP-first): Source (12 个) → Datastream / Fivetran → GCS raw landing zone → Dataform (BigQuery 内置 SQL transform 工具, dbt 替代) → BigQuery unified warehouse → Vertex AI Feature Store → Prediction Model.<br>阶段一 (Week 1-2): 用 Datastream (Google 自家 CDC, 接 Postgres/MySQL/Oracle) + Fivetran (接 Shopify/Salesforce/Stripe 这些 SaaS) 接 8 个 source, 调度用 Cloud Composer (managed Airflow). 剩下 4 个偏门源用 Cloud Run 自写 connector (1-2 天/source). 所有 source 落 GCS raw bucket, 按 source_name / date 分区, 同时直接 stream 到 BigQuery (Datastream 原生支持).<br>阶段二 (Week 3-4): Dataform 项目 (BigQuery 原生 SQL 转换, 也支持 dbt 兼容语法) — `staging/` (1:1 清洗, rename, cast) → `intermediate/` (业务 join, 算 metric) → `marts/` (给 model 用的 final feature table). 每个 model 加 assertion (not_null, unique), 跑 fail 就停 pipeline.<br>阶段三 (Week 5): Vertex AI Feature Store 把 marts 表注册成 feature view, model 通过 SDK 取实时 / batch feature. SLA 是 feature freshness &lt; 24h, 关键 feature (库存) &lt; 1h, 用 BigQuery Streaming Inserts + Vertex AI Feature Store online serving 走快 path.<br>Cost: Datastream pay-per-GB (~$0.01/GB), BigQuery $25/TB query + $0.02/GB storage, Vertex AI Feature Store ~$0.30/GB-month online. Total &lt; $500/月 for medium retail (BigQuery 比 Snowflake 便宜显著, slot 模式更灵活).</blockquote>
+  <blockquote>架构 (GCP-first): Source (12 个) → Datastream / Fivetran → GCS raw landing zone → Dataform (BigQuery 内置 SQL transform 工具, dbt 替代) → BigQuery unified warehouse → Vertex AI Feature Store → Prediction Model.<br>阶段一 (Week 1-2): 用 Datastream (Google 自家 CDC, 接 Postgres/MySQL/Oracle) + Fivetran (接 Shopify/Salesforce/Stripe 这些 SaaS) 接 8 个 source, 调度用 Cloud Composer (managed Airflow). 剩下 4 个偏门源用 Cloud Run 自写 connector (1-2 天/source). 所有 source 落 GCS raw bucket, 按 source_name / date 分区, 同时直接 stream 到 BigQuery (Datastream 原生支持).<br>阶段二 (Week 3-4): Dataform 项目 (BigQuery 原生 SQL 转换, 也支持 dbt 兼容语法) — `staging/` (1:1 清洗, rename, cast) → `intermediate/` (业务 join, 算 metric) → `marts/` (给 model 用的 final feature table). 每个 model 加 assertion (not_null, unique), 跑 fail 就停 pipeline.<br>阶段三 (Week 5): Vertex AI Feature Store 把 marts 表注册成 feature view, model 通过 SDK 取实时 / batch feature. SLA 是 feature freshness &lt; 24h, 关键 feature (库存) &lt; 1h, 用 BigQuery Streaming Inserts + Vertex AI Feature Store online serving 走快 path.<br>Cost: Datastream pay-per-GB (~$0.01/GB), BigQuery $25/TB query + $0.02/GB storage, Vertex AI Feature Store ~$0.30/GB-month online. Total &lt; $500/月 for medium retail (BigQuery 比 BigQuery 便宜显著, slot 模式更灵活).</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
-      <li><strong>Q: 为啥 BigQuery 不是 Snowflake?</strong><br>Google FDE 这种场景 default BigQuery — (1) serverless, no cluster 管理; (2) 跟 Vertex AI / Looker / Dataform 原生集成, 走同一个 IAM; (3) 比 Snowflake 便宜 30-50% (按 query, 不按 warehouse-hour); (4) BAA 自动覆盖. 客户已在 Snowflake 也行 — BigQuery 支持 Snowflake federated query, 不强迁.</li>
+      <li><strong>Q: 为啥 BigQuery 不是 BigQuery?</strong><br>Google FDE 这种场景 default BigQuery — (1) serverless, no cluster 管理; (2) 跟 Vertex AI / Looker / Dataform 原生集成, 走同一个 IAM; (3) 比 BigQuery 便宜 30-50% (按 query, 不按 warehouse-hour); (4) BAA 自动覆盖. 客户已在 BigQuery 也行 — BigQuery 支持 BigQuery federated query, 不强迁.</li>
       <li><strong>Q: 12 source 某个挂了怎么办?</strong><br>Cloud Composer DAG 每个 source 独立 task, 一个挂不阻塞其他。挂的 source 用上次成功的数据 + 加 staleness 标记进 feature, model 知道 &#x27;inventory feature is 48h stale, downweight&#x27;。每天 ops 报表显示哪些 source stale, Cloud Monitoring alert 失败 task.</li>
       <li><strong>Q: schema 变了 — Shopify 加字段不通知?</strong><br>Dataform staging 用 explicit SELECT (不 SELECT *), source 加字段 staging 不破; source 删字段 staging fail, Dataform 报错, ops 24h 内 fix。BigQuery schema evolution 支持自动加列 (不删).</li>
       <li><strong>Q: real-time stream 怎么塞进来?</strong><br>Pub/Sub → Dataflow streaming pipeline → BigQuery Storage Write API (秒级 ingest). Feature Store online (Redis on Memorystore) 服务实时, offline (BigQuery) 服务 training, schema 同源.
@@ -812,13 +812,13 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
 </article>
 
 <article data-cat="设计" data-num="Q23" id="q23">
-  <h2><span class="qnum">Q23</span><span class="qcat">设计</span>F500 AWS VPC + Okta SSO + Snowflake 部署 (含 GCP 镜像版)</h2>
+  <h2><span class="qnum">Q23</span><span class="qcat">设计</span>F500 AWS VPC + Okta SSO + BigQuery 部署 (含 GCP 镜像版)</h2>
 
   <h3><span class="step-n">1</span>5 个澄清问题</h3>
   <ol>
-      <li>客户用 AWS 哪些 service 跑我们的 agent (EC2/EKS/Lambda/Bedrock)</li>
+      <li>客户用 AWS 哪些 service 跑我们的 agent (EC2/GKE/Cloud Functions/Vertex AI)</li>
       <li>Okta groups 怎么 map 到我们的 role (admin / analyst / read-only)</li>
-      <li>Snowflake 是 customer-managed 还是我们 share — 数据所有权 / 计费</li>
+      <li>BigQuery 是 customer-managed 还是我们 share — 数据所有权 / 计费</li>
       <li>数据是否含 PII — 决定要不要 column-level encryption + masking</li>
       <li>Latency / availability — 单 region 还是多 region, 99.9 vs 99.99</li>
   </ol>
@@ -827,22 +827,22 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   <ul>
       <li><strong>Identity</strong>: Okta SAML / OIDC → AWS IAM Identity Center → temporary credentials</li>
       <li><strong>Network</strong>: VPC peering / PrivateLink, no public internet for sensitive data path</li>
-      <li><strong>Data</strong>: Snowflake external table / Reader account / Secure Data Sharing, 选哪个看治理需求</li>
+      <li><strong>Data</strong>: BigQuery external table / Reader account / Secure Data Sharing, 选哪个看治理需求</li>
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>架构 3 层:<br>(1) Identity layer — Okta 作 IdP, 配 SAML 联邦到 AWS IAM Identity Center (formerly SSO)。Okta group `fde-agent-admin` / `fde-agent-analyst` → AWS Permission Set (admin 可改 prompt, analyst 只看 dashboard)。Session 用 STS temporary credentials, 8 小时 TTL。客户员工登录 Okta → MFA → 拿到 AWS console 或 CLI credential, 全程不创 IAM user。<br>(2) Network layer — 我们的 agent service 部署在客户 VPC 里 (他们 own infra), 用 EKS on Fargate。和 Snowflake 之间走 AWS PrivateLink (Snowflake 支持, endpoint 在客户 VPC, 不过公网); 和 Bedrock 走 VPC interface endpoint。结果: 所有数据流量 stay in AWS 内网, 客户 audit 友好。<br>(3) Data layer — Snowflake 留在客户账号 (不 share), 我们通过 IAM role 申请只读 access。用 &#x27;Reader Account&#x27; 或 &#x27;Secure Data Sharing&#x27; 都不要 — 直接 IAM-based access 最简单。Snowflake 端建 dedicated role `fde_agent_role`, GRANT 必要 table, row access policy 限制 agent 只看授权数据。<br>Deploy stack: Terraform 写 30 个 module, GitOps 走 customer 自己 ArgoCD; 我们提供 helm chart 客户自己 deploy。Day 1 上线 SLA: 99.9, 后续提到 99.99 加 multi-AZ。</blockquote>
+  <blockquote>架构 3 层:<br>(1) Identity layer — Okta 作 IdP, 配 SAML 联邦到 AWS IAM Identity Center (formerly SSO)。Okta group `fde-agent-admin` / `fde-agent-analyst` → AWS Permission Set (admin 可改 prompt, analyst 只看 dashboard)。Session 用 STS temporary credentials, 8 小时 TTL。客户员工登录 Okta → MFA → 拿到 AWS console 或 CLI credential, 全程不创 IAM user。<br>(2) Network layer — 我们的 agent service 部署在客户 VPC 里 (他们 own infra), 用 GKE on Fargate。和 BigQuery 之间走 AWS PrivateLink (BigQuery 支持, endpoint 在客户 VPC, 不过公网); 和 Vertex AI 走 VPC interface endpoint。结果: 所有数据流量 stay in AWS 内网, 客户 audit 友好。<br>(3) Data layer — BigQuery 留在客户账号 (不 share), 我们通过 IAM role 申请只读 access。用 &#x27;Reader Account&#x27; 或 &#x27;Secure Data Sharing&#x27; 都不要 — 直接 IAM-based access 最简单。BigQuery 端建 dedicated role `fde_agent_role`, GRANT 必要 table, row access policy 限制 agent 只看授权数据。<br>Deploy stack: Terraform 写 30 个 module, GitOps 走 customer 自己 ArgoCD; 我们提供 helm chart 客户自己 deploy。Day 1 上线 SLA: 99.9, 后续提到 99.99 加 multi-AZ。</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
       <li><strong>Q: 为啥不用 SCIM 自动 sync Okta → AWS?</strong><br>SCIM provision 用户但不 provision permission, 还是要 AWS Identity Center 配 Permission Set。SCIM 简化 &#x27;user joining/leaving 自动反映&#x27;, F500 有这要求一定加, 不到 100 人不上。</li>
-      <li><strong>Q: Snowflake 数据 PII 怎么处理?</strong><br>Snowflake Dynamic Data Masking + Row Access Policies。Masking 在 query time 自动 mask PII (姓名 → &#x27;XXX&#x27;, SSN → hash); Row policy 限制只看 region-allowed 行。我们 agent 拿到的就是 masked data, 不接触原始 PII。</li>
-      <li><strong>Q: 客户安全团队会问啥?</strong><br>三件: (1) credential 哪里存 (答: STS temp credentials / GCP Workload Identity, no long-lived); (2) data 是否 exfiltrate (答: VPC + PrivateLink / Private Service Connect, no public egress); (3) audit log 是否他们可查 (答: CloudTrail / Cloud Audit Logs in their account, Snowflake / BigQuery query log in their account).</li>
-      <li><strong>Q: multi-region DR 怎么做?</strong><br>Snowflake 自带 cross-region replication (paid feature)。我们的 service 在 us-east-1 主 us-west-2 standby, Route53 健康检查 failover。RTO 5min RPO 0 (Snowflake replication 同步), $extra for second region。</li>
+      <li><strong>Q: BigQuery 数据 PII 怎么处理?</strong><br>BigQuery Dynamic Data Masking + Row Access Policies。Masking 在 query time 自动 mask PII (姓名 → &#x27;XXX&#x27;, SSN → hash); Row policy 限制只看 region-allowed 行。我们 agent 拿到的就是 masked data, 不接触原始 PII。</li>
+      <li><strong>Q: 客户安全团队会问啥?</strong><br>三件: (1) credential 哪里存 (答: STS temp credentials / GCP Workload Identity, no long-lived); (2) data 是否 exfiltrate (答: VPC + PrivateLink / Private Service Connect, no public egress); (3) audit log 是否他们可查 (答: Cloud Audit Logs / Cloud Audit Logs in their account, BigQuery / BigQuery query log in their account).</li>
+      <li><strong>Q: multi-region DR 怎么做?</strong><br>BigQuery 自带 cross-region replication (paid feature)。我们的 service 在 us-east-1 主 us-west-2 standby, Route53 健康检查 failover。RTO 5min RPO 0 (BigQuery replication 同步), $extra for second region。</li>
   </ul>
 
   <h3><span class="step-n">5</span>加分料</h3>
-  <div class="bonus">⭐ F500 安全 review checklist 必背: (1) No long-lived credential (2) No public egress (3) Audit log in customer account (4) Customer-managed encryption keys option (5) MFA on console.<br><br>🅖 &lt;strong&gt;GCP 镜像版 (Google FDE engagement 时这样说)&lt;/strong&gt;: &#x27;Same architecture on GCP — Okta SAML → &lt;strong&gt;Cloud Identity&lt;/strong&gt; → IAM with Permission Sets (workforce identity federation). Service on customer GKE / Cloud Run in their VPC. Snowflake 客户已有就保留, 走 &lt;strong&gt;Private Service Connect&lt;/strong&gt; 不走公网; 更推荐换 BigQuery 因为跟 Vertex AI 原生集成. Bedrock 换 &lt;strong&gt;Vertex AI in customer project&lt;/strong&gt;. Audit 走 &lt;strong&gt;Cloud Audit Logs&lt;/strong&gt;, perimeter 用 &lt;strong&gt;VPC Service Controls&lt;/strong&gt; 锁住 Vertex AI + BigQuery + GCS, 数据 perimeter-level 隔离 (AWS 没等价). 99.99 用 multi-region active-active via Cloud Load Balancing global anycast.&#x27;</div>
+  <div class="bonus">⭐ F500 安全 review checklist 必背: (1) No long-lived credential (2) No public egress (3) Audit log in customer account (4) Customer-managed encryption keys option (5) MFA on console.<br><br>🅖 &lt;strong&gt;GCP 镜像版 (Google FDE engagement 时这样说)&lt;/strong&gt;: &#x27;Same architecture on GCP — Okta SAML → &lt;strong&gt;Cloud Identity&lt;/strong&gt; → IAM with Permission Sets (workforce identity federation). Service on customer GKE / Cloud Run in their VPC. BigQuery 客户已有就保留, 走 &lt;strong&gt;Private Service Connect&lt;/strong&gt; 不走公网; 更推荐换 BigQuery 因为跟 Vertex AI 原生集成. Vertex AI 换 &lt;strong&gt;Vertex AI in customer project&lt;/strong&gt;. Audit 走 &lt;strong&gt;Cloud Audit Logs&lt;/strong&gt;, perimeter 用 &lt;strong&gt;VPC Service Controls&lt;/strong&gt; 锁住 Vertex AI + BigQuery + GCS, 数据 perimeter-level 隔离 (AWS 没等价). 99.99 用 multi-region active-active via Cloud Load Balancing global anycast.&#x27;</div>
 </article>
 
 <article data-cat="设计" data-num="Q24" id="q24">
@@ -906,7 +906,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
       <li><strong>Q: 怎么 instrument 不影响 latency?</strong><br>用 OpenTelemetry, sampling rate 1% 在生产 (头部 100% 在测试)。每个 span 加 attribute (model, prompt_size_tokens, output_size_tokens), tracing 后端 Tempo / Honeycomb。</li>
       <li><strong>Q: speculative decoding 的代价?</strong><br>额外 GPU memory (draft model) + 实现复杂。throughput 2-3x 但 acceptance rate 关键 — draft 准, 大 model 几乎不重算 token, throughput 高; draft 烂, 反而慢。一般 7B draft + 70B main 是 sweet spot。</li>
       <li><strong>Q: prefix caching 哪些 model 支持?</strong><br>vLLM / SGLang / Anthropic API (automatic prefix caching), Gemini (explicit caching API)。OpenAI 也有 prompt caching automatic。系统 prompt 大且重复的场景 (agent) 收益 50%+ latency 减少。</li>
-      <li><strong>Q: 客户端到端 vs 服务端为啥差很多?</strong><br>典型 90% latency 在服务端 inference, 但有时差距 = 客户网络。我会用 client-side 探针 (CloudWatch RUM / Sentry) 测真实用户 region 网络延迟, 再决定是不是要 edge POP。</li>
+      <li><strong>Q: 客户端到端 vs 服务端为啥差很多?</strong><br>典型 90% latency 在服务端 inference, 但有时差距 = 客户网络。我会用 client-side 探针 (Cloud Monitoring RUM / Sentry) 测真实用户 region 网络延迟, 再决定是不是要 edge POP。</li>
   </ul>
 
   <h3><span class="step-n">5</span>加分料</h3>
@@ -933,7 +933,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>GCP-native stack 默认推荐:<br>(1) **Backend 三选一**:<br>  - **Cloud Tasks** — HTTP-based short-running tasks (&lt; 10min), 最简单, 类比 AWS SQS. 原生支持 retry policy (exp backoff + max retry), priority queue (多 queue 配置), DLQ. 1M tasks 内免费.<br>  - **Pub/Sub** — 高 throughput pub-sub (1M+ msg/s), 任务有顺序 / replay / fanout 需求. 类比 AWS SNS + Kafka.<br>  - **Cloud Workflows + Temporal** (on GKE) — 长 workflow / 复杂 retry / 状态机. Cloud Workflows 适合 5-30min 的 step orchestration, Temporal 适合 hours/days 长 workflow + 事件溯源 + replay 调试.<br>(2) **优先级实现**: Cloud Tasks 多 queue (`high-priority` / `medium` / `low`), worker 配 weighted polling (5:3:1). Pub/Sub 用 ordering key + 多 subscription 隔离 priority.<br>(3) **Retry**: Cloud Tasks native config `{maxAttempts:5, minBackoff:1s, maxBackoff:60s, maxDoublings:5}`. Non-retryable (4xx) 直接 fail, retryable (5xx, timeout) 重试. Temporal 同样支持.<br>(4) **DLQ**: Cloud Tasks 自动转 DLQ topic 后用 Pub/Sub subscription 接, Cloud Monitoring alarm depth &gt; 0 触发 PagerDuty. Failed task 永久 retain in DLQ, Cloud Run Job 处理人工 review.<br>(5) **监控**: throughput per queue, p99 latency from enqueue to start, retry rate, DLQ depth — 4 个 critical metric. Cloud Monitoring 自带 dashboard.<br>如果 throughput &gt; 100K msg/s 且 message 大, Pub/Sub 单 topic 撑得住 (millions/s), 走 partition key=customer_id 保 ordering.</blockquote>
+  <blockquote>GCP-native stack 默认推荐:<br>(1) **Backend 三选一**:<br>  - **Cloud Tasks** — HTTP-based short-running tasks (&lt; 10min), 最简单, 类比 Cloud Tasks / Pub/Sub. 原生支持 retry policy (exp backoff + max retry), priority queue (多 queue 配置), DLQ. 1M tasks 内免费.<br>  - **Pub/Sub** — 高 throughput pub-sub (1M+ msg/s), 任务有顺序 / replay / fanout 需求. 类比 AWS SNS + Kafka.<br>  - **Cloud Workflows + Temporal** (on GKE) — 长 workflow / 复杂 retry / 状态机. Cloud Workflows 适合 5-30min 的 step orchestration, Temporal 适合 hours/days 长 workflow + 事件溯源 + replay 调试.<br>(2) **优先级实现**: Cloud Tasks 多 queue (`high-priority` / `medium` / `low`), worker 配 weighted polling (5:3:1). Pub/Sub 用 ordering key + 多 subscription 隔离 priority.<br>(3) **Retry**: Cloud Tasks native config `{maxAttempts:5, minBackoff:1s, maxBackoff:60s, maxDoublings:5}`. Non-retryable (4xx) 直接 fail, retryable (5xx, timeout) 重试. Temporal 同样支持.<br>(4) **DLQ**: Cloud Tasks 自动转 DLQ topic 后用 Pub/Sub subscription 接, Cloud Monitoring alarm depth &gt; 0 触发 PagerDuty. Failed task 永久 retain in DLQ, Cloud Run Job 处理人工 review.<br>(5) **监控**: throughput per queue, p99 latency from enqueue to start, retry rate, DLQ depth — 4 个 critical metric. Cloud Monitoring 自带 dashboard.<br>如果 throughput &gt; 100K msg/s 且 message 大, Pub/Sub 单 topic 撑得住 (millions/s), 走 partition key=customer_id 保 ordering.</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
@@ -944,7 +944,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">5</span>加分料</h3>
-  <div class="bonus">⭐ GCP queue 决策树: HTTP task &lt; 10min 短任务 → &lt;strong&gt;Cloud Tasks&lt;/strong&gt;; event fanout / 高 throughput → &lt;strong&gt;Pub/Sub&lt;/strong&gt;; multi-step workflow 几分钟 → &lt;strong&gt;Cloud Workflows&lt;/strong&gt;; long-running 复杂状态 → &lt;strong&gt;Temporal on GKE&lt;/strong&gt;. 全部 BAA 覆盖, IAM + Audit Logs 原生. AWS 等价是 SQS / SNS / Step Functions / Temporal — 概念 1:1 对应, 但 GCP 这套跟 Vertex AI / BigQuery 一个 IAM model 内, F500 客户喜欢.</div>
+  <div class="bonus">⭐ GCP queue 决策树: HTTP task &lt; 10min 短任务 → &lt;strong&gt;Cloud Tasks&lt;/strong&gt;; event fanout / 高 throughput → &lt;strong&gt;Pub/Sub&lt;/strong&gt;; multi-step workflow 几分钟 → &lt;strong&gt;Cloud Workflows&lt;/strong&gt;; long-running 复杂状态 → &lt;strong&gt;Temporal on GKE&lt;/strong&gt;. 全部 BAA 覆盖, IAM + Audit Logs 原生. AWS 等价是 Cloud Tasks / SNS / Step Functions / Temporal — 概念 1:1 对应, 但 GCP 这套跟 Vertex AI / BigQuery 一个 IAM model 内, F500 客户喜欢.</div>
 </article>
 
 <article data-cat="设计" data-num="Q27" id="q27">
@@ -967,7 +967,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>分场景 (GCP-first):<br>**Real-time (&lt;1s):** 用 **BigQuery Federated Queries / BigQuery Omni** 跨源查 (原生连 Cloud SQL, AlloyDB, Postgres, 还能跨 AWS S3 + Azure). 或者 BigLake 把多源建成虚拟表. Agent 走单一 BigQuery 入口 SQL 跨 join. 比 Trino 优点: serverless 不维护集群, 跟 IAM / Vertex AI 一个权限模型. 缺点: SAP / Salesforce 这种 SaaS 还得先用 Datastream / Fivetran 同步进 BigQuery, 不是真 federated. latency p95 ~ 1-3s.<br>**Near real-time (5min):** 用 **Datastream** (Google 原生 CDC, 接 Postgres / MySQL / Oracle binlog) → BigQuery, 5min 内可见. SAP 用 SAP Datasphere connector 或 Fivetran HVR. Agent 查 BigQuery, p99 &lt; 100ms.<br>**Batch (daily):** Datastream / Fivetran daily sync → BigQuery. 最简单, $200-500/月.<br>选型推荐: customer service agent → BigQuery Federated; analytics agent → Datastream CDC; internal ops → batch.<br>**Source of truth:** 必须显式声明 — 客户基本信息 → Salesforce 是 SoT, SAP 是延迟副本; 订单金额 → SAP 是 SoT, SF 是 reflection。建一个 &#x27;master data dictionary&#x27; 文档 + 在 agent tool 描述里标 (e.g., `get_customer(...)` &#x27;returns from Salesforce — primary source for contact info&#x27;)。<br>**Agent tool wrapper:** 不让 agent 写 SQL (太自由 + 安全风险), 包装成几个 namedtool: `get_customer(id)` `search_orders(customer_id, date_range)` `get_invoice(order_id)`. 每个 tool 内部去 unified layer 查, 返回固定 schema。</blockquote>
+  <blockquote>分场景 (GCP-first):<br>**Real-time (&lt;1s):** 用 **BigQuery Federated Queries / BigQuery Omni** 跨源查 (原生连 Cloud SQL, AlloyDB, Postgres, 还能跨 GCS (Cloud Storage) + Azure). 或者 BigLake 把多源建成虚拟表. Agent 走单一 BigQuery 入口 SQL 跨 join. 比 Trino 优点: serverless 不维护集群, 跟 IAM / Vertex AI 一个权限模型. 缺点: SAP / Salesforce 这种 SaaS 还得先用 Datastream / Fivetran 同步进 BigQuery, 不是真 federated. latency p95 ~ 1-3s.<br>**Near real-time (5min):** 用 **Datastream** (Google 原生 CDC, 接 Postgres / MySQL / Oracle binlog) → BigQuery, 5min 内可见. SAP 用 SAP Datasphere connector 或 Fivetran HVR. Agent 查 BigQuery, p99 &lt; 100ms.<br>**Batch (daily):** Datastream / Fivetran daily sync → BigQuery. 最简单, $200-500/月.<br>选型推荐: customer service agent → BigQuery Federated; analytics agent → Datastream CDC; internal ops → batch.<br>**Source of truth:** 必须显式声明 — 客户基本信息 → Salesforce 是 SoT, SAP 是延迟副本; 订单金额 → SAP 是 SoT, SF 是 reflection。建一个 &#x27;master data dictionary&#x27; 文档 + 在 agent tool 描述里标 (e.g., `get_customer(...)` &#x27;returns from Salesforce — primary source for contact info&#x27;)。<br>**Agent tool wrapper:** 不让 agent 写 SQL (太自由 + 安全风险), 包装成几个 namedtool: `get_customer(id)` `search_orders(customer_id, date_range)` `get_invoice(order_id)`. 每个 tool 内部去 unified layer 查, 返回固定 schema。</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
@@ -1006,7 +1006,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
       <li><strong>Q: 如果 accuracy 不能让步?</strong><br>只能堆硬件: vLLM + speculative decode + tensor parallel + 自己跑模型 (groq / Cerebras 上 Llama 3 70B 能做到 inference &lt;100ms full quality)。或者 Anthropic / Google 的 &#x27;Fast&#x27; 版 API。</li>
-      <li><strong>Q: semantic cache 怎么做?</strong><br>query embedding (text-embedding-3-small, 5ms) → Qdrant top-1 (similarity &gt; 0.95 命中)。注意要 invalidate (knowledge update 后清 cache), 用 versioned key (cache_key = hash(query) + knowledge_version)。</li>
+      <li><strong>Q: semantic cache 怎么做?</strong><br>query embedding (text-embedding-3-small, 5ms) → Vertex AI Vector Search top-1 (similarity &gt; 0.95 命中)。注意要 invalidate (knowledge update 后清 cache), 用 versioned key (cache_key = hash(query) + knowledge_version)。</li>
       <li><strong>Q: streaming retrieval 实际效果?</strong><br>用户看到 first token 100ms, 但完整答案需要等 retrieval 完, total 还是 500-800ms。perceived latency 砍半但 actual 不变。客户大多接受 perceived。</li>
       <li><strong>Q: 如果是 conversational (多轮)?</strong><br>cache 用 conversation hash 不是 query hash, 同 conversation 中重复问 (用户复述) 命中率更高。每轮往前缓存上下文 (Anthropic prompt caching) 减少 prefill。</li>
   </ul>
@@ -1171,11 +1171,11 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>三阶段:<br>**Phase 1 (Month 1-3): Read-only 化合物查询 agent**<br>用户 — 化学家自然语言查 &#x27;所有 IC50 &lt; 10nM 的 EGFR inhibitor 在过去 5 年内部实验&#x27;。技术: SMILES + 实验结果存 ChEMBL-like schema, 向 unified DB 转 SQL (text-to-SQL agent, 用 Gemini Pro)。LLM 在客户 VPC (Bedrock in-VPC 或 Vertex AI customer-owned project)。所有 query log → 审计存证 7 年。<br>**Phase 2 (Month 4-9): 文献 RAG (PubMed + 内部文献)**<br>加文献 search — 内部研究文档 + PubMed dump, 跑 RAG (BM25 + dense + rerank)。Key: 内部文献绝不可 leak — embedding 用本地 model (BGE), 不发到任何 cloud LLM。LLM only see retrieved chunk + query, 不 see 全文。Citation 强制。<br>**Phase 3 (Month 10-18): 生成类 (草拟 ELN / 实验设计建议)**<br>生成性 use case 受 GxP 监管 — 任何 AI-generated 内容必须 (a) electronic signature (21 CFR Part 11); (b) human approval; (c) audit trail。Agent 输出标 &#x27;AI draft&#x27;, 化学家修改 + 签字 才入正式 ELN。<br>**贯穿三阶段 — IP &amp; 合规守门**:<br>(1) Data 永远在客户 infra, 用 Bedrock / Vertex AI customer project, LLM 不在 OpenAI / 公有 endpoint (除非签 BAA + zero retention);<br>(2) Audit log: 每次 LLM call 记 user / prompt / output / model_version, 永久保留;<br>(3) IP 防 leak: prompt 不能 include 化合物结构 raw, 用 hash 替代; output 检查是否含 patent-pending compound (regex / NER);<br>(4) Validation: GxP 系统要走 IQ/OQ/PQ (installation/operational/performance qualification), 6 周流程。</blockquote>
+  <blockquote>三阶段:<br>**Phase 1 (Month 1-3): Read-only 化合物查询 agent**<br>用户 — 化学家自然语言查 &#x27;所有 IC50 &lt; 10nM 的 EGFR inhibitor 在过去 5 年内部实验&#x27;。技术: SMILES + 实验结果存 ChEMBL-like schema, 向 unified DB 转 SQL (text-to-SQL agent, 用 Gemini Pro)。LLM 在客户 VPC (Vertex AI in-VPC 或 Vertex AI customer-owned project)。所有 query log → 审计存证 7 年。<br>**Phase 2 (Month 4-9): 文献 RAG (PubMed + 内部文献)**<br>加文献 search — 内部研究文档 + PubMed dump, 跑 RAG (BM25 + dense + rerank)。Key: 内部文献绝不可 leak — embedding 用本地 model (BGE), 不发到任何 cloud LLM。LLM only see retrieved chunk + query, 不 see 全文。Citation 强制。<br>**Phase 3 (Month 10-18): 生成类 (草拟 ELN / 实验设计建议)**<br>生成性 use case 受 GxP 监管 — 任何 AI-generated 内容必须 (a) electronic signature (21 CFR Part 11); (b) human approval; (c) audit trail。Agent 输出标 &#x27;AI draft&#x27;, 化学家修改 + 签字 才入正式 ELN。<br>**贯穿三阶段 — IP &amp; 合规守门**:<br>(1) Data 永远在客户 infra, 用 Vertex AI / Vertex AI customer project, LLM 不在 OpenAI / 公有 endpoint (除非签 BAA + zero retention);<br>(2) Audit log: 每次 LLM call 记 user / prompt / output / model_version, 永久保留;<br>(3) IP 防 leak: prompt 不能 include 化合物结构 raw, 用 hash 替代; output 检查是否含 patent-pending compound (regex / NER);<br>(4) Validation: GxP 系统要走 IQ/OQ/PQ (installation/operational/performance qualification), 6 周流程。</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
-      <li><strong>Q: 为啥不用 OpenAI?</strong><br>药企 IP 极敏感, OpenAI 即使 zero-retention policy 也不被法务接受。Bedrock / Vertex AI 在客户自己的 AWS / GCP account, model in-VPC, 数据不离 boundary, 法务签字概率高 10x。</li>
+      <li><strong>Q: 为啥不用 OpenAI?</strong><br>药企 IP 极敏感, OpenAI 即使 zero-retention policy 也不被法务接受。Vertex AI / Vertex AI 在客户自己的 AWS / GCP account, model in-VPC, 数据不离 boundary, 法务签字概率高 10x。</li>
       <li><strong>Q: 化合物 embedding 怎么做?</strong><br>两层: (a) molecular fingerprint (ECFP4 / MACCS) for substructure search; (b) 文本 embedding (BGE) for description / abstract search。query 时 hybrid。SMILES 字符串本身不适合直接 embed, 表达力差。</li>
       <li><strong>Q: GxP validation 太慢怎么办?</strong><br>Phase 1 (read-only) 不在 GxP 范围 (decision support, 不直接影响产品)。Phase 3 才入 GxP, 这时已经有 6+ 月数据证明系统稳定。GxP 流程不能 cut, 但能 parallelize (validation team 早介入)。</li>
       <li><strong>Q: 10 个化学家试用反馈差?</strong><br>Phase 1 试用版反馈 50% 是 &#x27;query 不理解我专业术语&#x27; (e.g., 化学家用 &#x27;klotho 通路&#x27; agent 不知道)。fix — 加 domain glossary RAG (内部已有 glossary doc), prompt 让 LLM 先 lookup 术语。fix 后接受率 80%+。</li>
@@ -1375,7 +1375,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>步骤:<br>**1. Schedule 30 min 跟安全 lead 直接谈** (不通过 sales / PM 代传):<br>开场 &#x27;Heard the credential request is blocked. Help me understand the specific concern — is it (a) credential might leak (b) we&#x27;d have too much access (c) no audit trail (d) contractual / compliance issue, or (e) something else?&#x27;<br><br>**2. 听他讲完, 不打断, 然后逐项 address**:<br>- &#x27;Leak risk&#x27; → 我们承诺 (a) credential 存 vault (HashiCorp / GCP Secret Manager / AWS Secrets Manager) (b) 不写代码 / 不发 Slack / 不存本地 (c) 自动 30 天 rotate (d) 任何 access 走 break-glass workflow 留 audit。<br>- &#x27;Too much access&#x27; → 提出 IAM role assumption 而非 long-lived credential — 我们的 service account 只能 assume scoped role (e.g., `read-only-on-table-X`), 不能 escalate; 每次 assume 限 1 小时。<br>- &#x27;No audit&#x27; → &#x27;Every credential use logs to your Cloud Audit Logs (or CloudTrail / SIEM) in your account. You see everything we touch in real-time, can revoke instantly.&#x27;<br>- &#x27;Contractual&#x27; → &#x27;Let me work with your legal and our legal to amend MSA section X with the new security controls&#x27; — 不绕过法务。<br><br>**3. Propose &#x27;least privilege + time-bound + audit-first&#x27; framework**:<br>&#x27;Instead of one production credential with full access, give us: (a) scoped IAM role (just the tables we need); (b) time-bound (rotate 30 days, expire 90 if not renewed); (c) audit-first (you set up Cloud Audit Logs / CloudTrail alert on any use, we acknowledge the alert before action); (d) break-glass for emergency (your security lead approves real-time via Slack workflow). Each layer reduces risk.&#x27;<br><br>**4. Write it down**: send a 1-page &#x27;Production Access Plan&#x27; 邮件抄 (security lead + my manager + customer&#x27;s exec sponsor)。把 commit 落地。<br><br>**5. Time-box**: &#x27;If we can&#x27;t get to a yes within 5 business days, I&#x27;ll escalate to your CISO and our VP for a joint conversation. I want to find the yes path, not block on bureaucracy.&#x27;<br><br>如果 5 天还卡住, 真正 escalate — 我 VP + customer CISO 同会议, 不绕过他但要 boss 在场。</blockquote>
+  <blockquote>步骤:<br>**1. Schedule 30 min 跟安全 lead 直接谈** (不通过 sales / PM 代传):<br>开场 &#x27;Heard the credential request is blocked. Help me understand the specific concern — is it (a) credential might leak (b) we&#x27;d have too much access (c) no audit trail (d) contractual / compliance issue, or (e) something else?&#x27;<br><br>**2. 听他讲完, 不打断, 然后逐项 address**:<br>- &#x27;Leak risk&#x27; → 我们承诺 (a) credential 存 vault (HashiCorp / GCP Secret Manager / AWS Secrets Manager) (b) 不写代码 / 不发 Slack / 不存本地 (c) 自动 30 天 rotate (d) 任何 access 走 break-glass workflow 留 audit。<br>- &#x27;Too much access&#x27; → 提出 IAM role assumption 而非 long-lived credential — 我们的 service account 只能 assume scoped role (e.g., `read-only-on-table-X`), 不能 escalate; 每次 assume 限 1 小时。<br>- &#x27;No audit&#x27; → &#x27;Every credential use logs to your Cloud Audit Logs (or Cloud Audit Logs / SIEM) in your account. You see everything we touch in real-time, can revoke instantly.&#x27;<br>- &#x27;Contractual&#x27; → &#x27;Let me work with your legal and our legal to amend MSA section X with the new security controls&#x27; — 不绕过法务。<br><br>**3. Propose &#x27;least privilege + time-bound + audit-first&#x27; framework**:<br>&#x27;Instead of one production credential with full access, give us: (a) scoped IAM role (just the tables we need); (b) time-bound (rotate 30 days, expire 90 if not renewed); (c) audit-first (you set up Cloud Audit Logs / Cloud Audit Logs alert on any use, we acknowledge the alert before action); (d) break-glass for emergency (your security lead approves real-time via Slack workflow). Each layer reduces risk.&#x27;<br><br>**4. Write it down**: send a 1-page &#x27;Production Access Plan&#x27; 邮件抄 (security lead + my manager + customer&#x27;s exec sponsor)。把 commit 落地。<br><br>**5. Time-box**: &#x27;If we can&#x27;t get to a yes within 5 business days, I&#x27;ll escalate to your CISO and our VP for a joint conversation. I want to find the yes path, not block on bureaucracy.&#x27;<br><br>如果 5 天还卡住, 真正 escalate — 我 VP + customer CISO 同会议, 不绕过他但要 boss 在场。</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>
@@ -1518,7 +1518,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
       <li><strong>Q: 所有 guardrail 都用 LLM 判别太贵?</strong><br>分层: cheap method 先 — regex / small classifier (5ms, $0.0001), 80% case kill 掉。剩 20% 用 LLM judge (Gemini Flash, $0.50/1M, ~50ms)。LLM 永远不用在 high-volume 第一层。</li>
       <li><strong>Q: Prompt injection 100% 防住吗?</strong><br>不可能。但能把 attack 成功率从 30% 降到 1% (industry data)。defense in depth — input filter + output check + behavior cap + audit。任意一层就够 stop 大部分。</li>
       <li><strong>Q: False positive 用户抱怨 &#x27;AI 拒绝我合理 query&#x27;?</strong><br>必有, 用 (a) 用户提交 &#x27;this was wrongly refused&#x27; feedback (b) 每周抽样 review 调阈值 (c) 给用户 channel escalate 人工。一定有 &#x27;no false positive&#x27; 是不可能的, 选 trade-off。</li>
-      <li><strong>Q: 合规要求 audit log 保多久?</strong><br>HIPAA 6+ 年, GDPR 7 年, SOX 7 年, 一般金融 10 年. GCP 用 GCS Bucket Lock (immutable) + lifecycle 到 Coldline / Archive 省钱; AWS 等价 S3 Object Lock + Glacier. 保留范围: input / output / guardrail trigger / user_id / timestamp / model_version.</li>
+      <li><strong>Q: 合规要求 audit log 保多久?</strong><br>HIPAA 6+ 年, GDPR 7 年, SOX 7 年, 一般金融 10 年. GCP 用 GCS Bucket Lock (immutable) + lifecycle 到 Coldline / Archive 省钱; AWS 等价 GCS Object Lock + Glacier. 保留范围: input / output / guardrail trigger / user_id / timestamp / model_version.</li>
   </ul>
 
   <h3><span class="step-n">5</span>加分料</h3>
@@ -1649,7 +1649,7 @@ article blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; paddin
   </ul>
 
   <h3><span class="step-n">3</span>MVP (能背的核心答)</h3>
-  <blockquote>**决策矩阵**:<br><br>| 维度 | 托管 (OpenAI/Anthropic/Gemini API) | 自托管 (Llama 3 / Mixtral on customer infra) |<br>|---|---|---|<br>| **数据 sovereignty** | data 走 API endpoint, 即使 zero-retention 法务仍担心 | data 全在客户 VPC, 完全 control |<br>| **Cost** | per-token, low volume 便宜 (&lt;1M tokens/month $20-100) | fixed GPU cost ($5-50K/月 H100), 高 volume 才摊得平 |<br>| **Quality** | frontier model (GPT-5.5, Opus 4.7, Gemini 3 Pro) — top tier | open weight 落后 frontier 6-12 月 (Llama 3.3 70B ~ GPT-4 水平) |<br>| **Latency** | API call + 网络, p99 ~1-3s | self-host 同 region, p99 200ms-1s (vLLM) |<br>| **Operational** | 0 运维, vendor 负责 SLA | 自建 GPU 集群 + vLLM + monitoring + oncall, 至少 2-3 FTE |<br>| **Compliance** | vendor BAA / DPA 覆盖, 简单 | 自己 own 全部 audit, 灵活但工作量 |<br>| **Lock-in** | model 切换需要 prompt 重调 + eval | 自由换 model, 但全栈 ownership |<br><br>**典型推荐**:<br><br>**Stick with 托管 (90% case)**:<br>- 数据 OK 走 API (有 BAA / zero retention 即可)<br>- Volume &lt; 100M token / 月 (~$1K-5K)<br>- 需要 frontier model 能力 (复杂 reasoning / 长 context)<br>- 团队没有 ML infra 专家<br><br>**自托管 if 4 个之一**:<br>- (a) **数据极敏感 + 法务死活不签 API** (军方, 部分医疗, 国家敏感)<br>- (b) **Volume 极大** — &gt; 1B token/月, Llama 3 70B self-host 比 GPT-5.5 API 便宜 5-10x (但前提是真的 1B+, 否则 break-even point 没到)<br>- (c) **Latency 必须 &lt; 200ms p99**, API 跨网络压不到<br>- (d) **不能受 vendor downtime 影响** — frontier vendor 偶尔 hours-level outage, 自托管能容灾<br><br>**Hybrid 推荐 (越来越常见)**:<br>- 简单分类 / 第一层 routing → 自托管小 model (Llama 3 8B, fine-tuned, 50ms)<br>- 复杂 reasoning / 长 context → 托管 frontier (Claude Opus 4.7 / Gemini 3 Pro)<br>- 这种 stack 80% 流量自托管 (便宜), 20% 走 API (质量), cost 节省 60%。<br><br>**2026 价格** (per 1M tokens, input/output):<br>- Gemini 3 Pro $2/$12, Gemini 3 Flash $0.50/$3<br>- Claude Opus 4.7 $5/$25, Claude Sonnet 4.6 $1.50/$7.5<br>- GPT-5.5 $5/$30<br>- 自托管 Llama 3 70B on **GCP A3 Mega (8×H100)**: ~$30/hour, throughput 4-8K tokens/s; 或 **TPU v5p** (Google 独有, 训练性价比 +30-50% over H100). AWS 等价 p5.48xlarge $10/hour. 都需要 24/7 utilization 才划算, 否则 idle 烧钱.</blockquote>
+  <blockquote>**决策矩阵**:<br><br>| 维度 | 托管 (OpenAI/Anthropic/Gemini API) | 自托管 (Llama 3 / Mixtral on customer infra) |<br>|---|---|---|<br>| **数据 sovereignty** | data 走 API endpoint, 即使 zero-retention 法务仍担心 | data 全在客户 VPC, 完全 control |<br>| **Cost** | per-token, low volume 便宜 (&lt;1M tokens/month $20-100) | fixed GPU cost ($5-50K/月 H100), 高 volume 才摊得平 |<br>| **Quality** | frontier model (GPT-5.5, Opus 4.7, Gemini 3 Pro) — top tier | open weight 落后 frontier 6-12 月 (Llama 3.3 70B ~ GPT-4 水平) |<br>| **Latency** | API call + 网络, p99 ~1-3s | self-host 同 region, p99 200ms-1s (vLLM) |<br>| **Operational** | 0 运维, vendor 负责 SLA | 自建 GPU 集群 + vLLM + monitoring + oncall, 至少 2-3 FTE |<br>| **Compliance** | vendor BAA / DPA 覆盖, 简单 | 自己 own 全部 audit, 灵活但工作量 |<br>| **Lock-in** | model 切换需要 prompt 重调 + eval | 自由换 model, 但全栈 ownership |<br><br>**典型推荐**:<br><br>**Stick with 托管 (90% case)**:<br>- 数据 OK 走 API (有 BAA / zero retention 即可)<br>- Volume &lt; 100M token / 月 (~$1K-5K)<br>- 需要 frontier model 能力 (复杂 reasoning / 长 context)<br>- 团队没有 ML infra 专家<br><br>**自托管 if 4 个之一**:<br>- (a) **数据极敏感 + 法务死活不签 API** (军方, 部分医疗, 国家敏感)<br>- (b) **Volume 极大** — &gt; 1B token/月, Llama 3 70B self-host 比 GPT-5.5 API 便宜 5-10x (但前提是真的 1B+, 否则 break-even point 没到)<br>- (c) **Latency 必须 &lt; 200ms p99**, API 跨网络压不到<br>- (d) **不能受 vendor downtime 影响** — frontier vendor 偶尔 hours-level outage, 自托管能容灾<br><br>**Hybrid 推荐 (越来越常见)**:<br>- 简单分类 / 第一层 routing → 自托管小 model (Llama 3 8B, fine-tuned, 50ms)<br>- 复杂 reasoning / 长 context → 托管 frontier (Claude Opus 4.7 / Gemini 3 Pro)<br>- 这种 stack 80% 流量自托管 (便宜), 20% 走 API (质量), cost 节省 60%。<br><br>**2026 价格** (per 1M tokens, input/output):<br>- Gemini 3 Pro $2/$12, Gemini 3 Flash $0.50/$3<br>- Claude Opus 4.7 $5/$25, Claude Sonnet 4.6 $1.50/$7.5<br>- GPT-5.5 $5/$30<br>- 自托管 Llama 3 70B on **GCP A3 Mega (8×H100)**: ~$30/hour, throughput 4-8K tokens/s; 或 **TPU v5p** (Google 独有, 训练性价比 +30-50% over H100). AWS 等价 A3 Mega VM (8×H100, GCP) $10/hour. 都需要 24/7 utilization 才划算, 否则 idle 烧钱.</blockquote>
 
   <h3><span class="step-n">4</span>Iter (被追问深挖)</h3>
   <ul>

@@ -278,7 +278,7 @@
 
 ```
 [CAD events stream]──┐
-                     ├─→ [Telemetry collector] ──→ [Postgres + S3]
+                     ├─→ [Telemetry collector] ──→ [Postgres + GCS]
 [Ambulance GPS]──────┘                                    │
                                                           ▼
                                               [Funnel Dashboard]

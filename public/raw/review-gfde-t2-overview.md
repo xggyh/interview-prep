@@ -19,7 +19,7 @@
 | 3 | 3-layer mental model | 5-9 min | **Knowledge boundary** (LLM cutoff 之后 + private = retrieval) / **Context boundary** (fits in 2M 也要 RAG — cost / latency / quality drop / 隔离) / **Trust boundary** (retrieved 是 untrusted, ground in retrieved + resist injection) | "RAG operates at 3 mental layers — knowledge, context, trust. Long-context doesn't kill any of them; let me walk through why." |
 | 4 | 7-step online pipeline | 9-20 min | Query understanding (rewrite + intent) → Retrieval routing (skip / SQL / dense / sparse / graph / tool) → Multi-source parallel retrieval → Rerank (RRF + cross-encoder + LLM-as-rerank) → Context assembly (token budget + Lost-in-middle 排序) → Generation with citations → Post-eval (faithfulness, thumbs) | "Now the online pipeline — 7 steps. Each step is a separate design choice and a separate FDE surface area. Let me trace one query through." |
 | 5 | 6 sub-topic map | 20-26 min | T2.1 Hybrid Search (dense+sparse+RRF+rerank) / T2.2 Chunking (per-doc-type strategy + late chunking) / T2.3 Context Window Mgmt (sliding/summarize/hierarchical/RAG-on-history) / T2.4 Tool Output→Prompt (XML wrap + provenance) / T2.5 Reranking (cross-encoder + cache) / T2.6 Long-context vs RAG (hybrid is winning) | "RAG splits into 6 sub-topics. Let me give you the 1-paragraph version of each so you can zoom in wherever interests you." |
-| 6 | Offline indexing pipeline | 26-32 min | Source ingest (crawler/DB/S3/Confluence) → Parse (PDF: LlamaParse, HTML: trafilatura) → Chunk (recursive/semantic/late) → Embed (text-embed-3 / voyage-3 / cohere-v4 / gemini-embed-1) → Index (Pinecone / OpenSearch BM25 / Neo4j graph). Refresh strategy: incremental + version control | "The online pipeline is half the story. Offline indexing is the other — let me walk through ingest → parse → chunk → embed → index and refresh strategy." |
+| 6 | Offline indexing pipeline | 26-32 min | Source ingest (crawler/DB/GCS/Confluence) → Parse (PDF: LlamaParse, HTML: trafilatura) → Chunk (recursive/semantic/late) → Embed (text-embed-3 / voyage-3 / cohere-v4 / gemini-embed-1) → Index (Vertex AI Vector Search / Vertex AI Vector Search BM25 / Neo4j graph). Refresh strategy: incremental + version control | "The online pipeline is half the story. Offline indexing is the other — let me walk through ingest → parse → chunk → embed → index and refresh strategy." |
 | 7 | 2026 hot trends | 32-40 min | (1) Late chunking (Jina v3 / Cohere v4) - embed full doc then chunk, 保 long-range context (2) GraphRAG for relation queries (3) LLM-as-rerank with Claude/Gemini scoring (4) Adaptive retrieval (LLM 决定要不要 retrieve) (5) Long-context + RAG hybrid (5K top-K → 200K window) (6) Multi-modal retrieval (image + text + table) | "Industry trends FDE 必懂 — let me hit 6: late chunking, GraphRAG, LLM-as-rerank, adaptive retrieval, long-context + RAG hybrid, multi-modal." |
 | 8 | Connect + resume hooks | 40-50 min | BNPL chatbot (RAG hybrid + intent routing, recall 60%→90%). ConvFinQA (multi-hop reasoning + ablation methodology, why GraphRAG helps). Voice agent RAG-on-history (用户上次问什么 retrieval-able) | "Resume hooks — BNPL chatbot hybrid search 60→90%, ConvFinQA multi-hop ablation, voice agent RAG-on-history. Let me close with one specific story." |
 
@@ -88,7 +88,7 @@ T2 全景题最容易死法是「上来讲 embedding 怎么算余弦」— 2022 
 - When: 任何 production retrieval (default)
 - Algorithm: Dense + BM25 并行 asyncio.gather → RRF k=60 → cross-encoder rerank top-50→10
 - Trade-off: +50-80ms latency, +8-12% recall
-- Tools: Qdrant + OpenSearch + bge-reranker-v2-m3
+- Tools: Vertex AI Vector Search + Vertex AI Vector Search + bge-reranker-v2-m3
 
 **Framework T2.2**: Chunking Decision
 - When: 文档接入 pipeline
@@ -241,8 +241,8 @@ Q: chunking strategy?
 
 | 类别 | Tool | 一句话 |
 |---|---|---|
-| Vector DB | Qdrant, Pinecone, Weaviate, Milvus, pgvector, FAISS | Qdrant 自部署首选, Pinecone SaaS |
-| Sparse / BM25 | OpenSearch, Elasticsearch, Vespa, Lucene | OpenSearch 开源默认 |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus, pgvector, FAISS | Vertex AI Vector Search 自部署首选, Vertex AI Vector Search SaaS |
+| Sparse / BM25 | Vertex AI Vector Search, Elasticsearch, Vespa, Lucene | Vertex AI Vector Search 开源默认 |
 | Embedding | gemini-embedding-001, text-embedding-3, bge-large, voyage-3 | Gemini 多语好, bge 自部署 |
 | Reranker | bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT | bge multilingual free 起步 |
 | PDF parse | LlamaParse, unstructured, pymupdf, Azure Doc Intelligence | LlamaParse 表格强 |
@@ -276,7 +276,7 @@ Embedding:
   text-embedding-3-large: $0.13 / 1M
   bge-large self-host: GPU $ amortized
 
-Vector DB (Pinecone serverless):
+Vector DB (Vertex AI Vector Search serverless):
   storage $0.33 / GB / month
   query $0.40 / 1M ops
 ```

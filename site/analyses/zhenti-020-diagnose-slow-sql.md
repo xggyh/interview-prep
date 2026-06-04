@@ -94,7 +94,7 @@
 |---|---|
 | **`PARTITION BY RANGE / LIST / HASH`** ⭐ | 分区策略: range (date), list (region), hash (customer_id). |
 | **Partition pruning** ⭐ | query 只扫相关 partition. WHERE 必带 partition key. |
-| **Hot vs cold partitions** | 近期 partition 放 SSD, 老 partition 放 HDD / S3. |
+| **Hot vs cold partitions** | 近期 partition 放 SSD, 老 partition 放 HDD / GCS. |
 | **`DROP TABLE old_partition`** | 删老 partition 是 O(1) — 删整文件, 比 `DELETE` 快百万倍. |
 
 ### 系统 / 配置
@@ -123,7 +123,7 @@
 | 术语 | 解释 |
 |---|---|
 | **MySQL `EXPLAIN FORMAT=JSON`** | MySQL 版 plan, 跟 PG 差不多概念. |
-| **Snowflake query profile** | UI 看 stage 时间分布; `Bytes Spilled to Remote Storage` 警示. |
+| **BigQuery query profile** | UI 看 stage 时间分布; `Bytes Spilled to Remote Storage` 警示. |
 | **BigQuery execution graph** | UI; `bytes_billed` 决定 $$. 无 index, 靠 partition + cluster columns. |
 | **ClickHouse** | 列存 OLAP, query 是 PG 100x. 不同的 mental model. |
 | **Trino / Presto** | 联邦 query engine. 跨数据源 SQL. |
@@ -718,11 +718,11 @@ A:
 4. **`CREATE INDEX CONCURRENTLY`** — online, no lock, customer 应该接受 (vs `CREATE INDEX` 阻塞 write)
 5. **Communication**: 解释 risk, ETA, 跟客户走 change management
 
-**Q5**: "Postgres 看完, 同样问题 MySQL / Snowflake / BigQuery 怎么看?"
+**Q5**: "Postgres 看完, 同样问题 MySQL / BigQuery / BigQuery 怎么看?"
 
 A:
 - **MySQL**: `EXPLAIN FORMAT=JSON`, `SHOW PROFILE`, `SHOW STATUS` for cache hits. Stats via `ANALYZE TABLE`. Composite index 列顺序同 PG.
-- **Snowflake**: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever
+- **BigQuery**: query profile UI; data spillage 看 "Bytes Spilled to Remote Storage"; cluster key (sort) 替代 index; warehouse size 主要 lever
 - **BigQuery**: execution graph in console; `bytes_billed` 决定 cost; partition pruning + cluster columns; no index (BQ doesn't index, sorts/scans)
 - **Trino / Presto**: EXPLAIN; partition pruning + bucketed tables
 

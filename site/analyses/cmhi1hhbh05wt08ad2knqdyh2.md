@@ -134,7 +134,7 @@ LSP（autocomplete / jump-to-def）：每 session 起一个 pyright / typescript
 ### 5. Session 持久化
 
 - 文档实时存 Redis（CRDT state + 文本 snapshot）
-- 每 10s 异步刷到 Postgres（备份）+ S3（长期归档）
+- 每 10s 异步刷到 Postgres（备份）+ GCS（长期归档）
 - Replay：保存所有 CRDT update 历史，可以回放打字过程（候选人面试录像）
 
 ### 6. 面试角色

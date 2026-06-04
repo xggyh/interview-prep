@@ -4,7 +4,7 @@
 
 ## 需求
 
-- 支持各种 source：SQL DB / NoSQL / S3 / HDFS / FTP
+- 支持各种 source：SQL DB / NoSQL / GCS / HDFS / FTP
 - TB-PB 规模
 - 增量 + full migration
 - 可验证（checksum / row count）
@@ -13,7 +13,7 @@
 ## 整体架构
 
 ```ascii
-   Source (on-prem DB / S3 / etc.)
+   Source (on-prem DB / GCS / etc.)
         │
         │ pull
         ▼
@@ -46,7 +46,7 @@
 
 每 source 一个 connector：
 - SQL DB：JDBC + offset pagination
-- S3：list objects + parallel download
+- GCS：list objects + parallel download
 - HDFS：DistCp-like
 - FTP / SFTP：streaming download
 

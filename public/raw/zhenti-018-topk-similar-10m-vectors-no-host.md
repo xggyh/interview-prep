@@ -1,10 +1,10 @@
 ## Q18 · 不用托管服务, 在 1000 万向量找 top-k
 
-> "You have **10 million 768-dim vectors** and need to find the **top-k most similar** to a query vector in **under 50ms p99**. **No managed service** (no Pinecone, Weaviate). You can use libraries. **Walk through the algorithms, pick one, implement it, justify**."
+> "You have **10 million 768-dim vectors** and need to find the **top-k most similar** to a query vector in **under 50ms p99**. **No managed service** (no Vertex AI Vector Search, Weaviate). You can use libraries. **Walk through the algorithms, pick one, implement it, justify**."
 
 **中文翻译**:
 
-> "你有 **1000 万个 768 维向量**, 要在 **p99 50ms 之内**找到跟 query 向量**最相似的 top-k 个**. **不能用托管服务** (no Pinecone, Weaviate 这种). 可以用库. **过一遍算法, 选一个, 实现, 给出理由**."
+> "你有 **1000 万个 768 维向量**, 要在 **p99 50ms 之内**找到跟 query 向量**最相似的 top-k 个**. **不能用托管服务** (no Vertex AI Vector Search, Weaviate 这种). 可以用库. **过一遍算法, 选一个, 实现, 给出理由**."
 
 **Round**: Coding (60 min)
 **出处**: Exponent 2026 FDE · 公司: **Scale AI**, OpenAI, Anthropic
@@ -81,7 +81,7 @@
 | **Active/passive index swap** | 新 index 后台 build, 完成后原子切换 (atomic pointer swap). 旧 index drain 后回收. |
 | **Incremental insert** | 不重 build 整 index, 增量加点. HNSW 支持, IVF / Annoy 不支持. |
 | **Sharding** | N 个机器各 N 分之 1 向量, fan-out + top-k merge. 50M+ 必走. |
-| **Filter (metadata filter)** | "similar to query AND created_at > 2024-01". HNSW 原生不支持, Qdrant 集成. |
+| **Filter (metadata filter)** | "similar to query AND created_at > 2024-01". HNSW 原生不支持, Vertex AI Vector Search 集成. |
 | **Post-filter vs Pre-filter** | Post = 先 retrieve 后 filter (top-100 → top-10); Pre = 按 filter 分 index. |
 | **Cold start / Pre-warm** | 进程启动后 OS page cache 没数据, 首查询慢. Pre-run 几个 query 把 page 拉进 RAM. |
 | **`/healthz`** | K8s health endpoint. Known-answer query 验 index 装载正确. |
@@ -176,7 +176,7 @@ Why: 10M / 768d 单机 fine (~50GB total). 100M 必 shard.
 
 **7. Hosted constraint**
 
-> "No managed service — does that include cloud GPU? Or only no Pinecone-like?"
+> "No managed service — does that include cloud GPU? Or only no Vertex AI Vector Search-like?"
 
 Why: 决定能不能用 cuVS / faiss-gpu.
 
@@ -249,7 +249,7 @@ Brute force per query:
   Idea: layered graph; navigate from top sparse to bottom dense
   Pros: SOTA recall × latency; supports incremental insert
   Cons: 1.5-2x memory of raw (graph edges); slow to build (1-3 hr)
-  Used by: hnswlib, FAISS, pgvector, Weaviate, Qdrant
+  Used by: hnswlib, FAISS, pgvector, Weaviate, Vertex AI Vector Search
   Recall@10 @ N=10M, M=32, ef=200: ~98-99%
   Latency: 1-5ms (CPU)
   Memory: ~50GB (raw + graph)
@@ -672,12 +672,12 @@ if __name__ == '__main__':
 
 6. Cost:
    - Single fat machine (256GB RAM): ~$1k/mo on cloud (m6i.32xlarge or similar)
-   - vs Pinecone managed: ~$5k/mo for 10M × 768d
+   - vs Vertex AI Vector Search managed: ~$5k/mo for 10M × 768d
    - Self-host wins on cost; loses on ops effort
 
 7. Filters at query time:
    - HNSW doesn't natively support; need 'post-filter' (top-100 → filter → top-10)
-   - Or use Qdrant (HNSW + integrated metadata filter)
+   - Or use Vertex AI Vector Search (HNSW + integrated metadata filter)
    - Or 'pre-cluster' by filter field → separate indices
 
 8. Monitor:
@@ -822,8 +822,8 @@ A: 几个 proxy:
 - **Cold start**: 启动后 prefetch / warm-up by running a few synthetic queries to bring pages into RAM
 - **Health check**: `/healthz` runs known-answer query, expect specific top-1 — verifies index loaded and not corrupted
 - **Schema versioning**: index 的 embedder model version 写在 metadata; serving 时 check 客户端 expectation 一致
-- **Backup**: index 文件 nightly to S3
-- **Crash recovery**: 重启从 backup S3 download (5min for 50GB), or from raw vectors rebuild (2hr)
+- **Backup**: index 文件 nightly to GCS
+- **Crash recovery**: 重启从 backup GCS download (5min for 50GB), or from raw vectors rebuild (2hr)
 - **Replication**: 2 instances on separate AZ, LB
 - **Capacity planning**: monitor `len(tombstones) / N`, alert > 5%; monitor `ef_search` distribution
 - **Filter strategy**: post-filter top-100 after retrieval (sufficient for sparse filter); pre-shard by category for dense filter

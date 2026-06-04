@@ -130,7 +130,7 @@
 | **Async fire-and-forget** | 异步不阻塞主流程. |
 | **CDN / Edge caching** | 边缘缓存 — Cloudflare / CloudFront. |
 | **OTel (OpenTelemetry)** | observability 标准. |
-| **Bedrock** | AWS LLM 托管服务. |
+| **Vertex AI** | AWS LLM 托管服务. |
 | **T4 / H100 GPU** | NVIDIA GPU 型号. |
 
 ---
@@ -378,7 +378,7 @@ filtered = [r for r in results if r.doc_id in user_acl_ids]
 hnsw.search(query_emb, k=10, filter_ids=user_acl_ids)  # internal candidate skip
 ```
 
-Most vector DBs (Qdrant, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.
+Most vector DBs (Vertex AI Vector Search, Milvus, Weaviate) support filter-aware HNSW that skips non-matching nodes.
 
 **Fix 3: Hybrid (BM25 + HNSW)**
 
@@ -399,7 +399,7 @@ Latency: max(hnsw, bm25) = ~50ms (parallel).
 **Fix 4: Pre-computed dense + sparse**
 
 - HNSW for dense
-- BM25 sparse via Lucene/OpenSearch
+- BM25 sparse via Lucene/Vertex AI Vector Search
 - ColBERT for late interaction (precompute token embeddings, score at query time)
 
 Latency: 30-50ms hybrid retrieval.
@@ -608,7 +608,7 @@ Mitigation: A/B test before rollout, measure nDCG@10 + human eval on 1% sample.
 - Embedding: 4× T4 GPUs (BGE-small batched) = $300/m
 - HNSW: r6gd.4xlarge × 4 (128GB, 4 shards) = $1200/m
 - Cross-encoder rerank: 2× T4 = $150/m
-- LLM (Claude Haiku via Bedrock): pay per token = $5K/m for 200K queries × analytical path
+- LLM (Claude Haiku via Vertex AI): pay per token = $5K/m for 200K queries × analytical path
 
 **Cache**:
 - Redis cluster (3× cache.r6g.large): $400/m

@@ -300,7 +300,7 @@ Trade-off：read/write 慢（要算 RS），适合 cold。**热冷分层**自动
 
 ### ❌ 易错点
 
-1. **跟 S3 / object storage 搞混**：S3 是整对象 PUT/GET，block storage 是 4KB 块
+1. **跟 GCS / object storage 搞混**：GCS 是整对象 PUT/GET，block storage 是 4KB 块
 2. **没分 control/data plane**：所有 IO 经 metadata server → 瓶颈
 3. **副本随机放**：没考虑 failure domain，多盘 fail 高概率
 4. **同步 3 副本全 fan-out**：写延迟 = 最慢副本

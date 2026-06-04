@@ -337,9 +337,9 @@ Total: ~5 分钟 + interviewer follow up. 严格不超过 6 分钟.
 
 ### 死路 2: 罗列 stack 不讲 decision
 
-**为什么挂**: "We used LangChain + Llama + vLLM + Pinecone" → 这是 stack 不是 architecture. Stack 任何人 list 得出, decision rationale 是 unique signal.
+**为什么挂**: "We used LangChain + Llama + vLLM + Vertex AI Vector Search" → 这是 stack 不是 architecture. Stack 任何人 list 得出, decision rationale 是 unique signal.
 
-**怎么改**: 每个组件讲 "我 considered X, Y, Z, 选 Y 因为 [trade-off]". 比如 "considered Pinecone vs Qdrant vs pgvector, 选 pgvector 因为我们 already use Postgres + scale fits + 1-team operational burden".
+**怎么改**: 每个组件讲 "我 considered X, Y, Z, 选 Y 因为 [trade-off]". 比如 "considered Vertex AI Vector Search vs Vertex AI Vector Search vs pgvector, 选 pgvector 因为我们 already use Postgres + scale fits + 1-team operational burden".
 
 ---
 

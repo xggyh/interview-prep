@@ -21,7 +21,7 @@
 | 5 | Reranker 深度 | 22-30 min | bi-encoder 召回快, cross-encoder 精排准 (cross-attention 看 query+doc 一起). bge-reranker-v2-m3 / Cohere rerank-3 / Voyage rerank-2 / Jina rerank. **Cache (query, doc) pair** 30-40% hit. LLM-as-rerank (Claude/Gemini 评 1-5 score) 是新 trend, 贵但准. Fine-tune on domain (legal/medical) 再 +3-5% | "Reranker is the precision booster. Cross-encoder reads query+doc jointly via cross-attention. Caching (query, doc) hashes saves 30-40%; LLM-as-rerank is the 2025 trend." |
 | 6 | Ablation methodology | 30-37 min | **关键: 每个 layer 的 recall 增量独立量化**. baseline 60%, +BM25 fusion +12-18% (→ 75%), +query rewrite +3-5% (→ 80%), +HyDE +2-4% (→ 84%), +cross-encoder +3-5% (→ 88%), +domain fine-tune +2-3% (→ 90%). Eval: recall@k, NDCG, MRR, slice eval (per query type) | "Now the methodology — I never deploy a layered system without per-layer ablation. Each layer must prove its recall delta independently. Here's the contribution breakdown." |
 | 7 | When hybrid DOESN'T help | 37-43 min | (1) Query 纯概念无 SKU → dense 已够 (BM25 噪音多反而拉低 precision) (2) 短 query 1-2 token → BM25 不稳 (3) Non-English low-resource → BM25 tokenizer 差 (4) 极小 corpus < 1K docs → 直接全 reranker 更简单. **Edge case**: dense + reranker 没 BM25 也可达 85%+ in pure concept domain | "Anti-pattern alert — hybrid isn't always net positive. Pure concept domains, very short queries, small corpus, low-resource languages all break the assumption." |
-| 8 | Connect + production hardening | 43-50 min | BNPL chatbot 60→90% 实战: pure dense 漏 BNPL-2024-IDR-late-fee-cap policy ID → 加 BM25 + ID prefix index 解决. Multi-tenant filter via Pinecone `tenant_id` namespace. Freshness decay `score *= exp(-age_days/30)`. Per-tenant eval slice (避免 head tenant 撑住 metric) | "Resume hook — BNPL chatbot 60→90% was this exact ablation. Let me share the policy-ID story and the per-tenant slice eval." |
+| 8 | Connect + production hardening | 43-50 min | BNPL chatbot 60→90% 实战: pure dense 漏 BNPL-2024-IDR-late-fee-cap policy ID → 加 BM25 + ID prefix index 解决. Multi-tenant filter via Vertex AI Vector Search `tenant_id` namespace. Freshness decay `score *= exp(-age_days/30)`. Per-tenant eval slice (避免 head tenant 撑住 metric) | "Resume hook — BNPL chatbot 60→90% was this exact ablation. Let me share the policy-ID story and the per-tenant slice eval." |
 
 ### 🎯 为啥按这个序
 
@@ -93,7 +93,7 @@
 - When: 始终
 - Algorithm: `await asyncio.gather(bm25_search(q), dense_search(embed(q)))`, top-100 each
 - Trade-off: 网络 ~5-15ms, 双索引存储
-- Tools: Qdrant + OpenSearch / Elasticsearch / Vespa
+- Tools: Vertex AI Vector Search + Vertex AI Vector Search / Elasticsearch / Vespa
 
 **Framework L3**: Fusion (3 法)
 - When: 始终 (after L2)
@@ -109,9 +109,9 @@
 
 **Framework L5**: Filter & Boost
 - When: 始终 (多租户必须)
-- Algorithm: retrieval-time filter (Qdrant query_filter), 非 post-rank
+- Algorithm: retrieval-time filter (Vertex AI Vector Search query_filter), 非 post-rank
 - Trade-off: filter 收缩候选集, 不影响 quality
-- Tools: Qdrant filter, OpenSearch term filter
+- Tools: Vertex AI Vector Search filter, Vertex AI Vector Search term filter
 
 ### 🌳 关键决策树 (ASCII)
 
@@ -141,7 +141,7 @@ Q: 哪种 query understanding?
 - BM25: Σ IDF(qi) · (tf(qi,d)(k1+1)) / (tf(qi,d) + k1(1-b+b·|d|/avgdl)), 默认 k1=1.2 b=0.75
 - 失败 case: dense miss "iPhone 15 Pro Max 256GB" (压缩到 cluster); BM25 miss "逾期=late payment" (词不重)
 - Top 3 gotchas: cosine 不归一化 / stopword 过 / 一刀切 chunk
-- Tools: bge-large-zh, OpenSearch 默认 BM25, Lucene
+- Tools: bge-large-zh, Vertex AI Vector Search 默认 BM25, Lucene
 
 **Problem 2: Fusion 策略 (RRF / Weighted / LTR)**
 - RRF: `score = Σ 1/(60+rank)`, 无 normalize, default
@@ -181,7 +181,7 @@ Q: 哪种 query understanding?
 1. Pure dense for SKU / 编号 → 必加 BM25
 2. Weighted fusion 没 min-max normalize → dense (0-1) 和 BM25 (0-∞) 不可比
 3. Reranker 跑 top-1000 → 50s latency 自爆
-4. Cross-tenant leak → retrieval-time filter (Qdrant query_filter) 强制
+4. Cross-tenant leak → retrieval-time filter (Vertex AI Vector Search query_filter) 强制
 5. Post-rank perms filter → top-k 被吃光, 返回空
 6. 凭 feel 调参 → 必有 eval set + CI regression
 7. 单 embedding model 通吃 code/legal/medical → 各自 specialized
@@ -202,7 +202,7 @@ Q: 哪种 query understanding?
 | Query Understanding | BNPL multi-lingual | Multi-query (6 lang) +5pp; pronoun resolution 助 multi-turn |
 | Reranker cascade | BNPL chatbot | bge-base → bge-large cascade, +60ms hide in stream |
 | Eval slice | BNPL slice metrics | acronym/SKU/long query 单独 weekly regress |
-| Multi-tenant filter | BNPL 7 markets | Qdrant query_filter per tenant_id, cross-tenant zero leak |
+| Multi-tenant filter | BNPL 7 markets | Vertex AI Vector Search query_filter per tenant_id, cross-tenant zero leak |
 | LTR | TikTok PayLater | Click data → XGBoost LambdaRank, +6pp NDCG |
 | HyDE | ConvFinQA | 财报问题 query 短 doc 长 → HyDE +3pp recall |
 | Specialized embed | BNPL code search | bge-large 通用 → CodeBERT 代码 search, +9pp |
@@ -242,8 +242,8 @@ Q: 哪种 query understanding?
 
 | 类别 | Tool | 一句话 |
 |---|---|---|
-| Vector DB | Qdrant, Pinecone, Weaviate, Milvus, FAISS, pgvector | Qdrant 性价比 ⭐ |
-| Sparse | OpenSearch, Elasticsearch, Vespa, Lucene | OpenSearch default |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus, FAISS, pgvector | Vertex AI Vector Search 性价比 ⭐ |
+| Sparse | Vertex AI Vector Search, Elasticsearch, Vespa, Lucene | Vertex AI Vector Search default |
 | Embedding | gemini-embedding-001, text-embedding-3-large, bge-large, voyage-3 | Gemini 多语 / bge 自部署 |
 | Reranker | bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank, JaColBERT | bge multilingual free |
 | Multi-vec | ColBERTv2, JaColBERT | Late interaction 中间路线 |

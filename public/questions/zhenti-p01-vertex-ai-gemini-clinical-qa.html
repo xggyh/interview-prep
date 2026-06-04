@@ -43,12 +43,12 @@
 <blockquote><p>"A regional hospital network uses <strong>Google Workspace</strong> and has <strong>20 million clinical notes in BigQuery</strong>. They want a <strong>'clinical Q&amp;A assistant' for doctors</strong> that can answer questions like 'What's this patient's medication history?' or 'Have any of my patients shown drug interactions with their current prescriptions?' with <strong>HIPAA compliance</strong>. You have <strong>Gemini 3 Pro, Vertex AI Search, and BigQuery</strong> available. Design the system. <strong>90-day MVP</strong>."</p></blockquote>
 <p><strong>中文翻译</strong>:</p>
 <blockquote><p>"一个区域性医疗集团已经在用 <strong>Google Workspace</strong>, 而且他们 <strong>2000 万份临床笔记</strong> 都已经躺在 <strong>BigQuery</strong> 里了. 他们想做一个 <strong>'临床 Q&amp;A 助手'</strong> 给医生用, 能回答类似 '这个病人的用药史是什么?' 或者 '我手上有没有哪些病人现有处方里出现了药物相互作用?' 这种问题, 必须 <strong>HIPAA 合规</strong>. 你手上能用的是 <strong>Gemini 3 Pro / Vertex AI Search / BigQuery</strong> 这套 Google 全家桶. 把这个系统设计出来. <strong>90 天 MVP</strong>."</p></blockquote>
-<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合) <strong>行业 / 约束</strong>: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX <strong>Distinguishing</strong>: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 <strong>Google primitives + 整合 + HIPAA</strong>, 标准 FDE "pick right Google product" 题. 不能再答 OpenSearch / pgvector — 客户要求 Google-native.</p>
+<p><strong>Round</strong>: System Design (60 min) <strong>出处</strong>: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合) <strong>行业 / 约束</strong>: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX <strong>Distinguishing</strong>: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 <strong>Google primitives + 整合 + HIPAA</strong>, 标准 FDE "pick right Google product" 题. 不能再答 Vertex AI Vector Search / pgvector — 客户要求 Google-native.</p>
 <hr />
 <h3>📖 术语速查 (本题用到的)</h3>
 <blockquote><p>这道题 4 类术语必须先过, 否则跟面试官来回讲 Vertex AI 和 grounding 都接不上.</p></blockquote>
 <h4>Google Cloud / Vertex AI 体系</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vertex AI</strong> ⭐</td><td>Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场.</td></tr><tr><td><strong>Vertex AI Search</strong> ⭐</td><td>Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. <strong>不需要你自己装 OpenSearch / pgvector</strong>. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高.</td></tr><tr><td><strong>Vertex AI Agent Builder</strong></td><td>上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage.</td></tr><tr><td><strong>Gemini 3 Pro</strong> ⭐</td><td>Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens.</td></tr><tr><td><strong>Gemini 3 Flash</strong> ⭐</td><td>轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro.</td></tr><tr><td><strong>Grounding</strong> ⭐</td><td>Gemini 的内置功能 — 让回答<strong>强制溯源</strong>到 Vertex AI Search 检索到的 docs, 自动加 citation. <strong>比 prompt-engineered citation 可靠</strong>, FDE 必提.</td></tr><tr><td><strong>Function calling</strong></td><td>Gemini 内置 tool use 协议. 这道题用于查 FHIR / BigQuery / Drug interaction API.</td></tr><tr><td><strong>BigQuery</strong> ⭐</td><td>Google 托管的 PB 级 columnar 数仓. 20M clinical notes 已经在这里 = 数据已经 ready. 关键: BigQuery 有 <strong>native HIPAA 合规承诺 + BAA</strong>.</td></tr><tr><td><strong>BigQuery ML</strong></td><td>在 BigQuery 内直接跑 SQL 训模型. 这题用于 medication history 聚合查询.</td></tr><tr><td><strong>Document AI</strong></td><td>Google 的 OCR / 文档解析服务. 如果 clinical notes 里有 scan 件 (~20%) 必用.</td></tr><tr><td><strong>Cloud DLP (Data Loss Prevention)</strong> ⭐</td><td>Google 的 PHI/PII 检测 + 脱敏服务. <strong>2026 已经 HIPAA-aligned</strong>, 替代 Presidio. 内置 medical infoTypes (US_HEALTHCARE_NPI, US_MEDICAL_RECORD_NUMBER, US_DEA_NUMBER 等).</td></tr><tr><td><strong>Cloud KMS / Cloud HSM</strong></td><td>Google KMS = AWS KMS 对应物. CMEK = Customer-Managed Encryption Key. 医疗强制 CMEK.</td></tr><tr><td><strong>VPC-SC (VPC Service Controls)</strong> ⭐</td><td>Google 特有 — 在 GCP API 周围画 perimeter, 防止 data exfiltration. 比 VPC endpoint 更高一层. HIPAA 部署必开.</td></tr><tr><td><strong>Cloud Audit Logs</strong> ⭐</td><td>Admin Activity + Data Access + System Event 三类自动日志. <strong>Data Access logs 必须显式开</strong> (默认关), 这是 HIPAA audit 命门.</td></tr><tr><td><strong>Workspace (Gmail/Calendar/Drive/Docs)</strong></td><td>这家医院已经在用 = doctor 入口是 Gmail/Docs 侧栏, 不是新 web app.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Vertex AI</strong> ⭐</td><td>Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场.</td></tr><tr><td><strong>Vertex AI Search</strong> ⭐</td><td>Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. <strong>不需要你自己装 Vertex AI Vector Search / pgvector</strong>. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高.</td></tr><tr><td><strong>Vertex AI Agent Builder</strong></td><td>上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage.</td></tr><tr><td><strong>Gemini 3 Pro</strong> ⭐</td><td>Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens.</td></tr><tr><td><strong>Gemini 3 Flash</strong> ⭐</td><td>轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro.</td></tr><tr><td><strong>Grounding</strong> ⭐</td><td>Gemini 的内置功能 — 让回答<strong>强制溯源</strong>到 Vertex AI Search 检索到的 docs, 自动加 citation. <strong>比 prompt-engineered citation 可靠</strong>, FDE 必提.</td></tr><tr><td><strong>Function calling</strong></td><td>Gemini 内置 tool use 协议. 这道题用于查 FHIR / BigQuery / Drug interaction API.</td></tr><tr><td><strong>BigQuery</strong> ⭐</td><td>Google 托管的 PB 级 columnar 数仓. 20M clinical notes 已经在这里 = 数据已经 ready. 关键: BigQuery 有 <strong>native HIPAA 合规承诺 + BAA</strong>.</td></tr><tr><td><strong>BigQuery ML</strong></td><td>在 BigQuery 内直接跑 SQL 训模型. 这题用于 medication history 聚合查询.</td></tr><tr><td><strong>Document AI</strong></td><td>Google 的 OCR / 文档解析服务. 如果 clinical notes 里有 scan 件 (~20%) 必用.</td></tr><tr><td><strong>Cloud DLP (Data Loss Prevention)</strong> ⭐</td><td>Google 的 PHI/PII 检测 + 脱敏服务. <strong>2026 已经 HIPAA-aligned</strong>, 替代 Presidio. 内置 medical infoTypes (US_HEALTHCARE_NPI, US_MEDICAL_RECORD_NUMBER, US_DEA_NUMBER 等).</td></tr><tr><td><strong>Cloud KMS / Cloud HSM</strong></td><td>Google KMS = AWS KMS 对应物. CMEK = Customer-Managed Encryption Key. 医疗强制 CMEK.</td></tr><tr><td><strong>VPC-SC (VPC Service Controls)</strong> ⭐</td><td>Google 特有 — 在 GCP API 周围画 perimeter, 防止 data exfiltration. 比 VPC endpoint 更高一层. HIPAA 部署必开.</td></tr><tr><td><strong>Cloud Audit Logs</strong> ⭐</td><td>Admin Activity + Data Access + System Event 三类自动日志. <strong>Data Access logs 必须显式开</strong> (默认关), 这是 HIPAA audit 命门.</td></tr><tr><td><strong>Workspace (Gmail/Calendar/Drive/Docs)</strong></td><td>这家医院已经在用 = doctor 入口是 Gmail/Docs 侧栏, 不是新 web app.</td></tr></tbody></table></div>
 <h4>HIPAA / 临床领域</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>HIPAA</strong></td><td>Health Insurance Portability and Accountability Act. 违反 = OCR 罚款 + 客户走人.</td></tr><tr><td><strong>PHI</strong> ⭐</td><td>Protected Health Information. 18 类直接标识符 (name, MRN, SSN, DOB, address...). 准标识符组合 (rare diagnosis + zip + DOB) 也算.</td></tr><tr><td><strong>BAA</strong> ⭐</td><td>Business Associate Agreement. <strong>Google Cloud 已经默认提供 BAA</strong> 给 covered service (BigQuery, Vertex AI, GCS, KMS). 但 Workspace 默认 BAA 范围有限制, 需要 Workspace Enterprise + HIPAA addendum.</td></tr><tr><td><strong>HIPAA Safe Harbor de-identification</strong> ⭐</td><td>HIPAA 提供的去识别方法 — 移除 18 类标识符 → 数据可以"非 PHI" 化使用. 这题用于 cross-patient 分析的合规通道.</td></tr><tr><td><strong>EHR / EMR</strong></td><td>Electronic Health Record. Epic 是市占率最高的 (~40% 大医院). 决定数据怎么进 BigQuery.</td></tr><tr><td><strong>FHIR (R4)</strong></td><td>现代医疗数据标准 (JSON / RESTful). Google Cloud 有 <strong>Cloud Healthcare API</strong> 原生支持 FHIR store.</td></tr><tr><td><strong>Cloud Healthcare API</strong> ⭐</td><td>Google 的 FHIR / HL7v2 / DICOM 托管存储 + 转换服务. 这道题可直接当 EHR-to-BigQuery 中间层.</td></tr><tr><td><strong>Clinical note</strong></td><td>医生写的自由文本笔记 (SOAP 格式: Subjective / Objective / Assessment / Plan). 20M = ~5 年医生输出量 (一家 5K-doctor 网络).</td></tr><tr><td><strong>ICD-10 / SNOMED CT</strong></td><td>国际疾病分类 / 临床术语本体. retrieval 必用 keyword.</td></tr><tr><td><strong>Drug interaction</strong> ⭐</td><td>药物相互作用. 临床痛点 — 一个病人 5 个 specialist 各开 1 个药, 互相冲突. 这是题目特意点出的 "cross-patient + cross-note" 复杂 query.</td></tr><tr><td><strong>Doctor-in-the-loop</strong></td><td>医生在回路 — AI 给建议但医生确认, 不是 autonomous decision. 临床 AI 标配, 避免 FDA Class II medical device 监管.</td></tr><tr><td><strong>Hallucination (medical)</strong></td><td>LLM 幻觉在医疗 = patient harm. citation 必须 token-span 级别可溯源.</td></tr><tr><td><strong>k-anonymity</strong></td><td>去识别度量 — 准标识符组合在数据集中至少 k 个相似. k&lt;5 = 仍可识别.</td></tr></tbody></table></div>
 <h4>LLM / RAG / Grounding</h4>
@@ -60,7 +60,7 @@
 <p><strong>不是</strong>: 考你能不能 design 一个 RAG.</p>
 <p><strong>是</strong>: 考你能不能 <strong>(a) 选对 Google primitives</strong> (b) <strong>整合 BigQuery + Vertex AI Search + Gemini grounding + Workspace</strong> (c) <strong>在 HIPAA 红线下面做 90-day MVP</strong>.</p>
 <p>4 个 signal:</p>
-<ol><li><strong>Don't re-invent what Vertex AI Search already does</strong> (不要重复造轮子) — 90% 候选人答 "我自己装 OpenSearch + 自训 embedding". 错. Google FDE 面试 = 用 <strong>Vertex AI Search managed retrieval</strong>. 自己装 = 显示你不懂 Google ecosystem.</li></ol>
+<ol><li><strong>Don't re-invent what Vertex AI Search already does</strong> (不要重复造轮子) — 90% 候选人答 "我自己装 Vertex AI Vector Search + 自训 embedding". 错. Google FDE 面试 = 用 <strong>Vertex AI Search managed retrieval</strong>. 自己装 = 显示你不懂 Google ecosystem.</li></ol>
 <ol><li><strong>Grounding ≠ prompt-engineered citation</strong> (Gemini grounding 是 native API feature) — 这是 Google 跟 OpenAI/Anthropic 最大的差异化能力. 必须提到 grounding API + grounding confidence score. 否则你"不像懂 Gemini".</li></ol>
 <ol><li><strong>Workspace integration is the UX win</strong> (Workspace 整合是 UX 的关键加分) — doctor 已经在 Gmail / Docs 里. 不要再做一个 web app, 做 Workspace Add-on. 这是 "FDE 理解 customer ecosystem" 的标志.</li></ol>
 <ol><li><strong>HIPAA in Google Cloud has different controls than AWS</strong> (HIPAA 在 GCP 上是不同的控件) — 不能 copy/paste AWS HIPAA 答案. Google 特有: VPC-SC perimeter, Cloud DLP, Cloud Healthcare API, BigQuery column-level security, Org Policy constraints. 提这些 = signal "我真的用过 GCP".</li></ol>
@@ -327,7 +327,7 @@ import_documents_request = ImportDocumentsRequest(
 )</code></pre>
 <p><strong>Vertex AI Search handles everything</strong>:</p>
 <ul><li>Auto-embedding (text-embedding-005, internal to Google, never leaves VPC-SC)</li><li>Auto-indexing (dense + sparse hybrid)</li><li>Auto-reranking (semantic ranker)</li><li>ACL via <code>structData</code> filters at query time</li></ul>
-<p><strong>Why this is the "FDE answer"</strong>: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting OpenSearch = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.</p>
+<p><strong>Why this is the "FDE answer"</strong>: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting Vertex AI Vector Search = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.</p>
 <p><strong>Throughput</strong>:</p>
 <ul><li>Backfill 60M chunks: Discovery Engine bulk import handles ~10K docs/sec → 60M / 10K = 6000s = ~2 hours per dept (cardiology subset ~3M chunks = 5 min)</li><li>Delta: hourly CDC from Cloud Healthcare API → 100-500 new chunks/hour → streaming insert</li></ul>
 <h4>Phase 5: Query path deep dive (10 min)</h4>
@@ -517,8 +517,8 @@ ORDER BY
 <p><strong>The push back</strong>:</p>
 <blockquote><p>"If you insist on full 20M + all 4 intents in 90 days: I'm going to <strong>honestly tell you we'll fail the JCAHO visit</strong>. We'll either ship a broken cross-patient query that hallucinates drug interactions (worse than nothing — patient harm), or we'll ship a feature that no doctor uses because Workspace Add-on UX is unfinished. <strong>Phase 1 (1 dept, single-patient, Workspace Add-on, audit-ready) is a real product on day 90, and Phase 2-3 follow with high confidence</strong>."</p></blockquote>
 <h4>Phase 9: Trade-offs + close (6 min)</h4>
-<p><strong>Decision 9.1 — Vertex AI Search vs self-host OpenSearch / Vespa</strong>:</p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Vertex AI Search</th><th>Self-host OpenSearch on GKE</th></tr></thead><tbody><tr><td>Build time (MVP)</td><td>1-2 weeks</td><td>4-6 weeks</td></tr><tr><td>HIPAA BAA</td><td>Yes (Google native)</td><td>Need to add to BAA chain</td></tr><tr><td>Hybrid search</td><td>Built-in</td><td>Need to configure</td></tr><tr><td>Reranking</td><td>Built-in semantic ranker</td><td>Need separate cross-encoder service</td></tr><tr><td>Grounding compatibility</td><td>Native with Gemini</td><td>Wrap manually</td></tr><tr><td>Cost (20M chunks)</td><td>~$2K/month</td><td>~$3K/month (compute) + ops</td></tr><tr><td>Customization</td><td>Limited (Google opinion)</td><td>Full</td></tr><tr><td>Operational</td><td>Zero</td><td>Team of 2-3</td></tr></tbody></table></div>
+<p><strong>Decision 9.1 — Vertex AI Search vs self-host Vertex AI Vector Search / Vespa</strong>:</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>维度</th><th>Vertex AI Search</th><th>Self-host Vertex AI Vector Search on GKE</th></tr></thead><tbody><tr><td>Build time (MVP)</td><td>1-2 weeks</td><td>4-6 weeks</td></tr><tr><td>HIPAA BAA</td><td>Yes (Google native)</td><td>Need to add to BAA chain</td></tr><tr><td>Hybrid search</td><td>Built-in</td><td>Need to configure</td></tr><tr><td>Reranking</td><td>Built-in semantic ranker</td><td>Need separate cross-encoder service</td></tr><tr><td>Grounding compatibility</td><td>Native with Gemini</td><td>Wrap manually</td></tr><tr><td>Cost (20M chunks)</td><td>~$2K/month</td><td>~$3K/month (compute) + ops</td></tr><tr><td>Customization</td><td>Limited (Google opinion)</td><td>Full</td></tr><tr><td>Operational</td><td>Zero</td><td>Team of 2-3</td></tr></tbody></table></div>
 <p><strong>My choice</strong>: <strong>Vertex AI Search</strong>. The customization limit (e.g. can't fine-tune ranker) is a real cost, but 90-day MVP needs speed. Phase 4+ we can evaluate Vespa if ranking quality plateaus.</p>
 <p><strong>Decision 9.2 — Gemini 3 Pro vs Gemini 3 Flash routing</strong>:</p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Intent</th><th>Model</th><th>Reason</th></tr></thead><tbody><tr><td>Intent classification</td><td>Flash</td><td>Simple, cheap, 6× lower cost</td></tr><tr><td>Single-patient narrative Q&amp;A</td><td>Pro</td><td>Quality matters, citation matters</td></tr><tr><td>Document summarization</td><td>Flash</td><td>Easier task, 4× cheaper</td></tr><tr><td>Cross-patient analytics summary</td><td>Pro</td><td>Complex reasoning over SQL result</td></tr><tr><td>Drug interaction explanation</td><td>Pro</td><td>Clinical reasoning, safety critical</td></tr></tbody></table></div>
@@ -606,7 +606,7 @@ ORDER BY
 <p>我会在 90-day MVP <strong>必须 instrument 5+ leading metrics</strong> in week 1, 才能在 day 90 retrospective 给 CMIO / Board 真实 ROI 数字."</p></blockquote>
 <hr />
 <h3>❌ 死路答法 (top 7)</h3>
-<ol><li><strong>冲 "I'd use OpenAI embeddings + Pinecone"</strong> — 直接挂. 不是 Google native, 不在客户 BAA.</li><li><strong>不用 Vertex AI Search, 自己装 OpenSearch on GKE</strong> — 重复造轮子, 90 天做不完.</li><li><strong>Citation 用 prompt "Always cite sources"</strong> — 不用 Gemini grounding API = 暴露不懂 Gemini.</li><li><strong>PHI redaction 用自托管 Presidio</strong> — 不加分, 应该用 Cloud DLP.</li><li><strong>接受 90 天做 20M + 全部 intent</strong> — 不 push back = 失败.</li><li><strong>建独立 web app</strong> — 客户已在 Workspace, 必须 Workspace Add-on.</li><li><strong>把 drug interaction 当 RAG 答</strong> — 应该 BigQuery SQL + drug interaction matrix.</li></ol>
+<ol><li><strong>冲 "I'd use OpenAI embeddings + Vertex AI Vector Search"</strong> — 直接挂. 不是 Google native, 不在客户 BAA.</li><li><strong>不用 Vertex AI Search, 自己装 Vertex AI Vector Search on GKE</strong> — 重复造轮子, 90 天做不完.</li><li><strong>Citation 用 prompt "Always cite sources"</strong> — 不用 Gemini grounding API = 暴露不懂 Gemini.</li><li><strong>PHI redaction 用自托管 Presidio</strong> — 不加分, 应该用 Cloud DLP.</li><li><strong>接受 90 天做 20M + 全部 intent</strong> — 不 push back = 失败.</li><li><strong>建独立 web app</strong> — 客户已在 Workspace, 必须 Workspace Add-on.</li><li><strong>把 drug interaction 当 RAG 答</strong> — 应该 BigQuery SQL + drug interaction matrix.</li></ol>
 <hr />
 <h3>✅ 加分项 (top 10)</h3>
 <ol><li><strong>第一句话提 Vertex AI Search + Gemini grounding</strong> — signal "我懂 Google 差异化"</li><li><strong>Cloud DLP with medical infoTypes</strong> — 不是 self-host Presidio</li><li><strong>VPC-SC perimeter</strong> — Google 特有, 比 AWS VPC endpoint 高一层</li><li><strong>Data Access audit logs 必须显式开</strong> — 显示真用过 GCP HIPAA</li><li><strong>Workspace Add-on as primary UX</strong> — 整合客户 ecosystem</li><li><strong>结构化 vs 非结构化分开</strong> (drug interaction = SQL, history = RAG)</li><li><strong>Gemini Pro/Flash 路由 by intent</strong> — cost optimization 思维</li><li><strong>G·O·O·D-F·T 10-question clarify</strong> + 强 push back 90 days</li><li><strong>Cloud Healthcare API as EHR bridge</strong> — Google 原生 FHIR, 不要再自己搭</li><li><strong>Audit 3 层 (Cloud Audit + app + UI events)</strong> + 6-10 yr retention</li></ol>
@@ -648,7 +648,7 @@ G·O·O·D-F·T Clarify 10 Q:
 
 死路:
   - OpenAI embeddings (PHI leak)
-  - Self-host OpenSearch (重复造)
+  - Self-host Vertex AI Vector Search (重复造)
   - Prompt citation (不用 grounding)
   - Self-host Presidio (不用 DLP)
   - 接 90 天 20M (不 push back)
@@ -715,7 +715,7 @@ Key phrases:
 **Round**: System Design (60 min)
 **出处**: 🔮 预测题 — 针对 Google FDE 主场 (Vertex AI / Gemini grounding / BigQuery / Workspace 整合)
 **行业 / 约束**: Healthcare provider · HIPAA · BAA · PHI · Google Cloud-native · 20M docs · in-Workspace UX
-**Distinguishing**: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 **Google primitives + 整合 + HIPAA**, 标准 FDE "pick right Google product" 题. 不能再答 OpenSearch / pgvector — 客户要求 Google-native.
+**Distinguishing**: Q21 是 generic HIPAA RAG (AWS / 自选 stack). 这道题考的是 **Google primitives + 整合 + HIPAA**, 标准 FDE "pick right Google product" 题. 不能再答 Vertex AI Vector Search / pgvector — 客户要求 Google-native.
 
 ---
 
@@ -728,7 +728,7 @@ Key phrases:
 | 术语 | 解释 |
 |---|---|
 | **Vertex AI** ⭐ | Google Cloud 的 ML / GenAI 总平台. 涵盖 model garden, training, prediction, agent builder, search, evaluation. FDE 主战场. |
-| **Vertex AI Search** ⭐ | Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. **不需要你自己装 OpenSearch / pgvector**. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高. |
+| **Vertex AI Search** ⭐ | Google 托管的企业级 RAG / 搜索服务. 自动做 chunking + embedding + retrieval + reranking + grounding. **不需要你自己装 Vertex AI Vector Search / pgvector**. 关键卖点: hospital legal 团队对 Google BAA 接受度比第三方 vector DB 高. |
 | **Vertex AI Agent Builder** | 上一层, 把 Search 包成 conversational agent (含 tool calling). 给 FDE 项目 90 天上线 leverage. |
 | **Gemini 3 Pro** ⭐ | Google 2026 旗舰多模态 LLM. 2M token 上下文, native grounding 支持. $2/$12 per 1M tokens. |
 | **Gemini 3 Flash** ⭐ | 轻量版, $0.50/$3 per 1M. 适合 chunking / classification / 简单 QA. 70% 临床 query 用 Flash 即可, 复杂 cross-patient 用 Pro. |
@@ -798,7 +798,7 @@ Key phrases:
 
 4 个 signal:
 
-1. **Don't re-invent what Vertex AI Search already does** (不要重复造轮子) — 90% 候选人答 "我自己装 OpenSearch + 自训 embedding". 错. Google FDE 面试 = 用 **Vertex AI Search managed retrieval**. 自己装 = 显示你不懂 Google ecosystem.
+1. **Don't re-invent what Vertex AI Search already does** (不要重复造轮子) — 90% 候选人答 "我自己装 Vertex AI Vector Search + 自训 embedding". 错. Google FDE 面试 = 用 **Vertex AI Search managed retrieval**. 自己装 = 显示你不懂 Google ecosystem.
 
 2. **Grounding ≠ prompt-engineered citation** (Gemini grounding 是 native API feature) — 这是 Google 跟 OpenAI/Anthropic 最大的差异化能力. 必须提到 grounding API + grounding confidence score. 否则你"不像懂 Gemini".
 
@@ -1210,7 +1210,7 @@ import_documents_request = ImportDocumentsRequest(
 - Auto-reranking (semantic ranker)
 - ACL via `structData` filters at query time
 
-**Why this is the "FDE answer"**: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting OpenSearch = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.
+**Why this is the "FDE answer"**: in 1 service call, I get embedding + indexing + retrieval + reranking + grounding-compatible output. Self-hosting Vertex AI Vector Search = 4 services + 6 weeks integration. Vertex AI Search = 1 service + 1 week.
 
 **Throughput**:
 - Backfill 60M chunks: Discovery Engine bulk import handles ~10K docs/sec → 60M / 10K = 6000s = ~2 hours per dept (cardiology subset ~3M chunks = 5 min)
@@ -1505,9 +1505,9 @@ ORDER BY
 
 ### Phase 9: Trade-offs + close (6 min)
 
-**Decision 9.1 — Vertex AI Search vs self-host OpenSearch / Vespa**:
+**Decision 9.1 — Vertex AI Search vs self-host Vertex AI Vector Search / Vespa**:
 
-| 维度 | Vertex AI Search | Self-host OpenSearch on GKE |
+| 维度 | Vertex AI Search | Self-host Vertex AI Vector Search on GKE |
 |---|---|---|
 | Build time (MVP) | 1-2 weeks | 4-6 weeks |
 | HIPAA BAA | Yes (Google native) | Need to add to BAA chain |
@@ -1713,8 +1713,8 @@ I chose **1 dept full-stack** over **all depts thin slice** because:
 
 ## ❌ 死路答法 (top 7)
 
-1. **冲 "I'd use OpenAI embeddings + Pinecone"** — 直接挂. 不是 Google native, 不在客户 BAA.
-2. **不用 Vertex AI Search, 自己装 OpenSearch on GKE** — 重复造轮子, 90 天做不完.
+1. **冲 "I'd use OpenAI embeddings + Vertex AI Vector Search"** — 直接挂. 不是 Google native, 不在客户 BAA.
+2. **不用 Vertex AI Search, 自己装 Vertex AI Vector Search on GKE** — 重复造轮子, 90 天做不完.
 3. **Citation 用 prompt "Always cite sources"** — 不用 Gemini grounding API = 暴露不懂 Gemini.
 4. **PHI redaction 用自托管 Presidio** — 不加分, 应该用 Cloud DLP.
 5. **接受 90 天做 20M + 全部 intent** — 不 push back = 失败.
@@ -1781,7 +1781,7 @@ G·O·O·D-F·T Clarify 10 Q:
 
 死路:
   - OpenAI embeddings (PHI leak)
-  - Self-host OpenSearch (重复造)
+  - Self-host Vertex AI Vector Search (重复造)
   - Prompt citation (不用 grounding)
   - Self-host Presidio (不用 DLP)
   - 接 90 天 20M (不 push back)

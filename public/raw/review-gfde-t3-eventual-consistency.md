@@ -390,8 +390,8 @@ Stack:
 | Event bus | Kafka | NATS, RabbitMQ | Kafka |
 | Idempotency cache | Redis SETNX | Memcached | Redis |
 | Vendor idem | Stripe / PayPal honor header | — | Stripe |
-| DLQ | Kafka DLQ topic | SQS DLQ | Kafka |
-| Audit log | Postgres append-only + S3 | DynamoDB | Postgres + S3 |
+| DLQ | Kafka DLQ topic | Cloud Tasks DLQ | Kafka |
+| Audit log | Postgres append-only + GCS | Firestore / Bigtable | Postgres + GCS |
 | Ops UI | Custom React + Temporal Web | Retool | Custom |
 | Replay | Temporal replay debugger | custom | Temporal |
 | Saga orchestrator | Temporal SAGA | custom state machine | Temporal |

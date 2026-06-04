@@ -19,7 +19,7 @@
 | 3 | D·K·D·M·P timeline | 4-5 min | Week 0 Discovery (5 stakeholder: Exec/End user/IT/Legal/Adjacent) → Week 0-1 KPI lock (baseline + target + anti-goals) → Week 1 Decomposition → Week 1-3 MVP vertical slice → Week 4-12 Pilot 10→50→200 user | "I drive delivery on a D·K·D·M·P cadence. Week 0…" |
 | 4 | Workflow tiering | 3 min | 3-question per step (Det? Rev? Latency?) → 5 outcomes (agent_auto / agent_with_confirm / agent_with_review / human_with_assist) — BNPL chatbot 60%/25%/15% 是我的活样本 | "Once KPI is locked, I tier every workflow step via 3 questions…" |
 | 5 | 4 human-agent pattern | 2 min | A confidence threshold (<0.7 escalate) + B confirm-required (destructive) + C scheduled review (Mon 50 random) + D /handoff — Indonesia refund tier 4 个 pattern 全部 in production | "In production I run 4 human-agent patterns coexisting…" |
-| 6 | 4-layer safety | 2 min | L1 IAM OBO (RFC 8693 token exchange, agent scope ≤ user) + L2 prompt injection XML wrap + L3 audit immutable S3 Object Lock 90d + L4 recovery outbox + compensating action (every send_X has recall_X) | "Enterprise demands a 4-layer safety stack…" |
+| 6 | 4-layer safety | 2 min | L1 IAM OBO (RFC 8693 token exchange, agent scope ≤ user) + L2 prompt injection XML wrap + L3 audit immutable GCS Object Lock 90d + L4 recovery outbox + compensating action (every send_X has recall_X) | "Enterprise demands a 4-layer safety stack…" |
 | 7 | Resume hook + anti-goals | 1 min | Voice agent 7 markets + Indonesia 24h→6h (75%) refund tier + Internal Agent Platform 200+ agent reuse + 红线: anti-goals 跟 goals 一样重要, 每次说 "no that's phase 2" | "Concretely, Indonesia refund tier went 24h→6h, fraud ↓40%, NPS ↑8 — and the discipline was…" |
 
 ### 🎯 为啥按这个序
@@ -72,7 +72,7 @@ FDE 工作 **30% code + 30% customer + 20% scoping + 20% selling**, success metr
 | User takeover | /handoff 转人 anytime | pattern D |
 | OBO (delegation) | Agent token ≤ user scope | T4.4 IAM 核心 |
 | Prompt injection | Tool output 含 "ignore prev instr" | T4.4 defense |
-| Immutable audit | S3 Object Lock 90d retention | SOC2 / ISO27001 |
+| Immutable audit | GCS Object Lock 90d retention | SOC2 / ISO27001 |
 | Compensating action | recall_X for every send_X | T4.4 recovery |
 | Stakeholder map | Exec / End user / IT / Legal / Adjacent | week 0 output |
 | 3-question (workflow) | Deterministic? Reversible? Latency? | T4.2 框架 |
@@ -101,7 +101,7 @@ FDE 工作 **30% code + 30% customer + 20% scoping + 20% selling**, success metr
 - When: enterprise + compliance
 - Algorithm: L1 IAM OBO + L2 prompt injection defense + L3 immutable audit 90d + L4 recovery / replay
 - Trade-off: security overhead vs breach risk
-- Tools: OAuth Token Exchange (RFC 8693), XML wrap tool output, S3 Object Lock, Temporal replay
+- Tools: OAuth Token Exchange (RFC 8693), XML wrap tool output, GCS Object Lock, Temporal replay
 
 **Framework 5: 3-Week MVP Playbook**
 - Week 1: Discovery (5 interview) + 1-page design + lock scope
@@ -224,7 +224,7 @@ L2 Prompt Injection Defense
 L3 Immutable Audit Trail
    Every agent action → audit log
    Fields: actor / on_behalf_of / action / resource / args / result / timestamp
-   90-day immutable storage (S3 Object Lock + versioning)
+   90-day immutable storage (GCS Object Lock + versioning)
    SOC2 / ISO27001 / GDPR friendly
 
 L4 Recovery / Rollback
@@ -234,7 +234,7 @@ L4 Recovery / Rollback
    DLQ for failed compensations
 ```
 - Top 3 gotchas: (1) agent token = admin scope (违反 OBO) (2) tool output 不 XML wrap (injection 成功) (3) audit log mutable (compliance fail)
-- Tools: Auth0 / Keycloak token exchange, Anthropic Claude 4.7 (injection resistance), S3 Object Lock, Temporal replay
+- Tools: Auth0 / Keycloak token exchange, Anthropic Claude 4.7 (injection resistance), GCS Object Lock, Temporal replay
 
 ### 🔥 Production gotchas (top 15)
 
@@ -314,7 +314,7 @@ Week 13+: Scale (multi-tenant, SSO, region failover, self-serve)
 | LangSmith for confidence | LangSmith | Phoenix, Helicone | LangSmith ✅ |
 | Confirm UI | Streamlit / Retool | custom React | Retool |
 | Token exchange (OBO) | Auth0 / Okta / Keycloak | — | Auth0 |
-| Immutable audit | S3 Object Lock | Azure WORM | S3 |
+| Immutable audit | GCS Object Lock | Azure WORM | GCS |
 | Workflow / recovery | Temporal | DBOS, Inngest | Temporal ✅ |
 | Replay debug | Temporal replay | custom | Temporal |
 

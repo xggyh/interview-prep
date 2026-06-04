@@ -81,7 +81,7 @@ Destructive tool safety = 「classification (safety / reversibility / blast_radi
 | Compensating tx | reverse op (refund / restore) | Saga pattern |
 | Outbox pattern | DB 同事务写 intent + execute | atomicity + replay |
 | Hash chain | prev_hash + self_hash 链 | tamper detection |
-| Tiered storage | hot Postgres / warm S3 / cold Glacier | cost vs query |
+| Tiered storage | hot Postgres / warm GCS / cold Glacier | cost vs query |
 | PII vault | 单独加密 store, deletable refs | GDPR balance |
 | Purge daemon | 30d 后真删 soft-deleted | hard delete |
 | Reflog | git 30d 内可恢复 | git force push 兜底 |
@@ -116,7 +116,7 @@ Destructive tool safety = 「classification (safety / reversibility / blast_radi
 - When: incident response + compliance
 - Algorithm: hash-chained log (prev_hash + self_hash) → tiered storage (hot 30d / warm 1y / cold 7y) → PII vault separation for GDPR → bulk rollback API (query by time + tool + actor, dry-run, reverse-order execute)
 - Trade-off: storage cost vs retention; audit retention vs GDPR erasure
-- Tools: AWS QLDB / Datomic (append-only DB), Postgres + INSERT-only, AWS CloudTrail / GCP Audit Logs reference, Vanta / Drata SOC2 automation, PII vault (separate encrypted store)
+- Tools: AWS QLDB / Datomic (append-only DB), Postgres + INSERT-only, Cloud Audit Logs / GCP Audit Logs reference, Vanta / Drata SOC2 automation, PII vault (separate encrypted store)
 
 ### 关键决策树 (ASCII)
 
@@ -272,7 +272,7 @@ def rollback_incident(time_range, tools, actors):
   1. Audit log mutable → attacker 改 log 抹证据 → hash chain 防
   2. PII 进 audit 不可删 → GDPR conflict → PII vault separate + refs
   3. 没 bulk rollback API → incident 手忙脚乱 (1000 user banned moderation bot)
-- Tools: AWS QLDB / Datomic append-only, Postgres INSERT-only + cron purge, AWS CloudTrail / GCP Audit Logs as reference, S3 Parquet tiered, Vanta/Drata SOC2 automation, PII vault separate encrypted store
+- Tools: AWS QLDB / Datomic append-only, Postgres INSERT-only + cron purge, Cloud Audit Logs / GCP Audit Logs as reference, GCS Parquet tiered, Vanta/Drata SOC2 automation, PII vault separate encrypted store
 
 ### Production gotchas (top 15)
 

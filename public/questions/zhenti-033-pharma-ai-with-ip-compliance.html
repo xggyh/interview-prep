@@ -56,7 +56,7 @@
 <h4>IP / 法务</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Chief IP Officer (CIPO)</strong> ⭐</td><td>首席知识产权官 — 这题<strong>最大 veto holder + 创伤来源</strong> (18 个月前 ChatGPT 化合物结构泄露事件).</td></tr><tr><td><strong>Trade secret</strong></td><td>商业秘密 — 比专利保护更敏感, 因为一公开就没了. Pre-filing 化合物属于这类.</td></tr><tr><td><strong>Patent claims</strong></td><td>专利权利要求 — 专利说明书里定义保护范围的条款.</td></tr><tr><td><strong>Patent prep notes</strong></td><td>专利申报前的草稿 + 律师笔记 — 在律师笔记本电脑里, 不在系统. <strong>永久 defer</strong>.</td></tr><tr><td><strong>CLO (Chief Legal Officer)</strong></td><td>首席法务官.</td></tr><tr><td><strong>CCO (Chief Compliance Officer)</strong></td><td>首席合规官 — 管 FDA / GxP 合规.</td></tr><tr><td><strong>CMO (Chief Medical Officer)</strong></td><td>首席医学官 — 管 patient safety + 临床决策.</td></tr></tbody></table></div>
 <h4>AI / 系统 / 架构</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RAG (Retrieval-Augmented Generation)</strong></td><td>检索增强生成 — LLM 先检索内部文档, 再基于文档生成答案 + 引用. 比 fine-tuning 适合企业内部知识.</td></tr><tr><td><strong>Self-hosted vs API</strong> ⭐</td><td>模型部署模式选择 — 自托管 (数据不离开公司) vs commercial API (数据走 OpenAI/Anthropic). <strong>药企几乎必选 self-hosted</strong>, 是 IP / 法务决策不是技术决策.</td></tr><tr><td><strong>Llama 3.1 70B / Mistral</strong></td><td>主流 self-host LLM. 这题 likely 选择.</td></tr><tr><td><strong>AWS Bedrock + PrivateLink</strong></td><td>AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择.</td></tr><tr><td><strong>Qdrant / Weaviate (self-hosted)</strong></td><td>自托管向量数据库. 用 self-hosted 而不是 Pinecone (SaaS) 因为 IP team 不批多租户云服务.</td></tr><tr><td><strong>Hallucination (幻觉)</strong></td><td>LLM 编造不存在的事实 — 在化学领域 = 编造化合物结构 / 假活性数据. 极危险.</td></tr><tr><td><strong>Citation / provenance</strong></td><td>每个答案必须引用来源文档. Audit + 合规必需.</td></tr><tr><td><strong>Walking skeleton</strong></td><td>最薄端到端版本, 每组件可 mock 但流程跑通. <strong>Decomposition 题 MVP 方法论</strong>.</td></tr><tr><td><strong>Red team</strong></td><td>红队测试 — 主动 probe 模型, 找漏洞. 化学领域 = 问竞品化合物看会不会泄露训练数据.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>RAG (Retrieval-Augmented Generation)</strong></td><td>检索增强生成 — LLM 先检索内部文档, 再基于文档生成答案 + 引用. 比 fine-tuning 适合企业内部知识.</td></tr><tr><td><strong>Self-hosted vs API</strong> ⭐</td><td>模型部署模式选择 — 自托管 (数据不离开公司) vs commercial API (数据走 OpenAI/Anthropic). <strong>药企几乎必选 self-hosted</strong>, 是 IP / 法务决策不是技术决策.</td></tr><tr><td><strong>Llama 3.1 70B / Mistral</strong></td><td>主流 self-host LLM. 这题 likely 选择.</td></tr><tr><td><strong>Vertex AI + PrivateLink</strong></td><td>AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择.</td></tr><tr><td><strong>Vertex AI Vector Search / Weaviate (self-hosted)</strong></td><td>自托管向量数据库. 用 self-hosted 而不是 Vertex AI Vector Search (SaaS) 因为 IP team 不批多租户云服务.</td></tr><tr><td><strong>Hallucination (幻觉)</strong></td><td>LLM 编造不存在的事实 — 在化学领域 = 编造化合物结构 / 假活性数据. 极危险.</td></tr><tr><td><strong>Citation / provenance</strong></td><td>每个答案必须引用来源文档. Audit + 合规必需.</td></tr><tr><td><strong>Walking skeleton</strong></td><td>最薄端到端版本, 每组件可 mock 但流程跑通. <strong>Decomposition 题 MVP 方法论</strong>.</td></tr><tr><td><strong>Red team</strong></td><td>红队测试 — 主动 probe 模型, 找漏洞. 化学领域 = 问竞品化合物看会不会泄露训练数据.</td></tr></tbody></table></div>
 <h4>角色 / 用户</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Head of Research</strong></td><td>研究负责人 — 这题 oncology pilot 的 sponsor.</td></tr><tr><td><strong>Regulatory affairs</strong></td><td>法规事务 — 跟 FDA 沟通的内部团队.</td></tr><tr><td><strong>Patent attorney</strong></td><td>专利律师 — 内部 IP 团队成员.</td></tr><tr><td><strong>InfoSec / CISO</strong></td><td>信息安全 — 管 network + encryption.</td></tr><tr><td><strong>Internal Audit</strong></td><td>内审 — SOX-adjacent controls 审查.</td></tr></tbody></table></div>
 <hr />
@@ -122,7 +122,7 @@
 <p><strong>Key gap / risk</strong>:</p>
 <ul><li>LIMS data isn't pre-classified by trade-secret status. <strong>Someone has to label which compounds are pre-filing and which are cleared</strong>. This is human work, not automation. Estimated 2 weeks.</li><li>Patent prep notes are in Word docs on individual attorneys' laptops, not in any DB. Defer permanently to v2 if ever.</li></ul>
 <p><strong>Architecture implications</strong>:</p>
-<ul><li><strong>Must be self-hosted</strong>: Llama 3 / Mistral / Anthropic claude on AWS Bedrock with PrivateLink (depending on what IP / InfoSec approves)</li><li><strong>Likely choice</strong>: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster</li><li><strong>Backup model</strong>: smaller (8B) for cost / latency optimization, with re-ranker</li><li><strong>Vector DB</strong>: self-hosted (Qdrant / Weaviate), NOT Pinecone (multi-tenant SaaS, IP team won't approve)</li></ul>
+<ul><li><strong>Must be self-hosted</strong>: Llama 3 / Mistral / Anthropic claude on Vertex AI with PrivateLink (depending on what IP / InfoSec approves)</li><li><strong>Likely choice</strong>: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster</li><li><strong>Backup model</strong>: smaller (8B) for cost / latency optimization, with re-ranker</li><li><strong>Vector DB</strong>: self-hosted (Vertex AI Vector Search / Weaviate), NOT Vertex AI Vector Search (multi-tenant SaaS, IP team won't approve)</li></ul>
 <hr />
 <h4>Step 4: 拆成可解子问题 (15 min)</h4>
 <blockquote><p>"Now decomposition. The unique thing about pharma is the <strong>'easy' subproblems are legal/compliance, the 'hard' subproblems are model quality on chemistry-specific queries</strong>. Both have to be solved."</p></blockquote>
@@ -171,7 +171,7 @@ Week 4: Show to Head of Research with 5 sample queries (lit search only)</code><
 <p><strong>Phase 2 Week 5-8</strong>: add cleared confidential data after IP signs off. Pilot with 5 friendly chemists first.</p>
 <p><strong>Phase 3 Week 9-13</strong>: full 30-chemist pilot, weekly retro with researchers + IP team.</p>
 <p><strong>Three things to flag proactively</strong>:</p>
-<p><strong>(a) Self-hosted is non-negotiable</strong>. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Pinecone is out, Qdrant / Weaviate self-hosted are in.</p>
+<p><strong>(a) Self-hosted is non-negotiable</strong>. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Vertex AI Vector Search is out, Vertex AI Vector Search / Weaviate self-hosted are in.</p>
 <p><strong>(b) Trade secret data is DEFERRED</strong>. Pre-filing compound structures + patent prep notes are the highest-risk data and adding them to pilot v1 = repeat of the ChatGPT leak trauma. IP team will block. Defer to v2 after pilot proves architecture.</p>
 <p><strong>(c) Chemistry-specific hallucination is the technical risk</strong>. LLM will make up compound structures + assay values if not constrained. Need (1) RAG forcing answers to cite retrieved documents, (2) refusal when retrieval is weak, (3) eval set of 'gotcha' chemistry questions that the model should say 'I don't know' on, not hallucinate.</p>
 <p>Want me to deep-dive the IP sign-off process, self-hosted architecture, or hallucination defense?"</p></blockquote>
@@ -270,7 +270,7 @@ Data classification (THE artifact):
 Architecture (IP-forced):
   Self-hosted Llama 3.1 70B or Mistral
   Internal AWS / SageMaker
-  Qdrant / Weaviate self-host (NOT Pinecone)
+  Vertex AI Vector Search / Weaviate self-host (NOT Vertex AI Vector Search)
   PrivateLink, no public internet egress
   Audit log immutable 7 yr
 
@@ -418,8 +418,8 @@ Key phrases:
 | **RAG (Retrieval-Augmented Generation)** | 检索增强生成 — LLM 先检索内部文档, 再基于文档生成答案 + 引用. 比 fine-tuning 适合企业内部知识. |
 | **Self-hosted vs API** ⭐ | 模型部署模式选择 — 自托管 (数据不离开公司) vs commercial API (数据走 OpenAI/Anthropic). **药企几乎必选 self-hosted**, 是 IP / 法务决策不是技术决策. |
 | **Llama 3.1 70B / Mistral** | 主流 self-host LLM. 这题 likely 选择. |
-| **AWS Bedrock + PrivateLink** | AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择. |
-| **Qdrant / Weaviate (self-hosted)** | 自托管向量数据库. 用 self-hosted 而不是 Pinecone (SaaS) 因为 IP team 不批多租户云服务. |
+| **Vertex AI + PrivateLink** | AWS 的私有 LLM hosting, 数据不走公网. 中等合规级别的选择. |
+| **Vertex AI Vector Search / Weaviate (self-hosted)** | 自托管向量数据库. 用 self-hosted 而不是 Vertex AI Vector Search (SaaS) 因为 IP team 不批多租户云服务. |
 | **Hallucination (幻觉)** | LLM 编造不存在的事实 — 在化学领域 = 编造化合物结构 / 假活性数据. 极危险. |
 | **Citation / provenance** | 每个答案必须引用来源文档. Audit + 合规必需. |
 | **Walking skeleton** | 最薄端到端版本, 每组件可 mock 但流程跑通. **Decomposition 题 MVP 方法论**. |
@@ -600,10 +600,10 @@ This is **NOT** "deploy AI assistant across the company". It's "**get one team u
 - Patent prep notes are in Word docs on individual attorneys' laptops, not in any DB. Defer permanently to v2 if ever.
 
 **Architecture implications**:
-- **Must be self-hosted**: Llama 3 / Mistral / Anthropic claude on AWS Bedrock with PrivateLink (depending on what IP / InfoSec approves)
+- **Must be self-hosted**: Llama 3 / Mistral / Anthropic claude on Vertex AI with PrivateLink (depending on what IP / InfoSec approves)
 - **Likely choice**: Llama 3.1 70B fine-tuned + RAG over internal corpus, hosted on internal SageMaker / GPU cluster
 - **Backup model**: smaller (8B) for cost / latency optimization, with re-ranker
-- **Vector DB**: self-hosted (Qdrant / Weaviate), NOT Pinecone (multi-tenant SaaS, IP team won't approve)
+- **Vector DB**: self-hosted (Vertex AI Vector Search / Weaviate), NOT Vertex AI Vector Search (multi-tenant SaaS, IP team won't approve)
 
 ---
 
@@ -730,7 +730,7 @@ After IP team approves the architecture review:
 >
 > **Three things to flag proactively**:
 >
-> **(a) Self-hosted is non-negotiable**. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Pinecone is out, Qdrant / Weaviate self-hosted are in.
+> **(a) Self-hosted is non-negotiable**. Commercial API is forbidden by IP policy. Llama 3.1 / Mistral on internal AWS, with PrivateLink. Vertex AI Vector Search is out, Vertex AI Vector Search / Weaviate self-hosted are in.
 >
 > **(b) Trade secret data is DEFERRED**. Pre-filing compound structures + patent prep notes are the highest-risk data and adding them to pilot v1 = repeat of the ChatGPT leak trauma. IP team will block. Defer to v2 after pilot proves architecture.
 >
@@ -920,7 +920,7 @@ Data classification (THE artifact):
 Architecture (IP-forced):
   Self-hosted Llama 3.1 70B or Mistral
   Internal AWS / SageMaker
-  Qdrant / Weaviate self-host (NOT Pinecone)
+  Vertex AI Vector Search / Weaviate self-host (NOT Vertex AI Vector Search)
   PrivateLink, no public internet egress
   Audit log immutable 7 yr
 

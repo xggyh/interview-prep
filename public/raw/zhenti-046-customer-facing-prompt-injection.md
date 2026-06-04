@@ -55,7 +55,7 @@
 | **Llama Guard 3** | Meta 开源内容分类器. Self-host. |
 | **NeMo Guardrails / Guardrails AI** | 开源 framework — 规则+LLM / schema validator. |
 | **Presidio (Microsoft)** | 开源 PII 检测 / 脱敏. |
-| **Azure Content Safety / AWS Bedrock Guardrails** | Cloud-hosted 内容安全. |
+| **Azure Content Safety / Vertex AI Guardrails** | Cloud-hosted 内容安全. |
 | **Pydantic** | Python schema validator. Output JSON 强校验. |
 | **Regex screen** | 正则匹配明显 injection — 便宜但只抓显式. |
 

@@ -50,25 +50,25 @@
 <h4>Agent / Tool 调用</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>MCP (Model Context Protocol)</strong> ⭐</td><td>Anthropic 2024 开源的 agent tool 调用标准, JSON-RPC over HTTP. 2026 业界 default.</td></tr><tr><td><strong>MCP server</strong></td><td>实现 MCP 协议的服务 — 每个 source 一个 server.</td></tr><tr><td><strong>MCP gateway</strong></td><td>中心化的 MCP 路由层 — 做 auth / cache / 日志.</td></tr><tr><td><strong>Tool / Function calling</strong> ⭐</td><td>LLM 调用外部 function 的能力. OpenAI 命名 "function calling", Anthropic 叫 "tool use".</td></tr><tr><td><strong>Tool catalog</strong></td><td>工具目录 — 所有可用 tool 的 metadata 集合.</td></tr><tr><td><strong>Domain tool vs Raw tool</strong> ⭐</td><td>Domain = <code>get_overdue_invoices</code> (业务语义); Raw = <code>POST /sap/odata/...</code> (技术细节). 用 domain.</td></tr><tr><td><strong>Composite tool</strong></td><td>组合工具 — 一个 tool 内部调多个 API, 减少 LLM compose 错误.</td></tr><tr><td><strong>Tool description</strong></td><td>工具描述 — 给 LLM 看的 docstring, 决定 LLM 选不选这个 tool.</td></tr><tr><td><strong>LangGraph</strong></td><td>LangChain 的 stateful agent 框架, 支持 parallel tool call.</td></tr><tr><td><strong>Claude Sonnet 4.6</strong></td><td>Anthropic 旗舰中端 model.</td></tr></tbody></table></div>
 <h4>Auth / 权限 (核心)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>OBO (On-Behalf-Of)</strong> ⭐</td><td>代理身份调用 — agent 以 user 身份调用 source, 不是 service account.</td></tr><tr><td><strong>Token exchange (RFC 8693)</strong></td><td>OAuth 2.0 token 互换标准 — user JWT 换 SAP/SFDC 的 access token.</td></tr><tr><td><strong>JWT Bearer flow</strong></td><td>SFDC 的 JWT 认证流 — 签发的 JWT 直接换 access token.</td></tr><tr><td><strong>Subject token</strong></td><td>被代理的 user 的 token.</td></tr><tr><td><strong>Service account</strong></td><td>服务账号 — 不依赖具体 user 的身份. 这题尽量不用.</td></tr><tr><td><strong>Permission flattening</strong></td><td>权限拍平 — ETL 后 source 端 RLS 丢失, 风险.</td></tr><tr><td><strong>RLS (Row-Level Security)</strong></td><td>行级安全 — Postgres / Snowflake 按 user 过滤行.</td></tr><tr><td><strong>IdP (Identity Provider)</strong></td><td>身份提供商 — Okta / Azure AD.</td></tr><tr><td><strong>Okta</strong></td><td>头部 SSO SaaS.</td></tr><tr><td><strong>SAML / OIDC</strong></td><td>两种企业身份联合协议.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>OBO (On-Behalf-Of)</strong> ⭐</td><td>代理身份调用 — agent 以 user 身份调用 source, 不是 service account.</td></tr><tr><td><strong>Token exchange (RFC 8693)</strong></td><td>OAuth 2.0 token 互换标准 — user JWT 换 SAP/SFDC 的 access token.</td></tr><tr><td><strong>JWT Bearer flow</strong></td><td>SFDC 的 JWT 认证流 — 签发的 JWT 直接换 access token.</td></tr><tr><td><strong>Subject token</strong></td><td>被代理的 user 的 token.</td></tr><tr><td><strong>Service account</strong></td><td>服务账号 — 不依赖具体 user 的身份. 这题尽量不用.</td></tr><tr><td><strong>Permission flattening</strong></td><td>权限拍平 — ETL 后 source 端 RLS 丢失, 风险.</td></tr><tr><td><strong>RLS (Row-Level Security)</strong></td><td>行级安全 — Postgres / BigQuery 按 user 过滤行.</td></tr><tr><td><strong>IdP (Identity Provider)</strong></td><td>身份提供商 — Okta / Azure AD.</td></tr><tr><td><strong>Okta</strong></td><td>头部 SSO SaaS.</td></tr><tr><td><strong>SAML / OIDC</strong></td><td>两种企业身份联合协议.</td></tr></tbody></table></div>
 <h4>数据源</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>SAP S/4HANA</strong> ⭐</td><td>SAP 现代 ERP 平台. Cloud 版有 OData API.</td></tr><tr><td><strong>SAP ECC</strong></td><td>SAP 老一代 ERP, 主要 BAPI / RFC API.</td></tr><tr><td><strong>OData v4</strong></td><td>SAP S/4 Cloud 的 RESTful API 标准.</td></tr><tr><td><strong>BAPI / RFC</strong></td><td>SAP ECC 的远程函数调用.</td></tr><tr><td><strong>SAP Cloud Connector</strong></td><td>连接 on-prem SAP 和 cloud 的网关.</td></tr><tr><td><strong>SAP JCo / pyrfc</strong></td><td>Java / Python SAP RFC 客户端库.</td></tr><tr><td><strong>Salesforce (SFDC)</strong> ⭐</td><td>头部 CRM SaaS. REST + Bulk API.</td></tr><tr><td><strong>SFDC governor limits</strong> ⭐</td><td>Salesforce 强制的 API 上限 (100K/24h free, 1M premium).</td></tr><tr><td><strong>SFDC org</strong></td><td>Salesforce 客户实例.</td></tr><tr><td><strong>Postgres</strong></td><td>开源关系数据库.</td></tr><tr><td><strong>read replica</strong></td><td>只读副本 — 减轻主库压力.</td></tr><tr><td><strong>Customer 360</strong></td><td>客户全景视图 — 销售 + 服务 + 营销整合.</td></tr></tbody></table></div>
 <h4>ETL / 数据架构 (这题反例)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>ETL / ELT</strong></td><td>Extract-Transform-Load — 数据仓库经典. 这题不能用.</td></tr><tr><td><strong>Data warehouse / Snowflake</strong></td><td>列式分析仓.</td></tr><tr><td><strong>Staleness</strong></td><td>数据陈旧度 — ETL 通常 30min-6h 滞后.</td></tr><tr><td><strong>Federated query</strong></td><td>联邦查询 — Trino / Presto 跨 source 直查. 慢但 real-time.</td></tr><tr><td><strong>Trino / Presto</strong></td><td>联邦 SQL 引擎.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>ETL / ELT</strong></td><td>Extract-Transform-Load — 数据仓库经典. 这题不能用.</td></tr><tr><td><strong>Data warehouse / BigQuery</strong></td><td>列式分析仓.</td></tr><tr><td><strong>Staleness</strong></td><td>数据陈旧度 — ETL 通常 30min-6h 滞后.</td></tr><tr><td><strong>Federated query</strong></td><td>联邦查询 — Trino / Presto 跨 source 直查. 慢但 real-time.</td></tr><tr><td><strong>Trino / Presto</strong></td><td>联邦 SQL 引擎.</td></tr></tbody></table></div>
 <h4>Caching / 性能</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Per-user cache key</strong> ⭐</td><td>缓存 key 包含 user_id — 不同 user 看不同数据时正确.</td></tr><tr><td><strong>Per-tool TTL</strong></td><td>每个 tool 不同的 cache 时长.</td></tr><tr><td><strong>Semantic cache</strong></td><td>语义缓存 — 相似 query 命中同 cache.</td></tr><tr><td><strong>Negative cache</strong></td><td>负缓存 — 错误结果也短暂缓存, 防止 flood retry.</td></tr><tr><td><strong>Cache invalidation</strong></td><td>缓存失效 — 数据变了如何清 cache.</td></tr><tr><td><strong>Cache hit rate</strong></td><td>缓存命中率 — 这题目标 &gt; 60%.</td></tr><tr><td><strong>Bulk API</strong></td><td>SFDC 的批量 API — 1 个 call 拿 10K 行.</td></tr><tr><td><strong>Governor limit</strong></td><td>SFDC API 24h 上限.</td></tr></tbody></table></div>
 <h4>Schema / Discovery</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Schema registry / Tool catalog</strong></td><td>工具元数据中心.</td></tr><tr><td><strong>RAG over tool catalog</strong> ⭐</td><td>用 vector search 从 1500 tool 里找 top-20 给 LLM.</td></tr><tr><td><strong>Vector DB (PGvector / Pinecone / Qdrant)</strong></td><td>向量数据库.</td></tr><tr><td><strong>Embedding</strong></td><td>把 query / tool description 转成向量.</td></tr><tr><td><strong>Tool eval suite</strong></td><td>工具评估套件 — golden Q × expected tool sequence.</td></tr><tr><td><strong>Identifier mapping</strong></td><td>ID 映射 — SAP customer_id ↔ SFDC account_id.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Schema registry / Tool catalog</strong></td><td>工具元数据中心.</td></tr><tr><td><strong>RAG over tool catalog</strong> ⭐</td><td>用 vector search 从 1500 tool 里找 top-20 给 LLM.</td></tr><tr><td><strong>Vector DB (PGvector / Vertex AI Vector Search / Vertex AI Vector Search)</strong></td><td>向量数据库.</td></tr><tr><td><strong>Embedding</strong></td><td>把 query / tool description 转成向量.</td></tr><tr><td><strong>Tool eval suite</strong></td><td>工具评估套件 — golden Q × expected tool sequence.</td></tr><tr><td><strong>Identifier mapping</strong></td><td>ID 映射 — SAP customer_id ↔ SFDC account_id.</td></tr></tbody></table></div>
 <h4>安全 / 沙箱</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Safe SQL / Sandboxed SQL</strong></td><td>受限 SQL 执行 — read-only + 表黑名单 + 行数上限 + 5s timeout.</td></tr><tr><td><strong>statement_timeout</strong></td><td>Postgres 单 query 超时.</td></tr><tr><td><strong>EXPLAIN cost</strong></td><td>Postgres 查询计划成本估算.</td></tr><tr><td><strong>SQL injection</strong></td><td>SQL 注入 — LLM 写 raw SQL 时风险.</td></tr><tr><td><strong>Audit log</strong></td><td>审计日志 — 谁在何时调了什么 tool.</td></tr><tr><td><strong>Immutable store</strong></td><td>不可变存储 — 审计日志写 WORM.</td></tr></tbody></table></div>
 <h4>部署 / 运维</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>VPC</strong></td><td>AWS 私有网络.</td></tr><tr><td><strong>Bedrock</strong></td><td>AWS 托管 LLM 服务.</td></tr><tr><td><strong>OTel span chain</strong></td><td>跨 service 的 trace 链.</td></tr><tr><td><strong>Dual-confirm UX</strong></td><td>双重确认界面 — 写操作前 user 显式 confirm.</td></tr><tr><td><strong>Eval suite daily run</strong></td><td>每日跑评估 — 检测 regression.</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>VPC</strong></td><td>AWS 私有网络.</td></tr><tr><td><strong>Vertex AI</strong></td><td>AWS 托管 LLM 服务.</td></tr><tr><td><strong>OTel span chain</strong></td><td>跨 service 的 trace 链.</td></tr><tr><td><strong>Dual-confirm UX</strong></td><td>双重确认界面 — 写操作前 user 显式 confirm.</td></tr><tr><td><strong>Eval suite daily run</strong></td><td>每日跑评估 — 检测 regression.</td></tr></tbody></table></div>
 <h4>业务术语</h4>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>解释</th></tr></thead><tbody><tr><td><strong>Overdue invoices</strong></td><td>逾期未付发票.</td></tr><tr><td><strong>Accounts receivable aging</strong></td><td>应收账款账龄.</td></tr><tr><td><strong>Collections</strong></td><td>催收.</td></tr><tr><td><strong>Customer master</strong></td><td>客户主数据 — SAP 概念.</td></tr><tr><td><strong>Lead / Opportunity / Account</strong></td><td>SFDC 销售概念: 潜客 / 商机 / 客户.</td></tr><tr><td><strong>Activity (SFDC)</strong></td><td>互动记录 (电话 / 邮件 / 会议).</td></tr><tr><td><strong>SKU</strong></td><td>Stock Keeping Unit — 库存单位.</td></tr></tbody></table></div>
 <hr />
 <h3>这道题在考什么</h3>
 <p>不是考你 RAG, 是考你<strong>异构数据源 agent 接入的 modern pattern</strong>:</p>
-<ol><li><strong>Tool-per-source pattern</strong> — 每 source 一组 tool, agent compose, 不是 fetch-then-LLM-join</li><li><strong>MCP server abstraction</strong> — 2026 industry standard, 每 source 一个 MCP server</li><li><strong>Permission preservation</strong> — user 在 SAP 看不到某 customer, agent 替 user 也不能</li><li><strong>Don't merge into one DB</strong> (题目明确) — 知道为什么 ETL 死路 (real-time / 双倍维护 / staleness)</li><li><strong>Cross-source composition</strong> — agent 要 join SAP order with SFDC contact, 这个 join 在 agent 端不是 DB</li><li><strong>Caching per source</strong> — SAP 查询慢, Salesforce 有 governor limits, 必须 cache</li><li><strong>Schema discovery</strong> — agent 怎么知道有哪些 table / field 可查</li><li><strong>菜鸟答案失败点</strong>: "ETL 到 Snowflake" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.</li></ol>
+<ol><li><strong>Tool-per-source pattern</strong> — 每 source 一组 tool, agent compose, 不是 fetch-then-LLM-join</li><li><strong>MCP server abstraction</strong> — 2026 industry standard, 每 source 一个 MCP server</li><li><strong>Permission preservation</strong> — user 在 SAP 看不到某 customer, agent 替 user 也不能</li><li><strong>Don't merge into one DB</strong> (题目明确) — 知道为什么 ETL 死路 (real-time / 双倍维护 / staleness)</li><li><strong>Cross-source composition</strong> — agent 要 join SAP order with SFDC contact, 这个 join 在 agent 端不是 DB</li><li><strong>Caching per source</strong> — SAP 查询慢, Salesforce 有 governor limits, 必须 cache</li><li><strong>Schema discovery</strong> — agent 怎么知道有哪些 table / field 可查</li><li><strong>菜鸟答案失败点</strong>: "ETL 到 BigQuery" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.</li></ol>
 <hr />
 <h3>必问 clarifying questions</h3>
 <ol><li><strong>Read or read+write</strong>: agent 能改 SAP / SFDC 数据吗? 99% case 是只读, 影响 transaction / consistency 复杂度</li><li><strong>Real-time required?</strong>: customer 1 分钟前更新 SFDC, agent 必须看到? 决定 cache TTL</li><li><strong>User identity</strong>: agent run as user (per-user auth) or as service account?</li><li><strong>Query complexity</strong>: agent 主要做 lookup ('show me customer X') 还是 aggregation ('top 10 by revenue')?</li><li><strong>SAP module</strong>: 客户用的是 S/4 cloud (OData public) 还是 ECC (BAPI)? 决定 connector</li><li><strong>Volume</strong>: agent 一天 10K queries 还是 1M? 影响 cache / cost</li><li><strong>Latency budget</strong>: &lt; 3s e2e 还是 &lt; 30s OK? 影响是否 async + status check</li><li><strong>Existing IdP</strong>: Okta? Azure AD? 决定 OBO flow</li></ol>
@@ -143,7 +143,7 @@
 <h4>Phase 1: Clarify + reject ETL (澄清 + 拒绝 ETL 死路) (5 min)</h4>
 <p>开口:</p>
 <ul><li>"Agent read-only or read+write? 我假设 99% read, 偶尔 write (SFDC update lead, SAP create order)"</li><li>"Real-time: 1 min latency OK? 我假设是, SAP 1min cache OK, SFDC 30s, PG 5s"</li><li>"Per-user permission preserved? — 假设是, agent run as user, OBO 流"</li></ul>
-<p>明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 Snowflake, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."</p>
+<p>明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 BigQuery, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."</p>
 <p>KPI:</p>
 <ul><li><strong>Latency p99</strong>: &lt; 5s for single-source query, &lt; 15s for cross-source (3 source compose)</li><li><strong>Permission accuracy</strong>: 100% (user 不应通过 agent 看到他在 source 里看不到的)</li><li><strong>Tool call success rate</strong>: &gt; 95% (not network / API error)</li><li><strong>Cache hit rate</strong>: &gt; 60% (cost saving)</li></ul>
 <h4>Phase 2: Anti-pattern critique (反模式批评) (5 min)</h4>
@@ -371,7 +371,7 @@ Step 4: Compose: zip SAP invoice + SFDC interaction by customer_id, format</code
 <p>Parallel execution is key. Agent framework (LangGraph) supports parallel tool calls.</p>
 <h4>Phase 8: Trade-offs + alternatives (权衡 + 备选方案) (7 min)</h4>
 <p><strong>Decision 8.1 — Tool-per-source vs federated query vs cached ETL</strong></p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Latency</th><th>Real-time</th><th>Complexity</th><th>Permission</th><th>When to use</th></tr></thead><tbody><tr><td>Tool-per-source (我推)</td><td>1-5s</td><td>Yes</td><td>Medium</td><td>Preserved (OBO)</td><td>Most cases</td></tr><tr><td>Federated query (Trino + connectors)</td><td>5-30s</td><td>Yes</td><td>High</td><td>Hard</td><td>Heavy analytics</td></tr><tr><td>Cached ETL (Snowflake + sync)</td><td>&lt;1s</td><td>No (30min stale)</td><td>High</td><td>Often flatten</td><td>BI dashboards only</td></tr><tr><td>Hybrid (cache common queries)</td><td>0.5-3s</td><td>Mixed</td><td>High</td><td>Mixed</td><td>High volume</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Latency</th><th>Real-time</th><th>Complexity</th><th>Permission</th><th>When to use</th></tr></thead><tbody><tr><td>Tool-per-source (我推)</td><td>1-5s</td><td>Yes</td><td>Medium</td><td>Preserved (OBO)</td><td>Most cases</td></tr><tr><td>Federated query (Trino + connectors)</td><td>5-30s</td><td>Yes</td><td>High</td><td>Hard</td><td>Heavy analytics</td></tr><tr><td>Cached ETL (BigQuery + sync)</td><td>&lt;1s</td><td>No (30min stale)</td><td>High</td><td>Often flatten</td><td>BI dashboards only</td></tr><tr><td>Hybrid (cache common queries)</td><td>0.5-3s</td><td>Mixed</td><td>High</td><td>Mixed</td><td>High volume</td></tr></tbody></table></div>
 <p>Hybrid 是 staff-level — cache 常 queries 答案 in Redis (e.g., daily revenue), 不常 queries 现查. 但 cache invalidation 复杂.</p>
 <p><strong>Decision 8.2 — Per-source MCP server vs single gateway</strong></p>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>选项</th><th>Pros</th><th>Cons</th></tr></thead><tbody><tr><td>Per-source MCP server (我推)</td><td>Modular, source-specific ops, easy to add new source</td><td>More services to run</td></tr><tr><td>Single gateway with internal routing</td><td>Less ops</td><td>Tight coupling, hard to evolve</td></tr></tbody></table></div>
@@ -409,7 +409,7 @@ Step 4: Compose: zip SAP invoice + SFDC interaction by customer_id, format</code
 <ul><li>SAP MCP server: 4 pods × m6i.large = $400/month</li><li>SFDC MCP server: 4 pods × m6i.large = $400/month</li><li>PG MCP server: 2 pods × m6i.large = $200/month</li></ul>
 <p><strong>Gateway</strong>:</p>
 <ul><li>4 gateway pods × m6i.xlarge = $800/month</li></ul>
-<p><strong>LLM cost</strong> (Claude Sonnet 4.6 in customer Bedrock):</p>
+<p><strong>LLM cost</strong> (Claude Sonnet 4.6 in customer Vertex AI):</p>
 <ul><li>50K queries/day × avg 4K in + 500 out = 200M in + 25M out / day</li><li>Per day: $0.6 in + $0.375 out = ~$1/day per user</li><li>1000 users × $1 × 30 = $30K/month — main cost driver</li></ul>
 <p><strong>Total</strong>: ~$32K/month infra + LLM</p>
 <p><strong>Per-query cost</strong>: $32K / (50K × 30) = $0.02 — acceptable for B2B</p>
@@ -429,10 +429,10 @@ Step 4: Compose: zip SAP invoice + SFDC interaction by customer_id, format</code
 <ol><li><strong>"SAP S/4HANA on-prem (ECC), 没 OData, 只有 BAPI / RFC, MCP 怎么接?"</strong> — 答: 走 SAP Cloud Connector (between on-prem and cloud) + BAPI wrapper. MCP server 跑在客户 VPC, 通过 SAP JCo (Java Connector) or pyrfc 调 BAPI. Tools 跟 OData 版本 same interface, internal 实现不同. 性能略差 (BAPI 1-3s vs OData 500ms).</li></ol>
 <ol><li><strong>"我们 agent 想 'create SAP order', 怎么做 write?"</strong> — 答: (a) Tool <code>sap_create_order</code> with confirmation UX (agent 不直接 create, 先 show user "I'm about to create order X with items Y, total $Z, confirm?"); (b) Idempotency: user-provided idempotency_key, dedup 24h; (c) Audit: full payload + user_id + ts → immutable log; (d) Optimistic lock or pre-check: get current inventory before order; (e) Rollback path: if order create succeeds but downstream fail, easier to write SAP cancel-order tool for compensation.</li></ol>
 <ol><li><strong>"SFDC governor 100K 24h cap, 大 customer 1 day 用完, 怎么 protect?"</strong> — 答: (a) Per-tenant rate limit at gateway, paid &gt; free; (b) Cache aggressive (1h account, 24h customer master); (c) Bulk API for batch operations (1 API call returns 10K records); (d) 预先 schedule heavy analytics overnight; (e) Premium SFDC tier $3K/month gets 5M cap; (f) Track per-user API usage in dashboard, alert at 80% of 24h cap.</li></ol>
-<ol><li><strong>"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + Snowflake DWH + 5 more sources, 我们怎么 scale tool catalog?"</strong> — 答: (a) Tool catalog 用 vector DB (Pinecone/Qdrant/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.</li></ol>
+<ol><li><strong>"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + BigQuery DWH + 5 more sources, 我们怎么 scale tool catalog?"</strong> — 答: (a) Tool catalog 用 vector DB (Vertex AI Vector Search/Vertex AI Vector Search/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.</li></ol>
 <hr />
 <h3>❌ 死路答法</h3>
-<ol><li><strong>"ETL 到 Snowflake"</strong> — 题目明说不要, 直接挂.</li><li><strong>"50 个 OpenAI function 在 prompt 里"</strong> — token cost 爆炸 + tool 误选高.</li><li><strong>"Text-to-SQL 跨 3 个 source"</strong> — federated SQL 慢复杂.</li><li><strong>"Service account (admin) 给 agent, simple"</strong> — 失去 permission preservation, 违反客户 SOC 2.</li><li><strong>"用 LangChain 默认 tool"</strong> — 没 schema, 没 permission, demo OK production 不行.</li><li><strong>"无 cache, 实时直查"</strong> — SFDC governor 立刻 trip.</li><li><strong>"agent 写 raw SAP OData URL"</strong> — LLM 出错率高, schema 变就崩.</li><li><strong>"无 audit log"</strong> — compliance 不过.</li><li><strong>"composite tool? agent 自己 compose"</strong> — agent 错误率高 (LLM hallucinate column name), composite 必要.</li><li><strong>"new source 加 = 新 LangChain tool 在 main repo"</strong> — 不模块化, 改一个 source 影响所有.</li></ol>
+<ol><li><strong>"ETL 到 BigQuery"</strong> — 题目明说不要, 直接挂.</li><li><strong>"50 个 OpenAI function 在 prompt 里"</strong> — token cost 爆炸 + tool 误选高.</li><li><strong>"Text-to-SQL 跨 3 个 source"</strong> — federated SQL 慢复杂.</li><li><strong>"Service account (admin) 给 agent, simple"</strong> — 失去 permission preservation, 违反客户 SOC 2.</li><li><strong>"用 LangChain 默认 tool"</strong> — 没 schema, 没 permission, demo OK production 不行.</li><li><strong>"无 cache, 实时直查"</strong> — SFDC governor 立刻 trip.</li><li><strong>"agent 写 raw SAP OData URL"</strong> — LLM 出错率高, schema 变就崩.</li><li><strong>"无 audit log"</strong> — compliance 不过.</li><li><strong>"composite tool? agent 自己 compose"</strong> — agent 错误率高 (LLM hallucinate column name), composite 必要.</li><li><strong>"new source 加 = 新 LangChain tool 在 main repo"</strong> — 不模块化, 改一个 source 影响所有.</li></ol>
 <hr />
 <h3>✅ 加分项</h3>
 <ol><li><strong>拒绝 ETL 并解释 3 个理由</strong> — 直接 signal 真懂 trade-off</li><li><strong>MCP tool-per-source pattern</strong> — 2026 industry standard</li><li><strong>OBO + per-source token exchange</strong> — security 严肃</li><li><strong>RAG over tool catalog</strong> — scalability 设计</li><li><strong>Per-user-per-tool cache</strong> — permission-aware caching, SFDC governor aware</li><li><strong>Composite tools for common cross-table</strong> — reduce LLM compose error</li><li><strong>Safe SQL tool only for PG (sandboxed)</strong> — pragmatic balance</li><li><strong>Agent compose in memory, parallel tool call</strong> — modern agent framework</li><li><strong>Identifier mapping table + daily sync</strong> — real-world cross-source pain</li><li><strong>Eval suite (golden Q × expected tool sequence)</strong> — production hygiene</li></ol>
@@ -473,7 +473,7 @@ Volumes:
 SFDC governor:
   100K cap × 60% cache hit + bulk API → 24K actual ≪ 100K ✓
 
-LLM cost (Claude Sonnet 4.6 via Bedrock):
+LLM cost (Claude Sonnet 4.6 via Vertex AI):
   50K queries × 4K in + 500 out = $30K/month
   Total all-in: ~$32K/month
   Per query: $0.02
@@ -558,7 +558,7 @@ Write operations:
 | **Subject token** | 被代理的 user 的 token. |
 | **Service account** | 服务账号 — 不依赖具体 user 的身份. 这题尽量不用. |
 | **Permission flattening** | 权限拍平 — ETL 后 source 端 RLS 丢失, 风险. |
-| **RLS (Row-Level Security)** | 行级安全 — Postgres / Snowflake 按 user 过滤行. |
+| **RLS (Row-Level Security)** | 行级安全 — Postgres / BigQuery 按 user 过滤行. |
 | **IdP (Identity Provider)** | 身份提供商 — Okta / Azure AD. |
 | **Okta** | 头部 SSO SaaS. |
 | **SAML / OIDC** | 两种企业身份联合协议. |
@@ -585,7 +585,7 @@ Write operations:
 | 术语 | 解释 |
 |---|---|
 | **ETL / ELT** | Extract-Transform-Load — 数据仓库经典. 这题不能用. |
-| **Data warehouse / Snowflake** | 列式分析仓. |
+| **Data warehouse / BigQuery** | 列式分析仓. |
 | **Staleness** | 数据陈旧度 — ETL 通常 30min-6h 滞后. |
 | **Federated query** | 联邦查询 — Trino / Presto 跨 source 直查. 慢但 real-time. |
 | **Trino / Presto** | 联邦 SQL 引擎. |
@@ -609,7 +609,7 @@ Write operations:
 |---|---|
 | **Schema registry / Tool catalog** | 工具元数据中心. |
 | **RAG over tool catalog** ⭐ | 用 vector search 从 1500 tool 里找 top-20 给 LLM. |
-| **Vector DB (PGvector / Pinecone / Qdrant)** | 向量数据库. |
+| **Vector DB (PGvector / Vertex AI Vector Search / Vertex AI Vector Search)** | 向量数据库. |
 | **Embedding** | 把 query / tool description 转成向量. |
 | **Tool eval suite** | 工具评估套件 — golden Q × expected tool sequence. |
 | **Identifier mapping** | ID 映射 — SAP customer_id ↔ SFDC account_id. |
@@ -630,7 +630,7 @@ Write operations:
 | 术语 | 解释 |
 |---|---|
 | **VPC** | AWS 私有网络. |
-| **Bedrock** | AWS 托管 LLM 服务. |
+| **Vertex AI** | AWS 托管 LLM 服务. |
 | **OTel span chain** | 跨 service 的 trace 链. |
 | **Dual-confirm UX** | 双重确认界面 — 写操作前 user 显式 confirm. |
 | **Eval suite daily run** | 每日跑评估 — 检测 regression. |
@@ -660,7 +660,7 @@ Write operations:
 5. **Cross-source composition** — agent 要 join SAP order with SFDC contact, 这个 join 在 agent 端不是 DB
 6. **Caching per source** — SAP 查询慢, Salesforce 有 governor limits, 必须 cache
 7. **Schema discovery** — agent 怎么知道有哪些 table / field 可查
-8. **菜鸟答案失败点**: "ETL 到 Snowflake" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.
+8. **菜鸟答案失败点**: "ETL 到 BigQuery" — 题目明说不要. "OpenAI function calling 50 个 function" — token cost 爆炸. "Text-to-SQL 单一 DB" — 不解决 3 个 source.
 
 ---
 
@@ -769,7 +769,7 @@ Write operations:
 - "Real-time: 1 min latency OK? 我假设是, SAP 1min cache OK, SFDC 30s, PG 5s"
 - "Per-user permission preserved? — 假设是, agent run as user, OBO 流"
 
-明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 Snowflake, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."
+明确说: "题目说 'don't try to merge into one DB' — 这是好建议. 即使 ETL 到 BigQuery, 我会面对 3 个 problem: (1) latency 30min-6h 不 real-time; (2) permission flatten (RLS 在 SAP / SFDC 各有 model, ETL 后丢失); (3) 双倍 maintain (schema change in source → ETL → analyst 维护). Tool-per-source 是正解."
 
 KPI:
 - **Latency p99**: < 5s for single-source query, < 15s for cross-source (3 source compose)
@@ -1139,7 +1139,7 @@ Parallel execution is key. Agent framework (LangGraph) supports parallel tool ca
 |---|---|---|---|---|---|
 | Tool-per-source (我推) | 1-5s | Yes | Medium | Preserved (OBO) | Most cases |
 | Federated query (Trino + connectors) | 5-30s | Yes | High | Hard | Heavy analytics |
-| Cached ETL (Snowflake + sync) | <1s | No (30min stale) | High | Often flatten | BI dashboards only |
+| Cached ETL (BigQuery + sync) | <1s | No (30min stale) | High | Often flatten | BI dashboards only |
 | Hybrid (cache common queries) | 0.5-3s | Mixed | High | Mixed | High volume |
 
 Hybrid 是 staff-level — cache 常 queries 答案 in Redis (e.g., daily revenue), 不常 queries 现查. 但 cache invalidation 复杂.
@@ -1229,7 +1229,7 @@ Daily golden:
 **Gateway**:
 - 4 gateway pods × m6i.xlarge = $800/month
 
-**LLM cost** (Claude Sonnet 4.6 in customer Bedrock):
+**LLM cost** (Claude Sonnet 4.6 in customer Vertex AI):
 - 50K queries/day × avg 4K in + 500 out = 200M in + 25M out / day
 - Per day: $0.6 in + $0.375 out = ~$1/day per user
 - 1000 users × $1 × 30 = $30K/month — main cost driver
@@ -1276,13 +1276,13 @@ reframe: "我在字节做 Agent Platform 接 50+ service, 这道题 3 个 source
 
 4. **"SFDC governor 100K 24h cap, 大 customer 1 day 用完, 怎么 protect?"** — 答: (a) Per-tenant rate limit at gateway, paid > free; (b) Cache aggressive (1h account, 24h customer master); (c) Bulk API for batch operations (1 API call returns 10K records); (d) 预先 schedule heavy analytics overnight; (e) Premium SFDC tier $3K/month gets 5M cap; (f) Track per-user API usage in dashboard, alert at 80% of 24h cap.
 
-5. **"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + Snowflake DWH + 5 more sources, 我们怎么 scale tool catalog?"** — 答: (a) Tool catalog 用 vector DB (Pinecone/Qdrant/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.
+5. **"如果 customer 同时 use SAP + SFDC + custom PG + Workday HR + BigQuery DWH + 5 more sources, 我们怎么 scale tool catalog?"** — 答: (a) Tool catalog 用 vector DB (Vertex AI Vector Search/Vertex AI Vector Search/PGvector), 不再 prompt-include, RAG retrieve top-20 per query; (b) Hierarchical: domain → category → tool (LLM 先选 domain "finance" 再选 tool "sap_get_invoice"); (c) Tool ownership: each source has team owner, version tool descriptions; (d) Per-tenant catalog: customer 选启用哪些 tools, 减小 their catalog; (e) Tool eval suite: golden questions × expected tool, daily regression.
 
 ---
 
 ## ❌ 死路答法
 
-1. **"ETL 到 Snowflake"** — 题目明说不要, 直接挂.
+1. **"ETL 到 BigQuery"** — 题目明说不要, 直接挂.
 2. **"50 个 OpenAI function 在 prompt 里"** — token cost 爆炸 + tool 误选高.
 3. **"Text-to-SQL 跨 3 个 source"** — federated SQL 慢复杂.
 4. **"Service account (admin) 给 agent, simple"** — 失去 permission preservation, 违反客户 SOC 2.
@@ -1351,7 +1351,7 @@ Volumes:
 SFDC governor:
   100K cap × 60% cache hit + bulk API → 24K actual ≪ 100K ✓
 
-LLM cost (Claude Sonnet 4.6 via Bedrock):
+LLM cost (Claude Sonnet 4.6 via Vertex AI):
   50K queries × 4K in + 500 out = $30K/month
   Total all-in: ~$32K/month
   Per query: $0.02

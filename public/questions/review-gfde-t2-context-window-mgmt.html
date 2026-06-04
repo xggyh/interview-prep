@@ -61,12 +61,12 @@
 <h4>🧠 核心心智模型 (1 sentence)</h4>
 <p>50-turn agent 不挂 = <strong>compaction + external memory + tool externalization + lost-in-middle defense + cost budget</strong>, 5 件套, 不是单 truncate; context 稳态 30K 而非随 turn 数线性涨, 成本从 $6/session 降到 $0.50.</p>
 <h4>📚 术语全表</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td><strong>Context window</strong></td><td>LLM 单次输入容量 (Gemini 3 Pro 2M / Claude 200K)</td><td>物理限制</td></tr><tr><td><strong>Effective context</strong></td><td>Attention 实际利用的部分 (常 &lt; 1/3 of window)</td><td>Lost-in-middle 区域不算</td></tr><tr><td><strong>Compaction</strong></td><td>Messages 转更短表示, 保关键弃冗余</td><td>软上限触发</td></tr><tr><td><strong>Sliding window</strong></td><td>仅保最近 N turn verbatim</td><td>短会话 baseline</td></tr><tr><td><strong>Hierarchical summary</strong></td><td>4-tier ancient/middle/recent/latest</td><td>Long agent ⭐</td></tr><tr><td><strong>Selective pruning</strong></td><td>按 importance score (LLM-judge) 砍低分 turn</td><td>Hybrid 配合</td></tr><tr><td><strong>External memory</strong></td><td>Blob (S3) + Vector DB (Qdrant) + Structured (Postgres)</td><td>数据 &gt; 1K 不进 context</td></tr><tr><td><strong>Tool output externalization</strong></td><td>&gt; 1K 存 blob, 留 short summary + ref_id</td><td>防爆</td></tr><tr><td><strong>Lost in middle</strong></td><td>Liu 2023, attention U 形, 中部 30-40% recall</td><td>Long ctx 通用问题</td></tr><tr><td><strong>Pinned message</strong></td><td>永不被 compact 的关键 turn</td><td>系统决策 / 用户偏好</td></tr><tr><td><strong>Decision log</strong></td><td>system prompt 内追加的 mini-summary</td><td>Anti-lost-middle</td></tr><tr><td><strong>Recall probe</strong></td><td>随机抽事实验 summary 质量</td><td>Weekly QA</td></tr><tr><td><strong>Periodic reinforcement</strong></td><td>每 10 turn 注入 reminder</td><td>防遗忘关键约束</td></tr><tr><td><strong>Prefix cache</strong></td><td>Anthropic 5min / Gemini 1h, 90% off cached</td><td>长 system prompt reuse</td></tr><tr><td><strong>Per-session budget</strong></td><td>$ / token 上限 hard cap</td><td>成本可控</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>术语</th><th>一句话定义</th><th>何时用</th></tr></thead><tbody><tr><td><strong>Context window</strong></td><td>LLM 单次输入容量 (Gemini 3 Pro 2M / Claude 200K)</td><td>物理限制</td></tr><tr><td><strong>Effective context</strong></td><td>Attention 实际利用的部分 (常 &lt; 1/3 of window)</td><td>Lost-in-middle 区域不算</td></tr><tr><td><strong>Compaction</strong></td><td>Messages 转更短表示, 保关键弃冗余</td><td>软上限触发</td></tr><tr><td><strong>Sliding window</strong></td><td>仅保最近 N turn verbatim</td><td>短会话 baseline</td></tr><tr><td><strong>Hierarchical summary</strong></td><td>4-tier ancient/middle/recent/latest</td><td>Long agent ⭐</td></tr><tr><td><strong>Selective pruning</strong></td><td>按 importance score (LLM-judge) 砍低分 turn</td><td>Hybrid 配合</td></tr><tr><td><strong>External memory</strong></td><td>Blob (GCS) + Vector DB (Vertex AI Vector Search) + Structured (Postgres)</td><td>数据 &gt; 1K 不进 context</td></tr><tr><td><strong>Tool output externalization</strong></td><td>&gt; 1K 存 blob, 留 short summary + ref_id</td><td>防爆</td></tr><tr><td><strong>Lost in middle</strong></td><td>Liu 2023, attention U 形, 中部 30-40% recall</td><td>Long ctx 通用问题</td></tr><tr><td><strong>Pinned message</strong></td><td>永不被 compact 的关键 turn</td><td>系统决策 / 用户偏好</td></tr><tr><td><strong>Decision log</strong></td><td>system prompt 内追加的 mini-summary</td><td>Anti-lost-middle</td></tr><tr><td><strong>Recall probe</strong></td><td>随机抽事实验 summary 质量</td><td>Weekly QA</td></tr><tr><td><strong>Periodic reinforcement</strong></td><td>每 10 turn 注入 reminder</td><td>防遗忘关键约束</td></tr><tr><td><strong>Prefix cache</strong></td><td>Anthropic 5min / Gemini 1h, 90% off cached</td><td>长 system prompt reuse</td></tr><tr><td><strong>Per-session budget</strong></td><td>$ / token 上限 hard cap</td><td>成本可控</td></tr></tbody></table></div>
 <h4>🎯 5 个核心 framework</h4>
 <p><strong>Framework 1</strong>: Compaction Strategies (4 法)</p>
 <ul><li>When: input &gt; soft cap (70% 模型上限)</li><li>Algorithm: combine sliding + summarize + hierarchical + selective</li><li>Trade-off: aggressive 失细节, lazy 爆 budget</li><li>Tools: LangChain ConversationSummaryBufferMemory, LlamaIndex memory, MemGPT</li></ul>
 <p><strong>Framework 2</strong>: External Memory (3 层 store)</p>
-<ul><li>When: 任何 long agent</li><li>Algorithm: Blob (S3, tool outputs &gt; 1K) + Vector DB (Qdrant, episodic search) + Postgres (decisions/prefs/state)</li><li>Trade-off: 1 extra hop, 但 context 不爆</li><li>Tools: S3 / GCS, Qdrant / Pinecone, Postgres / Redis / DynamoDB</li></ul>
+<ul><li>When: 任何 long agent</li><li>Algorithm: Blob (GCS, tool outputs &gt; 1K) + Vector DB (Vertex AI Vector Search, episodic search) + Postgres (decisions/prefs/state)</li><li>Trade-off: 1 extra hop, 但 context 不爆</li><li>Tools: GCS / GCS, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable</li></ul>
 <p><strong>Framework 3</strong>: Tool Output Externalization</p>
 <ul><li>When: tool result &gt; 1K token</li><li>Algorithm: 阈值分层 (1K inline / 5K summarize+ref / 50K minimal+ref / &gt;50K reject); per-tool summary</li><li>Trade-off: 额外 retrieve hop, 但成本 $ / latency 都降</li><li>Tools: blob ref_id, per-tool summarizer (Flash)</li></ul>
 <p><strong>Framework 4</strong>: Lost-in-Middle Mitigation</p>
@@ -103,7 +103,7 @@ Q: 用什么模型省钱?
 <p><strong>Problem 1: Compaction Strategies (4 法)</strong></p>
 <ul><li>Sliding window: 最近 N turn verbatim (baseline, 短会话)</li><li>Summarize old + keep recent: 老 turn → 1 段 LLM summary, 近 N verbatim</li><li>Hierarchical (4 tier): ancient (turn 1-30, 500 tok heavy) / middle (31-40, 1500 tok med) / recent (41-50, 5000 tok light) / latest (verbatim 5-10 turn) ⭐</li><li>Selective pruning: 每 turn LLM-judge importance score, 低分砍</li><li>整合: hierarchical (主) + selective (辅), trigger at soft cap 70%, emergency at 90%</li><li>Top 3 gotchas: blind truncate / single mega-summary 失结构 / 不 pin 关键</li><li>Tools: LangChain ConversationSummaryBufferMemory, MemGPT, LlamaIndex memory</li></ul>
 <p><strong>Problem 2: External Memory Architecture</strong></p>
-<ul><li>3 层 store: Blob (S3) → tool outputs / files / artifacts; Vector DB (Qdrant) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)</li><li>Blob usage: store(content) → ref_id, agent tool fetch(ref_id) on demand</li><li>Vector DB: 老 turn segment → embed → upsert with metadata (turn#, ts, type)</li><li>Postgres schema: session_id, key, value, type (decision/pref/state), created_at</li><li>一致性: write-through (decision 先 Postgres 后 context); read-back probe</li><li>Top 3 gotchas: 不 externalize 大输出 / vector DB cross-session 混 / Postgres 没 session_id 隔离</li><li>Tools: S3 / GCS / Azure Blob, Qdrant / Pinecone, Postgres / Redis / DynamoDB</li></ul>
+<ul><li>3 层 store: Blob (GCS) → tool outputs / files / artifacts; Vector DB (Vertex AI Vector Search) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)</li><li>Blob usage: store(content) → ref_id, agent tool fetch(ref_id) on demand</li><li>Vector DB: 老 turn segment → embed → upsert with metadata (turn#, ts, type)</li><li>Postgres schema: session_id, key, value, type (decision/pref/state), created_at</li><li>一致性: write-through (decision 先 Postgres 后 context); read-back probe</li><li>Top 3 gotchas: 不 externalize 大输出 / vector DB cross-session 混 / Postgres 没 session_id 隔离</li><li>Tools: GCS / GCS / Azure Blob, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable</li></ul>
 <p><strong>Problem 3: Tool Output Externalization</strong></p>
 <ul><li>阈值: ≤1K inline / 1K-5K summary+ref / 5K-50K minimal+ref / &gt;50K reject</li><li>Smart summary by type: SQL → stats + sample 5 rows; file read → first/last + lines; web search → title + snippet; image → caption + features</li><li>Provenance: ref_id + tool + executed_at + original_query → 后续可 retrieve full</li><li>Avoid dup: detect file re-read (path hash) → reference earlier ref_id, 不 re-store</li><li>Top 3 gotchas: 阈值过松 / 没 ref_id / 重复 store same content</li><li>Tools: 自实现 store layer + Redis dedup hash + presidio for PII before store</li></ul>
 <p><strong>Problem 4: Lost-in-Middle Mitigation</strong></p>
@@ -113,7 +113,7 @@ Q: 用什么模型省钱?
 <h4>🔥 Production gotchas (top 15)</h4>
 <ol><li>Blind truncate (FIFO 砍最老) → 失关键决策</li><li>Single mega-summary one-shot → 失结构, 不能 update</li><li>Tool output 全 inline (50K+) → context 爆</li><li>没 external memory → 一次性 in-context</li><li>没 pin / pinned messages → 关键决策被 compact</li><li>忽略 lost-in-middle → 中部 turn 答错率高</li><li>没 cost monitoring → session $50 才发现</li><li>没 recall probe → summary 质量盲飞</li><li>没 prefix cache → 长 system prompt 每 turn 全价</li><li>Cross-session memory 混 → 跨用户泄漏</li><li>Compact 在每 turn (over-eager) → cost 反升</li><li>没 emergency hard cap → 爆 context 全挂</li><li>所有 turn 全 Opus → 4-5x cost</li><li>Decision log 没更新 → 旧决策仍在 prompt</li><li>Recall probe &lt; 80% 不管 → silent quality drift</li></ol>
 <h4>💬 简历 reframe 索引</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Compaction</td><td>Voice agent 7 markets</td><td>10-20 turn 20K+ tok, hierarchical 4-tier + recent 5 verbatim, token 减半</td></tr><tr><td>External memory</td><td>BNPL multi-turn agent</td><td>Postgres (decisions) + Qdrant (history embed) + S3 (tool blob)</td></tr><tr><td>Tool externalization</td><td>ConvFinQA 5 calc tools</td><td>Tool result &gt; 5K 走 blob ref, summary inline, context 稳态 30K</td></tr><tr><td>Lost-in-middle</td><td>Voice agent</td><td>Decision log + pinned + periodic recap 每 10 turn, 关键 recall 95%+</td></tr><tr><td>Cost / routing</td><td>Internal Agent Plt</td><td>Flash 简单 + Opus 推理 + Haiku batch, session $ ↓ 60%</td></tr><tr><td>Prefix cache</td><td>BNPL chatbot</td><td>30K system prompt, Anthropic 5min cache, hit 70%, $ 80% off</td></tr><tr><td>Per-session budget</td><td>Voice agent prod</td><td>Hard cap $1, soft warn $0.50, top 1% session 拦截</td></tr><tr><td>Recall probe</td><td>Voice agent QA</td><td>Weekly 100 session abstract → fact probe, summary 质量阈值</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>题考点</th><th>你的项目</th><th>1-line story</th></tr></thead><tbody><tr><td>Compaction</td><td>Voice agent 7 markets</td><td>10-20 turn 20K+ tok, hierarchical 4-tier + recent 5 verbatim, token 减半</td></tr><tr><td>External memory</td><td>BNPL multi-turn agent</td><td>Postgres (decisions) + Vertex AI Vector Search (history embed) + GCS (tool blob)</td></tr><tr><td>Tool externalization</td><td>ConvFinQA 5 calc tools</td><td>Tool result &gt; 5K 走 blob ref, summary inline, context 稳态 30K</td></tr><tr><td>Lost-in-middle</td><td>Voice agent</td><td>Decision log + pinned + periodic recap 每 10 turn, 关键 recall 95%+</td></tr><tr><td>Cost / routing</td><td>Internal Agent Plt</td><td>Flash 简单 + Opus 推理 + Haiku batch, session $ ↓ 60%</td></tr><tr><td>Prefix cache</td><td>BNPL chatbot</td><td>30K system prompt, Anthropic 5min cache, hit 70%, $ 80% off</td></tr><tr><td>Per-session budget</td><td>Voice agent prod</td><td>Hard cap $1, soft warn $0.50, top 1% session 拦截</td></tr><tr><td>Recall probe</td><td>Voice agent QA</td><td>Weekly 100 session abstract → fact probe, summary 质量阈值</td></tr></tbody></table></div>
 <h4>🎤 面试现场 quotables (top 8)</h4>
 <blockquote><p>"Context management is what separates a 1-turn chatbot from a 50-turn agent. Without it, you hit lost-in-middle by turn 15 and bankruptcy by turn 50."</p></blockquote>
 <blockquote><p>"I run a 4-tier hierarchical summary: ancient 500 tok, middle 1500, recent 5000, latest verbatim. Steady-state context stays at 30K regardless of turn count."</p></blockquote>
@@ -126,7 +126,7 @@ Q: 用什么模型省钱?
 <h4>🚨 红线 (top 10 anti-patterns)</h4>
 <ol><li>Blind truncation (FIFO 砍最老 turn)</li><li>Single mega-summary (失结构, 不可 update)</li><li>All tool outputs verbatim (1KB OK, 50KB 自爆)</li><li>No external memory layer</li><li>No pinning of critical decisions</li><li>Ignoring lost-in-middle</li><li>No cost monitoring / no per-session budget</li><li>No recall probe (quality silent drift)</li><li>No prefix caching (烧钱)</li><li>All turns use Opus / GPT-5.5 (没 routing)</li></ol>
 <h4>🛠️ Tool zoo (2026)</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>Tool</th><th>一句话</th></tr></thead><tbody><tr><td>Memory libs</td><td>LangChain ConversationSummaryBufferMemory, LlamaIndex memory, MemGPT</td><td>起步</td></tr><tr><td>Vector DB</td><td>Qdrant, Pinecone, Weaviate</td><td>Episodic memory</td></tr><tr><td>Blob</td><td>S3, GCS, Azure Blob</td><td>Tool output &gt; 1K</td></tr><tr><td>Structured</td><td>Postgres, Redis, DynamoDB</td><td>Decisions / state</td></tr><tr><td>Tracing</td><td>Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry</td><td>Phoenix 开源</td></tr><tr><td>Prompt cache</td><td>Anthropic 5min, Gemini context cache 1h</td><td>90% off cached</td></tr><tr><td>Cost dashboard</td><td>OTel + Grafana / Phoenix</td><td>Per-session $</td></tr><tr><td>LLM router</td><td>DSPy, Portkey, LiteLLM</td><td>Cost-aware routing</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>类别</th><th>Tool</th><th>一句话</th></tr></thead><tbody><tr><td>Memory libs</td><td>LangChain ConversationSummaryBufferMemory, LlamaIndex memory, MemGPT</td><td>起步</td></tr><tr><td>Vector DB</td><td>Vertex AI Vector Search, Vertex AI Vector Search, Weaviate</td><td>Episodic memory</td></tr><tr><td>Blob</td><td>GCS, GCS, Azure Blob</td><td>Tool output &gt; 1K</td></tr><tr><td>Structured</td><td>Postgres, Redis, Firestore / Bigtable</td><td>Decisions / state</td></tr><tr><td>Tracing</td><td>Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry</td><td>Phoenix 开源</td></tr><tr><td>Prompt cache</td><td>Anthropic 5min, Gemini context cache 1h</td><td>90% off cached</td></tr><tr><td>Cost dashboard</td><td>OTel + Grafana / Phoenix</td><td>Per-session $</td></tr><tr><td>LLM router</td><td>DSPy, Portkey, LiteLLM</td><td>Cost-aware routing</td></tr></tbody></table></div>
 <h4>📊 2026 pricing 速查</h4>
 <pre class="language-plaintext"><code class="language-plaintext">                  Input              Output
 Gemini 3 Pro      $2 (≤200K)         $12 per 1M
@@ -272,7 +272,7 @@ R  Recall probe           (weekly summary quality QA)</code></pre>
 | **Sliding window** | 仅保最近 N turn verbatim | 短会话 baseline |
 | **Hierarchical summary** | 4-tier ancient/middle/recent/latest | Long agent ⭐ |
 | **Selective pruning** | 按 importance score (LLM-judge) 砍低分 turn | Hybrid 配合 |
-| **External memory** | Blob (S3) + Vector DB (Qdrant) + Structured (Postgres) | 数据 > 1K 不进 context |
+| **External memory** | Blob (GCS) + Vector DB (Vertex AI Vector Search) + Structured (Postgres) | 数据 > 1K 不进 context |
 | **Tool output externalization** | > 1K 存 blob, 留 short summary + ref_id | 防爆 |
 | **Lost in middle** | Liu 2023, attention U 形, 中部 30-40% recall | Long ctx 通用问题 |
 | **Pinned message** | 永不被 compact 的关键 turn | 系统决策 / 用户偏好 |
@@ -292,9 +292,9 @@ R  Recall probe           (weekly summary quality QA)</code></pre>
 
 **Framework 2**: External Memory (3 层 store)
 - When: 任何 long agent
-- Algorithm: Blob (S3, tool outputs > 1K) + Vector DB (Qdrant, episodic search) + Postgres (decisions/prefs/state)
+- Algorithm: Blob (GCS, tool outputs > 1K) + Vector DB (Vertex AI Vector Search, episodic search) + Postgres (decisions/prefs/state)
 - Trade-off: 1 extra hop, 但 context 不爆
-- Tools: S3 / GCS, Qdrant / Pinecone, Postgres / Redis / DynamoDB
+- Tools: GCS / GCS, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable
 
 **Framework 3**: Tool Output Externalization
 - When: tool result > 1K token
@@ -356,13 +356,13 @@ Q: 用什么模型省钱?
 - Tools: LangChain ConversationSummaryBufferMemory, MemGPT, LlamaIndex memory
 
 **Problem 2: External Memory Architecture**
-- 3 层 store: Blob (S3) → tool outputs / files / artifacts; Vector DB (Qdrant) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)
+- 3 层 store: Blob (GCS) → tool outputs / files / artifacts; Vector DB (Vertex AI Vector Search) → episodic memory, embed 老 turn; Postgres → 结构化 (decisions, preferences, session_state)
 - Blob usage: store(content) → ref_id, agent tool fetch(ref_id) on demand
 - Vector DB: 老 turn segment → embed → upsert with metadata (turn#, ts, type)
 - Postgres schema: session_id, key, value, type (decision/pref/state), created_at
 - 一致性: write-through (decision 先 Postgres 后 context); read-back probe
 - Top 3 gotchas: 不 externalize 大输出 / vector DB cross-session 混 / Postgres 没 session_id 隔离
-- Tools: S3 / GCS / Azure Blob, Qdrant / Pinecone, Postgres / Redis / DynamoDB
+- Tools: GCS / GCS / Azure Blob, Vertex AI Vector Search / Vertex AI Vector Search, Postgres / Redis / Firestore / Bigtable
 
 **Problem 3: Tool Output Externalization**
 - 阈值: ≤1K inline / 1K-5K summary+ref / 5K-50K minimal+ref / >50K reject
@@ -415,7 +415,7 @@ Q: 用什么模型省钱?
 | 题考点 | 你的项目 | 1-line story |
 |---|---|---|
 | Compaction | Voice agent 7 markets | 10-20 turn 20K+ tok, hierarchical 4-tier + recent 5 verbatim, token 减半 |
-| External memory | BNPL multi-turn agent | Postgres (decisions) + Qdrant (history embed) + S3 (tool blob) |
+| External memory | BNPL multi-turn agent | Postgres (decisions) + Vertex AI Vector Search (history embed) + GCS (tool blob) |
 | Tool externalization | ConvFinQA 5 calc tools | Tool result > 5K 走 blob ref, summary inline, context 稳态 30K |
 | Lost-in-middle | Voice agent | Decision log + pinned + periodic recap 每 10 turn, 关键 recall 95%+ |
 | Cost / routing | Internal Agent Plt | Flash 简单 + Opus 推理 + Haiku batch, session $ ↓ 60% |
@@ -459,9 +459,9 @@ Q: 用什么模型省钱?
 | 类别 | Tool | 一句话 |
 |---|---|---|
 | Memory libs | LangChain ConversationSummaryBufferMemory, LlamaIndex memory, MemGPT | 起步 |
-| Vector DB | Qdrant, Pinecone, Weaviate | Episodic memory |
-| Blob | S3, GCS, Azure Blob | Tool output > 1K |
-| Structured | Postgres, Redis, DynamoDB | Decisions / state |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate | Episodic memory |
+| Blob | GCS, GCS, Azure Blob | Tool output > 1K |
+| Structured | Postgres, Redis, Firestore / Bigtable | Decisions / state |
 | Tracing | Phoenix (Arize), LangSmith, Langfuse, OpenTelemetry | Phoenix 开源 |
 | Prompt cache | Anthropic 5min, Gemini context cache 1h | 90% off cached |
 | Cost dashboard | OTel + Grafana / Phoenix | Per-session $ |

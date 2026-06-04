@@ -71,7 +71,7 @@
 
 - 100M users × avg 50 subscriptions = 5B subscription rows × 50 B = 250 GB
 - 100k offers/day × avg 100 matching subscribers = 10B notification events/day = **115k notification QPS sustained**, 1M peak
-- Storage offers: 100k/day × 5 KB × 365 = 180 GB/year + S3 archive
+- Storage offers: 100k/day × 5 KB × 365 = 180 GB/year + GCS archive
 
 ---
 

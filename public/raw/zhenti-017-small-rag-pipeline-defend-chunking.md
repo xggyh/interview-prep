@@ -66,7 +66,7 @@
 | **HNSW** | 图算法 ANN, 详见 Q18. |
 | **Chroma** | 开源 vector DB, 持久化 + metadata filter 友好. Demo 阶段标配. |
 | **pgvector** | PostgreSQL 向量扩展. 跟业务表共库, 减依赖. |
-| **Pinecone / Weaviate / Qdrant / Milvus** | 托管 / 开源 vector DB. 本题题面禁 Pinecone. |
+| **Vertex AI Vector Search / Weaviate / Vertex AI Vector Search / Milvus** | 托管 / 开源 vector DB. 本题题面禁 Vertex AI Vector Search. |
 | **HyDE (Hypothetical Document Embedding)** | LLM 先回答 (hypothetically), embed 答案, 用它去 retrieve. 对 vague query 有奇效. |
 
 ### Retrieval 算法

@@ -74,7 +74,7 @@
 
 - 每用户一个 **EBS volume**（10-100 GB），挂载到容器 `/workspace`
 - 容器销毁时 detach EBS，下次 attach 到新容器
-- 备份：EBS snapshot 每天一次到 S3
+- 备份：EBS snapshot 每天一次到 GCS
 - 跨 region 同步：选择性（用户付费功能）
 
 ### 3. 网络与端口转发
@@ -91,7 +91,7 @@ edge: https://3000-<workspace-id>.devbox.example.com
 
 ### 4. 容器隔离
 
-**Firecracker MicroVM**（AWS Lambda / Fly.io 同款）：每个 workspace 是一个轻量虚拟机，启动 < 100 ms，与宿主内核完全隔离。比 Docker 安全得多 —— 容器逃逸不影响其他 workspace。
+**Firecracker MicroVM**（Cloud Functions / Fly.io 同款）：每个 workspace 是一个轻量虚拟机，启动 < 100 ms，与宿主内核完全隔离。比 Docker 安全得多 —— 容器逃逸不影响其他 workspace。
 
 替代：gVisor（Google）—— 用户态 syscall 拦截，性能稍弱但隔离强。
 
@@ -129,7 +129,7 @@ class Template:
 | 决策 | 选择 | 替代 |
 |---|---|---|
 | 隔离 | Firecracker MicroVM | Docker（够快但不够安全） / 虚拟机（太重） |
-| FS | EBS per user | NFS / EFS：高延迟，编辑器卡；S3：不支持 POSIX |
+| FS | EBS per user | NFS / EFS：高延迟，编辑器卡；GCS：不支持 POSIX |
 | 编排 | K8s + custom controller | Nomad / 自研：K8s 生态最成熟 |
 | 启动延迟 | Hot pool + snapshot restore | 每次冷启动：用户跑不了 |
 | Image distribution | Stargz lazy pull | Full pull：1GB 镜像得拉 30 秒 |

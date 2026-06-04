@@ -82,7 +82,7 @@ def render_nested(s, mapping):
 > ❌ 找不到 key 时不处理 —— 输出含原始 `${var}` 或应该 raise。
 
 > [!key]
-> 模板引擎核心：**递归 expand + cycle detection**。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Lambda calc 替换。
+> 模板引擎核心：**递归 expand + cycle detection**。同模板用于：Makefile 变量、Bash $VAR 展开、TOML/YAML 引用、Cloud Functions calc 替换。
 
 > [!followup]
 > "支持函数式占位 `${upper(name)}`？" → 解析 `name` 后再 apply function；"延迟 evaluation？" → 返回 lambda 而非 string；"性能（大模板）？" → 预 parse 成 AST 树，多次 render 时直接 walk；"streaming？" → 一边读一边输出，碰到完整 `${...}` 时展开。

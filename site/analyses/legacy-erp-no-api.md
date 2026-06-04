@@ -158,11 +158,11 @@ Month 3+: 真正需要 real-time 时再上 CDC
 **Reality check**:
 - SAP 数据在 Oracle DB 后端, 几千张表 (MARA, MARC, MARD, MSEG...)
 - IT 不让你碰 prod DB
-- 但 BI team 每天凌晨从 SAP 导出 CSV 到 Snowflake
+- 但 BI team 每天凌晨从 SAP 导出 CSV 到 BigQuery
 
 **Phase 1 (Week 1-2)**: 
 - 你和 BI team 谈, 同样的 CSV 给你 read
-- 你接 Snowflake, 你的 AI model 训练 + 推理用日级数据
+- 你接 BigQuery, 你的 AI model 训练 + 推理用日级数据
 - 部署 1 个 demo dashboard 给客户看
 
 **Phase 2 (Month 2-3)**:
@@ -233,12 +233,12 @@ Mexico:         legacy + new mix ↔ ESB
 2. 跟 BI / data engineering team 直接接触, 看现有 ETL
 3. 调查 ERP 厂商 (是 SAP? Oracle? JDE? 各有不同 escape hatch)
 4. 列出你的 use case 需要的具体数据 (哪些表 / 哪些字段)
-5. 找出 customer 已有的 staging Snowflake / Redshift / on-prem warehouse
+5. 找出 customer 已有的 staging BigQuery / BigQuery / on-prem warehouse
 
 **Phase 1 — File drop baseline (Week 2-4)**:
 
 6. 跟 BI 协调: 现有 CSV export 加 1 个 dump for AI use case
-7. 你的服务接 SFTP / shared S3, 增量读取
+7. 你的服务接 SFTP / shared GCS, 增量读取
 8. Schema validation (上游变了就 alert)
 9. 在你的平台跑 first AI model 用 day-1 数据
 10. **部署 visible value** — 至少 1 个 dashboard / 1 个 insight 给客户看

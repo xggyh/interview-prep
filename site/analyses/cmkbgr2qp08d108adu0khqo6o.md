@@ -16,7 +16,7 @@
        │ upload (chunked)
        ▼
   ┌──────────────┐
-  │ Upload API   │  → presigned URL → S3-like blob store
+  │ Upload API   │  → presigned URL → GCS-like blob store
   └──────┬───────┘
          │
          ▼
@@ -103,7 +103,7 @@ Offline 拍的照片 queue + 等 wifi upload。
 
 - Hot (last 90 days): SSD blob
 - Warm: HDD
-- Cold (1 year+): object archive (S3 Glacier)
+- Cold (1 year+): object archive (GCS Glacier)
 
 User access cold photo → 触发 rehydrate (几秒延迟)。
 

@@ -88,7 +88,7 @@
 - When: 系统设计开始
 - Algorithm: corpus < 200K + static + low-vol → long-ctx + cache ⭐; 200K-2M single tenant → Pure Pro 2M; 200K-2M multi-tenant → Hybrid; > 2M → Pure RAG (default)
 - Trade-off: 同 corpus 不同 cost / freshness 走不同分支
-- Tools: Gemini 3 Pro 2M, Claude 200K, Qdrant, Pinecone
+- Tools: Gemini 3 Pro 2M, Claude 200K, Vertex AI Vector Search, Vertex AI Vector Search
 
 **Framework 2**: Cost Math (2026 pricing)
 - When: 任何 architecture 决策
@@ -100,7 +100,7 @@
 - When: 大 corpus + 多 hop
 - Algorithm: RAG retrieve top-10 docs (doc-level not chunk) → 500K total → Gemini 3 Pro 2M → multi-hop within
 - Trade-off: 双层架构 + RAG infra + LLM 调用, 但 quality + cost 折中
-- Tools: Qdrant for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache
+- Tools: Vertex AI Vector Search for RAG, Gemini 3 Pro 2M for ctx, Anthropic prompt cache
 
 **Framework 4**: Citation Strategy
 - When: 始终 (audit / 防 hallucinate)
@@ -112,7 +112,7 @@
 - When: 数据动态 / 多源混合
 - Algorithm: static (年级) → long-ctx + permanent cache; daily → hybrid + nightly cache rebuild; hourly → hybrid + cache invalidate; real-time → pure RAG (hot index)
 - Trade-off: 实时数据 long-ctx 不可
-- Tools: Qdrant snapshot, freshness decay metadata, cache key versioning
+- Tools: Vertex AI Vector Search snapshot, freshness decay metadata, cache key versioning
 
 ### 🌳 关键决策树 (ASCII)
 
@@ -170,12 +170,12 @@ Q: Citation 严格度?
 - Tools: 自实现 cost dashboard, OTel cost attrib per query
 
 **Problem 3: Hybrid Pattern (RAG narrow → Long-ctx within)**
-- 标准架构: RAG (Qdrant + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation
+- 标准架构: RAG (Vertex AI Vector Search + BM25 + hybrid) top-10 doc-level (not chunk) ~500K → Gemini 3 Pro 2M context within → multi-hop 推理 → answer + citation
 - 关键设计: doc-level not chunk (避免 chunk 切碎); top-10 not 100 (cost); 加 prefix cache 5-min reuse
 - Caching: 同 user session 内 prefix 同; cross-session 不 reuse; 关键: cache key 含 RAG candidates set
 - 失效场景: 跨 turn corpus 不同 → cache miss; doc 更新 → cache invalidate
 - Top 3 gotchas: chunk-level not doc-level / 没 cache / 跨 user mix cache
-- Tools: Qdrant retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key
+- Tools: Vertex AI Vector Search retrieval, Gemini 3 Pro 2M, Anthropic prompt cache, Redis for cache key
 
 **Problem 4: Citation + Provenance Comparison**
 - RAG citation 天然: 每 chunk 有 chunk_id, system prompt 要求引用, post-LLM regex validate
@@ -195,7 +195,7 @@ Q: Citation 严格度?
 - Cache invalidation patterns: TTL-based (5min/1h) / version-based (doc hash) / event-based (Kafka invalidate)
 - Update cost analysis: full reload 500K tokens × $2 = $1; delta RAG index 0.001
 - Top 3 gotchas: long-ctx for real-time / cache 不 invalidate / 没 freshness decay
-- Tools: Qdrant snapshots, Anthropic cache headers, Kafka event invalidate
+- Tools: Vertex AI Vector Search snapshots, Anthropic cache headers, Kafka event invalidate
 
 ### 🔥 Production gotchas (top 15)
 
@@ -225,7 +225,7 @@ Q: Citation 严格度?
 | Prefix cache | BNPL system prompt | 30K system + 50K project ctx, hit 70%+, $ 80% off |
 | Citation validate | ConvFinQA | post-LLM regex + Flash SC, hallucinate cite -60% |
 | Hot + warm | BNPL ticket index | hot 24h in-mem 5min, warm month batch, cold archive |
-| Multi-tenant | BNPL 7 markets | Per-tenant Qdrant shard, no cross-tenant cache |
+| Multi-tenant | BNPL 7 markets | Per-tenant Vertex AI Vector Search shard, no cross-tenant cache |
 | Long-ctx middle | Voice agent | 重要 turn 在 start AND end, periodic recap 每 10 turn |
 
 ### 🎤 面试现场 quotables (top 8)
@@ -264,8 +264,8 @@ Q: Citation 严格度?
 | 类别 | Tool | 一句话 |
 |---|---|---|
 | Long-ctx LLM | Gemini 3 Pro 2M, Flash 1M, Claude 200K, GPT-5.5 256K | Pro 2M 最大 |
-| Vector DB | Qdrant, Pinecone, Weaviate, Milvus | RAG 索引 |
-| Sparse | OpenSearch, Elasticsearch | Hybrid 必须 |
+| Vector DB | Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus | RAG 索引 |
+| Sparse | Vertex AI Vector Search, Elasticsearch | Hybrid 必须 |
 | Prefix cache | Anthropic 5min, Gemini context cache 1h | 90% off cached |
 | Tracing | Phoenix (Arize), LangSmith, Langfuse | Per-query cost |
 | Citation validate | 自实现 regex + Flash SC | Hallucinate cite |

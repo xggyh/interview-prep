@@ -419,7 +419,7 @@ def prune_low_importance(messages, target_token_count):
 <h4>2.2 Blob store usage</h4>
 <pre class="language-python"><code class="language-python">class BlobMemory:
     def __init__(self, bucket='agent-blobs'):
-        self.s3 = boto3.client('s3')
+        self.s3 = storage.Client()
         self.bucket = bucket
 
     def put(self, content: str, ttl_hours=24) -&gt; str:
@@ -1663,7 +1663,7 @@ def manage_context(
 ```python
 class BlobMemory:
     def __init__(self, bucket='agent-blobs'):
-        self.s3 = boto3.client('s3')
+        self.s3 = storage.Client()
         self.bucket = bucket
 
     def put(self, content: str, ttl_hours=24) -> str:
