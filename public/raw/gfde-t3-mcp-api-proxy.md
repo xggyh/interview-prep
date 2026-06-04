@@ -408,7 +408,7 @@ agent 要操作 3 个 cloud 资源:
   → 相似 schema, 不同实现
 
 Cross-cloud workflow:
-  Agent: "Copy bigquery export to S3"
+  Agent: "Copy bigquery export to GCS"
   → 1. gcp:bigquery:export (output → gcs)
   → 2. transfer:gcs_to_s3 (or gcp:storage:read + aws:storage:write)
   → 3. confirm completion
@@ -461,7 +461,7 @@ Reality check:
 **设计 MCP Gateway** (作为 platform team):
 
 1. **Tool catalog 持久化** — DB table: tools (id, name, description, schema, owner, version, deprecated)
-2. **Vector index over descriptions** — 给 RAG discovery 用 (Pinecone / Qdrant / pgvector)
+2. **Vector index over descriptions** — 给 RAG discovery 用 (Vertex AI Vector Search / Vertex AI Vector Search / pgvector)
 3. **Per-tool metadata** — required_scopes, rate_limit, cache_policy, version, owner
 4. **OBO token broker** — OAuth scope exchange, per-tenant key isolation
 5. **Trace propagation** — OpenTelemetry headers passed to MCP servers
@@ -1163,7 +1163,7 @@ Even if fits: LLM 在 500 tool 里选错率 ~30% (太多选项 attention dilute)
 class ToolDiscovery:
     def __init__(self):
         # Vector index over tool descriptions
-        self.vector_db = QdrantClient(...)
+        self.vector_db = VertexVectorSearchClient(...)
         # Tool metadata DB
         self.db = ...
     
@@ -1248,7 +1248,7 @@ Domain layer:
   - "CRM" (Salesforce, HubSpot, Pipedrive)
   - "Payments" (Stripe, PayPal, Adyen)
   - "Communication" (Slack, Email, SMS)
-  - "Data" (BigQuery, Snowflake, Postgres)
+  - "Data" (BigQuery, BigQuery, Postgres)
 
 LLM first picks domain (10 options), then tool within domain (20-50 options).
 
@@ -1385,7 +1385,7 @@ After RAG discovery:
   Per-query: top-20 returned: 4K token
   Tool selection accuracy: 92% (+22pp)
   Per-call cost: $0.008 input (10x reduction)
-  RAG retrieval latency: 30ms (Qdrant + text-embedding-3)
+  RAG retrieval latency: 30ms (Vertex AI Vector Search + text-embedding-3)
 ```
 
 简历挂钩: **"70% → 92% tool selection accuracy"** 这个数字是你 Internal Agent Platform 的拿手 quote.
@@ -1971,7 +1971,7 @@ class OpenAPIToMCPGenerator:
 >
 > **(2) Per-service MCP server** wrapping each microservice. REST adapter pattern: hand-curated tool descriptions (auto-gen from OpenAPI is bad — descriptions too technical for LLM). 1 day work per service for clean MCP.
 >
-> **(3) Tool discovery** via Qdrant vector index + RBAC pre-filter + hybrid retrieval (dense + BM25 with RRF) + usage frequency boost. Return top-20 to LLM, not all 500. Our internal data: tool selection accuracy 70% → 92% after RAG + per-user history weighting.
+> **(3) Tool discovery** via Vertex AI Vector Search vector index + RBAC pre-filter + hybrid retrieval (dense + BM25 with RRF) + usage frequency boost. Return top-20 to LLM, not all 500. Our internal data: tool selection accuracy 70% → 92% after RAG + per-user history weighting.
 >
 > **(4) Versioning + eval**: schema-diff CI check, breaking change forces major version bump, adapter chain v1 ↔ v2, 90-day deprecation window with customer notification, daily eval against golden set to detect drift.
 >
@@ -2154,7 +2154,7 @@ Versioning:
 Legacy integration:
   REST API → adapter (modern)
   Mainframe → 3270 scrape (read-only)
-  Batch only → file drop S3
+  Batch only → file drop GCS
   Always: graceful degradation tier-1 → tier-4
 
 Cache policy:

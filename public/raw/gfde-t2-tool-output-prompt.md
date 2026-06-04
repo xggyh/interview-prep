@@ -1401,7 +1401,7 @@ Tool zoo (2026):
   PII: presidio (Microsoft)
   Tracing: Phoenix (Arize), LangSmith
   Schema registry: in-app or JSON schema files
-  Blob store: S3 / GCS / Azure Blob
+  Blob store: GCS / GCS / Azure Blob
 
 红线:
   - Raw dump

@@ -250,7 +250,7 @@ step_3_charge_payment(order, idem_key):
 | **Linearizability** | Reads + writes appear in single global order | Coordinated DB (Spanner, FoundationDB) |
 | **Sequential consistency** | Operations of each process in order | Some MQ guarantees |
 | **Causal consistency** | Causally related events in order | Collaborative apps (Notion, Figma) |
-| **Eventual consistency** | Eventually all replicas converge | DNS, S3, gossip protocols, cross-vendor agent workflow ⭐ |
+| **Eventual consistency** | Eventually all replicas converge | DNS, GCS, gossip protocols, cross-vendor agent workflow ⭐ |
 
 ### 4.2 Distributed transaction patterns
 

@@ -151,8 +151,8 @@ Turn 50:
   └────────────────────────┘
 
 External components:
-  ├── Blob store (S3): full tool outputs
-  ├── Vector DB (Qdrant): semantic memory of old turns
+  ├── Blob store (GCS): full tool outputs
+  ├── Vector DB (Vertex AI Vector Search): semantic memory of old turns
   ├── Structured memory (Postgres): facts, preferences, decisions
   └── File system: working files agent reads/writes
 ```
@@ -167,7 +167,7 @@ External components:
 | **Episodic memory** | Vector DB | "你之前说过 X" 类查询 | 旧 turn 摘要, embed 后 search |
 | **Semantic memory** | Postgres / KV | 用户 preferences / facts | "用户喜欢 dark mode" / "项目用 FastAPI" |
 | **Procedural memory** | LLM weights + system prompt | How to use tools | Tool 使用说明, examples |
-| **External docs** | Vector DB / S3 | User-uploaded reference material | 用户上传的 PDF |
+| **External docs** | Vector DB / GCS | User-uploaded reference material | 用户上传的 PDF |
 | **Scratchpad** | Local file / blob | Agent 自己的工作笔记 | research_notes.md |
 | **Decision log** | Structured Postgres | 永远不能丢的决策 | "user approved spec on turn 12" |
 
@@ -247,7 +247,7 @@ Agent 监控 metric, 每 30s data update:
 
 1. **设定 soft cap / hard cap**: e.g., model_limit = 128K, soft = 70% = 90K, hard = 90% = 115K
 2. **设计 message tagging**: 每 message 加 metadata `{type, importance, source, ts, pinned}`
-3. **设计 external memory schema**: 哪些进 vector DB, 哪些进 KV, 哪些进 S3
+3. **设计 external memory schema**: 哪些进 vector DB, 哪些进 KV, 哪些进 GCS
 4. **设计 tool 列表**: `read_file`, `get_full_tool_output`, `recall_past`, `write_note` 等
 
 **在线运行时**:
@@ -289,7 +289,7 @@ Agent 监控 metric, 每 30s data update:
 | 9 | **每 turn 全量 compact** | Compact 本身就贵, 应该 threshold trigger |
 | 10 | **No recall test** | Summary 静默坏掉, agent 忘东忘西无 metric |
 | 11 | **Block on compaction** | User 等 5s 才回应, 应 async |
-| 12 | **External memory 不归一** | Vector DB / Postgres / S3 状态不一致 |
+| 12 | **External memory 不归一** | Vector DB / Postgres / GCS 状态不一致 |
 
 ---
 
@@ -529,7 +529,7 @@ def manage_context(
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  Blob store (S3 / GCS)                   │
+│                  Blob store (GCS / GCS)                   │
 │    - Full tool outputs (>1K tokens)                      │
 │    - Uploaded files (PDFs, CSVs)                         │
 │    - Long agent-generated artifacts                      │
@@ -537,7 +537,7 @@ def manage_context(
 └──────────────────┬──────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────┐
-│              Vector DB (Qdrant / Pinecone)               │
+│              Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)               │
 │    - Episodic memory: old turn summaries indexed         │
 │    - User-uploaded doc chunks                            │
 │    - Project knowledge (Confluence / Slack archive)      │
@@ -597,7 +597,7 @@ Agent 用 `get_full_tool_output(ref_id)` 拿全文 — 自助按需 fetch.
 ```python
 class EpisodicMemory:
     def __init__(self):
-        self.qdrant = QdrantClient()
+        self.qdrant = VertexVectorSearchClient()
         self.qdrant.create_collection(
             collection_name='agent_memory',
             vectors_config={'size': 768, 'distance': 'Cosine'},
@@ -1293,8 +1293,8 @@ production sweet spot: **hierarchical + Flash summary + prefix caching ≈ $0.20
 > - Step D: reinforce decisions / preferences at end (lost-in-middle defense)
 >
 > **External memory**: 3 store
-> - Blob (S3): full tool outputs, key by content hash, 24h TTL
-> - Vector DB (Qdrant): episodic, search past turns by semantic
+> - Blob (GCS): full tool outputs, key by content hash, 24h TTL
+> - Vector DB (Vertex AI Vector Search): episodic, search past turns by semantic
 > - Postgres: structured (decisions, user_preferences, session_state)
 >
 > **Tool output handling**: >1K → externalize, replace with `<tool_output ref="...">{summary}</tool_output>`; agent has `get_full_tool_output(ref)` to fetch on demand
@@ -1360,7 +1360,7 @@ production sweet spot: **hierarchical + Flash summary + prefix caching ≈ $0.20
 **A**:
 - Persist conversation state to Postgres (session_id, turns, decisions, preferences) on session-end
 - On resume: load last summary + last 5 turns from DB + system prompt with decisions injected
-- Optionally: snapshot full state before close, semantic-index all turns to Qdrant
+- Optionally: snapshot full state before close, semantic-index all turns to Vertex AI Vector Search
 - **Practical**: 80% restore is enough; pixel-perfect not worth the cost
 - **User confirms continuity**: agent says "last time we agreed X — continuing on Y. Sound right?" — explicit handshake
 
@@ -1433,8 +1433,8 @@ Hierarchical 4 tier:
   Tier 4: latest (verbatim, last 5-10 turns)
 
 External memory (3 store):
-  Blob (S3): tool outputs >1K, files, artifacts
-  Vector DB (Qdrant): episodic memory, semantic search past
+  Blob (GCS): tool outputs >1K, files, artifacts
+  Vector DB (Vertex AI Vector Search): episodic memory, semantic search past
   Postgres: structured (decisions, preferences, session_state)
 
 Tool output thresholds:
@@ -1479,9 +1479,9 @@ Observability:
 
 Tool zoo (2026):
   Tracing: Phoenix (Arize), LangSmith, Langfuse
-  Vector DB: Qdrant, Pinecone, Weaviate
-  Blob: S3, GCS, Azure Blob
-  Structured: Postgres, Redis, DynamoDB
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
+  Blob: GCS, GCS, Azure Blob
+  Structured: Postgres, Redis, Firestore / Bigtable
   Compaction libs: LangChain ConversationSummaryBufferMemory, LlamaIndex memory
 
 红线:

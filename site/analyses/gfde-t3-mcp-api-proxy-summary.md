@@ -24,7 +24,7 @@ MCP (Anthropic 2024 开源, 2026 业界标准) = vendor-neutral, 跨 Claude/Gemi
 ### Layer 2: Gateway 6 责任 (统一入口)
 
 ```
-1. Tool discovery   RAG over tool descriptions (Qdrant + RRF)
+1. Tool discovery   RAG over tool descriptions (Vertex AI Vector Search + RRF)
 2. Auth + OBO       OAuth scope exchange (RFC 8693), token broker
 3. Rate limit       Token bucket per (user, tool, tenant)
 4. Observability    OTel trace propagation end-to-end
@@ -66,7 +66,7 @@ Agent service principal 不直接调 API. 每次走 token broker 换 service_tok
 - **EC2 MCP server crash**: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.
 - **EC3 Auto-gen MCP from OpenAPI**: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.
 - **EC4 Latency sub-100ms 不允许 MCP overhead**: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.
-- **EC5 Legacy mainframe COBOL 没 modern API**: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop S3 daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".
+- **EC5 Legacy mainframe COBOL 没 modern API**: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop GCS daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".
 
 ### Production hardening
 
@@ -160,7 +160,7 @@ Adapter pattern: REST → MCP wrapper ~1 day/service, hand-curate description (N
 
 Versioning: semver in tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite
 
-Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop S3 / always graceful degrade tier 1-4
+Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop GCS / always graceful degrade tier 1-4
 
 Cache policy: idempotent read cached w/ TTL, write NEVER cached, per-user isolation, semantic for fuzzy
 

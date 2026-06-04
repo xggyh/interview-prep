@@ -6,7 +6,7 @@
 
 > "RAG recall drops 20% when you change chunking from 512 tokens to 1024. Why? When is each better?"
 
-**出处**: Google FDE T2 / Pinecone / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.
+**出处**: Google FDE T2 / Vertex AI Vector Search / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.
 
 **Round**: RAG Pipeline Design (45 min)
 
@@ -240,7 +240,7 @@ production 90% 用 **heading-aware recursive + fixed-size fallback + table/code 
 
 **Phase 1: 文档解析**:
 
-1. **PDF → 结构化**: 用 `unstructured`, `pymupdf`, `PyPDF2`, 或商用 (Azure Document Intelligence, AWS Textract)
+1. **PDF → 结构化**: 用 `unstructured`, `pymupdf`, `PyPDF2`, 或商用 (Azure Document Intelligence, Document AI)
 2. **Element 分类**: title / heading / paragraph / table / list / code / figure
 3. **Heading hierarchy 建树**: H1 > H2 > H3, 维护 ancestor path
 4. **OCR fallback** for image-only PDF (Tesseract / Azure)
@@ -260,8 +260,8 @@ production 90% 用 **heading-aware recursive + fixed-size fallback + table/code 
 
 **Phase 4: Index**:
 
-12. **Dense index** to Qdrant / Pinecone (含 metadata)
-13. **Sparse index** to OpenSearch (BM25) — 同 chunk text
+12. **Dense index** to Vertex AI Vector Search / Vertex AI Vector Search (含 metadata)
+13. **Sparse index** to Vertex AI Vector Search (BM25) — 同 chunk text
 14. **Metadata 双写** 保持一致
 
 **Phase 5: 更新管理**:
@@ -692,9 +692,9 @@ Query 时可以 text-query 命中 image (CLIP-class 共享空间) 或 hybrid que
 
 | 任务 | 工具 |
 |---|---|
-| PDF 结构化 | `unstructured`, `pymupdf`, Azure Document Intelligence, AWS Textract |
+| PDF 结构化 | `unstructured`, `pymupdf`, Azure Document Intelligence, Document AI |
 | 表格提取 | Camelot, Tabula, pdfplumber, Azure Form Recognizer |
-| OCR | Tesseract, AWS Textract, Google Document AI |
+| OCR | Tesseract, Document AI, Google Document AI |
 | Code AST | tree-sitter (语言无关), Python ast 模块 |
 | LaTeX from PDF | mathpix API, pix2tex |
 | Multimodal embed | CLIP, BLIP, gemini-embedding multimodal |
@@ -860,8 +860,8 @@ def tag_pii(chunk_text):
 10K PDF × avg 100 chunk per doc = 1M chunks
 1M chunks × gemini-embedding-001 batch 256 = 4000 batch calls
 Each batch ~200ms = 800s = 13 minutes (just for embedding)
-+ Qdrant bulk upsert ~10 minutes
-+ OpenSearch bulk index ~15 minutes
++ Vertex AI Vector Search bulk upsert ~10 minutes
++ Vertex AI Vector Search bulk index ~15 minutes
 
 总: 40+ 分钟 stop-the-world reindex
 每天 / 每小时改个 doc 都 full reindex → 显然不可
@@ -970,12 +970,12 @@ async def reindex_worker():
 ```
 Hot index:
   Last 24h created/updated docs
-  In-memory Qdrant 小 collection
+  In-memory Vertex AI Vector Search 小 collection
   Refresh every 5 min from doc DB
 
 Warm index:
   Older docs
-  Persistent Qdrant collection
+  Persistent Vertex AI Vector Search collection
   Async background reindex
 
 Query: search both, RRF merge
@@ -1241,7 +1241,7 @@ jobs:
 **Q1**: "Smaller chunks = more vectors = more storage. Cost concern."
 
 **A**:
-- **Storage**: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Qdrant.
+- **Storage**: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Vertex AI Vector Search.
 - **Index size (HNSW)**: 1.5-2x raw, still cheap
 - **Query cost**: ANN search O(log n), small impact
 - **Real cost**: embedding upfront — 1M chunks × 500 tok × $0.025/1M = $12.5 one-time. Negligible amortized.
@@ -1389,12 +1389,12 @@ Per-source-type chunker:
 
 Tool zoo (2026):
   PDF parse: unstructured, pymupdf, Azure Document Intelligence
-  Tables: Camelot, Tabula, AWS Textract
+  Tables: Camelot, Tabula, Document AI
   Code AST: tree-sitter
   PII: presidio (Microsoft)
   Embedding: gemini-embedding-001, text-embedding-3, bge-large
   Late chunking: jina-embeddings-v3
-  Vector DB: Qdrant, Pinecone, Weaviate, Milvus
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus
 
 红线:
   - Fixed-size everywhere

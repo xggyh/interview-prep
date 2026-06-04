@@ -277,7 +277,7 @@ Failure → L4 Recovery:
 **Phase 3: L3 Audit (Week 5-6)**
 
 - Audit log schema
-- Storage tier (hot DB / cold S3)
+- Storage tier (hot DB / cold GCS)
 - Hash-chaining (block hash + prev hash)
 - Compliance retention (per-jurisdiction)
 - Forensic query tool (per-actor / per-action / per-time)
@@ -745,9 +745,9 @@ async def write_audit(action, outcome, ctx):
 
 | Tier | Retention | Storage | Use Case |
 |---|---|---|---|
-| **Hot** | 90 days | Postgres / OpenSearch | Real-time query, alerts, ops dashboards |
-| **Warm** | 1 year | S3 + Parquet | Slow query for investigation |
-| **Cold** | 7 years | S3 Glacier | Compliance retention (financial / health) |
+| **Hot** | 90 days | Postgres / Vertex AI Vector Search | Real-time query, alerts, ops dashboards |
+| **Warm** | 1 year | GCS + Parquet | Slow query for investigation |
+| **Cold** | 7 years | GCS Glacier | Compliance retention (financial / health) |
 
 **Retention by data class**:
 
@@ -809,7 +809,7 @@ def verify_chain():
         expected_prev = entry['hash']
 ```
 
-**Storage**: append-only blob store (S3 Object Lock + Glacier) prevents overwrite even by admin.
+**Storage**: append-only blob store (GCS Object Lock + Glacier) prevents overwrite even by admin.
 
 ### 3.5 Audit Use Cases
 
@@ -1533,13 +1533,13 @@ L3 Audit:
   Fields: actor / on_behalf_of / tool / args / result / 
           scope / tenant / trace_id / ts / reasoning / confirmed_by
   Storage tiers:
-    Hot 90d (Postgres / OpenSearch) — queryable, alerts
-    Warm 1y (S3 Parquet) — slow query
-    Cold 7y (S3 Glacier) — compliance
+    Hot 90d (Postgres / Vertex AI Vector Search) — queryable, alerts
+    Warm 1y (GCS Parquet) — slow query
+    Cold 7y (GCS Glacier) — compliance
   PII redaction:
     Day 0-30: full audit with redaction patterns
     Day 30+: more aggressive redaction (only IDs + types)
-  Immutability: hash-chained + S3 Object Lock + Glacier
+  Immutability: hash-chained + GCS Object Lock + Glacier
 
 L4 Recovery:
   Outbox: write intent BEFORE execute

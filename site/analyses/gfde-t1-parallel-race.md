@@ -884,7 +884,7 @@ async def hold_with_heartbeat(lock, work):
 - **etcd**: `etcd3` lease-based locks
 - **Hazelcast / Apache Curator**: enterprise distributed locks
 - **PostgreSQL advisory locks**: `pg_advisory_lock`, 简单 use case
-- **Cloud**: AWS DynamoDB conditional writes (cheap fencing)
+- **Cloud**: Firestore / Bigtable conditional writes (cheap fencing)
 
 ---
 

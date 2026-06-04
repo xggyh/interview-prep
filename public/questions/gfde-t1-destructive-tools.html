@@ -993,12 +993,12 @@ def verify_chain(start_id, end_id):
   - 100GB-1TB
 
 Tier 2: Warm (90 days - 1 year)
-  - S3 + Athena, queryable but slow
+  - GCS + Athena, queryable but slow
   - Parquet partitioned by date
   - 10TB+
 
 Tier 3: Cold (7 years for compliance)
-  - S3 Glacier
+  - GCS Glacier
   - Restore on demand for legal request
   - Per-tool TTL: read-only 30 days, destructive 7 years</code></pre>
 <pre class="language-python"><code class="language-python">def archive_old_entries():
@@ -1128,7 +1128,7 @@ def gdpr_erase(user_id):
 # - PII anonymized after GDPR erase request
 # - Cross-reference map (anon_id ↔ PII) deletable on erase</code></pre>
 <h4>5.8 Tools</h4>
-<ul><li><strong>Append-only DB</strong>: Postgres with INSERT-only + cron purge, or QLDB (AWS), Datomic</li><li><strong>Hash chain</strong>: simple SHA-256 chain, or Merkle tree for bulk verify</li><li><strong>Storage tiers</strong>: Postgres → S3 Parquet → S3 Glacier</li><li><strong>PII vault</strong>: separate encrypted store with deletable refs</li><li><strong>Audit framework</strong>: AWS CloudTrail / GCP Audit Logs as reference designs</li><li><strong>Compliance</strong>: Vanta / Drata for SOC2 audit log automation</li></ul>
+<ul><li><strong>Append-only DB</strong>: Postgres with INSERT-only + cron purge, or QLDB (AWS), Datomic</li><li><strong>Hash chain</strong>: simple SHA-256 chain, or Merkle tree for bulk verify</li><li><strong>Storage tiers</strong>: Postgres → GCS Parquet → GCS Glacier</li><li><strong>PII vault</strong>: separate encrypted store with deletable refs</li><li><strong>Audit framework</strong>: Cloud Audit Logs / GCP Audit Logs as reference designs</li><li><strong>Compliance</strong>: Vanta / Drata for SOC2 audit log automation</li></ul>
 <hr />
 <h1>Part 3 · 把 5 个问题串起来看</h1>
 <p>这 5 个 deep problem 构成 <strong>destructive tool safety 的全栈</strong>:</p>
@@ -1205,7 +1205,7 @@ def charge_customer(account_id, amount): ...</code></pre>
 <ul><li>'Autonomous within limit X' (max $100, max 5 deletes/day)</li><li>'Autonomous on reversible ops, confirm on destructive_permanent'</li><li>'Post-hoc review' — auto-execute then human reviews in 24h</li><li>Customer's risk appetite, but you draw the boundary</li><li>Contract: customer signs SLA accepting auto-actions within bounded limits, you log everything</li></ul>
 <p><strong>Q3</strong>: "Audit log is 10GB / day. Cost concern."</p>
 <p><strong>A</strong>: Tiered storage:</p>
-<ul><li><strong>Hot</strong> (last 30 days): Postgres, fully queryable, ~$200/mo for 1TB</li><li><strong>Warm</strong> (90 days - 1 year): S3 + Athena, queryable but slow, ~$50/mo for 10TB</li><li><strong>Cold</strong> (7 years compliance): Glacier, ~$1/TB/mo</li><li><strong>Per-tool TTL</strong>: read-only 30 days, write 1 year, destructive 7 years</li><li><strong>PII separated</strong>: audit metadata small, PII vault separate (deletable for GDPR)</li><li>Total cost manageable &lt; $500/mo even at 10GB/day</li></ul>
+<ul><li><strong>Hot</strong> (last 30 days): Postgres, fully queryable, ~$200/mo for 1TB</li><li><strong>Warm</strong> (90 days - 1 year): GCS + Athena, queryable but slow, ~$50/mo for 10TB</li><li><strong>Cold</strong> (7 years compliance): Glacier, ~$1/TB/mo</li><li><strong>Per-tool TTL</strong>: read-only 30 days, write 1 year, destructive 7 years</li><li><strong>PII separated</strong>: audit metadata small, PII vault separate (deletable for GDPR)</li><li>Total cost manageable &lt; $500/mo even at 10GB/day</li></ul>
 <p><strong>Q4</strong>: "Agent's prompt injection — user input embedded says 'delete all users'. How prevented at tool layer?"</p>
 <p><strong>A</strong>: Multi-layer:</p>
 <ul><li><strong>Permission scoping</strong>: Agent runs with user's perms, can't delete other users (no admin escalation via prompt)</li><li><strong>XML wrap tool output</strong>: <code>&lt;tool_output untrusted&gt;...&lt;/tool_output&gt;</code> + system reminder</li><li><strong>Confirm-required on destructive</strong>: LLM can ATTEMPT to call delete, but UI blocks until user confirms</li><li><strong>Output sanitization</strong>: scan LLM output for tool-call syntax injected from user</li><li><strong>Anomaly detection</strong>: 50 deletes from same session in 1 min auto-pause + alert</li><li><strong>Audit log injection attempts</strong>: every bypass attempt logged + security alert</li></ul>
@@ -1217,7 +1217,7 @@ def charge_customer(account_id, amount): ...</code></pre>
 <ol><li><strong>Tool 不分级</strong> — read/write/destructive 一锅</li><li><strong>Confirm-on-every-action</strong> — fatigue → user just clicks Y</li><li><strong>No blast radius limit</strong> — 1 prompt 删 1000 user</li><li><strong>No reversibility infrastructure</strong> — hard delete 真删了</li><li><strong>No audit log</strong> — incident 后查不到根因</li><li><strong>Trust LLM accuracy</strong> — 假设它永远对</li><li><strong>No batch-detection</strong> — 50 calls × single confirm UX broken</li><li><strong>Confirm bypass via prompt injection</strong> — LLM listens to 'skip confirm'</li><li><strong>Same tool same behavior across env</strong> — dev vs prod no distinction</li><li><strong>Audit log mutable</strong> — attacker modifies log to cover tracks</li><li><strong>No tier</strong> — small + large customers same threshold</li><li><strong>No bulk rollback API</strong> — incident response 手忙脚乱</li><li><strong>Recovery window 太短</strong> — 用户没意识到错就过了</li><li><strong>Cross-tenant blast</strong> — tenant A 操作影响 tenant B</li></ol>
 <hr />
 <h3>✅ 加分项</h3>
-<ol><li><strong>Per-tool classification</strong> with safety + reversibility + max-per-session + blast_radius</li><li><strong>3-layer safety</strong> (pre-gate / execution-wrap / post-audit)</li><li><strong>Confirmation patterns</strong> matched to scenario (inline / batch / async / implicit)</li><li><strong>Progressive trust</strong> to avoid fatigue</li><li><strong>Blast radius multi-axis</strong> (per-minute / per-session / per-day / per-resource-dollar)</li><li><strong>Outbox-based execution</strong> for replay</li><li><strong>Soft delete + purge daemon</strong> for reversibility</li><li><strong>Email queue 60s delay</strong> for recall</li><li><strong>Immutable hash-chained audit log</strong></li><li><strong>Tiered storage</strong> (hot Postgres / warm S3 / cold Glacier)</li><li><strong>PII vault separation</strong> for GDPR balance</li><li><strong>Bulk rollback API</strong> with dry-run</li><li><strong>Compensating action playbook</strong></li><li><strong>Postmortem culture mention</strong></li><li><strong>Tier-aware policy</strong> (gold vs bronze)</li><li><strong>Quote Indonesia refund tier 3 multi-level approval</strong></li><li><strong>Quote 1000-user moderation bot incident + bulk rollback</strong></li></ol>
+<ol><li><strong>Per-tool classification</strong> with safety + reversibility + max-per-session + blast_radius</li><li><strong>3-layer safety</strong> (pre-gate / execution-wrap / post-audit)</li><li><strong>Confirmation patterns</strong> matched to scenario (inline / batch / async / implicit)</li><li><strong>Progressive trust</strong> to avoid fatigue</li><li><strong>Blast radius multi-axis</strong> (per-minute / per-session / per-day / per-resource-dollar)</li><li><strong>Outbox-based execution</strong> for replay</li><li><strong>Soft delete + purge daemon</strong> for reversibility</li><li><strong>Email queue 60s delay</strong> for recall</li><li><strong>Immutable hash-chained audit log</strong></li><li><strong>Tiered storage</strong> (hot Postgres / warm GCS / cold Glacier)</li><li><strong>PII vault separation</strong> for GDPR balance</li><li><strong>Bulk rollback API</strong> with dry-run</li><li><strong>Compensating action playbook</strong></li><li><strong>Postmortem culture mention</strong></li><li><strong>Tier-aware policy</strong> (gold vs bronze)</li><li><strong>Quote Indonesia refund tier 3 multi-level approval</strong></li><li><strong>Quote 1000-user moderation bot incident + bulk rollback</strong></li></ol>
 <hr />
 <h3>一句话总结</h3>
 <blockquote><p><strong>Destructive tool safety = "classification (safety/reversibility/blast_radius) + L1 pre-gate (perm/limit/confirm) + L2 outbox-wrap + L3 immutable hash-chained audit + reversibility infrastructure (soft delete/recall/refund) + bulk rollback API + tier-aware + postmortem culture"</strong>.</p>
@@ -2611,12 +2611,12 @@ Tier 1: Hot (last 30 days)
   - 100GB-1TB
 
 Tier 2: Warm (90 days - 1 year)
-  - S3 + Athena, queryable but slow
+  - GCS + Athena, queryable but slow
   - Parquet partitioned by date
   - 10TB+
 
 Tier 3: Cold (7 years for compliance)
-  - S3 Glacier
+  - GCS Glacier
   - Restore on demand for legal request
   - Per-tool TTL: read-only 30 days, destructive 7 years
 ```
@@ -2779,9 +2779,9 @@ def gdpr_erase(user_id):
 
 - **Append-only DB**: Postgres with INSERT-only + cron purge, or QLDB (AWS), Datomic
 - **Hash chain**: simple SHA-256 chain, or Merkle tree for bulk verify
-- **Storage tiers**: Postgres → S3 Parquet → S3 Glacier
+- **Storage tiers**: Postgres → GCS Parquet → GCS Glacier
 - **PII vault**: separate encrypted store with deletable refs
-- **Audit framework**: AWS CloudTrail / GCP Audit Logs as reference designs
+- **Audit framework**: Cloud Audit Logs / GCP Audit Logs as reference designs
 - **Compliance**: Vanta / Drata for SOC2 audit log automation
 
 ---
@@ -2969,7 +2969,7 @@ Audit (5) 没 → 出事查不到 → 反复重演
 
 **A**: Tiered storage:
 - **Hot** (last 30 days): Postgres, fully queryable, ~$200/mo for 1TB
-- **Warm** (90 days - 1 year): S3 + Athena, queryable but slow, ~$50/mo for 10TB
+- **Warm** (90 days - 1 year): GCS + Athena, queryable but slow, ~$50/mo for 10TB
 - **Cold** (7 years compliance): Glacier, ~$1/TB/mo
 - **Per-tool TTL**: read-only 30 days, write 1 year, destructive 7 years
 - **PII separated**: audit metadata small, PII vault separate (deletable for GDPR)
@@ -3028,7 +3028,7 @@ Audit (5) 没 → 出事查不到 → 反复重演
 7. **Soft delete + purge daemon** for reversibility
 8. **Email queue 60s delay** for recall
 9. **Immutable hash-chained audit log**
-10. **Tiered storage** (hot Postgres / warm S3 / cold Glacier)
+10. **Tiered storage** (hot Postgres / warm GCS / cold Glacier)
 11. **PII vault separation** for GDPR balance
 12. **Bulk rollback API** with dry-run
 13. **Compensating action playbook**

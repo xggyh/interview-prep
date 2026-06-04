@@ -1598,7 +1598,7 @@ Alerts:
 **主动 quote** (面试场说出来):
 
 > "I built three different statefulness patterns in production at TikTok Global Payment:
-> - **Voice agent**: strict stateful, WebSocket-bound, in-process actor pattern. Single biggest challenge was per-call state size cap — long calls 20min+ accumulating ASR transcript would OOM. Solution: rolling summarize after 5min, dump to S3.
+> - **Voice agent**: strict stateful, WebSocket-bound, in-process actor pattern. Single biggest challenge was per-call state size cap — long calls 20min+ accumulating ASR transcript would OOM. Solution: rolling summarize after 5min, dump to GCS.
 > - **BNPL chatbot**: hybrid stateless API + 4-tier cache. KV cache hint with conversation_id gave 80% prefix reuse, p99 dropped from 1.2s → 450ms.
 > - **Refund workflow**: stateful via Temporal. Workflow_id is state. Cross-vendor (payment provider + CRM), 2PC impossible, Saga + verify-on-timeout.
 >

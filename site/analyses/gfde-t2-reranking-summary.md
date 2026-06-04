@@ -200,7 +200,7 @@ GCP stack (2026):
   Vertex AI Ranker (managed cross-encoder, no GPU mgmt)
   Vertex AI Endpoints (self-host bge on A10G/A100)
   Triton/vLLM | Cloud Trace | Cloud Monitoring
-  AWS: SageMaker / Bedrock Reranker / Kendra
+  AWS: SageMaker / Vertex AI Reranker / Kendra
 
 Decision when to use:
   QPS<10 generic       → Cohere rerank-3 API

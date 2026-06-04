@@ -50,7 +50,7 @@ FDE 的工作不是 "写最好的代码", 是 **"让这个客户 6 个月后给�
 ```
 Week 1: 客户说 "用 AI 提升销售效率"
         你想: 销售大概是 lead 进来、跟进、报价、成单
-        你开始写 LangChain agent + Pinecone + Salesforce SDK
+        你开始写 LangChain agent + Vertex AI Vector Search + Salesforce SDK
         架构图画了 3 张
 
 Week 2: 你写了 RAG over 客户的产品文档
@@ -496,7 +496,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting
 **Tech Stack (deliberately minimal for MVP)**:
 
 - **LLM**: Gemini 3 Pro ($2/$12 per 1M) for reasoning + summarization, Gemini 3 Flash ($0.50/$3) for cheap operations (parsing, formatting). Skip self-host.
-- **Vector DB**: Pinecone (cloud, 几分钟接好). 不要自建.
+- **Vector DB**: Vertex AI Vector Search (cloud, 几分钟接好). 不要自建.
 - **Frontend**: Streamlit (Python, 1 天起页). 不上 Next.js.
 - **Integration**: Salesforce Read-only API. 不写, 减权限审批时间.
 - **Storage**: Postgres (Supabase free tier). 不上 distributed DB.
@@ -766,7 +766,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting
 | Multi-tenancy | **NO** | 1 customer |
 | Auth (proper SSO) | **NO** | Basic password / 仅 demo 用 |
 | CI/CD pipeline | **NO** | Manual deploy |
-| Vector DB self-host | **NO** | Pinecone managed |
+| Vector DB self-host | **NO** | Vertex AI Vector Search managed |
 | Auto-scaling | **NO** | 1 instance |
 | GDPR / compliance | **NO** (for MVP) | Demo data 用 fake, compliance 在 pilot phase |
 | Edge case handling | **NO** | 失败让用户 retry |
@@ -1037,7 +1037,7 @@ Week 3 Day 14 demo 30 min 节奏:
 > 10 sub-step sales workflow. Score each on (耗时 × 痛 × LLM-friendly × data ready). Pick Step 2 (qualification) — highest scoring.
 >
 > **M — MVP (Week 1-3)**:
-> Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.
+> Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.
 >
 > **P — Pilot (Week 4-12)**:
 > 3 friendly reps soft launch → 3 vs 3 A/B → iterate → 10-20 rep expand. Weekly KPI review.
@@ -1199,7 +1199,7 @@ MVP carve-out 红线:
   1 happy path
   1 user
   Streamlit / Next.js
-  Pinecone (managed)
+  Vertex AI Vector Search (managed)
   GCP Cloud Run (single)
   Read-only API
   No multi-tenant

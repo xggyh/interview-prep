@@ -401,14 +401,14 @@ Production combo:
   
   Per-request:
     1. Route by tenant_id, look up LoRA
-    2. If LoRA not in hot pool, swap from disk (S3) — adds ~200ms
+    2. If LoRA not in hot pool, swap from disk (GCS) — adds ~200ms
     3. vLLM applies base + LoRA delta for this request
     4. Multiple tenants in same batch, different LoRAs applied per-request
   
   Cold LoRA cache:
     Hot 50 LoRA in GPU
     Cold 50 LoRA in CPU RAM (LRU)
-    Even colder in S3
+    Even colder in GCS
     Tenant first request: cold load + warm up
   
   vLLM 0.6+ 原生支持: --enable-lora --max-loras 50
@@ -902,7 +902,7 @@ class ExactCache:
 ```python
 class SemanticCache:
     def __init__(self):
-        self.vector_db = QdrantClient(...)
+        self.vector_db = VertexVectorSearchClient(...)
     
     async def lookup(self, query):
         emb = await embed(query)   # text-embedding-3-small, $0.02/1M
@@ -1256,7 +1256,7 @@ Challenge 2: Per-request LoRA selection
   Can't compile separate kernel per tenant
 
 Challenge 3: LoRA swap latency
-  Cold LoRA (in S3): load takes ~500ms
+  Cold LoRA (in GCS): load takes ~500ms
   Cold LoRA (in CPU RAM): swap to GPU ~50ms
   Hot LoRA (in GPU): instant
 ```
@@ -1272,7 +1272,7 @@ class MultiLoRABatching:
     def __init__(self):
         self.lora_cache = LRUCache(maxsize=200)   # hot LoRA in GPU
         self.cpu_lora_cache = LRUCache(maxsize=1000)  # warm in CPU RAM
-        # Cold in S3
+        # Cold in GCS
     
     async def ensure_lora_loaded(self, lora_id):
         if lora_id in self.lora_cache:
@@ -1285,7 +1285,7 @@ class MultiLoRABatching:
             self.lora_cache[lora_id] = lora
             return
         
-        # Cold: load from S3
+        # Cold: load from GCS
         lora_bytes = await s3.get(f"loras/{lora_id}.safetensors")
         lora = LoRA.from_bytes(lora_bytes)
         await self._cpu_to_gpu(lora)
@@ -1437,7 +1437,7 @@ async def train_lora_worker(job):
     # Eval against tenant's eval set
     eval_score = await evaluate(result.model, job.get("eval_set"))
     
-    # Upload to S3 for serving
+    # Upload to GCS for serving
     await s3.put(f"loras/tenant_{job['tenant_id']}.safetensors", result.lora_weights)
     
     # Notify serving cluster to refresh LoRA list
@@ -1634,7 +1634,7 @@ async def train_lora_worker(job):
 - **Burst spillover**: overflow to vendor API (Gemini Flash) — expensive but elastic
 - **Graceful degradation**: smaller model under load (Llama 8B fallback)
 - **Cold start mitigation**:
-  - Pre-pull model weights to local SSD (avoid S3 cold)
+  - Pre-pull model weights to local SSD (avoid GCS cold)
   - Warm up CUDA kernels on startup
   - First N requests do prefill but mark replica "warming"
 - Healthcheck only marks replica "healthy" after warm-up completes
@@ -1753,7 +1753,7 @@ Multi-LoRA (S-LoRA):
   Base shared (frozen)
   Per-tenant LoRA 50-100 MB
   Hot pool: 200 LoRA in GPU
-  Cold: CPU RAM / S3
+  Cold: CPU RAM / GCS
   vLLM: --enable-lora --max-loras 50
 
 Cache hierarchy:

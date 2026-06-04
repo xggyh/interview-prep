@@ -100,7 +100,7 @@ L7 total fail     → static "service busy, try later"
 
 ### 🪝 Resume hook
 
-"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, **cost reduction 42%**. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. **Budget**: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
+"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, **cost reduction 42%**. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. **Budget**: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
 
 ---
 

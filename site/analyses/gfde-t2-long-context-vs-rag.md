@@ -6,7 +6,7 @@
 
 > "Customer has 100K-page legal docs. Build a chatbot. Long context, RAG, or hybrid? Defend choice."
 
-**出处**: Google FDE T2 / Anthropic Forward Deployed / Pinecone Solutions Engineering 等都问. 2024-2025 业界辩论, 2026 hybrid 是共识.
+**出处**: Google FDE T2 / Anthropic Forward Deployed / Vertex AI Vector Search Solutions Engineering 等都问. 2024-2025 业界辩论, 2026 hybrid 是共识.
 
 **Round**: RAG Architecture / Trade-off (45 min)
 

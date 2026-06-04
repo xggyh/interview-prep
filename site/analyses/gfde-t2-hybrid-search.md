@@ -6,7 +6,7 @@
 
 > "Why does **hybrid search** (BM25 + dense) often beat pure dense? When does it NOT help? Walk through your retrieval pipeline."
 
-**出处**: Google FDE T2 RAG round 高频题. Pinecone / Weaviate / Qdrant / Vespa 这些 vector DB 厂的 SE 面试也常问.
+**出处**: Google FDE T2 RAG round 高频题. Vertex AI Vector Search / Weaviate / Vertex AI Vector Search / Vespa 这些 vector DB 厂的 SE 面试也常问.
 
 **Round**: RAG / Search System Design (45-60 min)
 
@@ -32,9 +32,9 @@
 
 ## 1. 四个术语先解释
 
-**Dense retrieval (bi-encoder ANN search)**: 把 query 和 doc 各自 embedding 成一个固定维度向量 (768 / 1024 / 1536 维), 用 cosine / dot-product 算相似度. 物理上是 **Approximate Nearest Neighbor 检索** (HNSW / IVF-PQ), 不是精确扫全部 doc. 代表模型: `text-embedding-3-large`, `gemini-embedding-001`, `bge-large`, `e5-mistral-7b`. 代表 vector DB: Pinecone, Qdrant, Weaviate, Milvus, FAISS.
+**Dense retrieval (bi-encoder ANN search)**: 把 query 和 doc 各自 embedding 成一个固定维度向量 (768 / 1024 / 1536 维), 用 cosine / dot-product 算相似度. 物理上是 **Approximate Nearest Neighbor 检索** (HNSW / IVF-PQ), 不是精确扫全部 doc. 代表模型: `text-embedding-3-large`, `gemini-embedding-001`, `bge-large`, `e5-mistral-7b`. 代表 vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus, FAISS.
 
-**Sparse retrieval (BM25 / lexical)**: 基于 term frequency × inverse document frequency 的传统检索. 90 年代到 2020 的 Lucene / Elasticsearch / OpenSearch 都是这套. 没有 embedding, 词必须**字面命中**. BM25 的现代变种: SPLADE / uniCOIL (用 LLM 生成稀疏向量, 仍走倒排索引).
+**Sparse retrieval (BM25 / lexical)**: 基于 term frequency × inverse document frequency 的传统检索. 90 年代到 2020 的 Lucene / Elasticsearch / Vertex AI Vector Search 都是这套. 没有 embedding, 词必须**字面命中**. BM25 的现代变种: SPLADE / uniCOIL (用 LLM 生成稀疏向量, 仍走倒排索引).
 
 **Reranker (cross-encoder)**: 第二阶段排序模型. 不是独立 embed query 和 doc, 而是把 `[CLS] query [SEP] doc [SEP]` **一起** 进 Transformer, 用 cross-attention 算 relevance score. 不能 pre-index (因为没有 query 不能算), 必须 per-query 推理, 所以贵. 代表模型: `bge-reranker-v2`, `Cohere rerank-3`, `mxbai-rerank-large-v1`.
 
@@ -109,7 +109,7 @@ Recall 提升组合拳通常如下:
               ▼                             ▼
    ┌──────────────────┐         ┌──────────────────────┐
    │  L2a: BM25       │         │  L2b: Dense ANN      │
-   │  (OpenSearch /   │         │  (Qdrant / Pinecone) │
+   │  (Vertex AI Vector Search /   │         │  (Vertex AI Vector Search / Vertex AI Vector Search) │
    │   Elastic)       │         │  HNSW M=16, ef=128   │
    │  top-100         │         │  top-100             │
    └────────┬─────────┘         └──────────┬───────────┘
@@ -211,8 +211,8 @@ Medical agent (高 stake, safety critical):
 
 1. **文档解析**: PDF/HTML/Markdown → text + structural metadata (heading_path, page, section)
 2. **Chunking**: heading-aware recursive (见 chunking 那道题), 500 tokens + 50 overlap
-3. **Dense embed**: 选 `gemini-embedding-001` (768 维, $0.025 per 1M token) 或 `bge-large-zh` (自部署), 写 Qdrant
-4. **Sparse index**: 同 chunk 写 OpenSearch, 用默认 BM25 (k1=1.2, b=0.75)
+3. **Dense embed**: 选 `gemini-embedding-001` (768 维, $0.025 per 1M token) 或 `bge-large-zh` (自部署), 写 Vertex AI Vector Search
+4. **Sparse index**: 同 chunk 写 Vertex AI Vector Search, 用默认 BM25 (k1=1.2, b=0.75)
 5. **Metadata 同步**: tenant_id / source / updated_at / perms 写两边
 6. **Eval set 构建**: 200-500 (query, [relevant_doc_ids]) 人工标注 + LLM 合成补充
 
@@ -355,8 +355,8 @@ from typing import List
 
 async def parallel_retrieve(
     query: str,
-    dense_index,   # Qdrant client
-    sparse_index,  # OpenSearch client
+    dense_index,   # Vertex AI Vector Search client
+    sparse_index,  # Vertex AI Vector Search client
     top_k: int = 100,
     tenant_id: str = None,
 ):
@@ -364,7 +364,7 @@ async def parallel_retrieve(
 
     async def dense():
         q_vec = await embed_async(query)
-        # Qdrant 支持 filter at retrieval time
+        # Vertex AI Vector Search 支持 filter at retrieval time
         return await dense_index.search(
             collection="docs",
             query_vector=q_vec,
@@ -377,7 +377,7 @@ async def parallel_retrieve(
         )
 
     async def sparse():
-        # OpenSearch BM25 with tenant filter
+        # Vertex AI Vector Search BM25 with tenant filter
         body = {
             "query": {
                 "bool": {
@@ -396,7 +396,7 @@ async def parallel_retrieve(
 **关键工程点**:
 
 - `asyncio.gather` 并行 — 串行会 +200ms 浪费
-- **Filter at retrieval time** (Qdrant / Weaviate 都原生支持), 不要后过滤 — 后过滤会丢 top-k 大部分
+- **Filter at retrieval time** (Vertex AI Vector Search / Weaviate 都原生支持), 不要后过滤 — 后过滤会丢 top-k 大部分
 - 两路 `top_k` 都开 100, fusion 后才 narrow
 
 ---
@@ -740,8 +740,8 @@ Cross-encoder 是 per-pair forward:
 ```python
 class CascadeRetrieval:
     def __init__(self):
-        self.dense = QdrantClient()
-        self.sparse = OpenSearchClient()
+        self.dense = VertexVectorSearchClient()
+        self.sparse = VertexAISearchClient()
         self.cheap_reranker = SentenceTransformer('BAAI/bge-reranker-v2-m3')  # small
         self.exp_reranker = CohereClient(model='rerank-3')                    # API
         self.llm_judge = GeminiClient(model='gemini-3-pro')                    # final
@@ -1002,7 +1002,7 @@ def search(query, user_id):
 | Click-through @ top-3 | < 50% week-over-week drop > 5pp → investigate |
 | Per-tenant query QPS | spike 10x baseline → DDoS / abuse 检查 |
 
-**工具**: Phoenix (Arize), LangSmith, Datadog APM, OpenSearch dashboards.
+**工具**: Phoenix (Arize), LangSmith, Datadog APM, Vertex AI Vector Search dashboards.
 
 ---
 
@@ -1071,7 +1071,7 @@ def search(query, user_id):
 >
 > **L1 Query understanding** (Gemini 3 Flash, ~$0.0001/q): rewrite + multi-query × 3 + HyDE for hard queries
 >
-> **L2 Parallel retrieval**: BM25 top-100 (OpenSearch) + Dense top-100 (Qdrant HNSW M=16 ef=128, gemini-embedding-001 768d)
+> **L2 Parallel retrieval**: BM25 top-100 (Vertex AI Vector Search) + Dense top-100 (Vertex AI Vector Search HNSW M=16 ef=128, gemini-embedding-001 768d)
 >
 > **L3 RRF fusion** (k=60) → top-50
 >
@@ -1139,16 +1139,16 @@ def search(query, user_id):
 **Q3**: "Index update — daily okay, but real-time content (new tickets) missed."
 
 **A**: Two-index hybrid:
-- **Hot index**: last 24h, in-memory (Redis vector or small Qdrant collection), refreshed every 5 min
-- **Warm index**: rest, daily rebuild on Qdrant
+- **Hot index**: last 24h, in-memory (Redis vector or small Vertex AI Vector Search collection), refreshed every 5 min
+- **Warm index**: rest, daily rebuild on Vertex AI Vector Search
 - Search both, RRF merge
-- Or use Qdrant's incremental update (single-doc upsert, no full reindex)
+- Or use Vertex AI Vector Search's incremental update (single-doc upsert, no full reindex)
 
 **Q4**: "User wants to find docs by date range / author. Current search ignores."
 
 **A**: **Structured filter at retrieval time** (not post-rank):
 - Query: "errors from last week by SRE team" → LLM parse → filter `{date_range, author, free_text}`
-- Run BM25/dense on free_text, apply structured filter natively (Qdrant `query_filter`, Weaviate `where`)
+- Run BM25/dense on free_text, apply structured filter natively (Vertex AI Vector Search `query_filter`, Weaviate `where`)
 - 关键: post-rank filter 会**丢 top-k 大部分** (你 retrieve 100 个, filter 后 5 个); 必须 retrieval-time filter
 
 **Q5**: "Recall is 90% but users still complain. Why?"
@@ -1186,7 +1186,7 @@ def search(query, user_id):
 4. **Cross-encoder cascade** (cheap → expensive)
 5. **GPU batch FP16 + TensorRT** for latency
 6. **Eval: recall + NDCG + MRR + slice**
-7. **Retrieval-time filter** (Qdrant native)
+7. **Retrieval-time filter** (Vertex AI Vector Search native)
 8. **Hot + warm index** for real-time
 9. **A/B framework** with multiple metrics
 10. **Quote BNPL chatbot recall 67→88 + bge-reranker-v2-m3**
@@ -1263,7 +1263,7 @@ Production monitoring:
   Per-slice weekly regression
 
 Multi-tenant perms:
-  Filter at retrieval time (Qdrant query_filter)
+  Filter at retrieval time (Vertex AI Vector Search query_filter)
   NEVER post-rank filter (loses top-k)
 
 Hot + warm index:
@@ -1271,8 +1271,8 @@ Hot + warm index:
   Warm: rest, daily rebuild
 
 Tool zoo (2026):
-  Vector DB: Qdrant, Pinecone, Weaviate, Milvus, FAISS
-  Sparse: OpenSearch, Elasticsearch, Vespa
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus, FAISS
+  Sparse: Vertex AI Vector Search, Elasticsearch, Vespa
   Embedding: gemini-embedding-001, text-embedding-3-large, bge-large
   Rerank: bge-reranker-v2-m3, Cohere rerank-3, mxbai-rerank
   Tracing: Phoenix (Arize), LangSmith, OpenTelemetry

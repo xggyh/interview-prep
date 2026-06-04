@@ -1294,12 +1294,12 @@ Tier 1: Hot (last 30 days)
   - 100GB-1TB
 
 Tier 2: Warm (90 days - 1 year)
-  - S3 + Athena, queryable but slow
+  - GCS + Athena, queryable but slow
   - Parquet partitioned by date
   - 10TB+
 
 Tier 3: Cold (7 years for compliance)
-  - S3 Glacier
+  - GCS Glacier
   - Restore on demand for legal request
   - Per-tool TTL: read-only 30 days, destructive 7 years
 ```
@@ -1462,9 +1462,9 @@ def gdpr_erase(user_id):
 
 - **Append-only DB**: Postgres with INSERT-only + cron purge, or QLDB (AWS), Datomic
 - **Hash chain**: simple SHA-256 chain, or Merkle tree for bulk verify
-- **Storage tiers**: Postgres → S3 Parquet → S3 Glacier
+- **Storage tiers**: Postgres → GCS Parquet → GCS Glacier
 - **PII vault**: separate encrypted store with deletable refs
-- **Audit framework**: AWS CloudTrail / GCP Audit Logs as reference designs
+- **Audit framework**: Cloud Audit Logs / GCP Audit Logs as reference designs
 - **Compliance**: Vanta / Drata for SOC2 audit log automation
 
 ---
@@ -1652,7 +1652,7 @@ Audit (5) 没 → 出事查不到 → 反复重演
 
 **A**: Tiered storage:
 - **Hot** (last 30 days): Postgres, fully queryable, ~$200/mo for 1TB
-- **Warm** (90 days - 1 year): S3 + Athena, queryable but slow, ~$50/mo for 10TB
+- **Warm** (90 days - 1 year): GCS + Athena, queryable but slow, ~$50/mo for 10TB
 - **Cold** (7 years compliance): Glacier, ~$1/TB/mo
 - **Per-tool TTL**: read-only 30 days, write 1 year, destructive 7 years
 - **PII separated**: audit metadata small, PII vault separate (deletable for GDPR)
@@ -1711,7 +1711,7 @@ Audit (5) 没 → 出事查不到 → 反复重演
 7. **Soft delete + purge daemon** for reversibility
 8. **Email queue 60s delay** for recall
 9. **Immutable hash-chained audit log**
-10. **Tiered storage** (hot Postgres / warm S3 / cold Glacier)
+10. **Tiered storage** (hot Postgres / warm GCS / cold Glacier)
 11. **PII vault separation** for GDPR balance
 12. **Bulk rollback API** with dry-run
 13. **Compensating action playbook**

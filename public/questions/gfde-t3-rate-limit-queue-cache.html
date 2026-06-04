@@ -448,7 +448,7 @@ Step 7: Long-term (week)
 <hr />
 <h3>6. 工程 checklist</h3>
 <p><strong>设计 5-layer system</strong>:</p>
-<ol><li><strong>Cache infrastructure</strong> — Redis (exact + semantic), Qdrant (vector), per-tool TTL config</li><li><strong>Embedding model</strong> — text-embedding-3-large or BGE for semantic</li><li><strong>Priority queue</strong> — RabbitMQ / Kafka with priority field, or Redis sorted set</li><li><strong>Per-tenant rate limiter</strong> — Redis Lua script, token bucket</li><li><strong>Per-tenant concurrency</strong> — Redis SETNX semaphore</li><li><strong>Cost-aware router</strong> — small classifier (Haiku LLM or trained model)</li><li><strong>Multi-vendor adapter</strong> — same API contract over Claude / Gemini / OpenAI / self-host</li><li><strong>Budget tracker</strong> — atomic increment in Postgres, alert at 80%, hard stop at 100%</li><li><strong>Graceful degradation triggers</strong> — automated monitor + manual override</li><li><strong>Observability</strong> — cache hit rate per tier, queue depth, model distribution, cost per tenant</li></ol>
+<ol><li><strong>Cache infrastructure</strong> — Redis (exact + semantic), Vertex AI Vector Search (vector), per-tool TTL config</li><li><strong>Embedding model</strong> — text-embedding-3-large or BGE for semantic</li><li><strong>Priority queue</strong> — RabbitMQ / Kafka with priority field, or Redis sorted set</li><li><strong>Per-tenant rate limiter</strong> — Redis Lua script, token bucket</li><li><strong>Per-tenant concurrency</strong> — Redis SETNX semaphore</li><li><strong>Cost-aware router</strong> — small classifier (Haiku LLM or trained model)</li><li><strong>Multi-vendor adapter</strong> — same API contract over Claude / Gemini / OpenAI / self-host</li><li><strong>Budget tracker</strong> — atomic increment in Postgres, alert at 80%, hard stop at 100%</li><li><strong>Graceful degradation triggers</strong> — automated monitor + manual override</li><li><strong>Observability</strong> — cache hit rate per tier, queue depth, model distribution, cost per tenant</li></ol>
 <p><strong>Cache config per use case</strong>:</p>
 <pre class="language-yaml"><code class="language-yaml">chatbot_general:
   exact_cache:
@@ -523,7 +523,7 @@ faq_workflow:
     """Cosine similarity over query embeddings"""
     
     def __init__(self, vector_db, embedding_model):
-        self.vector_db = vector_db  # Qdrant / Pinecone
+        self.vector_db = vector_db  # Vertex AI Vector Search / Vertex AI Vector Search
         self.embedding_model = embedding_model
         self.threshold = 0.95
     
@@ -1753,7 +1753,7 @@ class CacheController:
 <blockquote><p>"Clarify — <em>[假设: latency &lt; 3s OK, FAQ-heavy (50% similar), 3 tenant tiers, monthly contract per tenant, smaller-model fallback acceptable, multi-vendor + self-host available]</em>.</p>
 <p><strong>5-layer defense</strong>:</p>
 <p><strong>(L1) Cache</strong> — Try first, cheapest:</p>
-<ul><li>Exact (hash): 15% hit</li><li>Semantic (Qdrant + embedding cosine &gt; 0.95): 35% hit on FAQ</li><li>Tool output (per-tool TTL): 80% hit on idempotent reads</li><li>LLM prefix (vLLM server-side): 75% hit when shared system prompt</li><li>Combined: 60% of queries avoid full LLM call</li></ul>
+<ul><li>Exact (hash): 15% hit</li><li>Semantic (Vertex AI Vector Search + embedding cosine &gt; 0.95): 35% hit on FAQ</li><li>Tool output (per-tool TTL): 80% hit on idempotent reads</li><li>LLM prefix (vLLM server-side): 75% hit when shared system prompt</li><li>Combined: 60% of queries avoid full LLM call</li></ul>
 <p><strong>(L2) Queue + per-tenant concurrency</strong>:</p>
 <ul><li>3 tier priority queue (Gold/Silver/Bronze)</li><li>Per-tenant Redis Lua semaphore (no noisy neighbor)</li><li>Gold tier dedicated worker pool (isolation)</li><li>Backpressure signal in response headers</li></ul>
 <p><strong>(L3) Vendor rate limit</strong> (token bucket per vendor):</p>
@@ -1770,7 +1770,7 @@ class CacheController:
 <h3>简历专属 reframe — Gao Xin's hooks</h3>
 <div class="table-wrap"><table class="md-table"><thead><tr><th>Topic</th><th>你的经验</th><th>How to quote</th></tr></thead><tbody><tr><td><strong>Cache strategy</strong></td><td>Voice agent — repeated phrase recognition</td><td>"Voice agent had semantic cache for repeated user phrases (e.g., 'check my balance'). 35% hit rate, cost dropped 30%."</td></tr><tr><td><strong>Rate limit + queue</strong></td><td>TikTok payment infra natural scale</td><td>"TikTok payment had natural per-user QPS limits. Per-tenant token bucket Redis Lua, sub-1ms latency. Easy to apply to LLM rate limits."</td></tr><tr><td><strong>Cost routing</strong></td><td>BNPL chatbot — intent → tool routing</td><td>"BNPL chatbot: simple query → small model (Gemini Flash), complex → big (Claude). 90/9/1 split, eval drop &lt; 1%."</td></tr><tr><td><strong>Multi-tenant</strong></td><td>Voice agent 7 markets</td><td>"Voice agent for 7 markets had per-market budget + concurrency cap. Indonesia spikes didn't affect Singapore."</td></tr><tr><td><strong>Budget enforcement</strong></td><td>TikTok payment quota / chargeback</td><td>"TikTok payment had quota workflow — atomic Redis Lua check + Postgres durable record. Applied same pattern to LLM cost cap."</td></tr><tr><td><strong>Degradation</strong></td><td>Voice agent fallback to text-input under ASR overload</td><td>"Under ASR overload, voice agent gracefully fell back to text-input mode. Same pattern for LLM: smaller model → cached canned → text fallback."</td></tr><tr><td><strong>Multi-vendor</strong></td><td>Self-host vLLM + external API</td><td>"Self-host vLLM main (90%), Gemini Flash spillover (8%), Claude Opus VIP (2%). Vendor outage = no service disruption."</td></tr></tbody></table></div>
 <p><strong>主动 quote</strong>:</p>
-<blockquote><p>"BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."</p></blockquote>
+<blockquote><p>"BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."</p></blockquote>
 <hr />
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Semantic cache wrong-hit — returns answer for slightly different question. Mitigate?"</p>
@@ -2440,7 +2440,7 @@ Step 7: Long-term (week)
 
 **设计 5-layer system**:
 
-1. **Cache infrastructure** — Redis (exact + semantic), Qdrant (vector), per-tool TTL config
+1. **Cache infrastructure** — Redis (exact + semantic), Vertex AI Vector Search (vector), per-tool TTL config
 2. **Embedding model** — text-embedding-3-large or BGE for semantic
 3. **Priority queue** — RabbitMQ / Kafka with priority field, or Redis sorted set
 4. **Per-tenant rate limiter** — Redis Lua script, token bucket
@@ -2557,7 +2557,7 @@ class SemanticCache:
     """Cosine similarity over query embeddings"""
     
     def __init__(self, vector_db, embedding_model):
-        self.vector_db = vector_db  # Qdrant / Pinecone
+        self.vector_db = vector_db  # Vertex AI Vector Search / Vertex AI Vector Search
         self.embedding_model = embedding_model
         self.threshold = 0.95
     
@@ -3954,7 +3954,7 @@ class RecoveryManager:
 >
 > **(L1) Cache** — Try first, cheapest:
 > - Exact (hash): 15% hit
-> - Semantic (Qdrant + embedding cosine > 0.95): 35% hit on FAQ
+> - Semantic (Vertex AI Vector Search + embedding cosine > 0.95): 35% hit on FAQ
 > - Tool output (per-tool TTL): 80% hit on idempotent reads
 > - LLM prefix (vLLM server-side): 75% hit when shared system prompt
 > - Combined: 60% of queries avoid full LLM call
@@ -4017,7 +4017,7 @@ class RecoveryManager:
 
 **主动 quote**:
 
-> "BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
+> "BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
 
 ---
 

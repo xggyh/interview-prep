@@ -957,7 +957,7 @@ def gdpr_erase_user(user_id):
 ### 3.8 Tools
 
 - **Microsoft Presidio**: open-source, 多语言 PII detection (Python)
-- **AWS Macie**: managed S3 PII scanner
+- **AWS Macie**: managed GCS PII scanner
 - **Google Cloud DLP API**: SaaS, broad coverage
 - **TruffleHog**: secret scanning in code / strings
 - **Detect-secrets**: Yelp's tool, pre-commit hook
@@ -1139,7 +1139,7 @@ def call_tool_with_budget(tool, args, budget):
 ### 4.8 Tools
 
 - **Token estimator**: tiktoken (OpenAI), vertexai tokenizer (Gemini), Anthropic tokenizer
-- **Blob store**: S3, MinIO, GCS, Cloudflare R2
+- **Blob store**: GCS, MinIO, GCS, Cloudflare R2
 - **Ad-hoc query on blob**: DuckDB, Polars, Apache DataFusion
 - **Summarization LLM**: Gemini Flash ($0.5/M), Haiku 4.5 ($1/M)
 - **Streaming**: server-sent events, async iterators
@@ -1424,9 +1424,9 @@ Post-fix:
 
 ### 5.8 Tools
 
-- **Blob storage**: S3, MinIO, GCS, Cloudflare R2
+- **Blob storage**: GCS, MinIO, GCS, Cloudflare R2
 - **Ad-hoc query**: DuckDB, Apache Arrow / DataFusion
-- **OCR**: Tesseract, AWS Textract, Google Document AI
+- **OCR**: Tesseract, Document AI, Google Document AI
 - **PDF text extract**: PyMuPDF, pdfplumber
 - **Audio transcribe**: Whisper, AssemblyAI
 - **Vision summarize**: Gemini Pro Vision, GPT-4V, Claude vision

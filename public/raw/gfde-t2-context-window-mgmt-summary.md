@@ -16,7 +16,7 @@
 - **Trigger**: soft cap 70% of model limit (e.g., 700K of 1M Pro) → compact; hard cap 90% → emergency aggressive
 - **Sliding window**: last 10 turn verbatim
 - **Hierarchical summary**: 4 tier
-- **External memory**: blob (>1K tool out) + Qdrant (episodic) + Postgres (decisions)
+- **External memory**: blob (>1K tool out) + Vertex AI Vector Search (episodic) + Postgres (decisions)
 - **Selective pruning**: importance score + pinned messages
 
 ### Layer 2: Hierarchical 4 tier (核心)
@@ -37,12 +37,12 @@ Cascade: tier 4 full → 移动 oldest 到 tier 3 (light summarize)
 ### Layer 3: External memory 3 store
 
 ```
-Blob (Cloud Storage / S3):
+Blob (Cloud Storage / GCS):
   - Tool outputs > 1K tokens (full)
   - Uploaded files, agent artifacts
   - Key by content hash, 24h TTL, agent 用 get_full_tool_output(ref_id)
 
-Vector DB (Vertex Vector Search / Qdrant):
+Vector DB (Vertex Vector Search / Vertex AI Vector Search):
   - Episodic memory: tier 2/3 summary 进 index
   - User-uploaded doc chunks
   - Agent recall_past_memory(query) tool
@@ -91,13 +91,13 @@ Structured (Postgres / Cloud SQL):
 Structured template ('Decisions / Files modified / Open TODOs / User preferences / Errors'); cheap LLM (Gemini 3 Flash $0.50/$3 够, 不用 flagship); recall probe weekly (failure → alert summary regressed); versioned summary A/B; distilled summarizer if domain repeatable (SFT small model on (long turns, ideal summary) pair).
 
 **Q2: 2M context 模型 (Gemini 3 Pro 2M) 就行了, 还要 compaction?**
-要. Cost: 2M × $4/1M (>200K tier) = $8/call × 100 turn = $800/session 不可持续. Latency: 2M first-token 60-120s. Lost-in-middle: even 2M middle 30-40% gap. Use 2M for cold-start (load 1 huge doc), 不为 accumulate 50-turn state. Hybrid: short-term active context 32K + archived Qdrant.
+要. Cost: 2M × $4/1M (>200K tier) = $8/call × 100 turn = $800/session 不可持续. Latency: 2M first-token 60-120s. Lost-in-middle: even 2M middle 30-40% gap. Use 2M for cold-start (load 1 huge doc), 不为 accumulate 50-turn state. Hybrid: short-term active context 32K + archived Vertex AI Vector Search.
 
 **Q3: Cost / session 什么经济?**
 按 segment: consumer chat $0.001-0.01/turn (Flash); B2B / pro $0.05-0.20/turn (Pro); dev tool / enterprise $0.50-3/agent task (mixed Pro + Opus); session $0.20-2 normal, $5+ problematic. Optimize via hierarchical compaction + cheaper Flash on summary + prefix caching.
 
 **Q4: User 说 "接着昨天的", multi-day session 实际?**
-Postgres 持久化 session_id / turns / decisions / preferences on session-end; resume 时 load last summary + last 5 turns + system prompt 注入 decisions; 可 snapshot 全 state + semantic-index Qdrant. **80% restore 够, pixel-perfect 不值**. User confirm: "上次我们 X, 接着 Y, 对吗?" explicit handshake.
+Postgres 持久化 session_id / turns / decisions / preferences on session-end; resume 时 load last summary + last 5 turns + system prompt 注入 decisions; 可 snapshot 全 state + semantic-index Vertex AI Vector Search. **80% restore 够, pixel-perfect 不值**. User confirm: "上次我们 X, 接着 Y, 对吗?" explicit handshake.
 
 **Q5: Agent 忘了最近 decision 因为 compaction 把它压没了?**
 Explicit decision_log in Postgres, separate from chat, never compacted; pinned messages (user 可 pin, summarizer 跳过); decision-tagging — LLM 输出 schema 含 `decision_made` field, summarizer 必 keep; periodic recap 每 10 turn re-inject; recall probe 测 'do you remember X' fail trigger alert.
@@ -161,7 +161,7 @@ Hierarchical 4 tier:
   Cascade: tier 4 满 → push old to tier 3 → ... → tier 1
 
 External memory (3 store):
-  Blob (Cloud Storage/S3)  tool outputs >1K, files, artifacts
+  Blob (Cloud Storage/GCS)  tool outputs >1K, files, artifacts
                             key by content hash, 24h TTL
   Vector DB (Vertex)        episodic (tier 2/3 summary), agent recall_past
   Postgres / Cloud SQL      structured (decisions, prefs, session_state)
@@ -206,7 +206,7 @@ GCP stack (2026):
   Cloud SQL Postgres (decisions/prefs/state)
   Cloud Trace/Logging (per-turn cost), Pub/Sub (async compact)
   Memorystore Redis (hot cache, dedup tool out)
-  AWS: S3 / OpenSearch / RDS / DynamoDB
+  AWS: GCS / Vertex AI Vector Search / RDS / Firestore / Bigtable
 
 Observability:
   Per-turn: input/output tokens, cost, compaction event

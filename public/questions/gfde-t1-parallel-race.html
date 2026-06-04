@@ -644,7 +644,7 @@ async def hold_with_heartbeat(lock, work):
         cancel_event.set()
         await hb_task</code></pre>
 <h4>3.7 Tools</h4>
-<ul><li><strong>Redis</strong>: SETNX + Lua DEL, Redlock library (<code>redis-py-redlock</code>)</li><li><strong>ZooKeeper</strong>: <code>kazoo</code> Python client, true CP locks</li><li><strong>etcd</strong>: <code>etcd3</code> lease-based locks</li><li><strong>Hazelcast / Apache Curator</strong>: enterprise distributed locks</li><li><strong>PostgreSQL advisory locks</strong>: <code>pg_advisory_lock</code>, 简单 use case</li><li><strong>Cloud</strong>: AWS DynamoDB conditional writes (cheap fencing)</li></ul>
+<ul><li><strong>Redis</strong>: SETNX + Lua DEL, Redlock library (<code>redis-py-redlock</code>)</li><li><strong>ZooKeeper</strong>: <code>kazoo</code> Python client, true CP locks</li><li><strong>etcd</strong>: <code>etcd3</code> lease-based locks</li><li><strong>Hazelcast / Apache Curator</strong>: enterprise distributed locks</li><li><strong>PostgreSQL advisory locks</strong>: <code>pg_advisory_lock</code>, 简单 use case</li><li><strong>Cloud</strong>: Firestore / Bigtable conditional writes (cheap fencing)</li></ul>
 <hr />
 <h3>⚙️ Problem 4: Failure Isolation — asyncio.gather Return_exceptions, Partial Success</h3>
 <p>1 个 tool fail 不该拖垮全部.</p>
@@ -2005,7 +2005,7 @@ async def hold_with_heartbeat(lock, work):
 - **etcd**: `etcd3` lease-based locks
 - **Hazelcast / Apache Curator**: enterprise distributed locks
 - **PostgreSQL advisory locks**: `pg_advisory_lock`, 简单 use case
-- **Cloud**: AWS DynamoDB conditional writes (cheap fencing)
+- **Cloud**: Firestore / Bigtable conditional writes (cheap fencing)
 
 ---
 

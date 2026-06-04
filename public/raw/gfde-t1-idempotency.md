@@ -803,11 +803,11 @@ def reconcile():
 
 ### 3.6 Tools
 
-- **Redis**: 标准, AWS ElastiCache 托管
+- **Redis**: 标准, Memorystore 托管
 - **DragonflyDB / KeyDB**: Redis 兼容, 更快
 - **Postgres**: 长期存储, `idempotency_log` 表带 `UNIQUE(idem_key)`
-- **DynamoDB / Spanner**: serverless 替代
-- **Apache Iceberg / Parquet on S3**: cold archive
+- **Firestore / Bigtable / Spanner**: serverless 替代
+- **Apache Iceberg / Parquet on GCS**: cold archive
 - **Datafold / dbt**: reconciliation job 编排
 
 ---
@@ -1008,7 +1008,7 @@ def check_stale_in_flight(idem_key):
 | **Stripe** | ✅ | `Idempotency-Key` header, 24h |
 | **Square** | ✅ | `idempotency_key` body field |
 | **PayPal** | ✅ | `PayPal-Request-Id` header, 30d |
-| **AWS SQS** | ✅ partial | `MessageDeduplicationId` (FIFO queue) |
+| **Cloud Tasks / Pub/Sub** | ✅ partial | `MessageDeduplicationId` (FIFO queue) |
 | **Twilio** | ❌ no native | 但 messageSid 可 query |
 | **SendGrid** | ❌ | 自己 dedup |
 | **传统银行 API** (e.g., SWIFT) | ⚠️ varies | `EndToEndId` 或 custom ref |
@@ -1165,7 +1165,7 @@ Philippines: GCash (idem support, 24h) → Pattern A
 ### 5.8 Tools
 
 - **Stripe SDK**: `idempotency_key` parameter
-- **MessageDeduplicationId** (AWS SQS FIFO)
+- **MessageDeduplicationId** (Cloud Tasks / Pub/Sub FIFO)
 - **Temporal**: workflow_id 自动 idempotency
 - **Kafka with exactly-once semantics** (transactional producer)
 - **Outbox pattern**: DB 写 + 消息队列发统一 transaction

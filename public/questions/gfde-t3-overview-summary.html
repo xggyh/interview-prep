@@ -56,7 +56,7 @@
 <pre class="language-plaintext"><code class="language-plaintext">Edge → API Gateway (auth/rate) → App Layer (Conversation/Router/MCP Proxy/Observ)
   → Cache + Queue + Tool Registry + Tracing
   → vLLM cluster + LLM vendors (Gemini 3 Pro $2/$12, Flash $0.50/$3, Opus 4.7 $5/$25)
-  → Vector DB (Qdrant/Pinecone) + Temporal workflow + GCS audit/eval DB</code></pre>
+  → Vector DB (Vertex AI Vector Search/Vertex AI Vector Search) + Temporal workflow + GCS audit/eval DB</code></pre>
 <h4>Layer 2: 6 个 sub-topic (各 1 句压扁)</h4>
 <ul><li><strong>T3.1 Stateless vs Stateful</strong>: 生产 default API 表面 stateless + 内部 hybrid 4-tier (LRU/Redis/DB/KV cache), voice 是 strict stateful 例外.</li><li><strong>T3.2 MCP / API Proxy</strong>: MCP (Anthropic 2024 标准) 3 原语 (Resources/Tools/Prompts) + Gateway 6 责任 (discover/auth/RL/obs/cache/version).</li><li><strong>T3.3 High throughput</strong>: 6 levers (continuous batch + PagedAttn + prefix cache + spec decode + TP + FP8) 叠乘 50-100x naive baseline.</li><li><strong>T3.4 Observability</strong>: 4 layers (OTel trace + LLM-specific log + Prometheus metric + eval-in-prod 5% LLM-judge).</li><li><strong>T3.5 Rate limit/Queue/Cache</strong>: 5-layer cost defense, 4-layer cache + priority queue + cost-aware routing (90/9/1 Flash/Pro/Opus) → 6-10x cost reduction.</li><li><strong>T3.6 Eventual consistency</strong>: 2PC fails cross-vendor → Saga + Outbox + idempotency + verify-on-timeout + Temporal/DBOS for 5+ step.</li></ul>
 <h4>Layer 3: 5 设计 Patterns 全记 (面试速查)</h4>
@@ -209,7 +209,7 @@ Top gotchas:
 Edge → API Gateway (auth/rate) → App Layer (Conversation/Router/MCP Proxy/Observ)
   → Cache + Queue + Tool Registry + Tracing
   → vLLM cluster + LLM vendors (Gemini 3 Pro $2/$12, Flash $0.50/$3, Opus 4.7 $5/$25)
-  → Vector DB (Qdrant/Pinecone) + Temporal workflow + GCS audit/eval DB
+  → Vector DB (Vertex AI Vector Search/Vertex AI Vector Search) + Temporal workflow + GCS audit/eval DB
 ```
 
 ### Layer 2: 6 个 sub-topic (各 1 句压扁)

@@ -6,7 +6,7 @@
 
 > "Cohere rerank vs cross-encoder vs LLM-as-judge for reranking — when each?"
 
-**出处**: Google FDE T2 / Cohere / Pinecone / Vespa / Weaviate / OpenAI / Anthropic Forward Deployed 等 RAG 相关 round 必问.
+**出处**: Google FDE T2 / Cohere / Vertex AI Vector Search / Vespa / Weaviate / OpenAI / Anthropic Forward Deployed 等 RAG 相关 round 必问.
 
 **Round**: RAG Quality / Reranking (45 min)
 

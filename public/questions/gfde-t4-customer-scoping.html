@@ -63,7 +63,7 @@
 <p><strong>设想没有 D·K·D·M·P 框架的灾难场景</strong>:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Week 1: 客户说 "用 AI 提升销售效率"
         你想: 销售大概是 lead 进来、跟进、报价、成单
-        你开始写 LangChain agent + Pinecone + Salesforce SDK
+        你开始写 LangChain agent + Vertex AI Vector Search + Salesforce SDK
         架构图画了 3 张
 
 Week 2: 你写了 RAG over 客户的产品文档
@@ -283,7 +283,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting</code></pre>
 7. Rep reviews + 1-click send</code></pre>
 <p><strong>Output</strong>: Lead 进来 5 min 内 rep 有完整 qualification + draft email, 可决定 accept/reject.</p>
 <p><strong>Tech Stack (deliberately minimal for MVP)</strong>:</p>
-<ul><li><strong>LLM</strong>: Gemini 3 Pro ($2/$12 per 1M) for reasoning + summarization, Gemini 3 Flash ($0.50/$3) for cheap operations (parsing, formatting). Skip self-host.</li><li><strong>Vector DB</strong>: Pinecone (cloud, 几分钟接好). 不要自建.</li><li><strong>Frontend</strong>: Streamlit (Python, 1 天起页). 不上 Next.js.</li><li><strong>Integration</strong>: Salesforce Read-only API. 不写, 减权限审批时间.</li><li><strong>Storage</strong>: Postgres (Supabase free tier). 不上 distributed DB.</li><li><strong>Deployment</strong>: GCP Cloud Run / single instance. 不上 K8s.</li></ul>
+<ul><li><strong>LLM</strong>: Gemini 3 Pro ($2/$12 per 1M) for reasoning + summarization, Gemini 3 Flash ($0.50/$3) for cheap operations (parsing, formatting). Skip self-host.</li><li><strong>Vector DB</strong>: Vertex AI Vector Search (cloud, 几分钟接好). 不要自建.</li><li><strong>Frontend</strong>: Streamlit (Python, 1 天起页). 不上 Next.js.</li><li><strong>Integration</strong>: Salesforce Read-only API. 不写, 减权限审批时间.</li><li><strong>Storage</strong>: Postgres (Supabase free tier). 不上 distributed DB.</li><li><strong>Deployment</strong>: GCP Cloud Run / single instance. 不上 K8s.</li></ul>
 <p><strong>Anti-perfection rules</strong> (前面 Section 6 提过, 这里再强调):</p>
 <ul><li>Hardcoded 100 个 demo lead (不接真 CRM live data)</li><li>1 个 user (sales VP demo 时用自己账号)</li><li>1 个 happy path (lead qualified + email drafted)</li><li>不处理 error case (fail loud + Slack alert ok)</li></ul>
 <h4>1.5 P — Pilot Rollout (Week 4-12)</h4>
@@ -407,7 +407,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting</code></pre>
 <p><strong>最难的不是"做什么", 是"不做什么"</strong>. MVP 的设计本质是<strong>说 NO 的艺术</strong>.</p>
 <h4>4.1 What's IN vs OUT 矩阵 (硬列表)</h4>
 <p>对 sales-qualification MVP:</p>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Feature</th><th>In MVP?</th><th>Why</th></tr></thead><tbody><tr><td>LLM-generated qualification summary</td><td>YES</td><td>Core value</td></tr><tr><td>RAG over company info</td><td>YES</td><td>Quality signal</td></tr><tr><td>Salesforce read API</td><td>YES</td><td>Real data</td></tr><tr><td>Simple Streamlit UI</td><td>YES</td><td>Demo ready</td></tr><tr><td>1 happy path end-to-end</td><td>YES</td><td>Demo proof</td></tr><tr><td>Salesforce write API</td><td><strong>NO</strong></td><td>Read-only enough for demo, write 增 IT 审批 1 周</td></tr><tr><td>Multi-rep support</td><td><strong>NO</strong></td><td>1 rep demo 够</td></tr><tr><td>Email integration</td><td><strong>NO</strong></td><td>Phase 2</td></tr><tr><td>Mobile UI</td><td><strong>NO</strong></td><td>Desktop demo</td></tr><tr><td>Error handling beyond Sentry alert</td><td><strong>NO</strong></td><td>Fail loud OK</td></tr><tr><td>Multi-language</td><td><strong>NO</strong></td><td>English only</td></tr><tr><td>Production observability (DataDog / NewRelic)</td><td><strong>NO</strong></td><td>Local log OK</td></tr><tr><td>Multi-tenancy</td><td><strong>NO</strong></td><td>1 customer</td></tr><tr><td>Auth (proper SSO)</td><td><strong>NO</strong></td><td>Basic password / 仅 demo 用</td></tr><tr><td>CI/CD pipeline</td><td><strong>NO</strong></td><td>Manual deploy</td></tr><tr><td>Vector DB self-host</td><td><strong>NO</strong></td><td>Pinecone managed</td></tr><tr><td>Auto-scaling</td><td><strong>NO</strong></td><td>1 instance</td></tr><tr><td>GDPR / compliance</td><td><strong>NO</strong> (for MVP)</td><td>Demo data 用 fake, compliance 在 pilot phase</td></tr><tr><td>Edge case handling</td><td><strong>NO</strong></td><td>失败让用户 retry</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Feature</th><th>In MVP?</th><th>Why</th></tr></thead><tbody><tr><td>LLM-generated qualification summary</td><td>YES</td><td>Core value</td></tr><tr><td>RAG over company info</td><td>YES</td><td>Quality signal</td></tr><tr><td>Salesforce read API</td><td>YES</td><td>Real data</td></tr><tr><td>Simple Streamlit UI</td><td>YES</td><td>Demo ready</td></tr><tr><td>1 happy path end-to-end</td><td>YES</td><td>Demo proof</td></tr><tr><td>Salesforce write API</td><td><strong>NO</strong></td><td>Read-only enough for demo, write 增 IT 审批 1 周</td></tr><tr><td>Multi-rep support</td><td><strong>NO</strong></td><td>1 rep demo 够</td></tr><tr><td>Email integration</td><td><strong>NO</strong></td><td>Phase 2</td></tr><tr><td>Mobile UI</td><td><strong>NO</strong></td><td>Desktop demo</td></tr><tr><td>Error handling beyond Sentry alert</td><td><strong>NO</strong></td><td>Fail loud OK</td></tr><tr><td>Multi-language</td><td><strong>NO</strong></td><td>English only</td></tr><tr><td>Production observability (DataDog / NewRelic)</td><td><strong>NO</strong></td><td>Local log OK</td></tr><tr><td>Multi-tenancy</td><td><strong>NO</strong></td><td>1 customer</td></tr><tr><td>Auth (proper SSO)</td><td><strong>NO</strong></td><td>Basic password / 仅 demo 用</td></tr><tr><td>CI/CD pipeline</td><td><strong>NO</strong></td><td>Manual deploy</td></tr><tr><td>Vector DB self-host</td><td><strong>NO</strong></td><td>Vertex AI Vector Search managed</td></tr><tr><td>Auto-scaling</td><td><strong>NO</strong></td><td>1 instance</td></tr><tr><td>GDPR / compliance</td><td><strong>NO</strong> (for MVP)</td><td>Demo data 用 fake, compliance 在 pilot phase</td></tr><tr><td>Edge case handling</td><td><strong>NO</strong></td><td>失败让用户 retry</td></tr></tbody></table></div>
 <p><strong>目标</strong>: IN 的 1-2 项是 demo 的 wow moment. OUT 的 N 项是 phase 2+.</p>
 <h4>4.2 Hardcoded OK List</h4>
 <p>MVP 阶段以下 hardcoded 不丢人:</p>
@@ -532,7 +532,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting</code></pre>
 <p><strong>D — Discovery (Day 1-3)</strong>: 5-7 stakeholder interviews — VP Sales (buyer), Sales Ops (process), 2 reps (users), IT (constraints), CFO (ROI), champion (insider). Each 30 min. Output: 1-page stakeholder map.</p>
 <p><strong>K — KPI lock (Day 3-4)</strong>: Force ONE primary metric. Likely 'time saved per rep on lead qualification' — baseline 8h/week, target 4h/week post-MVP. Get sign-off doc.</p>
 <p><strong>D — Decomposition (Day 4-5)</strong>: 10 sub-step sales workflow. Score each on (耗时 × 痛 × LLM-friendly × data ready). Pick Step 2 (qualification) — highest scoring.</p>
-<p><strong>M — MVP (Week 1-3)</strong>: Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.</p>
+<p><strong>M — MVP (Week 1-3)</strong>: Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.</p>
 <p><strong>P — Pilot (Week 4-12)</strong>: 3 friendly reps soft launch → 3 vs 3 A/B → iterate → 10-20 rep expand. Weekly KPI review.</p>
 <p><strong>Customer management tactics</strong>: Scope creep → roadmap doc, defer. Change of mind → distinguish real-pivot vs shiny-toy. 'Faster please' → strip to PoC (1 week) or stage (1 week PoC + 2 week MVP). '100% auto' → phase 1-3 trust ladder.</p>
 <p><strong>What I'd avoid</strong>: writing code week 1, skipping stakeholder interviews, multiple KPIs, building perfect architecture pre-validation, promising 100% automation.</p>
@@ -608,7 +608,7 @@ MVP carve-out 红线:
   1 happy path
   1 user
   Streamlit / Next.js
-  Pinecone (managed)
+  Vertex AI Vector Search (managed)
   GCP Cloud Run (single)
   Read-only API
   No multi-tenant
@@ -716,7 +716,7 @@ FDE 的工作不是 "写最好的代码", 是 **"让这个客户 6 个月后给�
 ```
 Week 1: 客户说 "用 AI 提升销售效率"
         你想: 销售大概是 lead 进来、跟进、报价、成单
-        你开始写 LangChain agent + Pinecone + Salesforce SDK
+        你开始写 LangChain agent + Vertex AI Vector Search + Salesforce SDK
         架构图画了 3 张
 
 Week 2: 你写了 RAG over 客户的产品文档
@@ -1162,7 +1162,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting
 **Tech Stack (deliberately minimal for MVP)**:
 
 - **LLM**: Gemini 3 Pro ($2/$12 per 1M) for reasoning + summarization, Gemini 3 Flash ($0.50/$3) for cheap operations (parsing, formatting). Skip self-host.
-- **Vector DB**: Pinecone (cloud, 几分钟接好). 不要自建.
+- **Vector DB**: Vertex AI Vector Search (cloud, 几分钟接好). 不要自建.
 - **Frontend**: Streamlit (Python, 1 天起页). 不上 Next.js.
 - **Integration**: Salesforce Read-only API. 不写, 减权限审批时间.
 - **Storage**: Postgres (Supabase free tier). 不上 distributed DB.
@@ -1432,7 +1432,7 @@ Phase 5+ (年):      Pipeline reasoning / forecasting
 | Multi-tenancy | **NO** | 1 customer |
 | Auth (proper SSO) | **NO** | Basic password / 仅 demo 用 |
 | CI/CD pipeline | **NO** | Manual deploy |
-| Vector DB self-host | **NO** | Pinecone managed |
+| Vector DB self-host | **NO** | Vertex AI Vector Search managed |
 | Auto-scaling | **NO** | 1 instance |
 | GDPR / compliance | **NO** (for MVP) | Demo data 用 fake, compliance 在 pilot phase |
 | Edge case handling | **NO** | 失败让用户 retry |
@@ -1703,7 +1703,7 @@ Week 3 Day 14 demo 30 min 节奏:
 > 10 sub-step sales workflow. Score each on (耗时 × 痛 × LLM-friendly × data ready). Pick Step 2 (qualification) — highest scoring.
 >
 > **M — MVP (Week 1-3)**:
-> Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Pinecone + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.
+> Vertical slice: 1 rep, 1 happy path, end-to-end. Tech: Gemini 3 Pro + Vertex AI Vector Search + Streamlit + Salesforce read API. Hardcoded list, single user, no fancy UI. Demo Day 14.
 >
 > **P — Pilot (Week 4-12)**:
 > 3 friendly reps soft launch → 3 vs 3 A/B → iterate → 10-20 rep expand. Weekly KPI review.
@@ -1865,7 +1865,7 @@ MVP carve-out 红线:
   1 happy path
   1 user
   Streamlit / Next.js
-  Pinecone (managed)
+  Vertex AI Vector Search (managed)
   GCP Cloud Run (single)
   Read-only API
   No multi-tenant

@@ -28,7 +28,7 @@
 Edge → API Gateway (auth/rate) → App Layer (Conversation/Router/MCP Proxy/Observ)
   → Cache + Queue + Tool Registry + Tracing
   → vLLM cluster + LLM vendors (Gemini 3 Pro $2/$12, Flash $0.50/$3, Opus 4.7 $5/$25)
-  → Vector DB (Qdrant/Pinecone) + Temporal workflow + GCS audit/eval DB
+  → Vector DB (Vertex AI Vector Search/Vertex AI Vector Search) + Temporal workflow + GCS audit/eval DB
 ```
 
 ### Layer 2: 6 个 sub-topic (各 1 句压扁)

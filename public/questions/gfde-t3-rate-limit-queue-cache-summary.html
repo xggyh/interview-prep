@@ -99,7 +99,7 @@ L5 context &gt;30K   → drop multi-turn (single-shot)
 L6 severe         → canned response from cache
 L7 total fail     → static "service busy, try later"</code></pre>
 <h4>🪝 Resume hook</h4>
-<p>"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, <strong>cost reduction 42%</strong>. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. <strong>Budget</strong>: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."</p>
+<p>"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, <strong>cost reduction 42%</strong>. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. <strong>Budget</strong>: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."</p>
 <hr />
 <h3>🔥 5 Follow-ups</h3>
 <p><strong>Q1: Semantic cache wrong-hit (返回相似但不同 query 的答案), 怎么 mitigate?</strong> <strong>Threshold tuning per domain</strong>: medical 0.97 / FAQ 0.88 / general 0.95. <strong>Verification pass</strong>: cheap Haiku ($1/$5) compare cached question to current, 10ms latency. <strong>Personalization layer</strong>: cached answer + user context → tailored (不 return verbatim). <strong>Per-domain stricter</strong>: 金融/医疗高 threshold. <strong>A/B canned vs LLM</strong>: measure thumbs ratio, canned 匹配 LLM → safe.</p>
@@ -295,7 +295,7 @@ L7 total fail     → static "service busy, try later"
 
 ### 🪝 Resume hook
 
-"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, **cost reduction 42%**. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. **Budget**: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
+"On BNPL chatbot at TikTok PayLater - 50% incoming queries were 5 FAQ variations ('how reschedule', 'balance', 'when due', 'cancel payment', 'change card'). Added semantic cache 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, **cost reduction 42%**. 3 priority tiers (gold ahead of bronze 5x). When peak hit, cost-routing pushed non-critical to Gemini 3 Flash ($0.50/$3, ~10x cheaper than Opus), no eval drop. **Budget**: per-tenant atomic Redis Lua check + Postgres durable. One Indonesia customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
 
 ---
 

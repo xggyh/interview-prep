@@ -86,21 +86,7 @@ eval_pass_rate (sampled 5%)
 jailbreak_attempts_per_min
 user_thumbs_ratio</code></pre>
 <h4>Layer 4: Quality monitoring (eval-in-prod)</h4>
-<pre class="language-python"><code class="language-python">def sampled_eval(req, response):
-    if random.random() &gt; 0.05 and not flagged:
-        return
-    
-    # LLM-as-judge (Sonnet 4.6)
-    scores = {
-        "faithfulness": llm_judge(req, resp, "faithfulness"),
-        "relevance": ..., "tool_selection": ...,
-        "safety": ..., "refusal": ..., "conciseness": ...,
-    }
-    eval_db.insert({...})
-    
-    if scores["faithfulness"] &lt; 0.6:
-        alert("low_faithfulness", req, resp)</code></pre>
-<p>5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge. Calibrate weekly vs human labelers 200-500 golden set.</p>
+<p>5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge (Sonnet 4.6) multi-dim score (faithfulness, relevance, tool_selection, safety, refusal, conciseness). Alert if faithfulness &lt;0.6. Calibrate weekly vs 200-500 human golden set.</p>
 <h4>Edge cases</h4>
 <ul><li><strong>EC1 10K QPS, 100% trace 太贵</strong>: <strong>tail-based sampling</strong> — 1% random + 100% errors + 100% slow (&gt;5s) + 100% high-cost (&gt;$0.5) + 100% VIP. OTel collector tail_sampling processor. 30x cost saving.</li><li><strong>EC2 PII 写 raw log</strong>: SOC2/GDPR fail. Presidio middleware on EVERY log call (NER spaCy + custom recognizer for account#/SSN). Apply at log-write time. Hash for correlation. RTBF via hash deletion.</li><li><strong>EC3 Silent quality drop (metric 全绿)</strong>: 传统 latency/error OK 但用户感受变差 = invisible. 必须 eval-in-prod 5% sample. Real case ID market 92% → 84% via slice analysis (by market/model/prompt/RAG), revert RAG 4h to recovery.</li><li><strong>EC4 Cost spike unknown</strong>: 7d trend by tenant → 某 tenant spike → by feature → identify expensive feature → by prompt → too-long context. Solution: per-feature cost guard alarm + 5x baseline detector.</li><li><strong>EC5 Jailbreak detection</strong>: pattern match (keywords "ignore previous", DAN, 中文 "忽略之前的指令") + LLM-classifier (Haiku $1/$5 cheap) + honeypot (inject fake secrets, detect leak) + response pattern ("I cannot" 异常增多) + user freq throttle (&gt;10/min temp ban).</li></ul>
 <h4>Production hardening</h4>
@@ -273,24 +259,7 @@ user_thumbs_ratio
 
 ### Layer 4: Quality monitoring (eval-in-prod)
 
-```python
-def sampled_eval(req, response):
-    if random.random() > 0.05 and not flagged:
-        return
-    
-    # LLM-as-judge (Sonnet 4.6)
-    scores = {
-        "faithfulness": llm_judge(req, resp, "faithfulness"),
-        "relevance": ..., "tool_selection": ...,
-        "safety": ..., "refusal": ..., "conciseness": ...,
-    }
-    eval_db.insert({...})
-    
-    if scores["faithfulness"] < 0.6:
-        alert("low_faithfulness", req, resp)
-```
-
-5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge. Calibrate weekly vs human labelers 200-500 golden set.
+5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge (Sonnet 4.6) multi-dim score (faithfulness, relevance, tool_selection, safety, refusal, conciseness). Alert if faithfulness <0.6. Calibrate weekly vs 200-500 human golden set.
 
 ### Edge cases
 

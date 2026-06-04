@@ -41,9 +41,9 @@ async def update_crm(record_id, fields, *, ctx):
 
 每条 entry: `actor_type / actor_id / on_behalf_of / tenant_id / tool / args(redacted) / scope_used / reasoning / outcome / result(redacted) / ts / trace_id / confirmed_by / confirm_method / jurisdiction / data_classification / prev_hash / hash`.
 
-**Storage tiers**: Hot 90d (Postgres / OpenSearch queryable + alert) / Warm 1y (S3 Parquet slow query) / Cold 7y (S3 Glacier compliance — SOX / HIPAA / 央行).
+**Storage tiers**: Hot 90d (Postgres / Vertex AI Vector Search queryable + alert) / Warm 1y (GCS Parquet slow query) / Cold 7y (GCS Glacier compliance — SOX / HIPAA / 央行).
 
-**Hash chain tamper detection**: verify `entry.hash == sha256(entry)` and `prev_hash == previous.hash`. Append-only blob store (S3 Object Lock) prevents overwrite even by admin.
+**Hash chain tamper detection**: verify `entry.hash == sha256(entry)` and `prev_hash == previous.hash`. Append-only blob store (GCS Object Lock) prevents overwrite even by admin.
 
 **PII redaction**: Day 0-30 full with redaction patterns. Day 30+ aggressive (IDs only). Legal hold = separate encrypted vault.
 
@@ -186,9 +186,9 @@ L3 Audit fields:
   prev_hash / hash (chain)
 
 Storage tiers (retention):
-  Hot 90d   Postgres / OpenSearch (queryable + alerts)
-  Warm 1y   S3 Parquet (slow query)
-  Cold 7y   S3 Glacier + Object Lock (SOX/HIPAA/央行)
+  Hot 90d   Postgres / Vertex AI Vector Search (queryable + alerts)
+  Warm 1y   GCS Parquet (slow query)
+  Cold 7y   GCS Glacier + Object Lock (SOX/HIPAA/央行)
 
 L4 Recovery (Compensating handlers per tool):
   send_email     → recall (60s window)

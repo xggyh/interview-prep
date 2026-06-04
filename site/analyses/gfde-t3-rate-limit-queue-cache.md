@@ -521,7 +521,7 @@ Step 7: Long-term (week)
 
 **设计 5-layer system**:
 
-1. **Cache infrastructure** — Redis (exact + semantic), Qdrant (vector), per-tool TTL config
+1. **Cache infrastructure** — Redis (exact + semantic), Vertex AI Vector Search (vector), per-tool TTL config
 2. **Embedding model** — text-embedding-3-large or BGE for semantic
 3. **Priority queue** — RabbitMQ / Kafka with priority field, or Redis sorted set
 4. **Per-tenant rate limiter** — Redis Lua script, token bucket
@@ -638,7 +638,7 @@ class SemanticCache:
     """Cosine similarity over query embeddings"""
     
     def __init__(self, vector_db, embedding_model):
-        self.vector_db = vector_db  # Qdrant / Pinecone
+        self.vector_db = vector_db  # Vertex AI Vector Search / Vertex AI Vector Search
         self.embedding_model = embedding_model
         self.threshold = 0.95
     
@@ -2035,7 +2035,7 @@ class RecoveryManager:
 >
 > **(L1) Cache** — Try first, cheapest:
 > - Exact (hash): 15% hit
-> - Semantic (Qdrant + embedding cosine > 0.95): 35% hit on FAQ
+> - Semantic (Vertex AI Vector Search + embedding cosine > 0.95): 35% hit on FAQ
 > - Tool output (per-tool TTL): 80% hit on idempotent reads
 > - LLM prefix (vLLM server-side): 75% hit when shared system prompt
 > - Combined: 60% of queries avoid full LLM call
@@ -2098,7 +2098,7 @@ class RecoveryManager:
 
 **主动 quote**:
 
-> "BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Qdrant + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
+> "BNPL chatbot at TikTok PayLater — 50% of incoming queries were variations of 5 FAQs ('how do I reschedule', 'what's my balance', 'when due', 'cancel payment', 'change card'). We added semantic cache with 0.92 threshold + 1h TTL on Vertex AI Vector Search + text-embedding-3-large. Hit rate 38%, cost reduction 42%. Queue with 3 priority tiers (gold ahead of bronze by 5x). When peak hit, cost-routing automatically pushed non-critical queries to Gemini 3 Flash ($0.50/$3 per 1M, ~10x cheaper than Claude Opus 4.7), no measurable quality drop on eval suite. Budget enforcement: per-tenant atomic Lua check + Postgres durable record. One Indonesian customer's bug ran 10K loop in 1 day — budget cap saved us from $50K hit, hard stop at $1K monthly limit."
 
 ---
 

@@ -537,7 +537,7 @@ def reconcile():
 <p>1M users × 50 tool calls / day = 50M keys/day.</p>
 <ul><li>Redis: 50M × 100 bytes = 5 GB. 单 Redis instance OK. Cluster 更稳.</li><li>DB: 50M × 500 bytes = 25 GB/day, archive 后 manageable.</li><li>Cost: Redis $50/month for 8GB, Postgres $200/month for 100GB. 完全 affordable.</li></ul>
 <h4>3.6 Tools</h4>
-<ul><li><strong>Redis</strong>: 标准, AWS ElastiCache 托管</li><li><strong>DragonflyDB / KeyDB</strong>: Redis 兼容, 更快</li><li><strong>Postgres</strong>: 长期存储, <code>idempotency_log</code> 表带 <code>UNIQUE(idem_key)</code></li><li><strong>DynamoDB / Spanner</strong>: serverless 替代</li><li><strong>Apache Iceberg / Parquet on S3</strong>: cold archive</li><li><strong>Datafold / dbt</strong>: reconciliation job 编排</li></ul>
+<ul><li><strong>Redis</strong>: 标准, Memorystore 托管</li><li><strong>DragonflyDB / KeyDB</strong>: Redis 兼容, 更快</li><li><strong>Postgres</strong>: 长期存储, <code>idempotency_log</code> 表带 <code>UNIQUE(idem_key)</code></li><li><strong>Firestore / Bigtable / Spanner</strong>: serverless 替代</li><li><strong>Apache Iceberg / Parquet on GCS</strong>: cold archive</li><li><strong>Datafold / dbt</strong>: reconciliation job 编排</li></ul>
 <hr />
 <h3>⚙️ Problem 4: Failure Modes — Redis down, key collision, agent retries with different args</h3>
 <p>每个 failure mode 都要有明确 policy.</p>
@@ -660,7 +660,7 @@ def check_stale_in_flight(idem_key):
 <h3>⚙️ Problem 5: Cross-Vendor Idempotency — when downstream doesn't support idem_key</h3>
 <p>50% 的下游 API 不原生支持 idempotency header. 怎么办?</p>
 <h4>5.1 Vendor 支持矩阵</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Vendor</th><th>支持</th><th>Header / Field</th></tr></thead><tbody><tr><td><strong>Stripe</strong></td><td>✅</td><td><code>Idempotency-Key</code> header, 24h</td></tr><tr><td><strong>Square</strong></td><td>✅</td><td><code>idempotency_key</code> body field</td></tr><tr><td><strong>PayPal</strong></td><td>✅</td><td><code>PayPal-Request-Id</code> header, 30d</td></tr><tr><td><strong>AWS SQS</strong></td><td>✅ partial</td><td><code>MessageDeduplicationId</code> (FIFO queue)</td></tr><tr><td><strong>Twilio</strong></td><td>❌ no native</td><td>但 messageSid 可 query</td></tr><tr><td><strong>SendGrid</strong></td><td>❌</td><td>自己 dedup</td></tr><tr><td><strong>传统银行 API</strong> (e.g., SWIFT)</td><td>⚠️ varies</td><td><code>EndToEndId</code> 或 custom ref</td></tr><tr><td><strong>Internal microservice</strong></td><td>⚠️ depends</td><td>看自己怎么写的</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Vendor</th><th>支持</th><th>Header / Field</th></tr></thead><tbody><tr><td><strong>Stripe</strong></td><td>✅</td><td><code>Idempotency-Key</code> header, 24h</td></tr><tr><td><strong>Square</strong></td><td>✅</td><td><code>idempotency_key</code> body field</td></tr><tr><td><strong>PayPal</strong></td><td>✅</td><td><code>PayPal-Request-Id</code> header, 30d</td></tr><tr><td><strong>Cloud Tasks / Pub/Sub</strong></td><td>✅ partial</td><td><code>MessageDeduplicationId</code> (FIFO queue)</td></tr><tr><td><strong>Twilio</strong></td><td>❌ no native</td><td>但 messageSid 可 query</td></tr><tr><td><strong>SendGrid</strong></td><td>❌</td><td>自己 dedup</td></tr><tr><td><strong>传统银行 API</strong> (e.g., SWIFT)</td><td>⚠️ varies</td><td><code>EndToEndId</code> 或 custom ref</td></tr><tr><td><strong>Internal microservice</strong></td><td>⚠️ depends</td><td>看自己怎么写的</td></tr></tbody></table></div>
 <h4>5.2 Pattern A: Vendor 原生支持 — pass-through</h4>
 <pre class="language-python"><code class="language-python">def transfer_via_stripe(args, idem_key):
     return stripe.transfers.create(
@@ -773,7 +773,7 @@ Philippines: GCash (idem support, 24h) → Pattern A
 ...</code></pre>
 <p><strong>统一抽象</strong>: payment-gateway wrapper 层暴露统一 <code>transfer(args, idem_key)</code> 接口, 内部按 market 选 pattern. Agent / LLM 不感知差异.</p>
 <h4>5.8 Tools</h4>
-<ul><li><strong>Stripe SDK</strong>: <code>idempotency_key</code> parameter</li><li><strong>MessageDeduplicationId</strong> (AWS SQS FIFO)</li><li><strong>Temporal</strong>: workflow_id 自动 idempotency</li><li><strong>Kafka with exactly-once semantics</strong> (transactional producer)</li><li><strong>Outbox pattern</strong>: DB 写 + 消息队列发统一 transaction</li><li><strong>Sage / Saga</strong>: cross-service compensating transaction framework</li></ul>
+<ul><li><strong>Stripe SDK</strong>: <code>idempotency_key</code> parameter</li><li><strong>MessageDeduplicationId</strong> (Cloud Tasks / Pub/Sub FIFO)</li><li><strong>Temporal</strong>: workflow_id 自动 idempotency</li><li><strong>Kafka with exactly-once semantics</strong> (transactional producer)</li><li><strong>Outbox pattern</strong>: DB 写 + 消息队列发统一 transaction</li><li><strong>Sage / Saga</strong>: cross-service compensating transaction framework</li></ul>
 <hr />
 <h1>Part 3 · 把 5 个问题串起来看</h1>
 <p>这 5 个 deep problem 其实是<strong>同一根线的 5 个 layer</strong>, 从抽象到具体:</p>
@@ -1748,11 +1748,11 @@ def reconcile():
 
 ### 3.6 Tools
 
-- **Redis**: 标准, AWS ElastiCache 托管
+- **Redis**: 标准, Memorystore 托管
 - **DragonflyDB / KeyDB**: Redis 兼容, 更快
 - **Postgres**: 长期存储, `idempotency_log` 表带 `UNIQUE(idem_key)`
-- **DynamoDB / Spanner**: serverless 替代
-- **Apache Iceberg / Parquet on S3**: cold archive
+- **Firestore / Bigtable / Spanner**: serverless 替代
+- **Apache Iceberg / Parquet on GCS**: cold archive
 - **Datafold / dbt**: reconciliation job 编排
 
 ---
@@ -1953,7 +1953,7 @@ def check_stale_in_flight(idem_key):
 | **Stripe** | ✅ | `Idempotency-Key` header, 24h |
 | **Square** | ✅ | `idempotency_key` body field |
 | **PayPal** | ✅ | `PayPal-Request-Id` header, 30d |
-| **AWS SQS** | ✅ partial | `MessageDeduplicationId` (FIFO queue) |
+| **Cloud Tasks / Pub/Sub** | ✅ partial | `MessageDeduplicationId` (FIFO queue) |
 | **Twilio** | ❌ no native | 但 messageSid 可 query |
 | **SendGrid** | ❌ | 自己 dedup |
 | **传统银行 API** (e.g., SWIFT) | ⚠️ varies | `EndToEndId` 或 custom ref |
@@ -2110,7 +2110,7 @@ Philippines: GCash (idem support, 24h) → Pattern A
 ### 5.8 Tools
 
 - **Stripe SDK**: `idempotency_key` parameter
-- **MessageDeduplicationId** (AWS SQS FIFO)
+- **MessageDeduplicationId** (Cloud Tasks / Pub/Sub FIFO)
 - **Temporal**: workflow_id 自动 idempotency
 - **Kafka with exactly-once semantics** (transactional producer)
 - **Outbox pattern**: DB 写 + 消息队列发统一 transaction

@@ -47,7 +47,7 @@ Chunk = {
 
 - **Delta**: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)
 - **Versioning**: 双写 v2 + v3, traffic split 80/20, eval pass → cutover
-- **Hot + warm**: last 24h in-memory 5min refresh + rest daily Qdrant, RRF merge
+- **Hot + warm**: last 24h in-memory 5min refresh + rest daily Vertex AI Vector Search, RRF merge
 - **Async pipeline**: doc change → Pub/Sub queue → background worker
 
 ### Edge cases (背 5 个)
@@ -75,7 +75,7 @@ Chunk = {
 ## 🔥 5 Follow-ups (面试官会问)
 
 **Q1: 小 chunk 更多向量, 存储 cost 担忧?**
-1M chunks × 768d × 4 bytes = 3GB, Qdrant/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.
+1M chunks × 768d × 4 bytes = 3GB, Vertex AI Vector Search/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.
 
 **Q2: Reindex — doc 改时重 embed 贵?**
 Delta indexing: chunk-level hash, 仅 re-embed changed; chunk_id 稳定 via `hash(doc_id + heading_path + chunk_index)`; versioning 灰度 (v_old + v_new 双写一段时间); async via Pub/Sub queue background worker; hot index for sub-5-min freshness on new docs.
@@ -177,7 +177,7 @@ Versioning + 灰度:
   Eval v_new >= v_old → cutover, drop v_old
 
 Hot + warm index:
-  Hot: last 24h, in-memory (Redis vec or small Qdrant), 5min refresh
+  Hot: last 24h, in-memory (Redis vec or small Vertex AI Vector Search), 5min refresh
   Warm: rest, async delta indexing daily
   Search both, RRF merge
 
@@ -207,16 +207,16 @@ GCP stack (2026):
   BigQuery            (chunk metadata + analytics)
   Cloud Run           (chunker worker, async)
   VPC Service Controls (tenant isolation)
-  AWS: Textract / OpenSearch / Kendra comparison
+  AWS: Document AI / Vertex AI Vector Search / Kendra comparison
 
 Tool zoo:
   PDF parse:     unstructured, pymupdf, LlamaParse, Document AI
-  Table extract: Camelot, Tabula, Textract, Document AI Form Parser
+  Table extract: Camelot, Tabula, Document AI, Document AI Form Parser
   Code AST:      tree-sitter (语言无关)
   PII:           presidio (Microsoft), Cloud DLP
   Embedding:     text-embedding-005, gemini-embedding, bge-large
   Late chunking: jina-embeddings-v3 (8K ctx)
-  Vector DB:     Vertex Vector Search, Qdrant, Pinecone, Weaviate
+  Vector DB:     Vertex Vector Search, Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
 
 红线:
   - Fixed-size everywhere

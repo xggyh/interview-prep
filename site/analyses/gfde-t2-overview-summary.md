@@ -161,7 +161,7 @@ RAG 7-step pipeline:
 Context mgmt (4 strategies, combine):
   Sliding window      last 10 turn verbatim
   Hierarchical        4 tier (ancient/mid/recent/latest)
-  External memory     blob (>1K out) + Qdrant (episodic) + Postgres (decisions)
+  External memory     blob (>1K out) + Vertex AI Vector Search (episodic) + Postgres (decisions)
   Selective pruning   importance score + pinned
 
 Cost (2026):
@@ -179,7 +179,7 @@ Decision: corpus → architecture
   Default                      → RAG narrow → long-ctx
 
 Multi-tenant perms:
-  Filter at retrieval time (Qdrant query_filter / Vertex Vector Search)
+  Filter at retrieval time (Vertex AI Vector Search query_filter / Vertex Vector Search)
   NEVER post-rank (loses top-k)
   Per-tenant index 或 metadata filter 强制
 
@@ -200,7 +200,7 @@ GCP-first stack (2026):
   BigQuery                      (analytics + RAG-on-warehouse)
   Pub/Sub                       (delta reindex queue)
   VPC Service Controls          (multi-tenant isolation)
-  AWS comparison: OpenSearch / Kendra / Bedrock KB
+  AWS comparison: Vertex AI Vector Search / Kendra / Vertex AI KB
 
 45-min rhythm:
   0-5    Clarify (corpus, doc type, tenancy, fresh, SLA)

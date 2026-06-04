@@ -64,7 +64,7 @@ Mixed enterprise wiki             → Late chunking (Jina v3 / Cohere v4) ⭐ 20
 }
 # Embed text prepend heading: f"{' &gt; '.join(heading_path)}\n\n{chunk.text}"</code></pre>
 <h4>Layer 4: Delta indexing + versioning + hot/warm</h4>
-<ul><li><strong>Delta</strong>: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)</li><li><strong>Versioning</strong>: 双写 v2 + v3, traffic split 80/20, eval pass → cutover</li><li><strong>Hot + warm</strong>: last 24h in-memory 5min refresh + rest daily Qdrant, RRF merge</li><li><strong>Async pipeline</strong>: doc change → Pub/Sub queue → background worker</li></ul>
+<ul><li><strong>Delta</strong>: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)</li><li><strong>Versioning</strong>: 双写 v2 + v3, traffic split 80/20, eval pass → cutover</li><li><strong>Hot + warm</strong>: last 24h in-memory 5min refresh + rest daily Vertex AI Vector Search, RRF merge</li><li><strong>Async pipeline</strong>: doc change → Pub/Sub queue → background worker</li></ul>
 <h4>Edge cases (背 5 个)</h4>
 <ul><li><strong>EC1 切表格中间</strong>: naive fixed-512 把表格切两半, 半个表无意义 → Document AI 解析为 table element, atomic chunk + Markdown serialize, caption embed.</li><li><strong>EC2 Heading 丢上下文</strong>: "Rated voltage: 5V" 不知是哪个设备 → embed_text prepend heading_path ('iPhone 15 Pro Max &gt; Specs &gt; Electrical\n\n5V'), embedding 有 context.</li><li><strong>EC3 Random chunk ID</strong>: 每次 random UUID → delta indexing 不可能 (无法 diff) → 用 <code>hash(doc_id + heading_path + chunk_index_in_section)</code> 结构性 hash.</li><li><strong>EC4 Tokenizer mismatch</strong>: 用 GPT tokenizer 数 token 但 embedding 用 BERT → 估算偏差 30%+ → 用 embedding model 自己的 tokenizer 数.</li><li><strong>EC5 PII tagging 漏</strong>: chunk 含 SSN/credit card 直接 embed 进 index → 索引前 Cloud DLP 扫描, mask 或 drop, 标 pii_level 用于检索时 perms.</li></ul>
 <h4>Production hardening (1 min)</h4>
@@ -73,7 +73,7 @@ Mixed enterprise wiki             → Late chunking (Jina v3 / Cohere v4) ⭐ 20
 <p>"BNPL chatbot 3 chunker 共存: FAQ atomic (1 FAQ = 1 chunk, avg 100 tok), policy heading-aware (avg 600 tok, retain hierarchy), ticket turn-aware (avg 300 tok, split by speaker). Metadata <code>source_type</code> 让 retrieval 混搜但 boost policy &gt; ticket. Naive 一刀切 512 recall@10 = 71%, 后变 84%. 最大单点 8pp 收益是 table-as-atomic — 监管表格 (利率/费率 cap) 是最高价值 content, 切 mid-cell 完全废. ConvFinQA 用 LlamaParse / Document AI 解析财报表格 + 用 tree-sitter parse 配套 code 例, 每类独立 chunker."</p>
 <hr />
 <h3>🔥 5 Follow-ups (面试官会问)</h3>
-<p><strong>Q1: 小 chunk 更多向量, 存储 cost 担忧?</strong> 1M chunks × 768d × 4 bytes = 3GB, Qdrant/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.</p>
+<p><strong>Q1: 小 chunk 更多向量, 存储 cost 担忧?</strong> 1M chunks × 768d × 4 bytes = 3GB, Vertex AI Vector Search/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.</p>
 <p><strong>Q2: Reindex — doc 改时重 embed 贵?</strong> Delta indexing: chunk-level hash, 仅 re-embed changed; chunk_id 稳定 via <code>hash(doc_id + heading_path + chunk_index)</code>; versioning 灰度 (v_old + v_new 双写一段时间); async via Pub/Sub queue background worker; hot index for sub-5-min freshness on new docs.</p>
 <p><strong>Q3: 有些 chunk 是 'TOC' / 'copyright' / junk, 怎么过?</strong> Pre-filter at index time: heuristic on heading text ('Table of Contents', 'References') skip; quality score (keyword density / structure); hand-curated stoplist for known patterns; LLM cheap pass 'is this informative?' on questionable.</p>
 <p><strong>Q4: 用户问题跨 3 个 section, retrieval 拿 1 个 miss 2 个?</strong> Hierarchical / parent-doc: small chunk retrieve, large parent chunk return (更多 context); multi-query expand 分 3 sub-query; iterative agentic retrieve (LLM 看 gap 再 retrieve); document-level retrieval first 再 chunk within; <strong>Late chunking</strong> chunks inherently 有 doc context.</p>
@@ -136,7 +136,7 @@ Versioning + 灰度:
   Eval v_new &gt;= v_old → cutover, drop v_old
 
 Hot + warm index:
-  Hot: last 24h, in-memory (Redis vec or small Qdrant), 5min refresh
+  Hot: last 24h, in-memory (Redis vec or small Vertex AI Vector Search), 5min refresh
   Warm: rest, async delta indexing daily
   Search both, RRF merge
 
@@ -166,16 +166,16 @@ GCP stack (2026):
   BigQuery            (chunk metadata + analytics)
   Cloud Run           (chunker worker, async)
   VPC Service Controls (tenant isolation)
-  AWS: Textract / OpenSearch / Kendra comparison
+  AWS: Document AI / Vertex AI Vector Search / Kendra comparison
 
 Tool zoo:
   PDF parse:     unstructured, pymupdf, LlamaParse, Document AI
-  Table extract: Camelot, Tabula, Textract, Document AI Form Parser
+  Table extract: Camelot, Tabula, Document AI, Document AI Form Parser
   Code AST:      tree-sitter (语言无关)
   PII:           presidio (Microsoft), Cloud DLP
   Embedding:     text-embedding-005, gemini-embedding, bge-large
   Late chunking: jina-embeddings-v3 (8K ctx)
-  Vector DB:     Vertex Vector Search, Qdrant, Pinecone, Weaviate
+  Vector DB:     Vertex Vector Search, Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
 
 红线:
   - Fixed-size everywhere
@@ -247,7 +247,7 @@ Chunk = {
 
 - **Delta**: chunk_id 稳定 hash → 仅 changed chunk re-embed (10K doc full reindex 40min vs delta 1 doc 1s)
 - **Versioning**: 双写 v2 + v3, traffic split 80/20, eval pass → cutover
-- **Hot + warm**: last 24h in-memory 5min refresh + rest daily Qdrant, RRF merge
+- **Hot + warm**: last 24h in-memory 5min refresh + rest daily Vertex AI Vector Search, RRF merge
 - **Async pipeline**: doc change → Pub/Sub queue → background worker
 
 ### Edge cases (背 5 个)
@@ -275,7 +275,7 @@ Chunk = {
 ## 🔥 5 Follow-ups (面试官会问)
 
 **Q1: 小 chunk 更多向量, 存储 cost 担忧?**
-1M chunks × 768d × 4 bytes = 3GB, Qdrant/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.
+1M chunks × 768d × 4 bytes = 3GB, Vertex AI Vector Search/Vertex Vector Search 便宜; HNSW 1.5-2x; embedding 一次性 1M × 500 tok × $0.025/1M = $12.5 amortized 0; 小 chunk 提升 precision → fed LLM 更少 → 省 LLM cost. Counter-net positive.
 
 **Q2: Reindex — doc 改时重 embed 贵?**
 Delta indexing: chunk-level hash, 仅 re-embed changed; chunk_id 稳定 via `hash(doc_id + heading_path + chunk_index)`; versioning 灰度 (v_old + v_new 双写一段时间); async via Pub/Sub queue background worker; hot index for sub-5-min freshness on new docs.
@@ -377,7 +377,7 @@ Versioning + 灰度:
   Eval v_new >= v_old → cutover, drop v_old
 
 Hot + warm index:
-  Hot: last 24h, in-memory (Redis vec or small Qdrant), 5min refresh
+  Hot: last 24h, in-memory (Redis vec or small Vertex AI Vector Search), 5min refresh
   Warm: rest, async delta indexing daily
   Search both, RRF merge
 
@@ -407,16 +407,16 @@ GCP stack (2026):
   BigQuery            (chunk metadata + analytics)
   Cloud Run           (chunker worker, async)
   VPC Service Controls (tenant isolation)
-  AWS: Textract / OpenSearch / Kendra comparison
+  AWS: Document AI / Vertex AI Vector Search / Kendra comparison
 
 Tool zoo:
   PDF parse:     unstructured, pymupdf, LlamaParse, Document AI
-  Table extract: Camelot, Tabula, Textract, Document AI Form Parser
+  Table extract: Camelot, Tabula, Document AI, Document AI Form Parser
   Code AST:      tree-sitter (语言无关)
   PII:           presidio (Microsoft), Cloud DLP
   Embedding:     text-embedding-005, gemini-embedding, bge-large
   Late chunking: jina-embeddings-v3 (8K ctx)
-  Vector DB:     Vertex Vector Search, Qdrant, Pinecone, Weaviate
+  Vector DB:     Vertex Vector Search, Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
 
 红线:
   - Fixed-size everywhere

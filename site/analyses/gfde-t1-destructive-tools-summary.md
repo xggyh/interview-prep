@@ -70,7 +70,7 @@ L3 Post:      immutable hash-chained audit + compensating registry
 ### Production hardening
 
 - **Hash chain audit** (immutable): `prev_hash + self_hash`, 改 N 需重算所有 N+1+...
-- **Tiered storage**: hot Postgres 30d / warm S3 Parquet 1y / cold Glacier 7y (合规); destructive ops 7 年保留
+- **Tiered storage**: hot Postgres 30d / warm GCS Parquet 1y / cold Glacier 7y (合规); destructive ops 7 年保留
 - **PII vault separation**: audit metadata 不存 raw PII, GDPR-compatible
 - **Postmortem culture**: 每 destructive incident → blameless review → new safeguard + regression test + retention bump
 - **Tier-aware policy**: gold $50K/session, silver default, bronze $5/session
@@ -90,7 +90,7 @@ L3 Post:      immutable hash-chained audit + compensating registry
 不说 no, 说 **bounded**: "autonomous within X" (max $100, max 5 deletes/day) + "auto on reversible, confirm on destructive_permanent" + "post-hoc 24h human review". 客户 SLA 签 bounded auto, 我们 log 所有. 这是 staff-level 谈判技巧, 把 risk 转 contract.
 
 **Q3: Audit log 10GB/day, cost concern?**
-Tiered storage: **hot** Postgres 30d ~$200/mo for 1TB + **warm** S3+Athena 1y ~$50/mo for 10TB + **cold** Glacier 7y ~$1/TB/mo. Per-tool TTL: read-only 30d, write 1y, destructive 7y. PII vault 独立小. 总成本 < $500/mo even at 10GB/day.
+Tiered storage: **hot** Postgres 30d ~$200/mo for 1TB + **warm** GCS+Athena 1y ~$50/mo for 10TB + **cold** Glacier 7y ~$1/TB/mo. Per-tool TTL: read-only 30d, write 1y, destructive 7y. PII vault 独立小. 总成本 < $500/mo even at 10GB/day.
 
 **Q4: Prompt injection bypass confirm (user input "delete all users")?**
 多层: (a) **Permission scoping**: agent 用 user perm 不是 platform perm, 删不了别人 (b) **XML wrap** tool output + system reminder isolation (c) **Confirm-required gate** 在 runtime, LLM 控制不了 (d) **Output sanitization** scan LLM 输出含 tool-call syntax (e) **Anomaly detect** 50 deletes/session/min auto-pause (f) **Audit injection attempts** + security alert.
@@ -128,7 +128,7 @@ Tiered storage: **hot** Postgres 30d ~$200/mo for 1TB + **warm** S3+Athena 1y ~$
 7. Soft delete + purge daemon 30 day
 8. Email queue 60s release delay (Gmail Undo Send 风格)
 9. Immutable hash-chained audit log
-10. Tiered storage (hot Postgres / warm S3 Parquet / cold Glacier)
+10. Tiered storage (hot Postgres / warm GCS Parquet / cold Glacier)
 11. PII vault separation for GDPR balance
 12. Bulk rollback API with dry-run
 13. Quote Indonesia refund tier 3 + 1000-user moderation bot bulk rollback
@@ -188,7 +188,7 @@ Audit log (immutable, hash-chained):
 
 Tiered storage:
   Hot 30d Postgres ~$200/mo 1TB
-  Warm 1y S3 Parquet + Athena ~$50/mo 10TB
+  Warm 1y GCS Parquet + Athena ~$50/mo 10TB
   Cold 7y Glacier ~$1/TB/mo
   Per-tool TTL: read 30d, write 1y, destructive 7y
 

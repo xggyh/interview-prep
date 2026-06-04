@@ -51,7 +51,7 @@ Tools     : 可执行函数 create_order, send_email
 Prompts   : 可复用模板 "summarize_meeting_notes"</code></pre>
 <p>MCP (Anthropic 2024 开源, 2026 业界标准) = vendor-neutral, 跨 Claude/Gemini/GPT. JSON-RPC over stdio/HTTP/SSE/WebSocket. OpenAI function calling 只对应 Tools, 没 Resources/Prompts.</p>
 <h4>Layer 2: Gateway 6 责任 (统一入口)</h4>
-<pre class="language-plaintext"><code class="language-plaintext">1. Tool discovery   RAG over tool descriptions (Qdrant + RRF)
+<pre class="language-plaintext"><code class="language-plaintext">1. Tool discovery   RAG over tool descriptions (Vertex AI Vector Search + RRF)
 2. Auth + OBO       OAuth scope exchange (RFC 8693), token broker
 3. Rate limit       Token bucket per (user, tool, tenant)
 4. Observability    OTel trace propagation end-to-end
@@ -76,7 +76,7 @@ Prompts   : 可复用模板 "summarize_meeting_notes"</code></pre>
 # Agent 永远不能拥有比用户更高权限</code></pre>
 <p>Agent service principal 不直接调 API. 每次走 token broker 换 service_token, scope ≤ user 权限. Bug 时 agent 不能越界. RFC 8693 OAuth 2.0 token exchange.</p>
 <h4>Edge cases</h4>
-<ul><li><strong>EC1 Customer schema 季度升级 break agent</strong>: semver 在 tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite alert pass rate drop.</li><li><strong>EC2 MCP server crash</strong>: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.</li><li><strong>EC3 Auto-gen MCP from OpenAPI</strong>: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.</li><li><strong>EC4 Latency sub-100ms 不允许 MCP overhead</strong>: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.</li><li><strong>EC5 Legacy mainframe COBOL 没 modern API</strong>: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop S3 daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".</li></ul>
+<ul><li><strong>EC1 Customer schema 季度升级 break agent</strong>: semver 在 tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite alert pass rate drop.</li><li><strong>EC2 MCP server crash</strong>: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.</li><li><strong>EC3 Auto-gen MCP from OpenAPI</strong>: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.</li><li><strong>EC4 Latency sub-100ms 不允许 MCP overhead</strong>: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.</li><li><strong>EC5 Legacy mainframe COBOL 没 modern API</strong>: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop GCS daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".</li></ul>
 <h4>Production hardening</h4>
 <ul><li><strong>Trace propagation</strong>: OTel <code>traceparent</code> header inject before forward. E2E: agent → gateway → MCP server → real API.</li><li><strong>Cost attribution</strong>: per-span tag (tenant_id, tool_id), monthly bill auto-gen.</li><li><strong>Cache policy</strong>: idempotent read cached (per-tool TTL), write 永不 cache, per-user namespace 隔离敏感数据.</li><li><strong>Eval suite</strong>: 200-500 golden cases per tool, daily run, alert on pass rate drop &gt; 5pp.</li></ul>
 <h4>🪝 Resume hook</h4>
@@ -118,7 +118,7 @@ Adapter pattern: REST → MCP wrapper ~1 day/service, hand-curate description (N
 
 Versioning: semver in tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite
 
-Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop S3 / always graceful degrade tier 1-4
+Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop GCS / always graceful degrade tier 1-4
 
 Cache policy: idempotent read cached w/ TTL, write NEVER cached, per-user isolation, semantic for fuzzy
 
@@ -188,7 +188,7 @@ MCP (Anthropic 2024 开源, 2026 业界标准) = vendor-neutral, 跨 Claude/Gemi
 ### Layer 2: Gateway 6 责任 (统一入口)
 
 ```
-1. Tool discovery   RAG over tool descriptions (Qdrant + RRF)
+1. Tool discovery   RAG over tool descriptions (Vertex AI Vector Search + RRF)
 2. Auth + OBO       OAuth scope exchange (RFC 8693), token broker
 3. Rate limit       Token bucket per (user, tool, tenant)
 4. Observability    OTel trace propagation end-to-end
@@ -230,7 +230,7 @@ Agent service principal 不直接调 API. 每次走 token broker 换 service_tok
 - **EC2 MCP server crash**: per-server circuit breaker (10 fails/min → open 5min cooldown). Health check 30s. Agent 收到 ToolUnavailable, fallback / degraded.
 - **EC3 Auto-gen MCP from OpenAPI**: 不要做. OpenAPI summary 写给 dev 太技术 ("Returns 200"), LLM 选不对. 人手 curate description + use case examples, ~1 day per service.
 - **EC4 Latency sub-100ms 不允许 MCP overhead**: 预取 token (OBO cache 10min) + Redis Lua rate limit (1ms) + sidecar pattern (Envoy ext_authz) 把 overhead 降到 ~5ms.
-- **EC5 Legacy mainframe COBOL 没 modern API**: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop S3 daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".
+- **EC5 Legacy mainframe COBOL 没 modern API**: 3 fallback — 3270 screen-scrape (read-only) / CDC stream Debezium / 文件 drop GCS daily batch. Plus graceful degradation: tier-1 real-time → tier-2 cached → tier-3 analytics replica → tier-4 "unavailable".
 
 ### Production hardening
 
@@ -324,7 +324,7 @@ Adapter pattern: REST → MCP wrapper ~1 day/service, hand-curate description (N
 
 Versioning: semver in tool spec + adapter chain v1↔v2 + 90-day deprecation + schema diff CI + daily eval suite
 
-Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop S3 / always graceful degrade tier 1-4
+Legacy: REST→adapter modern / Mainframe→3270 scrape read-only / Batch→file drop GCS / always graceful degrade tier 1-4
 
 Cache policy: idempotent read cached w/ TTL, write NEVER cached, per-user isolation, semantic for fuzzy
 

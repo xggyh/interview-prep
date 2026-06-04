@@ -43,7 +43,7 @@
 <blockquote><p>"You're indexing 10K technical PDFs (each 50-500 pages) for RAG. How do you <strong>chunk</strong> them? Walk through your decision tree and the failure modes of naive approaches."</p></blockquote>
 <p>或追问形态:</p>
 <blockquote><p>"RAG recall drops 20% when you change chunking from 512 tokens to 1024. Why? When is each better?"</p></blockquote>
-<p><strong>出处</strong>: Google FDE T2 / Pinecone / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.</p>
+<p><strong>出处</strong>: Google FDE T2 / Vertex AI Vector Search / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.</p>
 <p><strong>Round</strong>: RAG Pipeline Design (45 min)</p>
 <hr />
 <h3>这道题在考什么</h3>
@@ -178,13 +178,13 @@ For each element in doc:
 <hr />
 <h3>6. 工程上要做什么 (实现 checklist)</h3>
 <p><strong>Phase 1: 文档解析</strong>:</p>
-<ol><li><strong>PDF → 结构化</strong>: 用 <code>unstructured</code>, <code>pymupdf</code>, <code>PyPDF2</code>, 或商用 (Azure Document Intelligence, AWS Textract)</li><li><strong>Element 分类</strong>: title / heading / paragraph / table / list / code / figure</li><li><strong>Heading hierarchy 建树</strong>: H1 &gt; H2 &gt; H3, 维护 ancestor path</li><li><strong>OCR fallback</strong> for image-only PDF (Tesseract / Azure)</li></ol>
+<ol><li><strong>PDF → 结构化</strong>: 用 <code>unstructured</code>, <code>pymupdf</code>, <code>PyPDF2</code>, 或商用 (Azure Document Intelligence, Document AI)</li><li><strong>Element 分类</strong>: title / heading / paragraph / table / list / code / figure</li><li><strong>Heading hierarchy 建树</strong>: H1 &gt; H2 &gt; H3, 维护 ancestor path</li><li><strong>OCR fallback</strong> for image-only PDF (Tesseract / Azure)</li></ol>
 <p><strong>Phase 2: Chunk 生成</strong>:</p>
 <ol><li><strong>遍历 element tree</strong>, 应用 chunking strategy (上面决策树)</li><li><strong>Atomic 处理 table / code / figure</strong> — 不切</li><li><strong>Fallback fixed-size + overlap</strong> for unstructured leaf section</li><li><strong>每 chunk 附 metadata</strong></li></ol>
 <p><strong>Phase 3: Embedding</strong>:</p>
 <ol><li><strong>Heading prepend</strong> to chunk text before embed: <code>embed(f"{heading_path}\n{text}")</code></li><li><strong>Batch embed</strong> (Gemini embedding-001 / OpenAI text-embedding-3 都支持 batch 256)</li><li><strong>L2 normalize</strong> for cosine similarity</li></ol>
 <p><strong>Phase 4: Index</strong>:</p>
-<ol><li><strong>Dense index</strong> to Qdrant / Pinecone (含 metadata)</li><li><strong>Sparse index</strong> to OpenSearch (BM25) — 同 chunk text</li><li><strong>Metadata 双写</strong> 保持一致</li></ol>
+<ol><li><strong>Dense index</strong> to Vertex AI Vector Search / Vertex AI Vector Search (含 metadata)</li><li><strong>Sparse index</strong> to Vertex AI Vector Search (BM25) — 同 chunk text</li><li><strong>Metadata 双写</strong> 保持一致</li></ol>
 <p><strong>Phase 5: 更新管理</strong>:</p>
 <ol><li><strong>Delta indexing</strong>: doc 改 → chunk 重 hash, 仅改 chunk 重 embed</li><li><strong>Versioning</strong>: 保留旧 chunk 短期 (灰度切换)</li><li><strong>Async pipeline</strong>: 用户上传 → queue → background worker</li></ol>
 <p><strong>Phase 6: Eval</strong>:</p>
@@ -474,7 +474,7 @@ Late:  text → 整文档 embed → 按 chunk 切 pool (每个 chunk 有全 doc 
     )</code></pre>
 <p>Query 时可以 text-query 命中 image (CLIP-class 共享空间) 或 hybrid query.</p>
 <h4>2.6 工具</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>任务</th><th>工具</th></tr></thead><tbody><tr><td>PDF 结构化</td><td><code>unstructured</code>, <code>pymupdf</code>, Azure Document Intelligence, AWS Textract</td></tr><tr><td>表格提取</td><td>Camelot, Tabula, pdfplumber, Azure Form Recognizer</td></tr><tr><td>OCR</td><td>Tesseract, AWS Textract, Google Document AI</td></tr><tr><td>Code AST</td><td>tree-sitter (语言无关), Python ast 模块</td></tr><tr><td>LaTeX from PDF</td><td>mathpix API, pix2tex</td></tr><tr><td>Multimodal embed</td><td>CLIP, BLIP, gemini-embedding multimodal</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>任务</th><th>工具</th></tr></thead><tbody><tr><td>PDF 结构化</td><td><code>unstructured</code>, <code>pymupdf</code>, Azure Document Intelligence, Document AI</td></tr><tr><td>表格提取</td><td>Camelot, Tabula, pdfplumber, Azure Form Recognizer</td></tr><tr><td>OCR</td><td>Tesseract, Document AI, Google Document AI</td></tr><tr><td>Code AST</td><td>tree-sitter (语言无关), Python ast 模块</td></tr><tr><td>LaTeX from PDF</td><td>mathpix API, pix2tex</td></tr><tr><td>Multimodal embed</td><td>CLIP, BLIP, gemini-embedding multimodal</td></tr></tbody></table></div>
 <hr />
 <h3>⚙️ Problem 3: Metadata Enrichment — Heading Path / Source / Perms / Freshness</h3>
 <h4>3.1 完整 metadata schema</h4>
@@ -597,8 +597,8 @@ results = [r for r in results if user_can_see(r)]  # 可能 0 个剩下</code></
 <pre class="language-plaintext"><code class="language-plaintext">10K PDF × avg 100 chunk per doc = 1M chunks
 1M chunks × gemini-embedding-001 batch 256 = 4000 batch calls
 Each batch ~200ms = 800s = 13 minutes (just for embedding)
-+ Qdrant bulk upsert ~10 minutes
-+ OpenSearch bulk index ~15 minutes
++ Vertex AI Vector Search bulk upsert ~10 minutes
++ Vertex AI Vector Search bulk index ~15 minutes
 
 总: 40+ 分钟 stop-the-world reindex
 每天 / 每小时改个 doc 都 full reindex → 显然不可</code></pre>
@@ -684,12 +684,12 @@ async def reindex_worker():
 <p>新建 doc 可能在 retrieval 里几小时不可见 (queue lag). 解决:</p>
 <pre class="language-plaintext"><code class="language-plaintext">Hot index:
   Last 24h created/updated docs
-  In-memory Qdrant 小 collection
+  In-memory Vertex AI Vector Search 小 collection
   Refresh every 5 min from doc DB
 
 Warm index:
   Older docs
-  Persistent Qdrant collection
+  Persistent Vertex AI Vector Search collection
   Async background reindex
 
 Query: search both, RRF merge</code></pre>
@@ -832,7 +832,7 @@ jobs:
 <h3>5 follow-ups</h3>
 <p><strong>Q1</strong>: "Smaller chunks = more vectors = more storage. Cost concern."</p>
 <p><strong>A</strong>:</p>
-<ul><li><strong>Storage</strong>: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Qdrant.</li><li><strong>Index size (HNSW)</strong>: 1.5-2x raw, still cheap</li><li><strong>Query cost</strong>: ANN search O(log n), small impact</li><li><strong>Real cost</strong>: embedding upfront — 1M chunks × 500 tok × $0.025/1M = $12.5 one-time. Negligible amortized.</li><li><strong>Counter</strong>: smaller chunks improve precision, fewer chunks fed to LLM → save LLM cost</li></ul>
+<ul><li><strong>Storage</strong>: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Vertex AI Vector Search.</li><li><strong>Index size (HNSW)</strong>: 1.5-2x raw, still cheap</li><li><strong>Query cost</strong>: ANN search O(log n), small impact</li><li><strong>Real cost</strong>: embedding upfront — 1M chunks × 500 tok × $0.025/1M = $12.5 one-time. Negligible amortized.</li><li><strong>Counter</strong>: smaller chunks improve precision, fewer chunks fed to LLM → save LLM cost</li></ul>
 <p><strong>Q2</strong>: "Reindexing — when doc changes, recompute embeddings expensive."</p>
 <p><strong>A</strong>:</p>
 <ul><li><strong>Delta indexing</strong>: chunk-level hash, only re-embed changed</li><li><strong>Chunk ID stability</strong> via structural hash (not random UUID)</li><li><strong>Versioning</strong>: old + new coexist briefly during transition</li><li><strong>Async</strong>: doc change → Kafka queue → background worker, eventual consistency acceptable</li><li><strong>Hot index</strong> for sub-5-min freshness on new docs</li></ul>
@@ -921,12 +921,12 @@ Per-source-type chunker:
 
 Tool zoo (2026):
   PDF parse: unstructured, pymupdf, Azure Document Intelligence
-  Tables: Camelot, Tabula, AWS Textract
+  Tables: Camelot, Tabula, Document AI
   Code AST: tree-sitter
   PII: presidio (Microsoft)
   Embedding: gemini-embedding-001, text-embedding-3, bge-large
   Late chunking: jina-embeddings-v3
-  Vector DB: Qdrant, Pinecone, Weaviate, Milvus
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus
 
 红线:
   - Fixed-size everywhere
@@ -957,7 +957,7 @@ Tool zoo (2026):
 
 > "RAG recall drops 20% when you change chunking from 512 tokens to 1024. Why? When is each better?"
 
-**出处**: Google FDE T2 / Pinecone / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.
+**出处**: Google FDE T2 / Vertex AI Vector Search / Cohere / LangChain / LlamaIndex 等几乎所有 RAG round 必问.
 
 **Round**: RAG Pipeline Design (45 min)
 
@@ -1191,7 +1191,7 @@ production 90% 用 **heading-aware recursive + fixed-size fallback + table/code 
 
 **Phase 1: 文档解析**:
 
-1. **PDF → 结构化**: 用 `unstructured`, `pymupdf`, `PyPDF2`, 或商用 (Azure Document Intelligence, AWS Textract)
+1. **PDF → 结构化**: 用 `unstructured`, `pymupdf`, `PyPDF2`, 或商用 (Azure Document Intelligence, Document AI)
 2. **Element 分类**: title / heading / paragraph / table / list / code / figure
 3. **Heading hierarchy 建树**: H1 > H2 > H3, 维护 ancestor path
 4. **OCR fallback** for image-only PDF (Tesseract / Azure)
@@ -1211,8 +1211,8 @@ production 90% 用 **heading-aware recursive + fixed-size fallback + table/code 
 
 **Phase 4: Index**:
 
-12. **Dense index** to Qdrant / Pinecone (含 metadata)
-13. **Sparse index** to OpenSearch (BM25) — 同 chunk text
+12. **Dense index** to Vertex AI Vector Search / Vertex AI Vector Search (含 metadata)
+13. **Sparse index** to Vertex AI Vector Search (BM25) — 同 chunk text
 14. **Metadata 双写** 保持一致
 
 **Phase 5: 更新管理**:
@@ -1643,9 +1643,9 @@ Query 时可以 text-query 命中 image (CLIP-class 共享空间) 或 hybrid que
 
 | 任务 | 工具 |
 |---|---|
-| PDF 结构化 | `unstructured`, `pymupdf`, Azure Document Intelligence, AWS Textract |
+| PDF 结构化 | `unstructured`, `pymupdf`, Azure Document Intelligence, Document AI |
 | 表格提取 | Camelot, Tabula, pdfplumber, Azure Form Recognizer |
-| OCR | Tesseract, AWS Textract, Google Document AI |
+| OCR | Tesseract, Document AI, Google Document AI |
 | Code AST | tree-sitter (语言无关), Python ast 模块 |
 | LaTeX from PDF | mathpix API, pix2tex |
 | Multimodal embed | CLIP, BLIP, gemini-embedding multimodal |
@@ -1811,8 +1811,8 @@ def tag_pii(chunk_text):
 10K PDF × avg 100 chunk per doc = 1M chunks
 1M chunks × gemini-embedding-001 batch 256 = 4000 batch calls
 Each batch ~200ms = 800s = 13 minutes (just for embedding)
-+ Qdrant bulk upsert ~10 minutes
-+ OpenSearch bulk index ~15 minutes
++ Vertex AI Vector Search bulk upsert ~10 minutes
++ Vertex AI Vector Search bulk index ~15 minutes
 
 总: 40+ 分钟 stop-the-world reindex
 每天 / 每小时改个 doc 都 full reindex → 显然不可
@@ -1921,12 +1921,12 @@ async def reindex_worker():
 ```
 Hot index:
   Last 24h created/updated docs
-  In-memory Qdrant 小 collection
+  In-memory Vertex AI Vector Search 小 collection
   Refresh every 5 min from doc DB
 
 Warm index:
   Older docs
-  Persistent Qdrant collection
+  Persistent Vertex AI Vector Search collection
   Async background reindex
 
 Query: search both, RRF merge
@@ -2192,7 +2192,7 @@ jobs:
 **Q1**: "Smaller chunks = more vectors = more storage. Cost concern."
 
 **A**:
-- **Storage**: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Qdrant.
+- **Storage**: 1M chunks × 768d × 4 bytes = 3GB. Cheap on Vertex AI Vector Search.
 - **Index size (HNSW)**: 1.5-2x raw, still cheap
 - **Query cost**: ANN search O(log n), small impact
 - **Real cost**: embedding upfront — 1M chunks × 500 tok × $0.025/1M = $12.5 one-time. Negligible amortized.
@@ -2340,12 +2340,12 @@ Per-source-type chunker:
 
 Tool zoo (2026):
   PDF parse: unstructured, pymupdf, Azure Document Intelligence
-  Tables: Camelot, Tabula, AWS Textract
+  Tables: Camelot, Tabula, Document AI
   Code AST: tree-sitter
   PII: presidio (Microsoft)
   Embedding: gemini-embedding-001, text-embedding-3, bge-large
   Late chunking: jina-embeddings-v3
-  Vector DB: Qdrant, Pinecone, Weaviate, Milvus
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate, Milvus
 
 红线:
   - Fixed-size everywhere

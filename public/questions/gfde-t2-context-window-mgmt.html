@@ -149,13 +149,13 @@ Turn 50:
   └────────────────────────┘
 
 External components:
-  ├── Blob store (S3): full tool outputs
-  ├── Vector DB (Qdrant): semantic memory of old turns
+  ├── Blob store (GCS): full tool outputs
+  ├── Vector DB (Vertex AI Vector Search): semantic memory of old turns
   ├── Structured memory (Postgres): facts, preferences, decisions
   └── File system: working files agent reads/writes</code></pre>
 <hr />
 <h3>4. 关键 memory 类型分类表</h3>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Memory type</th><th>存哪</th><th>何时用</th><th>例</th></tr></thead><tbody><tr><td><strong>Working context</strong></td><td>LLM context window</td><td>当前 turn 需要的所有信息</td><td>Recent 10 turns + summary + system prompt</td></tr><tr><td><strong>Episodic memory</strong></td><td>Vector DB</td><td>"你之前说过 X" 类查询</td><td>旧 turn 摘要, embed 后 search</td></tr><tr><td><strong>Semantic memory</strong></td><td>Postgres / KV</td><td>用户 preferences / facts</td><td>"用户喜欢 dark mode" / "项目用 FastAPI"</td></tr><tr><td><strong>Procedural memory</strong></td><td>LLM weights + system prompt</td><td>How to use tools</td><td>Tool 使用说明, examples</td></tr><tr><td><strong>External docs</strong></td><td>Vector DB / S3</td><td>User-uploaded reference material</td><td>用户上传的 PDF</td></tr><tr><td><strong>Scratchpad</strong></td><td>Local file / blob</td><td>Agent 自己的工作笔记</td><td>research_notes.md</td></tr><tr><td><strong>Decision log</strong></td><td>Structured Postgres</td><td>永远不能丢的决策</td><td>"user approved spec on turn 12"</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Memory type</th><th>存哪</th><th>何时用</th><th>例</th></tr></thead><tbody><tr><td><strong>Working context</strong></td><td>LLM context window</td><td>当前 turn 需要的所有信息</td><td>Recent 10 turns + summary + system prompt</td></tr><tr><td><strong>Episodic memory</strong></td><td>Vector DB</td><td>"你之前说过 X" 类查询</td><td>旧 turn 摘要, embed 后 search</td></tr><tr><td><strong>Semantic memory</strong></td><td>Postgres / KV</td><td>用户 preferences / facts</td><td>"用户喜欢 dark mode" / "项目用 FastAPI"</td></tr><tr><td><strong>Procedural memory</strong></td><td>LLM weights + system prompt</td><td>How to use tools</td><td>Tool 使用说明, examples</td></tr><tr><td><strong>External docs</strong></td><td>Vector DB / GCS</td><td>User-uploaded reference material</td><td>用户上传的 PDF</td></tr><tr><td><strong>Scratchpad</strong></td><td>Local file / blob</td><td>Agent 自己的工作笔记</td><td>research_notes.md</td></tr><tr><td><strong>Decision log</strong></td><td>Structured Postgres</td><td>永远不能丢的决策</td><td>"user approved spec on turn 12"</td></tr></tbody></table></div>
 <p>production 的 long-running agent <strong>必同时用 4-6 种</strong>, 各司其职.</p>
 <hr />
 <h3>5. 具体业务场景 (5 个高频)</h3>
@@ -187,7 +187,7 @@ External components:
 <hr />
 <h3>6. 工程上要做什么 (实现 checklist)</h3>
 <p><strong>离线设计</strong>:</p>
-<ol><li><strong>设定 soft cap / hard cap</strong>: e.g., model_limit = 128K, soft = 70% = 90K, hard = 90% = 115K</li><li><strong>设计 message tagging</strong>: 每 message 加 metadata <code>{type, importance, source, ts, pinned}</code></li><li><strong>设计 external memory schema</strong>: 哪些进 vector DB, 哪些进 KV, 哪些进 S3</li><li><strong>设计 tool 列表</strong>: <code>read_file</code>, <code>get_full_tool_output</code>, <code>recall_past</code>, <code>write_note</code> 等</li></ol>
+<ol><li><strong>设定 soft cap / hard cap</strong>: e.g., model_limit = 128K, soft = 70% = 90K, hard = 90% = 115K</li><li><strong>设计 message tagging</strong>: 每 message 加 metadata <code>{type, importance, source, ts, pinned}</code></li><li><strong>设计 external memory schema</strong>: 哪些进 vector DB, 哪些进 KV, 哪些进 GCS</li><li><strong>设计 tool 列表</strong>: <code>read_file</code>, <code>get_full_tool_output</code>, <code>recall_past</code>, <code>write_note</code> 等</li></ol>
 <p><strong>在线运行时</strong>:</p>
 <ol><li><strong>Pre-call check</strong>: <code>est_tokens(messages) &gt; soft_cap</code> → trigger compact</li><li><strong>Compaction pipeline</strong> (4 步, 见上图)</li><li><strong>Tool output handler</strong>: &gt; 1K token 自动 externalize</li><li><strong>Post-call tagging</strong>: LLM 自标 importance (or heuristic)</li></ol>
 <p><strong>Observability</strong>:</p>
@@ -196,7 +196,7 @@ External components:
 <ol><li><strong>Summary template</strong>: 'Decisions / Files modified / Open TODOs / User preferences' structured</li><li><strong>Summary model</strong>: 用 Gemini 3 Flash ($0.50/$3) 而不是 Pro</li><li><strong>Eval set</strong>: 几个长跑场景, 比较不同 compaction policy</li><li><strong>A/B</strong> new compaction strategy vs old</li></ol>
 <hr />
 <h3>7. 几个容易踩的坑</h3>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Truncate oldest blindly</strong></td><td>丢 system prompt / 第 1 turn 关键决策</td></tr><tr><td>2</td><td><strong>Single mega-summary</strong></td><td>"前 50 turn 摘要" 失细节, agent 忘细节</td></tr><tr><td>3</td><td><strong>Keep all tool outputs verbatim</strong></td><td>10MB pytest output 直接爆</td></tr><tr><td>4</td><td><strong>没 external memory</strong></td><td>一切塞 context, 注定爆</td></tr><tr><td>5</td><td><strong>No pinning</strong></td><td>summarizer 把 "user said yes to X" 压没了</td></tr><tr><td>6</td><td><strong>Ignore lost-in-middle</strong></td><td>关键 info 埋在中间 attention 弱</td></tr><tr><td>7</td><td><strong>No cost monitoring</strong></td><td>Session 花 $20 老板才发现</td></tr><tr><td>8</td><td><strong>Summary 用 flagship LLM</strong></td><td>浪费, Flash 足够好</td></tr><tr><td>9</td><td><strong>每 turn 全量 compact</strong></td><td>Compact 本身就贵, 应该 threshold trigger</td></tr><tr><td>10</td><td><strong>No recall test</strong></td><td>Summary 静默坏掉, agent 忘东忘西无 metric</td></tr><tr><td>11</td><td><strong>Block on compaction</strong></td><td>User 等 5s 才回应, 应 async</td></tr><tr><td>12</td><td><strong>External memory 不归一</strong></td><td>Vector DB / Postgres / S3 状态不一致</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>坑</th><th>后果 / 应对</th></tr></thead><tbody><tr><td>1</td><td><strong>Truncate oldest blindly</strong></td><td>丢 system prompt / 第 1 turn 关键决策</td></tr><tr><td>2</td><td><strong>Single mega-summary</strong></td><td>"前 50 turn 摘要" 失细节, agent 忘细节</td></tr><tr><td>3</td><td><strong>Keep all tool outputs verbatim</strong></td><td>10MB pytest output 直接爆</td></tr><tr><td>4</td><td><strong>没 external memory</strong></td><td>一切塞 context, 注定爆</td></tr><tr><td>5</td><td><strong>No pinning</strong></td><td>summarizer 把 "user said yes to X" 压没了</td></tr><tr><td>6</td><td><strong>Ignore lost-in-middle</strong></td><td>关键 info 埋在中间 attention 弱</td></tr><tr><td>7</td><td><strong>No cost monitoring</strong></td><td>Session 花 $20 老板才发现</td></tr><tr><td>8</td><td><strong>Summary 用 flagship LLM</strong></td><td>浪费, Flash 足够好</td></tr><tr><td>9</td><td><strong>每 turn 全量 compact</strong></td><td>Compact 本身就贵, 应该 threshold trigger</td></tr><tr><td>10</td><td><strong>No recall test</strong></td><td>Summary 静默坏掉, agent 忘东忘西无 metric</td></tr><tr><td>11</td><td><strong>Block on compaction</strong></td><td>User 等 5s 才回应, 应 async</td></tr><tr><td>12</td><td><strong>External memory 不归一</strong></td><td>Vector DB / Postgres / GCS 状态不一致</td></tr></tbody></table></div>
 <hr />
 <h3>一句话总结 (Part 1)</h3>
 <blockquote><p><strong>Context management = 「Sliding window 最近 + Hierarchical summary 中间 + External memory 大数据 + Selective pruning 不重要 + Pinning 关键决策 + Lost-in-middle 觉知」 6 件套</strong>.</p>
@@ -394,7 +394,7 @@ def prune_low_importance(messages, target_token_count):
 <h3>⚙️ Problem 2: External Memory Architecture — Blob + Vector DB + Structured</h3>
 <h4>2.1 三层 external memory</h4>
 <pre class="language-plaintext"><code class="language-plaintext">┌─────────────────────────────────────────────────────────┐
-│                  Blob store (S3 / GCS)                   │
+│                  Blob store (GCS / GCS)                   │
 │    - Full tool outputs (&gt;1K tokens)                      │
 │    - Uploaded files (PDFs, CSVs)                         │
 │    - Long agent-generated artifacts                      │
@@ -402,7 +402,7 @@ def prune_low_importance(messages, target_token_count):
 └──────────────────┬──────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────┐
-│              Vector DB (Qdrant / Pinecone)               │
+│              Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)               │
 │    - Episodic memory: old turn summaries indexed         │
 │    - User-uploaded doc chunks                            │
 │    - Project knowledge (Confluence / Slack archive)      │
@@ -453,7 +453,7 @@ def execute_tool_with_externalization(tool_name, args, blob_mem):
 <h4>2.3 Vector DB for episodic memory</h4>
 <pre class="language-python"><code class="language-python">class EpisodicMemory:
     def __init__(self):
-        self.qdrant = QdrantClient()
+        self.qdrant = VertexVectorSearchClient()
         self.qdrant.create_collection(
             collection_name='agent_memory',
             vectors_config={'size': 768, 'distance': 'Cosine'},
@@ -974,7 +974,7 @@ def agent_step(messages, budget: SessionBudget):
 <p><strong>Pipeline</strong>:</p>
 <ul><li>Step A: externalize big tool outputs (&gt; 1K → blob + summary + ref)</li><li>Step B: prune low-importance intermediate</li><li>Step C: hierarchical re-summarize tiers</li><li>Step D: reinforce decisions / preferences at end (lost-in-middle defense)</li></ul>
 <p><strong>External memory</strong>: 3 store</p>
-<ul><li>Blob (S3): full tool outputs, key by content hash, 24h TTL</li><li>Vector DB (Qdrant): episodic, search past turns by semantic</li><li>Postgres: structured (decisions, user_preferences, session_state)</li></ul>
+<ul><li>Blob (GCS): full tool outputs, key by content hash, 24h TTL</li><li>Vector DB (Vertex AI Vector Search): episodic, search past turns by semantic</li><li>Postgres: structured (decisions, user_preferences, session_state)</li></ul>
 <p><strong>Tool output handling</strong>: &gt;1K → externalize, replace with <code>&lt;tool_output ref="..."&gt;{summary}&lt;/tool_output&gt;</code>; agent has <code>get_full_tool_output(ref)</code> to fetch on demand</p>
 <p><strong>Lost-in-middle</strong>: critical info (system prompt, decisions, preferences) always at start AND end; periodic recap every 10 turn; decision_log in Postgres always re-injected to system prompt</p>
 <p><strong>Cost</strong>: Gemini 3 Pro main loop + Flash for summary, with prefix caching (50K project prefix cache 5min) — typical session $0.20-0.40</p>
@@ -998,7 +998,7 @@ def agent_step(messages, budget: SessionBudget):
 <ul><li>$0.001-0.01/turn (Gemini 3 Flash): consumer chat acceptable</li><li>$0.05-0.20/turn (Gemini 3 Pro): B2B / pro</li><li>$0.50-3/agent task (mixed Pro + Opus): dev tool / enterprise</li><li>Total session $0.20-2 normal, $5+ problematic</li><li>Higher → must optimize via compaction + cheaper models on summarize + prefix caching</li></ul>
 <p><strong>Q4</strong>: "User says 'pick up where we left off' from yesterday's session. Practical?"</p>
 <p><strong>A</strong>:</p>
-<ul><li>Persist conversation state to Postgres (session_id, turns, decisions, preferences) on session-end</li><li>On resume: load last summary + last 5 turns from DB + system prompt with decisions injected</li><li>Optionally: snapshot full state before close, semantic-index all turns to Qdrant</li><li><strong>Practical</strong>: 80% restore is enough; pixel-perfect not worth the cost</li><li><strong>User confirms continuity</strong>: agent says "last time we agreed X — continuing on Y. Sound right?" — explicit handshake</li></ul>
+<ul><li>Persist conversation state to Postgres (session_id, turns, decisions, preferences) on session-end</li><li>On resume: load last summary + last 5 turns from DB + system prompt with decisions injected</li><li>Optionally: snapshot full state before close, semantic-index all turns to Vertex AI Vector Search</li><li><strong>Practical</strong>: 80% restore is enough; pixel-perfect not worth the cost</li><li><strong>User confirms continuity</strong>: agent says "last time we agreed X — continuing on Y. Sound right?" — explicit handshake</li></ul>
 <p><strong>Q5</strong>: "Agent forgets recent decision because compaction summarized it."</p>
 <p><strong>A</strong>:</p>
 <ul><li><strong>Explicit decision log</strong> in Postgres, separate from chat history, never compacted</li><li><strong>Pinned messages</strong>: user can pin a turn, never compacted</li><li><strong>Decision-tagging</strong>: LLM tags important turns with <code>decision_made</code> field in output schema, summarizer treats as must-keep</li><li><strong>Periodic recap</strong>: every 10 turn re-inject "key decisions so far" at end of context</li><li><strong>Recall probe</strong>: test "do you remember X" → fail trigger alert</li></ul>
@@ -1031,8 +1031,8 @@ Hierarchical 4 tier:
   Tier 4: latest (verbatim, last 5-10 turns)
 
 External memory (3 store):
-  Blob (S3): tool outputs &gt;1K, files, artifacts
-  Vector DB (Qdrant): episodic memory, semantic search past
+  Blob (GCS): tool outputs &gt;1K, files, artifacts
+  Vector DB (Vertex AI Vector Search): episodic memory, semantic search past
   Postgres: structured (decisions, preferences, session_state)
 
 Tool output thresholds:
@@ -1077,9 +1077,9 @@ Observability:
 
 Tool zoo (2026):
   Tracing: Phoenix (Arize), LangSmith, Langfuse
-  Vector DB: Qdrant, Pinecone, Weaviate
-  Blob: S3, GCS, Azure Blob
-  Structured: Postgres, Redis, DynamoDB
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
+  Blob: GCS, GCS, Azure Blob
+  Structured: Postgres, Redis, Firestore / Bigtable
   Compaction libs: LangChain ConversationSummaryBufferMemory, LlamaIndex memory
 
 红线:
@@ -1256,8 +1256,8 @@ Turn 50:
   └────────────────────────┘
 
 External components:
-  ├── Blob store (S3): full tool outputs
-  ├── Vector DB (Qdrant): semantic memory of old turns
+  ├── Blob store (GCS): full tool outputs
+  ├── Vector DB (Vertex AI Vector Search): semantic memory of old turns
   ├── Structured memory (Postgres): facts, preferences, decisions
   └── File system: working files agent reads/writes
 ```
@@ -1272,7 +1272,7 @@ External components:
 | **Episodic memory** | Vector DB | "你之前说过 X" 类查询 | 旧 turn 摘要, embed 后 search |
 | **Semantic memory** | Postgres / KV | 用户 preferences / facts | "用户喜欢 dark mode" / "项目用 FastAPI" |
 | **Procedural memory** | LLM weights + system prompt | How to use tools | Tool 使用说明, examples |
-| **External docs** | Vector DB / S3 | User-uploaded reference material | 用户上传的 PDF |
+| **External docs** | Vector DB / GCS | User-uploaded reference material | 用户上传的 PDF |
 | **Scratchpad** | Local file / blob | Agent 自己的工作笔记 | research_notes.md |
 | **Decision log** | Structured Postgres | 永远不能丢的决策 | "user approved spec on turn 12" |
 
@@ -1352,7 +1352,7 @@ Agent 监控 metric, 每 30s data update:
 
 1. **设定 soft cap / hard cap**: e.g., model_limit = 128K, soft = 70% = 90K, hard = 90% = 115K
 2. **设计 message tagging**: 每 message 加 metadata `{type, importance, source, ts, pinned}`
-3. **设计 external memory schema**: 哪些进 vector DB, 哪些进 KV, 哪些进 S3
+3. **设计 external memory schema**: 哪些进 vector DB, 哪些进 KV, 哪些进 GCS
 4. **设计 tool 列表**: `read_file`, `get_full_tool_output`, `recall_past`, `write_note` 等
 
 **在线运行时**:
@@ -1394,7 +1394,7 @@ Agent 监控 metric, 每 30s data update:
 | 9 | **每 turn 全量 compact** | Compact 本身就贵, 应该 threshold trigger |
 | 10 | **No recall test** | Summary 静默坏掉, agent 忘东忘西无 metric |
 | 11 | **Block on compaction** | User 等 5s 才回应, 应 async |
-| 12 | **External memory 不归一** | Vector DB / Postgres / S3 状态不一致 |
+| 12 | **External memory 不归一** | Vector DB / Postgres / GCS 状态不一致 |
 
 ---
 
@@ -1634,7 +1634,7 @@ def manage_context(
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  Blob store (S3 / GCS)                   │
+│                  Blob store (GCS / GCS)                   │
 │    - Full tool outputs (>1K tokens)                      │
 │    - Uploaded files (PDFs, CSVs)                         │
 │    - Long agent-generated artifacts                      │
@@ -1642,7 +1642,7 @@ def manage_context(
 └──────────────────┬──────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────┐
-│              Vector DB (Qdrant / Pinecone)               │
+│              Vector DB (Vertex AI Vector Search / Vertex AI Vector Search)               │
 │    - Episodic memory: old turn summaries indexed         │
 │    - User-uploaded doc chunks                            │
 │    - Project knowledge (Confluence / Slack archive)      │
@@ -1702,7 +1702,7 @@ Agent 用 `get_full_tool_output(ref_id)` 拿全文 — 自助按需 fetch.
 ```python
 class EpisodicMemory:
     def __init__(self):
-        self.qdrant = QdrantClient()
+        self.qdrant = VertexVectorSearchClient()
         self.qdrant.create_collection(
             collection_name='agent_memory',
             vectors_config={'size': 768, 'distance': 'Cosine'},
@@ -2398,8 +2398,8 @@ production sweet spot: **hierarchical + Flash summary + prefix caching ≈ $0.20
 > - Step D: reinforce decisions / preferences at end (lost-in-middle defense)
 >
 > **External memory**: 3 store
-> - Blob (S3): full tool outputs, key by content hash, 24h TTL
-> - Vector DB (Qdrant): episodic, search past turns by semantic
+> - Blob (GCS): full tool outputs, key by content hash, 24h TTL
+> - Vector DB (Vertex AI Vector Search): episodic, search past turns by semantic
 > - Postgres: structured (decisions, user_preferences, session_state)
 >
 > **Tool output handling**: >1K → externalize, replace with `<tool_output ref="...">{summary}</tool_output>`; agent has `get_full_tool_output(ref)` to fetch on demand
@@ -2465,7 +2465,7 @@ production sweet spot: **hierarchical + Flash summary + prefix caching ≈ $0.20
 **A**:
 - Persist conversation state to Postgres (session_id, turns, decisions, preferences) on session-end
 - On resume: load last summary + last 5 turns from DB + system prompt with decisions injected
-- Optionally: snapshot full state before close, semantic-index all turns to Qdrant
+- Optionally: snapshot full state before close, semantic-index all turns to Vertex AI Vector Search
 - **Practical**: 80% restore is enough; pixel-perfect not worth the cost
 - **User confirms continuity**: agent says "last time we agreed X — continuing on Y. Sound right?" — explicit handshake
 
@@ -2538,8 +2538,8 @@ Hierarchical 4 tier:
   Tier 4: latest (verbatim, last 5-10 turns)
 
 External memory (3 store):
-  Blob (S3): tool outputs >1K, files, artifacts
-  Vector DB (Qdrant): episodic memory, semantic search past
+  Blob (GCS): tool outputs >1K, files, artifacts
+  Vector DB (Vertex AI Vector Search): episodic memory, semantic search past
   Postgres: structured (decisions, preferences, session_state)
 
 Tool output thresholds:
@@ -2584,9 +2584,9 @@ Observability:
 
 Tool zoo (2026):
   Tracing: Phoenix (Arize), LangSmith, Langfuse
-  Vector DB: Qdrant, Pinecone, Weaviate
-  Blob: S3, GCS, Azure Blob
-  Structured: Postgres, Redis, DynamoDB
+  Vector DB: Vertex AI Vector Search, Vertex AI Vector Search, Weaviate
+  Blob: GCS, GCS, Azure Blob
+  Structured: Postgres, Redis, Firestore / Bigtable
   Compaction libs: LangChain ConversationSummaryBufferMemory, LlamaIndex memory
 
 红线:

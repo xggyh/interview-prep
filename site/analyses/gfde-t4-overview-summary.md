@@ -82,7 +82,7 @@ Input (混乱需求 vs PRD), Success (客户 KPI vs LOC), Timeline (3-week MVP v
 Honest framing: "MVP success criteria 我们一起定的, phase 2 我们 commitment 是 conditional on phase 1 hit target. 如果 phase 1 missed, 我们会和你一起 decide pivot / iterate / stop." 不要假承诺. Trust > 短期 sales win.
 
 **Q5: 客户的 IT 团队完全不想配合 (deploy 阻力大)?**
-Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Pinecone vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.
+Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Vertex AI Vector Search vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.
 
 ---
 

@@ -193,7 +193,7 @@ Failure → L4 Recovery:
 <p><strong>Phase 2: L2 Injection Defense (Week 3-4)</strong></p>
 <ul><li>Trust marking 框架 (untrusted data XML wrap)</li><li>System reminder 模板</li><li>Pattern detection regex</li><li>Output validation (LLM classifier 看 tool calls 是否 suspicious)</li><li>Confirm UI for destructive</li></ul>
 <p><strong>Phase 3: L3 Audit (Week 5-6)</strong></p>
-<ul><li>Audit log schema</li><li>Storage tier (hot DB / cold S3)</li><li>Hash-chaining (block hash + prev hash)</li><li>Compliance retention (per-jurisdiction)</li><li>Forensic query tool (per-actor / per-action / per-time)</li></ul>
+<ul><li>Audit log schema</li><li>Storage tier (hot DB / cold GCS)</li><li>Hash-chaining (block hash + prev hash)</li><li>Compliance retention (per-jurisdiction)</li><li>Forensic query tool (per-actor / per-action / per-time)</li></ul>
 <p><strong>Phase 4: L4 Recovery (Week 7-8)</strong></p>
 <ul><li>Outbox table + state machine</li><li>Compensating handler per destructive tool</li><li>Bulk rollback API</li><li>Soft delete (vs hard delete)</li><li>Email recall mechanism (60s window)</li><li>Refund reverse</li></ul>
 <p><strong>Phase 5: Anomaly + Incident (Week 9-10)</strong></p>
@@ -499,7 +499,7 @@ for test in RED_TEAM_TESTS:
         'data_classification': action.data_class,  # 'pii' / 'phi' / 'public'
     })</code></pre>
 <h4>3.2 Storage Tiers</h4>
-<div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use Case</th></tr></thead><tbody><tr><td><strong>Hot</strong></td><td>90 days</td><td>Postgres / OpenSearch</td><td>Real-time query, alerts, ops dashboards</td></tr><tr><td><strong>Warm</strong></td><td>1 year</td><td>S3 + Parquet</td><td>Slow query for investigation</td></tr><tr><td><strong>Cold</strong></td><td>7 years</td><td>S3 Glacier</td><td>Compliance retention (financial / health)</td></tr></tbody></table></div>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Tier</th><th>Retention</th><th>Storage</th><th>Use Case</th></tr></thead><tbody><tr><td><strong>Hot</strong></td><td>90 days</td><td>Postgres / Vertex AI Vector Search</td><td>Real-time query, alerts, ops dashboards</td></tr><tr><td><strong>Warm</strong></td><td>1 year</td><td>GCS + Parquet</td><td>Slow query for investigation</td></tr><tr><td><strong>Cold</strong></td><td>7 years</td><td>GCS Glacier</td><td>Compliance retention (financial / health)</td></tr></tbody></table></div>
 <p><strong>Retention by data class</strong>:</p>
 <ul><li>Financial transactions: 7 years (SOX / 央行)</li><li>Healthcare: 7 years (HIPAA)</li><li>Personal data (EU): per GDPR retention guidance, typically 3-5 years</li><li>General logs: 1 year</li></ul>
 <h4>3.3 PII Redaction Strategy</h4>
@@ -540,7 +540,7 @@ for test in RED_TEAM_TESTS:
         if entry['hash'] != sha256(canonicalize(entry)):
             alert('TAMPERED entry ' + entry['id'])
         expected_prev = entry['hash']</code></pre>
-<p><strong>Storage</strong>: append-only blob store (S3 Object Lock + Glacier) prevents overwrite even by admin.</p>
+<p><strong>Storage</strong>: append-only blob store (GCS Object Lock + Glacier) prevents overwrite even by admin.</p>
 <h4>3.5 Audit Use Cases</h4>
 <p><strong>Forensic query</strong>:</p>
 <pre class="language-sql"><code class="language-sql">SELECT * FROM audit_log
@@ -987,13 +987,13 @@ L3 Audit:
   Fields: actor / on_behalf_of / tool / args / result / 
           scope / tenant / trace_id / ts / reasoning / confirmed_by
   Storage tiers:
-    Hot 90d (Postgres / OpenSearch) — queryable, alerts
-    Warm 1y (S3 Parquet) — slow query
-    Cold 7y (S3 Glacier) — compliance
+    Hot 90d (Postgres / Vertex AI Vector Search) — queryable, alerts
+    Warm 1y (GCS Parquet) — slow query
+    Cold 7y (GCS Glacier) — compliance
   PII redaction:
     Day 0-30: full audit with redaction patterns
     Day 30+: more aggressive redaction (only IDs + types)
-  Immutability: hash-chained + S3 Object Lock + Glacier
+  Immutability: hash-chained + GCS Object Lock + Glacier
 
 L4 Recovery:
   Outbox: write intent BEFORE execute
@@ -1369,7 +1369,7 @@ Failure → L4 Recovery:
 **Phase 3: L3 Audit (Week 5-6)**
 
 - Audit log schema
-- Storage tier (hot DB / cold S3)
+- Storage tier (hot DB / cold GCS)
 - Hash-chaining (block hash + prev hash)
 - Compliance retention (per-jurisdiction)
 - Forensic query tool (per-actor / per-action / per-time)
@@ -1837,9 +1837,9 @@ async def write_audit(action, outcome, ctx):
 
 | Tier | Retention | Storage | Use Case |
 |---|---|---|---|
-| **Hot** | 90 days | Postgres / OpenSearch | Real-time query, alerts, ops dashboards |
-| **Warm** | 1 year | S3 + Parquet | Slow query for investigation |
-| **Cold** | 7 years | S3 Glacier | Compliance retention (financial / health) |
+| **Hot** | 90 days | Postgres / Vertex AI Vector Search | Real-time query, alerts, ops dashboards |
+| **Warm** | 1 year | GCS + Parquet | Slow query for investigation |
+| **Cold** | 7 years | GCS Glacier | Compliance retention (financial / health) |
 
 **Retention by data class**:
 
@@ -1901,7 +1901,7 @@ def verify_chain():
         expected_prev = entry['hash']
 ```
 
-**Storage**: append-only blob store (S3 Object Lock + Glacier) prevents overwrite even by admin.
+**Storage**: append-only blob store (GCS Object Lock + Glacier) prevents overwrite even by admin.
 
 ### 3.5 Audit Use Cases
 
@@ -2625,13 +2625,13 @@ L3 Audit:
   Fields: actor / on_behalf_of / tool / args / result / 
           scope / tenant / trace_id / ts / reasoning / confirmed_by
   Storage tiers:
-    Hot 90d (Postgres / OpenSearch) — queryable, alerts
-    Warm 1y (S3 Parquet) — slow query
-    Cold 7y (S3 Glacier) — compliance
+    Hot 90d (Postgres / Vertex AI Vector Search) — queryable, alerts
+    Warm 1y (GCS Parquet) — slow query
+    Cold 7y (GCS Glacier) — compliance
   PII redaction:
     Day 0-30: full audit with redaction patterns
     Day 30+: more aggressive redaction (only IDs + types)
-  Immutability: hash-chained + S3 Object Lock + Glacier
+  Immutability: hash-chained + GCS Object Lock + Glacier
 
 L4 Recovery:
   Outbox: write intent BEFORE execute

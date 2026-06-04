@@ -68,24 +68,7 @@ user_thumbs_ratio
 
 ### Layer 4: Quality monitoring (eval-in-prod)
 
-```python
-def sampled_eval(req, response):
-    if random.random() > 0.05 and not flagged:
-        return
-    
-    # LLM-as-judge (Sonnet 4.6)
-    scores = {
-        "faithfulness": llm_judge(req, resp, "faithfulness"),
-        "relevance": ..., "tool_selection": ...,
-        "safety": ..., "refusal": ..., "conciseness": ...,
-    }
-    eval_db.insert({...})
-    
-    if scores["faithfulness"] < 0.6:
-        alert("low_faithfulness", req, resp)
-```
-
-5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge. Calibrate weekly vs human labelers 200-500 golden set.
+5% random sample + 100% flagged (low thumbs / new prompt version / VIP tenant / jailbreak detected) → LLM-as-judge (Sonnet 4.6) multi-dim score (faithfulness, relevance, tool_selection, safety, refusal, conciseness). Alert if faithfulness <0.6. Calibrate weekly vs 200-500 human golden set.
 
 ### Edge cases
 

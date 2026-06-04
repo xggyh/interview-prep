@@ -12,7 +12,7 @@
 
 **先纠正一个常见误区**:
 
-候选人面试时, 一开口就是「先 chunk, embed, 存 Chroma/Pinecone, query 时 cosine similarity top-K」. 这是 **2022 年的 RAG**, 在 2026 年的 production 里**只是 baseline**, 拿不到分.
+候选人面试时, 一开口就是「先 chunk, embed, 存 Chroma/Vertex AI Vector Search, query 时 cosine similarity top-K」. 这是 **2022 年的 RAG**, 在 2026 年的 production 里**只是 baseline**, 拿不到分.
 
 **2026 年 production-grade RAG**:
 
@@ -93,8 +93,8 @@ Layer 3: TRUST BOUNDARY
 │                                                                  │
 │  Raw docs → Parse → Chunk → Embed → Index                        │
 │     │        │       │       │       │                           │
-│     │        │       │       │       └→ Vector DB (Pinecone)     │
-│     │        │       │       │           BM25 index (OpenSearch) │
+│     │        │       │       │       └→ Vector DB (Vertex AI Vector Search)     │
+│     │        │       │       │           BM25 index (Vertex AI Vector Search) │
 │     │        │       │       │           Graph DB (Neo4j)        │
 │     │        │       │       │                                   │
 │     │        │       │       └→ Embedding model                  │
@@ -110,7 +110,7 @@ Layer 3: TRUST BOUNDARY
 │     │            HTML: trafilatura; Office: python-docx)         │
 │     │                                                            │
 │     └→ Source ingest                                             │
-│        (Crawler / DB / S3 / Confluence / GitHub)                 │
+│        (Crawler / DB / GCS / Confluence / GitHub)                 │
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐

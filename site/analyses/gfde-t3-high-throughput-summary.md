@@ -96,7 +96,7 @@ vs 100 separate replicas: 33-100x cost reduction, <0.1% quality diff
 TTFT = 用户感知 "开始回应" (prefill 决定), 重 chat / voice. TPOT = 后续 token 间隔 (decode), 重 batch. Voice: 优先 TTFT — 小 batch + spec decode + prefix cache aggressive. Batch: 优先 TPOT — 大 batch + 无 spec decode + max GPU util. 调 `max_num_batched_tokens` per use case.
 
 **Q2: Multi-LoRA - vLLM 怎么 same batch 处理 per-request LoRA?**
-S-LoRA / Punica 算法. LoRA 计算分解: 共享 base GEMM + per-request LoRA delta. Custom CUDA kernel per-token LoRA apply. Hot pool 200 LoRA in GPU (50MB each), cold CPU RAM / S3 LRU. Cold swap 50-200ms overhead. `--enable-lora --max-loras 50`.
+S-LoRA / Punica 算法. LoRA 计算分解: 共享 base GEMM + per-request LoRA delta. Custom CUDA kernel per-token LoRA apply. Hot pool 200 LoRA in GPU (50MB each), cold CPU RAM / GCS LRU. Cold swap 50-200ms overhead. `--enable-lora --max-loras 50`.
 
 **Q3: Autoscaling LLM cold start 1-5min 怎么 burst?**
 Pre-warm 20% extra running (5x burst absorb). Predictive scaling 10min ahead (ML on traffic pattern). Burst spillover vendor API (Gemini Flash) — 贵但弹性. Graceful degrade 小 model (Llama 8B fallback). Cold start mitigate: pre-pull weights to local SSD + warm CUDA kernels + first N req mark "warming" not "healthy".
@@ -185,7 +185,7 @@ Speculative decoding:
 
 Multi-LoRA (S-LoRA):
   Base shared frozen / per-tenant LoRA 50-100MB
-  Hot pool 200 LoRA in GPU / cold CPU RAM/S3
+  Hot pool 200 LoRA in GPU / cold CPU RAM/GCS
   vLLM: --enable-lora --max-loras 50
 
 Cache hierarchy: L1 exact hash 10-20% / L2 semantic 0.95 30-50% FAQ / L3 prefix vLLM 60-90% / L4 tool per-TTL

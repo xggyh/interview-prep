@@ -76,7 +76,7 @@ L4 Recovery      outbox + compensating handler + bulk rollback</code></pre>
 <p><strong>Q2: 怎么决定 MVP 范围? 客户想要 5 features.</strong> 锁 ONE primary KPI. Decompose workflow 成 N sub-step. 给每步打分 (耗时×痛×LLM-fit×data×risk). Pick <strong>highest single sub-step</strong>, 做端到端. 其他 4 feature 进 phase 2-3 roadmap. 红线: 5 features at 50% &lt; 1 feature at 100%.</p>
 <p><strong>Q3: Sponsor 不在 demo 现场怎么办?</strong> 不 demo. 重新 schedule. Demo 给非决策者 = 浪费 (反馈无法 act). Workaround: pre-demo dry-run 给 champion + 录 demo video + 用 1-on-1 sponsor schedule 30 min on different day.</p>
 <p><strong>Q4: 怎么和 customer 谈 "phase 2 你可能不会做" 的话?</strong> Honest framing: "MVP success criteria 我们一起定的, phase 2 我们 commitment 是 conditional on phase 1 hit target. 如果 phase 1 missed, 我们会和你一起 decide pivot / iterate / stop." 不要假承诺. Trust &gt; 短期 sales win.</p>
-<p><strong>Q5: 客户的 IT 团队完全不想配合 (deploy 阻力大)?</strong> Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Pinecone vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.</p>
+<p><strong>Q5: 客户的 IT 团队完全不想配合 (deploy 阻力大)?</strong> Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Vertex AI Vector Search vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.</p>
 <hr />
 <h3>❌ 易错点 (10 条红线)</h3>
 <ol><li><strong>Spec before demo</strong> — 6 周 perfect design, 客户看 demo 说 "不是这个"</li><li><strong>Promise 100% automation</strong> — 第 1 个 incident 失信</li><li><strong>Skip clarifying questions</strong> — design wrong thing perfectly</li><li><strong>Vendor-style narrative</strong> — 讲 "我们 platform 怎么 work" 而非客户 KPI 语言</li><li><strong>Ignore IT / Security</strong> — week 3 demo 才发现 API 不开放</li><li><strong>No observability</strong> — 上线 silent fail</li><li><strong>Multiple KPIs</strong> — 同时优化 win rate + cycle time + cost → 都 mediocre</li><li><strong>Write code week 1</strong> — 没 scoping</li><li><strong>Heroics culture</strong> — 周末烧人, 12 周 sustained 离职</li><li><strong>No anti-goals</strong> — 没写 "we are NOT building X", scope creep 无底洞</li></ol>
@@ -257,7 +257,7 @@ Input (混乱需求 vs PRD), Success (客户 KPI vs LOC), Timeline (3-week MVP v
 Honest framing: "MVP success criteria 我们一起定的, phase 2 我们 commitment 是 conditional on phase 1 hit target. 如果 phase 1 missed, 我们会和你一起 decide pivot / iterate / stop." 不要假承诺. Trust > 短期 sales win.
 
 **Q5: 客户的 IT 团队完全不想配合 (deploy 阻力大)?**
-Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Pinecone vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.
+Day 1 见 IT lead, 把 constraints 当 input. 找 IT 的 champion (通常是想做新东西的 engineer). 用 IT-friendly 方案 (Cloud Run vs custom K8s, managed Vertex AI Vector Search vs self-host). 让 IT 自己 demo 给他们 boss — 把功劳让出去.
 
 ---
 

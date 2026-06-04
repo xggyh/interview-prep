@@ -128,8 +128,8 @@ LLM service:
        ┌──────────┐    ┌──────────────┐
        │ Vector   │    │  Workflow    │
        │ DB       │    │  Engine      │
-       │(Pinecone │    │  (Temporal / │
-       │ /Qdrant) │    │   DBOS)      │
+       │(Vertex AI Vector Search │    │  (Temporal / │
+       │ /Vertex AI Vector Search) │    │   DBOS)      │
        └──────────┘    └──────────────┘
                               │
                               ▼
@@ -840,12 +840,12 @@ class OrderProcessing:
 | **T3.2 MCP / API Proxy** | Internal Agent Platform | "ByteDance Internal Agent Platform — 我们做了 unified tool catalog (类 MCP server pattern), 各业务 team register tool, 平台层统一 auth / versioning / quota / cost meter. LLM proxy 层路由到 self-host (vLLM) or hosted (OpenAI / Anthropic / Google), 一套 SDK, fail-over 自动" |
 | **T3.3 High Throughput** | vLLM + SGLang + DeepSpeed (简历明示) | "Voice agent self-host LLM 用 vLLM (continuous batching + PagedAttention + prefix cache), Llama 3.1 8B fine-tuned, 单 A100 sustained 150 QPS (vs HF Transformers baseline 8 QPS, 18x speedup). BNPL chatbot 用 SGLang 因 RadixAttention 在 multi-turn cache 更佳, 20-30% extra hit rate" |
 | **T3.4 Observability** | Voice agent 7 markets weekly metric review | "Voice agent 每周 review: per-market p99 latency, error rate by ASR/TTS/LLM 三段, eval score (CER, intent accuracy), 用户 hangup rate. 加了 LangSmith 的 prompt-level tracing 后, 一次 catch 到 Indonesian prompt 因 LLM 升级 faithfulness drop 12%, 提前 rollback" |
-| **T3.5 Rate Limit / Queue / Cache** | TikTok PayLater scale + voice agent | "PayLater chatbot peak 5k QPS. 4-layer: (1) semantic cache (Pinecone, threshold 0.97) hit 35%; (2) priority queue (Gold tenant 优先, 5% traffic); (3) token bucket per user / tenant; (4) cost-aware routing — 70% Flash, 25% Pro, 5% Opus. Blended cost $0.85/1M vs all-Opus $5/1M, 6x savings. 同 quality (faithfulness ≥ 0.85)" |
+| **T3.5 Rate Limit / Queue / Cache** | TikTok PayLater scale + voice agent | "PayLater chatbot peak 5k QPS. 4-layer: (1) semantic cache (Vertex AI Vector Search, threshold 0.97) hit 35%; (2) priority queue (Gold tenant 优先, 5% traffic); (3) token bucket per user / tenant; (4) cost-aware routing — 70% Flash, 25% Pro, 5% Opus. Blended cost $0.85/1M vs all-Opus $5/1M, 6x savings. 同 quality (faithfulness ≥ 0.85)" |
 | **T3.6 Eventual Consistency** | Indonesia refund tier + Voice agent retry | "Refund tier 3 (> $200) 是 multi-step: (1) lookup customer history; (2) call risk score; (3) write ledger entry; (4) trigger fund return API; (5) send confirmation. 用 Temporal workflow — step 3 失败自动 compensate step 1-2, alert ops. 比起手写 outbox + saga, dev velocity 3-4x, bug 显著少" |
 
 **面试主动 quote 范例**:
 
-> "On the BNPL chatbot, the throughput story was about **layered defense, not single bullet**. We had: 35% semantic cache hit (Pinecone, 0.97 threshold) + priority queue for Gold tier + token bucket rate limit + cost-aware model routing across Gemini 3 Flash / Pro / Claude Opus. Net result: blended cost $0.85/1M tokens vs $5/1M if we'd run everything on Opus — 6x reduction, same quality. The hardest part wasn't picking the techniques; it was the **eval harness to prove no quality regression** across the cheaper routes."
+> "On the BNPL chatbot, the throughput story was about **layered defense, not single bullet**. We had: 35% semantic cache hit (Vertex AI Vector Search, 0.97 threshold) + priority queue for Gold tier + token bucket rate limit + cost-aware model routing across Gemini 3 Flash / Pro / Claude Opus. Net result: blended cost $0.85/1M tokens vs $5/1M if we'd run everything on Opus — 6x reduction, same quality. The hardest part wasn't picking the techniques; it was the **eval harness to prove no quality regression** across the cheaper routes."
 
 ---
 

@@ -149,7 +149,7 @@ L4 Quality Monitoring       → eval-in-prod, drift detection, user signal
    │ OTel SDK exports
    │
    ├─── Trace export ────→  Honeycomb / Datadog / Tempo (hot 7d)
-   │                        S3 cold storage (90d)
+   │                        GCS cold storage (90d)
    │
    ├─── Log export ──────→  Datadog Logs / Loki / BigQuery
    │   (PII-redacted)       Searchable, sampled
@@ -742,7 +742,7 @@ class LLMLogger:
 
 # Storage tiers
 # Hot (7 days): Datadog Logs / Loki - queryable
-# Warm (90 days): S3 / BigQuery - bulk analytics  
+# Warm (90 days): GCS / BigQuery - bulk analytics  
 # Cold: aggregated only, 1 year
 ```
 
@@ -1916,7 +1916,7 @@ Without observability stack: 几天 (用户投诉 → 调查 → 排错)
 >
 > **L1 Distributed Tracing** with OpenTelemetry. Per-request trace including agent loop, each LLM call (model / template version / tokens / cost / TTFT), each tool call (MCP, OBO, DB), each cache lookup. Trace context propagates to MCP servers and downstream services via traceparent header.
 >
-> **L2 LLM-specific Logging**. Per LLM call, structured log with: trace_id, model, prompt_template_version, prompt_hash, input/output tokens, cost, latency, tools_used. Content (prompt/response) is **PII-redacted at write time** via Microsoft Presidio. We keep hash for correlation but never plaintext PII. Storage tiered: hot 7d Datadog, warm 90d S3, cold 1y BigQuery aggregated.
+> **L2 LLM-specific Logging**. Per LLM call, structured log with: trace_id, model, prompt_template_version, prompt_hash, input/output tokens, cost, latency, tools_used. Content (prompt/response) is **PII-redacted at write time** via Microsoft Presidio. We keep hash for correlation but never plaintext PII. Storage tiered: hot 7d Datadog, warm 90d GCS, cold 1y BigQuery aggregated.
 >
 > **L3 Metrics** time-series via Prometheus / Mimir. Beyond traditional latency/error, LLM-specific: TTFT/TPOT, input/output tokens per (model, tenant), cost per (tenant, feature), cache hit rate per tier (L1/L2/L3/prefix), tool error rate, eval pass rate sampled.
 >

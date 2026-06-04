@@ -701,7 +701,7 @@ def gdpr_erase_user(user_id):
     # 4. Notify downstream systems
     publish('user_erased', user_id)</code></pre>
 <h4>3.8 Tools</h4>
-<ul><li><strong>Microsoft Presidio</strong>: open-source, 多语言 PII detection (Python)</li><li><strong>AWS Macie</strong>: managed S3 PII scanner</li><li><strong>Google Cloud DLP API</strong>: SaaS, broad coverage</li><li><strong>TruffleHog</strong>: secret scanning in code / strings</li><li><strong>Detect-secrets</strong>: Yelp's tool, pre-commit hook</li><li><strong>Microsoft Purview</strong>: enterprise data governance</li></ul>
+<ul><li><strong>Microsoft Presidio</strong>: open-source, 多语言 PII detection (Python)</li><li><strong>AWS Macie</strong>: managed GCS PII scanner</li><li><strong>Google Cloud DLP API</strong>: SaaS, broad coverage</li><li><strong>TruffleHog</strong>: secret scanning in code / strings</li><li><strong>Detect-secrets</strong>: Yelp's tool, pre-commit hook</li><li><strong>Microsoft Purview</strong>: enterprise data governance</li></ul>
 <hr />
 <h3>⚙️ Problem 4: Size + Token Budget Management — Top-N Selection + Summarization + Reference to Blob</h3>
 <p>10MB output 不能塞进 100K context window. 必须 size manage.</p>
@@ -838,7 +838,7 @@ def call_tool_with_budget(tool, args, budget):
     budget.add(tokens)
     return formatted</code></pre>
 <h4>4.8 Tools</h4>
-<ul><li><strong>Token estimator</strong>: tiktoken (OpenAI), vertexai tokenizer (Gemini), Anthropic tokenizer</li><li><strong>Blob store</strong>: S3, MinIO, GCS, Cloudflare R2</li><li><strong>Ad-hoc query on blob</strong>: DuckDB, Polars, Apache DataFusion</li><li><strong>Summarization LLM</strong>: Gemini Flash ($0.5/M), Haiku 4.5 ($1/M)</li><li><strong>Streaming</strong>: server-sent events, async iterators</li></ul>
+<ul><li><strong>Token estimator</strong>: tiktoken (OpenAI), vertexai tokenizer (Gemini), Anthropic tokenizer</li><li><strong>Blob store</strong>: GCS, MinIO, GCS, Cloudflare R2</li><li><strong>Ad-hoc query on blob</strong>: DuckDB, Polars, Apache DataFusion</li><li><strong>Summarization LLM</strong>: Gemini Flash ($0.5/M), Haiku 4.5 ($1/M)</li><li><strong>Streaming</strong>: server-sent events, async iterators</li></ul>
 <hr />
 <h3>⚙️ Problem 5: Provenance + Iterative Refinement — LLM Can Call get_full_output, Query Refinement</h3>
 <p>最后一 layer: 让 LLM 知道数据<strong>来源 + 信任 + 可以怎么进一步</strong>.</p>
@@ -1081,7 +1081,7 @@ Post-fix:
 - False positive: 1% (legit notes blocked, manual override)
 - Production approval anomaly rate: dropped to near 0</code></pre>
 <h4>5.8 Tools</h4>
-<ul><li><strong>Blob storage</strong>: S3, MinIO, GCS, Cloudflare R2</li><li><strong>Ad-hoc query</strong>: DuckDB, Apache Arrow / DataFusion</li><li><strong>OCR</strong>: Tesseract, AWS Textract, Google Document AI</li><li><strong>PDF text extract</strong>: PyMuPDF, pdfplumber</li><li><strong>Audio transcribe</strong>: Whisper, AssemblyAI</li><li><strong>Vision summarize</strong>: Gemini Pro Vision, GPT-4V, Claude vision</li><li><strong>Eval</strong>: Promptfoo, Inspect (UK AISI), garak</li><li><strong>Monitoring</strong>: per-tool PII / injection / truncation metrics</li></ul>
+<ul><li><strong>Blob storage</strong>: GCS, MinIO, GCS, Cloudflare R2</li><li><strong>Ad-hoc query</strong>: DuckDB, Apache Arrow / DataFusion</li><li><strong>OCR</strong>: Tesseract, Document AI, Google Document AI</li><li><strong>PDF text extract</strong>: PyMuPDF, pdfplumber</li><li><strong>Audio transcribe</strong>: Whisper, AssemblyAI</li><li><strong>Vision summarize</strong>: Gemini Pro Vision, GPT-4V, Claude vision</li><li><strong>Eval</strong>: Promptfoo, Inspect (UK AISI), garak</li><li><strong>Monitoring</strong>: per-tool PII / injection / truncation metrics</li></ul>
 <hr />
 <h1>Part 3 · 把 5 个问题串起来看</h1>
 <p>这 5 个 deep problem 是 <strong>tool output 防御的 5 个 layer</strong>, 从结构到语义:</p>
@@ -2245,7 +2245,7 @@ def gdpr_erase_user(user_id):
 ### 3.8 Tools
 
 - **Microsoft Presidio**: open-source, 多语言 PII detection (Python)
-- **AWS Macie**: managed S3 PII scanner
+- **AWS Macie**: managed GCS PII scanner
 - **Google Cloud DLP API**: SaaS, broad coverage
 - **TruffleHog**: secret scanning in code / strings
 - **Detect-secrets**: Yelp's tool, pre-commit hook
@@ -2427,7 +2427,7 @@ def call_tool_with_budget(tool, args, budget):
 ### 4.8 Tools
 
 - **Token estimator**: tiktoken (OpenAI), vertexai tokenizer (Gemini), Anthropic tokenizer
-- **Blob store**: S3, MinIO, GCS, Cloudflare R2
+- **Blob store**: GCS, MinIO, GCS, Cloudflare R2
 - **Ad-hoc query on blob**: DuckDB, Polars, Apache DataFusion
 - **Summarization LLM**: Gemini Flash ($0.5/M), Haiku 4.5 ($1/M)
 - **Streaming**: server-sent events, async iterators
@@ -2712,9 +2712,9 @@ Post-fix:
 
 ### 5.8 Tools
 
-- **Blob storage**: S3, MinIO, GCS, Cloudflare R2
+- **Blob storage**: GCS, MinIO, GCS, Cloudflare R2
 - **Ad-hoc query**: DuckDB, Apache Arrow / DataFusion
-- **OCR**: Tesseract, AWS Textract, Google Document AI
+- **OCR**: Tesseract, Document AI, Google Document AI
 - **PDF text extract**: PyMuPDF, pdfplumber
 - **Audio transcribe**: Whisper, AssemblyAI
 - **Vision summarize**: Gemini Pro Vision, GPT-4V, Claude vision

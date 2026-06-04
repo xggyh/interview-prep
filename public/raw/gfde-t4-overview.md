@@ -206,7 +206,7 @@ L2 - Prompt Injection Defense
 L3 - Immutable Audit Trail
      Every agent action → audit log
      Fields: actor / on_behalf_of / action / resource / args / result / timestamp
-     90-day immutable storage (S3 + Object Lock)
+     90-day immutable storage (GCS + Object Lock)
      Compliance: SOC2, ISO27001 friendly
 
 L4 - Recovery / Rollback
@@ -721,7 +721,7 @@ def audit_log(event):
         "agent_version": AGENT_VERSION,
         "prompt_template_version": PROMPT_VERSION,
     }
-    # Write to S3 with Object Lock (immutable)
+    # Write to GCS with Object Lock (immutable)
     s3.put_object(
         Bucket="audit-log",
         Key=f"{event.tenant_id}/{record['id']}.json",
@@ -999,7 +999,7 @@ D·K·D·M·P FRAMEWORK:
 4-LAYER PERMISSIONS / SAFETY / RECOVERY:
   L1 IAM (least privilege via delegation, agent ≤ user)
   L2 Prompt injection defense (XML wrap + system reminder)
-  L3 Audit trail (immutable 90d, S3 Object Lock)
+  L3 Audit trail (immutable 90d, GCS Object Lock)
   L4 Recovery (outbox + compensation + replay)
 
 3-WEEK MVP PLAYBOOK:
