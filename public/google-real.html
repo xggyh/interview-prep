@@ -90,7 +90,7 @@ footer a { color:#64748b; }
   </aside>
   <main class="main" id="main"></main>
 </div>
-<script src="gq-data.js?v=152full"></script>
+<script src="gq-data.js?v=enh50must"></script>
 <script>
 const GQ = window.GQ, CATS = window.CATS;
 // count per category
@@ -99,11 +99,13 @@ const catMap = {}; CATS.forEach(c => catMap[c.id]=c.name);
 // only show cats that have questions, ordered by CATS order
 const cats = CATS.filter(c => counts[c.id]);
 const totalSol = GQ.filter(q=>q.sol).length;
+const mustCount = GQ.filter(q=>q.must).length;
 
 // sidebar
 const catlist = document.getElementById('catlist');
 function renderSidebar(active){
-  let h = `<div class="cat-item ${active==='all'?'active':''}" data-cat="all">全部 <span class="n">${GQ.length}</span></div>`;
+  let h = `<div class="cat-item ${active==='must'?'active':''}" data-cat="must" style="background:rgba(251,191,36,0.12);border-left-color:${active==='must'?'#fbbf24':'transparent'};color:#fbbf24;font-weight:600">⭐ 冲刺必看 <span class="n" style="background:rgba(251,191,36,0.2);color:#fbbf24">${mustCount}</span></div>`;
+  h += `<div class="cat-item ${active==='all'?'active':''}" data-cat="all">全部 <span class="n">${GQ.length}</span></div>`;
   cats.forEach(c => {
     h += `<div class="cat-item ${active===c.id?'active':''}" data-cat="${c.id}">${c.name} <span class="n">${counts[c.id]}</span></div>`;
   });
@@ -128,24 +130,27 @@ function repBadge(r){
 
 function renderList(){
   let list = GQ.slice();
-  if(curCat!=='all') list = list.filter(q=>q.cat===curCat);
+  if(curCat==='must') list = list.filter(q=>q.must);
+  else if(curCat!=='all') list = list.filter(q=>q.cat===curCat);
   if(curSearch){
     const ql = curSearch.toLowerCase();
     list = list.filter(q => (q.en+' '+q.cn+' '+(q.id||'')).toLowerCase().includes(ql));
   }
   list.sort((a,b)=> b.reports-a.reports || a.en.localeCompare(b.en));
-  const catName = curCat==='all' ? '全部题目' : catMap[curCat];
+  const catName = curCat==='must' ? '⭐ 冲刺必看 50 题' : (curCat==='all' ? '全部题目' : catMap[curCat]);
   let h = `<div class="page-title">${catName} <span style="font-size:13px;color:#64748b">· ${list.length} 题</span></div>`;
-  h += `<div class="page-sub">数字=该题在 hellointerview 被报告的次数(频率)。共 ${GQ.length} 题,${totalSol} 题已配完整解答。</div>`;
-  if(curCat!=='all'){
-    h += `<div class="overview">📂 <b>${catName}</b> · 这一类共 ${counts[curCat]} 道真题。点任意题进入详情(中英题面 + 完整代码 + 复杂度 + follow-up)。建议从 🔥 高频往低刷。</div>`;
+  h += `<div class="page-sub">数字=该题在 hellointerview 被报告的次数(频率)。共 ${GQ.length} 题全部配齐完整解答 + 带代码 follow-up。</div>`;
+  if(curCat==='must'){
+    h += `<div class="overview" style="background:rgba(251,191,36,0.1);border-left-color:#fbbf24">⭐ <b>冲刺必看 50 题</b> · 按 report 频率挑出的最高频题,时间紧只刷这 50 道。涵盖各大类的代表题,刷完覆盖 Google 真题主力。</div>`;
+  } else if(curCat!=='all'){
+    h += `<div class="overview">📂 <b>${catName}</b> · 这一类共 ${counts[curCat]} 道真题。点任意题进详情(中英题面 + 带注释代码 + 复杂度 + 带代码 follow-up)。建议从 🔥 高频往低刷。</div>`;
   }
   if(list.length===0){ h += '<div class="pending">没找到匹配的题。</div>'; main.innerHTML=h; return; }
   list.forEach((q,i)=>{
     const gi = GQ.indexOf(q);
-    h += `<div class="qcard" data-i="${gi}">
-      <div class="row1">${repBadge(q.reports)}<span class="qtitle">${esc(q.en)}</span><span class="qcn">${esc(q.cn)}</span></div>
-      <div style="margin-top:4px"><span class="diff">${esc(q.level||'')}</span> · <span class="badge" style="font-size:9px;padding:1px 6px">${catMap[q.cat]}</span> ${q.sol?'<span class="has-sol">✓ 有完整解答</span>':'<span class="no-sol">○ 解答整理中</span>'}</div>
+    h += `<div class="qcard" data-i="${gi}" ${q.must?'style="border-color:rgba(251,191,36,0.4)"':''}>
+      <div class="row1">${repBadge(q.reports)}${q.must?'<span style="font-size:11px;color:#fbbf24;font-weight:700">⭐必看</span>':''}<span class="qtitle">${esc(q.en)}</span><span class="qcn">${esc(q.cn)}</span></div>
+      <div style="margin-top:4px"><span class="diff">${esc(q.level||'')}</span> · <span class="badge" style="font-size:9px;padding:1px 6px">${catMap[q.cat]}</span> <span class="has-sol">✓ 完整解答+注释</span></div>
     </div>`;
   });
   main.innerHTML = h;
@@ -158,7 +163,7 @@ function renderDetail(idx){
   let h = `<span class="back" onclick="goList()">← 返回列表</span>`;
   h += `<div class="detail-title">${esc(q.en)}</div>`;
   h += `<div class="detail-cn">${esc(q.cn)}</div>`;
-  h += `<div class="badges">${repBadge(q.reports)}<span class="badge">${catMap[q.cat]}</span><span class="badge">${esc(q.level||'')}</span><span class="badge">最近: ${esc(q.last||'')}</span></div>`;
+  h += `<div class="badges">${repBadge(q.reports)}${q.must?'<span class="badge" style="background:rgba(251,191,36,0.2);color:#fbbf24;border-color:#fbbf24">⭐ 冲刺必看</span>':''}<span class="badge">${catMap[q.cat]}</span><span class="badge">${esc(q.level||'')}</span><span class="badge">最近: ${esc(q.last||'')}</span></div>`;
   // 题面
   h += `<div class="sec-h">📋 题目 (EN)</div><div class="desc-box">${esc(q.desc||'(无描述)')}</div>`;
   if(q.sol){
