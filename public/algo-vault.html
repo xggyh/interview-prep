@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧮 算法代码库 · Tag 速查</title>
+<meta name="description" content="Google L5 / FDE 冲刺算法代码库 — 点 tag 看该类所有 code + 答案 + 复杂度">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #0f172a; color: #e2e8f0; line-height: 1.55;
+  padding-bottom: 60px;
+}
+.container { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+
+/* hero */
+header.hero {
+  text-align: center; padding: 30px 20px 22px;
+  background: linear-gradient(135deg, #6366f1, #ec4899, #f59e0b);
+  border-radius: 0 0 18px 18px; margin-bottom: 18px;
+  box-shadow: 0 12px 40px rgba(99,102,241,0.3);
+}
+header.hero h1 { font-size: 26px; letter-spacing: -0.5px; color: #fff; }
+header.hero .tagline { font-size: 13px; opacity: 0.95; margin-top: 6px; color: #fff; }
+
+/* search */
+.search-wrap { margin: 0 auto 14px; max-width: 1000px; padding: 0 16px; }
+#search {
+  width: 100%; padding: 11px 16px; font-size: 15px;
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  color: #f1f5f9; outline: none;
+}
+#search::placeholder { color: #64748b; }
+#search:focus { border-color: #6366f1; }
+
+/* sticky tag bar */
+.tagbar-wrap {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(15,23,42,0.95); backdrop-filter: blur(8px);
+  padding: 10px 0; margin-bottom: 16px; border-bottom: 1px solid #1e293b;
+}
+.tagbar { display: flex; flex-wrap: wrap; gap: 8px; max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+.tag {
+  background: #1e293b; border: 1px solid #334155; color: #cbd5e1;
+  padding: 7px 14px; border-radius: 20px; font-size: 13px; cursor: pointer;
+  transition: all 0.15s ease; white-space: nowrap; user-select: none;
+}
+.tag:hover { background: #334155; color: #fff; }
+.tag.active { background: linear-gradient(135deg,#6366f1,#ec4899); color: #fff; border-color: transparent; font-weight: 600; }
+.tag .cnt { opacity: 0.7; font-size: 11px; margin-left: 3px; }
+
+/* category heading shown when filtering */
+.cat-heading {
+  font-size: 18px; font-weight: 700; color: #f1f5f9; margin: 8px 0 4px;
+  padding-left: 10px; border-left: 4px solid #6366f1;
+}
+.cat-note { font-size: 12.5px; color: #94a3b8; margin: 0 0 14px; padding-left: 14px; }
+
+/* problem card */
+.problem {
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 14px;
+}
+.prob-head { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.prob-id { color: #60a5fa; font-weight: 700; }
+.cat-badge { font-size: 10px; background: rgba(99,102,241,0.25); color: #a5b4fc; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.prob-approach { font-size: 13px; color: #cbd5e1; margin: 4px 0; }
+.prob-approach b { color: #f0abfc; }
+.prob-cx {
+  font-size: 12px; color: #fbbf24; font-weight: 600; margin-top: 6px;
+  background: rgba(251,191,36,0.1); padding: 3px 10px; border-radius: 6px; display: inline-block;
+}
+pre {
+  background: #0b1120; color: #e2e8f0; padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.5; margin: 8px 0 4px;
+  font-family: "SF Mono", Menlo, Consolas, monospace; border: 1px solid #1e293b;
+}
+.kw { color: #f472b6; }
+.cm { color: #64748b; font-style: italic; }
+.str { color: #86efac; }
+
+.tip {
+  background: rgba(251,191,36,0.08); border-left: 3px solid #f59e0b;
+  padding: 8px 12px; font-size: 12.5px; color: #cbd5e1; margin: 6px 0 0; border-radius: 0 6px 6px 0;
+}
+.pattern-note {
+  background: rgba(99,102,241,0.1); border-left: 3px solid #6366f1;
+  padding: 8px 12px; font-size: 12.5px; color: #cbd5e1; margin-bottom: 12px; border-radius: 0 6px 6px 0;
+}
+.pattern-note b { color: #a5b4fc; }
+.no-result { text-align: center; color: #64748b; padding: 40px; font-size: 14px; }
+footer { text-align: center; color: #475569; font-size: 11.5px; margin-top: 30px; }
+footer a { color: #64748b; }
+@media (max-width: 640px) {
+  header.hero h1 { font-size: 22px; }
+  pre { font-size: 11.5px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🧮 算法代码库</h1>
+  <div class="tagline">Google L5 / FDE 冲刺 · 点 tag 看该类全部 code + 复杂度</div>
+</header>
+
+<div class="search-wrap">
+  <input id="search" type="text" placeholder="🔍 搜题号 / 题名 / 关键词 (如 743, dijkstra, 并查集, LRU...)" autocomplete="off">
+</div>
+
+<div class="tagbar-wrap">
+  <div class="tagbar" id="tagbar"></div>
+</div>
+
+<div class="container" id="content"></div>
+
+<footer>
+  🧮 Algorithm Vault · 13 类 · <a href="cram.html">← 回 Cram Hub</a> · Built with Claude Code
+</footer>
+
+<script>
+// ===== 分类定义 =====
+const CATS = [
+  { id: "union-find",   name: "并查集",   note: "信号:分组/连通/传递性/朋友圈/动态加边。三件套:parent + find(路径压缩) + union(计组数)。" },
+  { id: "intervals",    name: "区间扫描线", note: "信号:合并/重叠/最大并发/空隙。套路:排序+扫描(prev_end/堆/差分)。判重叠:s1<e2 and s2<e1。" },
+  { id: "stack",        name: "栈",       note: "信号:嵌套/括号/表达式/后进先出。栈顶永远是 [-1]。" },
+  { id: "mono-stack",   name: "单调栈",   note: "信号:下一个更大/更小/柱状图面积/接雨水。弹出瞬间结算答案,每元素进出各一次 O(n)。" },
+  { id: "heap",         name: "堆/Top-K", note: "信号:第K大小/Top K/数据流中位数/反复取极值合并。取最大用负数模拟 max-heap。" },
+  { id: "dfs",          name: "DFS/岛屿", note: "连通块:seen永久不回溯,flag初始True。路径:seen add→remove回溯,flag初始False,返回值要接住。" },
+  { id: "bfs",          name: "BFS/图/最短路", note: "无权→BFS · 非负权→Dijkstra · 有约束→Bellman-Ford · 用完边→欧拉 · 依赖排序→拓扑。" },
+  { id: "trie",         name: "Trie",     note: "信号:前缀匹配/多词搜索/自动补全/词典。核心:嵌套dict,沿字符走,结尾标记。" },
+  { id: "tree",         name: "树/BST",   note: "BST升序/第k→中序 · 树高/直径→后序 · 序列化→前序 · 按层→BFS。BST:左<根<右。" },
+  { id: "binary-search",name: "二分",     note: "只精通闭区间 lo≤hi。二分答案:最大化可行值→可行 lo=mid+1 记 ans。" },
+  { id: "design",       name: "OOP设计",  note: "L5高频。选对结构(嵌套dict/双栈/HashMap+链表/堆)→__init__→维护不变式→报复杂度+follow-up。" },
+  { id: "segment-tree", name: "线段树/BIT", note: "信号:带修改的区间查询。线段树改/查都O(log n)。只前缀和→BIT更简洁;区间最值/区间改→线段树。" },
+  { id: "greedy",       name: "贪心/模拟", note: "贪心:分类讨论+找一次操作最多解决几个+处理奇偶。模拟:照题意走,注意原地修改。" },
+];
+
+// ===== 题目数据 =====
+// k=关键词(搜索用), c=分类, t=标题, a=思路(可空), x=复杂度, code=代码
+const P = [
+/* ===== 并查集 ===== */
+{c:"union-find",id:"#547",t:"Number of Provinces — 模板",k:"547 provinces 并查集 省份",x:"O(n²·α)≈O(n²) · O(n)",code:
+`class Solution:
+    def findCircleNum(self, isConnected):
+        n = len(isConnected)
+        parent = list(range(n))
+        self.count = n                       # 组数
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]  # 路径压缩
+                x = parent[x]
+            return x
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry
+                self.count -= 1              # 合并成功,组数-1
+        for i in range(n):
+            for j in range(i + 1, n):
+                if isConnected[i][j] == 1:
+                    union(i, j)
+        return self.count`},
+{c:"union-find",id:"#1101",t:"Earliest Moment Everyone Friends",k:"1101 earliest moment friends 并查集 时间",a:"同模板,多两步:按 timestamp 排序 + 组数变 1 返回当前时刻。",x:"O(E log E) · O(n)",code:
+`class Solution:
+    def earliestAcq(self, logs, n):
+        logs.sort()                          # ① 按 timestamp 排序
+        parent = list(range(n)); self.count = n
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]; x = parent[x]
+            return x
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry; self.count -= 1
+        for t, a, b in logs:
+            union(a, b)
+            if self.count == 1:              # ③ 全连通
+                return t
+        return -1`},
+{c:"union-find",id:"#737",t:"Sentence Similarity II",k:"737 sentence similarity 并查集 同义词 传递",a:"同义词对 union 成组;逐位置检查相同或同根。传递性→并查集。",x:"O((P+N)·α) · O(词数)",code:
+`class Solution:
+    def areSentencesSimilarTwo(self, sentence1, sentence2, pairs):
+        if len(sentence1) != len(sentence2):
+            return False
+        parent = {}
+        def find(x):
+            parent.setdefault(x, x)
+            if parent[x] != x:
+                parent[x] = find(parent[x])
+            return parent[x]
+        for a, b in pairs:
+            parent[find(a)] = find(b)
+        for w1, w2 in zip(sentence1, sentence2):
+            if w1 != w2 and find(w1) != find(w2):
+                return False
+        return True`},
+
+/* ===== 区间 ===== */
+{c:"intervals",id:"#56",t:"Merge Intervals — 合并",k:"56 merge intervals 区间合并",x:"O(n log n) · O(n)",code:
+`class Solution:
+    def merge(self, intervals):
+        intervals.sort(key=lambda x: x[0])
+        res = []
+        for s, e in intervals:
+            if not res or res[-1][1] < s:    # 不重叠→新段
+                res.append([s, e])
+            else:
+                res[-1][1] = max(res[-1][1], e)  # 重叠→延伸
+        return res`},
+{c:"intervals",id:"#3169",t:"Count Days Without Meetings — 找空隙",k:"3169 count days without meetings 空闲",x:"O(n log n) · O(1)",code:
+`class Solution:
+    def countDays(self, days, meetings):
+        meetings.sort(key=lambda x: x[0])
+        free, prev_end = 0, 0
+        for s, e in meetings:
+            if s > prev_end + 1:
+                free += s - prev_end - 1     # 空隙
+            prev_end = max(prev_end, e)      # 注意 max(内嵌区间)
+        if days > prev_end:
+            free += days - prev_end          # 末尾空隙
+        return free`},
+{c:"intervals",id:"#253",t:"Meeting Rooms II — 最大并发",k:"253 meeting rooms 会议室 最大并发 堆",x:"O(n log n) · O(n)",code:
+`import heapq
+class Solution:
+    def minMeetingRooms(self, intervals):
+        intervals.sort(key=lambda x: x[0])
+        heap = []                            # 进行中会议的 end
+        for s, e in intervals:
+            if heap and heap[0] <= s:
+                heapq.heappop(heap)          # 复用最早结束的房间
+            heapq.heappush(heap, e)
+        return len(heap)`},
+{c:"intervals",id:"#2402",t:"Meeting Rooms III — 双堆+等待",k:"2402 meeting rooms iii 双堆 等待",x:"O(m log m + m log n) · O(n)",code:
+`import heapq
+class Solution:
+    def mostBooked(self, n, meetings):
+        meetings.sort()
+        idle = list(range(n)); heapq.heapify(idle)
+        busy = []; count = [0] * n
+        for s, e in meetings:
+            while busy and busy[0][0] <= s:  # 释放已结束的
+                _, r = heapq.heappop(busy); heapq.heappush(idle, r)
+            if idle:                         # 有空房→最小编号
+                r = heapq.heappop(idle); heapq.heappush(busy, (e, r))
+            else:                            # 没空房→等最早结束
+                end, r = heapq.heappop(busy)
+                heapq.heappush(busy, (end + (e - s), r))
+            count[r] += 1
+        return count.index(max(count))`},
+{c:"intervals",id:"#1854",t:"Maximum Population Year — 差分",k:"1854 population year 差分 扫描线 人口",x:"O(N+Y) · O(Y)",code:
+`class Solution:
+    def maximumPopulation(self, logs):
+        delta = [0] * 2051
+        for b, d in logs:
+            delta[b] += 1; delta[d] -= 1
+        cur = mx = ans = 0
+        for y in range(1950, 2051):
+            cur += delta[y]                  # 前缀和=当年人口
+            if cur > mx:
+                mx, ans = cur, y
+        return ans`},
+{c:"intervals",id:"#759",t:"Employee Free Time — 摊平+合并+找缝",k:"759 employee free time 公共空闲",x:"O(n log n) · O(n)",code:
+`class Solution:
+    def employeeFreeTime(self, schedule):
+        intervals = []
+        for emp in schedule:                 # 摊平
+            for iv in emp:
+                intervals.append(iv)
+        intervals.sort(key=lambda x: x[0])
+        merged = []
+        for iv in intervals:                 # 合并
+            if not merged or merged[-1][1] < iv[0]:
+                merged.append(iv)
+            else:
+                merged[-1][1] = max(merged[-1][1], iv[1])
+        res = []
+        for i in range(1, len(merged)):      # 相邻合并区间的缝=空闲
+            res.append([merged[i-1][1], merged[i][0]])
+        return res`},
+{c:"intervals",id:"#729",t:"My Calendar I — 区间冲突",k:"729 my calendar 区间冲突 重叠",x:"book O(n) · O(n)",code:
+`class MyCalendar:
+    def __init__(self):
+        self.books = []
+    def book(self, start, end):
+        for s, e in self.books:
+            if start < e and s < end:        # 重叠公式
+                return False
+        self.books.append((start, end))
+        return True`},
+
+/* ===== 栈 ===== */
+{c:"stack",id:"#20",t:"Valid Parentheses",k:"20 valid parentheses 括号匹配 栈",x:"O(n) · O(n)",code:
+`class Solution:
+    def isValid(self, s):
+        stack = []
+        pairs = {')': '(', ']': '[', '}': '{'}
+        for ch in s:
+            if ch in pairs:                  # 右括号
+                if not stack or stack[-1] != pairs[ch]:
+                    return False
+                stack.pop()
+            else:
+                stack.append(ch)
+        return not stack`},
+{c:"stack",id:"#394",t:"Decode String — 栈处理嵌套",k:"394 decode string 解码 栈 嵌套",x:"O(输出长) · O(嵌套深度)",code:
+`class Solution:
+    def decodeString(self, s):
+        stack = []; cur = ""; num = 0
+        for ch in s:
+            if ch.isdigit():
+                num = num * 10 + int(ch)     # 多位数
+            elif ch == '[':
+                stack.append((cur, num))     # 存现场
+                cur, num = "", 0
+            elif ch == ']':
+                prev, k = stack.pop()
+                cur = prev + k * cur         # 拼接
+            else:
+                cur += ch
+        return cur`},
+{c:"stack",id:"#224",t:"Basic Calculator — 含括号 (+ -)",k:"224 basic calculator 计算器 括号",x:"O(n) · O(n)",code:
+`class Solution:
+    def calculate(self, s):
+        stack = []; result = 0; num = 0; sign = 1
+        for ch in s:
+            if ch.isdigit():
+                num = num * 10 + int(ch)
+            elif ch == '+':
+                result += sign * num; num, sign = 0, 1
+            elif ch == '-':
+                result += sign * num; num, sign = 0, -1
+            elif ch == '(':
+                stack.append(result); stack.append(sign)
+                result, sign = 0, 1
+            elif ch == ')':
+                result += sign * num; num = 0
+                result *= stack.pop()        # 括号前符号
+                result += stack.pop()        # 括号前结果
+        return result + sign * num`},
+{c:"stack",id:"#227",t:"Basic Calculator II — 优先级",k:"227 basic calculator ii 优先级 乘除",x:"O(n) · O(n)",code:
+`class Solution:
+    def calculate(self, s):
+        stack = []; num = 0; op = '+'
+        for i, ch in enumerate(s):
+            if ch.isdigit():
+                num = num * 10 + int(ch)
+            if ch in '+-*/' or i == len(s) - 1:
+                if op == '+': stack.append(num)
+                elif op == '-': stack.append(-num)
+                elif op == '*': stack.append(stack.pop() * num)
+                else: stack.append(int(stack.pop() / num))  # 截断向0
+                op, num = ch, 0
+        return sum(stack)`},
+
+/* ===== 单调栈 ===== */
+{c:"mono-stack",id:"#739",t:"Daily Temperatures — 下一个更暖",k:"739 daily temperatures 单调栈 下一个更大",x:"O(n) · O(n)",code:
+`class Solution:
+    def dailyTemperatures(self, temperatures):
+        res = [0] * len(temperatures)
+        stack = []                           # 存下标,温度递减
+        for i, t in enumerate(temperatures):
+            while stack and temperatures[stack[-1]] < t:
+                j = stack.pop()
+                res[j] = i - j               # 等了 i-j 天
+            stack.append(i)
+        return res`},
+{c:"mono-stack",id:"#496",t:"Next Greater Element I",k:"496 next greater element 单调栈",x:"O(n+m) · O(n)",code:
+`class Solution:
+    def nextGreaterElement(self, nums1, nums2):
+        nxt = {}; stack = []
+        for x in nums2:
+            while stack and stack[-1] < x:
+                nxt[stack.pop()] = x
+            stack.append(x)
+        return [nxt.get(x, -1) for x in nums1]`},
+{c:"mono-stack",id:"#84",t:"Largest Rectangle in Histogram",k:"84 largest rectangle histogram 柱状图 单调栈",a:"递增栈;弹出时以该高度为矮边算矩形。末尾哨兵 0 清空栈。",x:"O(n) · O(n)",code:
+`class Solution:
+    def largestRectangleArea(self, heights):
+        stack = []; max_area = 0
+        heights = heights + [0]              # 哨兵清空栈
+        for i, h in enumerate(heights):
+            while stack and heights[stack[-1]] > h:
+                height = heights[stack.pop()]
+                width = i if not stack else i - stack[-1] - 1
+                max_area = max(max_area, height * width)
+            stack.append(i)
+        return max_area`},
+{c:"mono-stack",id:"#42",t:"Trapping Rain Water — 双指针",k:"42 trapping rain water 接雨水 双指针",x:"O(n) · O(1)",code:
+`class Solution:
+    def trap(self, height):
+        left, right = 0, len(height) - 1
+        lmax = rmax = water = 0
+        while left < right:
+            if height[left] < height[right]:
+                lmax = max(lmax, height[left])
+                water += lmax - height[left]; left += 1
+            else:
+                rmax = max(rmax, height[right])
+                water += rmax - height[right]; right -= 1
+        return water`},
+
+/* ===== 堆 ===== */
+{c:"heap",id:"#215",t:"Kth Largest — Quick Select",k:"215 kth largest quick select 第k大",x:"O(n) 平均 · O(1)",code:
+`import random
+class Solution:
+    def findKthLargest(self, nums, k):
+        target = len(nums) - k               # 升序第 (n-k) 位
+        lo, hi = 0, len(nums) - 1
+        while lo <= hi:
+            p = self.partition(nums, lo, hi)
+            if p == target: return nums[p]
+            elif p < target: lo = p + 1
+            else: hi = p - 1
+    def partition(self, nums, lo, hi):
+        r = random.randint(lo, hi)           # 随机pivot防最坏
+        nums[r], nums[hi] = nums[hi], nums[r]
+        pivot = nums[hi]; i = lo
+        for j in range(lo, hi):
+            if nums[j] < pivot:
+                nums[i], nums[j] = nums[j], nums[i]; i += 1
+        nums[i], nums[hi] = nums[hi], nums[i]
+        return i`},
+{c:"heap",id:"#347",t:"Top K Frequent — 桶排序 O(n)",k:"347 top k frequent 桶排序 频率",x:"O(n) · O(n)",code:
+`from collections import Counter
+class Solution:
+    def topKFrequent(self, nums, k):
+        cnt = Counter(nums); n = len(nums)
+        buckets = [[] for _ in range(n + 1)] # 索引=频率
+        for num, f in cnt.items():
+            buckets[f].append(num)
+        res = []
+        for i in range(n, 0, -1):            # 从高频往低
+            for num in buckets[i]:
+                res.append(num)
+                if len(res) == k:
+                    return res
+        return res`},
+{c:"heap",id:"#1167",t:"Connect Sticks — Huffman 贪心",k:"1167 connect sticks huffman 贪心 堆",x:"O(n log n) · O(1)",code:
+`import heapq
+class Solution:
+    def connectSticks(self, sticks):
+        heapq.heapify(sticks); total = 0
+        while len(sticks) > 1:
+            a = heapq.heappop(sticks)        # 最短两根
+            b = heapq.heappop(sticks)
+            total += a + b
+            heapq.heappush(sticks, a + b)    # 合并放回
+        return total`},
+{c:"heap",id:"#295",t:"Find Median from Data Stream — 双堆",k:"295 median data stream 双堆 中位数",x:"add O(log n) · find O(1)",code:
+`import heapq
+class MedianFinder:
+    def __init__(self):
+        self.small = []  # 大顶堆(存负数):较小一半
+        self.large = []  # 小顶堆:较大一半
+    def addNum(self, num):
+        heapq.heappush(self.small, -num)
+        heapq.heappush(self.large, -heapq.heappop(self.small))
+        if len(self.large) > len(self.small):
+            heapq.heappush(self.small, -heapq.heappop(self.large))
+    def findMedian(self):
+        if len(self.small) > len(self.large):
+            return -self.small[0]
+        return (-self.small[0] + self.large[0]) / 2`},
+
+/* ===== DFS/岛屿 ===== */
+{c:"dfs",id:"#200",t:"Number of Islands",k:"200 number of islands 岛屿数量 dfs",x:"O(m·n) · O(m·n)",code:
+`class Solution:
+    def numIslands(self, grid):
+        if not grid: return 0
+        m, n = len(grid), len(grid[0]); seen = set()
+        def dfs(i, j):
+            if i<0 or i>=m or j<0 or j>=n or grid[i][j]=='0' or (i,j) in seen:
+                return
+            seen.add((i, j))                 # 永久标记,不回溯
+            for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                dfs(i + dx, j + dy)
+        count = 0
+        for i in range(m):
+            for j in range(n):
+                if grid[i][j]=='1' and (i,j) not in seen:
+                    dfs(i, j); count += 1
+        return count`},
+{c:"dfs",id:"#1254",t:"Closed Islands (0=陆地,1=水)",k:"1254 closed islands 闭合岛屿 dfs flag",a:"flag is_closed 碰边界翻 False;DFS 走完整个岛不提前 return。",x:"O(m·n) · O(m·n)",code:
+`class Solution:
+    def closedIsland(self, grid):
+        m, n = len(grid), len(grid[0]); seen = set(); is_closed = True
+        def dfs(i, j):
+            nonlocal is_closed
+            if i<0 or i>=m or j<0 or j>=n or grid[i][j]==1 or (i,j) in seen:
+                return
+            seen.add((i, j))
+            if i==0 or i==m-1 or j==0 or j==n-1:
+                is_closed = False            # 碰边界
+            for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                dfs(i + dx, j + dy)
+        count = 0
+        for i in range(m):
+            for j in range(n):
+                if grid[i][j]==0 and (i,j) not in seen:
+                    is_closed = True; dfs(i, j)
+                    if is_closed: count += 1
+        return count`},
+{c:"dfs",id:"#695",t:"Max Area of Island — DFS 返回面积",k:"695 max area island 面积 dfs 返回值",x:"O(m·n) · O(m·n)",code:
+`class Solution:
+    def maxAreaOfIsland(self, grid):
+        m, n = len(grid), len(grid[0]); seen = set()
+        def dfs(i, j):
+            if i<0 or i>=m or j<0 or j>=n or grid[i][j]==0 or (i,j) in seen:
+                return 0                     # 不贡献面积
+            seen.add((i, j))
+            area = 1                         # 自己 1 个
+            for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                area += dfs(i + dx, j + dy)  # 加四方向
+            return area
+        return max((dfs(i, j) for i in range(m) for j in range(n)), default=0)`},
+{c:"dfs",id:"#79",t:"Word Search — 路径回溯",k:"79 word search 单词搜索 回溯 dfs",a:"seen add→remove 回溯;found 初始 False;返回值要接住。",x:"O(m·n·3^L) · O(L)",code:
+`class Solution:
+    def exist(self, grid, word):
+        m, n = len(grid), len(grid[0]); seen = set()
+        def dfs(i, j, cnt):
+            if cnt == len(word): return True # 先判!在越界前
+            if (i<0 or i>=m or j<0 or j>=n
+                    or (i,j) in seen or grid[i][j] != word[cnt]):
+                return False
+            seen.add((i, j)); found = False
+            for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                if dfs(i+dx, j+dy, cnt+1):
+                    found = True; break
+            seen.remove((i, j))              # 回溯
+            return found
+        for i in range(m):
+            for j in range(n):
+                if dfs(i, j, 0): return True
+        return False`},
+{c:"dfs",id:"#489",t:"Robot Room Cleaner — puzzle 回溯",k:"489 robot room cleaner 机器人 回溯 puzzle 相对坐标",a:"相对坐标(0,0);方向顺时针配 turnRight;go_back物理复位;循环末尾 turnRight 同步朝向。",x:"O(N-M) · O(N-M)",code:
+`class Solution:
+    def cleanRoom(self, robot):
+        dirs = [(-1,0),(0,1),(1,0),(0,-1)]   # 顺时针配 turnRight
+        visited = set()
+        def go_back():                       # 物理复位,方向不变
+            robot.turnRight(); robot.turnRight()
+            robot.move()
+            robot.turnRight(); robot.turnRight()
+        def bt(r, c, d):
+            visited.add((r, c)); robot.clean()
+            for i in range(4):
+                nd = (d + i) % 4
+                dx, dy = dirs[nd]
+                nr, nc = r + dx, c + dy
+                if (nr, nc) not in visited and robot.move():
+                    bt(nr, nc, nd); go_back()
+                robot.turnRight()            # ★ 同步物理朝向
+        bt(0, 0, 0)`},
+{c:"dfs",id:"#366",t:"Find Leaves of Binary Tree — 后序",k:"366 find leaves 树 后序 高度分层",x:"O(n) · O(h)",code:
+`import collections
+class Solution:
+    def findLeaves(self, root):
+        res = collections.defaultdict(list)
+        def height(node):
+            if not node: return -1
+            h = 1 + max(height(node.left), height(node.right))
+            res[h].append(node.val)          # 按高度分组
+            return h
+        height(root)
+        return [res[i] for i in range(max(res) + 1)]`},
+
+/* ===== BFS/图 ===== */
+{c:"bfs",id:"#743",t:"Network Delay — Dijkstra 模板",k:"743 network delay dijkstra 最短路 图",x:"O(E log V) · O(V+E)",code:
+`import heapq, collections
+class Solution:
+    def networkDelayTime(self, times, n, k):
+        graph = collections.defaultdict(list)
+        for u, v, w in times:
+            graph[u].append((v, w))
+        dist = {}; heap = [(0, k)]
+        while heap:
+            d, node = heapq.heappop(heap)
+            if node in dist: continue        # 第一次弹出即最短
+            dist[node] = d
+            for nei, w in graph[node]:
+                if nei not in dist:
+                    heapq.heappush(heap, (d + w, nei))
+        return max(dist.values()) if len(dist) == n else -1`},
+{c:"bfs",id:"#1631",t:"Path Min Effort — 最小化最大(瓶颈)",k:"1631 path minimum effort dijkstra 最小化最大 瓶颈",a:"COMBINE=max(瓶颈,相邻差);min-heap。",x:"O(mn log mn) · O(mn)",code:
+`import heapq
+class Solution:
+    def minimumEffortPath(self, heights):
+        m, n = len(heights), len(heights[0])
+        effort = [[float('inf')] * n for _ in range(m)]
+        effort[0][0] = 0; heap = [(0, 0, 0)]
+        while heap:
+            e, x, y = heapq.heappop(heap)
+            if x == m-1 and y == n-1: return e
+            if e > effort[x][y]: continue
+            for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < m and 0 <= ny < n:
+                    ne = max(e, abs(heights[nx][ny] - heights[x][y]))
+                    if ne < effort[nx][ny]:
+                        effort[nx][ny] = ne
+                        heapq.heappush(heap, (ne, nx, ny))`},
+{c:"bfs",id:"#2258",t:"Escape Fire — 多源BFS + 二分",k:"2258 escape fire 逃火灾 多源bfs 二分 网格",a:"多源BFS算火时间→二分等待→BFS验证(终点≥放宽一格)。",x:"O(mn log mn) · O(mn)",code:
+`from math import inf
+from collections import deque
+class Solution:
+    def maximumMinutes(self, grid):
+        m, n = len(grid), len(grid[0])
+        DIRS = [(0,1),(0,-1),(1,0),(-1,0)]
+        fire = [[inf] * n for _ in range(m)]; q = deque()
+        for i in range(m):                   # ① 多源BFS算火时间
+            for j in range(n):
+                if grid[i][j] == 1:
+                    fire[i][j] = 0; q.append((i, j))
+        while q:
+            x, y = q.popleft()
+            for dx, dy in DIRS:
+                nx, ny = x+dx, y+dy
+                if 0<=nx<m and 0<=ny<n and grid[nx][ny]==0 and fire[nx][ny]==inf:
+                    fire[nx][ny] = fire[x][y] + 1; q.append((nx, ny))
+        def can(wait):                       # ② 验证等wait能否到终点
+            if fire[0][0] <= wait: return False
+            seen = {(0,0)}; q = deque([(0, 0, wait)])
+            while q:
+                x, y, t = q.popleft()
+                for dx, dy in DIRS:
+                    nx, ny = x+dx, y+dy
+                    if 0<=nx<m and 0<=ny<n and grid[nx][ny]!=2 and (nx,ny) not in seen:
+                        nt = t + 1
+                        if nx==m-1 and ny==n-1:
+                            if fire[nx][ny] >= nt: return True  # 终点放宽
+                        elif fire[nx][ny] > nt:
+                            seen.add((nx,ny)); q.append((nx,ny,nt))
+            return False
+        lo, hi, ans = 0, m*n, -1             # ③ 二分等待时间
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if can(mid): ans = mid; lo = mid + 1
+            else: hi = mid - 1
+        return 10**9 if ans == m*n else ans`},
+{c:"bfs",id:"#2101",t:"Detonate Bombs — 有向图 BFS",k:"2101 detonate bombs 引爆炸弹 有向图 bfs",a:"有向图(i炸到j:dx²+dy²≤ri²);每点BFS数可达取max。",x:"O(n³) · O(n²)",code:
+`import collections
+class Solution:
+    def maximumDetonation(self, bombs):
+        n = len(bombs)
+        graph = collections.defaultdict(list)
+        for i in range(n):                   # 建有向图
+            xi, yi, ri = bombs[i]
+            for j in range(n):
+                if i != j:
+                    xj, yj, _ = bombs[j]
+                    if (xi-xj)**2 + (yi-yj)**2 <= ri*ri:  # 距离平方
+                        graph[i].append(j)
+        def bfs(start):
+            seen = {start}; queue = collections.deque([start])
+            while queue:
+                node = queue.popleft()
+                for nei in graph[node]:
+                    if nei not in seen:
+                        seen.add(nei); queue.append(nei)
+            return len(seen)
+        return max(bfs(i) for i in range(n))`},
+{c:"bfs",id:"#2115",t:"Find All Recipes — 拓扑排序 (Kahn)",k:"2115 recipes 拓扑排序 kahn 依赖",a:"supplies入度0先入队;recipe入度=配料数;料齐则解锁。",x:"O(V+E) · O(V+E)",code:
+`from collections import defaultdict, deque
+class Solution:
+    def findAllRecipes(self, recipes, ingredients, supplies):
+        graph = defaultdict(list); indeg = defaultdict(int)
+        for i, r in enumerate(recipes):      # 建图
+            for ing in ingredients[i]:
+                graph[ing].append(r); indeg[r] += 1
+        queue = deque(supplies); res = []    # supplies入度0先入队
+        while queue:
+            item = queue.popleft()
+            for r in graph[item]:
+                indeg[r] -= 1
+                if indeg[r] == 0:            # 料齐→解锁
+                    res.append(r); queue.append(r)
+        return res`},
+{c:"bfs",id:"#332",t:"Reconstruct Itinerary — 欧拉路径",k:"332 reconstruct itinerary 欧拉路径 hierholzer 行程",a:"Hierholzer:排序+DFS走到底+后序反转。",x:"O(E log E) · O(E)",code:
+`from collections import defaultdict
+class Solution:
+    def findItinerary(self, tickets):
+        graph = defaultdict(list)
+        for src, dst in sorted(tickets, reverse=True):
+            graph[src].append(dst)           # 反序,pop()取最小
+        stack = ["JFK"]; res = []
+        while stack:
+            while graph[stack[-1]]:
+                stack.append(graph[stack[-1]].pop())
+            res.append(stack.pop())          # 后序
+        return res[::-1]                     # 反转`},
+
+/* ===== Trie ===== */
+{c:"trie",id:"#208",t:"Implement Trie",k:"208 trie 字典树 实现",x:"insert/search O(L) · O(总字符)",code:
+`class Trie:
+    def __init__(self):
+        self.root = {}
+    def insert(self, word):
+        node = self.root
+        for ch in word:
+            node = node.setdefault(ch, {})
+        node['#'] = True                     # 结尾标记
+    def search(self, word):
+        node = self._find(word)
+        return node is not None and '#' in node
+    def startsWith(self, prefix):
+        return self._find(prefix) is not None
+    def _find(self, s):
+        node = self.root
+        for ch in s:
+            if ch not in node: return None
+            node = node[ch]
+        return node`},
+{c:"trie",id:"#212",t:"Word Search II — Trie + DFS",k:"212 word search ii trie dfs 多词 网格",a:"所有词建Trie('#'存整词),只扫一遍board,沿Trie走+剪枝。",x:"O(m·n·3^L) · O(总字符)",code:
+`class Solution:
+    def findWords(self, board, words):
+        trie = {}
+        for w in words:                      # 建 Trie
+            node = trie
+            for ch in w:
+                node = node.setdefault(ch, {})
+            node['#'] = w                     # 存整词
+        m, n = len(board), len(board[0]); res = []
+        def dfs(i, j, node):
+            ch = board[i][j]
+            if ch not in node: return        # 剪枝
+            nxt = node[ch]
+            if '#' in nxt:
+                res.append(nxt['#']); del nxt['#']  # 防重复
+            board[i][j] = '#'
+            for di, dj in [(0,1),(0,-1),(1,0),(-1,0)]:
+                ni, nj = i+di, j+dj
+                if 0<=ni<m and 0<=nj<n and board[ni][nj] != '#':
+                    dfs(ni, nj, nxt)
+            board[i][j] = ch                 # 回溯
+        for i in range(m):
+            for j in range(n):
+                dfs(i, j, trie)
+        return res`},
+
+/* ===== 树/BST ===== */
+{c:"tree",id:"#236",t:"LCA — 最近公共祖先",k:"236 lca lowest common ancestor 公共祖先 树",x:"O(n) · O(h)",code:
+`class Solution:
+    def lowestCommonAncestor(self, root, p, q):
+        if not root or root == p or root == q:
+            return root
+        L = self.lowestCommonAncestor(root.left, p, q)
+        R = self.lowestCommonAncestor(root.right, p, q)
+        if L and R: return root              # 分居两侧→LCA
+        return L or R`},
+{c:"tree",id:"#450",t:"Delete Node in BST",k:"450 delete node bst 删除 二叉搜索树",a:"无孩子删;一孩子顶替;两孩子用中序后继(右子树最小)替换再删后继。",x:"O(h) · O(h)",code:
+`class Solution:
+    def deleteNode(self, root, key):
+        if not root: return None
+        if key < root.val:
+            root.left = self.deleteNode(root.left, key)
+        elif key > root.val:
+            root.right = self.deleteNode(root.right, key)
+        else:
+            if not root.left: return root.right
+            if not root.right: return root.left
+            succ = root.right                # 中序后继=右子树最小
+            while succ.left:
+                succ = succ.left
+            root.val = succ.val
+            root.right = self.deleteNode(root.right, succ.val)
+        return root`},
+{c:"tree",id:"#98",t:"Validate BST — 传上下界",k:"98 validate bst 验证 二叉搜索树",x:"O(n) · O(h)",code:
+`class Solution:
+    def isValidBST(self, root):
+        def valid(node, low, high):
+            if not node: return True
+            if not (low < node.val < high):
+                return False
+            return (valid(node.left, low, node.val) and
+                    valid(node.right, node.val, high))
+        return valid(root, float('-inf'), float('inf'))`},
+{c:"tree",id:"#230",t:"Kth Smallest in BST — 中序迭代",k:"230 kth smallest bst 第k小 中序",x:"O(h+k) · O(h)",code:
+`class Solution:
+    def kthSmallest(self, root, k):
+        stack, node = [], root
+        while node or stack:
+            while node:                      # 一路向左
+                stack.append(node); node = node.left
+            node = stack.pop()               # 中序下一个
+            k -= 1
+            if k == 0: return node.val
+            node = node.right`},
+{c:"tree",id:"#1522",t:"Diameter of N-Ary Tree — 后序",k:"1522 diameter n-ary tree 直径 后序",a:"每点算最深两条子链之和更新全局,返回单边最深。",x:"O(n) · O(h)",code:
+`class Solution:
+    def diameter(self, root):
+        self.ans = 0
+        def depth(node):
+            top1 = top2 = 0                  # 最深/次深子链
+            for ch in node.children:
+                d = depth(ch) + 1
+                if d > top1: top1, top2 = d, top1
+                elif d > top2: top2 = d
+            self.ans = max(self.ans, top1 + top2)  # 过node最长
+            return top1                      # 向上带单边
+        depth(root)
+        return self.ans`},
+
+/* ===== 二分 ===== */
+{c:"binary-search",id:"#704",t:"Binary Search — 模板",k:"704 binary search 二分查找 模板",x:"O(log n) · O(1)",code:
+`class Solution:
+    def search(self, nums, target):
+        lo, hi = 0, len(nums) - 1            # 闭区间
+        while lo <= hi:                      # <=
+            mid = (lo + hi) // 2
+            if nums[mid] == target:
+                return mid
+            elif nums[mid] < target:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        return -1`},
+{c:"binary-search",id:"#34",t:"Find First and Last Position — 找边界",k:"34 find first last position 二分 边界 lower bound",x:"O(log n) · O(1)",code:
+`class Solution:
+    def searchRange(self, nums, target):
+        def lower_bound(t):                  # 第一个 >= t 的位置
+            lo, hi = 0, len(nums)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if nums[mid] < t: lo = mid + 1
+                else: hi = mid
+            return lo
+        left = lower_bound(target)
+        if left == len(nums) or nums[left] != target:
+            return [-1, -1]
+        return [left, lower_bound(target + 1) - 1]`},
+{c:"binary-search",id:"模板",t:"二分答案模板 (如 #2258 / #1631)",k:"二分答案 binary search answer 最大化可行",x:"O(log(范围)·验证)",code:
+`lo, hi, ans = 0, MAX, -1
+while lo <= hi:
+    mid = (lo + hi) // 2
+    if can(mid):                             # 可行
+        ans = mid; lo = mid + 1              # 试更大
+    else:
+        hi = mid - 1
+return ans`},
+
+/* ===== OOP设计 ===== */
+{c:"design",id:"#146",t:"LRU Cache — O(1)",k:"146 lru cache 设计 ordereddict",x:"每操作 O(1) · O(capacity)",code:
+`from collections import OrderedDict
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.cache = OrderedDict()
+    def get(self, key):
+        if key not in self.cache: return -1
+        self.cache.move_to_end(key)
+        return self.cache[key]
+    def put(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.cap:
+            self.cache.popitem(last=False)   # 弹首=最久未用`},
+{c:"design",id:"#460",t:"LFU Cache — O(1)",k:"460 lfu cache 设计 频率 ordereddict",a:"三件套(val/freq/freq→keys)+min_freq主动维护+OrderedDict当LRU平局。",x:"每操作 O(1) · O(capacity)",code:
+`from collections import OrderedDict, defaultdict
+class LFUCache:
+    def __init__(self, capacity):
+        self.cap = capacity; self.min_freq = 0
+        self.key_to_val = {}; self.key_to_freq = {}
+        self.freq_to_keys = defaultdict(OrderedDict)
+    def _touch(self, key):
+        f = self.key_to_freq[key]
+        del self.freq_to_keys[f][key]
+        if not self.freq_to_keys[f] and f == self.min_freq:
+            self.min_freq += 1
+        self.key_to_freq[key] = f + 1
+        self.freq_to_keys[f + 1][key] = None
+    def get(self, key):
+        if key not in self.key_to_val: return -1
+        self._touch(key)
+        return self.key_to_val[key]
+    def put(self, key, value):
+        if self.cap == 0: return
+        if key in self.key_to_val:
+            self.key_to_val[key] = value; self._touch(key); return
+        if len(self.key_to_val) >= self.cap:
+            ev, _ = self.freq_to_keys[self.min_freq].popitem(last=False)
+            del self.key_to_val[ev]; del self.key_to_freq[ev]
+        self.key_to_val[key] = value
+        self.key_to_freq[key] = 1
+        self.freq_to_keys[1][key] = None
+        self.min_freq = 1`},
+{c:"design",id:"#588",t:"In-Memory File System",k:"588 file system 文件系统 嵌套dict 设计",x:"ls O(路径+k log k) · O(总内容)",code:
+`class FileSystem:
+    def __init__(self):
+        self.root = {}
+    def _walk(self, path):
+        node = self.root
+        if path == '/': return node
+        for part in path.split('/')[1:]:
+            node = node.setdefault(part, {})
+        return node
+    def ls(self, path):
+        node = self._walk(path)
+        if isinstance(node, str):            # 文件
+            return [path.split('/')[-1]]
+        return sorted(node.keys())
+    def mkdir(self, path):
+        self._walk(path)
+    def addContentToFile(self, filePath, content):
+        parts = filePath.split('/'); name = parts[-1]
+        node = self._walk('/'.join(parts[:-1]) or '/')
+        node[name] = node.get(name, '') + content
+    def readContentFromFile(self, filePath):
+        return self._walk(filePath)`},
+{c:"design",id:"OOP",t:"继承 + 多态 (File/Folder) ★",k:"oop 继承 多态 inheritance polymorphism entity file folder",a:"面试官想看:封装/继承(super)/多态(同名不同实现)/抽象(NotImplementedError)。",x:"get_size O(子树) · O(深度)",code:
+`class Entity:                          # 父类
+    def __init__(self, name):
+        self.name = name
+    def get_size(self):
+        raise NotImplementedError      # 抽象:子类必须实现
+class File(Entity):                    # 继承
+    def __init__(self, name, size):
+        super().__init__(name)         # 调父类构造
+        self.size = size
+    def get_size(self):                # 多态:文件直接返回
+        return self.size
+class Folder(Entity):                  # 继承
+    def __init__(self, name):
+        super().__init__(name)
+        self.children = []
+    def get_size(self):                # 多态:文件夹递归求和
+        return sum(c.get_size() for c in self.children)`},
+{c:"design",id:"#2296",t:"Design Text Editor — 双栈夹光标",k:"2296 text editor 文本编辑器 双栈 光标 设计",x:"各操作 O(k) · O(总字符)",code:
+`class TextEditor:
+    def __init__(self):
+        self.left = []; self.right = []
+    def addText(self, text):
+        for ch in text:
+            self.left.append(ch)
+    def deleteText(self, k):
+        cnt = min(k, len(self.left))
+        for _ in range(cnt):
+            self.left.pop()
+        return cnt
+    def cursorLeft(self, k):
+        cnt = min(k, len(self.left))
+        for _ in range(cnt):
+            self.right.append(self.left.pop())
+        return ''.join(self.left[-10:])
+    def cursorRight(self, k):
+        cnt = min(k, len(self.right))
+        for _ in range(cnt):
+            self.left.append(self.right.pop())
+        return ''.join(self.left[-10:])`},
+{c:"design",id:"#251",t:"Flatten 2D Vector — 迭代器",k:"251 flatten 2d vector 迭代器 iterator 设计",a:"(row,col)双指针+_advance()跳空行;next/hasNext都先_advance。",x:"均摊 O(1) · O(1)",code:
+`class Vector2D:
+    def __init__(self, vec):
+        self.vec = vec; self.row = 0; self.col = 0
+    def _advance(self):                  # 跳过空行/读完的行
+        while self.row < len(self.vec) and self.col == len(self.vec[self.row]):
+            self.row += 1; self.col = 0
+    def next(self):
+        self._advance()
+        v = self.vec[self.row][self.col]; self.col += 1
+        return v
+    def hasNext(self):
+        self._advance()
+        return self.row < len(self.vec)`},
+
+/* ===== 线段树/BIT ===== */
+{c:"segment-tree",id:"#307",t:"Range Sum Query Mutable — 线段树",k:"307 range sum query mutable 线段树 segment tree 区间和",x:"update/query O(log n) · O(n)",code:
+`class NumArray:
+    def __init__(self, nums):
+        self.n = len(nums)
+        self.tree = [0] * (2 * self.n)   # [n,2n)叶子
+        for i in range(self.n):
+            self.tree[self.n + i] = nums[i]
+        for i in range(self.n - 1, 0, -1):  # 自底向上建
+            self.tree[i] = self.tree[2*i] + self.tree[2*i+1]
+    def update(self, index, val):
+        i = index + self.n; self.tree[i] = val
+        while i > 1:                     # 向上更新
+            i //= 2
+            self.tree[i] = self.tree[2*i] + self.tree[2*i+1]
+    def sumRange(self, left, right):
+        l, r = left + self.n, right + 1 + self.n  # 含两端→半开
+        res = 0
+        while l < r:
+            if l & 1: res += self.tree[l]; l += 1
+            if r & 1: r -= 1; res += self.tree[r]
+            l //= 2; r //= 2
+        return res`},
+{c:"segment-tree",id:"BIT",t:"树状数组 BIT — 求和更简洁",k:"bit 树状数组 fenwick binary indexed tree lowbit",x:"update/query O(log n) · O(n)",code:
+`class BIT:
+    def __init__(self, n):
+        self.n = n
+        self.tree = [0] * (n + 1)        # 1-indexed
+    def update(self, i, delta):
+        while i <= self.n:
+            self.tree[i] += delta
+            i += i & (-i)                # lowbit 跳下一个
+    def query(self, i):                  # 前缀和 [1,i]
+        s = 0
+        while i > 0:
+            s += self.tree[i]
+            i -= i & (-i)
+        return s`},
+{c:"segment-tree",id:"#315",t:"Count of Smaller After Self — BIT",k:"315 count smaller after self 逆序对 bit 树状数组",a:"离散化+从右往左,query(rank-1)=右边比它小的个数,再update(rank)。",x:"O(n log n) · O(n)",code:
+`class Solution:
+    def countSmaller(self, nums):
+        rank = {v: i+1 for i, v in enumerate(sorted(set(nums)))}
+        n = len(rank); tree = [0] * (n + 1); res = []
+        def upd(i):
+            while i <= n:
+                tree[i] += 1; i += i & (-i)
+        def qry(i):
+            s = 0
+            while i > 0:
+                s += tree[i]; i -= i & (-i)
+            return s
+        for x in reversed(nums):             # 从右往左
+            r = rank[x]
+            res.append(qry(r - 1))           # 右边比它小的个数
+            upd(r)
+        return res[::-1]`},
+
+/* ===== 贪心/模拟 ===== */
+{c:"greedy",id:"#1247",t:"Min Swaps Strings Equal — 贪心配对",k:"1247 min swaps strings equal 贪心 配对",a:"同类配对1次,跨类配对2次,总数奇则-1。",x:"O(n) · O(1)",code:
+`class Solution:
+    def minimumSwap(self, s1, s2):
+        xy = yx = 0
+        for a, b in zip(s1, s2):
+            if a == 'x' and b == 'y': xy += 1
+            elif a == 'y' and b == 'x': yx += 1
+        if (xy + yx) % 2 == 1:               # 总奇→无解
+            return -1
+        return xy // 2 + yx // 2 + (xy % 2) * 2  # 同类1次,跨类2次`},
+{c:"greedy",id:"#289",t:"Game of Life — 原地模拟 (bit编码)",k:"289 game of life 生命游戏 原地 模拟 bit",a:"bit0存旧、bit1存新;第一遍|=2写新,第二遍>>=1移下来。",x:"O(m·n) · O(1)",code:
+`class Solution:
+    def gameOfLife(self, board):
+        m, n = len(board), len(board[0])
+        DIRS = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
+        for i in range(m):                   # ① 新状态写到 bit1
+            for j in range(n):
+                live = 0
+                for dx, dy in DIRS:
+                    ni, nj = i + dx, j + dy
+                    if 0<=ni<m and 0<=nj<n and (board[ni][nj] & 1) == 1:
+                        live += 1            # 读旧值 bit0
+                if board[i][j] & 1:
+                    if live == 2 or live == 3:
+                        board[i][j] |= 2     # 保持活
+                elif live == 3:
+                    board[i][j] |= 2         # 复活
+        for i in range(m):                   # ② 右移取新值
+            for j in range(n):
+                board[i][j] >>= 1`},
+{c:"greedy",id:"#3439",t:"Reschedule Meetings — 问题转化(滑窗)",k:"3439 reschedule meetings 滑动窗口 转化",a:"移k个会议=合并k+1段相邻空隙=定长滑窗最大和。",x:"O(n) · O(n)",code:
+`class Solution:
+    def maxFreeTime(self, eventTime, k, startTime, endTime):
+        n = len(startTime)
+        gaps = [startTime[0]]                # 开头空隙
+        for i in range(1, n):
+            gaps.append(startTime[i] - endTime[i-1])  # 中间
+        gaps.append(eventTime - endTime[-1]) # 结尾
+        window = k + 1                       # 移k个=合并k+1段缝
+        cur = sum(gaps[:window]); best = cur
+        for i in range(window, len(gaps)):
+            cur += gaps[i] - gaps[i - window]  # 滑窗
+            best = max(best, cur)
+        return best`},
+];
+
+// ===== 渲染 =====
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const KW = /\b(class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|break|continue|lambda|del|nonlocal|with|as|yield|raise)\b/g;
+function highlight(code){
+  let h = escapeHtml(code);
+  // comments
+  h = h.replace(/(#[^\n]*)/g, '<span class="cm">$1</span>');
+  // keywords (skip inside comment spans — simple approach: only outside existing spans)
+  h = h.replace(/(<span class="cm">[^<]*<\/span>)|(\b(?:class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|break|continue|lambda|del|nonlocal|with|as|yield|raise)\b)/g,
+    (m, cmt, kw) => cmt ? cmt : '<span class="kw">'+kw+'</span>');
+  return h;
+}
+
+const catMap = {}; CATS.forEach(c => catMap[c.id] = c);
+const counts = {}; P.forEach(p => counts[p.c] = (counts[p.c]||0)+1);
+
+// tag bar
+const tagbar = document.getElementById('tagbar');
+let tags = '<button class="tag active" data-cat="all">全部 <span class="cnt">'+P.length+'</span></button>';
+CATS.forEach(c => {
+  tags += '<button class="tag" data-cat="'+c.id+'">'+c.name+' <span class="cnt">'+(counts[c.id]||0)+'</span></button>';
+});
+tagbar.innerHTML = tags;
+
+function renderProblem(p){
+  let h = '<div class="problem">';
+  h += '<div class="prob-head"><span class="prob-id">'+p.id+'</span> '+escapeHtml(p.t)+' <span class="cat-badge">'+catMap[p.c].name+'</span></div>';
+  if(p.a) h += '<div class="prob-approach">'+p.a.replace(/</g,'&lt;')+'</div>';
+  h += '<pre>'+highlight(p.code)+'</pre>';
+  h += '<div class="prob-cx">'+p.x.replace(/</g,'&lt;')+'</div>';
+  h += '</div>';
+  return h;
+}
+
+const content = document.getElementById('content');
+let curCat = 'all', curSearch = '';
+
+function render(){
+  let list = P;
+  if(curCat !== 'all') list = list.filter(p => p.c === curCat);
+  if(curSearch){
+    const q = curSearch.toLowerCase();
+    list = list.filter(p => (p.k + ' ' + p.t + ' ' + p.id).toLowerCase().includes(q));
+  }
+  if(list.length === 0){ content.innerHTML = '<div class="no-result">😶 没找到匹配的题,换个关键词试试</div>'; return; }
+  let html = '';
+  // group by category for display
+  const groups = {};
+  list.forEach(p => { (groups[p.c] = groups[p.c] || []).push(p); });
+  CATS.forEach(c => {
+    if(!groups[c.id]) return;
+    html += '<div class="cat-heading">'+c.name+'</div>';
+    html += '<div class="cat-note">'+c.note.replace(/</g,'&lt;')+'</div>';
+    groups[c.id].forEach(p => { html += renderProblem(p); });
+  });
+  content.innerHTML = html;
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// tag click
+tagbar.addEventListener('click', e => {
+  const btn = e.target.closest('.tag');
+  if(!btn) return;
+  document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  curCat = btn.dataset.cat;
+  render();
+});
+
+// search
+document.getElementById('search').addEventListener('input', e => {
+  curSearch = e.target.value.trim();
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
