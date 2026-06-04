@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🅖 Google 真题刷题库 · hellointerview</title>
+<meta name="description" content="hellointerview 真实 Google CODING 题 152 道,按 report 频率排序,分类 + 中英 + 完整代码 + 复杂度 + follow-up">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  background: #0f172a; color: #e2e8f0; line-height: 1.55; }
+a { color: inherit; text-decoration: none; }
+
+/* layout */
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 230px; background: #111a2e; border-right: 1px solid #1e293b;
+  position: fixed; top: 0; bottom: 0; left: 0; overflow-y: auto; padding: 16px 0; z-index: 50; }
+.main { margin-left: 230px; flex: 1; padding: 20px 26px 60px; max-width: 920px; }
+
+/* sidebar */
+.brand { font-size: 15px; font-weight: 700; padding: 0 18px 12px; color: #f1f5f9; }
+.brand small { display:block; font-size: 10.5px; color:#64748b; font-weight: 400; margin-top: 2px; }
+.side-search { margin: 0 12px 12px; }
+.side-search input { width: 100%; padding: 8px 12px; font-size: 13px; background: #1e293b;
+  border: 1px solid #334155; border-radius: 8px; color: #f1f5f9; outline: none; }
+.side-search input:focus { border-color: #6366f1; }
+.cat-item { display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 18px; font-size: 13.5px; cursor: pointer; color: #cbd5e1; border-left: 3px solid transparent; }
+.cat-item:hover { background: #1e293b; }
+.cat-item.active { background: #1e293b; border-left-color: #6366f1; color: #fff; font-weight: 600; }
+.cat-item .n { font-size: 11px; color: #64748b; background:#0f172a; padding: 1px 7px; border-radius: 10px; }
+.cat-item.active .n { color:#a5b4fc; }
+
+/* main */
+.page-title { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+.page-sub { font-size: 12.5px; color: #94a3b8; margin-bottom: 16px; }
+.overview { background: rgba(99,102,241,0.1); border-left: 3px solid #6366f1;
+  padding: 10px 14px; font-size: 13px; color: #cbd5e1; border-radius: 0 6px 6px 0; margin-bottom: 18px; }
+
+/* question list */
+.qcard { background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s; }
+.qcard:hover { border-color: #6366f1; }
+.qcard .row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rep { font-size: 11px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#f59e0b,#ef4444);
+  padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.rep.low { background: #334155; color: #94a3b8; }
+.qtitle { font-size: 14px; font-weight: 600; color: #f1f5f9; }
+.qcn { font-size: 12.5px; color: #94a3b8; }
+.diff { font-size: 10px; color: #64748b; }
+.has-sol { font-size: 10px; color: #34d399; }
+.no-sol { font-size: 10px; color: #fbbf24; }
+
+/* detail */
+.back { font-size: 13px; color: #60a5fa; cursor: pointer; margin-bottom: 14px; display: inline-block; }
+.detail-title { font-size: 19px; font-weight: 700; color: #f1f5f9; }
+.detail-cn { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.badge { font-size: 11px; padding: 2px 9px; border-radius: 10px; background: #1e293b; border: 1px solid #334155; color: #cbd5e1; }
+.sec-h { font-size: 13px; font-weight: 700; color: #a5b4fc; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.desc-box { background:#1e293b; border:1px solid #334155; border-radius:8px; padding:10px 14px; font-size:13px; color:#cbd5e1; }
+.approach-box { background: rgba(52,211,153,0.08); border-left:3px solid #34d399; padding:8px 12px; font-size:13px; color:#cbd5e1; border-radius:0 6px 6px 0; }
+.fu-box { background: rgba(251,191,36,0.08); border-left:3px solid #f59e0b; padding:8px 12px; font-size:13px; color:#cbd5e1; border-radius:0 6px 6px 0; }
+.cx { font-size:12.5px; color:#fbbf24; font-weight:600; background:rgba(251,191,36,0.1); padding:4px 12px; border-radius:6px; display:inline-block; margin: 2px 0; }
+pre { background:#0b1120; color:#e2e8f0; padding:14px 16px; border-radius:8px; overflow-x:auto;
+  font-size:13px; line-height:1.55; font-family:"SF Mono",Menlo,Consolas,monospace; border:1px solid #1e293b; margin: 6px 0; }
+.kw { color:#f472b6; } .cm { color:#64748b; font-style:italic; }
+.pending { color:#fbbf24; font-size:13px; padding: 14px; background:#1e293b; border-radius:8px; border:1px dashed #475569; }
+
+/* mobile */
+.menu-btn { display:none; position:fixed; top:10px; left:10px; z-index:60; background:#6366f1; color:#fff;
+  border:none; padding:8px 12px; border-radius:8px; font-size:14px; cursor:pointer; }
+@media (max-width: 760px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.2s; width: 220px; }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; padding: 56px 16px 60px; }
+  .menu-btn { display: block; }
+}
+footer { color:#475569; font-size:11px; text-align:center; margin-top:30px; }
+footer a { color:#64748b; }
+</style>
+</head>
+<body>
+<button class="menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰ 分类</button>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">🅖 Google 真题库<small>hellointerview · 152 题 · 按 report 排序</small></div>
+    <div class="side-search"><input id="search" placeholder="🔍 搜题号/题名/中文" autocomplete="off"></div>
+    <div id="catlist"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<script src="gq-data.js"></script>
+<script>
+const GQ = window.GQ, CATS = window.CATS;
+// count per category
+const counts = {}; GQ.forEach(q => counts[q.cat] = (counts[q.cat]||0)+1);
+const catMap = {}; CATS.forEach(c => catMap[c.id]=c.name);
+// only show cats that have questions, ordered by CATS order
+const cats = CATS.filter(c => counts[c.id]);
+const totalSol = GQ.filter(q=>q.sol).length;
+
+// sidebar
+const catlist = document.getElementById('catlist');
+function renderSidebar(active){
+  let h = `<div class="cat-item ${active==='all'?'active':''}" data-cat="all">全部 <span class="n">${GQ.length}</span></div>`;
+  cats.forEach(c => {
+    h += `<div class="cat-item ${active===c.id?'active':''}" data-cat="${c.id}">${c.name} <span class="n">${counts[c.id]}</span></div>`;
+  });
+  catlist.innerHTML = h;
+}
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hl(code){
+  let h = esc(code);
+  h = h.replace(/(#[^\n]*)/g, '<span class="cm">$1</span>');
+  h = h.replace(/(<span class="cm">[^<]*<\/span>)|(\b(?:class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|break|continue|lambda|del|nonlocal|with|as|yield|raise|global)\b)/g,
+    (m,cmt,kw)=> cmt?cmt:'<span class="kw">'+kw+'</span>');
+  return h;
+}
+
+const main = document.getElementById('main');
+let curCat = 'all', curSearch = '';
+
+function repBadge(r){
+  return `<span class="rep ${r<2?'low':''}">🔥 ${r}</span>`;
+}
+
+function renderList(){
+  let list = GQ.slice();
+  if(curCat!=='all') list = list.filter(q=>q.cat===curCat);
+  if(curSearch){
+    const ql = curSearch.toLowerCase();
+    list = list.filter(q => (q.en+' '+q.cn+' '+(q.id||'')).toLowerCase().includes(ql));
+  }
+  list.sort((a,b)=> b.reports-a.reports || a.en.localeCompare(b.en));
+  const catName = curCat==='all' ? '全部题目' : catMap[curCat];
+  let h = `<div class="page-title">${catName} <span style="font-size:13px;color:#64748b">· ${list.length} 题</span></div>`;
+  h += `<div class="page-sub">数字=该题在 hellointerview 被报告的次数(频率)。共 ${GQ.length} 题,${totalSol} 题已配完整解答。</div>`;
+  if(curCat!=='all'){
+    h += `<div class="overview">📂 <b>${catName}</b> · 这一类共 ${counts[curCat]} 道真题。点任意题进入详情(中英题面 + 完整代码 + 复杂度 + follow-up)。建议从 🔥 高频往低刷。</div>`;
+  }
+  if(list.length===0){ h += '<div class="pending">没找到匹配的题。</div>'; main.innerHTML=h; return; }
+  list.forEach((q,i)=>{
+    const gi = GQ.indexOf(q);
+    h += `<div class="qcard" data-i="${gi}">
+      <div class="row1">${repBadge(q.reports)}<span class="qtitle">${esc(q.en)}</span><span class="qcn">${esc(q.cn)}</span></div>
+      <div style="margin-top:4px"><span class="diff">${esc(q.level||'')}</span> · <span class="badge" style="font-size:9px;padding:1px 6px">${catMap[q.cat]}</span> ${q.sol?'<span class="has-sol">✓ 有完整解答</span>':'<span class="no-sol">○ 解答整理中</span>'}</div>
+    </div>`;
+  });
+  main.innerHTML = h;
+  window.scrollTo(0,0);
+}
+
+function renderDetail(idx){
+  const q = GQ[idx];
+  let h = `<span class="back" onclick="goList()">← 返回列表</span>`;
+  h += `<div class="detail-title">${esc(q.en)}</div>`;
+  h += `<div class="detail-cn">${esc(q.cn)}</div>`;
+  h += `<div class="badges">${repBadge(q.reports)}<span class="badge">${catMap[q.cat]}</span><span class="badge">${esc(q.level||'')}</span><span class="badge">最近: ${esc(q.last||'')}</span></div>`;
+  // 题面
+  h += `<div class="sec-h">📋 题目 (EN)</div><div class="desc-box">${esc(q.desc||'(无描述)')}</div>`;
+  if(q.sol){
+    h += `<div class="sec-h">💡 思路</div><div class="approach-box">${esc(q.sol.ap)}</div>`;
+    h += `<div class="sec-h">💻 完整代码</div><pre>${hl(q.sol.code)}</pre>`;
+    h += `<div class="sec-h">⏱️ 复杂度</div><div><span class="cx">时间 ${esc(q.sol.t)}</span> &nbsp; <span class="cx">空间 ${esc(q.sol.s)}</span></div>`;
+    if(q.sol.fu) h += `<div class="sec-h">🔁 Follow-up</div><div class="fu-box">${esc(q.sol.fu)}</div>`;
+  } else {
+    h += `<div class="sec-h">💡 解答</div><div class="pending">○ 这道题的完整解答正在整理中。题面见上方;它属于「${catMap[q.cat]}」类,可参考同类已配解答的题目套路。</div>`;
+  }
+  main.innerHTML = h;
+  window.scrollTo(0,0);
+}
+
+function goList(){ location.hash = curCat==='all'?'':('cat='+curCat); renderList(); }
+
+// events
+catlist.addEventListener('click', e=>{
+  const it = e.target.closest('.cat-item'); if(!it) return;
+  curCat = it.dataset.cat; renderSidebar(curCat); renderList();
+  document.querySelector('.sidebar').classList.remove('open');
+});
+main.addEventListener('click', e=>{
+  const card = e.target.closest('.qcard'); if(!card) return;
+  renderDetail(parseInt(card.dataset.i));
+});
+document.getElementById('search').addEventListener('input', e=>{
+  curSearch = e.target.value.trim(); curCat = curCat==='all'?'all':curCat; renderList();
+});
+
+renderSidebar('all');
+renderList();
+</script>
+<footer>🅖 hellointerview Google 真题 · <a href="cram.html">← Cram Hub</a> · 数据抓取自 hellointerview.com community</footer>
+</body>
+</html>
