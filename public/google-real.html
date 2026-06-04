@@ -154,6 +154,7 @@ function renderList(){
 
 function renderDetail(idx){
   const q = GQ[idx];
+  location.hash = 'q=' + q.id;
   let h = `<span class="back" onclick="goList()">← 返回列表</span>`;
   h += `<div class="detail-title">${esc(q.en)}</div>`;
   h += `<div class="detail-cn">${esc(q.cn)}</div>`;
@@ -164,7 +165,17 @@ function renderDetail(idx){
     h += `<div class="sec-h">💡 思路</div><div class="approach-box">${esc(q.sol.ap)}</div>`;
     h += `<div class="sec-h">💻 完整代码</div><pre>${hl(q.sol.code)}</pre>`;
     h += `<div class="sec-h">⏱️ 复杂度</div><div><span class="cx">时间 ${esc(q.sol.t)}</span> &nbsp; <span class="cx">空间 ${esc(q.sol.s)}</span></div>`;
-    if(q.sol.fu) h += `<div class="sec-h">🔁 Follow-up</div><div class="fu-box">${esc(q.sol.fu)}</div>`;
+    const fus = q.sol.fus || [];
+    if(fus.length){
+      h += `<div class="sec-h">🔁 Follow-up · ${fus.length} 个 (每个都有代码)</div>`;
+      fus.forEach((f,fi)=>{
+        h += `<div class="fu-box"><b>Q${fi+1}: ${esc(f.q)}</b>${f.ap?'<br>'+esc(f.ap):''}</div>`;
+        if(f.code) h += `<pre>${hl(f.code)}</pre>`;
+        if(f.t||f.s) h += `<div style="margin-bottom:10px"><span class="cx">时间 ${esc(f.t||'-')}</span> &nbsp; <span class="cx">空间 ${esc(f.s||'-')}</span></div>`;
+      });
+    } else if(q.sol.fu){
+      h += `<div class="sec-h">🔁 Follow-up</div><div class="fu-box">${esc(q.sol.fu)}</div>`;
+    }
   } else {
     h += `<div class="sec-h">💡 解答</div><div class="pending">○ 这道题的完整解答正在整理中。题面见上方;它属于「${catMap[q.cat]}」类,可参考同类已配解答的题目套路。</div>`;
   }
@@ -188,8 +199,19 @@ document.getElementById('search').addEventListener('input', e=>{
   curSearch = e.target.value.trim(); curCat = curCat==='all'?'all':curCat; renderList();
 });
 
-renderSidebar('all');
-renderList();
+function initFromHash(){
+  const h = location.hash.slice(1);
+  if(h.startsWith('q=')){
+    const id = h.slice(2);
+    const idx = GQ.findIndex(q=>q.id===id);
+    if(idx>=0){ renderSidebar('all'); renderDetail(idx); return; }
+  }
+  if(h.startsWith('cat=')){
+    curCat = h.slice(4);
+  }
+  renderSidebar(curCat); renderList();
+}
+initFromHash();
 </script>
 <footer>🅖 hellointerview Google 真题 · <a href="cram.html">← Cram Hub</a> · 数据抓取自 hellointerview.com community</footer>
 </body>
