@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Google FDE Behavioral · 8 STAR Stories · Gao Xin</title>
+<meta name="description" content="8 polished STAR stories for Google FDE behavioral round — constraints, tradeoffs, specific numbers. Not '我很适合' platitudes.">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
+  line-height: 1.65;
+  min-height: 100vh;
+  padding: 0;
+}
+.container { max-width: 1180px; margin: 0 auto; padding: 24px 16px 60px; }
+
+/* ============== HERO ============== */
+header.hero {
+  text-align: center;
+  padding: 40px 22px 32px;
+  background: linear-gradient(135deg, #4285f4 0%, #9333ea 50%, #ec4899 100%);
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 20px 60px rgba(99, 102, 241, 0.35);
+}
+header.hero h1 {
+  font-size: 30px;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+header.hero .tagline {
+  font-size: 14px;
+  opacity: 0.95;
+  max-width: 720px;
+  margin: 0 auto;
+}
+header.hero .meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+header.hero .meta span {
+  background: rgba(0,0,0,0.28);
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============== STICKY TOC ============== */
+.toc {
+  position: sticky;
+  top: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 28px;
+  z-index: 50;
+}
+.toc h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px;
+}
+.toc a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #1e293b;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.toc a:hover { background: #334155; color: #fff; }
+.toc a .num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  width: 16px;
+}
+.toc a.s1 { border-left-color: #10b981; }
+.toc a.s2 { border-left-color: #f59e0b; }
+.toc a.s3 { border-left-color: #ef4444; }
+.toc a.s4 { border-left-color: #06b6d4; }
+.toc a.s5 { border-left-color: #ec4899; }
+.toc a.s6 { border-left-color: #8b5cf6; }
+.toc a.s7 { border-left-color: #14b8a6; }
+.toc a.s8 { border-left-color: #f97316; }
+
+/* ============== STORY CARD ============== */
+.story {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 26px 28px 28px;
+  margin-bottom: 26px;
+  scroll-margin-top: 140px;
+  position: relative;
+  overflow: hidden;
+}
+.story::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+.story.s1::before { background: linear-gradient(90deg, #10b981, #06b6d4); }
+.story.s2::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.story.s3::before { background: linear-gradient(90deg, #ef4444, #f97316); }
+.story.s4::before { background: linear-gradient(90deg, #06b6d4, #2563eb); }
+.story.s5::before { background: linear-gradient(90deg, #ec4899, #9333ea); }
+.story.s6::before { background: linear-gradient(90deg, #8b5cf6, #6366f1); }
+.story.s7::before { background: linear-gradient(90deg, #14b8a6, #10b981); }
+.story.s8::before { background: linear-gradient(90deg, #f97316, #eab308); }
+
+.story-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #334155;
+}
+.story-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.story.s1 .story-num { background: linear-gradient(135deg, #10b981, #06b6d4); }
+.story.s2 .story-num { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.story.s3 .story-num { background: linear-gradient(135deg, #ef4444, #f97316); }
+.story.s4 .story-num { background: linear-gradient(135deg, #06b6d4, #2563eb); }
+.story.s5 .story-num { background: linear-gradient(135deg, #ec4899, #9333ea); }
+.story.s6 .story-num { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+.story.s7 .story-num { background: linear-gradient(135deg, #14b8a6, #10b981); }
+.story.s8 .story-num { background: linear-gradient(135deg, #f97316, #eab308); }
+
+.story-pattern {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  font-weight: 600;
+  padding: 4px 9px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+}
+.story h2 {
+  font-size: 20px;
+  color: #f1f5f9;
+  line-height: 1.4;
+  flex: 1;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+/* SECTION HEADERS */
+.story h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #94a3b8;
+  margin: 18px 0 8px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.story h3 .emoji { font-size: 14px; }
+.story h3 .step {
+  display: inline-block;
+  background: #334155;
+  color: #f1f5f9;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.story.s1 h3 .step { background: #047857; }
+.story.s2 h3 .step { background: #b45309; }
+.story.s3 h3 .step { background: #b91c1c; }
+.story.s4 h3 .step { background: #0e7490; }
+.story.s5 h3 .step { background: #be185d; }
+.story.s6 h3 .step { background: #6d28d9; }
+.story.s7 h3 .step { background: #0f766e; }
+.story.s8 h3 .step { background: #c2410c; }
+
+/* TRIGGER QUESTIONS */
+.triggers {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid #475569;
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+  margin: 6px 0 4px;
+}
+.story.s1 .triggers { border-left-color: #10b981; }
+.story.s2 .triggers { border-left-color: #f59e0b; }
+.story.s3 .triggers { border-left-color: #ef4444; }
+.story.s4 .triggers { border-left-color: #06b6d4; }
+.story.s5 .triggers { border-left-color: #ec4899; }
+.story.s6 .triggers { border-left-color: #8b5cf6; }
+.story.s7 .triggers { border-left-color: #14b8a6; }
+.story.s8 .triggers { border-left-color: #f97316; }
+.triggers ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.triggers li {
+  font-size: 13.5px;
+  color: #cbd5e1;
+  padding: 3px 0;
+  font-style: italic;
+}
+.triggers li::before {
+  content: '› ';
+  color: #64748b;
+  font-style: normal;
+}
+
+/* BODY PARAGRAPHS */
+.story p {
+  font-size: 14.5px;
+  color: #e2e8f0;
+  margin: 4px 0 8px;
+}
+.story p strong { color: #fff; font-weight: 700; }
+.story p code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 12.5px;
+  color: #fbbf24;
+}
+
+/* ACTION BULLETS */
+.actions {
+  list-style: none;
+  padding: 0;
+  counter-reset: action;
+}
+.actions li {
+  position: relative;
+  padding: 10px 12px 10px 44px;
+  margin: 6px 0;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #e2e8f0;
+  counter-increment: action;
+}
+.actions li::before {
+  content: counter(action);
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  width: 22px;
+  height: 22px;
+  background: #334155;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.story.s1 .actions li::before { background: #047857; }
+.story.s2 .actions li::before { background: #b45309; }
+.story.s3 .actions li::before { background: #b91c1c; }
+.story.s4 .actions li::before { background: #0e7490; }
+.story.s5 .actions li::before { background: #be185d; }
+.story.s6 .actions li::before { background: #6d28d9; }
+.story.s7 .actions li::before { background: #0f766e; }
+.story.s8 .actions li::before { background: #c2410c; }
+.actions li strong { color: #fff; }
+.actions li .why {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-style: italic;
+}
+.actions li .why::before {
+  content: '↳ why this vs the obvious: ';
+  color: #64748b;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* TRADEOFFS BOX */
+.tradeoffs {
+  background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(239,68,68,0.06));
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 14px 0 8px;
+}
+.tradeoffs h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fbbf24;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.tradeoffs dl {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 6px 14px;
+  font-size: 13.5px;
+}
+.tradeoffs dt {
+  color: #cbd5e1;
+  font-weight: 700;
+}
+.tradeoffs dd {
+  color: #f1f5f9;
+}
+.tradeoffs dd.almost { color: #fca5a5; }
+.tradeoffs dd.chose { color: #6ee7b7; }
+.tradeoffs dd.cost { color: #fcd34d; }
+
+/* RESULT BOX */
+.result {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 4px solid #10b981;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 6px 0;
+  font-size: 14.5px;
+  color: #d1fae5;
+}
+.result strong { color: #6ee7b7; }
+
+/* FOLLOWUPS */
+.followups {
+  margin-top: 4px;
+}
+.followups .qa {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  font-size: 13.5px;
+}
+.followups .q {
+  color: #c4b5fd;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 3px;
+}
+.followups .q::before { content: 'Q: '; color: #64748b; }
+.followups .a { color: #e2e8f0; }
+.followups .a::before { content: '→ '; color: #64748b; }
+
+/* TOP NAV BACK LINK */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.back-link:hover { background: #334155; color: #fff; }
+
+/* INTRO BOX */
+.intro {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+}
+.intro h2 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #f1f5f9;
+}
+.intro p { font-size: 13.5px; color: #cbd5e1; margin: 6px 0; }
+.intro .checklist {
+  list-style: none;
+  margin-top: 8px;
+}
+.intro .checklist li {
+  font-size: 13px;
+  color: #cbd5e1;
+  padding: 3px 0 3px 22px;
+  position: relative;
+}
+.intro .checklist li.good::before {
+  content: '✓';
+  position: absolute;
+  left: 4px;
+  color: #10b981;
+  font-weight: 700;
+}
+.intro .checklist li.bad::before {
+  content: '✗';
+  position: absolute;
+  left: 4px;
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* FOOTER */
+footer {
+  text-align: center;
+  color: #64748b;
+  font-size: 11.5px;
+  margin-top: 36px;
+  line-height: 1.7;
+}
+footer a { color: #94a3b8; }
+
+@media (max-width: 720px) {
+  header.hero h1 { font-size: 24px; }
+  .story { padding: 20px 18px; }
+  .story h2 { font-size: 17px; }
+  .story-head { flex-wrap: wrap; }
+  .tradeoffs dl { grid-template-columns: 1fr; gap: 2px; }
+  .tradeoffs dt { margin-top: 6px; }
+  .actions li { padding-left: 38px; }
+  .toc { position: relative; top: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <a href="cram.html" class="back-link">← Back to Cram Hub</a>
+
+  <header class="hero">
+    <h1>Google FDE Behavioral · 8 STAR Stories</h1>
+    <div class="tagline">8 个具体故事 — 不是"我很适合", 是"在约束下我做了什么 tradeoff"。每个故事都有: trigger 题、Situation/Task/Action/Result、tradeoff 高亮、追问应对。</div>
+    <div class="meta">
+      <span>👤 Gao Xin · TikTok PayLater 7-market voice agent lead</span>
+      <span>📊 380K conv/mo at peak</span>
+      <span>🎯 8 patterns covered</span>
+    </div>
+  </header>
+
+  <div class="intro">
+    <h2>用法说明 · 2 分钟读完</h2>
+    <p><strong>核心原则</strong>：behavioral 面试官筛的不是"你做过什么"，而是"在约束下你做了什么 tradeoff"。空话(<em>"I love impact"</em>) 一票否决，具体数字 + 具体决策 + 具体被牺牲的东西 = 通过信号。</p>
+    <p><strong>每个故事都有</strong>：</p>
+    <ul class="checklist">
+      <li class="good">3-4 个 trigger questions — 这个故事能 cover 哪些题</li>
+      <li class="good">Situation/Task/Action/Result — 不超过 8 个 action bullets</li>
+      <li class="good">Tradeoff 高亮区 — almost did / chose / accepted as cost (这是最关键的)</li>
+      <li class="good">2-3 个 follow-up + 1-line 答 — 防止追问被打懵</li>
+      <li class="bad">不出现："我很适合"、"I'm passionate"、"我有 ownership"、"我擅长沟通"</li>
+    </ul>
+  </div>
+
+  <!-- =============== STICKY TOC =============== -->
+  <div class="toc">
+    <h3>8 个故事目录</h3>
+    <div class="toc-grid">
+      <a href="#s1" class="s1"><span class="num">1</span> Ambiguity · BNPL chatbot 模糊范围</a>
+      <a href="#s2" class="s2"><span class="num">2</span> Conflict · Monolith vs Per-market deploy</a>
+      <a href="#s3" class="s3"><span class="num">3</span> Failed launch · ID OTP retry 12% 失败</a>
+      <a href="#s4" class="s4"><span class="num">4</span> Security pushback · 客户 prod 凭证被卡</a>
+      <a href="#s5" class="s5"><span class="num">5</span> Trust loss + recovery · MAS 监管漏看</a>
+      <a href="#s6" class="s6"><span class="num">6</span> Lead w/o authority · 7 国 UAT 协调</a>
+      <a href="#s7" class="s7"><span class="num">7</span> Tech disagree w/ PM · 硬推 vs 软推</a>
+      <a href="#s8" class="s8"><span class="num">8</span> Postmortem · P0 BNPL retry 复盘</a>
+    </div>
+  </div>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 1: AMBIGUITY ==================== -->
+  <!-- ====================================================== -->
+  <article class="story s1" id="s1">
+    <div class="story-head">
+      <span class="story-num">STORY 1</span>
+      <span class="story-pattern">Pattern · Ambiguity</span>
+      <h2>BNPL chatbot 接手时 scope 模糊到无法 estimate · 4 周拆 3 个 use case 出 POC</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you had to start a project with very ambiguous requirements.</li>
+        <li>How do you make progress when you don't have a clear PRD?</li>
+        <li>Describe a situation where you had to narrow down a vague problem.</li>
+        <li>Walk me through how you scope a 0→1 project.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>2024 年 Q3, TikTok PayLater 印尼业务方丢给我一句话: <strong>"我们想要个 chatbot, 让用户问 BNPL 的问题。"</strong> 没有 PRD、没有 success metric、没有现成 conversation log。业务方一边说 "什么都能问", 一边又说 "下个月就要上"。我当时刚从 voice agent 项目轮过来, 手上只有 0 名工程师 (要我自己 ramp 团队), 2 个 ML researcher 借调 50%。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我是 tech lead, 要在 <strong>4 周内交一个 POC</strong> 给业务方做 demo, 但 "POC 要能干什么" 这件事本身要我自己定义清楚——业务方说不清。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>5 步收敛</h3>
+    <ol class="actions">
+      <li>
+        <strong>第一周不写代码, 只做 clarification</strong>: 我跟印尼客服中心要了 2 周的 ticket 历史 (~6,000 条), 自己 + 借调的 1 个 ops 同学手标了 500 条, 拉出 top intent 分布。
+        <span class="why">直接相信业务方"什么都能问", POC 会做成一个空壳 RAG. 我要的是数据驱动的 scope, 不是 PM 的直觉。</span>
+      </li>
+      <li>
+        <strong>3 个 use case 占了 71% 流量</strong>: 还款状态查询 (38%), 分期方案咨询 (21%), 逾期协商 (12%)。剩 29% 是长尾 (账户冻结、客诉等) 走人工。我把这个分布画成 1 张图, 不是 PRD 而是 <code>scope_evidence.png</code>。
+        <span class="why">用图片比用文档说服力强 3 倍——业务方第一次看到自己 ticket 的真实分布。</span>
+      </li>
+      <li>
+        <strong>跟业务方 1 小时锁定 scope</strong>: 我开会带着图, 直接说 "POC 只做这 3 个, 长尾 fallback 转人工。" 业务方一开始想加 "营销推荐" 进去, 我用数据反驳——营销 intent 在 ticket 里 &lt;2%, 而且涉及 OJK 合规审批至少 6 周。
+        <span class="why">业务方"什么都想要"通常是因为没看过数据。先给数据再谈 scope, 比先谈 scope 再补数据有效得多。</span>
+      </li>
+      <li>
+        <strong>架构选 intent routing + sub-agent, 不一上来就 single agent</strong>: 3 个 sub-agent (查询/咨询/协商) + 1 个 router。每个 sub-agent 接不同 RAG corpus。
+        <span class="why">一个大 agent 看起来简单, 但 3 个 use case 的 prompt 和 knowledge base 互相干扰, 后期 debug 噩梦。我之前在 voice agent 上吃过这亏。</span>
+      </li>
+      <li>
+        <strong>POC 只做 happy path + 1 个失败 fallback</strong>: 不做完整的多轮、不做权限校验、不做 UI——demo 用 Postman + slide。
+        <span class="why">4 周里把 80% 时间留给 prompt + retrieval 调优, 而不是 plumbing。POC 的目的是 prove value, 不是 ship。</span>
+      </li>
+      <li>
+        <strong>每周五给业务方一个 "可点" 的 demo link</strong> (即使是半成品), 收 3-5 条反馈进下周。
+        <span class="why">业务方两周不见东西就开始焦虑, 焦虑→加 scope。让他们每周看到进展, scope creep 自己就消了。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      <strong>4 周交付 POC</strong>, top 3 intent 准确率 87% (POC 阈值要求 80%)。业务方拍板进入 production build, 我拿到 2 名 FTE 工程师 + 6 个月预算。3 个月后正式上线, 月均 12 万对话, 转人工率从原 chatbot 的 41% 降到 19%。<strong>关键 lesson</strong>: 模糊范围不是问题, 业务方"什么都想要"才是问题——用真实数据反推 scope 比开会 brainstorm 高效 10 倍。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">直接按业务方的口头描述写 prompt + 接个通用 RAG, 第二周就能给 demo, 但 scope 注定爆炸。</dd>
+        <dt>我选择的</dt><dd class="chose">第一周不写代码, 拿真实 ticket 数据反推 scope, 把"什么都能问"砍到"3 个 use case + 1 个 fallback"。</dd>
+        <dt>我接受的代价</dt><dd class="cost">第一周没有 demo 给业务方看, 业务方一度怀疑我在拖延; 我用日报 + 标注进度截图扛过去。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果业务方坚持 scope 要包括营销 intent 怎么办?</span><span class="a">我会把营销 intent 单独 fork 成第二个 POC, 用 OJK 合规审批的 6 周时间线作为客观约束, 让业务方在 "等 6 周 + 拿全部" 和 "4 周拿 71%" 里二选一。决策权还在他, 但代价透明。</span></div>
+      <div class="qa"><span class="q">第一周不写代码, 老板会不会觉得你在划水?</span><span class="a">我每天日报里附标注进度截图 (今天标了多少条 ticket、top intent 是什么), 让 "在做" 这件事可视化。沟通成本低很多。</span></div>
+      <div class="qa"><span class="q">如果手标 500 条发现没有明显 top intent 分布呢?</span><span class="a">那就说明业务方 "什么都能问" 真的是事实——这时候 POC 应该做一个 generic LLM + 强 fallback, 而不是 sub-agent 架构。Data 决定架构, 不是反过来。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 2: CONFLICT ===================== -->
+  <!-- ====================================================== -->
+  <article class="story s2" id="s2">
+    <div class="story-head">
+      <span class="story-num">STORY 2</span>
+      <span class="story-pattern">Pattern · Conflict w/ Senior</span>
+      <h2>跟资深同事吵 monolith vs per-market deploy · 用 1 周影子 A/B 拿数据收尾</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you disagreed with a senior engineer on a technical decision.</li>
+        <li>How do you handle conflict in a code review?</li>
+        <li>Describe a situation where you pushed back on someone more experienced than you.</li>
+        <li>Walk me through a technical disagreement and how it got resolved.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>Voice agent 早期, 7 个市场共用一个 FastAPI monolith, 一个 release 全推 7 国。出问题: 印尼晚上 promotion 流量峰 → ASR 模型 OOM → 把新加坡的支付确认 endpoint 也拖挂了。月度故障率 8.3%。我提议拆成 per-market deploy, 但平台组一个比我高半级的 senior (P7, 我 P6) 反对——他认为"7 个 deployment 运维成本太高, 而且 monolith 没问题, 是你 ASR 写得有问题"。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我要么说服他, 要么接受他的方案改 ASR——但我相信架构是根因, 不是 ASR. <strong>我不能用 title 压他</strong> (他比我高), 也不能让冲突变成站队 (会影响后续合作)。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>不情绪化, 用数据收尾</h3>
+    <ol class="actions">
+      <li>
+        <strong>先承认他对的部分</strong>: ASR 确实有 memory 优化空间, 我把 ASR 那块的 profile 报告先发给他, 主动说 "这部分我会优化"。
+        <span class="why">直接对喷 "你说错了" 是面试官最不想看到的。先承认对方有道理的部分, 后面 push back 才有信用。</span>
+      </li>
+      <li>
+        <strong>提议一个 1 周的影子 A/B 实验</strong>: 我自己用 staging 环境搭一个 per-market 的 mock deploy, 把生产流量 mirror 5% 进去, 不影响线上。"如果数据不支持拆, 我们就按你的方案走。"
+        <span class="why">直接讨论 "应不应该拆" 是哲学辩论, 永远吵不完。把它降级为一个 1 周可验证的实验, 焦点变成 "数据怎么样", 而不是 "谁更资深"。</span>
+      </li>
+      <li>
+        <strong>拉双方都信任的中立第三方做 review</strong>: 我请 platform team 的 staff engineer 当 reviewer, 让他帮看实验设计——这样他和我的资深同事都不会觉得我在偏袒自己。
+        <span class="why">如果我自己做实验自己分析, 他会怀疑数据。第三方背书让结论不可争。</span>
+      </li>
+      <li>
+        <strong>实验数据出来 6 天</strong>: 印尼 ASR OOM 完全 contained, 没有 cross-market spillover; per-market p95 latency 从 1.2s → 410ms; 但 deploy 时间从 6min → 23min, 运维 toil 确实升 4 倍。
+        <span class="why">数据要诚实——把对自己不利的指标 (运维 toil) 主动暴露, 资深同事的反对意见 80% 被验证了, 但他的解决方案不对。这种诚实让他更愿意 buy in。</span>
+      </li>
+      <li>
+        <strong>给他一个 face-saving 的 framing</strong>: 在 review 会上我说 "Senior 同事的担心是对的, monolith 简化运维。所以我们要拆, 但同时上 ArgoCD + 7 个 helm chart 模板化, 把运维 toil 抵消。" 把他的反对包装成对最终方案的 contribution。
+        <span class="why">如果让他在公开会议上"输", 后面合作会僵。把他的反对意见纳入解决方案设计, 大家都赢。</span>
+      </li>
+      <li>
+        <strong>refactor 我亲自带, 不甩给他的组</strong>: 我说 "因为是我提议的, 我来 own 这次 refactor 的 80% 工作"。
+        <span class="why">如果让别人替我背改动成本, 下次再吵架就没人理我了。Push back 的人要 own execution, 这是信用基础。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      Refactor 历时 7 周, 上线后 <strong>月度故障率从 8.3% → 3.4% (-60%)</strong>, 跨市场 cascading failure 归零。这位资深同事后来主动来找我合作下一个项目, 跟我说 "你那次没让我下不来台, 我记你这个情。" 这个 refactor 后来被平台组写进 best practice doc, 推广到另外 3 个产品线。<strong>关键 lesson</strong>: 跟 senior 吵架不是 zero-sum, 数据是中立裁判, 给对方下台阶比赢辩论更重要。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">直接 escalate 给我俩共同的 director, 让他拍板——快, 但破坏跟 senior 同事的关系, 后续合作会很僵。</dd>
+        <dt>我选择的</dt><dd class="chose">用 1 周影子实验把哲学辩论降级成数据题, 把他的反对意见纳入最终方案设计, 给他下台阶。</dd>
+        <dt>我接受的代价</dt><dd class="cost">多花了 1 周做实验 (本可以直接开干); refactor 期间我亲自 own 80% 工作量, 牺牲了我手上另一个 RAG 优化项目 1 个月进度。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果数据反过来支持 senior 同事呢, 你怎么办?</span><span class="a">那就按他的方案走, 而且我自己去优化 ASR——我答应过的。诚信是 push back 的前提, 否则下次没人陪我玩了。</span></div>
+      <div class="qa"><span class="q">为啥不一开始就 escalate, 节省时间?</span><span class="a">Escalate 是核武器, 用一次毁所有关系。我估算了一下 refactor 总工时 7 周, 多 1 周做实验换一个 long-term 合作关系, ROI 是正的。</span></div>
+      <div class="qa"><span class="q">如果 staff engineer reviewer 也偏向 senior 同事呢?</span><span class="a">那我也会接受。但前提是我要看到他给出的具体 counter-argument 是什么——如果只是 "我相信资深同事的直觉", 我会再 push 一次要数据反驳。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 3: FAILED LAUNCH ================ -->
+  <!-- ====================================================== -->
+  <article class="story s3" id="s3">
+    <div class="story-head">
+      <span class="story-num">STORY 3</span>
+      <span class="story-pattern">Pattern · Failed Launch (own root cause)</span>
+      <h2>印尼 BNPL OTP retry 12% 误失败 · 1 小时回滚 + 永久 guardrail + 3 周降 47%</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time something you shipped broke in production.</li>
+        <li>Describe a project that failed and what you learned.</li>
+        <li>How do you handle it when your code causes a customer-facing incident?</li>
+        <li>Walk me through your worst production bug.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>印尼 BNPL voice agent 上线第二周, 我加了一个 OTP retry policy: 如果用户口述 OTP 错了, agent 自动 retry 一次。我自己 staging 测了 30 个 case 都通过, 直接推生产。<strong>结果第三天监控发现: 12% 的支付被错误地标成 failed</strong>——根因是我的 retry 把上一次的 OTP cache 没清, 拿旧 OTP 验新交易, 验失败就 reject。客服中心一晚上接了 280+ 投诉, 业务方早上 9 点电话打到我家里。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我是这个 feature 的 sole owner——bug 是我引入的, 没有任何人可以怪。<strong>我要在最短时间内: (1) 止血 (2) 道歉 (3) 不甩锅 (4) 给业务方/客户一个"不会再犯"的答案</strong>。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>1 小时止血 + 不甩锅复盘</h3>
+    <ol class="actions">
+      <li>
+        <strong>电话挂了 5 分钟内</strong>: 我立刻在 Slack incident channel 开 P0, 不等业务方追问, 主动 ping 印尼 GM + 我自己的 director, 写 "I introduced a retry bug. Rolling back now. ETA 45min."
+        <span class="why">业务方最怕的不是 bug, 是 bug 出了之后工程师躲起来。主动 declare ownership 是 trust 的开始。如果我等他们追问, 我已经在 trust 上输了一半。</span>
+      </li>
+      <li>
+        <strong>52 分钟回滚到上一个 release</strong> + 同时让客服走人工 OTP 兜底
+        <span class="why">回滚优先级高于 hotfix。我有自信能 1 小时内修, 但 production 不是验证我自信的地方。先回滚, 修在 staging 做。</span>
+      </li>
+      <li>
+        <strong>主动联系受影响的 280 个用户</strong>: 拉 list 给客服, 让客服一个一个打电话道歉 + 退积分。我自己写了 apology script 给客服参考。
+        <span class="why">这本来是 ops 的活, 但我作为根因引入者, 主动 own 后续清理。如果我只修代码不管用户, 客服会觉得"工程师不用清理烂摊子", 长期关系崩。</span>
+      </li>
+      <li>
+        <strong>blameless 5-Whys 复盘当晚做完, 不拖第二天</strong>: 根因不是 "我 cache 没清"——那是 surface。深层是 "我没有 retry/idempotency 的测试模板, staging case 偏 happy path"。
+        <span class="why">5-Whys 不是甩锅工具, 是找 systemic gap 的工具。如果我止步在 "我下次注意点", 这种 bug 一定还会出。</span>
+      </li>
+      <li>
+        <strong>把发现转成 2 条永久 guardrail</strong>: (a) 所有涉及 retry/idempotency 的 PR 必须附 5 个 stateful test case (cache 污染、并发、超时、partial fail、跨 session); (b) OTP/支付类 feature 必须 canary 24h + 5% traffic 才能全推。
+        <span class="why">"下次注意" 是空话; 写进 PR template + CI 检查才是 systemic fix. Guardrail 不依赖我个人记忆。</span>
+      </li>
+      <li>
+        <strong>postmortem 公开发到全 team 频道</strong>, 标题写 "I shipped a bug — here's what I missed", 不藏。
+        <span class="why">公开比私下让 team 更敢公开自己的失败, 心理安全是 blameless 文化的前提。如果我藏起来, 别人下次出 bug 也藏。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      <strong>3 周内 OTP false-fail 从 12% 降到 0.5% (-47%)</strong>, 6 个月内同类 retry/idempotency bug 0 复发。印尼 GM 在月度业务 review 上反而 cite 这次 incident 作为 "trust through transparency" 的案例。我的 PR template + canary guardrail 后来被推广到另外 2 个产品线。<strong>关键 lesson</strong>: bug 本身不会损害 trust, 处理 bug 的方式才会。30 分钟主动 declare + blameless 复盘 + 永久 guardrail, 比写 100 个完美 PR 都更建立 trust。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">直接 hotfix——我能 1 小时内找到 cache bug——这样不用回滚、不用通知 GM, "悄悄修掉就行"。</dd>
+        <dt>我选择的</dt><dd class="chose">回滚 + 主动 declare ownership + 公开 postmortem。Bug 是已经发生的事实, 隐藏只会让下次更糟。</dd>
+        <dt>我接受的代价</dt><dd class="cost">个人 KPI 上吃了一个 P0, 季度评级被 1 分; 但换来 team 心理安全文化 + 永久 guardrail + GM 长期信任。Net positive。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">为啥 staging 30 个 case 没发现? 是不是 testing 不够?</span><span class="a">staging 30 case 都是 happy path——同一个 user, OTP 错 1 次, retry 成功。我漏掉了 stateful 场景: 同 session 第二笔交易复用旧 cache。Guardrail #1 就是为了系统性堵这个 gap。</span></div>
+      <div class="qa"><span class="q">回滚的话 retry 功能就丢了, 业务方不会有意见吗?</span><span class="a">我跟业务方明确说: retry 功能 7 天后带 canary 再上, 同时这 7 天给他们一个 "manual OTP 客服兜底" 流程。要 retry 是要快, 还是要稳? 这种选择业务方愿意做, 但前提是工程师把代价讲清楚。</span></div>
+      <div class="qa"><span class="q">如果团队里有人甩锅给你怎么办?</span><span class="a">这次没有, 因为我先 declare 是我的。但即使有人甩锅, blameless postmortem 的规矩是: 谁引入的不重要, 重要的是 systemic gap 在哪。Manager 看到 5-Whys 自然知道 root cause 在系统而不是个人。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 4: SECURITY PUSHBACK ============ -->
+  <!-- ====================================================== -->
+  <article class="story s4" id="s4">
+    <div class="story-head">
+      <span class="story-num">STORY 4</span>
+      <span class="story-pattern">Pattern · Customer Security Pushback</span>
+      <h2>客户 security lead 卡 prod 凭证 · 没有 bypass, 5 天反而 harden 了 posture</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you had to work with a customer's security team.</li>
+        <li>Describe a situation where compliance blocked your timeline.</li>
+        <li>How do you handle pushback from a customer's IT/InfoSec team?</li>
+        <li>Walk me through a deal where security review almost killed it.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>新加坡某 e-wallet 客户接入 TikTok PayLater voice agent, integration 进入 UAT 阶段, 我们需要客户的 sandbox + production 凭证才能跑端到端。客户的 security lead (一个 15 年经验的 CISO 直接下属) 在 onboarding call 上直接说: <strong>"我们不会给任何外部 vendor production credentials, 这是我们的 policy red line."</strong> 项目 deadline 还有 3 周, 业务方电话已经打到我老板那里催。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我是 integration tech lead——要么找到符合客户 policy 的方案, 要么项目延期。我老板暗示我可以让他 escalate 给客户 CTO 给 exception, 但<strong>这会立刻烧掉客户 security team 的信任</strong>, 后续每次 change 都会被刁难。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>不 bypass, 反而 harden</h3>
+    <ol class="actions">
+      <li>
+        <strong>先约 30 分钟 1:1, 不带其他人</strong>: 我跟 security lead 单独开会, 不带 PM, 不带业务方。开场说 "I'm not here to argue policy. I want to understand what you're protecting against, so we can solve it without compromising your stance."
+        <span class="why">CISO 团队最反感 vendor 一上来就找漏洞 bypass。先承认他的 policy 合理, 让他从 "守门人" 变成 "合作者", 后面才有空间。</span>
+      </li>
+      <li>
+        <strong>让他 vent 5 分钟</strong>: 他举了 3 个之前 vendor 滥用凭证的例子 (其中一个还上了媒体)。我全程没打断, 只问 follow-up: "Then what happened? How did you find out?"
+        <span class="why">venting 60% 是情绪释放, 40% 是测试我能不能保持职业。如果我打断或者反驳, 他会觉得我跟那 3 个 vendor 一样。listen 是建立 trust 的第一步, 不是软弱。</span>
+      </li>
+      <li>
+        <strong>提出 "audit-first + least-privilege" 替代方案</strong>: (a) 不要 production credentials, 要客户搭一个 audit proxy, 我们的请求全部走 proxy 并写日志; (b) UAT 用客户提供的 scoped service account, 权限只覆盖我们 integration 用到的 3 个 API; (c) 所有 token 24h 过期 + 客户随时 revoke.
+        <span class="why">直接 "给我 prod 凭证 + 我保证不滥用" 这种诚信赌博方案 CISO 永远不会签。把方案设计成 "你能 audit + 你能 revoke", 控制权在他手里, 他才有动力支持。</span>
+      </li>
+      <li>
+        <strong>主动接受 1 个对我们不便的条件</strong>: 我提议每次部署 change 都要走他们的 change advisory board (CAB), 即使是小 bug fix。这会拖慢我们 release 1-2 天/次。
+        <span class="why">如果我只提对我们有利的方案, security lead 会觉得我在算计。主动让一步, 让他知道我把 security posture 看得比我的 release velocity 重。这一步是关键。</span>
+      </li>
+      <li>
+        <strong>把方案写成 1 页 architecture diagram + 5 行 commitment</strong>, 让他可以直接拿去跟他自己的 CISO 汇报。
+        <span class="why">security lead 的真实压力是向上汇报。给他一个 ready-to-present 的材料, 他能在他老板面前显得专业, 他就有动力支持。</span>
+      </li>
+      <li>
+        <strong>5 天内全部到位</strong>: 客户 IT 搭 audit proxy 用了 3 天, 我们改 client 走 proxy 用 1 天, scope service account 1 天。
+        <span class="why">不 bypass、不 escalate、不 work around, 但最终 unblock 速度反而比 escalate 还快——因为 security team 不需要"被说服", 他们是主动配合。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      Integration 准时上线, 没有延期。<strong>客户 security lead 在 quarterly review 上反而把这次 integration 作为 "vendor security best practice" 的范例</strong>, 还介绍我们去他们另一个事业部接洽。我们的 audit proxy + scoped credential 架构后来变成了我们对新加坡市场的默认部署模板。<strong>关键 lesson</strong>: customer security team 不是障碍, 是天然 ally——他们的 incentive 是 "不出事", 跟你的 incentive ("integration 上线") 完全一致, 只是路径不同。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">让我老板 escalate 给客户 CTO 拿 policy exception——快、解决短期问题、但烧掉 security team 信任, 后续每次 deploy 被刁难。</dd>
+        <dt>我选择的</dt><dd class="chose">承认对方 policy 合理, 设计 audit-first + least-privilege 方案, 主动接受 CAB 流程拖慢我们 release。</dd>
+        <dt>我接受的代价</dt><dd class="cost">长期每次 deploy 多 1-2 天 CAB 流程; 短期多了 5 天架构改造工作; 但换来 security team 主动支持 + 后续 cross-BU 推荐。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果客户搭 audit proxy 要 2 个月怎么办?</span><span class="a">那我会问 security lead "在 proxy 建好之前, 我们能用一个 sandbox-only mode 跑 80% 的测试吗?" 把 unblock 拆成两阶段, 而不是等所有事都 ready。</span></div>
+      <div class="qa"><span class="q">为啥不直接让 PM 去谈, 你做工程师就行?</span><span class="a">PM 谈这种事容易把它当合规 procedure 走流程; security 决策本质是技术决策——audit proxy 怎么搭、scope service account 怎么定权限, 这些只有工程师能跟 CISO 直接对线。FDE 的价值就在这里。</span></div>
+      <div class="qa"><span class="q">如果 security lead 完全不讲理, vent 完还是说不?</span><span class="a">那我会把决策权还给他: "Here are the 3 options I see, all of which respect your policy. Which one do you want to pursue?" 让他选, 而不是让他被说服。CISO 不喜欢被 sales, 喜欢自己拍板。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 5: TRUST LOSS + RECOVERY ======== -->
+  <!-- ====================================================== -->
+  <article class="story s5" id="s5">
+    <div class="story-head">
+      <span class="story-num">STORY 5</span>
+      <span class="story-pattern">Pattern · Customer Trust Loss + Recovery</span>
+      <h2>MAS 监管 guidance 漏看 · 2 周延期主动 disclose · 8 周后全量上线 + 关系反而更稳</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you lost a customer's trust and had to rebuild it.</li>
+        <li>Describe a situation where you missed something important and had to deliver bad news.</li>
+        <li>How do you handle a regulatory/compliance miss?</li>
+        <li>Walk me through a project where you had to delay launch and tell the customer.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>新加坡某 SME 合作伙伴 (本地 e-commerce 平台) 要接 PayLater, 我们 6 周 sprint 准备 launch。MAS (新加坡金管局) 在 launch 前 2 周更新了 e-money guidance, 要求 BNPL 在新商户 onboarding 时必须做额外的 source-of-fund 验证。<strong>我在 weekly compliance review 里没仔细读这条更新, 导致到 launch 前 3 天 compliance team 发现合规 gap, 必须延期 2 周</strong>。客户已经准备好了 marketing campaign, 200 万预算押在原计划日期。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我是 integration TL——这次 miss 主要责任在我 (我应该 surface MAS 更新)。<strong>要在 2 小时内决定: 自己背锅延期, 还是甩给 compliance team?</strong> 客户 CTO 的电话已经在路上。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>主动暴露 + 双路径 + 周报体系</h3>
+    <ol class="actions">
+      <li>
+        <strong>不等客户来电, 1 小时内主动打给客户 CTO</strong>: 开口第一句是 "I missed an MAS update from last week. I take full responsibility. Here's what happened and here's what I'm proposing."
+        <span class="why">trust 损失最深的瞬间不是 miss 本身, 是 vendor 隐瞒到东窗事发。主动 disclose 让客户感觉到我跟他一边, 不是对立面。1 小时主动 vs 客户先发现, trust 差 10 倍。</span>
+      </li>
+      <li>
+        <strong>同时给两条路径, 让客户选</strong>: (a) 等 2 周, 全量 launch, marketing 全保留; (b) 立即 launch 一个 sandbox-only "early access" 版本给 100 个 beta 用户, 这样 marketing 可以 pivot 成 "exclusive beta", 2 周后再 GA.
+        <span class="why">单方面说 "我们延期了" 把客户摆在被动接受的位置, 信任永远不会回来。给两个选项, 让客户感觉 "我还能控制结果", 是 trust 修复的核心。</span>
+      </li>
+      <li>
+        <strong>主动承担一部分 marketing pivot 成本</strong>: 我提议我们这边出 1 个工程师 + 1 个 designer 帮客户 1 周内 pivot beta campaign, 不另外收钱。
+        <span class="why">道歉是空的, 实际行动是实的。如果我只说 "对不起" 不出资源, trust 修复没有支点。出资源是把 "我承担责任" 变成可见行为。</span>
+      </li>
+      <li>
+        <strong>从那一天起每周一上午 9 点发 status update</strong>, 持续 8 周直到全量 launch: 每周固定 5 行——this week's progress / next week's plan / risks I see / what I need from you / 1 thing I'm still worried about.
+        <span class="why">客户被 disappoint 后最怕的不是再出问题, 是 "我不知道在发生什么"。每周一固定时间固定格式, 是把 trust 重新机械化、可预测化。情绪上的 trust 是脆的, mechanical 的 trust 是稳的。</span>
+      </li>
+      <li>
+        <strong>这 8 周里另外 2 个小问题, 我都主动先 surface</strong> (比如有一次 sandbox 数据 desync 6 小时), 不等客户问。
+        <span class="why">trust 修复期最怕第二次 surprise。我宁可主动暴露 4-5 个小问题, 也不让客户自己 catch 1 个——前者强化 "他很 transparent", 后者重置 trust 进度条。</span>
+      </li>
+      <li>
+        <strong>8 周后全量 launch 当天</strong>, 我主动跟客户 CTO 做 1 个 15 分钟 retrospective: "这次 miss 我学到什么, 我对自己流程做了什么改动"。把 lesson 公开给客户, 而不是只内部消化。
+        <span class="why">客户不只想知道 "你 launch 成了", 还想知道 "下次同样的问题你不会再犯"。把内部改动主动 share, 是把 trust 从一次性修复变成长期 compound。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      客户选了 path (b), pivot 成 "exclusive beta", 实际 beta GMV 反而比原计划首周高 30%。<strong>8 周后全量 launch 顺利, 客户后来主动追加了第二个产品线合作 (+$1.2M 年合同)</strong>, 并在我们的 case study 里出镜。客户 CTO 后来跟我说 "你 1 小时主动打来电话那次, 我对你们 vendor 的判断从 B+ 升到了 A-。如果你晚 6 小时, 我已经在找替代方案了。"<strong>关键 lesson</strong>: trust 不是 "不犯错", 是 "犯错后怎么处理"。1 小时主动 disclose 比 6 小时完美 mitigation 更重要。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">把责任 framing 成 "compliance team 发现晚了" (技术上也对), 自己只承认部分责任, 等客户先来问。</dd>
+        <dt>我选择的</dt><dd class="chose">1 小时内主动打电话, 直接说 "我 missed 这条", 给双路径选项 + 8 周固定周一 status update。</dd>
+        <dt>我接受的代价</dt><dd class="cost">个人季度评级被 1 分; 出了 1 工程师 + 1 designer 帮客户 pivot (额外 ~80 小时); 但换来 +$1.2M 追加合同 + case study 引用。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果客户选 path (a) 等 2 周, 你会怎么处理 marketing 损失?</span><span class="a">我会提议帮客户 negotiate 跟广告平台延期 (我们有合作渠道), 同时把 2 周时间用于额外的 stress test, 让客户 launch 后有 "extra robust" 的故事可以讲, 把延期 reframe 成质量加码。</span></div>
+      <div class="qa"><span class="q">你为啥觉得是你的责任, 不是 compliance team 的责任?</span><span class="a">作为 integration TL, 我应该在 weekly compliance review 上 actively read updates, 不是等 compliance team 来 ping 我。把责任推给上游 team, 短期省事, 长期破坏 ownership culture。</span></div>
+      <div class="qa"><span class="q">如果客户根本不接电话, disclose 不出去呢?</span><span class="a">我会发 email 标 high priority + 同时 ping 客户的 PM + 让我老板平级 ping 客户老板, 三个渠道并行。重点不是 1 小时打通电话, 是 1 小时之内 信息已经在路上, 客户不会从别处先听到。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 6: LEAD W/O AUTHORITY =========== -->
+  <!-- ====================================================== -->
+  <article class="story s6" id="s6">
+    <div class="story-head">
+      <span class="story-num">STORY 6</span>
+      <span class="story-pattern">Pattern · Lead Without Authority</span>
+      <h2>7 国 voice agent UAT 没有 direct report · ops-lead champion 模型 + 数据当影响力货币</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you had to lead a project across multiple teams without formal authority.</li>
+        <li>How do you influence people who don't report to you?</li>
+        <li>Describe a situation where you coordinated stakeholders in different orgs/countries.</li>
+        <li>Walk me through how you ran a cross-functional rollout.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>TikTok PayLater voice agent 要在 7 个市场 (SG/MY/ID/TH/VN/PH/JP) 同时跑 UAT, 每个市场有自己的 ops team、客服中心、本地合规——总共 7 个 GM + 7 个 ops lead + 14 个客服主管, 没有一个人直接 report 给我。<strong>我只是新加坡的一个 tech lead, P6, 上面 4 层才到能 "命令" 这些 ops lead 的 director。</strong> 但 UAT 必须每个市场都跑完, 否则 launch 不了。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我要在 6 周内让 7 个市场都跑完 UAT, 每个市场至少 200 条标注对话回我手上。<strong>没法 escalate (每个 director 都不会为我一个 P6 调动他下面的 ops team)</strong>, 没法 incentive (没预算), 没法 hire。只能影响。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>champion 模型 + 数据货币 + 弱依赖结构</h3>
+    <ol class="actions">
+      <li>
+        <strong>不跟 GM 谈, 跟每个市场的 ops lead 谈</strong>: 我画了一张表, 7 个市场每个市场我先 1:1 跟 ops lead 30 分钟。目标不是 "请帮忙", 是 "你想从这个项目拿到什么"。
+        <span class="why">GM 没时间见 P6, 他们的 ops lead 才是我能 access 到的人。而且 ops lead 才是 UAT 实际执行的人, 跟 GM 谈完落地还是 ops lead——直接跳过中介。</span>
+      </li>
+      <li>
+        <strong>把每个 ops lead 变成本地 champion</strong>: 我跟每个 ops lead 找一个对他个人有价值的角度——印尼 lead 想让她的 team metric (FCR, first-call resolution) 好看, 我答应给她 UAT 期间的 FCR uplift report; 越南 lead 想要 promotion 案例, 我答应把她的名字写进项目 launch doc。
+        <span class="why">"为公司大局" 这种话对中层无效, 因为 promotion 不是大局给的。给每个人一个 personal win, 他们就有动力跑 UAT。这不是操纵, 是匹配 incentive。</span>
+      </li>
+      <li>
+        <strong>建立每周二 30 分钟的全 7 国 sync</strong> (不更长, 不更频繁): 每个市场只讲 3 件事——this week's UAT count / blockers / 1 thing I want from peer markets.
+        <span class="why">没有 authority 的时候, structure 就是 authority. 每周二固定时间, 7 个市场 ops lead 互相看到对方进度, 落后市场自然有压力 (peer pressure 比 manager pressure 还强), 我不用催。</span>
+      </li>
+      <li>
+        <strong>数据是我的影响力货币</strong>: 每周一 8am 我自己 pull dashboard, 把 7 个市场的 UAT 数据做成 1 张可视化, 周二 sync 开头先放 5 分钟。哪个市场 UAT 多, 数据上一目了然。
+        <span class="why">P6 在跨 org 协调上没有 title authority, 只有 information authority. 谁掌握数据谁定 narrative。我不用说 "印尼落后了", dashboard 自己说话, ops lead 自己会回去推。</span>
+      </li>
+      <li>
+        <strong>给每个市场 ops lead 准备一个 "10 分钟 ramp-up doc"</strong>: 不是技术文档, 是 "如何跟你的客服主管讲清楚 UAT 怎么跑、为啥重要、对她团队有啥好处"。
+        <span class="why">ops lead 也要 sell 给她下面的客服主管, 我帮她降低 sell 的成本, 她就不会拖。这是 leverage——我花 1 小时写, 7 个市场省下 7 × 4 小时。</span>
+      </li>
+      <li>
+        <strong>主动 publicly credit, 不抢功</strong>: launch 时 7 个市场的 ops lead 名字全部写进 launch announcement, 我自己的名字放最后。
+        <span class="why">没 authority 的时候, credit 是唯一能给的"工资"。如果我把 credit 都揽给自己, 下次没人陪我玩。Long-term 我损失少量 visibility, 换大量 collaboration capital。</span>
+      </li>
+      <li>
+        <strong>遇到完全推不动的市场 (泰国)</strong>, 我没有 escalate, 而是去找泰国 ops lead 的 peer (越南 ops lead) 帮我侧面 ping——她俩同事关系好, 一句话比我 10 封 email 管用。
+        <span class="why">escalate 是核武器, 会损坏关系。peer-to-peer pressure 是 invisible authority, 不留痕迹, 但有效得多。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      <strong>6 周内 7 个市场全部完成 UAT, 平均每市场 280+ 条标注对话 (target 200)</strong>。Voice agent 准时 launch, 12 个月做到 380K 对话/月。这 7 个 ops lead 后来变成我跨市场协作的固定网络, 之后另外 2 个 cross-region 项目我直接复用这套 champion 关系。<strong>关键 lesson</strong>: 没有 authority 不等于没有 leverage——structure (固定 sync)、information (dashboard)、credit (公开归属)、peer pressure 这 4 样比 title 还有效。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">让我老板 escalate 给 director 拿 7 个 GM 的 top-down 命令——快, 但每个市场会出工不出力, UAT 数据质量糟糕。</dd>
+        <dt>我选择的</dt><dd class="chose">花 4 周时间一个一个 ops lead 建关系, 用 dashboard + peer pressure + personal incentive 拉动, 不 escalate。</dd>
+        <dt>我接受的代价</dt><dd class="cost">前 2 周 UAT 数据增长很慢, 我老板一度觉得我"协调能力不行"; 我自己的 launch credit 大部分让给了 ops lead。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果某个市场 ops lead 就是不配合呢?</span><span class="a">泰国一开始就这样。我没有 escalate, 而是先找她 peer 侧面提, 再调整给她的 incentive (我多给她数据 visualization 的 credit), 6 周里慢慢拉回来。如果还不动, 才会让我老板 ping 她老板, 但 escalation 是最后选项。</span></div>
+      <div class="qa"><span class="q">这么花时间建关系, 不会拖慢项目吗?</span><span class="a">前 2 周确实慢, 但后 4 周复合加速——7 个市场互相 peer pressure 比我一个个催效率高 5 倍。投入是前置的, 收益是后置的。</span></div>
+      <div class="qa"><span class="q">如果 Google FDE 项目你要协调 GCP 多个产品组, 你怎么用这个 model?</span><span class="a">同样道理——不去 escalate 给 director, 而是找每个产品组的 TL/PM, 用 customer evidence (客户在我面前抱怨什么) 作为 dashboard, 给每个产品组一个 "你 fix 这个会让客户多用你产品 X%" 的 personal angle。FDE 天然没有跨产品 authority, 只能用 customer voice 当货币。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 7: TECH DISAGREE W/ PM ========== -->
+  <!-- ====================================================== -->
+  <article class="story s7" id="s7">
+    <div class="story-head">
+      <span class="story-num">STORY 7</span>
+      <span class="story-pattern">Pattern · Technical Disagree with PM/Business</span>
+      <h2>Marketing 要硬 upsell BNPL · 我用 A/B + OJK + 软推替代守住 opt-in · 6 个月 0 监管事件</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you disagreed with a PM or business stakeholder on a feature.</li>
+        <li>How do you push back on a product decision you think is wrong?</li>
+        <li>Describe a situation where business priorities conflicted with what you thought was right for users.</li>
+        <li>Walk me through a time you said no to marketing/sales.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>BNPL chatbot 上线 3 个月后, 印尼 marketing team 要在 chatbot 里加一个 "硬 upsell" 模块——只要用户问任何问题, agent 在回答完之后必须推一个 BNPL 升级方案 (从 3 期免息升到 6 期免息), 而且要默认勾选 "我同意升级", 用户需要主动取消。Marketing head 说这能让转化率提升 35%, KPI 季度看板上压力很大。<strong>我的技术 sense 告诉我这违反 OJK (印尼金融监管局) 关于 "active consent" 的规定, 而且会爆客诉</strong>。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我是 chatbot 的 tech lead, marketing head 比我高 2 级。<strong>她不需要我同意就能在 PRD 里写——我能 push back, 但不能直接拒绝</strong>。如果硬顶, 她可以让我老板 override; 如果不顶, 上线 3 个月内大概率出监管事件。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>不情绪化, 数据 + 合规 + 替代方案三件套</h3>
+    <ol class="actions">
+      <li>
+        <strong>先问她 underlying goal, 不直接谈方案</strong>: 我约 marketing head 20 分钟, 第一个问题是 "What's the actual goal—是这个季度 conversion 数字, 还是 6 个月 LTV?" 她说是季度 conversion。
+        <span class="why">谈方案永远吵不完, 谈 goal 才有可能换方案。如果她要的是 6 个月 LTV, 硬 upsell 本来就反向 (会增加 churn); 如果是季度 conversion, 我才知道怎么设计替代。</span>
+      </li>
+      <li>
+        <strong>拉 OJK 的 active consent 原文给她看</strong>, 不是说 "你违法了", 是 "这是 OJK 的原文, 你看一下, 我们都不希望 90 天内出监管事件"。
+        <span class="why">marketing 不读监管文件——不是不愿意, 是 not their job。我把原文翻译 + 关键句标红, 让她在 5 分钟内能 own 这个风险。把合规风险从"工程师顾虑"变成"她也看见的事实"。</span>
+      </li>
+      <li>
+        <strong>提议跑 1 周 A/B</strong>: 硬 upsell (default opt-in) vs 软 upsell (default opt-out + 一行温和文案)。流量 5% 跑硬, 5% 跑软, 看 conversion + 客诉率。
+        <span class="why">如果只说 "我担心客诉" 没用, 数据是 marketing 唯一信的东西。把哲学辩论降级成 1 周可验证实验, 焦点变成 "数字怎么样"。</span>
+      </li>
+      <li>
+        <strong>实验数据出来</strong>: 硬 upsell conversion +12% 但客诉率 +180% (从 1.2% → 3.4%), 客服人工成本上升 4 倍; 软 upsell conversion +9% 客诉率持平。
+        <span class="why">我没有 cherry-pick——硬 upsell 确实涨了 12%。诚实展示让 marketing head 不觉得我在 sabotage 她, 信任建立后她才愿意接受软方案。</span>
+      </li>
+      <li>
+        <strong>给她一个 face-saving framing</strong>: 在跨部门 review 上我说 "Marketing 提出 upsell 这个 angle 是对的, 我们的 chatbot 之前没有任何 upsell。基于 A/B, 软 upsell 是更稳健的 path, conversion 损失 3% 但客诉省 4x 成本, 净收益更高。" 把她的 idea 包装成 win。
+        <span class="why">如果让她在跨部门会议上"输", 她下次 PRD 直接绕过我跟我老板谈。包装她为 idea owner, 我是 execution helper, 大家都有面子。</span>
+      </li>
+      <li>
+        <strong>同时给她一个 "未来选项"</strong>: 我说 "如果 6 个月后 OJK guidance 放松, 我们可以再 revisit 硬 upsell。" 不把门关死。
+        <span class="why">marketing head 最怕的不是 "现在不能", 是 "永远不能"。给一个未来的 hook, 她能跟自己老板汇报, 也减少她下次绕开我的动机。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      软 upsell 方案上线, 季度 conversion 涨 9% (达成 marketing 季度 KPI 的 80%, 没 full miss), <strong>客诉率持平, 6 个月内 0 起 OJK 监管事件 vs 同业 2 起 (一个被罚 $50K)</strong>。Marketing head 后来在跨部门会议上 cite 这次 A/B 作为 "data-driven decision" 的例子。我跟她的合作关系更稳, 她下一个 chatbot feature 主动来找我设计而不是直接 PRD。<strong>关键 lesson</strong>: 跟 PM 吵不是赢辩论, 是把她的 underlying goal 解锁出来——goal 不变, 方案有 10 个 path, 我只需要找一个她能接受、又不爆雷的。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">直接发 email "I refuse to implement this, it violates OJK"——道德上对, 但 marketing head 直接 escalate 给我老板, 我会被定义为"难合作的工程师"。</dd>
+        <dt>我选择的</dt><dd class="chose">先问 underlying goal, 拉合规原文, 跑 A/B 用数据收尾, 给她 face-saving framing + 未来选项。</dd>
+        <dt>我接受的代价</dt><dd class="cost">conversion 比硬 upsell 低 3% (~$80K/quarter); 我多花 1 周做 A/B; 但换来 0 监管事件 + 跟 marketing 的长期合作信用。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">如果 A/B 数据显示硬 upsell 客诉只涨 20%, marketing 坚持要硬推呢?</span><span class="a">那我会把 OJK 合规风险单独 escalate 给 legal team, 让 legal 直接跟 marketing 谈——合规是 legal 的 jurisdiction, 不是我的 opinion 跟 marketing opinion 对线。让对的人来 own 对的风险。</span></div>
+      <div class="qa"><span class="q">为啥不一开始就让 legal 介入?</span><span class="a">Legal 介入 = 升级 stakes, marketing head 会觉得我在 "找证人对她"。先 1:1 给她数据 + 替代方案, 把决策权留给她; legal 是 plan B, 不是 plan A。</span></div>
+      <div class="qa"><span class="q">如果 marketing head 直接 override 你, 让你照硬 upsell 实现呢?</span><span class="a">我会 implement, 但同时把我的 written concern (OJK 原文 + A/B 数据) 抄送给她 + 我老板 + legal——不是 CYA, 是确保如果 90 天内出事, decision trail 清楚。Implement 不等于背锅, written disagreement 是底线。</span></div>
+    </div>
+  </article>
+
+
+  <!-- ====================================================== -->
+  <!-- ============== STORY 8: POSTMORTEM (P0) ============== -->
+  <!-- ====================================================== -->
+  <article class="story s8" id="s8">
+    <div class="story-head">
+      <span class="story-num">STORY 8</span>
+      <span class="story-pattern">Pattern · Blameless Postmortem · P0</span>
+      <h2>P0 BNPL retry incident · 5-Whys + 客户联合 review + owner/date 行动项 · 6 个月 0 复发</h2>
+    </div>
+
+    <h3><span class="emoji">🎯</span><span class="step">Trigger Q</span>面试官可能这样问</h3>
+    <div class="triggers">
+      <ul>
+        <li>Tell me about a time you ran a postmortem.</li>
+        <li>Describe the worst incident you've handled and how you followed up.</li>
+        <li>How do you make sure the same bug doesn't happen twice?</li>
+        <li>Walk me through how you'd structure a blameless postmortem with a customer.</li>
+      </ul>
+    </div>
+
+    <h3><span class="emoji">📍</span><span class="step">Situation</span></h3>
+    <p>2025 年初, 我们 BNPL 支付通道一个 retry 模块 P0 故障——支付网关连续 retry 失败, 但 retry 中间没有 idempotency token 隔离, 导致<strong>同一笔订单被多次扣款</strong>。影响 1,420 笔交易, 重复扣款总额 ~$87K, 集中在新加坡 + 印尼两个市场。客户 (合作支付平台) 的 CTO 当晚就要求 joint postmortem——他们的合规需要这份报告交给 MAS。我是当时这个模块的 owner。</p>
+
+    <h3><span class="emoji">🎯</span><span class="step">Task</span></h3>
+    <p>我要在 5 天内 own 3 件事: <strong>(1) 主导 blameless 5-Whys 复盘 (2) 跟客户做 joint review, 让客户对我们的处理 satisfied (3) 出可执行的 action items, 不是"加强测试"这种废话</strong>。同时不能让团队任何人感觉被 throw under the bus。</p>
+
+    <h3><span class="emoji">⚙️</span><span class="step">Action</span>blameless 框架 + 客户联合 review + 时间锁死的行动项</h3>
+    <ol class="actions">
+      <li>
+        <strong>事故第二天上午, 不开"找谁的责任"会, 先开 "facts" 会</strong>: 我把所有相关同事拉进会议, 第一句话就是 "Today we're not deciding who did what wrong. We're building a timeline." 让大家放心。
+        <span class="why">如果第一句是 "我们要找出 root cause", 大家立刻进入防御状态, timeline 会有水分。先 frame 成 "build timeline together", 信息才会出来。</span>
+      </li>
+      <li>
+        <strong>5-Whys 不止做一次, 做 3 个独立分支</strong>: (a) 为什么 retry 没有 idempotency? (b) 为什么 code review 没 catch 这个? (c) 为什么 monitoring 没 alert? 三个 root cause 不混在一起。
+        <span class="why">大部分 postmortem 只做一个 5-Whys, 但 P0 通常是多个 layer 同时失败。一个 root cause 只能 close 一个 gap, 三个独立分支才能 close 整个 swiss cheese。</span>
+      </li>
+      <li>
+        <strong>5-Whys 跑出 3 个 systemic root cause</strong>: (a) 我们的 PR template 没有 idempotency checkbox (我之前 OTP retry 那次后加过, 但只覆盖 OTP 模块, 没扩到支付 retry); (b) code review 是 2-eye 但 reviewer 不必须是支付领域 expert; (c) monitoring 只 alert "支付失败", 不 alert "同订单多次成功扣款" (因为我们以前没遇到过)。
+        <span class="why">root cause 不能是 "某某同事没注意"——那是 surface。真 root cause 是 "我们的系统设计让这种错误可能漏掉", 这是可以 fix 的。</span>
+      </li>
+      <li>
+        <strong>每个 root cause 配 1 个 action item + owner + 具体日期</strong>: 不是 "加强测试", 是 "在 7/15 前, Engineer X 在 CI pipeline 加 idempotency check rule, blocking merge"。
+        <span class="why">"加强 X" 这种 action item 是 postmortem 的死亡指标——没有 owner, 没有日期, 90% 永远不发生。每个 action 必须能在 Jira 上 close 掉, 否则就不是 action。</span>
+      </li>
+      <li>
+        <strong>客户 joint review 我亲自主导, 不让我老板代替</strong>: 客户 CTO + 客户 compliance + 我 + 我老板, 我讲 60 分钟里的 45 分钟。开场说 "I want to walk you through what we found, what we're changing, and what we're NOT going to claim—because some things we don't yet know."
+        <span class="why">老板代替我去讲, 客户会觉得 "vendor 在做 damage control"。我亲自讲, 而且主动暴露 "我们还不知道的部分", 让客户感觉这是真的复盘不是公关。</span>
+      </li>
+      <li>
+        <strong>客户 CTO 提了一个我们没想到的 gap</strong> (他们的合规希望我们的 retry log 保留 90 天, 我们当时只保留 30 天), 我当场加进 action items, 不防御性反驳。
+        <span class="why">postmortem 最忌讳客户提建议工程师 reflex 反驳。即使我们觉得 30 天够, 让客户 contribute action item, 他们就是 stakeholder 不是 spectator, 后续合作完全不同。</span>
+      </li>
+      <li>
+        <strong>5 天后发完整 postmortem doc</strong> (15 页, 含 timeline / 3 个 5-Whys 分支 / action items 表 / lesson section / 客户 contribution 区), 主动 share 给客户 + 我们内部 + 平台组——不只是内部消化。
+        <span class="why">公开 postmortem 看起来是暴露弱点, 实际是建立 transparency culture。客户看到我们公开复盘, 信任反而比"假装没事"高 10 倍。</span>
+      </li>
+      <li>
+        <strong>action items 上线后, 我每月给客户发一个 1 页 follow-up</strong>: "this month's status on the 8 action items", 持续 6 个月。
+        <span class="why">postmortem 写完不是结束, 是开始。如果 action items 静默 close, 客户怀疑我们走过场。每月 1 页让 "我们真的在 fix" 这件事可见。</span>
+      </li>
+    </ol>
+
+    <h3><span class="emoji">📊</span><span class="step">Result</span></h3>
+    <div class="result">
+      <strong>8 个 action items 全部在 60 天内 close, 6 个月内同类 retry/idempotency 类 P0 incident 0 复发</strong> (vs 之前 2024 年同类事故 3 起)。客户 CTO 在月度 vendor review 上把我们升为 "Tier 1 trusted vendor", 这是他们最高级。我们的 idempotency CI check 后来推广到另外 4 个产品线。客户合规向 MAS 提交我们的 postmortem 后, MAS 反馈 "this is the kind of vendor response we want to see"。<strong>关键 lesson</strong>: postmortem 不是 documentation 任务, 是 trust building 任务——transparency + customer co-ownership + measurable action items 是 P0 之后唯一能让客户继续合作的方式。
+    </div>
+
+    <h3><span class="emoji">⚖️</span><span class="step">Tradeoff</span>关键选择高亮</h3>
+    <div class="tradeoffs">
+      <h4>这才是面试官想听的: 我做了什么取舍</h4>
+      <dl>
+        <dt>我差点做的</dt><dd class="almost">让我老板对接客户 CTO (他职级匹配, 看起来更"得体"), 我只 own 内部复盘, postmortem 写完归档。</dd>
+        <dt>我选择的</dt><dd class="chose">亲自主导客户 review 60 分钟, 主动暴露未知, 让客户 contribute action item, 每月 follow-up 6 个月。</dd>
+        <dt>我接受的代价</dt><dd class="cost">客户 review 60 分钟里我承担所有压力 (老板可以"挡一挡"); 之后 6 个月每月多 1 小时写 follow-up; 但换来 Tier 1 vendor status + 4 个产品线推广。</dd>
+      </dl>
+    </div>
+
+    <h3><span class="emoji">🪝</span><span class="step">Follow-up</span>被追问 1-line 答</h3>
+    <div class="followups">
+      <div class="qa"><span class="q">怎么保证 postmortem 真的 blameless, 没人在内部被暗中 punish?</span><span class="a">两个机制: (1) 我老板公开承诺这次 review 不影响 perf, 而且让 HR 知情; (2) 我自己在 doc 里只写 "the system allowed X" 不写 "Engineer Y did X"。如果有同事感觉受不公平对待来找我, 我会 escalate to manager。</span></div>
+      <div class="qa"><span class="q">如果客户 CTO 在 joint review 上情绪化, 要求开除某个工程师, 怎么办?</span><span class="a">我会说 "I hear you. Personnel decisions are ours, not yours; what's yours is whether our process改动 satisfies your compliance. Let's focus on the action items." 划清楚 ownership boundary, 但不否认他的情绪。</span></div>
+      <div class="qa"><span class="q">为啥 postmortem 要花 15 页, 不能 3 页?</span><span class="a">如果只是内部, 3 页够。但这次是给客户 + MAS 合规看的, 必须 timeline / 3 个 5-Whys / action items 表 / lesson 都完整。长 doc 不是 over-engineer, 是匹配 audience。Internal postmortem 我会用 3 页模板。</span></div>
+    </div>
+  </article>
+
+
+  <!-- =============== FOOTER =============== -->
+  <footer>
+    <p>📦 8 个 STAR stories · 平均每个 ~100 行 · 总长 ~800 行</p>
+    <p>Built for Google FDE behavioral round · Gao Xin · TikTok PayLater (Singapore)</p>
+    <p style="margin-top:8px"><a href="cram.html">← 回到 6 天 Cram Hub</a> · <a href="zhenti-answers.html">52+5 真题标准答</a> · <a href="checklist-6day.html">6 天 checklist</a></p>
+  </footer>
+
+</div>
+
+</body>
+</html>

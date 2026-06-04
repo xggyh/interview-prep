@@ -1,0 +1,1283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎯 Google FDE 45-min Real Prompt Drill · Gao Xin</title>
+<meta name="description" content="5 realistic Google FDE 45-min interview prompts — full walkthrough weaving T1 tool calling + T2 RAG + T3 LLM eng + T4 FDE delivery">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  line-height: 1.65;
+  padding: 24px 16px 80px;
+}
+.container { max-width: 1180px; margin: 0 auto; }
+
+header.hero {
+  text-align: center;
+  padding: 32px 20px 24px;
+  background: linear-gradient(135deg, #4f46e5, #db2777, #f59e0b);
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 16px 48px rgba(79, 70, 229, 0.3);
+  color: white;
+}
+header.hero h1 { font-size: 28px; margin-bottom: 6px; letter-spacing: -0.5px; }
+header.hero .sub { font-size: 14px; opacity: 0.95; max-width: 760px; margin: 0 auto; }
+
+nav.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: #1e293b;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+  background: rgba(30, 41, 59, 0.95);
+}
+nav.tabs a {
+  flex: 1 1 200px;
+  text-align: center;
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13px;
+  border: 1px solid #334155;
+  transition: all 0.15s;
+}
+nav.tabs a:hover { background: #334155; color: white; border-color: #6366f1; }
+nav.tabs a .n { display: block; font-size: 11px; color: #64748b; margin-bottom: 2px; }
+
+.intro {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+}
+.intro h2 { font-size: 17px; color: #f1f5f9; margin-bottom: 8px; }
+.intro p { font-size: 14px; color: #cbd5e1; }
+.intro .weave {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.intro .weave div {
+  background: #0f172a;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid #6366f1;
+  font-size: 13px;
+}
+.intro .weave div strong { color: #a78bfa; }
+
+.prompt-section {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 26px 28px;
+  margin-bottom: 24px;
+  scroll-margin-top: 80px;
+}
+.prompt-section h2 {
+  font-size: 22px;
+  color: #f1f5f9;
+  padding-bottom: 10px;
+  border-bottom: 3px solid;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prompt-section.p1 h2 { border-color: #10b981; }
+.prompt-section.p2 h2 { border-color: #06b6d4; }
+.prompt-section.p3 h2 { border-color: #ec4899; }
+.prompt-section.p4 h2 { border-color: #f59e0b; }
+.prompt-section.p5 h2 { border-color: #a855f7; }
+
+.prompt-section .badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.08);
+  color: #cbd5e1;
+}
+
+.verbatim {
+  background: #0f172a;
+  border-left: 4px solid #6366f1;
+  padding: 14px 18px;
+  border-radius: 0 8px 8px 0;
+  margin: 12px 0 18px;
+  font-style: italic;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+.verbatim::before { content: "💬 "; font-style: normal; }
+
+.time-budget {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 14px 0 20px;
+}
+.time-budget div {
+  background: #0f172a;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-top: 3px solid;
+  font-size: 12px;
+}
+.time-budget div strong { color: #f1f5f9; display: block; font-size: 13px; margin-bottom: 2px; }
+.time-budget div.t0 { border-color: #10b981; }
+.time-budget div.t1 { border-color: #06b6d4; }
+.time-budget div.t2 { border-color: #6366f1; }
+.time-budget div.t3 { border-color: #ec4899; }
+.time-budget div.t4 { border-color: #f59e0b; }
+.time-budget div.t5 { border-color: #a855f7; }
+
+h3.phase {
+  font-size: 17px;
+  margin: 22px 0 12px;
+  color: #f1f5f9;
+  padding-left: 12px;
+  border-left: 4px solid #6366f1;
+}
+h3.phase .tier {
+  font-size: 11px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
+.q-list { margin: 10px 0 14px; }
+.q-list .q {
+  background: #0f172a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border-left: 3px solid #06b6d4;
+  font-size: 13.5px;
+}
+.q-list .q .ask { color: #f1f5f9; font-weight: 600; margin-bottom: 4px; }
+.q-list .q .why { color: #94a3b8; font-size: 12.5px; margin-bottom: 2px; }
+.q-list .q .why::before { content: "🎯 Why: "; color: #06b6d4; font-weight: 600; }
+.q-list .q .assume { color: #cbd5e1; font-size: 12.5px; }
+.q-list .q .assume::before { content: "⚡ If waved on: "; color: #f59e0b; font-weight: 600; }
+
+.diagram {
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.layer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.layer {
+  background: #0f172a;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border-top: 3px solid;
+  font-size: 13px;
+}
+.layer h4 { font-size: 13px; color: #f1f5f9; margin-bottom: 6px; }
+.layer.t1 { border-color: #10b981; }
+.layer.t1 h4::before { content: "🛠 T1 "; }
+.layer.t2 { border-color: #06b6d4; }
+.layer.t2 h4::before { content: "📚 T2 "; }
+.layer.t3 { border-color: #ec4899; }
+.layer.t3 h4::before { content: "⚙️ T3 "; }
+.layer.t4 { border-color: #f59e0b; }
+.layer.t4 h4::before { content: "🧭 T4 "; }
+.layer ul { margin: 4px 0 0 18px; color: #cbd5e1; font-size: 12.5px; }
+.layer ul li { margin-bottom: 3px; }
+
+.callout {
+  border-left: 4px solid;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 12px 0;
+  font-size: 13.5px;
+}
+.callout.risk { background: rgba(239, 68, 68, 0.08); border-color: #ef4444; }
+.callout.risk strong { color: #fca5a5; }
+.callout.win { background: rgba(16, 185, 129, 0.08); border-color: #10b981; }
+.callout.win strong { color: #6ee7b7; }
+.callout.tip { background: rgba(245, 158, 11, 0.08); border-color: #f59e0b; }
+.callout.tip strong { color: #fcd34d; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+table th {
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 8px 12px;
+  text-align: left;
+  border: 1px solid #334155;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+table td {
+  padding: 8px 12px;
+  border: 1px solid #334155;
+  vertical-align: top;
+  color: #cbd5e1;
+}
+table td.num { text-align: right; font-variant-numeric: tabular-nums; color: #fcd34d; }
+table td strong { color: #f1f5f9; }
+
+code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  color: #fcd34d;
+}
+
+.qa-drill { margin: 14px 0; }
+.qa-drill .qa {
+  background: #0f172a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border-left: 3px solid #ec4899;
+}
+.qa-drill .qa .q { color: #f9a8d4; font-weight: 600; margin-bottom: 6px; font-size: 13.5px; }
+.qa-drill .qa .q::before { content: "❓ "; }
+.qa-drill .qa .a { color: #cbd5e1; font-size: 13px; }
+.qa-drill .qa .a::before { content: "→ "; color: #ec4899; font-weight: 600; }
+
+.resume-hook {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(236, 72, 153, 0.15));
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: #fef3c7;
+}
+.resume-hook::before {
+  content: "🪝 Resume hook to drop";
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fcd34d;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+footer {
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid #334155;
+}
+footer a { color: #94a3b8; }
+
+@media (max-width: 720px) {
+  header.hero h1 { font-size: 22px; }
+  nav.tabs a { flex: 1 1 100%; }
+  .prompt-section { padding: 18px 16px; }
+  .prompt-section h2 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<header class="hero">
+  <h1>🎯 Google FDE 45-min Real Prompt Drill</h1>
+  <div class="sub">5 realistic interview prompts × full walkthroughs · 把 T1 (tool calling) + T2 (RAG) + T3 (LLM 工程) + T4 (FDE 交付) 编织成 45 min 一气呵成的答案 · 2026 GCP stack</div>
+</header>
+
+<nav class="tabs">
+  <a href="#p1"><span class="n">Prompt 1</span>🛍 Customer Support</a>
+  <a href="#p2"><span class="n">Prompt 2</span>🚚 Logistics Reroute</a>
+  <a href="#p3"><span class="n">Prompt 3</span>🏥 HIPAA Clinical RAG</a>
+  <a href="#p4"><span class="n">Prompt 4</span>💳 Banking BNPL</a>
+  <a href="#p5"><span class="n">Prompt 5</span>🔄 F500 LLM Migration</a>
+</nav>
+
+<div class="intro">
+  <h2>面试的真相 — 没人问"解释 T1.2 retry-fallback"</h2>
+  <p>Google FDE 面试官只会给一个 <strong>realistic customer scenario</strong>, 然后让你在 45 min 里把 architecture / scaling / eval / cost / risk 全 cover 掉. 你脑子里的 T1-T4 知识必须能 <strong>编织</strong> 出来 — 不是按章节背, 而是按 customer 的痛点串.</p>
+  <div class="weave">
+    <div><strong>T1 · Tool calling</strong>: idempotency / retry / destructive wrappers / function schema</div>
+    <div><strong>T2 · RAG</strong>: chunking / embed / hybrid retrieval / rerank / fresh data</div>
+    <div><strong>T3 · LLM eng</strong>: serving / cache / eval / observability / canary</div>
+    <div><strong>T4 · FDE delivery</strong>: scoping / MVP / handoff / runbook / customer trust</div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- PROMPT 1 — CUSTOMER SUPPORT AGENT -->
+<!-- ============================================== -->
+<section class="prompt-section p1" id="p1">
+  <h2><span class="badge">Prompt 1</span> 🛍 F500 Retail Customer Support Agent</h2>
+
+  <div class="verbatim">"Design an AI customer service agent for an F500 retail brand — 10M conversations/month, English + Spanish, integrates with Shopify, Zendesk, internal returns system. Walk me through architecture, scaling, eval."</div>
+
+  <div class="time-budget">
+    <div class="t0"><strong>0-5 min</strong>Clarify · 5Q</div>
+    <div class="t1"><strong>5-15 min</strong>Scope + MVP</div>
+    <div class="t2"><strong>15-25 min</strong>Architecture</div>
+    <div class="t3"><strong>25-35 min</strong>Eval / Ops / Risk</div>
+    <div class="t4"><strong>35-40 min</strong>Cost / Scaling</div>
+    <div class="t5"><strong>40-45 min</strong>Q&A drill</div>
+  </div>
+
+  <h3 class="phase">Min 0-5 — Clarify <span class="tier">T4.1 customer scoping</span></h3>
+  <div class="q-list">
+    <div class="q">
+      <div class="ask">1. What % of those 10M conversations are <strong>order status / returns</strong> vs open-ended product Q?</div>
+      <div class="why">Order status = deterministic tool call (cheap, Flash). Product Q = RAG (expensive, Pro). 决定了 model mix.</div>
+      <div class="assume">70% transactional, 30% product RAG.</div>
+    </div>
+    <div class="q">
+      <div class="ask">2. Current containment rate? What's the <strong>success metric</strong> — CSAT, AHT, deflection $?</div>
+      <div class="why">F500 retail 平均 deflection ≈ 30%; 跳到 60% 才有 ROI 故事. Need a baseline.</div>
+      <div class="assume">Baseline 25% deflection, target 55% in 90 days, CSAT ≥ 4.2/5.</div>
+    </div>
+    <div class="q">
+      <div class="ask">3. What's the <strong>escalation path</strong> when agent fails — Zendesk human queue? SLA?</div>
+      <div class="why">决定了 HITL 设计 (T4.3). 没有 human fallback 等于把 risk 全压在模型上.</div>
+      <div class="assume">Zendesk human queue, 2-min SLA, agent must hand off with full context.</div>
+    </div>
+    <div class="q">
+      <div class="ask">4. <strong>Data residency</strong>? Spanish customers in LATAM or US? Any PII regulations (GDPR if EU)?</div>
+      <div class="why">影响 region 选址 (us-central1 vs southamerica-east1) + 是否要 VPC-SC + DLP.</div>
+      <div class="assume">US-only retailer, no GDPR, but PCI for payment data (mask card #s).</div>
+    </div>
+    <div class="q">
+      <div class="ask">5. <strong>Channel mix</strong>: web chat / SMS / WhatsApp / voice? Streaming requirement?</div>
+      <div class="why">Voice 改变一切 — latency budget 从 2s 变 500ms, 要用 Gemini Live.</div>
+      <div class="assume">90% web + SMS, 10% WhatsApp. No voice in MVP.</div>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 5-15 — Scope + MVP <span class="tier">T4.1 + T4.2</span></h3>
+  <p style="font-size:13.5px;margin-bottom:10px"><strong>4-week walking skeleton</strong> (Mason Mirin 风格 — ship Friday week 4):</p>
+  <table>
+    <tr><th>Week</th><th>Ship</th><th>Risk killed</th></tr>
+    <tr><td><strong>W1</strong></td><td>Single-turn FAQ bot on Gemini Flash + Vertex RAG Engine, 50 hand-picked English FAQs, deployed in Zendesk widget for 1 store</td><td>"Can we call Vertex from Zendesk?" + auth wiring</td></tr>
+    <tr><td><strong>W2</strong></td><td>Add Shopify <code>get_order_status</code> tool, Spanish translation via Gemini, conversation memory</td><td>Tool calling works end-to-end, i18n quality</td></tr>
+    <tr><td><strong>W3</strong></td><td>Add <code>initiate_return</code> (with human-confirm gate), eval harness with 500 golden Q, Cloud Logging + traces</td><td>Destructive action safety, baseline accuracy</td></tr>
+    <tr><td><strong>W4</strong></td><td>5% canary on production traffic, dashboard for deflection rate + CSAT, runbook for on-call</td><td>Real traffic shadowing reveals top failure modes</td></tr>
+  </table>
+  <div class="callout win"><strong>Why this slice:</strong> Each week ships an end-to-end demo customer can click. W1 already de-risks the 3 hardest things: auth into Zendesk, Vertex RAG retrieval quality on real FAQs, and rendering in the customer's actual UI. 后面 8 周才扩大覆盖.</div>
+
+  <h3 class="phase">Min 15-25 — Architecture <span class="tier">T1 + T2 + T3 stitched</span></h3>
+  <div class="diagram">
+[Zendesk widget / SMS gateway / WhatsApp BSP]
+              │
+              ▼
+   ┌──────────────────────────────┐
+   │  Cloud Load Balancer (HTTPS) │
+   └──────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────────────┐
+   │  Agent Runtime (Vertex Agent Engine)         │
+   │  Gemini Enterprise Agent Platform · ADK app  │
+   │  ── Gemini 3 Flash (router + 80% replies)    │
+   │  ── Gemini 3 Pro (complex / escalation)      │
+   │  ── Model Armor (prompt-injection + PII)     │
+   └──────────────────────────────────────────────┘
+       │           │              │             │
+       ▼           ▼              ▼             ▼
+   [RAG]      [Tools]         [Memory]      [Eval/Trace]
+   Vertex RAG  ADK function   Spanner KV    Cloud Trace
+   Engine +    tools w/       (24h session) Gen AI Eval
+   Vector      OAuth +        + Memory Bank Service
+   Search      idempotency    (long-term)
+              │
+       ┌──────┼────────┬───────────┐
+       ▼      ▼        ▼           ▼
+   Shopify  Zendesk  Returns API  Inventory
+   (orders) (tickets) (internal)  (BigQuery)</div>
+
+  <div class="layer-grid">
+    <div class="layer t1">
+      <h4>Tool calling layer</h4>
+      <ul>
+        <li><code>get_order_status(order_id)</code> — <strong>read-only</strong>, no confirm needed</li>
+        <li><code>initiate_return(order_id, reason)</code> — <strong>destructive wrapper</strong>: agent must show summary, customer types "confirm"</li>
+        <li><code>create_ticket(summary, customer_id)</code> — idempotent via <code>idempotency_key = sha256(session_id + summary)</code></li>
+        <li>Each tool: timeout 3s, 2 retries with exponential backoff, structured error → LLM gets <code>{"error": "OUT_OF_STOCK", "user_msg": "..."}</code></li>
+        <li>Function schema in JSON, version pinned per agent release</li>
+      </ul>
+    </div>
+    <div class="layer t2">
+      <h4>RAG layer</h4>
+      <ul>
+        <li><strong>Source</strong>: ~5K product docs + 2K help articles + 90-day return policies</li>
+        <li><strong>Chunking</strong>: 512 tokens / 80 overlap; preserve product SKU as metadata</li>
+        <li><strong>Embed</strong>: <code>text-embedding-005</code> (Vertex), 768 dim; bilingual model (EN + ES)</li>
+        <li><strong>Store</strong>: Vector Search w/ ScaNN, <strong>+ BM25 hybrid</strong> via Discovery Engine (lexical for SKU codes)</li>
+        <li><strong>Rerank</strong>: Gemini Flash rerank top-30 → top-5 (cheap, +8% recall)</li>
+        <li><strong>Freshness</strong>: incremental index every 15 min from Shopify product DB</li>
+      </ul>
+    </div>
+    <div class="layer t3">
+      <h4>Serving / infra</h4>
+      <ul>
+        <li><strong>Vertex Agent Engine</strong> as managed runtime (autoscale, no infra)</li>
+        <li><strong>Prompt cache</strong>: Gemini explicit cache for system prompt (8K tok) → -50% input cost</li>
+        <li><strong>Router</strong>: Flash classifies intent → 80% answered by Flash, 20% routed to Pro</li>
+        <li><strong>Queue</strong>: Pub/Sub for async (returns processing, escalation enrichment)</li>
+        <li><strong>Streaming</strong>: SSE to widget, p50 first-token 300ms</li>
+      </ul>
+    </div>
+    <div class="layer t4">
+      <h4>FDE delivery wraps</h4>
+      <ul>
+        <li>Customer-readable <strong>runbook</strong>: on-call escalation, kill switch, rollback to prev agent version</li>
+        <li><strong>Permissions</strong>: agent service account scoped to read Shopify, write Zendesk only — no DB write</li>
+        <li>Workforce Identity Federation for support team to access dashboards</li>
+        <li>Weekly customer check-in: deflection / CSAT / top failure modes</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 25-35 — Eval / Ops / Risk <span class="tier">T3.4 + T4.3 + T4.4</span></h3>
+  <p style="font-size:13.5px"><strong>3-layer eval</strong>:</p>
+  <table>
+    <tr><th>Layer</th><th>Tool</th><th>Cadence</th><th>Threshold</th></tr>
+    <tr><td><strong>L1: Golden Q&A</strong> (500 hand-curated)</td><td>Gen AI Evaluation Service offline</td><td>Every PR + nightly</td><td>≥ 92% pass, no regression > 2%</td></tr>
+    <tr><td><strong>L2: LLM judge on live</strong> (sample 5%)</td><td>Pro-as-judge, rubric: helpful + accurate + safe</td><td>Real-time, async</td><td>Helpful ≥ 85%, safe ≥ 99.5%</td></tr>
+    <tr><td><strong>L3: Business KPI</strong></td><td>BigQuery + Looker</td><td>Daily dashboard</td><td>Deflection ≥ 50%, CSAT ≥ 4.2</td></tr>
+  </table>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>Observability</strong> (T4.4):</p>
+  <ul style="font-size:13px;margin-left:20px;color:#cbd5e1">
+    <li>Cloud Trace: every conversation → span tree (LLM call · tool calls · retrieval), latency p50/p95/p99 per hop</li>
+    <li>Cloud Logging: structured logs, PII redacted via DLP API at write time</li>
+    <li>3-tier alert: <strong>P0</strong> error rate > 1% / 5min · <strong>P1</strong> p95 latency > 5s / 15min · <strong>P2</strong> CSAT drop > 5pp / day</li>
+    <li>Cloud Audit Logs: every destructive tool call (return initiated, ticket created) logged with user + agent version</li>
+  </ul>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>HITL escalation</strong> (T4.3):</p>
+  <ul style="font-size:13px;margin-left:20px;color:#cbd5e1">
+    <li>Triggers: explicit "speak to human" / 3 failed clarifications / negative sentiment / sensitive topic (medical, legal)</li>
+    <li>Handoff payload: conversation transcript + extracted intent + tools tried + agent's confidence</li>
+    <li>Human can replay in Zendesk in < 30s of taking ticket — measured</li>
+  </ul>
+
+  <div class="callout risk"><strong>Top 3 risks:</strong> (1) Hallucinated return policy → <em>strict RAG with "I don't know" prompt + LLM judge flags unsupported claims</em>. (2) Bad Spanish translations losing trust → <em>native-speaker eval set + bilingual judge</em>. (3) Tool retry storm on Shopify outage → <em>circuit breaker, exponential backoff, graceful "I can't reach the order system right now"</em>.</div>
+
+  <h3 class="phase">Min 35-40 — Cost + Scaling <span class="tier">napkin math</span></h3>
+  <p style="font-size:13.5px"><strong>10M conv/month ≈ 333K/day · ~13K/hr peak (3x)</strong></p>
+  <table>
+    <tr><th>Cost line</th><th>Math</th><th>$/month</th></tr>
+    <tr><td>LLM Flash (80% × 3K in + 200 out)</td><td>8M × (3K×$0.5 + 200×$3) / 1M</td><td class="num">$16.8K</td></tr>
+    <tr><td>LLM Pro (20% × 5K in + 500 out)</td><td>2M × (5K×$2 + 500×$12) / 1M</td><td class="num">$32K</td></tr>
+    <tr><td>Vector Search (5K docs × 768 dim, ~3 reads/conv)</td><td>30M queries × $0.0004</td><td class="num">$12K</td></tr>
+    <tr><td>Embedding refresh (15-min reindex)</td><td>~50M tokens / month × $0.02 / 1M</td><td class="num">$1K</td></tr>
+    <tr><td>Agent Engine compute + egress + logs</td><td>—</td><td class="num">$8K</td></tr>
+    <tr><td><strong>Total before optimization</strong></td><td>—</td><td class="num"><strong>~$70K/mo</strong></td></tr>
+    <tr><td>With prompt cache (-30% on Pro) + Flash routing tuned to 88%</td><td>—</td><td class="num"><strong>~$48K/mo</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>Cost story for the customer</strong>: $48K/mo agent vs $1.2M/mo (10M × 50% deflection × $0.25 saved/conv) → <strong>25× ROI</strong>. 这就是 FDE 的 "ROI in 1 paragraph" 必备段子.</div>
+
+  <h3 class="phase">Min 40-45 — Q&A drill</h3>
+  <div class="qa-drill">
+    <div class="qa">
+      <div class="q">"What if Gemini drops a model version mid-quarter — how do you handle it?"</div>
+      <div class="a">Pin model version in the agent config (<code>gemini-3-flash-001</code> not <code>gemini-3-flash-latest</code>). Run eval suite on the new version in staging first. Canary 5% → 25% → 100% over a week. Keep last 2 versions hot for instant rollback.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How would you detect prompt injection in customer messages?"</div>
+      <div class="a">Model Armor as front gate (managed Google service for prompt injection + PII + jailbreak). Plus a thin LLM-judge that flags "instructions to ignore previous prompt" patterns. Tool layer is the real defense — agents only get scoped function access, not raw SQL.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"Spanish CSAT is 0.4 lower than English — what do you do?"</div>
+      <div class="a">Three hypotheses: (1) RAG corpus is English-heavy → translate KB to Spanish, re-embed with bilingual model. (2) Tone mismatch → tune system prompt with LATAM-native examples. (3) Eval set was English → build native Spanish golden set. Probably all three — ship in that order.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"Customer wants to add voice channel — what changes?"</div>
+      <div class="a">Latency budget collapses from 2s to 500ms. Switch to Gemini Live API for streaming ASR+LLM+TTS. RAG retrieval must finish in 200ms (use HNSW + cached top-K). Smaller context window (preserve only last 3 turns). Probably need Gemini Flash exclusively, no Pro routing. New eval dimension: speech recognition accuracy on accent variants.</div>
+    </div>
+  </div>
+
+  <div class="resume-hook">
+    在 TikTok 我做过 PayLater 跨 7 个市场的多语 voice agent — 同样的 routing pattern (Flash + Pro mix), 同样的 destructive wrapper (refund / 改卡限额). 当时印尼市场 OTP refund 投诉因为 retry idempotency 设计降了 47%. 这套对话 + 工具 + 多市场合规的 wiring 直接可以 port 到 retail 场景, 只是把 KYC / payments 换成 Shopify / returns API.
+  </div>
+</section>
+
+<!-- ============================================== -->
+<!-- PROMPT 2 — LOGISTICS REROUTE AGENT -->
+<!-- ============================================== -->
+<section class="prompt-section p2" id="p2">
+  <h2><span class="badge">Prompt 2</span> 🚚 Logistics Reroute Agent (500 warehouses · 99% on-time)</h2>
+
+  <div class="verbatim">"Build an agent for a logistics company with 500 warehouses across US. Agent reroutes shipments based on weather + traffic + capacity. 99% on-time target. How do you scope, build, eval?"</div>
+
+  <div class="time-budget">
+    <div class="t0"><strong>0-5 min</strong>Clarify · 5Q</div>
+    <div class="t1"><strong>5-15 min</strong>Scope + MVP</div>
+    <div class="t2"><strong>15-25 min</strong>Architecture</div>
+    <div class="t3"><strong>25-35 min</strong>Eval / Ops / Risk</div>
+    <div class="t4"><strong>35-40 min</strong>Cost / Scaling</div>
+    <div class="t5"><strong>40-45 min</strong>Q&A drill</div>
+  </div>
+
+  <h3 class="phase">Min 0-5 — Clarify <span class="tier">T4.1</span></h3>
+  <div class="q-list">
+    <div class="q">
+      <div class="ask">1. Is this <strong>fully autonomous</strong> reroute, or agent suggests + human dispatcher approves?</div>
+      <div class="why">99% on-time + autonomous = liability disaster. 大多 logistics 是 human-in-loop 推荐系统.</div>
+      <div class="assume">Agent recommends, dispatcher 1-click approves; full-auto only for "low-risk" (< $X cargo, in-state, no perishables).</div>
+    </div>
+    <div class="q">
+      <div class="ask">2. Daily <strong>shipment volume</strong>? How many <strong>rerouting decisions/day</strong>?</div>
+      <div class="why">500 warehouse × 1K shipments/day = 500K, 但 reroute candidates 也许 5-10K. 完全不同量级.</div>
+      <div class="assume">500K shipments/day, ~3% need reroute = 15K decisions/day, peak 2K/hr.</div>
+    </div>
+    <div class="q">
+      <div class="ask">3. <strong>Data freshness</strong>: weather/traffic feed latency? Warehouse capacity DB?</div>
+      <div class="why">If weather feed is 1hr stale, agent makes bad decisions confidently. 必须知道 data SLA.</div>
+      <div class="assume">Weather: NOAA, 15-min updates. Traffic: HERE API, 5-min. Capacity: real-time SAP ERP.</div>
+    </div>
+    <div class="q">
+      <div class="ask">4. Why does an <strong>LLM agent</strong> beat existing OR (linear programming) solver?</div>
+      <div class="why">99% logistics 公司已经有 OR solver. Agent value 是 explanation + edge case + dispatcher dialog, 不是 raw optimization.</div>
+      <div class="assume">LLM 是 dispatcher copilot — explains OR output, handles novel disruptions OR can't model, learns from overrides.</div>
+    </div>
+    <div class="q">
+      <div class="ask">5. Definition of "<strong>on-time</strong>"? SLA per cargo type? Penalties?</div>
+      <div class="why">99% on-time across <em>all</em> cargo = different from 99% on tier-1. F500 contract 字眼会要命.</div>
+      <div class="assume">99% = "within promised delivery window, weighted by revenue", tier-1 cargo (40% revenue) 99.5%.</div>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 5-15 — Scope + MVP <span class="tier">T4.2</span></h3>
+  <p style="font-size:13.5px">这题陷阱: 99% target + 500 warehouse 听起来很大. <strong>不要试图重写 OR solver</strong>. MVP = "dispatcher copilot for 1 region".</p>
+  <table>
+    <tr><th>Week</th><th>Ship</th><th>Risk killed</th></tr>
+    <tr><td><strong>W1-2</strong></td><td>Read-only "explainer" — agent reads existing OR output + weather + traffic, writes English explanation for dispatcher in 1 pilot region (Texas, 30 warehouses)</td><td>Read-side data integration, dispatcher buy-in</td></tr>
+    <tr><td><strong>W3-4</strong></td><td>Add "propose reroute" — agent suggests alternate warehouse with rationale, dispatcher 1-click approve. Tools: <code>get_alt_warehouses</code>, <code>simulate_eta</code>, <code>check_capacity</code></td><td>Tool calling correctness, latency under disruption</td></tr>
+    <tr><td><strong>W5-6</strong></td><td>Eval against 6 months historical: how often does agent agree with human dispatcher? Find disagreement cases, learn</td><td>Quality baseline · trust</td></tr>
+    <tr><td><strong>W7-8</strong></td><td>Shadow mode on 2 more regions; "low-risk auto" (in-state, < $5K cargo, no perishable) starts auto-executing</td><td>Auto-mode safety</td></tr>
+  </table>
+
+  <h3 class="phase">Min 15-25 — Architecture <span class="tier">T1 + T2 + T3</span></h3>
+  <div class="diagram">
+[Disruption event] ── Pub/Sub topic ──┐
+(weather / traffic / capacity changes)│
+                                       ▼
+                          ┌──────────────────────────┐
+                          │ Reroute Decision Service │
+                          │ (Cloud Run · Python)     │
+                          └──────────────────────────┘
+                                       │
+                                       ▼
+                ┌─────────────────────────────────────┐
+                │  ADK Agent · Gemini 3 Pro           │
+                │  System prompt: dispatcher persona  │
+                │  Tools (function calling):          │
+                │    - get_shipment_status()          │
+                │    - get_alt_warehouses(geo, sla)   │
+                │    - simulate_eta(route)            │
+                │    - check_capacity(wh_id)          │
+                │    - propose_reroute(...)           │
+                │    - notify_dispatcher(...)         │
+                └─────────────────────────────────────┘
+                                       │
+        ┌────────────┬─────────────────┼─────────────┬───────────────┐
+        ▼            ▼                 ▼             ▼               ▼
+    [SAP ERP]   [OR Solver]      [RAG: SOP/    [Weather/Traffic] [BigQuery
+    capacity    (OR-Tools          contracts]   APIs              ML — historical
+    inventory   gRPC service)     Vector        live feeds        ETA model]
+                                  Search</div>
+
+  <div class="layer-grid">
+    <div class="layer t1">
+      <h4>Tool calling layer</h4>
+      <ul>
+        <li><strong>Read tools</strong>: <code>get_shipment</code>, <code>get_alt_warehouses</code>, <code>check_capacity</code> — idempotent, cached 60s</li>
+        <li><strong>Write tools</strong>: <code>propose_reroute(shipment_id, new_wh, reason)</code> — writes to dispatcher review queue, NOT to SAP directly</li>
+        <li><strong>Auto-execute</strong> only after policy gate: <code>if cargo.value < $5K and same_state and no_perishable</code></li>
+        <li>Tool spec versioned per agent release; new tools require 1-week shadow eval before live</li>
+        <li>Retry: idempotent reads 3 retries; writes are inherently idempotent via <code>shipment_id + version</code></li>
+      </ul>
+    </div>
+    <div class="layer t2">
+      <h4>RAG layer</h4>
+      <ul>
+        <li><strong>Corpus</strong>: 1500 SOPs (cold chain rules, hazmat, customer contracts) + 200 SLA contracts</li>
+        <li><strong>Chunking</strong>: by section, preserve contract name + customer ID as metadata for filtered retrieval</li>
+        <li><strong>Hybrid retrieval</strong>: BM25 (for exact SLA clauses) + dense (for SOP semantic match)</li>
+        <li><strong>Metadata filter</strong>: only retrieve docs scoped to this customer's contract</li>
+        <li>Index refresh: nightly (SOPs change rarely)</li>
+      </ul>
+    </div>
+    <div class="layer t3">
+      <h4>Serving / infra</h4>
+      <ul>
+        <li><strong>Vertex Agent Runtime</strong> for orchestration; OR solver stays in dedicated Cloud Run (low latency, deterministic)</li>
+        <li><strong>Agent2Agent (A2A)</strong>: Reroute agent calls Forecast agent (predicts capacity) and Compliance agent (checks hazmat rules) as A2A sub-agents</li>
+        <li><strong>Streaming</strong>: dispatcher UI shows agent reasoning token-by-token (trust building)</li>
+        <li><strong>Latency budget</strong>: 4s total — 200ms data fetch + 800ms OR solve + 2s LLM reasoning + 1s buffer</li>
+      </ul>
+    </div>
+    <div class="layer t4">
+      <h4>FDE delivery wraps</h4>
+      <ul>
+        <li><strong>Dispatcher dashboard</strong>: shows agent suggestion + confidence + 1-click approve / reject / edit</li>
+        <li><strong>Override capture</strong>: every dispatcher edit logged → fed back to weekly fine-tune dataset</li>
+        <li>Customer-facing <strong>weekly review</strong>: on-time %, reroute saves $, top failure modes, dispatcher trust score</li>
+        <li>Permissions: agent SA can <em>read</em> SAP, <em>write</em> only to review queue, no direct order modification</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 25-35 — Eval / Ops / Risk <span class="tier">T3.4 + T4.3 + T4.4</span></h3>
+  <p style="font-size:13.5px"><strong>Eval is the hard part here</strong> — there's no "correct answer" for "reroute this shipment". Approach:</p>
+  <table>
+    <tr><th>Eval layer</th><th>Method</th><th>Signal</th></tr>
+    <tr><td><strong>Backtesting</strong> on 12 months historical disruption events</td><td>Run agent in dry-run, compare its suggestion to what dispatchers actually did + final on-time outcome</td><td>Agreement rate · disagreement-where-agent-was-right rate</td></tr>
+    <tr><td><strong>LLM judge on rationale</strong></td><td>Pro-as-judge evaluates if the explanation cites correct SLA clause + matches the proposed reroute</td><td>Faithfulness ≥ 95%</td></tr>
+    <tr><td><strong>Dispatcher acceptance</strong></td><td>Live: % of suggestions accepted as-is</td><td>Target: 70% (week 4) → 85% (week 12)</td></tr>
+    <tr><td><strong>End KPI: on-time rate</strong></td><td>BigQuery weekly</td><td>≥ 99% (was target)</td></tr>
+  </table>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>Observability</strong>: Cloud Trace span tree per decision · Cloud Logging w/ shipment_id correlation · BigQuery sink for ML feedback loop · Looker dashboard for dispatcher team.</p>
+
+  <div class="callout risk"><strong>Top 3 risks</strong>: (1) Stale capacity data → agent reroutes to overflowing warehouse. Fix: TTL freshness check in tool, refuse to suggest if data > 5min stale. (2) LLM rationalizes a bad OR output. Fix: separate "validate OR output" prompt as a guard. (3) Auto-execute on edge case (perishable mis-tagged). Fix: defense in depth — both metadata filter + RAG SOP check + dispatcher review for any cargo value > $1K.</div>
+
+  <h3 class="phase">Min 35-40 — Cost + Scaling</h3>
+  <table>
+    <tr><th>Cost line</th><th>Math</th><th>$/month</th></tr>
+    <tr><td>LLM Pro on reroute decisions (15K/day × 8K in + 600 out)</td><td>450K × (8K×$2 + 600×$12) / 1M</td><td class="num">$10.5K</td></tr>
+    <tr><td>LLM Flash for routine status explainers (50K/day × 2K + 200)</td><td>1.5M × (2K×$0.5 + 200×$3) / 1M</td><td class="num">$2.4K</td></tr>
+    <tr><td>Vector Search + RAG Engine</td><td>1500 docs · low QPS</td><td class="num">$500</td></tr>
+    <tr><td>OR Solver Cloud Run (always-on, peak 2K/hr)</td><td>4 vCPU × 24 × 30</td><td class="num">$800</td></tr>
+    <tr><td>BigQuery storage + queries for backtesting</td><td>—</td><td class="num">$1.5K</td></tr>
+    <tr><td>Agent Runtime + observability</td><td>—</td><td class="num">$3K</td></tr>
+    <tr><td><strong>Total</strong></td><td>—</td><td class="num"><strong>~$19K/mo</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>ROI story</strong>: 1% on-time improvement × $50/shipment penalty × 500K shipments/day × 30 days = $7.5M/mo saved. $19K cost · 400× ROI. (Be ready to defend每个数字 — F500 logistics will press.)</div>
+
+  <h3 class="phase">Min 40-45 — Q&A drill</h3>
+  <div class="qa-drill">
+    <div class="qa">
+      <div class="q">"What's the difference between this agent and your existing OR solver?"</div>
+      <div class="a">OR solver gives an optimal route given a fixed model of constraints. The agent <strong>interprets novel constraints</strong> (a hurricane warning, a contract clause), <strong>explains</strong> the OR output to a non-technical dispatcher, and <strong>captures dispatcher overrides</strong> as labeled data. The OR solver still does the optimization — the agent is the wrapper that makes it useful in messy reality.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How do you handle a multi-region outage where 50 warehouses go offline at once?"</div>
+      <div class="a">Circuit breaker on the tool layer — if capacity API returns errors > 10% for 60s, agent enters "degraded mode": no auto-execute, all reroutes go to dispatcher with a "data may be stale" badge. Pub/Sub queue absorbs the spike. We treat the outage itself as a runbook incident, not an agent decision.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"Why Gemini Pro and not a fine-tuned smaller model?"</div>
+      <div class="a">Reasoning quality on multi-constraint trade-offs (cost vs SLA vs cargo type) is where Pro pays back its cost. We'd consider fine-tune <em>after</em> 6 months of dispatcher override data — then maybe fine-tune Flash on accepted reroutes for 70% of cases and reserve Pro for novel disruptions. Premature fine-tuning kills agility.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"What if the customer asks for full automation, no dispatcher?"</div>
+      <div class="a">Push back. 99% on-time + zero human = liability. But propose a gradient: full-auto for low-value in-state same-day; review for everything else. Re-evaluate quarterly as agent's accept rate climbs above 90%. Skipping the dispatcher buy-in phase tanks adoption — that's FDE 101.</div>
+    </div>
+  </div>
+
+  <div class="resume-hook">
+    在 TikTok 我搭的 Internal Agent Platform 跑了类似的 "human-in-loop tool calling" pattern — agents propose, ops 1-click approve, override 都进 weekly training set. 12 周里 acceptance rate 从 62% 涨到 88%. 这套 dispatcher copilot 在 logistics 里完全适用, 只是 tool 从内部 OKR API 换成 SAP + OR Solver.
+  </div>
+</section>
+
+<!-- ============================================== -->
+<!-- PROMPT 3 — HIPAA CLINICAL RAG -->
+<!-- ============================================== -->
+<section class="prompt-section p3" id="p3">
+  <h2><span class="badge">Prompt 3</span> 🏥 HIPAA Clinical Decision RAG (50K doctors · 20M records)</h2>
+
+  <div class="verbatim">"Design a clinical decision support RAG for a 50K-doctor hospital network. 20M medical records, HIPAA, must cite source. Interviewer cares: data sovereignty, latency, hallucination control."</div>
+
+  <div class="time-budget">
+    <div class="t0"><strong>0-5 min</strong>Clarify · 5Q</div>
+    <div class="t1"><strong>5-15 min</strong>Scope + MVP</div>
+    <div class="t2"><strong>15-25 min</strong>Architecture</div>
+    <div class="t3"><strong>25-35 min</strong>Eval / Ops / Risk</div>
+    <div class="t4"><strong>35-40 min</strong>Cost / Scaling</div>
+    <div class="t5"><strong>40-45 min</strong>Q&A drill</div>
+  </div>
+
+  <h3 class="phase">Min 0-5 — Clarify <span class="tier">T4.1 · 在 healthcare 里 clarify 决定生死</span></h3>
+  <div class="q-list">
+    <div class="q">
+      <div class="ask">1. Is this <strong>clinical decision support</strong> (suggests diagnosis/treatment) or <strong>information retrieval</strong> (answers "what does this lab mean")?</div>
+      <div class="why">CDS = FDA-regulated software, 6-12 mo certification. IR = lower-risk physician-tool. 两个走完全不同 path.</div>
+      <div class="assume">Information retrieval first — physician-facing reference / chart summarization, NOT autonomous diagnosis.</div>
+    </div>
+    <div class="q">
+      <div class="ask">2. <strong>Data sovereignty</strong>: on-prem? GCP region locked? BAA in place?</div>
+      <div class="why">HIPAA BAA with Google Cloud is standard; data residency to us regions; PHI never leaves customer's project.</div>
+      <div class="assume">GCP us-central1 in customer's project; BAA signed; VPC-SC perimeter around all PHI.</div>
+    </div>
+    <div class="q">
+      <div class="ask">3. <strong>Source corpus</strong>: EHR notes (unstructured) vs clinical guidelines vs PubMed?</div>
+      <div class="why">EHR notes = PHI everywhere, de-id required. Guidelines = public, low risk. 完全不同 pipeline.</div>
+      <div class="assume">3 corpora: (a) UpToDate + guidelines (public), (b) hospital's internal protocols (PHI-free), (c) patient-specific EHR retrieved per-query with explicit consent.</div>
+    </div>
+    <div class="q">
+      <div class="ask">4. <strong>Latency budget</strong>? Physician at bedside vs in clinic?</div>
+      <div class="why">Bedside (ER) = sub-2s; clinic chart review = 5-8s OK. 决定 retrieval depth + model choice.</div>
+      <div class="assume">Mostly clinic, 5s p95 acceptable; have a "rapid" mode for ER with reduced corpus.</div>
+    </div>
+    <div class="q">
+      <div class="ask">5. Citation requirement: <strong>literal quote</strong> with page number, or <strong>summary with link</strong>?</div>
+      <div class="why">Literal quote = strict RAG with extractive constraint. Summary = abstractive, more risk.</div>
+      <div class="assume">Both — extractive snippet from source + summary, every claim must have inline citation marker.</div>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 5-15 — Scope + MVP <span class="tier">T4.2 · HIPAA 不允许 MVP 走捷径</span></h3>
+  <p style="font-size:13.5px">Healthcare MVP 的特殊性: <strong>合规和 audit 不能放到 V2</strong>. 但仍然可以小范围 ship.</p>
+  <table>
+    <tr><th>Week</th><th>Ship</th><th>Risk killed</th></tr>
+    <tr><td><strong>W1-2</strong></td><td>BAA + VPC-SC + IAM design doc approved; data flow diagram signed off by customer's CISO + privacy officer</td><td>Compliance gate — 不过这关后面全白做</td></tr>
+    <tr><td><strong>W3-4</strong></td><td>RAG on <strong>guidelines corpus only</strong> (no PHI). 100 hand-picked clinician Q. Citation marker required in every output. 5 friendly-user clinicians</td><td>Retrieval quality + citation discipline on public data</td></tr>
+    <tr><td><strong>W5-6</strong></td><td>Add hospital internal protocols (still PHI-free). Eval w/ physician-rated golden set (200 Q). Audit log every query</td><td>Physician trust + audit completeness</td></tr>
+    <tr><td><strong>W7-10</strong></td><td>EHR per-patient retrieval (PHI) behind explicit consent UI; de-identification + access logging; pilot in 1 department (cardiology)</td><td>PHI handling end-to-end</td></tr>
+    <tr><td><strong>W11-12</strong></td><td>Expand to 3 departments; physician feedback loop UI; weekly hallucination review board</td><td>Scale + governance</td></tr>
+  </table>
+
+  <h3 class="phase">Min 15-25 — Architecture <span class="tier">T1 + T2 + T3 + HIPAA</span></h3>
+  <div class="diagram">
+   [Physician portal · SAML SSO]
+              │
+              ▼
+   ┌──────────────────────────────────────────────┐
+   │  VPC Service Controls perimeter              │
+   │  ┌─────────────────────────────────────┐    │
+   │  │ Cloud Load Balancer (internal)      │    │
+   │  └─────────────────────────────────────┘    │
+   │              │                                │
+   │              ▼                                │
+   │  ┌─────────────────────────────────────┐    │
+   │  │ Vertex Agent Runtime (CMEK)         │    │
+   │  │  - Gemini 3 Pro (BAA-covered)       │    │
+   │  │  - Model Armor (PHI filter)         │    │
+   │  │  - Citation-enforcing system prompt │    │
+   │  └─────────────────────────────────────┘    │
+   │       │                                       │
+   │   ┌───┼────────────────────┬─────────────┐   │
+   │   ▼   ▼                    ▼             ▼   │
+   │ [Guideline   [Protocol    [EHR Retrieval  [Cloud DLP
+   │  RAG]        RAG]          w/ consent]    De-ID]
+   │ Vector       Vector        FHIR API
+   │ Search       Search        + patient scope
+   │   │            │             │
+   │   ▼            ▼             ▼
+   │ [UpToDate   [Internal      [Cerner/Epic FHIR
+   │  + guides]   protocols]     server, on-prem
+   │  re-indexed  CMEK GCS       via Anthos]
+   └──────────────────────────────────────────────┘
+              │
+              ▼
+   [Cloud Audit Logs · Access Transparency · BigQuery (de-id)]</div>
+
+  <div class="layer-grid">
+    <div class="layer t1">
+      <h4>Tool calling layer</h4>
+      <ul>
+        <li><code>get_patient_summary(patient_id, consent_token)</code> — requires explicit consent_token from physician's signed UI action</li>
+        <li><code>search_guidelines(condition, age, severity)</code> — read-only, no PHI</li>
+        <li><code>get_lab_history(patient_id, range, consent_token)</code> — FHIR call, audit logged</li>
+        <li><strong>No write tools</strong> in V1 — agent never modifies EHR; physician copies/pastes</li>
+        <li>Every tool call: structured log with physician ID + patient ID + reason → BigQuery audit table</li>
+      </ul>
+    </div>
+    <div class="layer t2">
+      <h4>RAG layer — citation-first</h4>
+      <ul>
+        <li><strong>Chunking</strong>: by section, preserve <code>doc_id + section + page + URL</code> in metadata for citation</li>
+        <li><strong>Embed</strong>: <code>text-embedding-005</code>; medical fine-tuned variant if available, else generic + domain re-rank</li>
+        <li><strong>Hybrid retrieval</strong>: BM25 for ICD/CPT codes + dense for semantic; metadata filter by specialty</li>
+        <li><strong>Rerank</strong>: Pro-as-reranker on top-30 → top-5 with relevance + recency score</li>
+        <li><strong>Citation enforcement</strong>: system prompt + structured output schema — every sentence must have <code>[doc_id:section]</code> marker; LLM judge rejects ungrounded sentences</li>
+        <li>EHR retrieval scoped to patient_id, never crosses patient boundary (tested with red-team eval)</li>
+      </ul>
+    </div>
+    <div class="layer t3">
+      <h4>Serving / infra</h4>
+      <ul>
+        <li><strong>CMEK</strong> (customer-managed encryption keys) on all storage + Vector Search indexes</li>
+        <li><strong>VPC-SC perimeter</strong> wraps the entire project; data exfiltration blocked at infra level</li>
+        <li><strong>Private Service Connect</strong> for hospital → GCP, no public internet path</li>
+        <li><strong>Streaming</strong>: SSE with citation markers appearing inline as model produces</li>
+        <li>Model pinned to Gemini 3 Pro BAA-covered version; HIPAA-eligible services only (Vertex, GCS, Spanner, BigQuery)</li>
+      </ul>
+    </div>
+    <div class="layer t4">
+      <h4>FDE delivery wraps — governance</h4>
+      <ul>
+        <li><strong>Access Transparency</strong>: every Google support touch on customer data is logged & visible to customer</li>
+        <li><strong>Workforce Identity Federation</strong> for hospital staff; physicians authenticate via hospital IdP</li>
+        <li><strong>Audit log</strong>: 7-year retention (HIPAA), partitioned in BigQuery, exportable for joint commissioner reviews</li>
+        <li>Weekly <strong>hallucination review board</strong> with hospital clinical informatics team — sample 100 conversations, rate</li>
+        <li>Customer-runnable <strong>kill switch</strong> + read-only mode + per-department rollout flags</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 25-35 — Eval / Ops / Risk <span class="tier">hallucination is the existential risk</span></h3>
+  <p style="font-size:13.5px"><strong>4-layer eval</strong> (most stringent of all 5 prompts):</p>
+  <table>
+    <tr><th>Layer</th><th>Method</th><th>Threshold</th></tr>
+    <tr><td><strong>L1: Faithfulness</strong></td><td>LLM judge: every sentence supported by cited chunk? (extractive verification)</td><td>≥ 99% sentences grounded; any ungrounded = hard fail</td></tr>
+    <tr><td><strong>L2: Citation correctness</strong></td><td>Cited chunk actually contains the claim — checked by string match + LLM</td><td>≥ 98%</td></tr>
+    <tr><td><strong>L3: Clinical accuracy</strong></td><td>2 board-certified physicians rate each answer in golden set (300 Q across specialties); inter-rater κ tracked</td><td>≥ 90% rated "clinically sound", 0% rated "potentially harmful"</td></tr>
+    <tr><td><strong>L4: Refusal correctness</strong></td><td>Adversarial set: out-of-scope, dangerous, prompt-injection — agent should refuse</td><td>100% refusal on the unsafe set</td></tr>
+  </table>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>HITL escalation</strong> (T4.3): If LLM judge confidence < 0.9 OR query matches "diagnosis"/"prescribe" intent, agent inserts a "this is information, not a recommendation — consult attending" + flags for review board.</p>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>Observability</strong> (T4.4): Cloud Trace per query · Cloud Audit Logs for every PHI access · Access Transparency for Google-side · BigQuery sink (de-id) for weekly hallucination review · Looker dashboards for hospital privacy officer.</p>
+
+  <div class="callout risk"><strong>Top 3 risks</strong>: (1) Cross-patient PHI leak via retrieval. Defense: hard metadata filter <code>patient_id</code> on every EHR query + red-team eval set. (2) Hallucinated drug dose or contraindication. Defense: citation-only output + drug-knowledge-base structured tool (not from LLM memory). (3) De-identification failure exposing PHI in logs. Defense: Cloud DLP API on log write path + auto-redaction + monthly DLP audit.</div>
+
+  <h3 class="phase">Min 35-40 — Cost + Scaling</h3>
+  <p style="font-size:13.5px">50K doctors × ~10 queries/day = 500K queries/day = 15M/month. Most queries are simple lookups.</p>
+  <table>
+    <tr><th>Cost line</th><th>Math</th><th>$/month</th></tr>
+    <tr><td>LLM Pro (15M queries × 10K in + 800 out, citation-heavy)</td><td>15M × (10K×$2 + 800×$12) / 1M</td><td class="num">$444K</td></tr>
+    <tr><td>With prompt caching (system prompt 8K) + 70% Flash routing for simple lookups</td><td>Pro 30% × $444K + Flash 70% × $63K</td><td class="num">$177K</td></tr>
+    <tr><td>Vector Search (20M chunks, 3 retrieves/query)</td><td>45M queries × $0.0004</td><td class="num">$18K</td></tr>
+    <tr><td>Embedding (20M chunks + weekly refresh)</td><td>~5B tokens / mo × $0.02 / 1M</td><td class="num">$100K (one-time-ish) + $5K refresh</td></tr>
+    <tr><td>FHIR egress, CMEK ops, audit storage</td><td>—</td><td class="num">$15K</td></tr>
+    <tr><td>Vertex Agent Runtime + observability + DLP</td><td>—</td><td class="num">$20K</td></tr>
+    <tr><td><strong>Steady-state monthly</strong></td><td>—</td><td class="num"><strong>~$235K/mo</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>ROI framing</strong>: $235K/mo on 50K physicians = $4.7/doctor/mo. Physician hourly cost ≈ $200; if agent saves 1 minute/query × 10 queries/day = $33/doctor/day saved. Net: 700× ROI. Stress: <em>information tool</em>, not CDS — value is time, not autonomy.</div>
+
+  <h3 class="phase">Min 40-45 — Q&A drill</h3>
+  <div class="qa-drill">
+    <div class="qa">
+      <div class="q">"What if Google subpoenas data — how is the customer protected?"</div>
+      <div class="a">Two layers: CMEK means Google can't decrypt without customer's KMS keys; customer can revoke. Plus Access Transparency logs every Google support access. Plus the contractual BAA + Google's customer-controlled subpoena policy (Google notifies customer before any disclosure unless legally prohibited). I'd walk the customer's CISO through these in week 1.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How do you stop the LLM from making up a medication dose?"</div>
+      <div class="a">Three defenses. (1) Structured tool: <code>get_drug_info(drug_name)</code> returns authoritative dose from First Databank — LLM cites it, never generates from memory. (2) Citation-only output: any drug claim without an inline <code>[FDB:drug_id]</code> marker fails LLM judge. (3) Red-team eval set of 200 known dangerous queries; any failure blocks release.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"What if a physician asks a question outside the agent's scope?"</div>
+      <div class="a">Refusal-correctness eval drives this. Agent has a scope classifier (Flash, fast) — if intent matches "diagnose" or "prescribe", agent responds with information-only framing + "please consult clinical decision support certified by your institution." Refusal accuracy ≥ 99.5% before launch. We never silently expand scope.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"20M records — how do you incrementally index?"</div>
+      <div class="a">Two indexes. Static index for guidelines/protocols, rebuilt weekly off-hours. Patient EHR is NOT bulk-indexed — we retrieve per-query from FHIR + embed on the fly (tiny corpus per patient, fits in 100ms). This sidesteps the "20M PHI vectors sitting in shared store" problem entirely. Each patient's retrieval is sandboxed.</div>
+    </div>
+  </div>
+
+  <div class="resume-hook">
+    在 TikTok 做 PayLater 的时候我处理过类似 PII 隔离的问题 — 印尼 BNPL 客户的 KYC 数据必须 region-bound, agent 不能跨用户 retrieve. 我们用 metadata filter + per-call consent token + 红队 eval 来保证. 同套 pattern 直接搬到 HIPAA 场景, 只是把 KYC token 换成 EHR consent_token, region 锁换成 VPC-SC + CMEK.
+  </div>
+</section>
+
+<!-- ============================================== -->
+<!-- PROMPT 4 — BANKING BNPL AGENT -->
+<!-- ============================================== -->
+<section class="prompt-section p4" id="p4">
+  <h2><span class="badge">Prompt 4</span> 💳 Banking BNPL Collections Agent (3 markets · no idempotency)</h2>
+
+  <div class="verbatim">"Design an AI agent for a regional bank's BNPL collections — 3 markets (US, Brazil, Indonesia), multilingual, regulatory variance, must integrate with legacy payment processors that don't support idempotency."</div>
+
+  <div class="time-budget">
+    <div class="t0"><strong>0-5 min</strong>Clarify · 5Q</div>
+    <div class="t1"><strong>5-15 min</strong>Scope + MVP</div>
+    <div class="t2"><strong>15-25 min</strong>Architecture</div>
+    <div class="t3"><strong>25-35 min</strong>Eval / Ops / Risk</div>
+    <div class="t4"><strong>35-40 min</strong>Cost / Scaling</div>
+    <div class="t5"><strong>40-45 min</strong>Q&A drill</div>
+  </div>
+
+  <h3 class="phase">Min 0-5 — Clarify <span class="tier">T4.1 · 监管 + legacy 一起来</span></h3>
+  <div class="q-list">
+    <div class="q">
+      <div class="ask">1. What's the <strong>collections channel</strong>? Outbound SMS / voice / email? Or inbound when customer pays late?</div>
+      <div class="why">Outbound voice = TCPA / FDCPA in US (auto-dialer rules), GDPR-like in BR; inbound = easier. 选错合规直接关停.</div>
+      <div class="assume">Mostly outbound SMS + inbound chat; voice only with prior consent.</div>
+    </div>
+    <div class="q">
+      <div class="ask">2. Per-market <strong>regulatory deltas</strong>: TCPA / LGPD (Brazil) / OJK (Indonesia)?</div>
+      <div class="why">同一个 agent 三套合规, 不可能一份 prompt 通用. 必须 prompt + tools + audit 都 per-market.</div>
+      <div class="assume">3 separate agent configs, shared core; legal review per market before launch.</div>
+    </div>
+    <div class="q">
+      <div class="ask">3. <strong>Payment processor</strong> integration: what does "no idempotency" actually mean?</div>
+      <div class="why">"No idempotency key" = double-charge risk. 必须在 agent 这层加保护. 不是 LLM 问题, 是 wrapper 问题.</div>
+      <div class="assume">Processor accepts retry but doesn't dedup; we wrap with our own idempotency layer in Spanner.</div>
+    </div>
+    <div class="q">
+      <div class="ask">4. <strong>Volume + delinquency</strong>: how many accounts in collections? What's current recovery rate?</div>
+      <div class="why">10K vs 1M 完全不同 ops. Recovery baseline 决定 ROI 数字.</div>
+      <div class="assume">300K active delinquent accounts, 18% baseline 30-day recovery, target 25%.</div>
+    </div>
+    <div class="q">
+      <div class="ask">5. <strong>Tone</strong>: empathetic vs assertive? Hardship handling? Settlement offers in scope?</div>
+      <div class="why">Collections tone is contractual + ethical. Settlement offer = financial decision, needs guardrails.</div>
+      <div class="assume">Empathetic-first, mandatory hardship path, settlement only in approved $-range with bank rep gate.</div>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 5-15 — Scope + MVP <span class="tier">T4.2</span></h3>
+  <table>
+    <tr><th>Week</th><th>Ship</th><th>Risk killed</th></tr>
+    <tr><td><strong>W1-2</strong></td><td>US-only outbound SMS + inbound chat, English. Static reminder + payment-link only (no tools). 1K-account pilot</td><td>Compliance with TCPA · SMS deliverability</td></tr>
+    <tr><td><strong>W3-4</strong></td><td>Add <code>charge_payment</code> wrapper w/ idempotency layer in Spanner; add hardship workflow; agent can offer 1 pre-approved payment plan</td><td>Idempotency under retry · destructive tool safety</td></tr>
+    <tr><td><strong>W5-6</strong></td><td>Add Spanish (Brazilian Portuguese) for BR market; LGPD-compliant prompt + audit; 1K-account pilot in BR</td><td>Per-market i18n + compliance</td></tr>
+    <tr><td><strong>W7-8</strong></td><td>Add Bahasa for ID market w/ OJK templates; collection-hour rules per market; expand US to 30K accounts</td><td>3-market unified architecture</td></tr>
+    <tr><td><strong>W9-12</strong></td><td>Settlement-offer tool behind human approval; recovery-rate dashboard; weekly compliance review</td><td>Financial decision boundary · governance</td></tr>
+  </table>
+
+  <h3 class="phase">Min 15-25 — Architecture <span class="tier">T1 idempotency is THE story</span></h3>
+  <div class="diagram">
+   [SMS gateway · WhatsApp · web chat]   ◄── 3 markets, 1 channel mux
+              │
+              ▼
+   ┌──────────────────────────────────────────┐
+   │  Agent Runtime (Vertex Agent Engine)     │
+   │  Per-market config:                      │
+   │    - System prompt (legal templates)     │
+   │    - Allowed-hours guard                 │
+   │    - Settlement $-range                  │
+   │    - Audit fields                        │
+   │  Model: Gemini 3 Flash (95%) / Pro (5%)  │
+   │  Model Armor: PII + jailbreak            │
+   └──────────────────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────────┐
+   │  Idempotency Layer (Spanner)             │
+   │   key = sha256(account_id + amount +    │
+   │                day + agent_intent_hash)  │
+   │   { status: PENDING / DONE / FAILED,    │
+   │     processor_txn_id, ts, version }      │
+   └──────────────────────────────────────────┘
+              │
+       ┌──────┼──────────────┬────────────┬──────────┐
+       ▼      ▼              ▼            ▼          ▼
+   [US     [BR             [ID        [RAG: legal  [HITL queue:
+    legacy  processor]      processor] templates    settlement
+    proc]                              per market]  / hardship]</div>
+
+  <div class="layer-grid">
+    <div class="layer t1">
+      <h4>Tool calling — idempotency is everything</h4>
+      <ul>
+        <li><strong>Idempotency wrapper</strong>: every <code>charge_payment</code> call goes through Spanner write-then-check pattern. If Spanner row exists with status DONE → return existing txn_id. If PENDING → wait & poll. If new → insert PENDING → call processor → update.</li>
+        <li><strong>Atomic insert + processor call</strong>: NOT possible (processor isn't transactional). Use compensating transaction — if Spanner inserts but processor call dies, a reconciler job runs every 60s to query processor status by our internal_ref and update Spanner.</li>
+        <li><code>get_account(account_id)</code>, <code>offer_payment_plan(plan_id)</code>, <code>flag_hardship(account_id, reason)</code> — all w/ structured schema</li>
+        <li><strong>Destructive wrappers</strong>: any settlement &gt; $X requires human approver in HITL queue before tool actually fires</li>
+        <li>Retry policy: read tools 3x; charge tool 0 LLM retries — only reconciler retries</li>
+      </ul>
+    </div>
+    <div class="layer t2">
+      <h4>RAG — per-market legal templates</h4>
+      <ul>
+        <li><strong>Corpus</strong>: 200 approved legal templates per market (TCPA-compliant scripts for US, LGPD wording for BR, OJK for ID) + hardship policy docs</li>
+        <li><strong>Hard metadata filter</strong>: <code>market = current_market</code>; agent literally cannot retrieve another market's templates</li>
+        <li><strong>Approved phrasing constraint</strong>: agent's reply must contain approved phrase boilerplate per market — checked by post-LLM compliance gate</li>
+        <li>Updated quarterly with bank legal team in the loop</li>
+      </ul>
+    </div>
+    <div class="layer t3">
+      <h4>Serving / infra</h4>
+      <ul>
+        <li><strong>Multi-region deploy</strong>: us-central1, southamerica-east1, asia-southeast2 — data stays in-market</li>
+        <li><strong>Per-market service accounts</strong>: ID agent SA has zero access to US data and vice versa (Workforce Identity Federation)</li>
+        <li><strong>Reconciler service</strong>: dedicated Cloud Run job, polls Spanner PENDING rows every 60s, queries processor by internal_ref, updates state. Idempotent by design.</li>
+        <li><strong>Allowed-hours gate</strong>: agent refuses to send outbound between TCPA-forbidden hours (8am-9pm local); enforced at outbound dispatch, not just prompt</li>
+      </ul>
+    </div>
+    <div class="layer t4">
+      <h4>FDE delivery wraps</h4>
+      <ul>
+        <li>Bank ops dashboard: market-specific compliance score, settlement queue, recovery rate</li>
+        <li><strong>Cloud Audit Logs</strong>: every charge attempt + every settlement offer + every override, 7-year retention per market</li>
+        <li>Customer (bank) gets quarterly compliance attestation report — auto-generated from audit logs</li>
+        <li>Per-market kill switch — bank's compliance officer can shut down 1 market without touching others</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 25-35 — Eval / Ops / Risk <span class="tier">T3.4 + T4.3 + T4.4</span></h3>
+  <table>
+    <tr><th>Eval layer</th><th>Method</th><th>Threshold</th></tr>
+    <tr><td><strong>Compliance phrasing</strong></td><td>Per-market approved-phrase checker (deterministic regex + LLM judge)</td><td>100% — any miss blocks send</td></tr>
+    <tr><td><strong>Hardship handling</strong></td><td>Golden set: 100 customer messages mentioning hardship → must route to hardship workflow</td><td>≥ 99% routed correctly</td></tr>
+    <tr><td><strong>Idempotency stress</strong></td><td>Inject 1% network errors in staging, replay 10K txns, count duplicate charges</td><td>0 duplicate charges</td></tr>
+    <tr><td><strong>Recovery rate</strong></td><td>A/B vs human-collector baseline, 30-day recovery %</td><td>+5pp vs baseline by week 12</td></tr>
+  </table>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>HITL escalation</strong> (T4.3): hardship cases · settlement &gt; $X · customer asks legal Q · 3 failed payment attempts in 24h · any "I'll sue" detection → human rep in &lt; 5min SLA.</p>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>Observability</strong>: Cloud Trace per conversation + per charge attempt · Cloud Logging with market + account_id correlation · Cloud Audit Logs for every settlement and charge · BigQuery for weekly compliance report · 3-tier alert: <strong>P0</strong> any duplicate charge / 1hr · <strong>P1</strong> compliance gate fail rate &gt; 0.1% · <strong>P2</strong> recovery rate drop &gt; 3pp.</p>
+
+  <div class="callout risk"><strong>Top 3 risks</strong>: (1) Double-charge from legacy processor. Defense: Spanner idempotency + reconciler + 0 LLM-driven retry on write tools. (2) Cross-market template leak (US script sent to ID). Defense: hard metadata filter + per-market SA + approved-phrase post-gate. (3) Tone error causing complaint / regulator letter. Defense: LLM judge on tone before send + sample human review + immediate kill switch.</div>
+
+  <h3 class="phase">Min 35-40 — Cost + Scaling</h3>
+  <table>
+    <tr><th>Cost line</th><th>Math</th><th>$/month</th></tr>
+    <tr><td>LLM Flash (300K accounts × ~5 turns/mo × 3K in + 200 out)</td><td>1.5M × (3K×$0.5 + 200×$3) / 1M</td><td class="num">$3.1K</td></tr>
+    <tr><td>LLM Pro (5% complex/escalation cases)</td><td>75K × (5K×$2 + 500×$12) / 1M</td><td class="num">$1.2K</td></tr>
+    <tr><td>SMS gateway (3 markets, ~5 SMS / delinquent account)</td><td>1.5M SMS × $0.01 avg (regional varies)</td><td class="num">$15K</td></tr>
+    <tr><td>Spanner regional (idempotency + audit), 3 regions</td><td>—</td><td class="num">$6K</td></tr>
+    <tr><td>Vector Search (small corpus)</td><td>—</td><td class="num">$500</td></tr>
+    <tr><td>Reconciler Cloud Run + observability + DLP</td><td>—</td><td class="num">$3K</td></tr>
+    <tr><td><strong>Total</strong></td><td>—</td><td class="num"><strong>~$29K/mo</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>ROI</strong>: +5pp recovery × 300K accounts × $200 avg = $30M/mo recovered. $29K cost · 1000× ROI on agent line item. (Real ROI lower because some recoveries already happen — be honest in the answer: net +$3-5M/mo realistic.)</div>
+
+  <h3 class="phase">Min 40-45 — Q&A drill</h3>
+  <div class="qa-drill">
+    <div class="qa">
+      <div class="q">"The legacy processor doesn't even return a transaction ID synchronously — how does idempotency work?"</div>
+      <div class="a">We mint our own <code>internal_ref</code> (UUID + account + amount + day-hash), pass it to the processor in a free-text field if available or via timestamp correlation if not. The reconciler polls the processor's status API by <code>internal_ref</code> every 60s. If the processor literally has no way to dedupe — we accept a small risk window (60s) and use the Spanner PENDING state to refuse a second concurrent call. Worst case: a duplicate is auto-refunded by reconciler within 60s. Document this in the runbook.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How do you ensure the BR market doesn't accidentally use a US script?"</div>
+      <div class="a">Three layers: (1) per-market service account — BR agent can only access BR corpus index. (2) Hard metadata filter at retrieval. (3) Post-LLM compliance gate — deterministic regex checks that the output contains the required Portuguese boilerplate and doesn't contain English-only phrases. Any layer failing blocks the send.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"What if a customer says 'I'll sue the bank' — what does the agent do?"</div>
+      <div class="a">Classifier intent — instant HITL escalation. Agent responds "I understand your concern. I'm connecting you with a specialist who can help" + stops outbound campaign for this account + flags for legal review. Audit logged. Bank rep takes over within 5min SLA. We test this on 50 adversarial transcripts in the eval set.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How would Indonesia's OJK regulations change the agent vs the US version?"</div>
+      <div class="a">Different allowed-hours (8am-8pm local, no Sundays). Different mandatory disclosures (must identify as collections in first SMS, must mention complaint channel). Different escalation paths — OJK requires SLA logs filed quarterly. We bake all of this into the per-market config and prompt template; same code path, different declarative config. That's the FDE play — write the engine once, configure per market.</div>
+    </div>
+  </div>
+
+  <div class="resume-hook">
+    我在 TikTok 做 PayLater 7-market voice agent 时候就吃过 idempotency 的亏 — 印尼 OTP refund 一开始没设计 idempotency key, 双扣事件率 0.3%. 后来加了类似的 wrapper + reconciler, 投诉降了 47%. 这个 prompt 几乎一比一映射 TikTok 那个项目, BNPL chatbot 也是我做过的 — 直接拿现成的 mental model.
+  </div>
+</section>
+
+<!-- ============================================== -->
+<!-- PROMPT 5 — F500 LLM MIGRATION -->
+<!-- ============================================== -->
+<section class="prompt-section p5" id="p5">
+  <h2><span class="badge">Prompt 5</span> 🔄 F500 OpenAI → Gemini Migration ($2M/yr · 12 apps · 6 mo)</h2>
+
+  <div class="verbatim">"F500 customer wants to migrate from OpenAI to Gemini across 12 apps, $2M/year spend. They have existing eval suites, fine-tuned models, and production prompt registry. 6-month timeline. Walk me through the program."</div>
+
+  <div class="time-budget">
+    <div class="t0"><strong>0-5 min</strong>Clarify · 5Q</div>
+    <div class="t1"><strong>5-15 min</strong>Scope + program plan</div>
+    <div class="t2"><strong>15-25 min</strong>Architecture / wave plan</div>
+    <div class="t3"><strong>25-35 min</strong>Eval / Risk / Rollback</div>
+    <div class="t4"><strong>35-40 min</strong>Cost / Scaling</div>
+    <div class="t5"><strong>40-45 min</strong>Q&A drill</div>
+  </div>
+
+  <h3 class="phase">Min 0-5 — Clarify <span class="tier">T4.1 · 这是 program, 不是 system</span></h3>
+  <div class="q-list">
+    <div class="q">
+      <div class="ask">1. What's the <strong>business driver</strong> — cost, performance, contractual, or data sovereignty?</div>
+      <div class="why">完全不同 program. Cost = aggressive timeline, accept some quality loss. Sovereignty = no-compromise migration even if cost rises.</div>
+      <div class="assume">Mix: 40% cost (Gemini cheaper), 30% multimodal capability gain, 30% Google Cloud strategic deal.</div>
+    </div>
+    <div class="q">
+      <div class="ask">2. What are the <strong>12 apps</strong>? Customer-facing vs internal? Same team owns all?</div>
+      <div class="why">12 apps × 6 mo = 2 weeks/app if serial. Real plan is wave-based by risk + ownership.</div>
+      <div class="assume">5 customer-facing (high risk), 4 internal copilot, 3 batch. 4 product teams own them.</div>
+    </div>
+    <div class="q">
+      <div class="ask">3. <strong>Fine-tuned models</strong> — which apps, what data, can we replicate or replace with RAG/prompt eng?</div>
+      <div class="why">Fine-tunes are the migration killers. 大多数能用 prompt + RAG 替代, 少数必须 re-tune on Gemini.</div>
+      <div class="assume">3 apps have fine-tunes; 2 are replaceable by RAG + prompt; 1 (named entity extraction) needs Gemini fine-tune.</div>
+    </div>
+    <div class="q">
+      <div class="ask">4. <strong>Existing eval suite</strong>: do they have golden sets, KPIs, A/B infra in place?</div>
+      <div class="why">Strong eval = fast migration. Weak eval = we have to build it first or fly blind.</div>
+      <div class="assume">Strong on 4 apps (full golden set + KPI), partial on 5, none on 3 (we build).</div>
+    </div>
+    <div class="q">
+      <div class="ask">5. Is "<strong>migrate</strong>" full replacement or multi-model with OpenAI as fallback?</div>
+      <div class="why">FDE 推荐 multi-model abstraction layer regardless — defends future model swaps.</div>
+      <div class="assume">Full migration goal, but we'll build a model gateway abstraction so future swap is config change.</div>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 5-15 — Scope + program plan <span class="tier">T4.2 · program shape</span></h3>
+  <table>
+    <tr><th>Phase</th><th>Weeks</th><th>Deliverable</th></tr>
+    <tr><td><strong>P0 — Discovery</strong></td><td>W1-3</td><td>App inventory: per-app traffic, cost, prompt registry, eval state, fine-tune presence, criticality. Risk matrix. Wave plan.</td></tr>
+    <tr><td><strong>P1 — Model Gateway</strong></td><td>W3-5</td><td>Build / deploy abstraction layer (Vertex Model Garden + custom router); shadow traffic for telemetry; no end-user change yet.</td></tr>
+    <tr><td><strong>P2 — Wave 1 (3 batch apps)</strong></td><td>W5-9</td><td>Migrate batch (lowest risk): re-prompt, eval, A/B vs OpenAI on offline data, cut over.</td></tr>
+    <tr><td><strong>P3 — Wave 2 (4 internal copilot)</strong></td><td>W9-15</td><td>Migrate internal apps: re-prompt, eval, 10% canary → 100%. 1 needs Gemini fine-tune.</td></tr>
+    <tr><td><strong>P4 — Wave 3 (5 customer-facing)</strong></td><td>W15-22</td><td>Migrate customer apps: full eval rebuild where missing, shadow mode 2 weeks each, gradual canary.</td></tr>
+    <tr><td><strong>P5 — Hardening</strong></td><td>W22-26</td><td>Decommission OpenAI calls (keep behind feature flag for 1 quarter), cost true-up, knowledge transfer to customer team.</td></tr>
+  </table>
+
+  <div class="callout win"><strong>Why wave-based</strong>: serializing 12 apps = brittle dependency. Wave-based = parallel work across 4 product teams, risk-graded, with the Model Gateway giving us instant rollback per app.</div>
+
+  <h3 class="phase">Min 15-25 — Architecture <span class="tier">T3 model gateway is THE platform play</span></h3>
+  <div class="diagram">
+   [App 1] [App 2] ... [App 12]
+         │     │              │
+         └─────┴──────┬───────┘
+                     ▼
+   ┌──────────────────────────────────────────────┐
+   │  Model Gateway (custom Cloud Run service)    │
+   │  - Provider-agnostic API (OpenAI-compatible) │
+   │  - Per-app routing config                    │
+   │  - Prompt template registry (versioned)      │
+   │  - Cost / latency / accuracy telemetry       │
+   │  - A/B + shadow + canary primitives          │
+   │  - Idempotency keys & retry                  │
+   └──────────────────────────────────────────────┘
+         │                          │
+   ┌─────▼──────┐            ┌──────▼─────┐
+   │ Vertex AI  │            │ OpenAI     │
+   │ ─ Gemini 3 │            │ (legacy,   │
+   │   Pro/Flash│            │  fallback) │
+   │ ─ Fine-tune│            │            │
+   │   adapters │            │            │
+   └────────────┘            └────────────┘
+         │
+         ▼
+   [Gen AI Evaluation Service]
+   [Cloud Trace · Cloud Logging · BigQuery telemetry warehouse]</div>
+
+  <div class="layer-grid">
+    <div class="layer t1">
+      <h4>Tool calling — schema portability</h4>
+      <ul>
+        <li>OpenAI <code>tools</code> JSON schema → Gemini function calling schema is 90% compatible; written a <strong>schema translator</strong> in the gateway</li>
+        <li>Differences: parallel tool calls (Gemini handles natively), JSON mode behavior (Gemini structured output), system prompt placement — all handled at gateway</li>
+        <li>Per-app idempotency keys preserved end-to-end</li>
+        <li>Existing apps see no API change because gateway speaks OpenAI-compatible API</li>
+      </ul>
+    </div>
+    <div class="layer t2">
+      <h4>RAG — replacing fine-tunes</h4>
+      <ul>
+        <li>2 of 3 fine-tunes were customer-domain knowledge → replace with Vertex RAG Engine + Vector Search instead of re-tuning</li>
+        <li>1 fine-tune (entity extraction on internal docs) → reproduced as Gemini Pro tune on same dataset; eval on customer's existing golden set</li>
+        <li>Embedding migration: OpenAI <code>text-embedding-3-small</code> → Vertex <code>text-embedding-005</code>; re-embed corpora during weekend windows</li>
+      </ul>
+    </div>
+    <div class="layer t3">
+      <h4>Migration tooling</h4>
+      <ul>
+        <li><strong>Prompt translator</strong>: automated initial pass on each prompt template; manual review by app team</li>
+        <li><strong>Shadow mode</strong>: gateway sends each request to both OpenAI and Gemini for sampled %; logs both responses to BigQuery</li>
+        <li><strong>Eval harness</strong>: Gen AI Evaluation Service runs golden set on each candidate prompt version; produces win/loss/tie report</li>
+        <li><strong>Cost dashboard</strong>: per-app, per-model, projected vs actual monthly</li>
+        <li><strong>Per-app canary controls</strong>: rollout % per app in real time</li>
+      </ul>
+    </div>
+    <div class="layer t4">
+      <h4>FDE delivery — program governance</h4>
+      <ul>
+        <li><strong>Weekly steering</strong> with customer's AI platform team + 4 product team leads</li>
+        <li><strong>RACI per wave</strong>: who decides go/no-go on cut-over, who owns rollback</li>
+        <li><strong>Knowledge transfer</strong>: every artifact (gateway code, prompts, evals, runbooks) lives in customer's repo, FDE pairs with their engineers</li>
+        <li><strong>Exit criteria</strong> per app: eval parity ≥ 95%, p95 latency ≤ baseline + 10%, cost ≤ baseline × 0.7, 2-week clean shadow run, zero P0/P1 incidents</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="phase">Min 25-35 — Eval / Risk / Rollback <span class="tier">T3.4 + T4.4</span></h3>
+  <p style="font-size:13.5px"><strong>Per-app eval rubric</strong> (Gen AI Evaluation Service):</p>
+  <table>
+    <tr><th>Dimension</th><th>Method</th><th>Threshold</th></tr>
+    <tr><td><strong>Task-specific golden set</strong></td><td>Run customer's existing eval suite on Gemini outputs</td><td>≥ baseline accuracy (within 1pp)</td></tr>
+    <tr><td><strong>Pairwise LLM judge</strong></td><td>Claude or Pro as independent judge on shadow-mode pairs</td><td>Gemini win-or-tie ≥ 55%</td></tr>
+    <tr><td><strong>Latency parity</strong></td><td>Real-traffic p50/p95/p99</td><td>p95 ≤ OpenAI baseline + 10%</td></tr>
+    <tr><td><strong>Cost</strong></td><td>Per-app cost dashboard, 2-week sample</td><td>≤ OpenAI baseline × 0.7 (target -30%)</td></tr>
+    <tr><td><strong>Business KPI</strong></td><td>App-specific (conversion / accuracy / CSAT) A/B 2 weeks</td><td>No statistically significant regression</td></tr>
+  </table>
+
+  <p style="font-size:13.5px;margin-top:12px"><strong>Rollback design</strong> (T4.4): Gateway has per-app config with model + prompt version. Rollback = config flip in &lt; 30s; no redeploy. Last 2 versions of each prompt + adapter cached hot. Runbook per app says exactly which config knob to flip.</p>
+
+  <div class="callout risk"><strong>Top 3 risks</strong>: (1) Prompt parity gap on subtle behavior (tone, format). Defense: pairwise judge + shadow mode 2 weeks before cut-over. (2) Fine-tune replacement underperforms. Defense: parallel A/B at canary, OpenAI fallback if Gemini fine-tune below threshold. (3) Hidden dependencies on OpenAI-specific behavior (e.g., specific JSON mode quirks). Defense: discovery phase reads code, not just docs; gateway abstracts most of it.</div>
+
+  <h3 class="phase">Min 35-40 — Cost + Scaling</h3>
+  <p style="font-size:13.5px">$2M/yr OpenAI ≈ $167K/mo. Target: $1.0-1.2M/yr post-migration.</p>
+  <table>
+    <tr><th>Cost line</th><th>Math</th><th>$/month</th></tr>
+    <tr><td>Customer LLM spend post-migration (60% Pro · 30% Flash · 10% fine-tune)</td><td>Migrate 12 apps to Gemini, blended -40% on token cost</td><td class="num">~$100K (was $167K)</td></tr>
+    <tr><td>Model Gateway (Cloud Run, low overhead)</td><td>2 vCPU × HA × 30 days</td><td class="num">$1K</td></tr>
+    <tr><td>Shadow-mode telemetry (BigQuery storage + queries)</td><td>3-month spike during migration</td><td class="num">$5K (decaying)</td></tr>
+    <tr><td>FDE labor for 6 mo (4 FDE @ blended rate)</td><td>—</td><td class="num">$120K/mo program cost</td></tr>
+    <tr><td><strong>Net customer savings (steady state)</strong></td><td>$67K/mo × 12 = $800K/yr</td><td class="num"><strong>~$800K/yr</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>ROI framing</strong>: One-time program cost $720K (4 FDE × 6 mo) recovers in &lt; 11 months at $67K/mo savings. After year 1, it's pure savings + multimodal capability gain (hard to dollarize, but real). Plus future model swaps now cost &lt; 1 wave thanks to the gateway.</div>
+
+  <h3 class="phase">Min 40-45 — Q&A drill</h3>
+  <div class="qa-drill">
+    <div class="qa">
+      <div class="q">"What if Gemini just isn't as good as OpenAI on one of the 12 apps?"</div>
+      <div class="a">Exit criteria are explicit — if eval parity fails after 2 prompt iterations + RAG augmentation + (if applicable) Gemini fine-tune, that app stays on OpenAI via the gateway. We don't force migrations that lose customer value. We report it honestly in the steering and the customer makes the call. The gateway makes "keep this one on OpenAI" a 1-line config.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"Why build a gateway instead of just changing the SDK call site by site?"</div>
+      <div class="a">Three reasons. (1) Centralized shadow/canary lets us migrate with real production data, not just offline eval. (2) Future-proofs against the next model swap (Claude 5, Gemini 4) — config change, not code change. (3) Per-app rollback in 30s vs hours of redeploy. The gateway pays for itself in the first wave's rollback alone.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"6 months is aggressive. What gets dropped if we slip?"</div>
+      <div class="a">Scope cut order: (1) Defer the 1-2 lowest-traffic apps to phase 2 — keep them on OpenAI through gateway. (2) Defer multimodal-only gains. (3) Defer fine-tune migration; replace with RAG-only for the affected app and accept the accuracy delta if eval passes. We never cut: the gateway, eval rigor, or shadow-mode discipline. Those are load-bearing.</div>
+    </div>
+    <div class="qa">
+      <div class="q">"How do you measure success at the end?"</div>
+      <div class="a">5 metrics. (1) % of $2M/yr spend migrated. (2) Net annualized savings vs baseline. (3) Per-app eval-parity status. (4) Time-to-rollback measured in a fire drill. (5) Customer team self-sufficiency — they ran the last app migration without FDE help. The 5th one is the FDE-specific success criterion.</div>
+    </div>
+  </div>
+
+  <div class="resume-hook">
+    在 TikTok Internal Agent Platform 我搭过类似的 model gateway — 12 个内部 app 通过统一 router 接入 GPT-4 + Claude + 自研 model, 后来切换 backbone 一行配置. 同时 ConvFinQA 项目里我做过 OpenAI → 自训 model 的迁移评估, 包括 pairwise LLM judge + 业务 KPI A/B. 这套 program 在 F500 客户场景下就是 scale up + 加监管层.
+  </div>
+</section>
+
+<footer>
+  <p><strong>Use case</strong>: read this end-to-end once, then practice 1 prompt out loud in 45 min · time yourself · grade against the time budget</p>
+  <p style="margin-top:6px">把 T1-T4 当 LEGO, 这 5 个 prompt 当组装样板 · 真面试只换 customer 名字</p>
+  <p style="margin-top:8px"><a href="cram.html">← 回 hub</a> · <a href="estimation-cheatsheet.html">napkin math 速查</a> · <a href="zhenti-answers.html">57 真题答案</a></p>
+</footer>
+
+</div>
+
+</body>
+</html>

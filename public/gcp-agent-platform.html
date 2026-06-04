@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🅖 2026 Google Cloud Agent Platform 速查 · Gemini Enterprise Agent Platform</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; max-width: 980px; margin: 0 auto; padding: 16px 20px 80px; line-height: 1.78; color: #1f2328; background: #fafbfc; }
+header { background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #0f9d58 100%); color: white; padding: 30px 26px; border-radius: 14px; margin-bottom: 24px; box-shadow: 0 12px 32px rgba(66, 133, 244, 0.28); }
+header h1 { margin: 0 0 8px; font-size: 28px; }
+header .subtitle { font-size: 14px; opacity: 0.95; }
+header a { color: white; text-decoration: underline; }
+header .badge { display: inline-block; background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 12px; font-size: 11px; margin-right: 6px; }
+section { background: white; border: 1px solid #d0d7de; border-radius: 10px; padding: 20px 26px; margin-bottom: 18px; }
+section h2 { font-size: 19px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #4285f4; color: #1a73e8; display: flex; align-items: center; gap: 8px; }
+section h3 { font-size: 14px; color: #57606a; margin: 18px 0 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+section h4 { font-size: 15px; color: #0f9d58; margin: 14px 0 6px; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th { background: #f6f8fa; padding: 8px 12px; text-align: left; border: 1px solid #d0d7de; font-weight: 600; font-size: 13px; }
+td { padding: 8px 12px; border: 1px solid #d0d7de; vertical-align: top; }
+td.old { color: #b45309; }
+td.new { color: #1a73e8; font-weight: 600; }
+td.swap { font-size: 12px; color: #57606a; }
+code { background: #f6f8fa; padding: 1px 6px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 12.5px; color: #d63384; }
+pre { background: #0d1117; color: #e6edf3; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; font-family: 'SF Mono', Monaco, monospace; }
+pre code { background: transparent; color: inherit; padding: 0; }
+.tip { background: linear-gradient(90deg, #e8f0fe, #ffffff); border-left: 4px solid #4285f4; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.warning { background: linear-gradient(90deg, #fef7e0, #ffffff); border-left: 4px solid #f9ab00; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.warning strong { color: #b45309; }
+.gcp-only { background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13.5px; }
+.gcp-only strong { color: #065f46; }
+.must { background: #fef2f2; border: 2px solid #ef4444; padding: 14px 18px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
+.must strong { color: #991b1b; }
+nav.toc { background: #f6f8fa; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; position: sticky; top: 8px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+nav.toc a { display: inline-block; margin: 2px 6px 2px 0; padding: 3px 10px; background: white; border: 1px solid #d0d7de; border-radius: 4px; text-decoration: none; color: #1f2328; font-size: 12.5px; }
+nav.toc a:hover { background: #4285f4; color: white; border-color: #4285f4; }
+.stack-diagram { background: linear-gradient(135deg, #f8fbff, #f0f9ff); border: 1px solid #cfe2ff; border-radius: 10px; padding: 18px 20px; margin: 14px 0; font-family: 'SF Mono', Monaco, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre; overflow-x: auto; }
+.product-card { background: #fafbfc; border: 1px solid #d0d7de; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+.product-card .name { font-weight: 700; color: #1a73e8; font-size: 15px; }
+.product-card .tag { display: inline-block; background: #e8f0fe; color: #1a73e8; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
+.product-card .tag.new-2026 { background: #d1fae5; color: #065f46; }
+.product-card .what { color: #57606a; font-size: 13.5px; margin: 4px 0; }
+.product-card .when { font-size: 13px; color: #0f9d58; margin: 4px 0; }
+.product-card .fde { font-size: 12.5px; background: #fff7ed; border-left: 3px solid #f59e0b; padding: 8px 12px; margin-top: 8px; color: #78350f; border-radius: 0 4px 4px 0; }
+.script-card { background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+.script-card .meta { font-size: 12px; color: #1e40af; font-weight: 600; margin-bottom: 6px; }
+.print-cheat { background: #fffbeb; border: 2px dashed #f59e0b; padding: 16px 20px; border-radius: 8px; font-size: 13px; }
+.print-cheat strong { color: #92400e; }
+.kbd { display: inline-block; background: #f6f8fa; border: 1px solid #d0d7de; border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: #1f2328; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🅖 2026 Google Cloud Agent Platform 速查</h1>
+  <div class="subtitle">
+    <span class="badge">Gemini Enterprise</span>
+    <span class="badge">ADK</span>
+    <span class="badge">Agent Runtime</span>
+    <span class="badge">RAG Engine</span>
+    <span class="badge">A2A</span>
+    <span class="badge">Model Armor</span>
+    <br>
+    2026 现行产品名 + 组合模式 + FDE 口播. 旧 <code>gcp-swap-reference.html</code> 配合用. <a href="cram.html">← Hub</a> · <a href="gcp-swap-reference.html">AWS→GCP swap →</a>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong>跳转:</strong>
+  <a href="#golden">🏆 5 条法则</a>
+  <a href="#umbrella">伞 Platform</a>
+  <a href="#build">1·Build</a>
+  <a href="#rag">2·RAG</a>
+  <a href="#a2a">3·A2A</a>
+  <a href="#safety">4·Safety/Eval</a>
+  <a href="#identity">5·Identity</a>
+  <a href="#example">6·Example</a>
+  <a href="#naming">7·改名表</a>
+  <a href="#scripts">8·口播</a>
+  <a href="#cheat">9·Cheat sheet</a>
+</nav>
+
+<!-- ============================================ -->
+<section id="golden">
+  <h2>🏆 5 条黄金法则 (面试当下脑里跑)</h2>
+  <ol style="margin-left:20px">
+    <li><strong>说 2026 product name, 不说 "Vertex AI"</strong> — 大伞已经改名 <strong>Gemini Enterprise Agent Platform</strong>. 具体说 ADK + Agent Runtime + RAG Engine + Agent Studio, 不要笼统说 "Vertex".</li>
+    <li><strong>每个能力都点名一个具体 sub-product</strong> — "agent 框架用 <strong>ADK</strong>, deploy 用 <strong>Agent Runtime</strong>, RAG 用 <strong>RAG Engine</strong>, eval 用 <strong>Gen AI Evaluation Service</strong>, safety 用 <strong>Model Armor</strong>". 越具体越内行.</li>
+    <li><strong>跨 agent 必提 A2A protocol</strong> — Agent2Agent (Google 主推 2025 开源协议) 是 2026 multi-agent 标配. 不要再说 "agent 之间 HTTP 调".</li>
+    <li><strong>Workforce Identity Federation 接 Okta/SAML</strong> — 面到 enterprise SSO, 别说 "SSO with SAML"; 说 "Workforce Identity Federation, 不在 GCP 建 user, 直接 trust 客户 IdP".</li>
+    <li><strong>承认 "Vertex AI" 还是 underlying</strong> — Agent Platform 是 Vertex AI 之上的 narrative layer; 底下 model serving / vector / training 仍走 Vertex. 不要不懂装懂说 Vertex 没了, 那是错的.</li>
+  </ol>
+</section>
+
+<!-- ============================================ -->
+<section id="umbrella">
+  <h2>🏗️ Gemini Enterprise Agent Platform — the umbrella</h2>
+  <div class="tip">
+    2025 末 Google 把 "Agent Builder" + "Vertex Agents" + 一堆零散 SKU 合并 rebrand 成 <strong>Gemini Enterprise Agent Platform</strong>. 它不是一个新产品, 是一个 narrative + billing 伞. 底下分这几个真东西:
+  </div>
+
+  <div class="stack-diagram">┌─────────────────────────────────────────────────────────────┐
+│         GEMINI ENTERPRISE AGENT PLATFORM (umbrella)          │
+├─────────────────────────────────────────────────────────────┤
+│ BUILD          │ ADK (Python SDK)   Agent Studio (low-code) │
+│ DEPLOY         │ Agent Runtime (managed)                    │
+│ RAG / MEMORY   │ RAG Engine   Vector Search   Memory Bank   │
+│ COMMS          │ Agent2Agent (A2A) protocol   MCP gateway   │
+│ SAFETY         │ Model Armor   Gen AI Evaluation Service    │
+│ IDENTITY       │ Workforce IdP Fed · IAM Conditions · VPCSC │
+│ FOUNDATION     │ Vertex AI  (model serving, training, TPU)  │
+│ MODELS         │ Gemini 3 Pro · Flash · Claude · Llama ...  │
+└─────────────────────────────────────────────────────────────┘</div>
+
+  <div class="gcp-only">
+    <strong>口播 mental model</strong>: "Vertex AI 还在, 它是 model + infra 底座. 上面的 Agent Platform 是 application-level building blocks. 面 agent / RAG / multi-agent 题, 我点上层 sub-products; 面纯 ML training 题, 我点 Vertex AI Training."
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="build">
+  <h2>🛠️ Section 1 — Building agents (ADK + Agent Runtime + Studio)</h2>
+
+  <div class="product-card">
+    <div><span class="name">ADK — Agent Development Kit</span><span class="tag new-2026">2026 GA</span></div>
+    <div class="what"><strong>What</strong>: Python (also Java/Go) SDK / framework for authoring agents — tool wiring, multi-step loops, memory, evaluation hooks, streaming. 开源 (Apache 2.0). 类比 LangGraph + AutoGen, 但 GCP-native.</div>
+    <div class="when"><strong>When to use</strong>: 写自定义 agent 逻辑、需要代码级控制、要 multi-agent orchestration. 复杂 workflow 默认它.</div>
+    <pre><code>from google.adk import Agent, Runner, Tool
+
+@Tool
+def lookup_order(order_id: str) -> dict:
+    return bigquery.query(f"SELECT * FROM orders WHERE id='{order_id}'")
+
+support_agent = Agent(
+    name="support",
+    model="gemini-3-pro",
+    instructions="You help users with order issues.",
+    tools=[lookup_order, escalate_to_human],
+)
+
+# Local run
+result = Runner(agent=support_agent).run("Where is order #1234?")</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "I'd build the agent in ADK because it's open-source, framework-portable, and integrates natively with Gemini 3, Vector Search, and Memory Bank — no glue code."</div>
+  </div>
+
+  <div class="product-card">
+    <div><span class="name">Agent Runtime</span><span class="tag new-2026">2026</span></div>
+    <div class="what"><strong>What</strong>: Managed serverless host for ADK agents. 部署一次得 HTTPS endpoint + auto-scale + session state + observability. 类比 AWS Bedrock Agents runtime / Lambda for agents.</div>
+    <div class="when"><strong>When to use</strong>: production deploy. 别自己起 GKE 跑 agent. Runtime 自动接 Cloud Logging / Trace / Audit.</div>
+    <pre><code># Deploy
+$ gcloud agents deploy support \
+    --source ./agent_dir \
+    --runtime python312 \
+    --region us-central1 \
+    --service-account agent-sa@proj.iam \
+    --vpc-connector projects/proj/locations/.../connectors/c1
+
+# Invoke
+$ gcloud agents invoke support --message "where is order 1234"</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "Deploy to <strong>Agent Runtime</strong> not Cloud Run — Runtime gives me session memory, tool tracing, and Model Armor hookup for free. Cloud Run is fine for stateless API, not agents."</div>
+  </div>
+
+  <div class="product-card">
+    <div><span class="name">Agent Studio</span><span class="tag">low-code UI</span></div>
+    <div class="what"><strong>What</strong>: Web UI inside Google Cloud console — drag tool / drag knowledge source / drag guardrail, output 一个 Runtime-deployable agent. 给 PM / BA / 非 dev 用.</div>
+    <div class="when"><strong>When to use</strong>: customer 想自己 own agent 迭代但没 ML team; demo / POC 阶段; FAQ-style assistant 不需要复杂逻辑.</div>
+    <div class="fde"><strong>FDE talking point</strong>: "I'd give the customer's business team Agent Studio for prompt iteration, while my team owns the ADK tools layer. Two-speed ownership keeps engineering bottleneck off the BA team."</div>
+  </div>
+
+  <div class="warning">
+    <strong>常被搞混</strong>: "Dialogflow CX" 还活着吗? 答: 还活着, 但只推荐做窄场景 IVR / FAQ. 新 agent 一律默认 ADK + Runtime. 面试不要主推 Dialogflow.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="rag">
+  <h2>📚 Section 2 — RAG &amp; memory (RAG Engine + Vector Search + Memory Bank)</h2>
+
+  <div class="product-card">
+    <div><span class="name">RAG Engine</span><span class="tag new-2026">2026 GA</span></div>
+    <div class="what"><strong>What</strong>: Managed end-to-end RAG pipeline. 你给文档 (GCS / Drive / SharePoint), 它做: parse → chunk → embed → store → retrieve → rerank. 一个 API <code>create_corpus + query</code> 搞定. 类比 AWS Bedrock Knowledge Bases.</div>
+    <div class="when"><strong>When to use</strong>: 95% RAG 场景默认它. 不要手撸 embed + Vector Search + rerank 三步 — 客户 maintain 不动.</div>
+    <pre><code>from google.cloud import rag
+
+corpus = rag.create_corpus(
+    name="support-kb",
+    embedding_model="text-embedding-005",
+    chunk_size=512,
+    rerank_model="semantic-ranker-default",
+)
+rag.import_files(corpus, paths=["gs://kb/*.pdf", "drive://folder/abc"])
+
+# Query
+results = rag.query(corpus, "what is refund policy", top_k=8)
+# returns: chunks + citations + scores
+
+# Wire into ADK
+agent = Agent(model="gemini-3-pro", tools=[rag.as_tool(corpus)])</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "Default to <strong>RAG Engine</strong>, not hand-rolled. Customer ops team can refresh the corpus by dragging PDFs to a GCS bucket; no ML engineer needed for content updates."</div>
+  </div>
+
+  <div class="product-card">
+    <div><span class="name">Vector Search</span><span class="tag">renamed from Matching Engine</span></div>
+    <div class="what"><strong>What</strong>: 独立 managed ANN service (HNSW + IVF). 千万-十亿 vectors. 仍叫 <strong>Vector Search</strong> (不再叫 "Vertex AI Vector Search", 简化 brand).</div>
+    <div class="when"><strong>When to use</strong>: 当 RAG Engine 太黑盒 — 需要 custom 切片 / 多 namespace / 自己 rerank / hybrid retrieval. 或者非 RAG 用途 (recommender, image dedupe).</div>
+    <div class="fde"><strong>FDE talking point</strong>: "RAG Engine default; if the customer needs hybrid BM25 + dense or custom rerankers, drop to raw <strong>Vector Search</strong> + Vertex Embeddings."</div>
+  </div>
+
+  <div class="product-card">
+    <div><span class="name">Memory Bank</span><span class="tag new-2026">2026</span></div>
+    <div class="what"><strong>What</strong>: Long-term agent memory. 不是 session state, 是 per-user / per-tenant persistent fact store. Auto-extracts facts from conversation, stores with embeddings, retrieves on next turn.</div>
+    <div class="when"><strong>When to use</strong>: 用户回访的 assistant (customer support / personal assistant). 短 session 不需要.</div>
+    <pre><code>agent = Agent(
+    model="gemini-3-pro",
+    memory=MemoryBank(
+        scope="user_id",        # per-user partition
+        retention_days=365,
+        pii_filter="model_armor",
+    ),
+)</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "<strong>Memory Bank</strong> handles 'remember I'm vegetarian' across sessions — agent doesn't re-ask. PII goes through Model Armor before write."</div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="a2a">
+  <h2>🔗 Section 3 — Inter-agent communication (Agent2Agent / A2A)</h2>
+
+  <div class="product-card">
+    <div><span class="name">Agent2Agent (A2A) Protocol</span><span class="tag new-2026">Google open spec 2025</span></div>
+    <div class="what"><strong>What</strong>: 开源协议 (Google 主导, 50+ partners signed). HTTP/JSON-RPC + SSE for streaming. 让一个 agent 调另一个 agent — 不管是不是同一个 cloud / 同一个 framework. 跟 MCP 互补: <strong>MCP = agent ↔ tools/data</strong>, <strong>A2A = agent ↔ agent</strong>.</div>
+    <div class="when"><strong>When to use</strong>: multi-agent 系统; 跨组织 agent 协作 (买方 agent 跟卖方 agent 谈判); 需要 standard discovery + auth.</div>
+    <pre><code># Agent A (orchestrator) discovers Agent B via agent card
+GET https://b.example.com/.well-known/agent.json
+→ { "name": "shipping-agent", "skills": ["track", "rebook"], ... }
+
+# Send task
+POST https://b.example.com/a2a/tasks
+{ "method": "tasks/send",
+  "params": { "id": "task-1", "message": "track FedEx 12345",
+              "auth": { "scheme": "bearer", "token": "..." } } }
+
+# Stream updates via SSE
+GET /a2a/tasks/task-1/stream → event: status / artifact / done</code></pre>
+    <div class="gcp-only">
+      <strong>MCP vs A2A 一句话</strong>: "MCP = how an agent talks <em>down</em> to tools and data. A2A = how an agent talks <em>sideways</em> to peer agents. I use both: MCP gateway for 500 internal APIs, A2A for the 3-agent orchestrator topology."
+    </div>
+    <div class="fde"><strong>FDE talking point</strong>: "For the multi-agent design I'd use <strong>A2A</strong> rather than raw HTTP — standard agent cards for discovery, native streaming, and partners outside GCP can join without bespoke integration."</div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="safety">
+  <h2>🛡️ Section 4 — Safety &amp; evaluation</h2>
+
+  <div class="product-card">
+    <div><span class="name">Model Armor</span><span class="tag new-2026">GA</span></div>
+    <div class="what"><strong>What</strong>: Managed safety layer — prompt-injection detection, PII redaction, jailbreak filtering, malicious URL block, sensitive content classification. 直接挂在 agent 入/出方向, 不用客户写 regex.</div>
+    <div class="when"><strong>When to use</strong>: 任何 prod agent 都该有. 类比 AWS Bedrock Guardrails / OpenAI Moderation, 但 GCP-native + BAA-covered.</div>
+    <pre><code>from google.cloud import modelarmor
+
+template = modelarmor.create_template(
+    name="support-guard",
+    filters={
+        "pii": "redact",              # SSN / 信用卡 etc.
+        "prompt_injection": "block",
+        "jailbreak": "block",
+        "malicious_uri": "block",
+        "rai_dangerous": "block",     # CSAM / self-harm / etc.
+    },
+)
+
+# Wire into ADK
+agent = Agent(
+    model="gemini-3-pro",
+    armor_template="support-guard",   # in + out both filtered
+)</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "<strong>Model Armor</strong> is the safety frontline — it catches prompt injection before the model sees the input, and PII before the response leaves. I'd never ship an agent without it; that's the 2026 minimum bar."</div>
+  </div>
+
+  <div class="product-card">
+    <div><span class="name">Gen AI Evaluation Service</span><span class="tag">aka Model Eval</span></div>
+    <div class="what"><strong>What</strong>: Managed eval — 上传 dataset (input / expected) → run model or agent → get pointwise (factuality, fluency, safety) and pairwise (A vs B) scores. Supports LLM-as-judge with Gemini, and rubric-based custom metrics.</div>
+    <div class="when"><strong>When to use</strong>: 模型/prompt 迭代; A/B test ADK agents; regression eval pre-deploy gate.</div>
+    <pre><code>from vertexai.evaluation import EvalTask
+
+task = EvalTask(
+    dataset="gs://eval/support-qa.jsonl",
+    metrics=["groundedness", "instruction_following", "safety",
+             "tool_use_quality"],
+    experiment="support-agent-v3",
+)
+result = task.evaluate(model=my_agent)
+# → table of scores, regression vs v2 baseline</code></pre>
+    <div class="fde"><strong>FDE talking point</strong>: "I gate deploys on <strong>Gen AI Evaluation Service</strong> — every PR runs the eval set; if groundedness drops &gt;3pp vs main, the deploy blocks. Same pattern as unit tests but for LLM behavior."</div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="identity">
+  <h2>🔐 Section 5 — Identity &amp; data perimeter</h2>
+
+  <table>
+    <tr><th>Need</th><th>2026 product</th><th>Note</th></tr>
+    <tr><td>Enterprise SSO (Okta / Azure AD / SAML)</td><td class="new">Workforce Identity Federation</td><td>不在 GCP 建 user, federate 客户 IdP. Engineer/CSM 用 Okta 登, principal 直接是 Okta identity</td></tr>
+    <tr><td>End-user auth (consumer)</td><td class="new">Identity Platform</td><td>Firebase Auth 企业版</td></tr>
+    <tr><td>Service-to-service</td><td class="new">Workload Identity Federation</td><td>跨 AWS / GitHub Actions / on-prem, 不用 long-lived keys</td></tr>
+    <tr><td>Fine-grained access (time / IP / device)</td><td class="new">IAM Conditions</td><td>"agent-sa 只能在 9-5pm / 公司 IP / 公司 device 上 access PHI bucket"</td></tr>
+    <tr><td>Data perimeter (data 出不去)</td><td class="new">VPC Service Controls</td><td>把 Vertex / BigQuery / GCS / RAG Engine / Agent Runtime 锁进一个 perimeter</td></tr>
+    <tr><td>Customer-managed encryption</td><td class="new">Cloud KMS (CMEK / EKM)</td><td>EKM = key 在客户的 HSM 上, GCP 用不动. Most paranoid customers ask for EKM</td></tr>
+    <tr><td>Tamper-proof audit</td><td class="new">Cloud Audit Logs</td><td>Data Access logs 一定要开 — agent 谁调了什么 tool 用了什么 PHI, 永远查得到</td></tr>
+    <tr><td>Org-level guardrail</td><td class="new">Organization Policies</td><td>"this org 不允许任何 non-EU region 起 agent" 一条 policy 锁死</td></tr>
+  </table>
+
+  <div class="must">
+    <strong>VPC Service Controls 必背组合</strong> (面 enterprise / healthcare / financial 题):
+    把 <code>aiplatform.googleapis.com</code> + <code>storage.googleapis.com</code> + <code>bigquery.googleapis.com</code> + <code>rag.googleapis.com</code> + <code>agentruntime.googleapis.com</code> + <code>modelarmor.googleapis.com</code> 锁进同一个 perimeter, agent 既出不去也连不到外网, customer data 物理不可能 leak.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="example">
+  <h2>🎯 Section 6 — Composition example: "Customer support agent" end-to-end</h2>
+
+  <div class="tip">
+    场景: 7 国 e-commerce 的 customer support agent. Multilingual, retrieves policy + order data, can refund, escalates to human, all PII-safe, SOC2-audit-ready.
+  </div>
+
+  <div class="stack-diagram">    [Customer chat in Web / app / WhatsApp]
+              │
+              ▼
+    ┌─────────────────────────────────────────┐
+    │ Apigee API Gateway   (rate limit, auth) │
+    └─────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────┐
+    │ Model Armor  (in: jailbreak / PII)      │  ← step 1: filter input
+    └─────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────┐
+    │ Agent Runtime  →  ADK agent (Gemini 3)  │  ← step 2: route
+    │   Memory Bank  (per-customer history)   │
+    │   Tools:                                │
+    │     • lookup_order  → Cloud SQL         │
+    │     • refund        → internal API/MCP  │
+    │     • escalate      → A2A to human-     │
+    │                       handoff agent     │
+    │     • policy_search → RAG Engine corpus │
+    └─────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────┐
+    │ Model Armor  (out: PII redact, safety)  │  ← step 3: filter output
+    └─────────────────────────────────────────┘
+              │
+              ▼
+        [Response]
+
+    Cross-cutting:
+    ├ VPC Service Controls    around all GCP services
+    ├ Workforce IdP Fed       for staff (Okta)
+    ├ Cloud Audit Logs        every tool invocation logged
+    ├ Gen AI Eval Service     nightly regression on 500 cases
+    └ Cloud Monitoring        latency p95, tool error %, armor block %</div>
+
+  <h3>口播版 (90 秒讲完上图)</h3>
+  <div class="script-card">
+    "客户消息进来先过 <strong>Apigee</strong> 做 rate-limit 和 auth, 然后 <strong>Model Armor</strong> 在入方向挡 prompt injection 和 PII. 干净的 input 进 <strong>Agent Runtime</strong> 上的 <strong>ADK</strong> agent — model 用 Gemini 3 Pro 2M context. Agent 有 4 个 tool: <code>lookup_order</code> 走 Cloud SQL, <code>refund</code> 走内部 API (通过 MCP gateway), <code>policy_search</code> 走 <strong>RAG Engine</strong>, <code>escalate</code> 通过 <strong>A2A</strong> 调 handoff agent. Per-customer 记忆用 <strong>Memory Bank</strong>. Response 出来再过一次 Model Armor 做 PII redaction. 整个 perimeter 用 <strong>VPC Service Controls</strong> 锁死, 员工 SSO 走 <strong>Workforce Identity Federation</strong> 接 Okta, 所有 tool 调用进 <strong>Cloud Audit Logs</strong>, 每晚 <strong>Gen AI Evaluation Service</strong> 跑 500 case regression."
+  </div>
+
+  <div class="gcp-only">
+    <strong>Resume hook 映射</strong>: Gao Xin 在 TikTok 做的 PayLater 7-market voice agent (2024) 对应到 2026 stack 就是 <em>ADK + Agent Runtime + RAG Engine (policy KB) + A2A (escalation to human) + Model Armor (PII for SSN-like IDs) + Memory Bank (复访客户) + Workforce IdP Fed (CSM SSO)</em>. 面试时直接把旧 project 用 2026 词汇重述一遍, 立刻显得 current.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="naming">
+  <h2>📜 Section 7 — Old (2024) → New (2026) naming map</h2>
+
+  <table>
+    <tr><th>听到 / 见到 (旧)</th><th>2026 正确叫法</th><th>说明</th></tr>
+    <tr><td class="old">"Agent Builder"</td><td class="new">Gemini Enterprise Agent Platform (umbrella) — concretely ADK + Agent Runtime + Agent Studio</td><td class="swap">2024 Agent Builder 是占位名, 已经拆开</td></tr>
+    <tr><td class="old">"Vertex AI Agents" (generic)</td><td class="new">ADK + Agent Runtime</td><td class="swap">说具体 sub-product, 不要笼统</td></tr>
+    <tr><td class="old">Hand-rolled RAG: embed + ANN + rerank</td><td class="new">RAG Engine</td><td class="swap">2024 还得自己拼 3 步; 2026 一个 API 搞定</td></tr>
+    <tr><td class="old">"Vertex AI Vector Search"</td><td class="new">Vector Search</td><td class="swap">brand 简化, prefix 砍掉</td></tr>
+    <tr><td class="old">"Matching Engine"</td><td class="new">Vector Search</td><td class="swap">已经叫了好几年但还是有人说旧名</td></tr>
+    <tr><td class="old">"Model Garden" generic</td><td class="new">Model Garden (in Vertex)</td><td class="swap">没改名, 还活着</td></tr>
+    <tr><td class="old">"Vertex AI Pipelines"</td><td class="new">Vertex AI Pipelines</td><td class="swap">没改名 — ML training pipeline 不是 agent</td></tr>
+    <tr><td class="old">手撸 prompt injection regex</td><td class="new">Model Armor</td><td class="swap">2026 managed safety GA</td></tr>
+    <tr><td class="old">"AutoSxS" / 手撸 eval script</td><td class="new">Gen AI Evaluation Service</td><td class="swap">原 AutoSxS 已整合</td></tr>
+    <tr><td class="old">"Reasoning Engine"</td><td class="new">Agent Runtime</td><td class="swap">2024 preview 名, 2026 rename</td></tr>
+    <tr><td class="old">"Vertex AI Conversation"</td><td class="new">Agent Studio (low-code) 或 Dialogflow CX (旧场景)</td><td class="swap"></td></tr>
+    <tr><td class="old">长会话历史塞 prompt</td><td class="new">Memory Bank</td><td class="swap">managed 长期记忆</td></tr>
+    <tr><td class="old">"Vertex AI Extensions"</td><td class="new">MCP servers + Agent Runtime tool wiring</td><td class="swap">Extensions 边缘化, MCP 上位</td></tr>
+    <tr><td class="old">SAML/OIDC SSO 手配</td><td class="new">Workforce Identity Federation</td><td class="swap">不在 GCP 建 user</td></tr>
+    <tr><td class="old">"Gemini in Vertex AI"</td><td class="new">Gemini 3 Pro / Flash / Nano on Vertex</td><td class="swap">model 名要带版本号</td></tr>
+    <tr><td class="old">"PaLM 2 / text-bison"</td><td class="new">Gemini 3 Flash</td><td class="swap">PaLM 已 deprecated, 提了直接减分</td></tr>
+  </table>
+
+  <div class="warning">
+    <strong>⚠️ 容易翻车的旧词</strong>:
+    <br>• 不要说 <code>text-bison</code> / <code>chat-bison</code> / "PaLM 2" — 2025 已 deprecated
+    <br>• 不要说 "Generative AI Studio" — 已合并入 Vertex AI Studio + Agent Studio
+    <br>• 不要说 "Vertex AI Search and Conversation" — 已拆 (Search → Vertex AI Search, Conv → Agent Studio)
+    <br>• 不要说 "Reasoning Engine" — 已 rename 为 Agent Runtime
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="scripts">
+  <h2>🎤 Section 8 — Interview talking scripts (3 口播)</h2>
+
+  <h3>Script A — "How would you build this agent on Google Cloud?" (30 秒)</h3>
+  <div class="script-card">
+    <div class="meta">SHORT · name-drop 4 products in 1 breath</div>
+    "I'd build it on the <strong>Gemini Enterprise Agent Platform</strong>. The agent itself is an <strong>ADK</strong> Python module — Gemini 3 Pro as the planner, tools wired through MCP. Deploy to <strong>Agent Runtime</strong> for managed scaling and session state. Knowledge comes from <strong>RAG Engine</strong> over the customer's GCS corpus. <strong>Model Armor</strong> sits in front for prompt-injection and PII. Audit goes to Cloud Audit Logs, and the whole thing lives inside <strong>VPC Service Controls</strong>. That's the 2026 default stack."
+  </div>
+
+  <h3>Script B — "What's new in 2026 GCP Agent stack?" (45 秒)</h3>
+  <div class="script-card">
+    <div class="meta">MEDIUM · show you tracked the rename + new SKUs</div>
+    "Three things shifted in the last 12 months. <strong>One</strong>, Google consolidated Agent Builder + Vertex Agents into <strong>Gemini Enterprise Agent Platform</strong> — the sub-products you actually use are <strong>ADK</strong> (the SDK), <strong>Agent Runtime</strong> (the managed deploy), and <strong>Agent Studio</strong> (low-code). <strong>Two</strong>, <strong>RAG Engine</strong> went GA so you don't hand-roll embed+search+rerank anymore — it's a one-API managed pipeline. <strong>Three</strong>, the <strong>Agent2Agent / A2A</strong> protocol that Google open-sourced is now the multi-agent standard; pairs with MCP, where MCP is agent-to-tool and A2A is agent-to-agent. Plus <strong>Model Armor</strong> for safety, <strong>Gen AI Evaluation Service</strong> for managed eval, and <strong>Memory Bank</strong> for long-term per-user memory."
+  </div>
+
+  <h3>Script C — "Why use Agent Platform vs build it yourself?" (60 秒)</h3>
+  <div class="script-card">
+    <div class="meta">LONG · push back on the false dichotomy</div>
+    "Two reasons. <strong>One — time-to-value</strong>. If I hand-roll, I'm writing chunking, embedding, ANN, rerank, prompt-injection filter, eval harness, audit pipeline. That's 4-6 engineer-months before the first useful demo. With <strong>RAG Engine</strong> + <strong>Agent Runtime</strong> + <strong>Model Armor</strong>, that's about a week. <strong>Two — compliance &amp; ownership</strong>. <strong>Agent Runtime</strong> runs inside the customer's GCP project; the data never leaves their VPC and is BAA-covered. If I custom-build, I have to argue compliance from scratch — auditors hate that. <strong>The honest tradeoff</strong>: managed services give up some flexibility — e.g., RAG Engine's reranker isn't swappable. So for the 10% where I need custom chunking or hybrid retrieval, I drop one layer down to <strong>Vector Search</strong> + Vertex Embeddings directly while keeping Runtime + Armor + Audit. Best of both."
+  </div>
+
+  <div class="tip">
+    <strong>面试 tip</strong>: 这 3 个 script 哪个抽到都能用. 关键是中间能流畅说出 4-6 个 2026 sub-product 名 — 这是 "currency" 信号. 模糊说 "I'd use Vertex AI" 表示你停在 2023 认知.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section id="cheat">
+  <h2>📋 Section 9 — Cheat sheet (面试前 3 分钟扫)</h2>
+
+  <div class="print-cheat">
+    <strong>🅖 2026 Google Cloud Agent Platform — One-Page Cheat</strong>
+    <table>
+      <tr><th>能力</th><th>2026 product</th><th>1-line use</th></tr>
+      <tr><td><strong>Build agent</strong></td><td>ADK (Python SDK)</td><td>open-source, framework, multi-step</td></tr>
+      <tr><td><strong>Deploy agent</strong></td><td>Agent Runtime</td><td>managed serverless, session, observability</td></tr>
+      <tr><td><strong>Low-code build</strong></td><td>Agent Studio</td><td>BA / PM 自己拖</td></tr>
+      <tr><td><strong>RAG (managed)</strong></td><td>RAG Engine</td><td>parse + chunk + embed + retrieve + rerank, 一个 API</td></tr>
+      <tr><td><strong>ANN (raw)</strong></td><td>Vector Search</td><td>HNSW+IVF, 千万-十亿 vectors</td></tr>
+      <tr><td><strong>Long-term memory</strong></td><td>Memory Bank</td><td>per-user facts across sessions</td></tr>
+      <tr><td><strong>Agent ↔ agent</strong></td><td>Agent2Agent (A2A)</td><td>open protocol, agent cards, SSE streaming</td></tr>
+      <tr><td><strong>Agent ↔ tools</strong></td><td>MCP gateway</td><td>tools / resources / prompts, vendor-neutral</td></tr>
+      <tr><td><strong>Safety filter</strong></td><td>Model Armor</td><td>prompt injection / PII / jailbreak in &amp; out</td></tr>
+      <tr><td><strong>Managed eval</strong></td><td>Gen AI Evaluation Service</td><td>groundedness, safety, tool-use quality</td></tr>
+      <tr><td><strong>SSO (workforce)</strong></td><td>Workforce Identity Federation</td><td>federate Okta / SAML, no GCP user</td></tr>
+      <tr><td><strong>SVC-to-SVC auth</strong></td><td>Workload Identity Federation</td><td>no long-lived keys, cross-cloud</td></tr>
+      <tr><td><strong>Data perimeter</strong></td><td>VPC Service Controls</td><td>service-level egress lock</td></tr>
+      <tr><td><strong>Keys (customer-held)</strong></td><td>Cloud KMS CMEK / EKM</td><td>EKM = key in customer HSM</td></tr>
+      <tr><td><strong>Audit</strong></td><td>Cloud Audit Logs (Data Access)</td><td>every tool call, every PHI access</td></tr>
+      <tr><td><strong>Model (top)</strong></td><td>Gemini 3 Pro</td><td>2M context, $2 in / $12 out per 1M tok</td></tr>
+      <tr><td><strong>Model (cheap)</strong></td><td>Gemini 3 Flash</td><td>$0.50 in / $3 out per 1M tok</td></tr>
+    </table>
+
+    <p style="margin-top:14px"><strong>面试电梯版 (15 秒)</strong>: "ADK + Agent Runtime + RAG Engine + Model Armor + VPC SC + Workforce IdP Fed. Gemini 3 Pro as planner, Flash for cheap calls. A2A for inter-agent, MCP for tool gateway. Eval through Gen AI Evaluation Service. All BAA-covered inside customer project."</p>
+  </div>
+
+  <div class="must" style="margin-top:18px">
+    <strong>最后提醒</strong>: 这页是 <em>名字层</em> 的更新. underlying 概念 (RAG / chunking / function calling / observability / IAM) 跟 <a href="gcp-swap-reference.html">gcp-swap-reference.html</a> 里讲的没变. 面试别只背名字 — 要能说清每个 sub-product <em>解决什么问题</em> + <em>什么时候 not 用</em>.
+  </div>
+</section>
+
+</body>
+</html>
