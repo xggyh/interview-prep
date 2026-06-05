@@ -118,7 +118,7 @@ footer a { color:#64748b; }
   </aside>
   <main class="main" id="main"></main>
 </div>
-<script src="gq-data.js?v=ex-edge"></script>
+<script src="gq-data.js?v=bydiff"></script>
 <script>
 const GQ = window.GQ, CATS = window.CATS;
 // count per category
@@ -133,11 +133,11 @@ const mustCount = GQ.filter(q=>q.must).length;
 const catlist = document.getElementById('catlist');
 function renderSidebar(active){
   let h = `<div class="cat-item ${active==='must'?'active':''}" data-cat="must" style="background:rgba(251,191,36,0.12);border-left-color:${active==='must'?'#fbbf24':'transparent'};color:#fbbf24;font-weight:600">⭐ 冲刺必看 <span class="n" style="background:rgba(251,191,36,0.2);color:#fbbf24">${mustCount}</span></div>`;
-  // 3天刷题计划
-  const dayColors = {day1:'#34d399',day2:'#60a5fa',day3:'#f472b6'};
+  // 3天刷题计划(按难度:中→难→易)
+  const dayMeta = {day1:{c:'#60a5fa',t:'中等'},day2:{c:'#f472b6',t:'偏难'},day3:{c:'#34d399',t:'简单'}};
   ['day1','day2','day3'].forEach((d,i)=>{
-    const c = dayColors[d], n = GQ.filter(q=>q.day===i+1).length;
-    h += `<div class="cat-item ${active===d?'active':''}" data-cat="${d}" style="background:${active===d?'rgba(255,255,255,0.04)':'transparent'};border-left-color:${active===d?c:'transparent'};color:${c};font-weight:600">📅 Day ${i+1} <span class="n" style="background:rgba(255,255,255,0.08);color:${c}">${n}</span></div>`;
+    const {c,t} = dayMeta[d], n = GQ.filter(q=>q.day===i+1).length;
+    h += `<div class="cat-item ${active===d?'active':''}" data-cat="${d}" style="background:${active===d?'rgba(255,255,255,0.04)':'transparent'};border-left-color:${active===d?c:'transparent'};color:${c};font-weight:600">📅 Day ${i+1} · ${t} <span class="n" style="background:rgba(255,255,255,0.08);color:${c}">${n}</span></div>`;
   });
   h += `<div class="cat-item ${active==='all'?'active':''}" data-cat="all" style="margin-top:6px">全部 <span class="n">${GQ.length}</span></div>`;
   cats.forEach(c => {
@@ -206,9 +206,9 @@ function progressBar(list){
 let hideDone = localStorage.getItem('gq_hidedone')==='1';
 function toggleHideDone(){ hideDone=!hideDone; localStorage.setItem('gq_hidedone', hideDone?'1':'0'); renderList(); }
 const dayInfo = {
-  day1:{name:'📅 Day 1 · 线性结构打底', color:'#34d399', desc:'数组 → 字符串 → 栈 → 二分 → 堆 → 树。都是范式短题,过得快、建手感。'},
-  day2:{name:'📅 Day 2 · 区间 + 搜索/回溯', color:'#60a5fa', desc:'区间扫描线 → DFS/岛屿/回溯 → 并查集 → Trie → 贪心。需要画图想清楚。'},
-  day3:{name:'📅 Day 3 · 图论 + 设计', color:'#f472b6', desc:'BFS/拓扑/最短路 → 设计/OOP。最硬核,建议先看💡思路再自己写。'},
+  day1:{name:'📅 Day 1 · 中等(周六 6/6)', color:'#60a5fa', desc:'中等难度主力题,各类都掺。今天先攻这批,把节奏和手感建起来。'},
+  day2:{name:'📅 Day 2 · 偏难(周日 6/7)', color:'#f472b6', desc:'最硬的设计/图论/解析题,集中啃。建议先看💡思路想清楚结构,再自己写。'},
+  day3:{name:'📅 Day 3 · 简单(周一 6/8 · 考前一天)', color:'#34d399', desc:'简单题快过一遍找手感、攒信心,别考前把自己刷崩。周二 6/9 面试。'},
 };
 function renderList(){
   let list = GQ.slice();
