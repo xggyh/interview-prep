@@ -87,6 +87,10 @@ pre { background:#0b1120; color:#e2e8f0; padding:14px 16px; border-radius:8px; o
 .hide-toggle input { cursor:pointer; }
 .export-btn { font-size:13px; color:#34d399; cursor:pointer; border:1px solid #334155; padding:4px 12px; border-radius:8px; background:#1e293b; }
 .export-btn:hover { border-color:#34d399; }
+.ex-box { background:rgba(52,211,153,0.08); border-left:3px solid #34d399; border-radius:8px; padding:12px 14px;
+  margin-bottom:14px; white-space:pre-wrap; font-size:14px; line-height:1.7; color:#d1fae5; font-family:'SF Mono',Menlo,monospace; }
+.edge-box { background:rgba(251,146,60,0.08); border-left:3px solid #fb923c; border-radius:8px; padding:12px 14px;
+  margin-bottom:14px; white-space:pre-wrap; font-size:13.5px; line-height:1.8; color:#fed7aa; }
 .note-box { width:100%; min-height:90px; box-sizing:border-box; background:#0f172a; border:1px solid #334155; border-radius:10px;
   color:#e2e8f0; font-size:14px; padding:12px; resize:vertical; font-family:inherit; line-height:1.6; margin-bottom:14px; }
 .note-box:focus { outline:none; border-color:#6366f1; }
@@ -114,7 +118,7 @@ footer a { color:#64748b; }
   </aside>
   <main class="main" id="main"></main>
 </div>
-<script src="gq-data.js?v=days-notes"></script>
+<script src="gq-data.js?v=ex-edge"></script>
 <script>
 const GQ = window.GQ, CATS = window.CATS;
 // count per category
@@ -258,6 +262,8 @@ function renderDetail(idx){
   h += `<textarea class="note-box" data-noteid="${q.id}" placeholder="写下你的思路卡点 / 易错点 / 复盘…">${esc(notes[q.id]||'')}</textarea>`;
   // 题面
   h += `<div class="sec-h">📋 题目 (EN)</div><div class="desc-box">${esc(q.desc||'(无描述)')}</div>`;
+  if(q.ex) h += `<div class="sec-h">📥 示例</div><div class="ex-box">${esc(q.ex)}</div>`;
+  if(q.edge) h += `<div class="sec-h">⚠️ 边界 &amp; 易错</div><div class="edge-box">${esc(q.edge)}</div>`;
   if(q.sol){
     h += `<div class="sec-h">💡 思路</div><div class="approach-box">${esc(q.sol.ap)}</div>`;
     h += `<div class="sec-h">💻 完整代码</div><pre>${hl(q.sol.code)}</pre>`;
