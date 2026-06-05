@@ -82,6 +82,14 @@ pre { background:#0b1120; color:#e2e8f0; padding:14px 16px; border-radius:8px; o
 .done-btn.on { background:#10b981; border-color:#10b981; color:#fff; }
 .reset-link { font-size:11px; color:#64748b; cursor:pointer; }
 .reset-link:hover { color:#ef4444; }
+.toolbar { display:flex; align-items:center; gap:16px; margin-bottom:12px; flex-wrap:wrap; }
+.hide-toggle { font-size:13px; color:#cbd5e1; cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none; }
+.hide-toggle input { cursor:pointer; }
+.export-btn { font-size:13px; color:#34d399; cursor:pointer; border:1px solid #334155; padding:4px 12px; border-radius:8px; background:#1e293b; }
+.export-btn:hover { border-color:#34d399; }
+.note-box { width:100%; min-height:90px; box-sizing:border-box; background:#0f172a; border:1px solid #334155; border-radius:10px;
+  color:#e2e8f0; font-size:14px; padding:12px; resize:vertical; font-family:inherit; line-height:1.6; margin-bottom:14px; }
+.note-box:focus { outline:none; border-color:#6366f1; }
 
 /* mobile */
 .menu-btn { display:none; position:fixed; top:10px; left:10px; z-index:60; background:#6366f1; color:#fff;
@@ -106,7 +114,7 @@ footer a { color:#64748b; }
   </aside>
   <main class="main" id="main"></main>
 </div>
-<script src="gq-data.js?v=must50v2"></script>
+<script src="gq-data.js?v=days-notes"></script>
 <script>
 const GQ = window.GQ, CATS = window.CATS;
 // count per category
@@ -121,7 +129,13 @@ const mustCount = GQ.filter(q=>q.must).length;
 const catlist = document.getElementById('catlist');
 function renderSidebar(active){
   let h = `<div class="cat-item ${active==='must'?'active':''}" data-cat="must" style="background:rgba(251,191,36,0.12);border-left-color:${active==='must'?'#fbbf24':'transparent'};color:#fbbf24;font-weight:600">⭐ 冲刺必看 <span class="n" style="background:rgba(251,191,36,0.2);color:#fbbf24">${mustCount}</span></div>`;
-  h += `<div class="cat-item ${active==='all'?'active':''}" data-cat="all">全部 <span class="n">${GQ.length}</span></div>`;
+  // 3天刷题计划
+  const dayColors = {day1:'#34d399',day2:'#60a5fa',day3:'#f472b6'};
+  ['day1','day2','day3'].forEach((d,i)=>{
+    const c = dayColors[d], n = GQ.filter(q=>q.day===i+1).length;
+    h += `<div class="cat-item ${active===d?'active':''}" data-cat="${d}" style="background:${active===d?'rgba(255,255,255,0.04)':'transparent'};border-left-color:${active===d?c:'transparent'};color:${c};font-weight:600">📅 Day ${i+1} <span class="n" style="background:rgba(255,255,255,0.08);color:${c}">${n}</span></div>`;
+  });
+  h += `<div class="cat-item ${active==='all'?'active':''}" data-cat="all" style="margin-top:6px">全部 <span class="n">${GQ.length}</span></div>`;
   cats.forEach(c => {
     h += `<div class="cat-item ${active===c.id?'active':''}" data-cat="${c.id}">${c.name} <span class="n">${counts[c.id]}</span></div>`;
   });
@@ -146,6 +160,33 @@ function saveDone(){ localStorage.setItem('gq_done', JSON.stringify([...done]));
 function toggleDone(id){ if(done.has(id)) done.delete(id); else done.add(id); saveDone(); }
 function resetDone(){ if(confirm('确定清空所有「已掌握」记录?')){ done = new Set(); saveDone(); renderList(); } }
 
+// 备注(localStorage 持久化)
+let notes = JSON.parse(localStorage.getItem('gq_notes')||'{}');
+function saveNote(id, val){ if(val&&val.trim()){ notes[id]=val; } else { delete notes[id]; } localStorage.setItem('gq_notes', JSON.stringify(notes)); }
+function exportNotes(){
+  const ids = Object.keys(notes);
+  let md = `# Google 刷题备注导出\n\n生成时间: ${new Date().toLocaleString('zh-CN')}\n已掌握: ${done.size} 题 · 有备注: ${ids.length} 题\n\n`;
+  // 按 Day 分组导出
+  [1,2,3].forEach(d=>{
+    const qs = GQ.filter(q=>q.day===d);
+    md += `\n## 📅 Day ${d}\n\n`;
+    qs.forEach(q=>{
+      const dn = done.has(q.id)?'✅':'⬜';
+      const nt = notes[q.id];
+      md += `- ${dn} **${q.en}** (${q.cn})\n`;
+      if(nt) md += nt.split('\n').map(l=>'    > '+l).join('\n')+'\n';
+    });
+  });
+  // 非计划内但有备注的
+  const extra = ids.filter(id=>{ const q=GQ.find(x=>x.id===id); return q && !q.day; });
+  if(extra.length){ md += `\n## 其它\n\n`; extra.forEach(id=>{ const q=GQ.find(x=>x.id===id); md += `- **${q.en}** (${q.cn})\n${notes[id].split('\n').map(l=>'    > '+l).join('\n')}\n`; }); }
+  const blob = new Blob([md], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `google刷题备注_${new Date().toISOString().slice(0,10)}.md`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
 function repBadge(r){
   return `<span class="rep ${r<2?'low':''}">🔥 ${r}</span>`;
 }
@@ -158,23 +199,38 @@ function progressBar(list){
   </div>`;
 }
 
+let hideDone = localStorage.getItem('gq_hidedone')==='1';
+function toggleHideDone(){ hideDone=!hideDone; localStorage.setItem('gq_hidedone', hideDone?'1':'0'); renderList(); }
+const dayInfo = {
+  day1:{name:'📅 Day 1 · 线性结构打底', color:'#34d399', desc:'数组 → 字符串 → 栈 → 二分 → 堆 → 树。都是范式短题,过得快、建手感。'},
+  day2:{name:'📅 Day 2 · 区间 + 搜索/回溯', color:'#60a5fa', desc:'区间扫描线 → DFS/岛屿/回溯 → 并查集 → Trie → 贪心。需要画图想清楚。'},
+  day3:{name:'📅 Day 3 · 图论 + 设计', color:'#f472b6', desc:'BFS/拓扑/最短路 → 设计/OOP。最硬核,建议先看💡思路再自己写。'},
+};
 function renderList(){
   let list = GQ.slice();
   if(curCat==='must') list = list.filter(q=>q.must);
+  else if(curCat.startsWith('day')) list = list.filter(q=>q.day===+curCat.slice(3));
   else if(curCat!=='all') list = list.filter(q=>q.cat===curCat);
   if(curSearch){
     const ql = curSearch.toLowerCase();
     list = list.filter(q => (q.en+' '+q.cn+' '+(q.id||'')).toLowerCase().includes(ql));
   }
-  list.sort((a,b)=> b.reports-a.reports || a.en.localeCompare(b.en));
-  const catName = curCat==='must' ? '⭐ 冲刺必看 50 题' : (curCat==='all' ? '全部题目' : catMap[curCat]);
+  if(hideDone) list = list.filter(q=>!done.has(q.id));
+  // day 视图按计划内顺序;其余按频率
+  if(curCat.startsWith('day')) list.sort((a,b)=> b.reports-a.reports || a.en.localeCompare(b.en));
+  else list.sort((a,b)=> b.reports-a.reports || a.en.localeCompare(b.en));
+  const di = dayInfo[curCat];
+  const catName = di ? di.name : (curCat==='must' ? '⭐ 冲刺必看 50 题' : (curCat==='all' ? '全部题目' : catMap[curCat]));
   let h = `<div class="page-title">${catName} <span style="font-size:13px;color:#64748b">· ${list.length} 题</span></div>`;
   h += `<div class="page-sub">数字=该题在 hellointerview 被报告的次数(频率)。共 ${GQ.length} 题全部配齐完整解答 + 带代码 follow-up。</div>`;
-  if(curCat==='must'){
-    h += `<div class="overview" style="background:rgba(251,191,36,0.1);border-left-color:#fbbf24">⭐ <b>冲刺必看 50 题</b> · 按 report 频率挑出的最高频题,时间紧只刷这 50 道。涵盖各大类的代表题,刷完覆盖 Google 真题主力。</div>`;
+  if(di){
+    h += `<div class="overview" style="background:rgba(255,255,255,0.03);border-left-color:${di.color}">${di.desc} 勾选「✓」标记已掌握,可点上方「隐藏已掌握」把做过的折叠掉。</div>`;
+  } else if(curCat==='must'){
+    h += `<div class="overview" style="background:rgba(251,191,36,0.1);border-left-color:#fbbf24">⭐ <b>冲刺必看 50 题</b> · 结合真题频率 + L5 FDE 判断挑出(已剔除全部 DP),按 Day1/2/3 三天计划安排。涵盖各大类代表题。</div>`;
   } else if(curCat!=='all'){
     h += `<div class="overview">📂 <b>${catName}</b> · 这一类共 ${counts[curCat]} 道真题。点任意题进详情(中英题面 + 带注释代码 + 复杂度 + 带代码 follow-up)。建议从 🔥 高频往低刷。</div>`;
   }
+  h += `<div class="toolbar"><label class="hide-toggle"><input type="checkbox" ${hideDone?'checked':''} onchange="toggleHideDone()"> 隐藏已掌握</label><span class="export-btn" onclick="exportNotes()">⬇️ 导出备注</span></div>`;
   h += progressBar(list);
   if(list.length===0){ h += '<div class="pending">没找到匹配的题。</div>'; main.innerHTML=h; return; }
   list.forEach((q,i)=>{
@@ -197,6 +253,9 @@ function renderDetail(idx){
   h += `<div class="detail-cn">${esc(q.cn)}</div>`;
   h += `<div class="badges">${repBadge(q.reports)}${q.must?'<span class="badge" style="background:rgba(251,191,36,0.2);color:#fbbf24;border-color:#fbbf24">⭐ 冲刺必看</span>':''}<span class="badge">${catMap[q.cat]}</span><span class="badge">${esc(q.level||'')}</span><span class="badge">最近: ${esc(q.last||'')}</span></div>`;
   h += `<div class="done-btn ${done.has(q.id)?'on':''}" data-doneid="${q.id}" data-idx="${idx}">${done.has(q.id)?'✓ 已掌握 (点击取消)':'○ 标记已掌握'}</div>`;
+  // 备注
+  h += `<div class="sec-h">📝 我的备注 <span style="font-size:11px;color:#64748b;font-weight:400">(自动保存,可在列表页「导出备注」)</span></div>`;
+  h += `<textarea class="note-box" data-noteid="${q.id}" placeholder="写下你的思路卡点 / 易错点 / 复盘…">${esc(notes[q.id]||'')}</textarea>`;
   // 题面
   h += `<div class="sec-h">📋 题目 (EN)</div><div class="desc-box">${esc(q.desc||'(无描述)')}</div>`;
   if(q.sol){
@@ -236,6 +295,10 @@ main.addEventListener('click', e=>{
   if(chk){ e.stopPropagation(); toggleDone(chk.dataset.chk); renderList(); return; }
   const card = e.target.closest('.qcard'); if(!card) return;
   renderDetail(parseInt(card.dataset.i));
+});
+main.addEventListener('input', e=>{
+  const ta = e.target.closest('[data-noteid]');
+  if(ta) saveNote(ta.dataset.noteid, ta.value);
 });
 document.getElementById('search').addEventListener('input', e=>{
   curSearch = e.target.value.trim(); curCat = curCat==='all'?'all':curCat; renderList();
