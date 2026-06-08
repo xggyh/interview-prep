@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>💳 Chatbot Project · BNPL 客服 Agent 技术设计 (面试背诵版)</title>
+<meta name="description" content="BNPL customer-support agent technical design — interview recitation version.">
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; max-width: 920px; margin: 0 auto; padding: 16px 20px 100px; line-height: 1.8; color: #1f2328; background: #fafbfc; font-size: 15px; }
+header.hero { background: linear-gradient(135deg, #7c3aed, #2563eb, #06b6d4); color: white; padding: 28px 26px; border-radius: 14px; margin-bottom: 22px; box-shadow: 0 12px 36px rgba(124,58,237,0.28); }
+header.hero h1 { margin: 0 0 8px; font-size: 25px; }
+header.hero .sub { font-size: 13.5px; opacity: 0.95; line-height: 1.6; }
+header.hero a { color: #fde68a; }
+nav.toc { background: #f0f3f8; border: 1px solid #d0d7de; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; font-size: 12.5px; columns: 2; column-gap: 20px; }
+nav.toc strong { display: block; column-span: all; margin-bottom: 8px; font-size: 13px; color: #57606a; }
+nav.toc a { display: block; margin: 3px 0; padding: 2px 0; text-decoration: none; color: #2563eb; break-inside: avoid; }
+nav.toc a:hover { text-decoration: underline; }
+h2 { font-size: 20px; margin: 32px 0 12px; padding: 8px 0 8px 14px; border-left: 5px solid #7c3aed; background: linear-gradient(90deg, #f3e8ff, transparent); scroll-margin-top: 16px; }
+h3 { font-size: 16.5px; margin: 22px 0 8px; color: #1e3a8a; }
+h4 { font-size: 14.5px; margin: 16px 0 6px; color: #57606a; }
+h5 { font-size: 13.5px; margin: 12px 0 4px; color: #6b7280; }
+p { margin: 8px 0; }
+blockquote { background: #fff7d1; border-left: 4px solid #d4a72c; padding: 10px 16px; margin: 10px 0; border-radius: 0 6px 6px 0; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+th { background: #f6f8fa; padding: 8px 10px; text-align: left; border: 1px solid #d0d7de; font-weight: 600; }
+td { padding: 7px 10px; border: 1px solid #d0d7de; vertical-align: top; }
+code { background: rgba(124,58,237,0.1); padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 12.5px; color: #6d28d9; }
+pre { background: #1f2937; color: #f3f4f6; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+pre code { background: none; color: inherit; padding: 0; }
+.ascii-diagram { background: #0f172a; color: #93c5fd; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 11.5px; line-height: 1.4; white-space: pre; margin: 12px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; }
+hr { border: none; border-top: 1px solid #e1e4e8; margin: 28px 0; }
+strong { color: #1f2328; }
+a { color: #2563eb; }
+@media (max-width: 640px) { nav.toc { columns: 1; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>💳 Chatbot Project · BNPL 客服 Agent 技术设计</h1>
+  <div class="sub">面试背诵版 · Gao Xin 在 TikTok PayLater 做的多市场 BNPL 客服 Agent 完整技术设计. 涵盖意图路由 / 5 类执行模式 / 工具 + 技能层 / RAG / 三层记忆 / 容错幂等 / eval. · <a href="cram.html">← 回 cram hub</a></div>
+</header>
+
+<nav class="toc">
+  <strong>📑 目录 (点跳转)</strong>
+  <a href="#sec-1">0. 如何用这份文档背（先背这页）</a>
+  <a href="#sec-2">1. 场景与需求边界</a>
+  <a href="#sec-3">2. 整体架构（能在白板画出来）</a>
+  <a href="#sec-4">3. 意图识别与路由（你最关心的那块）</a>
+  <a href="#sec-5">3.5 路由进阶：SFT 分类器 + 校准门控 + 错分自愈 + 训练飞轮</a>
+  <a href="#sec-6">4. 执行模式详解（A/B/C/D 各怎么落地）</a>
+  <a href="#sec-7">5. 工具层：Registry + Discovery</a>
+  <a href="#sec-8">6. 技能层：Skill Registry + Discovery（融合 Anthropic 内部 Skills 一手经验）</a>
+  <a href="#sec-9">7. 规划与编排（多工具：依赖 / 并发 / 聚合）</a>
+  <a href="#sec-10">8. 记忆系统（三层）</a>
+  <a href="#sec-11">9. RAG 知识层（你点名要的，贯穿全局）</a>
+  <a href="#sec-12">10. 上下文管理与自动压缩</a>
+  <a href="#sec-13">11. 容错、降级与幂等（动钱红线）</a>
+  <a href="#sec-14">12. 安全、合规、沙箱与鉴权（横切，BNPL 的命门）</a>
+  <a href="#sec-15">13. 转人工 / Escalation</a>
+  <a href="#sec-16">14. 性能与延迟（你的主场，sub-2s）</a>
+  <a href="#sec-17">15. 可观测性 / 评估 / 自省（成功率的地基）</a>
+  <a href="#sec-18">16. 多语言 / 本地化（APAC）</a>
+  <a href="#sec-19">17. 工程化底座（先点名，被追问能接住）</a>
+  <a href="#sec-20">18. 实施优先级（被问「先做什么」答这个）</a>
+  <a href="#sec-21">附录 A：面试速答卡（被问就背这几句）</a>
+  <a href="#sec-22">附录 B：模块 ↔ 基准题号对照（按题复习用）</a>
+</nav>
+
+<h1>BNPL 客服 Agent · 技术设计文档（面试背诵版）</h1>
+<blockquote><p>用途：明天面试背诵。每个模块统一用 <strong>可背诵三段式</strong>： <strong>① 一句话总纲</strong>（脱口而出）｜<strong>② 设计要点 + 选型理由（trade-off）</strong>｜<strong>③ 关联考点 &amp; 可能追问</strong> 关联考点对应《高难度大模型面试题精选》的题号，用 <code>【Q?】</code> 标注。 RAG 作为横切能力，在每个相关模块用 <code>🔎RAG触点</code> 标出。</p></blockquote>
+<hr />
+<h2 id="sec-1">0. 如何用这份文档背（先背这页）</h2>
+<p><strong>背诵优先级</strong>：先背 §1 的 30 秒电梯陈述 + §2 架构图（能在白板画出来）→ 再背每个模块的「一句话总纲」→ 最后背「trade-off + BNPL 的坑 + 追问答法」。</p>
+<p><strong>面试心法（一句话）</strong>：</p>
+<blockquote><p>「<strong>已知任务走确定性的 skill/workflow，未知任务才放 agent loop；越确定越可测越可靠。动钱的操作一律幂等 + fail-safe + 人确认。可靠性脊柱（tracing/eval/guardrails/幂等）先于花哨能力。</strong>」 —— 这句话能解释我 80% 的设计选择，被问住时就回到它。</p></blockquote>
+<hr />
+<h2 id="sec-2">1. 场景与需求边界</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>一个面向 <strong>2M+/天</strong> 请求、<strong>APAC 多市场（EN/马来/泰/印尼）</strong> 的 BNPL（先买后付）客服 Agent，要在 <strong>sub-2s</strong> 内、<strong>合规可审计</strong>地解决账户/还款/退货/争议/欺诈/hardship 等场景，<strong>涉及真金白银，错一次就是事故</strong>。</p></blockquote>
+<h3>② 需求要点 + 为什么</h3>
+<p><strong>典型场景清单（按执行模式分类，面试时能报出来就赢一半）：</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>场景</th><th>例子</th><th>适合的执行模式</th></tr></thead><tbody><tr><td>账户/额度查询</td><td>余额、可用额度、账单日</td><td>A 单工具</td></tr><tr><td><strong>BNPL 用不了</strong></td><td>结账被拒：额度不足/风控拦截/逾期冻结/KYC未完成/商户不支持</td><td>B 动态多工具诊断</td></tr><tr><td>还款</td><td>查还款计划、提前还款、改还款日、扣款失败</td><td>C 预设 workflow（动钱）</td></tr><tr><td><strong>退货退款</strong></td><td>怎么退、退款进度、退款如何冲销分期</td><td>C workflow + D 政策RAG</td></tr><tr><td>争议/拒付</td><td>未收到货、重复扣款、金额错、未授权交易</td><td>C skill（dispute）</td></tr><tr><td>欺诈/未授权</td><td>报欺诈、冻结账户</td><td>C skill + 强制 escalate</td></tr><tr><td>费用解释</td><td>滞纳金、手续费为什么收</td><td>D RAG + 账户回源</td></tr><tr><td>Hardship</td><td>还不上、想重组还款</td><td>C skill + escalate（弱势客户）</td></tr><tr><td>政策问答</td><td>利息怎么算、谁能用、BNPL 怎么运作</td><td>D 纯 RAG</td></tr><tr><td>账户管理</td><td>改手机/邮箱、换扣款方式、销户</td><td>C workflow + step-up 鉴权</td></tr><tr><td>投诉</td><td>各类不满</td><td>E escalate</td></tr></tbody></table></div>
+<p><strong>硬约束（写进需求才算数）：</strong></p>
+<ul><li><strong>延迟</strong>：端到端 sub-2s，要做延迟预算分配。</li><li><strong>规模</strong>：2M+/天 → 跨用户隔离是红线，缓存/模型分层是刚需。</li><li><strong>合规</strong>：新加坡 PDPA + APAC 各市场监管 + 催收行为规范 + 弱势客户话术红线；全程 audit trail。</li><li><strong>金融属性</strong>：写操作/动钱必须幂等 + fail-safe；记忆/缓存绝不能当账实来源。</li></ul>
+<h3>③ 成功的定义（被问「怎么衡量好不好」时答这个）【Q12】</h3>
+<p><strong>别只看「有没有回话」，按任务级多指标一起看：</strong></p>
+<ol><li><strong>Task completion rate</strong>（任务真完成）</li><li><strong>Containment rate</strong>（没转人工就解决的比例）</li><li><strong>Correct-action rate</strong>（做对了动作，尤其动钱）</li><li><strong>合规违规率</strong>（目标 ≈ 0）</li><li><strong>延迟 SLO 达标率</strong></li><li><strong>Fallback / Escalation 率</strong></li></ol>
+<blockquote><p>金句：「单看任一指标都会骗自己——containment 高但 correct-action 低，是在错误地'自己硬扛'。」</p></blockquote>
+<hr />
+<h2 id="sec-3">2. 整体架构（能在白板画出来）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>横切层（guardrails / 鉴权 / 可观测 / 合规）包住一切；意图 Router 在顶端分发到 5 类执行模式；下面挂工具/技能层（registry+discovery）和能力底座（三层记忆 + RAG + 容错 + 压缩）；账务系统永远是唯一事实来源。</strong></p></blockquote>
+<h3>② 架构图</h3>
+<pre class="language-plaintext"><code class="language-plaintext">        ┌──────────────────────────────────────────────────────────────┐
+        │     横切层 Cross-cutting（包住一切，每条链路都过）              │
+        │  Guardrails · 鉴权/Step-up · 可观测/Tracing/Replay ·          │
+        │  合规/审计 · 多语言 · 成本/限流/多供应商兜底                  │
+        └──────────────────────────────────────────────────────────────┘
+  用户(2M+/天)                            │
+   文本/语音(EN/MS/TH/ID)                 ▼
+   ┌──────────┐    ┌──────────────────────────────────────────────────┐
+   │感知:语言  │──▶│        意图识别 + 路由 Intent Router               │
+   │检测/槽位  │    │  置信度→选执行模式 + 按意图&amp;权限收敛工具/技能子集  │
+   └──────────┘    └──────────────────────────────────────────────────┘
+                  │         │          │           │            │
+                  ▼         ▼          ▼           ▼            ▼
+              ┌───────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
+              │A 单工具│ │B 动态多│ │C 预设   │ │D 纯RAG │ │E 澄清/   │
+              │ 直答  │ │工具    │ │workflow│ │知识问答│ │ 升级/拒答│
+              │(账户) │ │sub-agt │ │/skill  │ │(政策)  │ │          │
+              │       │ │ReAct/  │ │(还款/  │ │        │ │          │
+              │       │ │Plan-Ex │ │争议)   │ │        │ │          │
+              └───┬───┘ └───┬────┘ └───┬────┘ └───┬────┘ └────┬─────┘
+                  └─────────┴─────┬────┴──────────┘            ▼
+                                  ▼                      转人工 warm handoff
+              ┌───────────────────────────────────────┐  (带完整上下文)
+              │  工具/技能层 Registry + Discovery       │
+              │  副作用等级/幂等键/scope/SLA/重试/降级   │
+              └───────────────────┬───────────────────┘
+                                  ▼
+        ┌─────────────────────────────────────────────────────┐
+        │ 能力底座: 三层记忆 · 🔎RAG知识层 · 容错降级ladder ·    │
+        │ 幂等/Saga · 上下文压缩 · 多级缓存                     │
+        └───────────────────────┬─────────────────────────────┘
+                                ▼
+        账务/借贷核心系统 (唯一事实来源) · 外部API · 审计库(全量transcript)</code></pre>
+<h3>③ 关联考点 &amp; 追问【Q1】</h3>
+<ul><li><strong>Agent 五大核心组件</strong>（被问「Agent 由什么组成」直接背）：<strong>感知 → 记忆 → 推理/规划 → 行动 → 评估/反思</strong>，形成闭环。</li><li>追问「你这架构哪里体现了组件协作？」→ Router=推理入口，工具层=行动，记忆+RAG=记忆，guardrails+eval=评估反思，闭环直到任务完成或 escalate。</li></ul>
+<hr />
+<h2 id="sec-4">3. 意图识别与路由（你最关心的那块）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>Router 不只是分类器，它是「<strong>置信度门控 + 执行模式选择 + 工具/技能子集收敛</strong>」三合一；并且<strong>优先走最确定的路径</strong>（workflow &gt; sub-agent &gt; 自由 loop）。</p></blockquote>
+<h3>② 设计要点 + 选型理由</h3>
+<p><strong>A) 你提的 3 类 → 我帮你补成完整的「执行模式」taxonomy。</strong></p>
+<p>你原来的 3 类：</p>
+<ol><li><strong>单工具直答</strong>（账户信息）</li><li><strong>动态多工具协作</strong>（工具间配合没预定义）→ <strong>是的，这就是一个 sub-agent</strong>（见下）</li><li><strong>预设 workflow</strong>（节点式）</li></ol>
+<p><strong>直接回答你的问题：这 3 类能覆盖所有场景吗？——能覆盖「执行/动作」这一维度，但不完整。</strong> 因为这 3 类只回答了「要不要调工具、调几个、路径定不定」，漏了「不调工具」和「不该自己干」的分支。补全后是 5 类：</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>模式</th><th>是什么</th><th>BNPL 例子</th><th>关键特征</th></tr></thead><tbody><tr><td><strong>A 单工具直答</strong></td><td>一次函数调用解决</td><td>查余额/额度</td><td>即使单工具也要挂 fallback（服务挂了不能编余额）</td></tr><tr><td><strong>B 动态多工具 = sub-agent</strong></td><td>工具间配合<strong>不预定义</strong>，模型边想边调</td><td>「为什么 BNPL 用不了」要查额度+查风控+查逾期+查商户</td><td>有 ReAct / Plan-Execute loop，<strong>有步数/时间/成本预算上限</strong></td></tr><tr><td><strong>C 预设 workflow / skill</strong></td><td>节点式状态机，路径<strong>确定</strong></td><td>发起还款、退货、dispute</td><td>确定性高、可审计、动钱首选</td></tr><tr><td><strong>D 纯知识问答（RAG）</strong></td><td>不调工具，检索政策/FAQ 作答</td><td>「怎么退货」「利息怎么算」</td><td>🔎核心 RAG 路径，必须带引用</td></tr><tr><td><strong>E 澄清 / 升级 / 拒答</strong></td><td>非动作分支</td><td>意图不清→澄清；hardship/欺诈→转人工；越权金融建议→拒答</td><td>「转人工」本身就是一种成功</td></tr></tbody></table></div>
+<blockquote><p>背诵口诀：<strong>「一具、多具、定流、查知、兜底」</strong> = A 单工具 / B 多工具 / C 定 workflow / D 查知识 / E 兜底升级。</p></blockquote>
+<p><strong>B) 为什么模式 2 是 sub-agent？</strong>【Q15, Q29】</p>
+<blockquote><p>sub-agent = Router 委派出去的、<strong>带自己作用域工具集 + 预算（max steps/time/cost）+ 专属 guardrails + 成功判据</strong>的有界 ReAct/Plan-Execute 循环，跑完把结果交回。 它和 C 的区别是<strong>确定性</strong>：C 是预先画好的 DAG/状态机；B 是模型动态规划路径。<strong>能用 C 就别用 B</strong>（确定性=可测=高成功率）。</p></blockquote>
+<p><strong>C) 路由怎么做（不止一个 LLM 分类）：</strong></p>
+<ul><li><strong>分层</strong>：先规则/关键词粗筛（快、便宜）→ 再小模型语义分类（兜底）→ 低置信才上大模型。【Q16 模型分层补偿】</li><li><strong>置信度门控</strong>：高置信→直接执行；中置信→先澄清/补槽位；低置信→转人工。</li><li><strong>意图驱动收敛</strong>：意图一旦定了，就只 expose 对应的工具/技能子集（见 §5 discovery），<strong>这是工具选择准确率的关键</strong>。</li><li><strong>槽位补全（slot-filling）</strong>：缺必填槽位（如退货要订单号）就反问，别瞎调工具。</li></ul>
+<p>🔎<strong>RAG触点</strong>：意图不清时，可先用语义检索把用户 query 匹配到 FAQ/skill 库做意图消歧。</p>
+<h3>③ 关联考点 &amp; 追问【Q2, Q29, Q30】</h3>
+<ul><li>追问「ReAct 和 CoT 区别？」→ <strong>CoT 只是把推理写出来（开环、纯内省、无外部交互）；ReAct 是「推理→行动→观察」闭环，能调工具拿外部真值、能纠错。</strong> 模式 B 用 ReAct。</li><li>追问「CoT 和 Planning 区别？」→ CoT 是把思考过程写出来；Planning 是生成一张「可执行的任务表」（如先查额度再查风控）。模式 B/C 是 Planning。</li><li>追问「3 类不够时怎么办？」→ 答 5 类 taxonomy + 「determinism ladder：能确定就确定」。</li></ul>
+<hr />
+<h2 id="sec-5">3.5 路由进阶：SFT 分类器 + 校准门控 + 错分自愈 + 训练飞轮</h2>
+<blockquote><p>这是全文最硬的一节，也是面试官最爱追的「<strong>你整个系统都挂在 router 上，它错了怎么办</strong>」。</p></blockquote>
+<h3>① 一句话总纲</h3>
+<blockquote><p>路由<strong>不靠「分得准」保正确</strong>，靠两条腿：(1) <strong>SFT 小模型 + 校准置信度</strong>——把准确率和「知道自己没把握」做上去；(2) <strong>错分自愈</strong>——能力包含、skill-as-tool、handler 回弹、危险类高召回、escalation 兜底接住残差。而自愈产生的信号又<strong>反哺 SFT 训练飞轮</strong>，越用越准。<strong>Router 是优化提示，不是不可逆承诺。</strong></p></blockquote>
+<h3>② 三块展开</h3>
+<h4>A) 为什么这里就该 SFT（封闭集 + 高流量 + 低延迟 + 校准）【Q16】</h4>
+<p>意图分类是「<strong>该上 SFT</strong>」的教科书场景：</p>
+<ol><li><strong>准确率</strong>：封闭标签集，把领域黑话（「用不了」「卡了」「扣两次」）烧进权重，in-distribution 稳赢 few-shot prompting。</li><li><strong>延迟/成本</strong>：微调小模型就是 §14 分层里那个「便宜快」的底座，2M+/天扛得住，大模型只留长尾。</li><li><strong>校准（最被低估）</strong>：①里的「置信度门控/弃权」靠一个<strong>可信的置信度</strong>。LLM 自报把握<strong>出了名地不准、还能被 prompt 带偏</strong>；训练分类器的 softmax（+ temperature/Platt 校准）是<strong>真概率、单调、可阈值</strong>。<strong>→ SFT 不只提准确率，它让整套门控真正成立</strong>——否则阈值建在沙子上。</li></ol>
+<p><strong>微调什么（具体到架构）：</strong></p>
+<ul><li><strong>头部高频意图</strong>：多语 encoder（XLM-R / mBERT / embedding + 分类头），tiny、&lt;10ms、给校准 softmax、覆盖 EN/MS/TH/ID。</li><li><strong>复合/难句</strong>：小 decoder（LoRA）输出结构化 <code>{intent, slots, 置信信号}</code>，处理多意图，配约束解码。</li><li><strong>分层即此</strong>：encoder 走快路 → 小 decoder 兜复合 → 大模型只啃长尾。</li><li><strong>铁律：微调「意图」、不微调「模式映射」</strong>。intent 语义稳定 → 烧进权重；<code>mode = f(intent)</code> 留在 registry/config，把某 skill 从 C 改到 B <strong>不用重训</strong>。</li></ul>
+<h4>B) 错分自愈（六机制，按「错误代价」设计而非追求 100% 准）</h4>
+<blockquote><p>模式之间<strong>不是互斥硬墙，能力是包含关系</strong>；错分 ≠ 失败，因为路径能自愈。</p></blockquote>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>#</th><th>机制</th><th>怎么救错分</th></tr></thead><tbody><tr><td><strong>1</strong></td><td><strong>能力包含 + 错向偏置</strong>（最重要）</td><td>B ⊇ A（sub-agent 本就能只调一次工具）→ <strong>A→B 错分无害</strong>。不对称：A→B 代价小（多点 token），<strong>B→A 代价大</strong>（单工具 handler 干不了多步→失败）。<strong>不确定时偏向更通用模式</strong>，动作类默认兜底走 B。</td></tr><tr><td><strong>2</strong></td><td><strong>Skill 也注册成 sub-agent 可调的工具</strong></td><td>router 错把 dispute 路由成 B 时，sub-agent 跑着发现「这是争议」→ 把 dispute skill 当工具调进来。<strong>C 的能力对 B 可达</strong>。</td></tr><tr><td><strong>3</strong></td><td><strong>Handler 能 say-no 回弹</strong>（re-entrant router）</td><td>handler 自检「不是我」→ 带富化上下文弹回 router 重路由（A→<code>needs_replan</code>→B；C 撞预设外分支→升 B/转人工）。<strong>重路由预算 ≤1~2 次</strong>，否则乒乓【Q7 防死循环】。</td></tr><tr><td><strong>4</strong></td><td><strong>D（RAG）当软着陆</strong></td><td>找不到可执行意图但能用知识答 → 先落 D 检索政策作答，再考虑放弃。</td></tr><tr><td><strong>5</strong></td><td><strong>危险类高召回</strong>（recall 优先）</td><td>欺诈/hardship/未授权/投诉配<strong>故意过度触发</strong>的检测器，宁可误升级不漏——<strong>漏一个欺诈代价 &gt;&gt; 多一次人工</strong>。</td></tr><tr><td><strong>6</strong></td><td><strong>Escalation 兜所有漏网</strong></td><td>低置信/反复失败/handler 喊搞不定 → 带完整上下文转人工。这就是「<strong>转人工=成功</strong>」。</td></tr></tbody></table></div>
+<p><strong>handler 回弹 / 重路由流程：</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">        ┌──────────────────────────────────────────────┐
+        │          Intent Router (SFT + 校准)            │
+        │     intent + 置信度 → mode = f(intent)         │
+        └──────┬──────────────────────────────┬────────┘
+      高置信 │                          低置信 / 无 intent 过阈
+              ▼                                   ▼
+   ┌──────────────────────┐                  ┌──────────┐
+   │ 选定 handler A/B/C/D  │                  │ E 澄清/   │
+   └──────────┬───────────┘                  │ 转人工    │
+              ▼                                └──────────┘
+       ┌──────────────┐  「不是我」               ▲
+       │ handler 执行  │ ─ needs_replan ─┐        │
+       │  + 自检       │  (带富化上下文)  │        │
+       └──────┬───────┘                  ▼        │
+       成功 │              ┌───────────────────────┐
+             ▼             │ 重路由 (预算 ≤1~2 次) │─┘ 超预算→E
+         返回结果          └───────────────────────┘
+   能力关系: B ⊇ A  ｜  C(skill) 可被 B 当工具调用</code></pre>
+<h4>C) 训练飞轮（自愈信号 = SFT 的标签来源，点睛之笔）【Q26, Q12】</h4>
+<ul><li><strong>冷启动</strong>：大模型自动打标 + 人审种子集；按意图合成 paraphrase（尤其泰/印尼低资源语）。</li><li><strong>生产飞轮</strong>：<strong>B 里那些兜底机制正好就是 SFT 的标签来源</strong>——</li><li><strong>重路由事件</strong> = 「原分类错了」负样本；<strong>escalation / 用户重述</strong> = 弱标签；<strong>低置信/规则与模型分歧</strong> → active learning 优先送人审。</li><li>→ <strong>自愈路径同时在生产训练数据，错分越多、数据越肥、下一版越准。</strong></li><li><strong>重训纪律</strong>：每次必过 <strong>eval + canary/shadow</strong>；<strong>macro-F1 涨了但欺诈 recall 掉了 = NO-GO</strong>，危险类按错误代价单独盯 recall。</li><li><strong>建设顺序</strong>：全新无流量 → 先 规则 + prompt 大模型 跑起来收数据 → 攒够量再 SFT。</li></ul>
+<pre class="language-plaintext"><code class="language-plaintext">   生产流量 ─▶ SFT路由器 ─▶ handler执行 ─▶ 结果
+       ▲                        │
+       │                        ├─ 重路由事件  ─┐ 错分负样本
+       │                        ├─ escalation  ─┤ 弱标签
+       │                        ├─ 用户重述    ─┤
+       │                        └─ 低置信/分歧  ─┘ active learning→人审
+       │      打标/合成(大模型)        │
+       └──── 重训(LoRA) ◀─ 标注池 ◀────┘
+                │
+                └─ 过 eval+canary，按错误代价盯 per-intent recall → 上线</code></pre>
+<h3>③ 关联考点 &amp; 追问【Q16, Q12, Q13, Q26, Q7, Q18】</h3>
+<ul><li>「怎么保证五分类准？」→ 别让模型在 5 个模式里猜，<strong>先识别意图再查表推导模式</strong>；SFT 提准确率 + 给校准置信度；剩下靠自愈。</li><li>「router 错了整条链就废了吧？」→ 不会：B⊇A、skill-as-tool、handler 回弹、高召回、escalation——<strong>错分能自愈</strong>。</li><li>「SFT 是不是就不用兜底了？」→ 反了。<strong>SFT 抬地板、不拆网</strong>：分类永远不完美（分布漂移/新意图），而且<strong>自愈信号正是 SFT 的训练数据</strong>，两者互补。</li></ul>
+<h3>🎯 本节金句</h3>
+<blockquote><p>「<strong>我不靠 router 分得准来保证正确——分类是封闭集 + 高流量 + 低延迟，正该 SFT，它既提准确率、又给我校准过的置信度让门控成立。但 SFT 抬地板不拆网：模式能力是包含关系（B⊇A）、skill 能被 sub-agent 当工具调、handler 能 say-no 回弹、危险类高召回、escalation 兜底；而这些自愈信号又反过来喂 SFT 的训练飞轮，越用越准。我微调意图不微调模式映射，每次重训按错误代价过 eval 才上线。</strong>」</p></blockquote>
+<hr />
+<h2 id="sec-6">4. 执行模式详解（A/B/C/D 各怎么落地）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>四条执行路径共用同一套工具层、记忆、容错；区别只在<strong>谁决定路径</strong>：A 无需规划、B 模型规划、C 预先规划、D 不规划只检索。</p></blockquote>
+<h3>② 要点 + 理由</h3>
+<p><strong>模式 B（sub-agent）规划范式怎么选</strong>【Q29, Q31, Q32】：</p>
+<ul><li><strong>Plan-Then-Act</strong>（先整体规划再执行，如 SayCan/TaskWeaver）：适合步骤可预先想清、要可审计的——<strong>BNPL 诊断类首选</strong>。</li><li><strong>ReAct + 轻规划</strong>（边做边调整）：适合中间结果会影响下一步的。</li><li><strong>ToT / LATS（树搜索/MCTS）</strong>：探索多路径找最优解，<strong>贵、慢</strong>，BNPL 客服基本用不上（留给离线/高价值决策），但要会讲：相比线性规划能回溯、能比较多条路径。</li><li><strong>鲁棒重规划</strong>【Q31】：某步失败（API 超时/返回格式错）→ 不是整个重来，而是<strong>局部重试→换路径→重规划</strong>，并保护已完成步骤的状态。</li></ul>
+<p><strong>防死循环</strong>（必背）【Q7】：</p>
+<ol><li><strong>轨迹检测</strong>：检测连续重复的 (tool, args) 或重复输出 → 中断。</li><li><strong>预算上限</strong>：max steps / max time / max cost，超了强制收口（转人工或降级答案）。</li></ol>
+<blockquote><p>这两条是有限状态自动机思路，不靠模型自觉。</p></blockquote>
+<p><strong>模式 C（workflow/skill）= 确定性状态机</strong>【Q9】：</p>
+<ul><li>节点 = (校验 → 调工具 → 等确认 → 写操作 → 回执)；每个节点可持久化、可断点续跑。</li><li>动钱节点前<strong>强制人确认 + step-up 鉴权</strong>。</li></ul>
+<p>🔎<strong>RAG触点</strong>：模式 D 是纯 RAG（见 §9）；模式 B/C 里也会调「政策检索工具」来给答案找依据。</p>
+<h3>③ 追问【Q20】</h3>
+<ul><li>「为什么不全用自回归 LLM 规划？」→ 自回归规划在<strong>可解释性/最优性/约束满足</strong>上弱于符号规划（PDDL/HTN）；BNPL 用「LLM 规划 + 确定性 workflow 兜约束」来弥合，不引入完整符号系统。</li></ul>
+<hr />
+<h2 id="sec-7">5. 工具层：Registry + Discovery</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>Registry 管「目录里有什么」，Discovery 管「这一轮给 LLM 看哪几个」——后者才决定调用准确率；工具元数据里没有「副作用等级」和「幂等键」，后面的重试和确认全是空中楼阁。</strong></p></blockquote>
+<h3>② 设计要点 + 理由</h3>
+<p><strong>A) Tool Registry 必填元数据</strong>（被问「你的工具怎么定义」时报字段）：</p>
+<ul><li>name / description / 参数 schema（基础）</li><li><strong>副作用等级</strong>：只读 / 写 / <strong>动钱</strong>（决定要不要确认、能不能重试）</li><li><strong>是否幂等 + 幂等键</strong>（动钱重试的命根子）</li><li><strong>所需鉴权 scope</strong>（决定 discovery 收敛和 step-up）</li><li><strong>per-tool 超时 + p99 SLA</strong>（吃进延迟预算）</li><li><strong>可重试错误集 + 退避策略</strong></li><li><strong>降级目标</strong>（替代 tool / 缓存 / 放弃）</li><li><strong>PII 标记</strong>（决定日志脱敏）</li><li><strong>版本号</strong></li><li>实现：<strong>声明式 + 启动时 schema 校验 + 热注册（不重启加 tool）</strong>，对外用 <strong>MCP</strong> 做互通。</li></ul>
+<p><strong>B) Tool Discovery</strong>【Q38】：</p>
+<ul><li>区分「目录里有什么」vs「这一轮 expose 哪几个」。</li><li>= <strong>按意图 + 用户权限动态收敛子集</strong>（语义检索 description + 规则按 intent 分类）。</li><li><strong>每轮 expose 上限（≤8）</strong>：工具一多，选择准确率掉、token 涨。</li><li><strong>权限外的 tool 连看都看不到</strong>（entitlement 收敛）。</li></ul>
+<p><strong>C) 工具描述 &amp; 参数 Schema 设计</strong>【Q5, Q37】（高频考点，必背）：</p>
+<ul><li>description 要让模型知道<strong>「何时用、为何用」</strong>，参数 schema 让模型知道<strong>「填什么、怎么填」</strong>。</li><li><strong>负向约束（negative constraints）</strong>：明确写「<strong>不要在 X 情况下用</strong>」。例：<code>refund_tool</code> 的 description 写「仅用于已结算订单；未结算退款用 cancel_order，不要用本工具」。</li><li>给<strong>调用策略</strong>：例「金额不确定时先调 get_order_detail，不要猜金额」。</li></ul>
+<p>🔎<strong>RAG触点</strong>：Discovery 的「语义检索 description」本身就是一次小型 RAG（对工具库做向量检索）。</p>
+<h3>③ 追问【Q18, Q38】</h3>
+<ul><li>「工具一多模型选不准怎么办？」→ 分层过滤 + 基于检索的预选（≤8）+ 工具类别层次。</li><li>「模型知道做什么但不会调工具？」→ 从<strong>表示学习</strong>角度：工具调用是稀疏信号；缓解靠演示检索（few-shot 调用样例）、工具原型网络、解耦推理与执行，<strong>而非单纯堆大模型</strong>。</li></ul>
+<hr />
+<h2 id="sec-8">6. 技能层：Skill Registry + Discovery（融合 Anthropic 内部 Skills 一手经验）</h2>
+<blockquote><p>本节融合 Anthropic 官方复盘《Lessons from building Claude Code: how we use Skills》。面试里能说「我参考了 Anthropic 公开的内部 Skills 实践」= 可信度 + 前瞻性。</p></blockquote>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>Skill 不是几段提示词，是「围绕一个任务组织起来的工作材料文件夹」</strong>——SKILL.md（目录）+ 参考文档 + 脚本 + 模板 + 示例 + hooks + 可持久化数据。Claude 调用时拿到的是「<strong>完成这件事的整套工作材料</strong>」。它给你 workflow 的确定性 + 可审计，同时靠 progressive disclosure 省 token。</p></blockquote>
+<h3>② tool vs skill + Discovery</h3>
+<ul><li><strong>分清</strong>：tool = 一次函数调用；skill = 打包好的「做法」（流程 + 要用的 tools + 专属 guardrails + slots + 成功判据）= 模式 C 的 workflow / 模式 B 的 sub-agent handler。</li><li><strong>Discovery</strong>：意图 → 候选 skill（语义 + 规则）→ <strong>JIT 加载</strong>（只在命中时进 context）。🔎RAG触点：候选召回 = 对 skill 库语义检索。</li><li><strong>聚焦 &gt; 大而全</strong>（Anthropic 强调）：能干净落进某一类的 skill 更稳；想一次覆盖太多目标会把模型带乱。← 呼应全文「确定性」主线。</li><li><strong>BNPL skill 举例</strong>：<code>dispute交易</code> / <code>设置还款计划</code> / <code>报欺诈</code> / <code>hardship协助</code> / <code>解释某笔费用</code> / <code>退货退款</code>（每个带自己的合规约束、可复用）。</li></ul>
+<h3>③ Anthropic 内部 9 类 Skill → 映射到 BNPL（背这张表 = 显示你想全了）</h3>
+<p>9 类连起来就是一条完整工作流：补知识 → 验证 → 取数 → 流程 → 脚手架 → 质量 → 发布 → 排障 → 运维。</p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>Anthropic 9 类</th><th>BNPL 客服 Agent 对应</th></tr></thead><tbody><tr><td>1 Library/API reference</td><td>内部账务/风控 SDK 怎么用 + gotchas（字段命名、append-only 表）</td></tr><tr><td>2 <strong>Product verification</strong>（最值钱）</td><td><strong>动钱后到底成没成的端到端验证</strong>：headless 跑还款/退款 + 对 ledger/payment_events 程序化断言</td></tr><tr><td>3 Data fetching &amp; analysis</td><td>取数 skill（账户/交易/对账），封装表结构与字段约定 ← §14 NL2SQL</td></tr><tr><td>4 Business process &amp; automation</td><td>内部运营流程：批量争议、合规报表、催收名单生成</td></tr><tr><td>5 Code scaffolding &amp; templates</td><td>（偏研发，BNPL agent 用得少，一句带过即可）</td></tr><tr><td>6 Code quality &amp; review</td><td>adversarial-review 子 agent 给「新鲜视角」挑错，可接 CI</td></tr><tr><td>7 CI/CD &amp; deployment</td><td>babysit-pr / deploy：agent 自身发布、放量、错误率对比、回滚 ← §15 canary</td></tr><tr><td>8 <strong>Runbooks</strong></td><td>「<strong>症状 → 排查</strong>」：用户报「扣两次/退款没到」→ 映射查哪些系统 → 结构化结论；也用于 agent 自身 on-call</td></tr><tr><td>9 Infrastructure operations</td><td>破坏性操作（清理/成本/依赖）<strong>必须 guardrail：先通知 → 确认 → 执行</strong> ← §12 自主边界</td></tr></tbody></table></div>
+<h3>④ 怎么写「对」一个 Skill（6 条铁律，全是反直觉的干货）</h3>
+<ol><li><strong>别写显而易见的</strong>：补模型默认拿不到的（团队 design taste、避坑点），不是教它本来就会的。</li><li><strong>SKILL.md 做目录、细节分文件按需加载</strong>：卡住读 <code>stuck-jobs.md</code>、API 签名进 <code>references/</code>、模板进 <code>assets/</code>——这就是 <strong>progressive disclosure</strong>；<strong>文件系统本身就是上下文工程</strong>。</li><li><strong>别写太死</strong>：给关键规则 + 留判断空间，否则一换情境就卡。</li><li><strong>setup 前置</strong>：缺的用户上下文放 <code>config.json</code>，缺了就问（结构化多选可调 <strong>AskUserQuestion</strong>）。例：争议发到哪个 Slack 渠道、退款审批人是谁。</li><li><strong>description 写给模型看、直接服务触发</strong>：系统开局扫所有 skill 的 name+description 决定触发——它不是摘要，是<strong>触发条件说明</strong>。把关键词（"dispute"/"退款"/"还不上"）、会上传的文件、激活场景直接写进去。</li><li><strong>最有信号量的是 gotchas</strong>（精华）：模型本来会写代码读库，真正值钱的是「把它从默认思路里拽出来」的细节。BNPL 例：</li></ol>
+<ul><li>分期/订阅表是 <strong>append-only，要找最高 version，不能只看最新 <code>created_at</code></strong>；</li><li>同一字段 gateway 里叫 <code>txn_ref</code>、billing 里叫 <code>loan_id</code>、风控里叫 <code>account_ref</code>；</li><li><strong>退款 API 返回 200 ≠ 钱到账</strong>，得去 <code>payment_events</code>/ledger 看真实结算状态。</li></ul>
+<blockquote><p>🚨<strong>Anthropic 最看重「验证」</strong>：模型最爱给「已经做完了」的错觉，最易掉链子的恰是最后一步验证；<strong>值得让工程师单独花一周</strong>把验证类 skill 做硬。两招：<strong>让 agent 录测试过程视频</strong> + <strong>关键节点加程序化断言</strong>（状态变没变、事件落没落库、终态对不对），<strong>绝不靠「看起来差不多」</strong>。← 直接接 §11 动钱 fail-safe + §15 eval。</p></blockquote>
+<h3>⑤ Skill 用深了，先长出三样：记忆 / 脚本 / hooks</h3>
+<ul><li><strong>记忆</strong>：per-skill 日志——dispute skill 把每次处理记进 <code>disputes.log</code>，下次先读历史；简单用 append-only/JSON、复杂用 SQLite，存在稳定持久化目录。← §8。</li><li><strong>脚本</strong>：「能给模型的最强工具之一就是代码本身」。预置取数/对账/分析 helper，模型不再每次重写样板，把回合花在<strong>编排和下一步</strong>上。← §14 省延迟。</li><li><strong>on-demand hooks</strong>（只在该 skill 调用时、只在当前会话生效）：</li><li><code>/careful</code> 拦 refund / charge / waive-fee / close-account 这类<strong>动钱或破坏性</strong>操作；</li><li><code>/freeze</code> 排障时只读、禁止越界 Edit/Write，防「一边查一边改坏」。</li><li>→ 动钱红线的<strong>一手背书落地机制</strong>，比空谈「要加确认」更硬。← §11/§12。</li></ul>
+<h3>⑥ 前瞻：Skill 规模化——分发 / 治理 / 度量 / 组合（内部 Agent 平台雏形）【Q17 AaaS】</h3>
+<ul><li><strong>分发</strong>：repo <code>./.claude/skills</code> check-in（小团队）↔ 内部 <strong>marketplace</strong>（团队大更优：按 market/角色自助安装，省「人人可见」的上下文负担）。BNPL 多市场（APAC）→ 倾向 marketplace。</li><li><strong>治理（不搞中央审批）</strong>：谁有 skill 想分享 → 传 GitHub sandbox → Slack 试用 → <strong>有 traction 后 owner 提 PR 进 marketplace</strong>。轻流程，符合「skill 靠真实使用长出来」。</li><li><strong>度量</strong>：用 <strong>PreToolUse hook 记 skill 使用率</strong> → 看哪些热、哪些「<strong>该触发却没被想起</strong>」。← 呼应 §3.5 飞轮 + §15 可观测。</li><li><strong>组合（skill composition）</strong>：退货 skill 调退款 skill 调对账 skill——直接引用名字即可串。</li><li><strong>一句话</strong>：分发 + 治理 + 度量 + 组合 = 内部 <strong>Agent-as-a-Service 平台</strong>雏形。BNPL 把每类客服能力做成可治理、可度量、可组合的 skill，就是「客服 Agent 平台化」的前瞻路线。</li></ul>
+<h3>⑦ 关联考点 &amp; 追问【Q17, Q6, Q9, Q12】+ 金句</h3>
+<ul><li>「为什么不把指令都塞 system prompt？」→ 窗口有限 + 干扰 + token；progressive disclosure 只在命中时加载。</li><li>「skill 之间有依赖怎么管？」→ 目前靠引用名字 + 模型串（composition）；强一致的动钱链路再叠 saga（§11）。</li><li>🎯<strong>金句</strong>：「<strong>Skill 的价值不在教模型它本来就会的，而在把团队人人知道、模型默认不知道的 gotcha 和验证方法固化下来；最好的 skill 一开始只有几行 + 一个 gotcha，越用越全。聚焦、可验证、可治理、可组合——这才是客服能力平台化的样子。</strong>」</li></ul>
+<hr />
+<h2 id="sec-9">7. 规划与编排（多工具：依赖 / 并发 / 聚合）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>多工具不是「列个清单挨个调」，而是<strong>用 DAG 表达依赖、能并行的并行、动钱的串行加锁、结果做冲突解决后聚合</strong>。</p></blockquote>
+<h3>② 要点 + 理由【Q6】</h3>
+<ul><li><strong>依赖</strong>：从「顺序」升级到 <strong>DAG</strong>（显式依赖图）；无依赖的并行（吃延迟预算）。</li><li><strong>并发冲突</strong>：读操作快照隔离；写/动钱用<strong>分布式锁 + 乐观锁版本号 + 工具设计为幂等</strong>，防重复扣款。</li><li><strong>结果聚合</strong>：多路输出去重 + 冲突解决（账务系统优先）+ 拼接生成；支持失败部分聚合（partial）。</li><li><strong>延迟</strong>：能并行就并行 + response streaming（见 §14）。</li></ul>
+<h3>③ 追问【Q6, Q25】</h3>
+<ul><li>「两个工具结果冲突？」→ 定义优先级（账务 &gt; 缓存 &gt; 记忆），不确定就回源核对。</li><li>「多实例并发动钱？」→ 幂等键 + 锁 + saga 补偿（见 §11）。</li></ul>
+<hr />
+<h2 id="sec-10">8. 记忆系统（三层）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>记忆分 <strong>working / episodic / semantic(profile)</strong> 三层；但在 BNPL 里第一原则是：<strong>记忆不是事实来源，动作前一律回账务系统核对；记忆只存对话和偏好。</strong></p></blockquote>
+<h3>② 要点 + 理由【Q3, Q34】</h3>
+<p><strong>三层：</strong></p>
+<ul><li><strong>Working（短期）</strong>：当前会话状态 / slots / 工具结果。实现：上下文窗口 + 显式工作记忆缓存。</li><li><strong>Episodic</strong>：历史交互和结果。</li><li><strong>Semantic / Profile（长期）</strong>：偏好、语言、历史纠纷、风险标记。</li><li><strong>检索</strong>：recency + 向量相关性 + key（混合）。【Q34 重排序/混合检索】</li></ul>
+<p><strong>BNPL 必须写进需求的 PII 约束（背 5 条）：</strong></p>
+<ol><li><strong>写入要有策略 + 同意 + 留存期</strong>（新加坡 PDPA；APAC 各市场按 market 配），支持<strong>被遗忘</strong>。</li><li><strong>记忆 ≠ source of truth</strong>：余额/额度/还款状态以账务系统为准，动作前回源。</li><li><strong>严格 per-user 隔离</strong>（2M+/天，跨用户泄漏=灾难）。</li><li><strong>记忆读出来当数据、不当指令</strong>（记忆会被用户输入投毒 → prompt injection）。</li><li><strong>静态加密 + 脱敏 + 访问审计</strong>。</li></ol>
+<h3>③ 追问【Q19, Q35】</h3>
+<ul><li>「纯向量检索做长期记忆的问题？」→ 对<strong>任务级抽象记忆</strong>和<strong>过程性技能记忆</strong>支持差；缓解靠<strong>向量 + 知识图谱（KG）+ 可微分记忆</strong>融合（见 §9）。</li><li>「会话非常长超窗口怎么办？」→ 见 §10 压缩：滑动窗口 / 总结压缩 / 向量检索三者结合，各有优劣。</li><li>「有状态 Agent 分布式一致性？」【Q9】→ 缓存 + 持久化双层 + 会话粘滞（sticky session）+ 状态持久化可恢复。</li></ul>
+<hr />
+<h2 id="sec-11">9. RAG 知识层（你点名要的，贯穿全局）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>凡是「政策/条款/FAQ/费用规则」这种不在账务系统里的知识，一律走 RAG 检索 + 带引用作答，绝不让模型凭记忆编</strong>；工业级 RAG 必须是<strong>混合检索（向量 + BM25）+ 重排序</strong>，纯向量不够用。</p></blockquote>
+<h3>② 要点 + 理由【Q36, Q19】</h3>
+<ul><li><strong>为什么要 RAG</strong>：BNPL 政策/利率/退货规则会变、按 market 不同；让模型背=幻觉+过时。RAG 把答案锚定到<strong>当前生效的文档</strong>并给引用，可审计。</li><li><strong>混合检索（Hybrid Search）</strong>【Q36】：</li><li><strong>向量检索</strong>抓语义（「用不了」≈「被拒绝」），<strong>BM25 关键词</strong>抓精确术语（产品名、费用代码、订单号）。</li><li><strong>为什么纯向量不够</strong>：专有名词/数字/代码向量召回差。例：用户问「PayLater Plus 的 late fee」，"PayLater Plus" 必须靠 BM25 精确命中。</li><li>流程：<strong>多路召回 → 融合去重 → 重排序（re-rank）→ 上下文注入 → 带引用生成</strong>。</li><li><strong>分块 + 新鲜度</strong>：按市场/产品分库，文档更新即重建索引；答复带「依据：T&amp;C v2025-04」。</li></ul>
+<p><strong>🔎RAG 在每个模块的触点（背这张表，回答「RAG 用在哪」）：</strong> | 模块 | RAG 怎么用 | |---|---| | 意图路由 §3 | query→FAQ/skill 语义匹配做意图消歧 | | 工具 discovery §5 | 对工具库语义检索收敛子集 | | 技能 discovery §6 | 对 skill 库语义召回候选 | | 记忆 §8 | episodic/semantic 的向量检索 | | 知识问答 §4-D | 政策/FAQ/费用规则检索作答（主战场） | | 缓存 §14 | FAQ 语义缓存（命中直接返回） | | 合规 §12 | 把监管/披露要求作为知识锚定输出 |</p>
+<h3>③ 追问【Q19, Q34】</h3>
+<ul><li>「向量记忆的根本局限 + 替代？」→ 任务级抽象 &amp; 过程性技能记不住；<strong>KG（实体关系，如用户↔订单↔争议）+ 可微分记忆网络</strong>融合，图增强的记忆读写。</li><li>「RAG 怎么防过时/防错引用？」→ 文档版本化 + 新鲜度过滤 + 强制引用 + 检索不到就 fail（不编）。</li></ul>
+<hr />
+<h2 id="sec-12">10. 上下文管理与自动压缩</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>触发阈值后做压缩：<strong>旧轮 rolling summary、近几轮留原文、工具大结果 elide（只留摘要+可回取 handle）</strong>；但要定义一组<strong>压缩时绝不能丢的「受保护状态」</strong>，且<strong>结构化信息单独存、不揉进散文</strong>。</p></blockquote>
+<h3>② 要点 + 理由【Q22, Q35】</h3>
+<ul><li><strong>触发</strong>：context 用量 % / 轮数 / 每次调用前检查。</li><li><strong>策略</strong>：</li><li>旧轮 → rolling summary；近几轮 → 原文。</li><li>真正大头是<strong>工具结果（交易清单、日志）→ elide</strong>：全量存 context 外，里面只留摘要 + handle 可回取。</li><li><strong>受保护状态（绝不能压掉）</strong>：待确认的写操作、active 任务的 slots、鉴权状态、合规相关陈述（用户刚说的 hardship/dispute 理由）、安全标记。</li><li><strong>结构化与散文分开</strong>：金额、交易 ID 单独用一个 state object 存，和 prose summary 并行，<strong>别让 summary 把数字揉丢</strong>。</li><li><strong>审计</strong>：不管 context 怎么压，<strong>全量 transcript 落库</strong>做审计回放。</li></ul>
+<h3>③ 追问【Q35】</h3>
+<ul><li>「滑动窗口 vs 总结 vs 向量检索？」→ 滑动窗口简单但丢远端；总结省 token 但可能丢细节；向量检索精准召回但要额外存储。<strong>工业上三者结合</strong>：近窗口原文 + 远端总结 + 关键信息向量可回取。</li></ul>
+<hr />
+<h2 id="sec-13">11. 容错、降级与幂等（动钱红线）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>错误先分类（可重试 vs 不可重试），重试用<strong>指数退避 + jitter + 最大次数 + 总时限上限</strong>，连续失败开 circuit breaker；降级是一条 <strong>ladder</strong>；<strong>写/动钱的重试必须带幂等键，不确定时对钱 fail-safe——宁可不做，绝不瞎猜。</strong></p></blockquote>
+<h3>② 要点 + 理由【Q8, Q31】</h3>
+<ul><li><strong>错误分类</strong>：可重试（超时/5xx/限流）vs 不可重试（4xx 校验/鉴权/业务拒绝——重试只会更糟）。</li><li><strong>重试</strong>：指数退避 + jitter + max 次数，<strong>一定有总时限上限</strong>（否则吃穿 2s 预算）；连续失败到阈值 → <strong>circuit breaker</strong>。</li><li><strong>降级 ladder</strong>：重试同 tool → 换 provider（多供应商 failover）→ 用缓存/稍旧数据（带说明）→ 给降级答案 → 转人工/转异步。</li><li><strong>🚨BNPL 红线</strong>：</li><li>动钱 tool 重试<strong>必须带幂等键</strong>，否则一次重试 = 一次重复扣款，「成功的双扣」就是事故。</li><li>对钱 <strong>fail-safe</strong>：不确定就别做。查余额服务挂了 → 只能降成「现在拿不到，要不要我提醒你」，<strong>绝不编一个余额</strong>；发起还款失败 → 直接 fail，<strong>不能降成「大概成功了」</strong>。</li><li><strong>工具幻觉容错</strong>【Q8】：预校验层拦掉「调用不存在的工具/参数非法」；schema 强约束；调用前校验、调用后核对返回格式。</li><li><strong>Saga / 事务完整性</strong>【Q6, Q25】：多个 tool 串起来动钱 → 补偿回滚，跨系统保证 exactly-once 效果。</li></ul>
+<h3>③ 追问【Q31】</h3>
+<ul><li>「多步任务中间步失败？」→ 局部重试 → 回滚（saga 补偿）→ 重规划，保护已完成状态，不整体重来。</li></ul>
+<hr />
+<h2 id="sec-14">12. 安全、合规、沙箱与鉴权（横切，BNPL 的命门）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>输入侧防 PII/注入/越狱/跑题；输出侧不给越权金融建议、不编账户事实、不承诺系统兑现不了的事、对<strong>弱势客户和催收语境</strong>守话术红线；叠加 APAC 各市场监管 + 全程 audit trail；工具按<strong>最小权限 + 沙箱</strong>隔离。</p></blockquote>
+<h3>② 要点 + 理由【Q10, Q11】</h3>
+<p><strong>Guardrails：</strong></p>
+<ul><li><strong>输入侧</strong>：PII 检测、prompt injection、jailbreak、跑题。</li><li><strong>输出侧</strong>：不给未授权的金融/投资建议、不编账户事实、不承诺兑现不了的事、<strong>弱势客户话术红线</strong>（催收语境尤其硬）。</li><li>叠加各 APAC 市场监管 + 催收行为规范 + 必要披露 + audit trail。</li></ul>
+<p><strong>鉴权 + Step-up + 身份</strong>：</p>
+<ul><li>用户是谁、认证到没到这个动作要求的等级；<strong>敏感/动钱操作做 step-up</strong>；工具/skill discovery 按 entitlement 收敛（权限外不可见）。</li></ul>
+<p><strong>沙箱 &amp; 数据最小化</strong>【Q10, Q11】：</p>
+<ul><li><strong>数据最小化</strong>：只给 Agent 完成任务所必需的数据（最小化 API，不直接给 SQL）。</li><li><strong>可审计</strong>：记录所有数据访问、不可抵赖（全链路审计日志）。</li><li><strong>访问控制</strong>：行级安全（RLS）+ 字段级权限 + 动态脱敏。</li><li>若有代码/外部系统执行：容器级隔离 + 命令白名单 + 网络隔离 + 资源限制（防耗尽）。</li></ul>
+<p><strong>自主行动的边界（你问的「agent 自主去做」）</strong>：</p>
+<ul><li>自主 loop 必须有<strong>预算上限</strong>（步/时/钱）；<strong>动钱/写操作一律 human-in-the-loop 确认</strong>；不确定 → fail-safe；全程审计。</li></ul>
+<h3>③ 追问【Q11】</h3>
+<ul><li>「怎么保证敏感数据最小化 + 可审计？」→ 最小化 API + RLS/字段权限 + 动态脱敏 + 全量审计日志 + 不可抵赖。</li></ul>
+<hr />
+<h2 id="sec-15">13. 转人工 / Escalation</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>带完整上下文（摘要 + transcript + 状态）的 warm handoff</strong>；触发条件含 hardship / 欺诈 / 投诉 / 低置信 / 反复失败 / 监管要求；<strong>对难 case，转人工本身就是一种成功，别为了 containment 硬扛。</strong></p></blockquote>
+<h3>② 要点 + 理由</h3>
+<ul><li><strong>warm handoff</strong>：把对话摘要 + 全量 transcript + 当前任务状态 + 已采取动作一并交给人工，客户不用重说一遍。</li><li><strong>触发器</strong>：低置信、反复失败、hardship、疑似欺诈、投诉、监管要求场景。</li></ul>
+<h3>③ 追问</h3>
+<ul><li>「containment 越高越好吗？」→ 不是。错误地硬扛会出合规事故；正确的 escalate 是高质量结果。</li></ul>
+<hr />
+<h2 id="sec-16">14. 性能与延迟（你的主场，sub-2s）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>sub-2s 靠<strong>延迟预算分配 + 能并行就并行 + response streaming + 模型分层 + 多级缓存</strong>五件套；目标是逼近物理延迟下限。</p></blockquote>
+<h3>② 要点 + 理由【Q23, Q16】</h3>
+<ul><li><strong>延迟预算分配</strong>：router + 检索 + LLM + tool 各分配多少 ms，超预算就降级。</li><li><strong>并行</strong>：无依赖工具并发。</li><li><strong>Streaming</strong>：边生成边返回，降感知延迟。</li><li><strong>模型分层</strong>：小模型跑路由/简单意图，大模型啃难的。【Q16 推理瓶颈工程补偿】</li><li><strong>多级缓存</strong>：FAQ 语义缓存（🔎RAG）+ prompt cache + tool 结果缓存。</li><li><strong>解码优化</strong>【Q23】：投机解码、前缀缓存、约束解码（强制 JSON）。</li></ul>
+<h3>③ 追问【Q23】</h3>
+<ul><li>「500ms 内完成输入→工具决策？」→ 三维度：解码优化（≤200ms）+ 工具路由（≤50ms，规则+轻语义）+ 并行执行（≤250ms）。</li></ul>
+<hr />
+<h2 id="sec-17">15. 可观测性 / 评估 / 自省（成功率的地基）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>可观测先于一切</strong>：router→skill→tool 每步结构化 span，可看 p50/p99、可整段 replay；每个 intent/skill 备 golden 用例跑 CI eval + canary/shadow 防回归；Agent 出错后能<strong>自省归因并修正策略</strong>。</p></blockquote>
+<h3>② 要点 + 理由【Q12, Q13, Q27】</h3>
+<ul><li><strong>Tracing / Replay</strong>：每一步、每个决策、每次重试都结构化 span（OTel / Langfuse）；<strong>看不见就改不动，这是成功率地基</strong>。</li><li><strong>Eval + 回归 harness</strong>【Q12】：先定义「成功」（§1 的多指标）→ 每 intent/skill 备 golden 用例 → 改 prompt/换模型/动 tool 都跑 <strong>CI eval + canary/shadow 流量</strong>。</li><li><strong>不稳定诊断</strong>【Q13】：分层排查——提示词 / 工具设计 / 模型选择 / 工作流 / 记忆，逐层定位。</li><li><strong>自省与策略修正</strong>【Q27】：Agent 执行错误后，做错误归因 → 修正后续策略（Reflexion 思路），<strong>无需重训基座模型</strong>；把「失败模式」写进记忆，下次避开。</li></ul>
+<h3>③ 追问【Q27】</h3>
+<ul><li>「怎么让 Agent 不重犯同类错？」→ 错误归因 + 策略修正器 + 把教训写进 episodic 记忆做检索增强，下次同场景注入。</li></ul>
+<hr />
+<h2 id="sec-18">16. 多语言 / 本地化（APAC）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p>马来/泰/印尼/英：<strong>语言检测 → per-language 的 prompt 和 skill → tool description 多语化 → 本地化回复 → locale-aware 合规</strong>。</p></blockquote>
+<h3>② 要点 + 理由</h3>
+<ul><li>不是翻译一层皮：每个 market 的<strong>合规、披露、催收规范不同</strong>，prompt/skill/guardrails 都要按 locale 配。</li></ul>
+<h3>③ 追问</h3>
+<ul><li>「多语言对 RAG 的影响？」→ 知识库按语言/市场分库；跨语言检索用多语 embedding 或先翻译再检索。</li></ul>
+<hr />
+<h2 id="sec-19">17. 工程化底座（先点名，被追问能接住）</h2>
+<ul><li><strong>状态持久化 + 断点续跑</strong>：长流程（dispute 调查可能跨天）崩了能恢复。【Q9】</li><li><strong>异步 / 事件驱动 + 主动通知</strong>：退款到账、争议有结果 → 主动推。</li><li><strong>LLM 多供应商兜底</strong>：单家挂了能切。</li><li><strong>成本 / 配额 / 限流</strong>。</li><li><strong>版本化 + 灰度回滚</strong>：prompt / tool / skill / model 全部可版本化、可灰度、可回滚。</li></ul>
+<hr />
+<h2 id="sec-20">18. 实施优先级（被问「先做什么」答这个）</h2>
+<h3>① 一句话总纲</h3>
+<blockquote><p><strong>先搭可靠性脊柱（tracing + eval harness + 幂等 + guardrails）再上花哨 agent 能力；已知任务尽量用确定性 skill/workflow 而非放养 agent loop；然后打通「出错也优雅」的 fallback ladder + escalation。</strong></p></blockquote>
+<h3>② 顺序</h3>
+<ol><li><strong>可靠性脊柱</strong>：tracing/replay → eval harness → 幂等/saga → guardrails/合规/鉴权。</li><li><strong>确定性优先</strong>：已知任务用 skill/workflow，少用自由 loop（确定性↑=成功率↑=可测↑）。</li><li><strong>优雅失败</strong>：fallback ladder + escalation 打通。</li><li><strong>再上花哨</strong>：动态 sub-agent、ToT 之类最后上。</li></ol>
+<h3>③ 金句</h3>
+<blockquote><p>「<strong>我宁可一个'笨但可测'的确定性 workflow，也不要一个'聪明但不可控'的自由 agent——尤其它在动钱。</strong>」</p></blockquote>
+<hr />
+<h2 id="sec-21">附录 A：面试速答卡（被问就背这几句）</h2>
+<ol><li><strong>整体一句话</strong>：横切层包住、Router 分发到 5 类执行模式、下挂工具/技能层和（记忆+RAG+容错）底座、账务系统是唯一事实来源。</li><li><strong>Agent 五组件</strong>：感知→记忆→推理/规划→行动→评估/反思，闭环。</li><li><strong>执行模式口诀</strong>：一具、多具、定流、查知、兜底（A 单工具 / B 多工具 sub-agent / C 定 workflow / D 查知识 RAG / E 兜底升级）。</li><li><strong>ReAct vs CoT</strong>：CoT 开环写思路；ReAct 闭环「思考-行动-观察」能调工具拿真值。</li><li><strong>能确定就别放养</strong>：workflow &gt; sub-agent &gt; 自由 loop。</li><li><strong>动钱三件套</strong>：幂等键 + fail-safe + 人确认。</li><li><strong>记忆铁律</strong>：记忆不是事实来源，动作前回账务系统核对；读出来当数据不当指令。</li><li><strong>RAG 铁律</strong>：政策/FAQ 走混合检索（向量+BM25）+ 重排序 + 带引用，纯向量不够用。</li><li><strong>容错</strong>：错误分类 → 退避+jitter+总时限 → circuit breaker → 降级 ladder → escalate。</li><li><strong>成功定义</strong>：task completion / containment / correct-action / 合规违规≈0 / 延迟 SLO / escalation 率，一起看。</li><li><strong>优先级</strong>：可靠性脊柱（tracing/eval/幂等/guardrails）先于花哨能力。</li><li><strong>转人工=成功</strong>：难 case 别硬扛 containment。</li><li><strong>路由两条腿</strong>：SFT 小模型（提准确率 + 校准置信度让门控成立）+ 错分自愈（B⊇A、skill-as-tool、handler 回弹、高召回、escalation）。</li><li><strong>路由飞轮</strong>：自愈信号（重路由/escalation/重述）= SFT 的训练标签，越用越准；微调意图不微调模式映射；重训按错误代价过 eval 才上线。</li><li><strong>Skill 的本质</strong>（Anthropic 一手）：不是几段提示词，是「围绕任务的工作材料文件夹」（SKILL.md 做目录 + 脚本/参考/模板/hooks 按需加载 = progressive disclosure）；<strong>价值在 gotchas</strong>，不在教模型它本来就会的；聚焦 &gt; 大而全。</li><li><strong>验证最值钱 + 动钱必拦</strong>：product-verification 类最该花力气（值得一周），别靠「看起来对」——<strong>程序化断言</strong>（ledger/payment_events 真状态）+ 录测试视频；动钱/破坏性操作用 <strong>on-demand hook</strong>（<code>/careful</code> 先通知→确认→执行、<code>/freeze</code> 排障只读）。</li></ol>
+<h2 id="sec-22">附录 B：模块 ↔ 基准题号对照（按题复习用）</h2>
+<div class="table-wrap"><table class="md-table"><thead><tr><th>题号</th><th>主题</th><th>本文对应模块</th></tr></thead><tbody><tr><td>Q1</td><td>Agent 核心组件</td><td>§2</td></tr><tr><td>Q2</td><td>ReAct vs CoT</td><td>§3, §4</td></tr><tr><td>Q3</td><td>记忆机制</td><td>§8</td></tr><tr><td>Q4</td><td>框架对比</td><td>（选型时提，LangGraph/SK/AutoGen）</td></tr><tr><td>Q5,Q37</td><td>工具描述/Schema/负向约束</td><td>§5</td></tr><tr><td>Q6</td><td>多工具依赖/并发/聚合</td><td>§7</td></tr><tr><td>Q7</td><td>防死循环</td><td>§4</td></tr><tr><td>Q8</td><td>工具幻觉容错</td><td>§11</td></tr><tr><td>Q9</td><td>有状态一致性</td><td>§8, §17</td></tr><tr><td>Q10</td><td>沙箱权限</td><td>§12</td></tr><tr><td>Q11</td><td>数据最小化/可审计</td><td>§12</td></tr><tr><td>Q12</td><td>评估体系</td><td>§15</td></tr><tr><td>Q13</td><td>不稳定诊断</td><td>§15</td></tr><tr><td>Q14</td><td>NL2SQL 数据分析架构</td><td>§4-B（诊断类同构）</td></tr><tr><td>Q15</td><td>多 Agent 协作</td><td>§3, §7</td></tr><tr><td>Q16</td><td>推理瓶颈工程补偿</td><td>§3, §14</td></tr><tr><td>Q17</td><td>Agent as a Service</td><td>§6⑥（Skill 平台化：分发/治理/度量/组合）</td></tr><tr><td>Q18</td><td>表示学习/不会调工具</td><td>§5</td></tr><tr><td>Q19</td><td>向量记忆批判+KG</td><td>§8, §9</td></tr><tr><td>Q20</td><td>自回归 vs 符号规划</td><td>§4</td></tr><tr><td>Q21</td><td>语言涌现协作</td><td>§3（多 sub-agent 时）</td></tr><tr><td>Q22</td><td>100M 上下文/无模块化</td><td>§10</td></tr><tr><td>Q23</td><td>500ms 低延迟</td><td>§14</td></tr><tr><td>Q24</td><td>世界模型剪枝</td><td>§4-B（进阶）</td></tr><tr><td>Q25</td><td>去中心化共识</td><td>§7, §11</td></tr><tr><td>Q26</td><td>无标注预训练规划</td><td>§3.5（路由 SFT 训练飞轮：自愈信号当标签）</td></tr><tr><td>Q27</td><td>可微分自省纠错</td><td>§15</td></tr><tr><td>Q28</td><td>探索利用 Bandit</td><td>§4（路径选择进阶）</td></tr><tr><td>Q29</td><td>ReAct 局限/ToT/LATS</td><td>§3, §4</td></tr><tr><td>Q30</td><td>CoT vs Planning</td><td>§3</td></tr><tr><td>Q31</td><td>鲁棒重规划</td><td>§4, §11</td></tr><tr><td>Q32</td><td>ToT/LATS MCTS</td><td>§4</td></tr><tr><td>Q33</td><td>推理断层缓解</td><td>§4, §15</td></tr><tr><td>Q34</td><td>长期记忆设计</td><td>§8, §9</td></tr><tr><td>Q35</td><td>超长对话记忆</td><td>§10</td></tr><tr><td>Q36</td><td>混合检索/BM25</td><td>§9</td></tr><tr><td>Q38</td><td>海量工具选择</td><td>§5, §6</td></tr></tbody></table></div>
+<hr />
+<blockquote><p><strong>最后再背一遍那句总纲</strong>：已知任务走确定性 skill/workflow，未知才放 agent loop；动钱一律幂等 + fail-safe + 人确认；可靠性脊柱先于花哨能力。被问住，就回到这句。</p></blockquote>
+
+</body>
+</html>
