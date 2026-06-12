@@ -14,6 +14,13 @@ I treated it as a routing problem on the quality-cost curve. We profiled quality
 The key design decision was *where quality is non-negotiable*: anything touching money — refund confirmation, dispute handling — never gets downgraded, regardless of load. Cost flexibility lives only in the tiers where errors are cheap to recover.
 My framing: quality-cost isn't one knob, it's a portfolio. Engineer the frontier outward with serving optimization, then spend your quality budget where errors are irreversible.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+BNPL chatbot 如果每一轮都用我们最大的模型, 对话质量最好 — 但在支付客户的量级上成本曲线撑不住. 两种朴素的立场都是错的:「永远用最好的模型」把钱烧在不需要它的请求上;「用便宜模型」悄悄劣化动钱流程, 而那里的错误最贵.
+我把它当成 quality-cost 曲线上的路由问题. 我们按请求类型画出质量/成本剖面, 然后分层: 一个小的 fine-tuned 模型扛意图分类和常规轮次 — 那是大部分流量; 大模型只保留给复杂或敏感流程的生成; serving 侧我主导了 vLLM 和 SGLang 的优化加显存效率调优, 把「每一层」的成本都压低 — 这是外推整条曲线, 不是在曲线上做交换 [✏️ 成本数字核实].
+关键的设计决定是「质量在哪里不可妥协」: 任何动钱的环节 — 退款确认、争议处理 — 无论负载多高永不降级. 成本弹性只存在于错误便宜可恢复的层.
+我的框架: quality-cost 不是一个旋钮, 是一个组合. 先用 serving 优化把帕累托前沿往外推, 再把质量预算花在错误不可逆的地方.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 全量大模型质量好但成本曲线不可持续; 当成 quality-cost 曲线上的路由问题: 小 fine-tuned 模型扛意图分类+常规轮次, 大模型只用于复杂/敏感生成; vLLM/SGLang+显存优化把整条曲线外推. 关键: 动钱流永不降级, 成本弹性只放在错误可恢复的层. 金句: quality-cost 是组合不是单旋钮.

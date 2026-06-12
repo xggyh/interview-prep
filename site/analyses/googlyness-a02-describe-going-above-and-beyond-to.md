@@ -14,6 +14,13 @@ I paired with their engineer over several evenings. The root cause was a tool-sc
 They launched on schedule [✏️ 核实], and the next teams onboarding never hit the issue.
 How I think about it: fixing someone's bug is kindness; converting their bug into a platform guardrail is leverage. I aim for the second every time.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+Global Payment 的一个兄弟团队在我们 Agent Platform 上做他们第一个 GenAI 上线, deadline 前两周 workflow 在 staging 反复失败. 不是我的项目, 也没人来找我 — 但他们是平台第一个外部使用方, 他们上线失败, 跨团队推广就会跟着停.
+我连续几个晚上和他们的工程师 pair. 根因是一个 tool schema 不匹配, 我们文档没覆盖. 我特意是「陪他 debug」而不是「替他修」— 然后把这次踩坑沉淀成平台资产: 一份排障 runbook, 加上工具注册时的 schema 校验, 让这一类错误在注册时就报清晰错误, 而不是死在 staging.
+他们按期上线了 [✏️ 核实], 后面接入的团队再也没踩过这个坑.
+我的看法是: 帮一个人修 bug 是好心, 把他的坑变成平台护栏才是杠杆. 我每次都奔着第二种去.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 兄弟团队首个平台落地卡 staging; 主动晚间 pair debug; 不只修 — 沉淀 runbook + 注册时 schema 校验; '修 bug 是好心, 把 bug 变护栏是杠杆'.

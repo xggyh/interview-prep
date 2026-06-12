@@ -14,6 +14,13 @@ The default would be triaging these as local bug reports. Instead I built a stru
 The cross-pollination changed the architecture. Japan's phrasing feedback became a per-market style layer in prompt config; Indonesia's number-format cases became validation logic that then caught defects in other markets too [✏️ 核实].
 The lesson: regional perspectives routed through one engineer get averaged away. Put them in one room with structure, and they turn into architecture.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+voice agent 跨市场推广时, 我协调多个国家的区域 ops 团队做 UAT — 没有一个人向我汇报, 而且每个市场听到的产品完全不一样. 日本团队指出我们的敬语措辞语法正确但听起来像念稿; 印尼团队最关心混合语言表达和本地数字格式; 泰国团队发现了我们任何指标都抓不到的语气问题.
+默认做法是把这些当本地 bug 报告分头处理. 我反而搭了一个让视角「合流」的结构: 一套共享 UAT 框架, 每个市场跑同样的场景矩阵加市场专属 case; 外加每周 review, 每个 ops lead 把自己的 top finding 讲给整个小组听 — 不是只讲给我.
+这种交叉传粉直接改变了架构. 日本的措辞反馈变成了 prompt config 里的 per-market style 层; 印尼的数字格式 case 变成了通用校验逻辑, 后来还在其他市场抓到了缺陷 [✏️ 核实].
+我的结论: 区域视角经过一个工程师中转会被平均掉. 把它们放进同一个房间、给结构, 它们才会变成架构.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 7 市场 UAT 各看见不同问题 (JP 语气/ID 混语数字/TH tone); 建共享 UAT 框架+每周各 ops lead 向全组讲 top finding; JP→per-market style 层, ID→通用校验. 金句: 视角经一人中转被平均, 同处一室才变架构.

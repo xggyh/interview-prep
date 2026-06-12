@@ -14,6 +14,13 @@ The pivot signal for me wasn't one bad demo — it was the eval distribution: un
 Crucially, the pivot preserved most prior investment: tool integrations, prompts and eval cases all carried over — we changed the control plane, not the parts.
 My takeaway: build the eval harness early precisely so a pivot is a data decision, not a confidence crisis — and pivot the architecture, not the team's morale.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+BNPL chatbot 第一版原型是一个自由 agent loop — 一个强模型带工具, 端到端推理任何请求. Demo 非常惊艳. 然后我们建了 eval harness, 它讲了另一个故事: 在退款、订单查询这类高频交易型意图上, 自由 agent 的 correct-action rate 远达不到动钱操作的要求, 而且失败是不可预测的 — 同样输入给出不同的错误答案 [✏️ 数字核实].
+对我来说 pivot 的信号不是某次糟糕的 demo, 而是 eval 的分布: 有界任务上的无界方差. 所以项目中途我重构了架构: intent 分类器把已识别意图路由到「专用 workflow 子 agent」— 退款、争议、订单查询走确定性、可审计的状态机 — 真正开放式的问题走 FAQ RAG 路径. 自由 loop 没有死, 它从「整个系统」降级成了系统里的一种模式.
+关键是这次 pivot 保住了大部分已有投入: 工具集成、prompt、eval case 全部沿用 — 我们换的是控制面, 不是零件.
+我的心得: 尽早建 eval harness, 正是为了让 pivot 成为一个数据决策, 而不是一场信心危机 — 并且 pivot 架构, 不 pivot 团队士气.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 自由 agent loop demo 惊艳但 eval 揭示: 交易类意图 correct-action 不达动钱标准+失败不可预测. 信号=有界任务上的无界方差. Pivot 到 intent router+workflow 子agent+RAG 路径; 自由 loop 降级为一种模式. 工具/prompt/eval 全保留 — 换控制面不换零件.

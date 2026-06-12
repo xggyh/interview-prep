@@ -14,6 +14,13 @@ With the Indonesian ops team, fast informal iteration worked: quick messages, sa
 So I adapted to nemawashi-style pre-alignment: written proposals shared ahead, one-on-one rounds with each stakeholder before any group decision, and the meeting itself repurposed as confirmation rather than debate. Decisions actually closed *faster*, because objections surfaced early and privately, where they could shape the proposal instead of blocking the room.
 Now I run a quick calibration at the start of any new collaboration: does this team decide in meetings or before them? Written or verbal? Consensus or owner-driven? A week of observation that saves months of friction.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+voice agent 推广时, 我合作的区域团队决策文化完全不同 — 而我吃过亏才学会: 我的默认风格只适配其中一部分.
+对印尼 ops 团队, 快节奏非正式迭代很有效: 即时消息、当天实验、会上拍板. 我把同样的风格带到日本市场团队时 — 我在日本生活过多年、会日语, 本该更早意识到 — 完全失效. 会上冷启动抛提案, 得到的是礼貌的沉默, 我一开始误读成了同意. 不是. 那是对「内部没对齐就要决策」的不适.
+于是我切换到根回し (nemawashi) 式预对齐: 提前发书面提案, 群体决策前逐个 1:1 过一轮, 会议本身重新定位成确认而非辩论. 决策反而「更快」了, 因为反对意见提早在私下浮出, 去塑造提案, 而不是在会议室里堵住整个房间.
+现在任何新合作开始, 我都先做一个快速校准: 这个团队是在会上决策还是会前? 书面还是口头? 共识驱动还是 owner 驱动? 一周的观察, 省几个月的摩擦.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 ID 团队快节奏 informal 有效; 同风格搬到 JP 失效 (会上冷提案→礼貌沉默≠同意); 切 nemawashi: 提前书面+逐个 1:1, 会议只确认 → 决策反而更快. 习惯: 新合作先校准决策文化.

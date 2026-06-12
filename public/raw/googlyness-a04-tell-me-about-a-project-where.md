@@ -14,6 +14,13 @@ I did two things. Where clarity was cheap, I forced it: I pulled real ticket dat
 Where clarity was impossible, I made the architecture absorb change instead: an intent router in front of swappable workflow sub-agents, with every per-market policy living in config and RAG knowledge bases — never in code, never in model weights. When a market changed its refund window, that was a config-and-document edit, not a retrain or redeploy.
 Requirements never stopped changing. The system stopped caring. That's my general approach: clarify what's cheap to clarify, architect for what isn't.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+BNPL chatbot 立项时需求只有一句话:「让客服更智能」. 每个 stakeholder 的理解都不一样 — ops 要减工单, product 要自助退款, 合规要零违规. 而且需求是真的在持续变, 因为各市场退款规则和监管预期都不同.
+我做了两件事. 第一, 便宜的地方强制澄清: 我拉了真实工单数据, 证明少数几个意图覆盖了大部分流量 [✏️ 比例核实], 然后让三方对齐了三个首发意图和明确的成功指标 — task completion 和 correct-action rate, 而不是只看挡了多少工单.
+第二, 让架构去吸收变化而不是对抗变化: intent router 在前, 后面挂可替换的 workflow 子 agent, 所有市场政策放在 config 和 RAG 知识库里 — 不进代码, 不进模型权重. 某市场改退款窗口, 就是改配置和文档, 不用重训不用重新部署.
+需求一直在变, 但系统不在乎了. 这就是我对模糊性的通用打法: 便宜的就澄清, 澄清不了的就用架构吸收.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 '更智能客服'一句话需求; ticket 数据收敛 3 意图+对齐指标; 架构吸收变化: router+子agent, 政策进 config/RAG 不进权重. 金句: 需求一直变, 系统不在乎.

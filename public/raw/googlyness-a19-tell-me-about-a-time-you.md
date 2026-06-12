@@ -14,6 +14,13 @@ So I did the unglamorous thing — sampled raw transcripts from "contained" conv
 I brought transcripts, not just numbers, to the metric review — three verbatim conversations are more persuasive than any chart. We then added correct-action rate as a primary metric, scored by sampled human review plus automated checks against backend state, and re-baselined the targets. Containment stayed as a guardrail, no longer the goal.
 The general principle I took: any single success metric will eventually learn to lie. The antidote is regularly reading raw reality — transcripts, tickets, calls — behind your best-looking number.
 
+## 🇨🇳 中文完整版 (口播稿, ~60-90 秒)
+
+我们 BNPL chatbot 的仪表盘看起来很好 — containment rate 持续上涨, 意味着越来越少的对话升级到人工. 团队把它读作成功. 但有个地方让我不舒服: 投诉量没有成比例下降.
+于是我做了那件不性感的事 — 从「成功」对话堆里抽样原始 transcript, 一条条读. 相当一部分是 bot「本该转人工却没转」的对话: 它自信地回答, 用户放弃离开, 指标记了一个 win [✏️ 比例核实]. Containment 在把静默失败计成成功 — 我们的北极星指标恰好在产品最痛的地方有盲区.
+我带去 metric review 的不只是数字, 是三段逐字 transcript — 三段原文比任何图表都有说服力. 之后我们把 correct-action rate 加为主指标 (抽样人工评审 + 对后端状态的自动校验), 重新定了基线. Containment 留下来, 但降级成护栏, 不再是目标.
+我带走的通用原则: 任何单一成功指标最终都会学会撒谎. 解药是定期去读你最好看的数字背后的原始现实 — transcript、工单、通话.
+
 ## 🇨🇳 中文速记 (结构记忆)
 
 Containment 上升像成功, 但投诉没同步降; 抽读'成功'对话 transcript → 相当比例是该转人工而没转、用户放弃离开被记为 win; 北极星指标在产品最痛处有盲区. 带 3 段原文 (比图表有说服力) 进 metric review → 加 correct-action 主指标, containment 降级护栏. 原则: 任何单一成功指标终将学会撒谎, 解药是定期读最好看数字背后的原始现实.
