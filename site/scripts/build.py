@@ -18,10 +18,11 @@ LEGACY_JSON = ROOT / "openai-interview-questions.json"
 QUESTIONS_JSON = UNIFIED_JSON if UNIFIED_JSON.exists() else LEGACY_JSON
 
 # Company display order on the index page
-COMPANY_ORDER = ["Google FDE Summary", "Google FDE", "Google L5", "FDE", "OpenAI", "Google"]
+COMPANY_ORDER = ["Google FDE Summary", "Googlyness 标准答", "Google FDE", "Google L5", "FDE", "OpenAI", "Google"]
 
 # Per-company brand color (used for the company badge tint)
 COMPANY_COLOR = {
+    "Googlyness 标准答": "#f9ab00",  # Google yellow — behavioral answers
     "Google FDE Summary": "#9333ea",  # Purple — 冲刺版 / sprint-ready
     "Google FDE": "#1a73e8",  # Google FDE — Google brand blue
     "Google L5":  "#0f9d58",  # Google L5 — Google brand green (Senior coding focus)
@@ -343,6 +344,7 @@ def render_index(questions, type_groups, company_groups, recency_sorted):
         ("真题", "🔥 真题（Exponent 2026 整理的 FDE 52 道高频真题 + 完美答案拆解）"),
         ("Review", "📝 Review（复习速查 — 49 页 Extended Cheat Sheet 抽取）"),
         ("Google FDE Summary", "⚡ Google FDE 冲刺版（每题 200 行: sample monologue + 5 followups + 易错 + 加分 + cheat sheet）"),
+        ("Googlyness 标准答", "🟡 Googlyness 标准答（26 道 Google behavioral 真题 · EN 背诵稿 + 中文速记 · 基于真实简历）"),
         ("Google FDE", "🎯 Google FDE 专项（HR 提示主题：tool calling / RAG / LLM 工程 / 落地）"),
         ("FDE", "FDE（Forward Deployed Engineer 真题 + reframe）"),
         ("Guide", "Guide（专题文章）"),

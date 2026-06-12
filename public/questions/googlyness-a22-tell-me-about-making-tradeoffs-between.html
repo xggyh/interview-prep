@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🟡 G22 · Tell me about making tradeoffs between quality and cost. · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Googlyness 标准答 / 🟡 G22 · Tell me about making tradeoffs between quality and cost.</div>
+  <h1>🟡 G22 · Tell me about making tradeoffs between quality and cost.</h1>
+  <div class="header-meta">
+    <span class="tag tag-googlyness">Googlyness 标准答</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#f9ab00"><strong>Googlyness 标准答</strong> · Senior · 📋 2 · 🕒 Early Jun, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/googlyness-a22-tell-me-about-making-tradeoffs-between.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/googlyness-a22-tell-me-about-making-tradeoffs-between.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">工程判断 · 商业意识 · EN 背诵稿 + 中文速记 + follow-up · 基于 Gao Xin 真实简历</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🟡 G22 · Tell me about making tradeoffs between quality and cost.</h1>
+<blockquote><p><strong>信号</strong>: 工程判断 · 商业意识 · <strong>hellointerview 报告数</strong>: 2 ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.</p></blockquote>
+<h3>🧠 这题在测什么</h3>
+<p>测你是否把 quality-cost 当曲线工程问题而非道德问题. 你的素材: 模型分层 + 推理优化 (简历硬技能).</p>
+<h3>📋 English Answer (背诵稿, ~60-90 秒)</h3>
+<p>For the BNPL chatbot, serving every turn with our largest model gave the best conversation quality — and an unsustainable cost curve at payment-customer scale. The naive frames were both wrong: "always use the best model" burns money on requests that don't need it; "use the cheap model" quietly degrades money-touching flows where errors are expensive. I treated it as a routing problem on the quality-cost curve. We profiled quality-per-cost by request type, then tiered: a small fine-tuned model handles intent classification and routine turns — that's most of the volume; the large model is reserved for generation in complex or sensitive flows; and on the serving side I drove vLLM and SGLang optimization with memory-efficiency tuning, which lowered the cost of <em>every</em> tier rather than trading anything away [✏️ 成本数字核实]. The key design decision was <em>where quality is non-negotiable</em>: anything touching money — refund confirmation, dispute handling — never gets downgraded, regardless of load. Cost flexibility lives only in the tiers where errors are cheap to recover. My framing: quality-cost isn't one knob, it's a portfolio. Engineer the frontier outward with serving optimization, then spend your quality budget where errors are irreversible.</p>
+<h3>🇨🇳 中文速记 (结构记忆)</h3>
+<p>全量大模型质量好但成本曲线不可持续; 当成 quality-cost 曲线上的路由问题: 小 fine-tuned 模型扛意图分类+常规轮次, 大模型只用于复杂/敏感生成; vLLM/SGLang+显存优化把整条曲线外推. 关键: 动钱流永不降级, 成本弹性只放在错误可恢复的层. 金句: quality-cost 是组合不是单旋钮.</p>
+<h3>🔁 高概率追问</h3>
+<p><strong>Q: How did you validate the small model was good enough?</strong></p>
+<p>Shadow evaluation against the large model on production traffic per intent — tiers were assigned from measured quality deltas, not assumptions, and re-checked after every model update.</p>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="googlyness-a21-tell-me-about-a-time-you.html">← 🟡 G21 · Tell me about a time you mentored a colleague.</a>
+    <a href="googlyness-a23-how-do-you-manage-multiple-priorities.html">🟡 G23 · How do you manage multiple priorities? Do you like an environment where priorities keep shifting? →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🟡 G22 · Tell me about making tradeoffs between quality and cost.
+
+> **信号**: 工程判断 · 商业意识 · **hellointerview 报告数**: 2
+> ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.
+
+## 🧠 这题在测什么
+
+测你是否把 quality-cost 当曲线工程问题而非道德问题. 你的素材: 模型分层 + 推理优化 (简历硬技能).
+
+## 📋 English Answer (背诵稿, ~60-90 秒)
+
+For the BNPL chatbot, serving every turn with our largest model gave the best conversation quality — and an unsustainable cost curve at payment-customer scale. The naive frames were both wrong: "always use the best model" burns money on requests that don't need it; "use the cheap model" quietly degrades money-touching flows where errors are expensive.
+I treated it as a routing problem on the quality-cost curve. We profiled quality-per-cost by request type, then tiered: a small fine-tuned model handles intent classification and routine turns — that's most of the volume; the large model is reserved for generation in complex or sensitive flows; and on the serving side I drove vLLM and SGLang optimization with memory-efficiency tuning, which lowered the cost of *every* tier rather than trading anything away [✏️ 成本数字核实].
+The key design decision was *where quality is non-negotiable*: anything touching money — refund confirmation, dispute handling — never gets downgraded, regardless of load. Cost flexibility lives only in the tiers where errors are cheap to recover.
+My framing: quality-cost isn't one knob, it's a portfolio. Engineer the frontier outward with serving optimization, then spend your quality budget where errors are irreversible.
+
+## 🇨🇳 中文速记 (结构记忆)
+
+全量大模型质量好但成本曲线不可持续; 当成 quality-cost 曲线上的路由问题: 小 fine-tuned 模型扛意图分类+常规轮次, 大模型只用于复杂/敏感生成; vLLM/SGLang+显存优化把整条曲线外推. 关键: 动钱流永不降级, 成本弹性只放在错误可恢复的层. 金句: quality-cost 是组合不是单旋钮.
+
+## 🔁 高概率追问
+
+**Q: How did you validate the small model was good enough?**
+
+Shadow evaluation against the large model on production traffic per intent — tiers were assigned from measured quality deltas, not assumptions, and re-checked after every model update.
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

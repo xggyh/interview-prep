@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🟡 G25 · Share an example where you resolved a significant conflict between different teams. · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Googlyness 标准答 / 🟡 G25 · Share an example where you resolved a significant conflict between different teams.</div>
+  <h1>🟡 G25 · Share an example where you resolved a significant conflict between different teams.</h1>
+  <div class="header-meta">
+    <span class="tag tag-googlyness">Googlyness 标准答</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#f9ab00"><strong>Googlyness 标准答</strong> · Senior · 📋 1 · 🕒 Early Jun, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/googlyness-a25-share-an-example-where-you-resolved.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/googlyness-a25-share-an-example-where-you-resolved.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">跨团队调解 · 机制设计 · EN 背诵稿 + 中文速记 + follow-up · 基于 Gao Xin 真实简历</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🟡 G25 · Share an example where you resolved a significant conflict between different teams.</h1>
+<blockquote><p><strong>信号</strong>: 跨团队调解 · 机制设计 · <strong>hellointerview 报告数</strong>: 1 ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.</p></blockquote>
+<h3>🧠 这题在测什么</h3>
+<p>与 Q11 区分: 你不是冲突方而是调解者/架构者 — 解法应是机制而非说服.</p>
+<h3>📋 English Answer (背诵稿, ~60-90 秒)</h3>
+<p>Automating refunds in the BNPL chatbot triggered a standoff between two teams I sat between. The payments backend team refused to expose write-access to refund APIs for an LLM-driven system — from their seat, entirely rational: they own the ledger, and a hallucinated refund is their incident. Product, meanwhile, had automation targets that were meaningless without exactly that access. Weeks of meetings restated positions; both sides were right, which is what made it stuck. My read: this wasn't a persuasion problem, it was a missing-mechanism problem — "access yes or no" was the wrong question. I designed a middle artifact: tiered execution. The agent gets no raw API access; instead, a constrained execution layer where small, rule-validated refunds auto-execute with idempotency keys and full audit trails; mid-tier amounts run agent-prepared but human-confirmed; anything large or anomalous routes to humans with the case pre-assembled [✏️ 阈值核实]. Backend co-designed the validation rules — their veto became executable code instead of a meeting position. Both teams got their real need: backend kept deterministic control of the ledger; product got automation on the volume that mattered. My takeaway for team conflicts: when both sides are right, stop arbitrating and design the mechanism that makes both constraints simultaneously true.</p>
+<h3>🇨🇳 中文速记 (结构记忆)</h3>
+<p>后端拒绝给 LLM 退款写权限 (幻觉退款=他们的事故) vs product 自动化指标. 判断: 不是说服问题是机制缺失. 设计分层执行: 小额规则校验自动执行(幂等+审计) / 中额 agent 备好人确认 / 大额异常转人工; 后端共建校验规则 — 否决权变成可执行代码. 金句: 双方都对时, 停止仲裁, 设计让两个约束同时为真的机制.</p>
+<h3>🔁 高概率追问</h3>
+<p><strong>Q: Why did backend trust the mechanism?</strong></p>
+<p>Because they wrote its rules — the validation layer was their code, their thresholds, their kill switch. Trust came from control, not promises.</p>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="googlyness-a24-give-an-example-of-tough-or.html">← 🟡 G24 · Give an example of tough or critical feedback you received.</a>
+    <a href="googlyness-a26-tell-me-about-an-important-decision.html">🟡 G26 · Tell me about an important decision between two strong options. →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🟡 G25 · Share an example where you resolved a significant conflict between different teams.
+
+> **信号**: 跨团队调解 · 机制设计 · **hellointerview 报告数**: 1
+> ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.
+
+## 🧠 这题在测什么
+
+与 Q11 区分: 你不是冲突方而是调解者/架构者 — 解法应是机制而非说服.
+
+## 📋 English Answer (背诵稿, ~60-90 秒)
+
+Automating refunds in the BNPL chatbot triggered a standoff between two teams I sat between. The payments backend team refused to expose write-access to refund APIs for an LLM-driven system — from their seat, entirely rational: they own the ledger, and a hallucinated refund is their incident. Product, meanwhile, had automation targets that were meaningless without exactly that access. Weeks of meetings restated positions; both sides were right, which is what made it stuck.
+My read: this wasn't a persuasion problem, it was a missing-mechanism problem — "access yes or no" was the wrong question. I designed a middle artifact: tiered execution. The agent gets no raw API access; instead, a constrained execution layer where small, rule-validated refunds auto-execute with idempotency keys and full audit trails; mid-tier amounts run agent-prepared but human-confirmed; anything large or anomalous routes to humans with the case pre-assembled [✏️ 阈值核实]. Backend co-designed the validation rules — their veto became executable code instead of a meeting position.
+Both teams got their real need: backend kept deterministic control of the ledger; product got automation on the volume that mattered.
+My takeaway for team conflicts: when both sides are right, stop arbitrating and design the mechanism that makes both constraints simultaneously true.
+
+## 🇨🇳 中文速记 (结构记忆)
+
+后端拒绝给 LLM 退款写权限 (幻觉退款=他们的事故) vs product 自动化指标. 判断: 不是说服问题是机制缺失. 设计分层执行: 小额规则校验自动执行(幂等+审计) / 中额 agent 备好人确认 / 大额异常转人工; 后端共建校验规则 — 否决权变成可执行代码. 金句: 双方都对时, 停止仲裁, 设计让两个约束同时为真的机制.
+
+## 🔁 高概率追问
+
+**Q: Why did backend trust the mechanism?**
+
+Because they wrote its rules — the validation layer was their code, their thresholds, their kill switch. Trust came from control, not promises.
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

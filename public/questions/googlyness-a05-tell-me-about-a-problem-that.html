@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🟡 G5 · Tell me about a problem that required in-depth thought and analysis. · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Googlyness 标准答 / 🟡 G5 · Tell me about a problem that required in-depth thought and analysis.</div>
+  <h1>🟡 G5 · Tell me about a problem that required in-depth thought and analysis.</h1>
+  <div class="header-meta">
+    <span class="tag tag-googlyness">Googlyness 标准答</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#f9ab00"><strong>Googlyness 标准答</strong> · Senior · 📋 1 · 🕒 Early Jun, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/googlyness-a05-tell-me-about-a-problem-that.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/googlyness-a05-tell-me-about-a-problem-that.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">技术深度 · 严谨 · EN 背诵稿 + 中文速记 + follow-up · 基于 Gao Xin 真实简历</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🟡 G5 · Tell me about a problem that required in-depth thought and analysis.</h1>
+<blockquote><p><strong>信号</strong>: 技术深度 · 严谨 · <strong>hellointerview 报告数</strong>: 1 ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.</p></blockquote>
+<h3>🧠 这题在测什么</h3>
+<p>要一次真正的深挖: 重构问题→实验→反直觉发现. 别讲日常 debug.</p>
+<h3>📋 English Answer (背诵稿, ~60-90 秒)</h3>
+<p>At Shopee I owned MYKAD — Malaysian ID — tamper detection for banking onboarding. The deep problem: real tampered samples were extremely rare and attack techniques kept evolving, so a standard classifier just memorized the few known fraud patterns — great offline metrics, useless against novel attacks. The analysis that cracked it was reframing the problem itself: stop classifying "tampered vs genuine," and instead learn the manifold of <em>genuine</em> documents so tightly that anything off-manifold flags. I implemented that with contrastive learning — pulling genuine-document representations together while pushing apart synthetically perturbed variants: font swaps, region splices, reprint artifacts — approximating the attack space without needing real fraud at scale. Second-order analysis mattered just as much: failure-mode clustering showed lighting and camera quality dominated false rejects, so the fix was capture-condition augmentation, not a bigger model. It shipped at 95% TAR at 1% FAR in production. The transferable lesson I use in LLM work now: when labels are scarce and adversarial, model normality and engineer augmentations against the threat model — not against the test set.</p>
+<h3>🇨🇳 中文速记 (结构记忆)</h3>
+<p>MYKAD 防篡改: 真样本稀缺+攻击演化 → 反转问题学'真'流形; contrastive + 合成篡改增广; 失败聚类发现光照主导误拒→采集条件增广而非大模型. 95% TAR@1%FAR (简历真实).</p>
+<h3>🔁 高概率追问</h3>
+<p><strong>Q: How does this transfer to LLMs?</strong></p>
+<p>Hallucination detection has the same shape — scarce labeled failures, shifting distribution. So anchor on grounded behavior, generate adversarial probes synthetically, and build the failure taxonomy before scaling the model.</p>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="googlyness-a04-tell-me-about-a-project-where.html">← 🟡 G4 · Tell me about a project where the requirements were not clear or kept changing.</a>
+    <a href="googlyness-a06-discuss-a-time-you-had-conflicting.html">🟡 G6 · Discuss a time you had conflicting perspectives with teammates and how you handled it. →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🟡 G5 · Tell me about a problem that required in-depth thought and analysis.
+
+> **信号**: 技术深度 · 严谨 · **hellointerview 报告数**: 1
+> ⚠️ 标 [✏️] 的数字是占位, 背诵前换成你的真实数据.
+
+## 🧠 这题在测什么
+
+要一次真正的深挖: 重构问题→实验→反直觉发现. 别讲日常 debug.
+
+## 📋 English Answer (背诵稿, ~60-90 秒)
+
+At Shopee I owned MYKAD — Malaysian ID — tamper detection for banking onboarding. The deep problem: real tampered samples were extremely rare and attack techniques kept evolving, so a standard classifier just memorized the few known fraud patterns — great offline metrics, useless against novel attacks.
+The analysis that cracked it was reframing the problem itself: stop classifying "tampered vs genuine," and instead learn the manifold of *genuine* documents so tightly that anything off-manifold flags. I implemented that with contrastive learning — pulling genuine-document representations together while pushing apart synthetically perturbed variants: font swaps, region splices, reprint artifacts — approximating the attack space without needing real fraud at scale.
+Second-order analysis mattered just as much: failure-mode clustering showed lighting and camera quality dominated false rejects, so the fix was capture-condition augmentation, not a bigger model.
+It shipped at 95% TAR at 1% FAR in production. The transferable lesson I use in LLM work now: when labels are scarce and adversarial, model normality and engineer augmentations against the threat model — not against the test set.
+
+## 🇨🇳 中文速记 (结构记忆)
+
+MYKAD 防篡改: 真样本稀缺+攻击演化 → 反转问题学'真'流形; contrastive + 合成篡改增广; 失败聚类发现光照主导误拒→采集条件增广而非大模型. 95% TAR@1%FAR (简历真实).
+
+## 🔁 高概率追问
+
+**Q: How does this transfer to LLMs?**
+
+Hallucination detection has the same shape — scarce labeled failures, shifting distribution. So anchor on grounded behavior, generate adversarial probes synthetically, and build the failure taxonomy before scaling the model.
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>
