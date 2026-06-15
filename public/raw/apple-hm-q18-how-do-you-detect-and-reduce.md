@@ -71,6 +71,18 @@ I built exactly this on our BNPL chatbot. The FAQ path was **grounded generation
 **Q: How does this change on-device / at Apple?**
 "The principles hold, and a couple get sharper. On device you can do **on-device retrieval over the user's own data**, which is both a grounding win and a privacy win — the facts never leave the device. And with a smaller on-device model, the 'escalate when unsure' branch — to a larger server model in Private Cloud Compute, or to a human — matters even more, because a 3B model has a smaller safe envelope than a frontier one."
 
+**Q: What's your single highest-leverage fix if you only had time for one?**
+"Separate facts from phrasing. Pull every specific — number, date, policy — from a tool or retrieval, and let the model only do the wording. Most damaging support-agent hallucinations are *wrong specifics*, and that one move removes most of the blast radius before you even touch model quality."
+
+## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
+
+| 问 | 🔴 弱答 (初级) | 🟢 强答 (Gao 该说) |
+|---|---|---|
+| 怎么减 | 「加 prompt 让它别瞎编」 | 「**grounding + citation 强制 + 涉钱数字走 tool**, 三件套」 |
+| 怎么测 | 「人工看一看」 | 「LLM-judge 测 faithfulness vs golden set, **人工 calibrate** + 追 unsupported-claim 率」 |
+| 消除程度 | 「能基本消除」 | 「**消不到零**, 所以低置信 → escalate to human 兜底」 |
+| 检索错了 | 「也算幻觉, 调模型」 | 「那是 **retrieval 失败**, 治检索 (rerank/top-k), 不是治模型」 |
+
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
 - **绝不**说「我能把幻觉降到零」——立刻显得不懂。说「消不到零，所以有检测 + 兜底」。

@@ -8,6 +8,18 @@ Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收�
 
 ## 📋 English Answer (背诵稿, 主答 ~80-90 秒, STAR)
 
+> **60 秒脊柱 (背死这句)**: *The requirement was one line — "make support smarter with AI." I converged scope with ticket data, not meetings, and — the senior part — I architected so shifting requirements land in config and RAG, not code. The intent-router-plus-RAG-fallback design itself absorbs the ambiguity.*
+
+**⭐ STAR 一眼回忆卡**
+
+| | |
+|---|---|
+| **S** | BNPL 启动需求就一句话: "make customer support smarter with AI". 无范围/无指标/各想各的. |
+| **T** | 把一句话变成能建、能量的东西; 且明知范围会一直变. |
+| **A** | ① 拉 **ticket 数据**收敛范围 (高频 intent→workflow agent, 长尾→FAQ RAG) + 和 product/ops 前置定指标. ② 架构让变化落在 **config/RAG/tool 不在代码**: 改 intent=config, 改政策=知识库热更, 新动作=tool. |
+| **R** | 一句话→上线可量化系统; 范围变动主要靠 config+知识库吸收, 不重构. **让变化变便宜**才是真考验. |
+| **学到** | 模糊时别等也别猜——拿让范围显而易见的数据, 把确定会变的部分架构成易改的. |
+
 **Situation.** "When we kicked off the BNPL chatbot, the requirement I got was essentially one line: **'make customer support smarter with AI.'** That was it. No defined scope, no target metric, no agreement on which problems to solve first — and product, ops, and engineering each had a different picture in their head of what 'smarter' meant."
 
 **Task.** "My job was to turn that one-liner into something we could actually build and measure — without guessing wrong and burning a quarter, and knowing the scope would keep moving as we learned."
@@ -54,6 +66,15 @@ Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收�
 - 别把自己讲成「等需求清晰才动手」——要主动用数据去**制造**清晰。
 - 别编 ticket 数量/intent 占比的精确数字——用定性（「volume concentrated in a handful of intents」）或 [✏️ 核实]。
 - 不要漏掉「和 product/ops 一起定指标」——这是把模糊业务诉求落地的关键，也命中 JD。
+
+## 🎯 面试官按什么打分 (自检清单, 背前对一遍)
+
+- ☑ 你**主动制造清晰** (拉数据收敛), 不是被动等需求 → 主动性
+- ☑ 你有**架构吸收变化**这一层 (config/RAG/tool), 不只沟通技巧 → senior 信号
+- ☑ 你**和 product/ops 一起定指标**, 把模糊业务诉求翻成工程目标 → 跨职能协作 (JD)
+- ☑ 你诚实承认**新能力仍要花工程**, 没把架构吹成万能 → 判断力 + humility
+- ☑ 有可迁移的**复盘** (拿数据 + 把会变的部分做易改) → 自我迭代
+- ☒ 红旗: 「需求不清我就一直等」/「我猜了一个方向就开干」/「架构让一切都免费」
 
 ## ✅ 加分钩子 (主动抛, steer 到强项)
 

@@ -52,6 +52,16 @@ The router is intentionally thin and fast; the sub-agents hold the business logi
 
 骨架一句话:**"分层是为了 separation of concerns —— 一层决策、一层动作 (含 tool + 收敛权限)、一层信息兜底、一个 orchestrator 持有状态;每层独立可测,且 router 永不假设 100% 准。"**
 
+讲述节奏 (60-90 秒主答的口播顺序):
+1. 先抛总纲一句:"three-layer design, key idea is separation of concerns"。
+2. 逐层 router → sub-agent → RAG,每层一句话讲清"它做什么 + 为什么"。
+3. 收尾两句:orchestrator 持有 state + router 永不假设 100% 准 (主动埋 Q10 的钩子)。
+4. 如果对方点头想深入,再延伸 eval 分层 / 加新意图 / 端到端走一遍。**不要一口气全倒**,留追问空间。
+
+口播提醒 (避免你的常见英语卡点):
+- "blast radius" "separation of concerns" "grounded reply" "stateless workers" 这几个词组提前练顺,它们是这题的关键词,卡壳会显得不熟。
+- 不要说 "we did everything" —— 这题要 "I designed the routing / I owned the eval harness",ownership 用 "I"。
+
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Why separate sub-agents per intent instead of one agent with all the tools?**
@@ -66,22 +76,35 @@ The router is intentionally thin and fast; the sub-agents hold the business logi
 - Multi-intent was handled by re-routing on the *next* turn, not parallel sub-agent fan-out — I won't overclaim a DAG orchestrator I didn't build.
 
 **Q: Where does the conversation state live across these layers?**
-State is held at the orchestration layer, not inside any one sub-agent — so when control passes from router to a sub-agent to RAG, they share the same conversation context and any resolved slots. Sub-agents are stateless workers; the orchestrator owns memory. (That's one of the things we abstracted into the platform.)
+- State is held at the *orchestration* layer, not inside any one sub-agent.
+- So when control passes router → sub-agent → RAG, they share the same conversation context and any resolved slots.
+- Sub-agents are stateless workers; the orchestrator owns memory. That's one of the things we later abstracted into the platform.
 
 **Q: What if RAG and a sub-agent both seem applicable?**
-Actionable intent always wins over RAG. RAG is the fallback, not a peer — if there's a real transaction the user wants done, retrieving an FAQ passage is the wrong answer. The router's job is precisely to prefer action when an actionable intent fires with enough confidence.
+- Actionable intent always wins over RAG. RAG is the fallback, not a peer.
+- If there's a real transaction the user wants done, retrieving an FAQ passage is the wrong answer.
+- The router's job is precisely to prefer *action* when an actionable intent fires with enough confidence.
 
 **Q: How did you decide the intent taxonomy — why those three?**
-Data-driven with ops. We looked at the actual ticket distribution; order lookup, refund, and dispute were the high-volume, automatable, money-touching flows worth a dedicated agent. Long-tail informational questions weren't worth a workflow each, so they collapse into the RAG bucket. [✏️ 核实 这三类占工单比例]
+- Data-driven, with ops. We looked at the actual ticket distribution.
+- Order lookup, refund, and dispute were the high-volume, automatable, money-touching flows worth a dedicated agent.
+- Long-tail informational questions weren't worth a workflow each, so they collapse into the RAG bucket. [✏️ 核实 这三类占工单比例]
 
 **Q: How would you add a new intent — say, "change payment date" — six months in?**
-That's where the layering pays off. I register a new sub-agent with its own scoped tool and guardrails, add the intent to the router's label set, and the rest of the system is untouched. The orchestrator and RAG don't change. That's the difference between a layered design and a monolithic prompt — extending a monolith means re-validating the whole thing; extending this means validating one new agent against its own eval set. This is also exactly the argument for the platform: the *mechanics* of registering an agent are shared, so adding an intent is config plus one agent, not a project.
+- Register a new sub-agent with its own scoped tool and guardrails, add the intent to the router's label set — the rest is untouched. Orchestrator and RAG don't change.
+- That's the difference between a layered design and a monolithic prompt: extending a monolith means re-validating the whole thing; extending this means validating *one* new agent against its own eval set.
+- It's also the argument for the platform — the *mechanics* of registering an agent are shared, so adding an intent is config plus one agent, not a project.
 
 **Q: How does this map to what this Apple team is building?**
-Pretty directly — it's the same shape. A conversational, multi-turn, multi-agent system where a controller routes user intent to specialized capabilities, falls back to retrieval for informational queries, and keeps state across turns. The domain differs — customer support across Apple's lines of business versus BNPL — but routing, scoped dispatch, grounded fallback, and an orchestrator owning state is the architecture either way. The thing I'd bring is having already hit the hard edges: misroute recovery, money-touching safety, and per-layer eval.
+- Pretty directly — it's the same shape: a conversational, multi-turn, multi-agent system where a controller routes intent to specialized capabilities, falls back to retrieval for informational queries, and keeps state across turns.
+- Domain differs — Apple customer support across lines of business vs BNPL — but routing, scoped dispatch, grounded fallback, and an orchestrator owning state is the architecture either way.
+- What I'd bring is having already hit the hard edges: misroute recovery, money-touching safety, per-layer eval.
 
 **Q: Walk me through one concrete turn, end to end.**
-Take "I want a refund on order 12345." Router classifies it as `refund` with high confidence and passes the turn plus the order ID to the refund sub-agent. The sub-agent calls the order API to verify the order exists and is refund-eligible, calls the refund API if so, gets a structured result back — refund initiated, amount, ETA — and generates a grounded reply citing that result, not free-text. The orchestrator records the resolved state. If the order *isn't* refund-eligible, the sub-agent doesn't invent an answer — it explains why and offers the next step or a handoff. Every fact in the reply traces to a tool result.
+- Take "I want a refund on order 12345." Router classifies it `refund`, high confidence, passes the turn plus order ID to the refund sub-agent.
+- The sub-agent calls the order API to verify the order is refund-eligible, calls the refund API if so, gets a structured result — refund initiated, amount, ETA.
+- It generates a grounded reply *citing that result*, not free text. The orchestrator records the resolved state.
+- If the order *isn't* eligible, the sub-agent doesn't invent an answer — it explains why and offers the next step or a handoff. Every fact traces to a tool result.
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
@@ -99,3 +122,5 @@ Take "I want a refund on order 12345." Router classifies it as `refund` with hig
 - 强调 **eval harness 是跟 product/ops 一起定的**,每层分开量 —— 对上 JD 反复强调的 "LLM eval" + "partner with stakeholders"。
 - 主动说 **"这跟你们团队在做的 multi-turn、multi-agent 系统是同一个 shape"** —— 让面试官看到 transfer 是直接的,不用脑补。然后补一句你已经踩过硬边界 (misroute 恢复、money 安全、分层 eval)。
 - 如果对方对延迟感兴趣,顺势抛 **"router 故意做薄是因为它在每一轮的关键路径上"** —— 把架构选择和 latency 挂钩,接 JD 的 latency/cost 主线 (可引到 Q4/Q20)。
+- 主动提 **"每层独立可测,出 regression 能定位到哪一层"** —— 这是把"分层"从架构口号落到运营收益,体现你真在生产里运营过 agent。
+- 如果聊到多市场,抛一句 **"这套在 BNPL 是单市场为主,但 RAG 知识库已带 market metadata"** —— 自然引到 7 市场经验 + Apple Greater China (引到 Q11/Q27),但别夸大成 BNPL 当时就 7 市场上线 [✏️ 核实 BNPL 实际市场数]。

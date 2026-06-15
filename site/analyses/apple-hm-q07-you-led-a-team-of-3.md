@@ -8,17 +8,30 @@
 
 ## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
 
+> 三类清晰切分：**mine hands-on / mine to direct / genuinely theirs**。按句换行方便背。
+
 "Fair question — let me actually separate it, because 'led' can hide a lot.
 
-What was **mine, hands-on and by decision**: the technical direction and the calls I'm accountable for. I owned the **architecture** of the whole pipeline — the streaming design, where to put the guardrails, the tool-orchestration boundaries. I owned the **foundation-model post-training** myself — the data construction, the multilingual adaptation strategy, the SFT and DPO-style alignment, and the eval-driven loop. And I owned the hardest engineering judgment calls — the latency budget and the barge-in design, the trade-offs where someone had to decide and be accountable. When we chose to bias barge-in toward yielding fast, or to never let the model assert a financial fact — those were my calls.
+What was **mine, hands-on and by decision** — the technical direction and the calls I'm accountable for.
+I owned the **architecture** of the whole pipeline — the streaming design, where to put the guardrails, the tool-orchestration boundaries.
+I owned the **foundation-model post-training** myself — the data construction, the multilingual adaptation strategy, the SFT and DPO-style alignment, and the eval-driven loop.
+And I owned the hardest judgment calls — the latency budget and the barge-in design, the trade-offs where someone had to decide and be accountable.
+When we chose to bias barge-in toward yielding fast, or to never let the model assert a financial fact — those were my calls.
 
-What was **mine to direct, the team to execute**: I set the eval framework and the metrics, and two engineers built out a lot of the tooling, the data pipelines, and the per-market integration work against my design. I reviewed it, I unblocked it, I owned whether it was good enough to ship — but the hands on much of that code were theirs.
+What was **mine to direct, the team to execute** —
+I set the eval framework and the metrics, and two engineers built out a lot of the tooling, the data pipelines, and the per-market integration against my design.
+I reviewed it, I unblocked it, and I owned whether it was good enough to ship — but the hands on much of that code were theirs.
 
-What was genuinely **theirs**: one of the engineers drove the per-market ASR/TTS integration and localization deeper than I did — across seven markets that's real specialized work, and they were better at the language-specific nuance than I was. I'd credit that to them honestly.
+What was genuinely **theirs** —
+one of the engineers drove the per-market ASR/TTS integration and localization deeper than I did.
+Across seven markets that's real specialized work, and they were better at the language-specific nuance than I was.
+I'd credit that to them, honestly.
 
-So the honest split: I own the architecture, the post-training, the hard trade-offs, and the bar for what ships. The team owned a lot of the build-out and some areas they were genuinely stronger in than me. My job was to make the calls I was accountable for, and to make the other two more effective at theirs."
+So the honest split: I own the architecture, the post-training, the hard trade-offs, and the bar for what ships.
+The team owned a lot of the build-out, and some areas where they were genuinely stronger than me.
+My job was to make the calls I was accountable for — and to make the other two more effective at theirs."
 
-*(可延伸)*: "The way I think about it — leading three people isn't doing everything; it's owning the decisions that can't be delegated and being honest about the ones that can."
+*(可延伸，可背金句)*: "The way I think about it — leading three people isn't doing everything. It's owning the decisions that can't be delegated, and being honest about the ones that can."
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

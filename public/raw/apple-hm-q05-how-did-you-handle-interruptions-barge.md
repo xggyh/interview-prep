@@ -8,19 +8,37 @@
 
 ## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
 
-"Barge-in was genuinely the hardest part of the real-time work, because it's where full-duplex bites you. The system has to listen and speak at the same time, and react the instant the user cuts in — like a real phone call, where you can interrupt the other person.
+> 三段式骨架 **Detect → Stop → Re-align**，按句换行方便背。
 
-There are three problems to solve. **Detect, stop, and re-align.**
+"Barge-in was genuinely the hardest part of the real-time work, because it's where full-duplex bites you.
+The system has to listen and speak at the same time, and react the instant the user cuts in — like a real phone call, where you can interrupt the other person.
 
-**Detect.** A VAD runs continuously on the inbound audio, including while we're speaking. When it sees sustained speech energy from the user during our playback, that's a barge-in candidate. The trap is false triggers — a cough, a 'mm-hmm' backchannel, or our own audio echoing back. So I don't trigger on a single frame; I require speech sustained past a short threshold, and we run echo cancellation so the agent doesn't interrupt itself. That threshold is a tuning knob — too twitchy and we stop mid-word on a cough, too slow and we talk over the customer.
+There are three problems to solve: **detect, stop, and re-align.**
 
-**Stop.** This is the dirty part. The moment we commit to a barge-in, we have to kill playback *fast*, and audio is already in flight — synthesized frames sitting in the TTS output buffer and frames already pushed onto the network. So I stop TTS generation, flush the local buffer, and stop sending frames. Because audio is **packetized into small frames** — 20-millisecond chunks — the most that's 'stuck in the pipe' is a frame or two, so the stop feels near-instant instead of the user hearing another full sentence. That's the whole point of fine-grained packetization: small frames mean a tight stop latency.
+**Detect.**
+A VAD runs continuously on the inbound audio, including while we're speaking.
+When it sees sustained speech energy from the user during our playback, that's a barge-in candidate.
+The trap is false triggers — a cough, an 'mm-hmm' backchannel, or our own audio echoing back.
+So I don't trigger on a single frame; I require speech sustained past a short threshold, and we run echo cancellation so the agent doesn't interrupt itself.
+That threshold is a tuning knob — too twitchy and we stop mid-word on a cough, too slow and we talk over the customer.
 
-**Re-align.** When we cut ourselves off, the dialogue state is now inconsistent — we said maybe 60% of a sentence, the LLM thinks it said 100%. So the turn manager records what was actually played, truncates the agent turn to that, re-opens the ASR for the user's incoming speech, and the next LLM turn is conditioned on 'you were interrupted here.' Otherwise the agent ploughs on as if nothing happened, which feels broken.
+**Stop.**
+This is the dirty part.
+The moment we commit to a barge-in, we have to kill playback *fast* — and audio is already in flight: synthesized frames sitting in the TTS output buffer, and frames already pushed onto the network.
+So I stop TTS generation, flush the local buffer, and stop sending frames.
+Because audio is **packetized into small frames** — 20-millisecond chunks — the most that's 'stuck in the pipe' is a frame or two.
+So the stop feels near-instant, instead of the user hearing another full sentence.
+That's the whole point of fine-grained packetization: small frames mean a tight stop latency.
 
-So: continuous VAD with anti-false-trigger gating, fast buffer flush enabled by small-frame packetization, and dialogue-state reconciliation so the interruption is actually understood, not just silenced."
+**Re-align.**
+When we cut ourselves off, the dialogue state is now inconsistent — we said maybe 60% of a sentence, but the LLM thinks it said 100%.
+So the turn manager records what was actually played, truncates the agent turn to that, and re-opens the ASR for the user's incoming speech.
+The next LLM turn is then conditioned on 'you were interrupted here.'
+Otherwise the agent ploughs on as if nothing happened, which feels broken.
 
-*(可延伸)*: "The product judgment underneath it: in debt collection especially, talking over an upset customer is a trust-killer, so I biased the tuning toward yielding fast — let the human win the floor."
+So: continuous VAD with anti-false-trigger gating; a fast buffer flush enabled by small-frame packetization; and dialogue-state reconciliation, so the interruption is actually understood — not just silenced."
+
+*(可延伸，上升到产品判断)*: "The judgment underneath it: in debt collection especially, talking over an upset customer is a trust-killer — so I biased the tuning toward yielding fast. Let the human win the floor."
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

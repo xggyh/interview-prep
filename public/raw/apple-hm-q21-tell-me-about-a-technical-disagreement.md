@@ -8,6 +8,18 @@ Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看�
 
 ## 📋 English Answer (背诵稿, 主答 ~75-90 秒, STAR)
 
+> **60 秒脊柱 (背死这句)**: *We disagreed on low-confidence intents — I wanted a safe fallback, my teammate wanted aggressive automation. I refused to argue opinion-vs-opinion; I pulled real ticket data, which reframed it as a measurable trade. We converged on a confidence threshold, and I gave my teammate co-ownership of it.*
+
+**⭐ STAR 一眼回忆卡**
+
+| | |
+|---|---|
+| **S** | BNPL 低置信 intent: 我=保守 fallback (护涉钱正确性) vs 队友=激进自动化 (护 automation 指标). 两边都合理. |
+| **T** | 共同 own 一个设计, 不能僵, 得发一版. |
+| **A** | 拒打观点战 → 拉真实 ticket 数据 → 重构成「automation vs wrong-action cost」可量化取舍 → 收敛到**置信阈值** → 让队友**共同 own** 阈值+指标. |
+| **R** | 上线带阈值 + 双指标追踪; 「数据定 + 共享所有权」成团队后续默认解法. |
+| **学到** | 在争论**前**就拉数据, 别等分歧僵化后当裁判. |
+
 **Situation.** "On the BNPL chatbot, a teammate and I disagreed on how to handle intents the classifier wasn't confident about. I wanted a **conservative fallback** — when confidence was low, route to the FAQ RAG path or hand off, rather than guess an action. A teammate argued for being more **aggressive** — let the workflow agents act on the best-guess intent to maximize automation rate, because automation was the headline metric we were measured on. Both positions were reasonable: mine protected correctness in a money-touching flow, theirs protected the number leadership cared about."
 
 **Task.** "I needed to resolve it without it becoming a standoff — we owned this together and had to ship one design."
@@ -48,6 +60,15 @@ Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看�
 - 别把结果讲成「我赢了」——讲成「我们收敛到一个更好的设计」。
 - "what I'd do differently" 一定要真诚具体（第一天拉数据），别说「我没什么要改的」——那是最大的红旗。
 - 别编无法核实的精确数字——automation/wrong-action 的具体百分比用 [✏️ 核实] 或干脆定性描述（「a meaningful slice」），宁可不报数。
+
+## 🎯 面试官按什么打分 (自检清单, 背前对一遍)
+
+- ☑ 你**没把队友贬低**, 反而认可他的关切是对的 → 协作信号
+- ☑ 你用**数据/客观证据**降温, 而不是靠职级或嗓门 → 成熟度
+- ☑ 你给了对方**共同所有权**, 结果是「我们的」不是「我赢」 → 团队信号
+- ☑ 你有真诚的 **"what I'd do differently"** → humility (Apple 最爱)
+- ☑ 分歧背后是**真技术取舍** (correctness vs automation), 不是琐事 → 判断力
+- ☒ 红旗: 「最后证明我对」/「他不懂」/「我没什么要改的」
 
 ## ✅ 加分钩子 (主动抛, steer 到强项)
 

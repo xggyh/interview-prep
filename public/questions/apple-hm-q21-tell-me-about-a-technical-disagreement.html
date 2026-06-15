@@ -44,6 +44,9 @@
 <h3>🧠 这题在测什么 / 面试官想看到</h3>
 <p>Apple 看的是<strong>成熟度和协作</strong>，不是「你赢没赢」。他们想看：你能不能把分歧从「人 vs 人」转成「让数据/用户来定」，能不能给对方台阶和<strong>共同所有权</strong>，以及事后有没有反思（"what I'd do differently" 是 Apple 最爱的信号，体现 humility + ownership）。强答案：具体技术分歧 + 你主动用数据/实验降温 + 双方都参与结论 + 一句真诚的复盘。弱答案：把对方讲成笨蛋、自己永远对、或者「我们后来达成一致了」没有过程。陷阱：选一个你单方碾压对方的故事——那暴露的是不会协作。要选「我也部分错了」或「结论靠数据不是靠我」的故事。</p>
 <h3>📋 English Answer (背诵稿, 主答 ~75-90 秒, STAR)</h3>
+<blockquote><p><strong>60 秒脊柱 (背死这句)</strong>: <em>We disagreed on low-confidence intents — I wanted a safe fallback, my teammate wanted aggressive automation. I refused to argue opinion-vs-opinion; I pulled real ticket data, which reframed it as a measurable trade. We converged on a confidence threshold, and I gave my teammate co-ownership of it.</em></p></blockquote>
+<p><strong>⭐ STAR 一眼回忆卡</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><strong>S</strong></td><td>BNPL 低置信 intent: 我=保守 fallback (护涉钱正确性) vs 队友=激进自动化 (护 automation 指标). 两边都合理.</td></tr><tr><td><strong>T</strong></td><td>共同 own 一个设计, 不能僵, 得发一版.</td></tr><tr><td><strong>A</strong></td><td>拒打观点战 → 拉真实 ticket 数据 → 重构成「automation vs wrong-action cost」可量化取舍 → 收敛到<strong>置信阈值</strong> → 让队友<strong>共同 own</strong> 阈值+指标.</td></tr><tr><td><strong>R</strong></td><td>上线带阈值 + 双指标追踪; 「数据定 + 共享所有权」成团队后续默认解法.</td></tr><tr><td><strong>学到</strong></td><td>在争论<strong>前</strong>就拉数据, 别等分歧僵化后当裁判.</td></tr></tbody></table></div>
 <p><strong>Situation.</strong> "On the BNPL chatbot, a teammate and I disagreed on how to handle intents the classifier wasn't confident about. I wanted a <strong>conservative fallback</strong> — when confidence was low, route to the FAQ RAG path or hand off, rather than guess an action. A teammate argued for being more <strong>aggressive</strong> — let the workflow agents act on the best-guess intent to maximize automation rate, because automation was the headline metric we were measured on. Both positions were reasonable: mine protected correctness in a money-touching flow, theirs protected the number leadership cared about."</p>
 <p><strong>Task.</strong> "I needed to resolve it without it becoming a standoff — we owned this together and had to ship one design."</p>
 <p><strong>Action.</strong> "I made a deliberate choice not to argue it as opinion-versus-opinion, because that goes nowhere. Instead I proposed we let <strong>data</strong> decide. We pulled a sample of real tickets where the classifier was low-confidence and looked at what actually happened when we guessed versus when we fell back. The data showed the aggressive path did lift automation on the easy misses, but on a meaningful slice it produced <strong>wrong actions</strong> on disputes and refunds — exactly the cases that are expensive and erode trust. That reframed the conversation: it wasn't my caution versus their ambition, it was a measurable trade between automation and wrong-action cost. So we converged on a middle design — a <strong>confidence threshold</strong>: above it, the workflow agent acts; below it, we fall back or escalate. And I made sure my teammate <strong>co-owned</strong> the threshold-tuning and the metric for it — it was genuinely our design, not me overruling them. We tuned that threshold together against the data."</p>
@@ -60,6 +63,8 @@
 <p><strong>Q: How did you keep the relationship intact?</strong> "By making it their design too. I gave my teammate co-ownership of the threshold and its metric, credited their automation concern as the right concern — because it was — and framed the outcome as <em>our</em> trade-off, not my win. People defend a decision they helped build. We worked well together afterward, which to me is the actual test of whether you handled a disagreement well."</p>
 <h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
 <ul><li><strong>绝不</strong>把队友讲成笨蛋或永远是自己对——Apple 立刻扣分。要明确说「他的关切是对的关切」。</li><li>别选你单方碾压的故事——暴露不会协作。选数据定胜负 + 你也让步的。</li><li>别把结果讲成「我赢了」——讲成「我们收敛到一个更好的设计」。</li><li>"what I'd do differently" 一定要真诚具体（第一天拉数据），别说「我没什么要改的」——那是最大的红旗。</li><li>别编无法核实的精确数字——automation/wrong-action 的具体百分比用 [✏️ 核实] 或干脆定性描述（「a meaningful slice」），宁可不报数。</li></ul>
+<h3>🎯 面试官按什么打分 (自检清单, 背前对一遍)</h3>
+<ul><li>☑ 你<strong>没把队友贬低</strong>, 反而认可他的关切是对的 → 协作信号</li><li>☑ 你用<strong>数据/客观证据</strong>降温, 而不是靠职级或嗓门 → 成熟度</li><li>☑ 你给了对方<strong>共同所有权</strong>, 结果是「我们的」不是「我赢」 → 团队信号</li><li>☑ 你有真诚的 <strong>"what I'd do differently"</strong> → humility (Apple 最爱)</li><li>☑ 分歧背后是<strong>真技术取舍</strong> (correctness vs automation), 不是琐事 → 判断力</li><li>☒ 红旗: 「最后证明我对」/「他不懂」/「我没什么要改的」</li></ul>
 <h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
 <ul><li>主动点出 <strong>「我刻意不打观点战，让数据定」</strong>——这是 Apple 想听的成熟度核心句。</li><li>强调 <strong>给对方共同所有权（co-own 阈值 + 指标）</strong>——直接命中协作信号。</li><li>顺势带出 <strong>money-touching 场景的 correctness vs automation 取舍</strong> 和 <strong>置信阈值 + 双指标追踪</strong>——把行为题悄悄变成你 BNPL 技术深度的展示。</li><li>复盘句「在争论前拿数据」体现 ownership + 自我迭代，呼应 Apple 的 quality bar。</li></ul>
   </section>
@@ -82,6 +87,18 @@
 Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看：你能不能把分歧从「人 vs 人」转成「让数据/用户来定」，能不能给对方台阶和**共同所有权**，以及事后有没有反思（"what I'd do differently" 是 Apple 最爱的信号，体现 humility + ownership）。强答案：具体技术分歧 + 你主动用数据/实验降温 + 双方都参与结论 + 一句真诚的复盘。弱答案：把对方讲成笨蛋、自己永远对、或者「我们后来达成一致了」没有过程。陷阱：选一个你单方碾压对方的故事——那暴露的是不会协作。要选「我也部分错了」或「结论靠数据不是靠我」的故事。
 
 ## 📋 English Answer (背诵稿, 主答 ~75-90 秒, STAR)
+
+> **60 秒脊柱 (背死这句)**: *We disagreed on low-confidence intents — I wanted a safe fallback, my teammate wanted aggressive automation. I refused to argue opinion-vs-opinion; I pulled real ticket data, which reframed it as a measurable trade. We converged on a confidence threshold, and I gave my teammate co-ownership of it.*
+
+**⭐ STAR 一眼回忆卡**
+
+| | |
+|---|---|
+| **S** | BNPL 低置信 intent: 我=保守 fallback (护涉钱正确性) vs 队友=激进自动化 (护 automation 指标). 两边都合理. |
+| **T** | 共同 own 一个设计, 不能僵, 得发一版. |
+| **A** | 拒打观点战 → 拉真实 ticket 数据 → 重构成「automation vs wrong-action cost」可量化取舍 → 收敛到**置信阈值** → 让队友**共同 own** 阈值+指标. |
+| **R** | 上线带阈值 + 双指标追踪; 「数据定 + 共享所有权」成团队后续默认解法. |
+| **学到** | 在争论**前**就拉数据, 别等分歧僵化后当裁判. |
 
 **Situation.** "On the BNPL chatbot, a teammate and I disagreed on how to handle intents the classifier wasn't confident about. I wanted a **conservative fallback** — when confidence was low, route to the FAQ RAG path or hand off, rather than guess an action. A teammate argued for being more **aggressive** — let the workflow agents act on the best-guess intent to maximize automation rate, because automation was the headline metric we were measured on. Both positions were reasonable: mine protected correctness in a money-touching flow, theirs protected the number leadership cared about."
 
@@ -123,6 +140,15 @@ Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看�
 - 别把结果讲成「我赢了」——讲成「我们收敛到一个更好的设计」。
 - "what I'd do differently" 一定要真诚具体（第一天拉数据），别说「我没什么要改的」——那是最大的红旗。
 - 别编无法核实的精确数字——automation/wrong-action 的具体百分比用 [✏️ 核实] 或干脆定性描述（「a meaningful slice」），宁可不报数。
+
+## 🎯 面试官按什么打分 (自检清单, 背前对一遍)
+
+- ☑ 你**没把队友贬低**, 反而认可他的关切是对的 → 协作信号
+- ☑ 你用**数据/客观证据**降温, 而不是靠职级或嗓门 → 成熟度
+- ☑ 你给了对方**共同所有权**, 结果是「我们的」不是「我赢」 → 团队信号
+- ☑ 你有真诚的 **"what I'd do differently"** → humility (Apple 最爱)
+- ☑ 分歧背后是**真技术取舍** (correctness vs automation), 不是琐事 → 判断力
+- ☒ 红旗: 「最后证明我对」/「他不懂」/「我没什么要改的」
 
 ## ✅ 加分钩子 (主动抛, steer 到强项)
 

@@ -69,6 +69,12 @@ So it's the same problem class I'm already strong in, on a constraint surface I 
 **Q: Why this team specifically, not Apple's core ML / Foundation Models team?**
 "Because my edge is *applied agentic systems for customers*, not pretraining foundation models. Your team builds multi-turn, multi-agent customer-facing apps and cares about latency, cost, and customer experience — that's the exact thing I do today. I'd be strongest where the model meets a real user with a real task."
 
+**Q: Why now? Why not in a year, once the voice agent is more mature?**
+"Two honest reasons. The system is past zero-to-one and into iteration — the hardest, most-mine part is behind me, so I'm not leaving something half-built. And the on-device shift is happening *now*; this is the moment the applied-agent and on-device worlds are converging, and I'd rather be early to that than catch up to it later."
+
+**Q: What if I told you a lot of this team's work is unglamorous plumbing — orchestration, monitoring, eval harnesses?**
+"That's most of what I actually do today, and it's the part I think I'm good at. The model is the easy 20%; the orchestration, the eval harness, the monitoring, the guardrails — that's the 80% that decides whether it works in production. I'm not looking for glamour, I'm looking for a harder constraint surface on the same kind of plumbing."
+
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
 - **绝不**说"I love Apple products / 一直想进 Apple / iPhone 改变了我"——明确红线（shared spec 点名）。

@@ -8,17 +8,34 @@ Apple 是 money-touching、品牌敏感、极重 customer experience 的公司�
 
 ## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
 
-"This was the core design constraint, not a feature. My starting premise: the LLM is non-deterministic and will sometimes be wrong, so anything that touches money or compliance can't depend on the model behaving. I built it in two layers — **reliable actions** and **safe conversation**.
+> 哲学先行，然后三层：**reliable actions / safe conversation / vulnerable customers**。按句换行方便背。
 
-On **reliable actions** — the tool side. Every money-touching call is **idempotent**: it carries an idempotency key, so a retry after a timeout can't double-post a payment or log a promise-to-pay twice. Retries are bounded with backoff, and there's a **circuit breaker** — if a downstream payment API starts failing, we trip it and stop hammering it rather than cascading. And critically, the model is never the source of truth for a financial fact — balance, payment status, due dates all come from a tool call against the system of record. If the tool fails, the agent degrades to a safe fallback — 'let me have a specialist follow up' — it never invents a number. Inventing a balance in a collections call is a hard failure in our eval.
+"This was the core design constraint, not a feature.
+My starting premise is blunt: the LLM is non-deterministic and will sometimes be wrong, so anything that touches money or compliance can't depend on the model behaving.
+So I built it in two layers — **reliable actions** and **safe conversation** — plus a human path on top.
 
-On **safe conversation** — compliance. Debt collection is regulated, and it differs by market across the seven we run. So the LLM doesn't free-form sensitive content. Required disclosures and prohibited language are constrained — the model is post-trained and guarded so it stays inside approved messaging, and we run a compliance check on outputs. Things like not threatening, not disclosing debt to third parties, honoring do-not-call and disputes — those are enforced, not hoped for.
+On **reliable actions** — the tool side.
+Every money-touching call is **idempotent**: it carries an idempotency key, so a retry after a timeout can't double-post a payment or log a promise-to-pay twice.
+Retries are bounded with backoff, and there's a **circuit breaker** — if a downstream payment API starts failing, we trip it and stop hammering it, rather than cascading.
+And critically, the model is never the source of truth for a financial fact — balance, payment status, due dates all come from a tool call against the system of record.
+If the tool fails, the agent degrades to a safe fallback — 'let me have a specialist follow up' — it never invents a number.
+Inventing a balance in a collections call is a hard failure in our eval.
 
-And **vulnerable customers** — this is the part I care about most. If someone signals hardship, distress, or that they're a wrong party, the agent doesn't push the script. It softens, and it escalates to a **human** — there's a human-in-the-loop path for exactly these cases. Some conversations should not be fully automated, and recognizing those is part of the design.
+On **safe conversation** — compliance.
+Debt collection is regulated, and it differs by market across the seven we run.
+So the LLM doesn't free-form sensitive content.
+Required disclosures and prohibited language are constrained — the model is post-trained and guarded so it stays inside approved messaging, and we run a compliance check on the output.
+Not threatening, not disclosing debt to third parties, honoring do-not-call and disputes — those are enforced, not hoped for.
 
-So: idempotent, bounded, circuit-broken actions; grounded facts via tools; compliance enforced outside the model; and a human escalation path for the cases that need a person. The model handles the conversation; the guardrails handle the consequences."
+And **vulnerable customers** — this is the part I care about most.
+If someone signals hardship, distress, or that they're the wrong party, the agent doesn't push the script.
+It softens, and it escalates to a **human** — there's a human-in-the-loop path for exactly these cases.
+Some conversations should not be fully automated, and recognizing those is part of the design.
 
-*(可延伸)*: "The mental model I keep is: let the LLM be creative about *how* it says things, never about *what's true* or *what's allowed*."
+So, to sum up: idempotent, bounded, circuit-broken actions; grounded facts via tools; compliance enforced outside the model; and a human escalation path for the cases that need a person.
+The model handles the conversation; the guardrails handle the consequences."
+
+*(可延伸，可背金句)*: "The mental model I keep is: let the LLM be creative about *how* it says things — never about *what's true* or *what's allowed*."
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

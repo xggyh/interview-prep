@@ -8,6 +8,24 @@
 
 ## 📋 English Answer (背诵稿, 主答 ~90 秒 + 可深挖)
 
+> **60 秒脊柱 (背死这句)**: *"Latency and cost" are three problems: TTFT = prefill, per-token latency = decode (bandwidth-bound), cost = throughput per GPU. Ask which one hurts, then pull the matching lever — don't reflex-list everything.*
+
+**🎯 哪个问题 → 哪个杠杆 (这张图是拉开档次的关键)**
+
+```
+   症状                  根因               杠杆 (附代价)
+ ┌──────────────┐   ┌──────────┐   ┌─────────────────────────────────────────┐
+ │ 首字慢 (TTFT)  │──▶│ prefill   │──▶│ streaming(感知) · prefix caching(共享前缀) │
+ ├──────────────┤   ├──────────┤   ├─────────────────────────────────────────┤
+ │ 后续吐字慢     │──▶│ decode    │──▶│ 量化(↓质量需测) · speculative decode(↑算力) │
+ │              │   │(带宽bound) │   │ · 更大 batch                              │
+ ├──────────────┤   ├──────────┤   ├─────────────────────────────────────────┤
+ │ 成本高 / 吞吐低 │──▶│ GPU 利用率 │──▶│ continuous batching(最大杠杆) · PagedAttn  │
+ │              │   │           │   │ · model routing/cascade(易→小, 难→大)     │
+ └──────────────┘   └──────────┘   └─────────────────────────────────────────┘
+   KV-cache = 全场景基本盘 (省重复 attention 计算, 必开)
+```
+
 "First I'd frame it, because 'latency and cost' are actually three different problems and they don't share the same fixes. **Time-to-first-token** is dominated by the **prefill** — processing the prompt. **Per-token latency after that** is the **decode** loop, which is memory-bandwidth bound. And **cost** is really about **throughput per GPU** — how many tokens per dollar. So I'd ask which one hurts, then pull the right levers.
 
 **For perceived latency — the cheapest win first: streaming.** Stream tokens as they're generated so the user sees output in a few hundred milliseconds instead of waiting for the full response. It doesn't make the model faster, it makes it *feel* fast, and for a conversational agent that's huge.
@@ -66,6 +84,18 @@ This is the work I actually did — inference acceleration on NVIDIA GPUs with *
 
 **Q: Which of these would you reach for first on Apple's on-device stack?**
 "Quantization and small task-specific models, because the binding constraint on device is memory and power, not GPU dollars. Then KV-cache sharing to cut prefill memory — Apple reports meaningful memory and prefill savings from it. Streaming still matters for perceived latency. Continuous batching matters less on a single-user device — that's a server-side throughput lever — which is a good example of *matching the technique to the constraint* rather than applying all of them reflexively."
+
+**Q: The model is fast but TTFT is terrible on long prompts. What do you do — and is speculative decoding the answer?**
+"No — speculative decoding speeds up *decode*, not prefill, so it won't help TTFT. Long-prompt TTFT is a prefill problem: I'd reach for prefix caching first if there's a shared prefix, then chunked prefill so the first token comes out before the whole prompt is processed, and stream from there. Naming the wrong lever for the wrong half is the classic mistake, so I always tie the fix to whether it's prefill- or decode-bound."
+
+## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
+
+| 问 | 🔴 弱答 (初级) | 🟢 强答 (Gao 该说) |
+|---|---|---|
+| 开场 | 报一串名词: 「量化、缓存、batching…」 | 「先框成**三个问题**: TTFT=prefill / 单token=decode / 成本=throughput」 |
+| 降成本最大杠杆 | 「换小模型」 | 「**continuous batching** (生产最大杠杆) + PagedAttn + routing」 |
+| spec decoding | 「能加速一切」 | 「只加速 **decode**, 对 TTFT 无用; 低 acceptance 时不划算」 |
+| 量化 | 「量化就省了」 | 「8-bit 近免费, 越低越要**看 task eval**; QAT > PTQ (Apple 端侧 2-bit 靠 QAT)」 |
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

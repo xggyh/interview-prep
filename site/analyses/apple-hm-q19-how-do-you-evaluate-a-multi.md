@@ -67,6 +67,18 @@ I built this end to end. On the BNPL chatbot I defined the metrics and the eval 
 **Q: How does eval change at Apple — on-device, privacy?**
 "Privacy constrains how you can look at real conversations — you may not be able to log raw user content the way a cloud product does. So you lean more on synthetic/golden sets, opt-in or aggregated signals, and on-device or privacy-preserving evaluation. The rubric and the offline/online split are the same; the data-access surface is tighter, which actually pushes you to invest more in high-quality curated eval sets up front."
 
+**Q: What's the very first eval you'd stand up on a brand-new agent?**
+"A small golden set of representative conversations with known good outcomes, including a handful of known-hard cases. It's cheap, it's a regression gate from day one, and it forces the team to agree on what 'good' even means — which is half the value. I'd grow it from real failures as they appear rather than trying to make it comprehensive up front."
+
+## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
+
+| 问 | 🔴 弱答 (初级) | 🟢 强答 (Gao 该说) |
+|---|---|---|
+| 怎么评 | 「看 accuracy / 让 GPT 打个分」 | 「离线 golden+judge+人工 三层 + 在线 A/B 业务指标, **同一 rubric**」 |
+| 多轮难点 | (没提) | 「**per-turn 对 ≠ task-level 成功**, 两层都打」 |
+| judge 可信吗 | 「LLM 打分挺准」 | 「人工 calibrate, 留 ground truth 防 drift, 防 **judge gaming**」 |
+| 看什么指标 | 「模型分高就行」 | 「在线看 **业务/行为**: completion / 正确动作 / escalation率 / 业务结果」 |
+
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
 - 别把多轮评成「一堆独立单轮」——必须明确 **per-turn vs task-level** 两层，否则暴露不懂多轮。

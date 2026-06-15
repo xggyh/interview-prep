@@ -44,14 +44,15 @@
 <h3>🧠 这题在测什么 / 面试官想看到</h3>
 <p>JD 明确要 "LLM eval"。HM 想看你<strong>有没有一套多维度、会互相打架的指标体系</strong>，而不是只盯一个数。强答案 = 给出一组指标，分清<strong>业务指标 / 质量指标 / 系统指标 / 红线指标</strong>，并且——这是关键——讲清它们<strong>如何 trade-off</strong>（比如只优化还款转化会撞合规红线），以及哪个是<strong>不可妥协的约束</strong>（合规违规率）。弱答案 = "我们看自动化率"或"我们看准确率"——单指标，没有制衡意识。陷阱：(1) 把"the agent is working"等同于一个数；(2) 忘了合规/安全类指标是<strong>约束（constraint）不是优化目标</strong>；(3) 说不清离线 eval 和线上指标的关系。Apple 会钻"如果这俩指标冲突你优化哪个"。</p>
 <h3>📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)</h3>
-<p>"'Working' is never one number for an agent like this — and the most important thing is that some of these metrics <em>fight each other</em>, so the design is really about which ones are goals and which are hard constraints.</p>
-<p>I tracked four families. <em>(具体数值全部 [✏️ 核实])</em></p>
-<p><strong>Business outcome</strong> — the reason it exists: <strong>repayment conversion</strong> and <strong>automation rate</strong> — what fraction of calls the agent resolved end to end without a human. Those are the dollars and the cost savings.</p>
-<p><strong>Task quality</strong> — is it doing the job correctly: <strong>task-completion rate</strong> — did the call achieve its intent — and <strong>correct-action rate</strong> — when the agent took an action, like logging a promise-to-pay or pulling a balance, was it the right action with the right data. Correct-action is the one I watch hardest, because a confident wrong action is worse than no action.</p>
-<p><strong>System / experience</strong>: a <strong>latency SLO</strong> — perceived time-to-first-audio under our bar, tracked at p95 not just mean — plus ASR accuracy and interruption-handling quality, because if it feels laggy or talks over people, none of the business numbers matter.</p>
-<p><strong>The red line</strong> — and this is a <em>constraint</em>, not a metric I trade: <strong>compliance-violation rate</strong>. This one I don't optimize against conversion. It has to stay at or near zero, and a regression is a release blocker regardless of how good the conversion looks.</p>
-<p>The key relationship is the tension. I could juice repayment conversion by letting the agent be more aggressive or over-promise — and that would blow up compliance and customer trust. So the way I frame it: compliance and a vulnerable-customer-safety bar are <strong>hard constraints</strong>; within those, I optimize repayment conversion and automation; and the latency SLO and correct-action rate are quality gates that keep it from being a bad experience. 'The agent is working' means: it's resolving calls and recovering money, <em>while</em> staying inside compliance, taking correct actions, and feeling like a real-time conversation. All four at once — not the best conversion number with violations hiding underneath."</p>
-<p><em>(可延伸)</em>: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."</p>
+<blockquote><p>数值全部 [✏️ 核实]——可只讲指标是什么、怎么算、怎么 trade-off，不报硬数。按句换行方便背。</p></blockquote>
+<p>"'Working' is never one number for an agent like this. And the most important thing is that some of these metrics <em>fight each other</em> — so the design is really about which ones are goals and which are hard constraints.</p>
+<p>I tracked four families.</p>
+<p><strong>Business outcome</strong> — the reason it exists. Repayment conversion, and automation rate — what fraction of calls the agent resolves end to end without a human. Those are the dollars and the cost savings.</p>
+<p><strong>Task quality</strong> — is it doing the job correctly. Task-completion rate — did the call achieve its intent — and correct-action rate: when the agent took an action, like logging a promise-to-pay or pulling a balance, was it the right action with the right data. Correct-action is the one I watch hardest, because a confident wrong action is worse than no action.</p>
+<p><strong>System and experience.</strong> A latency SLO — perceived time-to-first-audio under our bar, tracked at p95, not just the mean — plus ASR accuracy and interruption-handling quality. Because if it feels laggy or talks over people, none of the business numbers matter.</p>
+<p><strong>The red line</strong> — and this one is a <em>constraint</em>, not a metric I trade: compliance-violation rate. I don't optimize this against conversion. It has to stay at or near zero, and a regression is a release blocker, no matter how good the conversion looks.</p>
+<p>The key relationship is the tension. I could juice repayment conversion by letting the agent be more aggressive or over-promise — and that would blow up compliance and customer trust. So the way I frame it: compliance and a vulnerable-customer-safety bar are <strong>hard constraints</strong>; within those, I optimize repayment conversion and automation; and the latency SLO and correct-action rate are quality gates that keep it from being a bad experience. 'The agent is working' means it's resolving calls and recovering money — <em>while</em> staying inside compliance, taking correct actions, and feeling like a real-time conversation. All four at once — not the best conversion number with violations hiding underneath."</p>
+<p><em>(可延伸，离线 vs 线上)</em>: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <p><strong>开场定调（最重要）</strong>：agent 的"working"从来不是一个数，关键是<strong>有些指标互相打架</strong>，所以设计的本质是分清<strong>哪些是优化目标、哪些是硬约束</strong>。</p>
 <p>四个指标家族（数值全 [✏️]）：</p>
@@ -92,21 +93,36 @@ JD 明确要 "LLM eval"。HM 想看你**有没有一套多维度、会互相打�
 
 ## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
 
-"'Working' is never one number for an agent like this — and the most important thing is that some of these metrics *fight each other*, so the design is really about which ones are goals and which are hard constraints.
+> 数值全部 [✏️ 核实]——可只讲指标是什么、怎么算、怎么 trade-off，不报硬数。按句换行方便背。
 
-I tracked four families. *(具体数值全部 [✏️ 核实])*
+"'Working' is never one number for an agent like this.
+And the most important thing is that some of these metrics *fight each other* — so the design is really about which ones are goals and which are hard constraints.
 
-**Business outcome** — the reason it exists: **repayment conversion** and **automation rate** — what fraction of calls the agent resolved end to end without a human. Those are the dollars and the cost savings.
+I tracked four families.
 
-**Task quality** — is it doing the job correctly: **task-completion rate** — did the call achieve its intent — and **correct-action rate** — when the agent took an action, like logging a promise-to-pay or pulling a balance, was it the right action with the right data. Correct-action is the one I watch hardest, because a confident wrong action is worse than no action.
+**Business outcome** — the reason it exists.
+Repayment conversion, and automation rate — what fraction of calls the agent resolves end to end without a human.
+Those are the dollars and the cost savings.
 
-**System / experience**: a **latency SLO** — perceived time-to-first-audio under our bar, tracked at p95 not just mean — plus ASR accuracy and interruption-handling quality, because if it feels laggy or talks over people, none of the business numbers matter.
+**Task quality** — is it doing the job correctly.
+Task-completion rate — did the call achieve its intent — and correct-action rate: when the agent took an action, like logging a promise-to-pay or pulling a balance, was it the right action with the right data.
+Correct-action is the one I watch hardest, because a confident wrong action is worse than no action.
 
-**The red line** — and this is a *constraint*, not a metric I trade: **compliance-violation rate**. This one I don't optimize against conversion. It has to stay at or near zero, and a regression is a release blocker regardless of how good the conversion looks.
+**System and experience.**
+A latency SLO — perceived time-to-first-audio under our bar, tracked at p95, not just the mean — plus ASR accuracy and interruption-handling quality.
+Because if it feels laggy or talks over people, none of the business numbers matter.
 
-The key relationship is the tension. I could juice repayment conversion by letting the agent be more aggressive or over-promise — and that would blow up compliance and customer trust. So the way I frame it: compliance and a vulnerable-customer-safety bar are **hard constraints**; within those, I optimize repayment conversion and automation; and the latency SLO and correct-action rate are quality gates that keep it from being a bad experience. 'The agent is working' means: it's resolving calls and recovering money, *while* staying inside compliance, taking correct actions, and feeling like a real-time conversation. All four at once — not the best conversion number with violations hiding underneath."
+**The red line** — and this one is a *constraint*, not a metric I trade: compliance-violation rate.
+I don't optimize this against conversion.
+It has to stay at or near zero, and a regression is a release blocker, no matter how good the conversion looks.
 
-*(可延伸)*: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."
+The key relationship is the tension.
+I could juice repayment conversion by letting the agent be more aggressive or over-promise — and that would blow up compliance and customer trust.
+So the way I frame it: compliance and a vulnerable-customer-safety bar are **hard constraints**; within those, I optimize repayment conversion and automation; and the latency SLO and correct-action rate are quality gates that keep it from being a bad experience.
+'The agent is working' means it's resolving calls and recovering money — *while* staying inside compliance, taking correct actions, and feeling like a real-time conversation.
+All four at once — not the best conversion number with violations hiding underneath."
+
+*(可延伸，离线 vs 线上)*: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

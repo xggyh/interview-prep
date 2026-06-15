@@ -44,12 +44,17 @@
 <h3>🧠 这题在测什么 / 面试官想看到</h3>
 <p>JD 第一句就是 latency / cost / customer experience。HM 想看你<strong>有没有真的拿延迟预算当工程对象在管</strong>——能不能把一个总目标拆到每一跳、知道哪一跳最贵、并讲出你具体动了什么把它压下来。强答案 = 一张 budget 表（每跳 ms + 占比）+ 明确指认瓶颈（几乎一定是 LLM TTFT，因为 TTS 要等它）+ 2-3 个真实优化手段。弱答案 = "我们优化了很多，大概 2 秒"——没有拆分、没有瓶颈、没有手段。陷阱：(1) 报一堆精确数字却说不出怎么测的（Apple 会问"how did you measure that"）；(2) 把所有数字当事实背——<strong>全部口头说 approximately 并在稿里标 [✏️]</strong>。这一题数字密度最高，最容易翻车，务必先和真实数据对齐。</p>
 <h3>📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)</h3>
-<p>"Right — and to be precise, the number that matters to a caller isn't total round-trip, it's <strong>time-to-first-audio</strong>: how long after they stop talking until they hear us start. That's the perceived latency. Let me give you the budget that way. <em>(数字全部 [✏️ 核实]，口头说 'roughly')</em></p>
+<blockquote><p>数字全部 [✏️ 核实]，口头一律说 "roughly / approximately / on the order of"。</p></blockquote>
+<p>"Right — and to be precise, the number that matters to a caller isn't total round-trip. It's <strong>time-to-first-audio</strong>: how long after they stop talking until they hear us start speaking. That's the perceived latency, so let me give you the budget that way.</p>
 <p>Out of a sub-2-second budget, roughly:</p>
-<ul><li><strong>ASR endpointing + final</strong>: ~[✏️ 300ms]. Most of that is the endpointer waiting to be confident the user actually stopped — not compute. That wait is a tunable: too short and we cut people off, too long and we feel slow.</li><li><strong>Retrieval + context assembly</strong>: ~[✏️ 100ms]. Pulling account state and dialogue history into the prompt.</li><li><strong>LLM time-to-first-token</strong>: ~[✏️ 500ms] — and this is the hardest millisecond. TTS literally cannot start until the first tokens exist, so TTFT sits on the critical path with nothing able to hide behind it.</li><li><strong>TTS time-to-first-audio</strong>: ~[✏️ 200ms] from first tokens to first synthesized frame.</li><li><strong>Network / telephony overhead</strong>: ~[✏️ 150ms] round trip.</li></ul>
-<p>So perceived latency lands around [✏️ 1.2s] of first-audio, under the 2-second bar.</p>
-<p>The hardest part, clearly, was <strong>LLM TTFT</strong>, for a structural reason: everything else can overlap, but TTS is strictly downstream of the first token. So I attacked it three ways. One — <strong>prefill optimization and KV-cache reuse</strong> on the serving side with vLLM/SGLang, so the static parts of the prompt — system instructions, tool schema — aren't recomputed every turn. Two — <strong>streaming the LLM output and starting TTS on the first clause</strong>, not the full sentence, so TTFT and synthesis overlap. Three — <strong>shrinking the prompt</strong> by retrieving only the account fields the policy needs, because prefill cost scales with input length. The endpointer was the other tuning knob — I traded a little latency for not interrupting people, because cutting a caller off is worse than being 100ms slower."</p>
-<p><em>(可延伸)</em>: "The honest caveat: these are the shapes from our dashboards — I'd want to pull the exact current percentiles before quoting them as hard numbers, and I track p95, not just the mean, because the tail is what callers actually feel."</p>
+<ul><li><strong>ASR endpointing + final</strong> — about [✏️ 300ms]. Most of that isn't compute; it's the endpointer waiting to be confident the user actually stopped. That wait is a tunable — too short and we cut people off, too long and we feel slow.</li><li><strong>Retrieval + context assembly</strong> — about [✏️ 100ms], pulling account state and dialogue history into the prompt.</li><li><strong>LLM time-to-first-token</strong> — about [✏️ 500ms], and this is the hardest millisecond. TTS literally cannot start until the first tokens exist, so TTFT sits on the critical path with nothing able to hide behind it.</li><li><strong>TTS time-to-first-audio</strong> — about [✏️ 200ms] from first tokens to first synthesized frame.</li><li><strong>Network / telephony overhead</strong> — about [✏️ 150ms] round trip.</li></ul>
+<p>So perceived latency lands around [✏️ 1.2s] to first audio — under the 2-second bar.</p>
+<p>The hardest part, clearly, was <strong>LLM time-to-first-token</strong>, for a structural reason: everything else can overlap, but TTS is strictly downstream of the first token. So I attacked it three ways.</p>
+<p>One — <strong>prefill optimization and KV-cache reuse</strong> on the serving side with vLLM and SGLang, so the static parts of the prompt — system instructions and the tool schema — aren't recomputed every turn.</p>
+<p>Two — <strong>streaming the LLM output and starting TTS on the first clause</strong>, not the full sentence, so TTFT and synthesis overlap instead of running back to back.</p>
+<p>Three — <strong>shrinking the prompt</strong> by retrieving only the account fields the policy actually needs, because prefill cost scales with input length.</p>
+<p>The endpointer was the other knob — I traded a little latency for not interrupting people, because cutting a caller off is worse than being a hundred milliseconds slower."</p>
+<p><em>(可延伸，主动认尾延迟)</em>: "Honest caveat — these are the shapes from our dashboards. I'd pull the exact current percentiles before quoting them as hard numbers, and I track p95, not just the mean, because the tail is what callers actually feel."</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <p><strong>第一步重新定义指标（关键，显专业）</strong>：用户感知的不是 total round-trip，是 <strong>time-to-first-audio</strong>（用户停说 → 听到我们开口）。按这个口径给预算。</p>
 <p>预算表（数字全 [✏️]，口头 "roughly"）： | 跳 | ~ms | 备注 | |---|---|---| | ASR endpointing + final | [✏️ 300] | 大头是 endpointer 等"确认停了"，不是算力 | | Retrieval + context 拼装 | [✏️ 100] | 拉账户 state + 历史 | | <strong>LLM TTFT</strong> | [✏️ 500] | <strong>最难</strong>，TTS 必须等它，挡在关键路径上 | | TTS time-to-first-audio | [✏️ 200] | 第一 token → 第一帧 | | Network / telephony | [✏️ 150] | round trip | | <strong>感知延迟</strong> | <strong>~[✏️ 1.2s]</strong> | 在 2s 内 |</p>
@@ -89,20 +94,34 @@ JD 第一句就是 latency / cost / customer experience。HM 想看你**有没�
 
 ## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
 
-"Right — and to be precise, the number that matters to a caller isn't total round-trip, it's **time-to-first-audio**: how long after they stop talking until they hear us start. That's the perceived latency. Let me give you the budget that way. *(数字全部 [✏️ 核实]，口头说 'roughly')*
+> 数字全部 [✏️ 核实]，口头一律说 "roughly / approximately / on the order of"。
+
+"Right — and to be precise, the number that matters to a caller isn't total round-trip.
+It's **time-to-first-audio**: how long after they stop talking until they hear us start speaking.
+That's the perceived latency, so let me give you the budget that way.
 
 Out of a sub-2-second budget, roughly:
-- **ASR endpointing + final**: ~[✏️ 300ms]. Most of that is the endpointer waiting to be confident the user actually stopped — not compute. That wait is a tunable: too short and we cut people off, too long and we feel slow.
-- **Retrieval + context assembly**: ~[✏️ 100ms]. Pulling account state and dialogue history into the prompt.
-- **LLM time-to-first-token**: ~[✏️ 500ms] — and this is the hardest millisecond. TTS literally cannot start until the first tokens exist, so TTFT sits on the critical path with nothing able to hide behind it.
-- **TTS time-to-first-audio**: ~[✏️ 200ms] from first tokens to first synthesized frame.
-- **Network / telephony overhead**: ~[✏️ 150ms] round trip.
 
-So perceived latency lands around [✏️ 1.2s] of first-audio, under the 2-second bar.
+- **ASR endpointing + final** — about [✏️ 300ms]. Most of that isn't compute; it's the endpointer waiting to be confident the user actually stopped. That wait is a tunable — too short and we cut people off, too long and we feel slow.
+- **Retrieval + context assembly** — about [✏️ 100ms], pulling account state and dialogue history into the prompt.
+- **LLM time-to-first-token** — about [✏️ 500ms], and this is the hardest millisecond. TTS literally cannot start until the first tokens exist, so TTFT sits on the critical path with nothing able to hide behind it.
+- **TTS time-to-first-audio** — about [✏️ 200ms] from first tokens to first synthesized frame.
+- **Network / telephony overhead** — about [✏️ 150ms] round trip.
 
-The hardest part, clearly, was **LLM TTFT**, for a structural reason: everything else can overlap, but TTS is strictly downstream of the first token. So I attacked it three ways. One — **prefill optimization and KV-cache reuse** on the serving side with vLLM/SGLang, so the static parts of the prompt — system instructions, tool schema — aren't recomputed every turn. Two — **streaming the LLM output and starting TTS on the first clause**, not the full sentence, so TTFT and synthesis overlap. Three — **shrinking the prompt** by retrieving only the account fields the policy needs, because prefill cost scales with input length. The endpointer was the other tuning knob — I traded a little latency for not interrupting people, because cutting a caller off is worse than being 100ms slower."
+So perceived latency lands around [✏️ 1.2s] to first audio — under the 2-second bar.
 
-*(可延伸)*: "The honest caveat: these are the shapes from our dashboards — I'd want to pull the exact current percentiles before quoting them as hard numbers, and I track p95, not just the mean, because the tail is what callers actually feel."
+The hardest part, clearly, was **LLM time-to-first-token**, for a structural reason: everything else can overlap, but TTS is strictly downstream of the first token.
+So I attacked it three ways.
+
+One — **prefill optimization and KV-cache reuse** on the serving side with vLLM and SGLang, so the static parts of the prompt — system instructions and the tool schema — aren't recomputed every turn.
+
+Two — **streaming the LLM output and starting TTS on the first clause**, not the full sentence, so TTFT and synthesis overlap instead of running back to back.
+
+Three — **shrinking the prompt** by retrieving only the account fields the policy actually needs, because prefill cost scales with input length.
+
+The endpointer was the other knob — I traded a little latency for not interrupting people, because cutting a caller off is worse than being a hundred milliseconds slower."
+
+*(可延伸，主动认尾延迟)*: "Honest caveat — these are the shapes from our dashboards. I'd pull the exact current percentiles before quoting them as hard numbers, and I track p95, not just the mean, because the tail is what callers actually feel."
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

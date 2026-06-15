@@ -80,6 +80,17 @@ Now, serving **many** adapters — this is where it gets interesting and it's wo
 **Q: How do you decide which layers to apply LoRA to?**
 "Conventionally the attention projection matrices (q, k, v, o); applying to those captures most of the benefit. You can extend to the MLP layers for more capacity at more cost. Again eval-driven — I'd start with attention projections and only widen if quality demands it."
 
+**Q: 100 adapters but GPU memory only holds 20 — how do you serve all 100?**
+"Adapters are tiny, so I keep a hot set resident and treat the rest as an LRU cache — swap an adapter in from host memory on demand, which is cheap because each is only megabytes. The base never moves. If traffic per adapter is predictable I'd pin the high-traffic ones. The expensive thing — the base weights — stays resident exactly once; only the cheap thing moves."
+
+## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
+
+| 问 | 🔴 弱答 (初级) | 🟢 强答 (Gao 该说) |
+|---|---|---|
+| 为什么省 | 「只训一小部分参数」 | 「可训参数少 → **optimizer state/梯度**大幅缩水 + base 冻结共享 + merge 后零延迟」 |
+| 多 adapter | 「每个 adapter 部署一个服务」 | 「base 常驻一份 + **跨 adapter 批处理**, vLLM/SGLang 亲手做过」 |
+| inference 延迟 | 「LoRA 会慢一点」 | 「merge 后**和 base 一样快**; 只有 unmerged 混批有小 matmul 开销」 |
+
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
 - 别说「LoRA inference 一定更慢」——merge 后零延迟，只有 unmerged 多 adapter 混批才有小开销。说错会被当场纠。

@@ -38,6 +38,9 @@ That's why this conversation is interesting to me."
 
 *(可延伸，如果 HM 说 "tell me more")*: "Happy to go deep on any of it — the part I'd geek out on most is how we got end-to-end latency low enough to feel like a real phone call, while keeping the dialogue compliant."
 
+**备用：30 秒压缩版**（如果 HM 明显赶时间或只想要一句话）：
+"Five years in payments ML at ByteDance, currently the GenAI technical POC. I came up through computer vision and fraud, then moved fully into LLMs and agents. Right now I lead a three-person team building a zero-to-one production voice agent for debt collection across seven languages — I own it end to end, from post-training to the streaming latency budget. Multi-turn, multilingual, agentic, money-touching — basically your team's problem."
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 骨架四段，**前三段各压成一两句，第四段讲透**：

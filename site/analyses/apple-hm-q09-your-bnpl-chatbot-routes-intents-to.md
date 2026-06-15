@@ -122,3 +122,5 @@ The router is intentionally thin and fast; the sub-agents hold the business logi
 - 强调 **eval harness 是跟 product/ops 一起定的**,每层分开量 —— 对上 JD 反复强调的 "LLM eval" + "partner with stakeholders"。
 - 主动说 **"这跟你们团队在做的 multi-turn、multi-agent 系统是同一个 shape"** —— 让面试官看到 transfer 是直接的,不用脑补。然后补一句你已经踩过硬边界 (misroute 恢复、money 安全、分层 eval)。
 - 如果对方对延迟感兴趣,顺势抛 **"router 故意做薄是因为它在每一轮的关键路径上"** —— 把架构选择和 latency 挂钩,接 JD 的 latency/cost 主线 (可引到 Q4/Q20)。
+- 主动提 **"每层独立可测,出 regression 能定位到哪一层"** —— 这是把"分层"从架构口号落到运营收益,体现你真在生产里运营过 agent。
+- 如果聊到多市场,抛一句 **"这套在 BNPL 是单市场为主,但 RAG 知识库已带 market metadata"** —— 自然引到 7 市场经验 + Apple Greater China (引到 Q11/Q27),但别夸大成 BNPL 当时就 7 市场上线 [✏️ 核实 BNPL 实际市场数]。

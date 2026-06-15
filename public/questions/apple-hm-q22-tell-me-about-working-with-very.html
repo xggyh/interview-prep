@@ -44,6 +44,9 @@
 <h3>🧠 这题在测什么 / 面试官想看到</h3>
 <p>Apple 想看你<strong>面对模糊不慌</strong>：能不能主动把一句话诉求<strong>收敛成可交付的范围</strong>（而不是等别人想清楚，也不是自己拍脑袋猜），以及能不能<strong>设计出吸收变化的架构</strong>（需求会一直变，好工程师让变化落在 config/数据/RAG 上，而不是每次改代码重发）。强答案：S 是真实的一句话需求 → 用数据收敛 → 架构层面让后续变化便宜。弱答案：「需求不清我就去问 PM，问清了就做」——太被动，没有架构思维。陷阱：把「应对模糊」讲成纯沟通技巧而漏掉<strong>工程设计如何让系统对变化鲁棒</strong>——后者才是 senior 信号，也是这题的关键差异点。</p>
 <h3>📋 English Answer (背诵稿, 主答 ~80-90 秒, STAR)</h3>
+<blockquote><p><strong>60 秒脊柱 (背死这句)</strong>: <em>The requirement was one line — "make support smarter with AI." I converged scope with ticket data, not meetings, and — the senior part — I architected so shifting requirements land in config and RAG, not code. The intent-router-plus-RAG-fallback design itself absorbs the ambiguity.</em></p></blockquote>
+<p><strong>⭐ STAR 一眼回忆卡</strong></p>
+<div class="table-wrap"><table class="md-table"><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><strong>S</strong></td><td>BNPL 启动需求就一句话: "make customer support smarter with AI". 无范围/无指标/各想各的.</td></tr><tr><td><strong>T</strong></td><td>把一句话变成能建、能量的东西; 且明知范围会一直变.</td></tr><tr><td><strong>A</strong></td><td>① 拉 <strong>ticket 数据</strong>收敛范围 (高频 intent→workflow agent, 长尾→FAQ RAG) + 和 product/ops 前置定指标. ② 架构让变化落在 <strong>config/RAG/tool 不在代码</strong>: 改 intent=config, 改政策=知识库热更, 新动作=tool.</td></tr><tr><td><strong>R</strong></td><td>一句话→上线可量化系统; 范围变动主要靠 config+知识库吸收, 不重构. <strong>让变化变便宜</strong>才是真考验.</td></tr><tr><td><strong>学到</strong></td><td>模糊时别等也别猜——拿让范围显而易见的数据, 把确定会变的部分架构成易改的.</td></tr></tbody></table></div>
 <p><strong>Situation.</strong> "When we kicked off the BNPL chatbot, the requirement I got was essentially one line: <strong>'make customer support smarter with AI.'</strong> That was it. No defined scope, no target metric, no agreement on which problems to solve first — and product, ops, and engineering each had a different picture in their head of what 'smarter' meant."</p>
 <p><strong>Task.</strong> "My job was to turn that one-liner into something we could actually build and measure — without guessing wrong and burning a quarter, and knowing the scope would keep moving as we learned."</p>
 <p><strong>Action.</strong> "I did two things deliberately.</p>
@@ -62,6 +65,8 @@
 <p><strong>Q: Doesn't pushing everything into config/RAG just move the complexity somewhere harder to debug?</strong> "It's a real trade-off — config and knowledge-base content become things you now have to govern and test. So I treated them as first-class: the FAQ content went through the same eval as the model, and routing config had its own regression checks. The point isn't 'no complexity,' it's putting the <em>frequently-changing</em> complexity somewhere you can update and validate fast, instead of in code that needs a deploy. I'd rather debug a knowledge-base entry than ship a hotfix."</p>
 <h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
 <ul><li>别把「应对模糊」讲成纯沟通技巧（「我就去多问 PM」）——必须带<strong>架构吸收变化</strong>这一层，否则不是 senior 答案。</li><li>别假装架构能让<strong>所有</strong>变化免费——主动承认「真正的新能力/新 tool 仍要花工程」，体现诚实 + 判断力（Apple 加分）。</li><li>别把自己讲成「等需求清晰才动手」——要主动用数据去<strong>制造</strong>清晰。</li><li>别编 ticket 数量/intent 占比的精确数字——用定性（「volume concentrated in a handful of intents」）或 [✏️ 核实]。</li><li>不要漏掉「和 product/ops 一起定指标」——这是把模糊业务诉求落地的关键，也命中 JD。</li></ul>
+<h3>🎯 面试官按什么打分 (自检清单, 背前对一遍)</h3>
+<ul><li>☑ 你<strong>主动制造清晰</strong> (拉数据收敛), 不是被动等需求 → 主动性</li><li>☑ 你有<strong>架构吸收变化</strong>这一层 (config/RAG/tool), 不只沟通技巧 → senior 信号</li><li>☑ 你<strong>和 product/ops 一起定指标</strong>, 把模糊业务诉求翻成工程目标 → 跨职能协作 (JD)</li><li>☑ 你诚实承认<strong>新能力仍要花工程</strong>, 没把架构吹成万能 → 判断力 + humility</li><li>☑ 有可迁移的<strong>复盘</strong> (拿数据 + 把会变的部分做易改) → 自我迭代</li><li>☒ 红旗: 「需求不清我就一直等」/「我猜了一个方向就开干」/「架构让一切都免费」</li></ul>
 <h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
 <ul><li>主动抛 <strong>「让变化落在 config/RAG/tool，不在代码」</strong>——这是这题最高分的工程洞见，体现平台/架构思维，对上 JD 的 scalable deployment。</li><li>强调 <strong>「intent router + RAG fallback 本身就是吸收模糊的结构」</strong>——把行为题变成你 BNPL 多 agent 架构的展示。</li><li>顺势带 <strong>「用 ticket 数据把一句话需求收敛成可量化范围」+「和 product/ops 前置定指标」</strong>——直接命中 JD 强调的跨非技术 stakeholder 协作（也为 Q24 铺垫）。</li><li>复盘句「让变化变便宜」呼应 Apple 「incorporate latest models / 持续演进」的核心诉求。</li></ul>
   </section>
@@ -84,6 +89,18 @@
 Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收敛成可交付的范围**（而不是等别人想清楚，也不是自己拍脑袋猜），以及能不能**设计出吸收变化的架构**（需求会一直变，好工程师让变化落在 config/数据/RAG 上，而不是每次改代码重发）。强答案：S 是真实的一句话需求 → 用数据收敛 → 架构层面让后续变化便宜。弱答案：「需求不清我就去问 PM，问清了就做」——太被动，没有架构思维。陷阱：把「应对模糊」讲成纯沟通技巧而漏掉**工程设计如何让系统对变化鲁棒**——后者才是 senior 信号，也是这题的关键差异点。
 
 ## 📋 English Answer (背诵稿, 主答 ~80-90 秒, STAR)
+
+> **60 秒脊柱 (背死这句)**: *The requirement was one line — "make support smarter with AI." I converged scope with ticket data, not meetings, and — the senior part — I architected so shifting requirements land in config and RAG, not code. The intent-router-plus-RAG-fallback design itself absorbs the ambiguity.*
+
+**⭐ STAR 一眼回忆卡**
+
+| | |
+|---|---|
+| **S** | BNPL 启动需求就一句话: "make customer support smarter with AI". 无范围/无指标/各想各的. |
+| **T** | 把一句话变成能建、能量的东西; 且明知范围会一直变. |
+| **A** | ① 拉 **ticket 数据**收敛范围 (高频 intent→workflow agent, 长尾→FAQ RAG) + 和 product/ops 前置定指标. ② 架构让变化落在 **config/RAG/tool 不在代码**: 改 intent=config, 改政策=知识库热更, 新动作=tool. |
+| **R** | 一句话→上线可量化系统; 范围变动主要靠 config+知识库吸收, 不重构. **让变化变便宜**才是真考验. |
+| **学到** | 模糊时别等也别猜——拿让范围显而易见的数据, 把确定会变的部分架构成易改的. |
 
 **Situation.** "When we kicked off the BNPL chatbot, the requirement I got was essentially one line: **'make customer support smarter with AI.'** That was it. No defined scope, no target metric, no agreement on which problems to solve first — and product, ops, and engineering each had a different picture in their head of what 'smarter' meant."
 
@@ -131,6 +148,15 @@ Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收�
 - 别把自己讲成「等需求清晰才动手」——要主动用数据去**制造**清晰。
 - 别编 ticket 数量/intent 占比的精确数字——用定性（「volume concentrated in a handful of intents」）或 [✏️ 核实]。
 - 不要漏掉「和 product/ops 一起定指标」——这是把模糊业务诉求落地的关键，也命中 JD。
+
+## 🎯 面试官按什么打分 (自检清单, 背前对一遍)
+
+- ☑ 你**主动制造清晰** (拉数据收敛), 不是被动等需求 → 主动性
+- ☑ 你有**架构吸收变化**这一层 (config/RAG/tool), 不只沟通技巧 → senior 信号
+- ☑ 你**和 product/ops 一起定指标**, 把模糊业务诉求翻成工程目标 → 跨职能协作 (JD)
+- ☑ 你诚实承认**新能力仍要花工程**, 没把架构吹成万能 → 判断力 + humility
+- ☑ 有可迁移的**复盘** (拿数据 + 把会变的部分做易改) → 自我迭代
+- ☒ 红旗: 「需求不清我就一直等」/「我猜了一个方向就开干」/「架构让一切都免费」
 
 ## ✅ 加分钩子 (主动抛, steer 到强项)
 
