@@ -67,22 +67,34 @@ I built this end to end. On the BNPL chatbot I defined the metrics and the eval 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: What exactly does the LLM-judge score, and how do you keep it reliable?**
+**中**: 这个 LLM-judge 到底打分打什么,你怎么保证它可靠?
 "Narrow, well-defined dimensions with a rubric — task success, groundedness, tone, tool-call correctness — each as a small focused judgment rather than one vague 'is this good' score. Reliability comes from calibration against human labels, keeping the judge's task narrow (narrow judgments are close to entailment, which models do well), and holding out a human-labeled set to detect drift over time."
+> 🇨🇳 打的是一些窄的、定义清晰的维度，配一份 rubric（评分细则）—— task success（任务成功）、groundedness、tone（语气）、tool-call correctness —— 每一个都是一个小而聚焦的判断，而不是一个含糊的「这个好不好」的总分。可靠性来自三件事：拿人工标注去 calibrate；把 judge 的任务保持得很窄（窄的判断接近 entailment，而这是模型擅长的）；再留出一份人工标注的集合来检测它随时间的 drift。
 
 **Q: How do you evaluate the agent when the *user* part is simulated — do you use a user simulator?**
+**中**: 当*用户*那一侧是模拟出来的时候,你怎么评估这个 agent —— 你会用 user simulator 吗?
 "For multi-turn you can, yes — an LLM user-simulator lets you generate many conversation trajectories cheaply and stress-test recovery, interruptions, topic switches. I treat simulator results as a fast signal, not truth — they over-represent how the simulator behaves. So simulator for breadth and regression, real-traffic A/B and human review for the actual verdict."
+> 🇨🇳 对多轮来说可以，会用 —— 一个 LLM user-simulator 让你能廉价地生成很多条对话 trajectory，去压测恢复能力、打断、话题切换。但我把 simulator 的结果当成一个快速信号，不是真理 —— 它过度代表了 simulator 自己的行为方式。所以 simulator 用来跑广度和回归，真实流量的 A/B 加人工 review 才是真正下结论的依据。
 
 **Q: Per-turn looks great but task success is low. How do you debug that?**
+**中**: 单轮看起来很好,但 task success 很低。你怎么 debug?
 "That's the classic multi-turn trap and exactly why I score both. I'd trace failed conversations turn by turn to find *where* it breaks — usually context loss as the conversation grows, a wrong tool call mid-dialogue, or the agent answering the literal turn but losing the user's overall goal. The fix is usually in state/context management or routing, not in single-response quality."
+> 🇨🇳 这正是经典的多轮陷阱，也正是我两层都打分的原因。我会一轮一轮地 trace 失败的对话，去找它*在哪里*崩 —— 通常是随着对话变长出现的 context 丢失、对话中途一个错误的 tool call、或者 agent 回答了字面那一轮但丢掉了用户的整体目标。修法通常在 state/context 管理或者 routing 上，而不在单条回复的质量上。
 
 **Q: Offline said ship, online regressed. What happened and what do you do?**
+**中**: 离线评估说可以上线,结果线上退化了。发生了什么,你怎么做?
 "Offline-online gap — my golden set wasn't representative of live distribution, or the judge rewarded something users don't. First I roll back or shift traffic down. Then I pull the regressed live conversations into the golden set and re-examine the judge rubric against them. The permanent fix is the feedback loop: real failures continuously refresh the offline set so the gap shrinks."
+> 🇨🇳 这是离线-在线 gap —— 我的 golden set 不能代表线上的分布，或者 judge 奖励了一个用户其实并不在意的东西。第一步我先 roll back 或者把流量调下去。然后我把退化的线上对话捞进 golden set，拿它们重新审视 judge 的 rubric。永久的修法是那个 feedback loop：让真实的失败持续地刷新离线集合，这样 gap 就会越来越小。
 
 **Q: How does eval change at Apple — on-device, privacy?**
+**中**: 在 Apple 评估会怎么变 —— on-device、隐私?
 "Privacy constrains how you can look at real conversations — you may not be able to log raw user content the way a cloud product does. So you lean more on synthetic/golden sets, opt-in or aggregated signals, and on-device or privacy-preserving evaluation. The rubric and the offline/online split are the same; the data-access surface is tighter, which actually pushes you to invest more in high-quality curated eval sets up front."
+> 🇨🇳 隐私会约束你能怎么去看真实对话 —— 你可能没法像一个云产品那样去记录原始的用户内容。所以你会更多地依靠 synthetic/golden set、opt-in 或者聚合过的信号、以及 on-device 或保护隐私的评估。rubric 和离线/在线的切分都是一样的；只是数据访问的面更紧了，而这反过来会逼着你在前期更多地投入到高质量、精心 curate 的 eval 集合上。
 
 **Q: What's the very first eval you'd stand up on a brand-new agent?**
+**中**: 对一个全新的 agent,你会最先搭起来的那个 eval 是什么?
 "A small golden set of representative conversations with known good outcomes, including a handful of known-hard cases. It's cheap, it's a regression gate from day one, and it forces the team to agree on what 'good' even means — which is half the value. I'd grow it from real failures as they appear rather than trying to make it comprehensive up front."
+> 🇨🇳 一个小的 golden set，装一些有代表性、已知好结果的对话，再放几个已知的难 case。它便宜，从第一天起就是一道回归的 gate，而且它逼着团队对「好」到底是什么达成一致 —— 这本身就是一半的价值。我会随着真实失败的出现一点点把它养大，而不是一开始就试图把它做得很全。
 
 ## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
 

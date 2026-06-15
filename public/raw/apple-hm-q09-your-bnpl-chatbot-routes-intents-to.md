@@ -94,46 +94,62 @@ router 是故意做薄做快的；业务逻辑都在 sub-agent 里；RAG 接的�
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Why separate sub-agents per intent instead of one agent with all the tools?**
+**中**: 为什么按 intent 拆成多个 sub-agent，而不是一个 agent 拿着所有工具？
 - Containment and reliability. One agent with every tool has a large blast radius — a wrong tool call in a refund context could trigger a dispute action.
 - Scoping tools per sub-agent means the model literally can't take an out-of-domain action.
 - It also makes each agent easier to eval, prompt-tune, and reason about independently.
 - The cost is orchestration complexity — which is exactly what the platform layer absorbs.
+> 🇨🇳 主要是 containment 和可靠性。一个 agent 拿着所有工具，blast radius 就很大 —— 在 refund 的上下文里调错一个工具，可能就触发了一个 dispute 动作。把工具按 sub-agent scope 死，意味着模型物理上根本没法做一个跨域的动作。它还让每个 agent 更容易单独 eval、单独调 prompt、单独推理。代价是 orchestration 的复杂度 —— 而这恰恰是 platform 层吸收掉的东西。
 
 **Q: How does a turn flow when the user mixes two intents — "where's my order and I want a refund"?**
+**中**: 用户一句话里混了两个意图 —— "我的订单在哪、我还想退款" —— 这一轮怎么走？
 - The router picks the dominant / first actionable intent and routes there; the sub-agent handles that, then control returns to the router for the second intent.
 - I'd be honest that clean single-intent turns are the common case [✏️ 核实 实际多意图占比].
 - Multi-intent was handled by re-routing on the *next* turn, not parallel sub-agent fan-out — I won't overclaim a DAG orchestrator I didn't build.
+> 🇨🇳 router 会挑那个主导的、或者第一个 actionable 的意图，路由过去；对应的 sub-agent 处理完，控制权再回到 router 去处理第二个意图。我会老实说，干净的单意图那一轮才是常见情况 [✏️ 核实 实际多意图占比]。多意图当时是靠*下一轮*重新路由来处理的，不是并行的 sub-agent fan-out —— 我不会把一个我没真正搭过的 DAG orchestrator 吹成做过。
 
 **Q: Where does the conversation state live across these layers?**
+**中**: 跨这几层，conversation state 存在哪？
 - State is held at the *orchestration* layer, not inside any one sub-agent.
 - So when control passes router → sub-agent → RAG, they share the same conversation context and any resolved slots.
 - Sub-agents are stateless workers; the orchestrator owns memory. That's one of the things we later abstracted into the platform.
+> 🇨🇳 state 持有在 *orchestration* 层，不在任何单个 sub-agent 里。所以当控制权从 router → sub-agent → RAG 传递时，它们共享同一份 conversation context 和已经 resolved 的 slot。sub-agent 是无状态的 worker；orchestrator 持有 memory。这也是我们后来抽象进 platform 的东西之一。
 
 **Q: What if RAG and a sub-agent both seem applicable?**
+**中**: 如果 RAG 和某个 sub-agent 看起来都适用，怎么办？
 - Actionable intent always wins over RAG. RAG is the fallback, not a peer.
 - If there's a real transaction the user wants done, retrieving an FAQ passage is the wrong answer.
 - The router's job is precisely to prefer *action* when an actionable intent fires with enough confidence.
+> 🇨🇳 actionable intent 永远优先于 RAG。RAG 是 fallback，不是同级的 peer。如果用户真的想完成一笔交易，去检索一段 FAQ 是错的回答。router 的职责恰恰就是：当一个 actionable intent 以足够 confidence 触发时，优先选*动作*。
 
 **Q: How did you decide the intent taxonomy — why those three?**
+**中**: intent 的 taxonomy 是怎么定的 —— 为什么是这三类？
 - Data-driven, with ops. We looked at the actual ticket distribution.
 - Order lookup, refund, and dispute were the high-volume, automatable, money-touching flows worth a dedicated agent.
 - Long-tail informational questions weren't worth a workflow each, so they collapse into the RAG bucket. [✏️ 核实 这三类占工单比例]
+> 🇨🇳 数据驱动的，跟 ops 一起定的。我们看了真实的工单分布。order lookup、refund、dispute 是高频、可自动化、又碰钱的流程，值得给一个专门的 agent。长尾的信息类问题不值得每个都做一套 workflow，所以它们就收进 RAG 那个桶里。[✏️ 核实 这三类占工单比例]
 
 **Q: How would you add a new intent — say, "change payment date" — six months in?**
+**中**: 半年后要加一个新意图 —— 比如"改还款日" —— 你会怎么加？
 - Register a new sub-agent with its own scoped tool and guardrails, add the intent to the router's label set — the rest is untouched. Orchestrator and RAG don't change.
 - That's the difference between a layered design and a monolithic prompt: extending a monolith means re-validating the whole thing; extending this means validating *one* new agent against its own eval set.
 - It's also the argument for the platform — the *mechanics* of registering an agent are shared, so adding an intent is config plus one agent, not a project.
+> 🇨🇳 注册一个新的 sub-agent，配上它自己 scoped 的工具和 guardrails，把这个意图加进 router 的标签集 —— 其余一概不动。orchestrator 和 RAG 都不用改。这就是分层设计和单体 prompt 的区别：扩展一个单体意味着要重新验证整个东西；扩展这套只意味着拿*一个*新 agent 去跑它自己的 eval set。这也是要做 platform 的理由 —— 注册一个 agent 的*机制*是共享的，所以加一个意图是 config 加一个 agent，而不是一个项目。
 
 **Q: How does this map to what this Apple team is building?**
+**中**: 这套跟你们 Apple 团队在做的东西怎么对得上？
 - Pretty directly — it's the same shape: a conversational, multi-turn, multi-agent system where a controller routes intent to specialized capabilities, falls back to retrieval for informational queries, and keeps state across turns.
 - Domain differs — Apple customer support across lines of business vs BNPL — but routing, scoped dispatch, grounded fallback, and an orchestrator owning state is the architecture either way.
 - What I'd bring is having already hit the hard edges: misroute recovery, money-touching safety, per-layer eval.
+> 🇨🇳 对得相当直接 —— 是同一个 shape：一个 conversational、multi-turn、multi-agent 的系统，一个 controller 把意图路由到专门的能力上，信息类查询 fallback 到检索，并且跨轮保持 state。域不同 —— Apple 是跨业务线的客服，我那个是 BNPL —— 但 routing、scoped dispatch、grounded fallback、加一个持有 state 的 orchestrator，这个架构两边都是一样的。我能带来的，是已经撞过那些硬边界：misroute 恢复、碰钱流程的安全、分层 eval。
 
 **Q: Walk me through one concrete turn, end to end.**
+**中**: 给我端到端走一个具体的 turn。
 - Take "I want a refund on order 12345." Router classifies it `refund`, high confidence, passes the turn plus order ID to the refund sub-agent.
 - The sub-agent calls the order API to verify the order is refund-eligible, calls the refund API if so, gets a structured result — refund initiated, amount, ETA.
 - It generates a grounded reply *citing that result*, not free text. The orchestrator records the resolved state.
 - If the order *isn't* eligible, the sub-agent doesn't invent an answer — it explains why and offers the next step or a handoff. Every fact traces to a tool result.
+> 🇨🇳 拿"我想退订单 12345"这句。router 把它分类成 `refund`，高 confidence，把这一轮加上 order ID 传给 refund sub-agent。这个 sub-agent 先调 order API 核实这个订单是否符合退款条件，符合的话再调 refund API，拿回一个结构化结果 —— 退款已发起、金额、预计到账时间。它生成一个 grounded 的回复，*引用那个结果*，而不是自由发挥的文本。orchestrator 记录下 resolved 的 state。如果这个订单*不*符合条件，sub-agent 不会编一个答案 —— 它会解释为什么，并给出下一步或者转人工。每一个事实都能追溯到一个工具结果。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

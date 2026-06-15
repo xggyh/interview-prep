@@ -99,19 +99,29 @@ correct-action 是我盯得最紧的一个，因为一个自信地做错的动�
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: If conversion goes up but compliance violations also tick up, what do you ship?**
+**中**: 如果 conversion 涨了，但 compliance violation 也跟着往上走，你 ship 哪个?
 "You don't ship it. Compliance is a constraint, not a dial — a higher conversion bought with violations is a net loss, because one violation in a regulated collections context can cost far more than the incremental recovery, in fines and trust. So that release is blocked, and I'd go find conversion that doesn't come from crossing the line — better grounding, better objection handling, not more aggression."
+> 🇨🇳 你不 ship 它。Compliance 是一个 constraint，不是一个可以拧的旋钮——用 violation 换来的更高 conversion 是净亏，因为在受监管的催收场景里，一次 violation 在罚款和信任上付出的代价，可能远超过那点多收回来的钱。所以那次 release 就被 block 掉，我会去找那种不靠越线得来的 conversion——更好的 grounding、更好的异议处理，而不是更激进。
 
 **Q: How do you measure 'correct-action' — who decides what the right action was?**
+**中**: 你怎么衡量'correct-action'——谁来决定正确的动作是什么?
 "Labeled eval cases. We build a set of call situations with the correct expected action — log promise-to-pay, escalate, pull balance, do nothing — defined with ops and compliance, not by me alone. The agent's action is scored against that. In production I sample real calls for the same review. The hard part is the label definition, so I co-own it with the people who own the policy, which also means the metric is defensible when someone challenges it." *(复用 BNPL 经历: defined metrics + eval harness with product/ops)*
+> 🇨🇳 用打了标的 eval case。我们建一组通话情境，每个都配上正确的预期动作——记 promise-to-pay、升级、拉余额、什么都不做——这些是和 ops 还有 compliance 一起定义的，不是我一个人定的。agent 的动作就拿这个来打分。在生产里我抽样真实通话做同样的 review。难的部分是标签的定义，所以我跟那些 own policy 的人共同 own 它，这也意味着当有人来挑战这个指标时，它是站得住脚的。
 
 **Q: Automation rate — isn't higher always better? Why not push it to 100%?**
+**中**: automation rate——不是越高越好吗? 为什么不把它推到 100%?
 "No, and this ties back to vulnerable customers. Some calls *should* go to a human — hardship, disputes, distress. If I optimized automation rate naively, I'd be automating exactly the conversations that need a person, which is both an ethics and a brand problem. So automation rate is good only *within* the safety constraint — I'd rather a lower automation number than auto-handling a call that should've escalated."
+> 🇨🇳 不是，这又回到了脆弱客户。有些通话*就该*转给真人——hardship、dispute、distress。如果我天真地去优化 automation rate，我就会恰恰把那些需要真人的对话给自动化掉，这既是伦理问题、也是品牌问题。所以 automation rate 只有在安全约束*之内*才是好的——我宁愿要一个更低的 automation 数字，也不要去自动处理一通本该升级的电话。
 
 **Q: How do offline eval scores correlate with the live business metrics?**
+**中**: 离线的 eval 分数和线上的业务指标，相关性如何?
 "Imperfectly, and I treat that gap as information. Offline gives me fast, repeatable signal on action-correctness and compliance so I can gate releases; it doesn't fully predict conversion, which depends on real customer behavior. So offline is the safety/quality gate, online is the outcome truth, and when they diverge — offline looks fine but conversion drops — that's a signal my eval set is missing a real-world case, and I go add it."
+> 🇨🇳 相关性是不完美的，而我把这个 gap 当成信息。离线给我的是在 action-correctness 和 compliance 上又快又可复现的信号，让我能 gate 住发布；它并不能完全预测 conversion，因为 conversion 取决于真实的客户行为。所以离线是安全/质量的 gate，线上是结果的真相，当两者分叉时——离线看着没问题、但 conversion 掉了——那就是一个信号，说明我的 eval set 缺了一个真实世界的 case，于是我就去把它补上。
 
 **Q: What single metric would you put on a dashboard for an exec?**
+**中**: 给一位高管的 dashboard 上，你会放哪一个单一指标?
 "I wouldn't give them one — I'd give them two with a rule: repayment conversion as the headline, with compliance-violation rate right next to it as a gate, framed as 'conversion only counts while this stays at zero.' A single number invites optimizing it into a corner. The pairing communicates the actual deal: outcome, bounded by the red line."
+> 🇨🇳 我不会给他们一个——我会给两个，外加一条规则：repayment conversion 作为头条，紧挨着它的是 compliance-violation rate 作为 gate，并且 frame 成'只有当这个保持在零时，conversion 才算数'。一个单一的数字会诱使人把它优化到死角里去。这个配对传达的是真实的那笔交易：结果，被红线约束着。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

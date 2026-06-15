@@ -94,19 +94,29 @@ The model handles the conversation; the guardrails handle the consequences."
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How do you actually enforce compliance — surely not just a prompt?**
+**中**: 你到底是怎么 enforce 合规的——总不会只靠一个 prompt 吧?
 "Right, a prompt alone isn't enforcement. It's layered: post-training so the model's default behavior is compliant, constrained generation / approved-phrasing for the high-risk disclosures, and an output-side check that flags or blocks non-compliant content before it's spoken. Plus eval — we score compliance violation rate as a first-class metric and treat regressions as release blockers. Prompt is the weakest layer, so it's not the only layer."
+> 🇨🇳 对，光一个 prompt 不叫 enforcement。它是分层的：用 post-training 让模型的默认行为就是合规的，对那些高风险的披露用 constrained generation / approved-phrasing，再加一道 output 侧的 check，在话说出口之前把不合规的内容标记出来或者拦掉。再加上 eval——我们把 compliance violation rate 当成一等的指标来打分，并且把它的回退当成 release blocker。Prompt 是最弱的一层，所以它绝不是唯一的一层。
 
 **Q: Idempotency key — where does it come from and what's the dedup window?**
+**中**: idempotency key——它从哪来，dedup 的窗口是多大?
 "It's derived per logical action — tied to the call and the specific operation, so a retry of 'log this $X promise-to-pay' reuses the same key and the backend dedups it rather than creating a second record. The dedup is enforced server-side at the system of record, not just client-side, because client-side alone can't survive a process crash. *(确切 key 派生规则 / 窗口 [✏️ 核实])* The point is the guarantee lives where the write happens."
+> 🇨🇳 它是按每一个逻辑动作派生出来的——绑在这通电话和那个具体的操作上，所以一次'记一笔 $X 的 promise-to-pay'的重试会复用同一个 key，后端就去 dedup 而不是再建一条记录。这个 dedup 是在 system of record 的服务端 enforce 的，不只是客户端，因为光靠客户端扛不住一次进程崩溃。*(确切 key 派生规则 / 窗口 [✏️ 核实])* 关键在于，这个保证活在"写"真正发生的地方。
 
 **Q: How does the agent detect a vulnerable customer? That seems hard and high-stakes.**
+**中**: agent 怎么检测出一个脆弱客户? 这看起来又难、又高风险。
 "It is, and I won't oversell it. We detect explicit signals reliably — stated hardship, distress language, 'this isn't me / wrong number,' requests to stop. Those route to softening and human escalation. The harder cases — subtle distress, implied vulnerability — we don't claim to catch perfectly, so the design bias is to escalate on *any* ambiguity rather than push. When the cost of a wrong automated push is a vulnerable person, you set the threshold to favor handing off to a human."
+> 🇨🇳 确实是，我不会夸大它。我们能可靠地检测出显式的信号——明说的 hardship、distress 的措辞、'这不是我 / 你打错了'、要求停止。这些都路由去软化处理和升级给人。更难的那些 case——细微的 distress、隐含的脆弱性——我们不声称能完美捕捉，所以设计上的偏向是：遇到*任何*模糊就升级，而不是往前推。当一次错误的自动化推进，代价是一个脆弱的人时，你就把阈值设成偏向交给一个真人。
 
 **Q: What's the failure mode you were most afraid of, and how did you guard it?**
+**中**: 你最害怕的 failure mode 是哪个，你又是怎么防住它的?
 "Two. One, double-charging or double-committing someone — guarded by idempotency end to end. Two, the agent saying something non-compliant or threatening to a real person — guarded by constrained generation plus the output check plus escalation. The shared theme: the scariest failures are irreversible or reputational, so I put deterministic guardrails on exactly those, and let the model be flexible only where a mistake is recoverable."
+> 🇨🇳 两个。第一，对一个人重复扣款、或者重复提交——靠端到端的 idempotency 来防。第二，agent 对一个真人说出不合规、或者带威胁性的话——靠 constrained generation 加上 output check 加上升级来防。它们共同的主题是：最可怕的 failure 是那些不可逆的、或者会伤品牌的，所以我恰恰在这些地方放上确定性的 guardrail，只在错了还能挽回的地方才让模型去灵活发挥。
 
 **Q: How is this relevant to Apple — you won't be doing collections here?**
+**中**: 这跟 Apple 有什么关系——你在这儿又不会做催收?
 "The domain changes, the discipline doesn't. Any money-touching or account-touching customer agent at Apple has the same shape: don't let the model assert facts it can't ground, make state-changing actions idempotent and reversible, enforce policy outside the model, and keep a human path for the cases that need one. That's portable to any customer-facing agent where mistakes have consequences."
+> 🇨🇳 领域会变，功夫不变。Apple 这边任何一个碰钱、或者碰账户的 customer agent，都是同样的形状：别让模型去断言它 ground 不了的事实，让会改变状态的动作变得 idempotent、可逆，把 policy 放在模型之外去 enforce，并且为那些需要真人的 case 留一条 human 的路径。这套东西可以迁移到任何一个"出错有后果"的、面向客户的 agent 上。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

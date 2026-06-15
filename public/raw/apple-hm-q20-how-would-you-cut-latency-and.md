@@ -88,25 +88,39 @@ This is the work I actually did — inference acceleration on NVIDIA GPUs with *
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Prefill-bound vs decode-bound — how do you tell, and does it change your fix?**
+**中**: prefill-bound 还是 decode-bound —— 你怎么判断,这会改变你的修法吗?
 "Long prompt, short output → prefill-bound; the win is prefix caching and faster prompt processing. Short prompt, long generation → decode-bound, which is memory-bandwidth limited, so the wins are quantization, speculative decoding, and bigger batches. I'd profile actual TTFT and inter-token latency to know which regime I'm in before optimizing — optimizing the wrong half wastes effort."
+> 🇨🇳 长 prompt、短输出 → prefill-bound；这时的赢点是 prefix caching 和更快的 prompt 处理。短 prompt、长生成 → decode-bound，它受限于 memory bandwidth（显存带宽），所以赢点是量化、speculative decoding、还有更大的 batch。我会先 profile 真实的 TTFT 和 inter-token latency，搞清楚自己处在哪个 regime 再去优化 —— 优化错的那一半是白费力气。
 
 **Q: How does continuous batching actually help latency, not just throughput — doesn't batching add latency?**
+**中**: continuous batching 到底怎么帮上延迟、而不只是吞吐 —— batching 不是会增加延迟吗?
 "It's a throughput-first technique, and naively bigger batches add queueing latency. The reason it still wins on latency in practice is that token-level scheduling means a request doesn't wait for a whole static batch to drain before joining — it joins on the next step. So you get high GPU utilization without the head-of-line blocking of static batching. There's still a batch-size knob that trades p99 latency against throughput, and I'd tune it to the SLA."
+> 🇨🇳 它本质上是一个吞吐优先的技术，而且粗暴地把 batch 调大确实会增加排队延迟。它在实践中之所以在延迟上仍然能赢，是因为 token 级的调度意味着一个请求不用等一整个 static batch 排空才能加入 —— 它在下一步就能加进去。所以你拿到了很高的 GPU 利用率，又没有 static batching 那种 head-of-line blocking（队头阻塞）。这里还有一个 batch-size 的旋钮，在 p99 延迟和吞吐之间做权衡，我会照着 SLA 去调它。
 
 **Q: Speculative decoding — when does it *not* help?**
+**中**: speculative decoding —— 它在什么时候*帮不上忙*?
 "When the draft model's acceptance rate is low — if the small model rarely agrees with the big one, you've paid for draft compute and verification and gained little. It shines on predictable text and a well-matched draft. On hard, high-entropy generation the speedup shrinks. So it's a measured bet per workload, not a free win."
+> 🇨🇳 当 draft model 的 acceptance rate（接受率）很低的时候 —— 如果那个小模型很少跟大模型意见一致，那你既付了 draft 的算力、又付了 verification 的算力，却没换来多少收益。它在可预测的文本、加上一个匹配得好的 draft 上才出彩。在难的、高 entropy 的生成上，加速幅度会缩水。所以它是一个针对每个 workload 去量化评估的赌注，不是一个免费的赢。
 
 **Q: How far can you quantize before it hurts? How do you decide?**
+**中**: 量化能压到多狠才会开始掉点?你怎么决定?
 "Eval-driven, always. I take the model down — 8-bit is usually nearly free, 4-bit needs checking, lower needs care — and watch task metrics, not perplexity alone, because quality can fall off a cliff non-linearly on the tasks you care about. QAT (quantization-aware training) buys you more headroom than post-training quantization, which is exactly why Apple can run ~2-bit on device — they train for it rather than bolt it on after."
+> 🇨🇳 永远是 eval 驱动的。我把模型一档一档往下压 —— 8-bit 通常几乎是免费的，4-bit 需要查一下，再低就得当心 —— 然后我盯的是任务指标，不光是 perplexity，因为在你真正在意的任务上，质量可能会非线性地、突然跌下悬崖。QAT（quantization-aware training）比 post-training quantization 给你更多余量，这正好就是 Apple 能在设备上跑大约 2-bit 的原因 —— 他们是为它而训练的，而不是事后硬装上去的。
 
 **Q: You have one big model serving mixed traffic. Walk me through cutting cost 50%.**
+**中**: 你有一个大模型在 serve 混合流量。带我走一遍怎么把成本砍掉 50%。
 "First, profile the traffic mix. Then in order of leverage: turn on continuous batching and prefix caching if not already — usually the biggest, lowest-risk wins. Then route: classify easy vs hard and send the easy majority to a smaller model. Then quantize the serving model as far as eval allows. I'd land the cut from batching+caching+routing first because they don't touch quality, and only lean on quantization to the degree eval says is safe. I'd verify each step against latency *and* quality so I'm not trading a cost win for a customer-experience loss."
+> 🇨🇳 第一步，先 profile 流量的构成。然后按杠杆从大到小：如果还没开，先把 continuous batching 和 prefix caching 打开 —— 这通常是最大、风险最低的赢。然后做 routing：把 easy 和 hard 分类，把占大多数的 easy 流量发给一个更小的模型。然后在 eval 允许的范围内把 serving 模型量化。我会先靠 batching 加 caching 加 routing 把这个砍量拿到手，因为它们不碰质量，量化只压到 eval 说安全的那个程度。我会拿每一步去对照延迟*和*质量做验证，这样我才不会拿一个成本上的赢去换一个客户体验上的损失。
 
 **Q: Which of these would you reach for first on Apple's on-device stack?**
+**中**: 在 Apple 的 on-device stack 上,这些手段里你会最先用哪个?
 "Quantization and small task-specific models, because the binding constraint on device is memory and power, not GPU dollars. Then KV-cache sharing to cut prefill memory — Apple reports meaningful memory and prefill savings from it. Streaming still matters for perceived latency. Continuous batching matters less on a single-user device — that's a server-side throughput lever — which is a good example of *matching the technique to the constraint* rather than applying all of them reflexively."
+> 🇨🇳 量化和小的 task-specific 模型，因为设备上真正的硬约束是 memory 和功耗，不是 GPU 的钱。然后是 KV-cache sharing 来砍 prefill 的显存 —— Apple 报告说它带来了可观的显存和 prefill 节省。Streaming 对感知到的延迟仍然重要。Continuous batching 在一个单用户的设备上就没那么要紧了 —— 那是一个服务端的吞吐杠杆 —— 这正好是一个*把技术匹配到约束*、而不是无脑把所有手段都套上去的好例子。
 
 **Q: The model is fast but TTFT is terrible on long prompts. What do you do — and is speculative decoding the answer?**
+**中**: 模型本身很快,但长 prompt 上的 TTFT 很糟糕。你怎么做 —— speculative decoding 是答案吗?
 "No — speculative decoding speeds up *decode*, not prefill, so it won't help TTFT. Long-prompt TTFT is a prefill problem: I'd reach for prefix caching first if there's a shared prefix, then chunked prefill so the first token comes out before the whole prompt is processed, and stream from there. Naming the wrong lever for the wrong half is the classic mistake, so I always tie the fix to whether it's prefill- or decode-bound."
+> 🇨🇳 不是 —— speculative decoding 加速的是*decode*，不是 prefill，所以它帮不了 TTFT。长 prompt 的 TTFT 是一个 prefill 问题：如果有共享前缀，我会先上 prefix caching，然后用 chunked prefill，让第一个 token 在整个 prompt 处理完之前就吐出来，再从那里开始 stream。给错的那一半安一个错的杠杆是经典的错误，所以我总是把修法绑到它到底是 prefill-bound 还是 decode-bound 上。
 
 ## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
 

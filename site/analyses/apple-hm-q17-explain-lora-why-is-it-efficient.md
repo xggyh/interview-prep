@@ -78,22 +78,34 @@ Now, serving **many** adapters — this is where it gets interesting and it's wo
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How do you pick the rank r?**
+**中**: 你怎么选 rank r?
 "It's a quality-vs-size trade-off you sweep empirically. Too low and the adapter can't capture the task; too high and you lose the efficiency and risk overfitting. For most style/format adaptation, a small rank like 8 or 16 is plenty — which is exactly why Apple landed on rank-16. I'd pick it by eval, not by gut: start small, increase only if eval plateaus below target."
+> 🇨🇳 这是一个质量对体积的权衡，你靠实验去 sweep。太低了 adapter 抓不住这个任务；太高了你就丢掉了效率，还有过拟合的风险。对大多数风格/格式的适配来说，一个小的 rank，比如 8 或者 16，就足够了 —— 这正好就是 Apple 落在 rank-16 的原因。我会靠 eval 来选，不靠拍脑袋：从小开始，只有当 eval 在目标线以下触顶了，才往上加。
 
 **Q: What's the difference between LoRA and QLoRA?**
+**中**: LoRA 和 QLoRA 的区别是什么?
 "QLoRA = LoRA on top of a **quantized** (typically 4-bit) frozen base. The base is quantized to save memory, the LoRA adapter is still trained in higher precision. It lets you fine-tune a big model on one GPU. Apple's on-device case rhymes with this — a heavily quantized base (they use ~2-bit weights) plus small adapters."
+> 🇨🇳 QLoRA 就是在一个**量化过的**（通常是 4-bit）冻结 base 之上做 LoRA。base 被量化是为了省显存，而 LoRA adapter 仍然用更高的精度去训练。它让你能在一张 GPU 上 fine-tune 一个大模型。Apple 的 on-device 场景跟这个很像 —— 一个被重度量化的 base（他们用大约 2-bit 的权重）加上一些小的 adapter。
 
 **Q: Does serving LoRA add latency vs the base model?**
+**中**: serving LoRA 相比 base 模型会增加延迟吗?
 "If you *merge* the adapter into the weights, no — it's identical to base. The latency question only appears in the *unmerged, multi-adapter* case, because you can't pre-merge when one batch mixes adapters. There the cost is a small extra matmul per request; modern kernels (e.g. in vLLM) make that cheap, and you trade it for not having to run a separate server per adapter."
+> 🇨🇳 如果你把 adapter *merge* 进权重里，不会 —— 它跟 base 完全一样。延迟这个问题只出现在*不 merge 的、多 adapter*的场景里，因为当一个 batch 混了多个 adapter 时你没法预先 merge。那种情况下的代价是每个请求多一个小的 matmul；现代的 kernel（比如 vLLM 里的）让这个很便宜，而你用它换来的是不必为每个 adapter 单独跑一个 server。
 
 **Q: Where does LoRA fall short — when wouldn't you use it?**
+**中**: LoRA 在哪些地方不够用 —— 什么时候你不会用它?
 "When the task needs a genuinely large capability shift, not a stylistic or narrow one — low-rank can under-fit there, and full fine-tuning or continued pre-training wins. Also if you only ever serve one task forever, the multi-adapter flexibility buys you nothing, so the choice is just about training memory."
+> 🇨🇳 当任务需要一个真正的大幅能力转变、而不是一个风格上的或者窄的转变时 —— low-rank 在那里可能会欠拟合，这时 full fine-tuning 或者 continued pre-training 会赢。另外，如果你这辈子就只 serve 一个任务，那多 adapter 的灵活性对你毫无价值，所以这时的选择就只跟训练时的显存有关了。
 
 **Q: How do you decide which layers to apply LoRA to?**
+**中**: 你怎么决定把 LoRA 应用到哪些层上?
 "Conventionally the attention projection matrices (q, k, v, o); applying to those captures most of the benefit. You can extend to the MLP layers for more capacity at more cost. Again eval-driven — I'd start with attention projections and only widen if quality demands it."
+> 🇨🇳 按惯例是 attention 的 projection 矩阵（q、k、v、o）；加在这些上面就能拿到大部分的收益。你可以扩展到 MLP 层去换更多容量，但成本也更高。又是 eval 驱动的 —— 我会从 attention projection 开始，只有当质量有需要时才把范围放宽。
 
 **Q: 100 adapters but GPU memory only holds 20 — how do you serve all 100?**
+**中**: 有 100 个 adapter,但 GPU 显存只放得下 20 个 —— 你怎么把 100 个全 serve 起来?
 "Adapters are tiny, so I keep a hot set resident and treat the rest as an LRU cache — swap an adapter in from host memory on demand, which is cheap because each is only megabytes. The base never moves. If traffic per adapter is predictable I'd pin the high-traffic ones. The expensive thing — the base weights — stays resident exactly once; only the cheap thing moves."
+> 🇨🇳 adapter 非常小，所以我把一个热集常驻在显存里，剩下的当成一个 LRU cache —— 按需从 host memory 把某个 adapter 换进来，这很便宜，因为每个才几个 MB。base 永远不动。如果每个 adapter 的流量是可预测的，我会把高流量的那几个 pin 住。那个昂贵的东西 —— base 权重 —— 只常驻恰好一份；只有便宜的东西在搬来搬去。
 
 ## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
 

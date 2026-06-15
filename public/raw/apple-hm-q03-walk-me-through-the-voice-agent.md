@@ -98,19 +98,29 @@ The whole thing is built so stages **overlap** — ASR, LLM, and TTS are pipelin
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Where's the latency bottleneck across those hops?**
+**中**: 在这几跳里，latency 的瓶颈在哪?
 "The LLM's time-to-first-token usually dominates the perceived gap, because TTS can't start until the first tokens land. So the biggest lever is TTFT plus ASR endpointing delay. I can break down the full budget if you want — that's a separate detailed answer." *(把 Q4 引出来)*
+> 🇨🇳 LLM 的 time-to-first-token 通常主导了用户感知到的那个间隙，因为 TTS 在第一批 token 落地之前没法开始。所以最大的杠杆是 TTFT 加上 ASR 的 endpointing 延迟。如果你想，我可以把整个 budget 拆开讲——那是另一个详细的答案。
 
 **Q: Why streaming ASR instead of waiting for the full utterance and transcribing once?**
+**中**: 为什么用 streaming ASR，而不是等整句说完一次性转写?
 "Latency. If I wait for end-of-utterance to even start recognizing, I've already burned the whole utterance duration before the LLM sees anything. Streaming lets ASR finalize within tens of milliseconds of the user stopping, and lets us run speculative work on partials. The cost is partials are unstable — so I only commit the LLM turn on a stabilized final, gated by the endpointer."
+> 🇨🇳 为了 latency。如果我要等到一句话说完才开始识别，那在 LLM 看到任何东西之前，我就已经把整句话的时长给烧掉了。streaming 让 ASR 在用户停下后几十毫秒内就能 finalize，还让我们能在 partial 上跑 speculative 的工作。代价是 partial 是不稳定的——所以我只在一个稳定下来的 final 上才 commit 这一轮 LLM，由 endpointer 来把关。
 
 **Q: How does the LLM decide between just replying versus calling a tool?**
+**中**: LLM 怎么决定是直接回话、还是去调一个 tool?
 "It's a tool-calling policy — the model is post-trained and prompted with the available tools and when to use them. Anything that needs ground truth — balance, payment status, account state — must go through a tool; the model is not allowed to assert those from memory. Conversational turns it answers directly. We enforce that boundary in eval: asserting an unverified financial fact is a hard failure."
+> 🇨🇳 这是一个 tool-calling 的 policy——模型经过 post-train，并且在 prompt 里告诉它有哪些可用的 tool、以及什么时候该用。任何需要 ground truth 的东西——余额、支付状态、账户状态——都必须走一个 tool；模型不允许凭记忆去断言这些。对话性的 turn 它就直接回答。这条边界我们在 eval 里 enforce：断言一个未经核实的财务事实，是一个 hard failure。
 
 **Q: Is the LLM on-device or in the cloud? What size model?**
+**中**: 这个 LLM 是 on-device 的还是在云上? 模型多大?
 "In our system it's a cloud-served LLM — that's the ByteDance GPU environment. Honestly, on-device wasn't our constraint; cost and throughput were. I know Apple's posture is on-device-first with PCC for the heavy turns, and I'd be genuinely interested in re-deriving this pipeline under a unified-memory budget — the hop structure stays, the model-placement and quantization decisions change." *(诚实承认 + 接 on-device 桥)*
+> 🇨🇳 在我们的系统里它是一个 cloud-served 的 LLM——也就是字节的 GPU 环境。老实说，on-device 当时不是我们的约束；成本和吞吐才是。我知道 Apple 的姿态是 on-device-first，重的 turn 交给 PCC，我会真心很有兴趣在一个 unified-memory 的预算下，把这条 pipeline 重新推导一遍——跳的结构不变，变的是模型放在哪里、以及 quantization 的那些决策。
 
 **Q: What happens if a tool call times out mid-turn?**
+**中**: 如果一个 tool call 在一轮中途 timeout 了，会怎么样?
 "The orchestration layer has per-tool timeouts and a circuit breaker. On timeout the agent doesn't hang silently — it either says a holding phrase and retries idempotently, or degrades to a safe fallback like 'let me have an agent follow up.' Never invent the answer. That's the compliance line." *(埋 Q6 钩子)*
+> 🇨🇳 编排层有 per-tool 的 timeout 和一个 circuit breaker。一旦 timeout，agent 不会静默地卡住——它要么说一句 holding 的话术然后做 idempotent 的重试，要么降级到一个安全的 fallback，比如'我让一位专员来跟进'。绝不去编一个答案出来。那是合规的红线。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

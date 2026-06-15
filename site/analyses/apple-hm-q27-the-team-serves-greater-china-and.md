@@ -53,16 +53,24 @@ So my honest claim is: I don't just speak Chinese — I've run the post-training
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: If you found a base model's tokenizer handled Chinese poorly, what would you actually do?**
+**中**: 如果你发现一个 base model 的 tokenizer 处理中文很糟, 你实际会怎么做?
 "It depends on how locked-in the tokenizer is. If I control pre-training, vocabulary expansion for Chinese is the clean fix. If I'm post-training on a fixed base — which is the realistic case — I can't change the tokenizer, so I'd quantify the damage first: measure tokens-per-character on real Chinese traffic and see how much context and latency it's actually costing. If it's severe, that becomes an argument for choosing a different base model, ideally one trained Chinese-inclusive from the start. The judgment is knowing when it's a tuning problem versus a base-model-selection problem."
+> 🇨🇳 这取决于这个 tokenizer 被锁死到什么程度。如果我能控制 pre-training, 那对中文做 vocabulary expansion (词表扩展) 就是那个干净的修法。如果我是在一个固定的 base 上做 post-training — 这才是现实里的情况 — 我没法改 tokenizer, 那我会先把损害量化出来: 在真实的中文流量上量 tokens-per-character, 看它实际上吃掉了多少 context 和 latency。如果很严重, 那这就成了一个 '换一个 base model' 的论据, 最好是一个从一开始就把中文包含进去训练的模型。这里的判断力, 在于知道什么时候它是一个 tuning 的问题, 什么时候它是一个 base-model-selection 的问题。
 
 **Q: How would you build a Chinese eval set you actually trust for a customer agent?**
+**中**: 你会怎么给一个面向客户的 agent 建一个你真正信得过的中文 eval set?
 "Three layers. Public native benchmarks like C-Eval and CMMLU for general capability — a sanity floor. Then a domain set built from real Chinese customer interactions, labeled with the outcomes we care about. Then a targeted adversarial slice: Simplified and Traditional, heavy code-switching, and colloquial register, because those are exactly the cases generic benchmarks miss. I'd weight the domain and adversarial layers highest, because that's what actually predicts production behavior — that's the lesson from building the voice-agent harness."
+> 🇨🇳 三层。公开的原生 benchmark, 像 C-Eval 和 CMMLU, 用来看通用能力 — 这是一个 sanity 的底线。然后是一个从真实中文客户交互里建出来的 domain set, 用我们在乎的那些结果去打标。再然后是一个有针对性的 adversarial 切片: 简体和繁体、大量的 code-switching、还有口语的 register, 因为这些恰恰是通用 benchmark 会漏掉的情况。我会给 domain 层和 adversarial 层最高的权重, 因为那才是真正能预测 production 行为的东西 — 这是我搭 voice-agent harness 时学到的教训。
 
 **Q: Simplified vs Traditional — is that really a model problem or just a conversion step?**
+**中**: 简体 vs 繁体 — 这真的是一个模型问题, 还是只是一个转换的步骤?
 "It's more than conversion. Script conversion handles the characters, but Traditional-using regions — Taiwan, Hong Kong — also differ in vocabulary, phrasing, and which English terms get borrowed. A naive Simplified-to-Traditional conversion produces text that's technically Traditional but reads as mainland-flavored and slightly off to a Taiwan user. For a customer-facing agent where trust matters, I'd treat the Traditional variants as their own register in both data and eval, not a post-processing afterthought."
+> 🇨🇳 它不止是转换。字形转换处理的是字, 但用繁体的地区 — 台湾、香港 — 在词汇、说法、以及借用哪些英文词上也都不一样。一个 naive 的简转繁会产出一种技术上是繁体、但读起来带着大陆味、对一个台湾用户来说有点 '不对劲' 的文本。对一个信任很重要的、面向客户的 agent 来说, 我会把繁体的变体当成它们自己的一个 register, 在数据和 eval 里都这么对待, 而不是当成一个事后的 post-processing。
 
 **Q: Did you measurably improve Chinese performance on your agent, or are these general principles?**
+**中**: 你在你的 agent 上有可度量地提升过中文的表现吗, 还是说这些都是一般性的原则?
 "Both — but let me be precise about what I can claim. I ran the multilingual post-training and eval loop across seven markets including Mainland Chinese, and Chinese was one of the markets where we moved the automation and conversion metrics [✏️ 核实 中文市场具体指标]. I'd rather state it as 'Chinese was an in-scope production market I owned end to end' than quote a per-language number I can't back precisely on the spot."
+> 🇨🇳 两者都有 — 但让我把我能 claim 的东西讲精确。我跑了那个跨七个市场、包括大陆中文的多语 post-training 和 eval loop, 而中文正是我们把 automation 和 conversion 指标推动起来的市场之一 [✏️ 核实 中文市场具体指标]。比起去引一个我当场没法精确背书的 per-language 数字, 我更愿意把它说成 '中文是一个我端到端 own 的、in-scope 的 production 市场'。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

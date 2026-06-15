@@ -45,13 +45,19 @@ Where it got real was when compliance wanted a hard rule the agent could never v
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How did you handle it when a business partner asked for something technically infeasible or a bad idea?**
+**中**: 当一个业务方提了一个技术上做不到、或者是个馊主意的需求时, 你怎么处理?
 "I don't say 'no, that's impossible' — that ends the conversation. I show the tradeoff with data. Ops once wanted the agent to push repayment harder on every call; I pulled the early-hangup numbers and showed that past a certain aggressiveness, conversion actually dropped because customers hung up. Once they saw the curve, they redefined the ask themselves. My job is to make the tradeoff visible, then let the business own the call within the guardrails."
+> 🇨🇳 我不会说 '不行, 这做不到' — 那一句话就把对话给堵死了。我会拿数据把那个取舍摆出来。运营有一次想让 agent 在每通电话里都更用力地催还款; 我把 early-hangup 的数字拉出来, 给他们看: 过了某个 aggressiveness 的临界点之后, conversion 反而往下掉, 因为客户直接挂了。他们一看到那条曲线, 自己就把需求重新定义了。我的工作是把取舍变得可见, 然后让业务方在 guardrail 之内自己 own 那个决定。
 
 **Q: Compliance and ops disagreed — how did you actually get to a decision, not just reframe it?**
+**中**: 合规和运营意见不一致 — 你到底是怎么做出决定的, 而不只是把它 reframe 一下?
 "The reframe set the structure, but the decision needed an owner. I made compliance rules a hard gate in the eval — any candidate model that violated them was disqualified before conversion was even scored. That made it unambiguous: we never trade compliance for conversion, full stop. Within that, ops owned the conversion target. So the decision rule was explicit and written down, not relitigated every week."
+> 🇨🇳 reframe 把结构定了下来, 但这个决定需要一个 owner。我把合规规则做成了 eval 里的一道硬 gate — 任何一个违反它的候选模型, 在 conversion 还没开始打分之前就直接被取消资格了。这就让事情变得毫不含糊: 我们绝不拿合规去换 conversion, 没得商量。在这个前提之内, 运营 own conversion 的目标。所以这个决策规则是明确写下来的, 而不是每周拿出来重新吵一遍。
 
 **Q: How do you make sure a non-technical partner actually understands the tradeoff, not just nods along?**
+**中**: 你怎么确保一个非技术的合作方是真的理解了那个取舍, 而不只是在跟着点头?
 "I stopped using metrics in the abstract and started bringing real transcripts to every review. A number like 'tone score dropped two points' means nothing to ops; a transcript where the agent sounds rude is instantly obvious to them. Grounding every metric in a concrete example they can judge themselves is how I know the understanding is real and not polite nodding."
+> 🇨🇳 我不再抽象地谈指标, 而是开始在每一次 review 上都带真实的 transcript。像 'tone score 掉了两分' 这种数字, 对运营来说毫无意义; 但一段 agent 听起来很无礼的 transcript, 他们一眼就懂了。把每一个指标都落在一个他们自己能判断的具体例子上 — 这就是我怎么知道这个理解是真的, 而不是礼貌性的点头。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

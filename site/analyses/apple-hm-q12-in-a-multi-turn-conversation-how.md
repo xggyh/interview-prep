@@ -80,49 +80,67 @@ So: protect the facts as structured state, summarize the prose, and hold a hard 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How do you build the rolling summary without it drifting or dropping facts?**
+**中**: 你怎么构建这个滚动 summary，让它既不 drift 又不丢事实？
 - Two safeguards. First, the summary only ever covers *prose* — the facts live in structured state, so even a lossy summary can't drop the order ID or amount.
 - Second, I summarize *incrementally* — update the prior summary with the new turn rather than re-summarizing from scratch, which is cheaper and drifts less.
 - I'd validate summary quality on an eval set, because a bad summarizer silently degrades every long conversation. [✏️ 核实 是否真上了 LLM summarizer vs 规则抽取]
+> 🇨🇳 两道防护。第一，summary 永远只覆盖*散文性*的内容 —— 事实都活在 structured state 里，所以哪怕是一个有损的 summary 也丢不掉 order ID 或者金额。第二，我是*增量*地做 summary —— 拿新的一轮去更新之前的 summary，而不是从头重新 summarize，这样更便宜、也更不容易 drift。我会在一个 eval set 上验证 summary 的质量，因为一个差的 summarizer 会悄无声息地拖垮每一段长对话。[✏️ 核实 是否真上了 LLM summarizer vs 规则抽取]
 
 **Q: What exactly goes into structured state vs the summary?**
+**中**: 到底什么进 structured state、什么进 summary？
 - Anything that, if paraphrased or lost, changes the *outcome* → state: IDs, amounts, resolved intent, confirmations, tool results.
 - Anything that's just rapport or phrasing → summary.
 - The test: "would a wrong paraphrase of this cause a wrong action?" If yes, it's protected state.
+> 🇨🇳 任何东西，只要被改述或丢失会改变*结果* → 进 state：ID、金额、已确定的意图、各种确认、工具结果。任何只是寒暄或措辞的 → 进 summary。判定标准就一句："把这个改述错了，会不会导致一个错误的动作？"如果会，它就是受保护的 state。
 
 **Q: How do you pick N — how many recent turns to keep verbatim?**
+**中**: N 怎么定 —— 保留多少轮最近的对话作为逐字原文？
 - It's a budget decision tuned against the eval, not a fixed number.
 - Enough turns to preserve local coherence — pronouns, "the second one", follow-ups — but no more, because every verbatim turn is tokens I could spend elsewhere.
 - In voice, where latency is audible, N was tighter than in text chat. [✏️ 核实 实际 N]
+> 🇨🇳 这是一个 budget 决策，对着 eval 来调，不是一个固定的数。够多到能保住局部连贯 —— 代词、"第二个那个"、follow-up —— 但不能再多，因为每一轮逐字保留的都是我本可以花在别处的 token。在 voice 里延迟是能被听见的，所以 N 比文字 chat 里更紧。[✏️ 核实 实际 N]
 
 **Q: User references something from way back that got summarized away — now what?**
+**中**: 用户提到一个很早之前、已经被 summary 掉的东西 —— 这下怎么办？
 - That's why the summary is *lossy on prose but lossless on facts*. If they reference a fact, it's in structured state.
 - If they reference earlier phrasing or a nuance, the summary should carry the gist.
 - And if it genuinely fell out, the agent asks a one-line clarifier rather than guess. I'd rather re-confirm than confabulate.
+> 🇨🇳 这正是为什么 summary 是*在散文上有损、在事实上无损*的。如果他们提的是一个事实，它在 structured state 里。如果他们提的是更早的措辞或者某个细微差别，summary 应该能带住那个大意。而如果它真的掉出去了，agent 会问一句话的澄清，而不是去猜。我宁愿再确认一遍，也不要 confabulate（编）。
 
 **Q: Does this differ between the chatbot and the voice agent?**
+**中**: 这套在 chatbot 和 voice agent 之间有区别吗？
 - Same architecture, different pressure. In text I have more budget headroom.
 - In voice, context length is a *latency* knob the user literally hears — so the budget is stricter and I lean harder on structured state plus a tight recent window.
 - The principle is identical; the constraint surface changes — same kind of shift I'd expect moving to on-device.
+> 🇨🇳 同一个架构，不同的压力。在文字里我有更多的 budget 余量。在 voice 里，context length 是一个用户真能*听到*的 latency 旋钮 —— 所以 budget 更严，我会更重地依赖 structured state 加一个很紧的 recent window。原理完全一样；变的是约束面 —— 这跟我预期搬到 on-device 上时的那种转变是同一类。
 
 **Q: Why not just use a long-context model and keep everything?**
+**中**: 为什么不干脆用一个 long-context 模型，把所有东西都留着？
 - Cost and latency scale with context length every single turn, and quality doesn't — models lose recall in the middle of very long contexts.
 - So a 100-turn conversation in full context is expensive *and* less reliable than state + summary + recent window.
 - Long context is a tool, not a substitute for managing what the model actually needs to see.
+> 🇨🇳 cost 和 latency 每一轮都随 context length 线性涨，而质量并不会 —— 模型在很长上下文的中段会丢 recall。所以一段 100 轮的对话全量塞进 context，既贵*又*比"state + summary + recent window"更不可靠。long context 是一个工具，不是"管理好模型真正需要看到什么"的替代品。
 
 **Q: How does the agent confirm a critical action when state and the user's words disagree?**
+**中**: 当 state 和用户说的话对不上时，agent 怎么确认一个关键动作？
 - Structured state is the source of truth for facts, but before a money-touching action I read the relevant slot back to the user for explicit confirmation — "to confirm, a $200 refund on order 12345?"
 - If their reply contradicts state, I don't silently overwrite — I re-confirm, because in a money flow a wrong write is worse than an extra question.
 - That confirmed value then updates the slot. State is authoritative, but a high-stakes change is always user-confirmed.
+> 🇨🇳 structured state 是事实的 source of truth，但在一个碰钱的动作之前，我会把相关的 slot 读回给用户做明确确认 —— "跟您确认一下，对订单 12345 退 200 美元？"如果他们的回复跟 state 矛盾，我不会悄悄覆盖 —— 我会再确认一遍，因为在 money flow 里，一次错误的写入比多问一句更糟。确认后的那个值再去更新 slot。state 是权威的，但一个高风险的改动永远要用户确认。
 
 **Q: What happens to all this state when the session ends or the user comes back later?**
+**中**: 会话结束、或者用户过一阵子回来时，这些 state 怎么办？
 - Within a session it lives in the orchestration layer. Across sessions, whether I persist it depends on the use case [✏️ 核实 是否做了跨 session 持久化].
 - If I persist, it's the structured slots — resolved intents, account context — not raw transcript, and it's subject to retention and privacy rules, which in a finance context are strict.
 - I'd be explicit that long-term per-user memory raises privacy questions, so I'd only keep what's needed and govern it — which is exactly the mindset Apple cares about.
+> 🇨🇳 在一个 session 之内，它活在 orchestration 层。跨 session 要不要持久化，取决于用例 [✏️ 核实 是否做了跨 session 持久化]。如果我持久化，存的是 structured 的 slot —— 已确定的意图、账户上下文 —— 而不是原始 transcript，而且它受 retention 和隐私规则约束，这些规则在金融语境下是很严的。我会明说：长期的 per-user memory 会带来隐私问题，所以我只保留必要的、并对它做治理 —— 这恰恰是 Apple 在意的那种心态。
 
 **Q: How would this run on-device with a small model and a hard memory ceiling?**
+**中**: 这套在端上跑会怎样 —— 一个小模型加一个硬性的内存上限？
 - The architecture barely changes — it's *built* around a token budget, which is just tighter on-device.
 - Structured state stays cheap because it's compact slots, not prose; the rolling summary and recent window shrink to fit device memory.
 - That's the cloud→device bridge: same discipline, the constraint flips from cost/HBM to unified memory and power.
+> 🇨🇳 架构几乎不变 —— 它本来就是*围着* token budget 搭起来的，在端上只是这个 budget 更紧。structured state 依然便宜，因为它是紧凑的 slot，不是散文；滚动 summary 和 recent window 缩小到能塞进设备内存。这就是 cloud→device 的那座桥：同样的纪律，约束从 cost/HBM 翻成 unified memory 和功耗。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

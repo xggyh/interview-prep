@@ -69,13 +69,19 @@ Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收�
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How did you get product and ops to actually agree on a scope?**
+**中**: 你是怎么让 product 和 ops 真正在一个范围上达成一致的?
 "The ticket data did most of the work — it's hard to argue against 'this is what customers actually contact us about.' I anchored the conversation on volume and resolvability: which intents are both high-volume and well-defined enough to automate safely. We agreed to start where impact and tractability overlapped, and I made the first scope explicitly a *first* scope — a starting point we'd expand from — so nobody felt their priority was dropped, just sequenced."
+> 🇨🇳 工单数据干了大部分的活儿 —— 「这就是客户真正来找我们的事情」这句话很难反驳。我把讨论锚定在 volume（量）和 resolvability（可解决性）上：哪些 intent 既是高频的、又足够定义清晰到可以安全地自动化。我们一致同意从影响力和可处理性重叠的地方开始，而且我明确地把第一个范围说成是一个*第一个*范围 —— 是一个我们会往外扩的起点 —— 这样没有人会觉得自己的优先级被砍掉了，只是被排了个先后。
 
 **Q: Give a concrete example of a requirement that shifted, and what it cost you.**
+**中**: 给一个需求发生变化的具体例子,以及它让你付出了什么代价。
 "A new intent or a changed policy — say a refund rule changes, or ops wants a new dispute sub-flow. Because policies lived in the RAG knowledge base and intents were routing config, those landed as a content or config update, not a model change or redeploy. A genuinely new *action* — something requiring a new backend call — did cost real engineering, because that's a new tool. So I'd be honest: the design made the *common* changes cheap; truly new capabilities still cost what they cost. The win was not paying engineering cost for the changes that happen most often."
+> 🇨🇳 一个新的 intent 或者一条变了的政策 —— 比如某条退款规则变了，或者 ops 想要一个新的争议子流程。因为政策是放在 RAG 的 knowledge base 里、intent 是 routing config，所以这些都落成了一次内容更新或者配置更新，而不是改模型、不是重新部署。但一个真正全新的*动作* —— 需要一个新的 backend call 的东西 —— 确实花了真实的工程，因为那是一个新的 tool。所以我会很诚实地说：这个设计让*常见*的变更很便宜；真正全新的能力，该花的成本还是要花。那个赢点在于，对那些发生得最频繁的变更，我们不必再付工程成本。
 
 **Q: Doesn't pushing everything into config/RAG just move the complexity somewhere harder to debug?**
+**中**: 把所有东西都塞进 config/RAG,不就是把复杂度挪到一个更难 debug 的地方去了吗?
 "It's a real trade-off — config and knowledge-base content become things you now have to govern and test. So I treated them as first-class: the FAQ content went through the same eval as the model, and routing config had its own regression checks. The point isn't 'no complexity,' it's putting the *frequently-changing* complexity somewhere you can update and validate fast, instead of in code that needs a deploy. I'd rather debug a knowledge-base entry than ship a hotfix."
+> 🇨🇳 这是一个真实的权衡 —— config 和 knowledge-base 的内容现在变成了你必须去治理和测试的东西。所以我把它们当成一等公民来对待：FAQ 的内容走跟模型一样的那套 eval，routing config 也有它自己的回归检查。重点不是「没有复杂度」，而是把那些*频繁变化*的复杂度放在一个你能快速更新、快速验证的地方，而不是放在需要一次部署的代码里。我宁愿去 debug 一条 knowledge-base 的条目，也不愿意去 ship 一个 hotfix。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

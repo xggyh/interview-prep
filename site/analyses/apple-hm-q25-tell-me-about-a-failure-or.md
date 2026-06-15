@@ -46,13 +46,19 @@ The lesson I actually internalized: a slow signal is not a failed signal, and mo
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Why did this get through review/testing in the first place?**
+**中**: 这个问题一开始为什么能通过 review / 测试漏出去?
 "Because our tests covered the happy path and clean failures, but not the ambiguous middle — a send that's slow but ultimately succeeds. The assumption 'no fast confirmation means failure' was baked in so quietly that no test challenged it. That's precisely why I didn't just add one test case afterward — a point fix would've left the next hidden assumption exposed. Shadow mode against real traffic catches the class of problem, not just this instance."
+> 🇨🇳 因为我们的测试覆盖了 happy path 和那种干净的失败, 但没覆盖那个模糊的中间地带 — 一个发送很慢、但最终成功了的情况。'没有快速确认就等于失败' 这个假设被悄无声息地埋了进去, 没有任何一个测试去挑战它。这正是为什么我后来没有只加一个 test case — 一个点修复 (point fix) 会把下一个隐藏的假设继续暴露在那里。拿真实流量跑的 shadow mode 抓的是这一整类的问题, 而不只是这一个个例。
 
 **Q: How do you make sure shadow mode doesn't just become a step people skip under deadline pressure?**
+**中**: 你怎么确保 shadow mode 不会在 deadline 压力下变成一个大家都跳过的步骤?
 "I made it a rule, not a suggestion — for customer-facing changes of that risk class, shadow-then-replay is the default path, and skipping it is the exception that needs a reason. Process that depends on goodwill erodes; process that's the default path survives deadlines. And because the replay harness is fast, it's cheaper to use it than to argue about skipping it."
+> 🇨🇳 我把它做成了一条规则, 而不是一个建议 — 对那个风险等级、面向客户的改动来说, shadow-then-replay 是默认路径, 跳过它反而是一个需要给理由的例外。靠 goodwill (自觉) 撑着的流程会被磨损掉; 而作为默认路径的流程, 能扛过 deadline。而且因为这个 replay harness 很快, 用它比起去争论要不要跳过它, 成本还更低。
 
 **Q: That 47% — how did you measure it, and are you confident in it?**
+**中**: 那个 47% — 你是怎么量的, 你有多大把握?
 "It's the false-fail-and-retry rate before versus after, measured on the same Indonesia traffic over comparable windows [✏️ 核实 — 背前确认口径和数字]. I want to be honest that it's a before/after on production metrics, not a controlled experiment, so I'd frame it as a strong directional improvement rather than a clean causal number."
+> 🇨🇳 它是 false-fail-and-retry 率的前后对比, 在同一个印尼市场的流量上、可比的时间窗口里量出来的 [✏️ 核实 — 背前确认口径和数字]。我想诚实地说: 这是 production 指标上的一个 before/after, 不是一个对照实验, 所以我会把它框成一个很强的方向性改进, 而不是一个干净的因果数字。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

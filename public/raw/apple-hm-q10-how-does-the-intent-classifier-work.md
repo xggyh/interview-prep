@@ -88,44 +88,60 @@ So the design assumption is: the classifier *will* be wrong some percent of the 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Why not just use the LLM for routing everywhere — it's more accurate?**
+**中**: 为什么不干脆全程用 LLM 来路由 —— 它更准啊？
 - Latency and cost. Routing is on the critical path of *every* turn — a large model there taxes every interaction, even trivial ones.
 - The tiered approach gives me the LLM's judgment on the hard 10–20% [✏️ 核实] while keeping median latency and cost down.
 - That latency/cost/quality trade-off is exactly what this role cares about.
+> 🇨🇳 latency 和 cost。routing 在*每一轮*的关键路径上 —— 在那放一个大模型，会给每一次交互都加税，哪怕是最 trivial 的那种。分层的做法让我在难的那 10–20% [✏️ 核实] 上拿到 LLM 的判断，同时把 median 的延迟和成本压下来。这个 latency/cost/quality 的权衡，恰恰是这个岗位关心的东西。
 
 **Q: How do you set the confidence threshold?**
+**中**: confidence 阈值你是怎么定的？
 - It's a precision/recall trade-off I tune on the eval set against the *cost of a misroute*.
 - Benign intents → route more aggressively. Money-touching intents (refund, dispute) → raise the bar; a wrong action there is expensive, so I'd rather ask or escalate.
 - So it's not one global number — it's *per-intent, risk-weighted*.
+> 🇨🇳 这是一个 precision/recall 的权衡，我在 eval set 上对着*一次 misroute 的代价*来调。无害的意图 → 路由得更激进一点。碰钱的意图（refund、dispute）→ 把门槛抬高；那里做错一个动作代价很大，所以我宁愿先问一句或者升级。所以它不是一个全局的数 —— 它是*按 intent、按风险加权*的。
 
 **Q: How do you even know a misroute happened — that's the hard part?**
+**中**: 你怎么知道发生了一次 misroute —— 这才是难的地方？
 - Two signals. *In-band*: the sub-agent detects domain mismatch — refund agent queries for a refundable order, finds none → strong misroute signal.
 - *Out-of-band*: instrumentation — user re-asks, expresses frustration, or the conversation stalls without resolution.
 - Those feed both the live escalation path and the offline retraining set.
+> 🇨🇳 两个信号。*In-band*：sub-agent 自己检测到域不匹配 —— refund agent 去查一个可退款的订单，结果一个都没找到 → 这是一个很强的 misroute 信号。*Out-of-band*：靠 instrumentation —— 用户反复追问、表现出 frustration，或者对话卡住一直没 resolve。这两类信号同时喂给线上的 escalation 路径和离线的 retraining 集。
 
 **Q: How does the classifier improve over time?**
+**中**: 这个 classifier 随时间怎么变好？
 - Misrouted-and-clarified turns are gold-standard labels — they flow back into the small model's training set.
 - I review the confusion matrix each iteration, especially the adjacent-intent cells.
 - Same eval-driven loop I ran on the voice agent: ship → measure → find failures → retrain on those failures.
+> 🇨🇳 那些先路由错、然后被澄清纠正的 turn，是 gold-standard 的标签 —— 它们回流进小模型的训练集。我每一轮迭代都看 confusion matrix，尤其是相邻意图那几格。跟我在 voice agent 上跑的是同一个 eval-driven 闭环：上线 → 度量 → 找失败 → 在这些失败上 retrain。
 
 **Q: Rules — did you use any at all?**
+**中**: 规则 —— 你到底用没用？
 - Yes, narrowly — as deterministic *guardrails*, not the classifier.
 - E.g. hard triggers for high-risk phrases that must *always* escalate — a regulatory complaint, fraud language — regardless of what the model thinks.
 - Rules are great at "never miss this," bad at general coverage. So I use them only where a miss is unacceptable.
+> 🇨🇳 用了，但很窄 —— 是作为确定性的 *guardrails*，不是作为 classifier。比如对一些高风险措辞设硬触发，这些必须*永远*升级 —— 监管投诉、涉欺诈的话术 —— 不管模型怎么想。规则擅长"绝不漏掉这个"，但不擅长泛化覆盖。所以我只在"漏掉就不可接受"的地方用它。
 
 **Q: What latency does the classifier add per turn?**
+**中**: 这个 classifier 每一轮加多少延迟？
 - The small model is cheap — a few milliseconds of overhead [✏️ 核实 实际延迟] — which is the whole reason it's tier one.
 - The LLM fallback is slower, but it only fires on the ambiguous minority, so it doesn't move the median.
 - This is a deliberate latency-budget decision, not an afterthought.
+> 🇨🇳 小模型很便宜 —— 就几毫秒的开销 [✏️ 核实 实际延迟] —— 这正是它能当 tier one 的全部原因。LLM 的 fallback 更慢，但它只在那一小撮 ambiguous 的情况上触发，所以它不会动 median。这是一个刻意的 latency-budget 决策，不是事后补的。
 
 **Q: New intents appear over time — how does the taxonomy not go stale?**
+**中**: 新意图会随时间冒出来 —— taxonomy 怎么不会过时？
 - I monitor the *general* / fallback bucket and the low-confidence cluster — a rising mass there is the signal that a new intent is emerging.
 - When a cluster is big and automatable enough, it graduates into its own labeled intent with a sub-agent.
 - So the taxonomy is data-driven and evolving, not frozen at launch. [✏️ 核实 实际有没有做这个 cluster 监控]
+> 🇨🇳 我会监控 *general* / fallback 那个桶，还有 low-confidence 的那一簇 —— 那里的量在涨，就是一个新意图正在浮现的信号。当某一簇足够大、又足够可自动化时，它就"毕业"成自己一个有标签的意图，配一个 sub-agent。所以这个 taxonomy 是数据驱动、不断演化的，不是上线那一刻就冻住的。[✏️ 核实 实际有没有做这个 cluster 监控]
 
 **Q: Could you skip the classifier and let an orchestrator LLM decide routing as part of generation?**
+**中**: 能不能干脆不要 classifier，让一个 orchestrator LLM 在生成的同时顺便决定路由？
 - You can — that's the "single agent decides its own next action" pattern. The trade-off is you lose the cheap, fast, separately-measurable routing decision.
 - A standalone classifier gives me a confidence score to gate on, a confusion matrix to debug, and a place to enforce risk-weighted thresholds — all harder to isolate inside one big generation call.
 - For a compliance-sensitive flow I value that observability and control over the elegance of one model doing everything.
+> 🇨🇳 可以 —— 那就是"单个 agent 自己决定下一步动作"的那种 pattern。代价是你失去了那个便宜、快、又能单独度量的 routing 决策。一个独立的 classifier 给我一个 confidence score 去 gate、一个 confusion matrix 去 debug、还有一个能强制施加风险加权阈值的地方 —— 这些塞进一个大的 generation 调用里都更难隔离出来。对一个合规敏感的流程，比起"一个模型干所有事"那种优雅，我更看重这种可观测性和控制力。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

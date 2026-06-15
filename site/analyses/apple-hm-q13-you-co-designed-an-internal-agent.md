@@ -81,54 +81,74 @@ Plus we standardized deployment, so going to production was a paved path, not a 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: You said "co-designed" — what was *yours* specifically?**
+**中**: 你说"co-designed" —— 具体哪部分是*你的*？
 - I'd be precise rather than claim the whole platform.
 - I drove the pieces that came straight out of my BNPL and voice work — the orchestration and tool-integration patterns, and the eval harness — because I'd already built those for real agents.
 - The infra layers — deployment, the inference-serving side — were more shared / co-owned [✏️ 核实 具体分工]. I'm careful not to over-claim co-design as sole ownership.
+> 🇨🇳 我会说得精确，而不是把整个平台都揽到自己身上。我主导的是那些直接从我 BNPL 和 voice 工作里长出来的部分 —— orchestration 和 tool-integration 的模式，还有 eval harness —— 因为我已经为真实的 agent 搭过这些。那些 infra 层 —— 部署、inference-serving 那一侧 —— 更偏共享 / 共同 own [✏️ 核实 具体分工]。我很小心，不会把 co-design 夸成是我一个人 own 的。
 
 **Q: What's the hardest abstraction to get right, and why?**
+**中**: 最难做对的抽象是哪个，为什么？
 - Tool integration — it's where safety and flexibility collide.
 - Too rigid and teams can't model their real workflows; too loose and you've handed agents unscoped power in money-touching contexts.
 - The resolution: a typed schema with explicit scoping and auth *per tool* — flexibility lives in *which* tools you register, but every call goes through the same safety gate.
+> 🇨🇳 tool integration —— 它是安全和灵活性正面相撞的地方。太死，团队没法建模他们真实的 workflow；太松，你就在碰钱的上下文里把没 scope 的权力交给了 agent。解法是：一个 typed schema，*每个工具*都有明确的 scoping 和 auth —— 灵活性在于你*注册哪些*工具，但每一次调用都走同一道安全闸门。
 
 **Q: How do you stop a platform from becoming a bottleneck that slows every team?**
+**中**: 你怎么防止一个平台变成拖慢每个团队的瓶颈？
 - Standardize the cross-cutting concerns; leave the *application logic* open.
 - Teams own their agent graph, prompts, and tools; the platform owns mechanics, observability, eval, deploy.
 - "Mechanics standardized, behavior open." If the platform owned product logic it'd be the thing everyone works around.
+> 🇨🇳 把横切关注点（cross-cutting concerns）标准化；把*应用逻辑*留开放。团队 own 他们自己的 agent graph、prompt 和工具；平台 own 机制、可观测性、eval、部署。一句话："机制标准化，行为开放。"如果平台连产品逻辑都 own 了，它就会变成那个所有人都想绕开的东西。
 
 **Q: How did you measure whether the platform was actually working?**
+**中**: 你怎么衡量这个平台到底有没有真的起作用？
 - Adoption and time-to-production for a new agent — if teams route around it, it failed.
 - And whether platform-built agents had *better* safety and eval coverage than the old hand-rolled ones, since that was the whole pitch.
 - [✏️ 核实 实际有没有量 adoption / TTP]
+> 🇨🇳 看 adoption，和一个新 agent 的 time-to-production —— 如果团队都绕开它，那它就失败了。还有：平台搭出来的 agent，是不是比以前手搓的那些有*更好*的安全和 eval 覆盖，因为这本来就是整个卖点。[✏️ 核实 实际有没有量 adoption / TTP]
 
 **Q: When would per-team code actually be the right call?**
+**中**: 什么时候"每个团队自己写代码"反而才是对的选择？
 - Early, when the problem isn't understood yet — you don't abstract before you have two or three real instances to learn the common shape from.
 - The platform was justified *because* we'd already shipped BNPL and the voice agent and saw the repeated structure.
 - Premature platforms abstract the wrong things — that's a real failure mode I'd avoid.
+> 🇨🇳 早期，问题还没被理解清楚的时候 —— 在你有两三个真实实例、能从中学到共同的 shape 之前，不要去抽象。这个平台之所以站得住脚，*正是因为*我们已经上了 BNPL 和 voice agent，看到了那个重复出现的结构。过早的平台会抽象错东西 —— 这是一个真实的失败模式，我会避开它。
 
 **Q: Multi-modal — voice, text — how does one platform serve both?**
+**中**: 多模态 —— 语音、文字 —— 一个平台怎么同时服务两者？
 - The orchestration, memory, tool, eval, and observability layers are modality-agnostic — a turn is a turn whether it arrived as text or as transcribed speech.
 - The modality-specific parts — ASR/TTS streaming for voice — sit at the edge, in front of the shared core.
 - So voice is "the same agent platform with a speech front-end," which is exactly how I'd think about Apple's multi-modal requirement.
+> 🇨🇳 orchestration、memory、tool、eval、observability 这几层是 modality-agnostic 的 —— 一轮就是一轮，不管它是以文字进来的，还是以转写后的语音进来的。跟模态相关的那些部分 —— voice 的 ASR/TTS streaming —— 坐在边缘，在共享内核的前面。所以 voice 就是"同一个 agent 平台加一个语音前端"，这恰恰是我看待 Apple 多模态需求的方式。
 
 **Q: How did teams onboard — what did "use the platform" actually look like for a new team?**
+**中**: 团队是怎么 onboard 的 —— 对一个新团队来说，"用这个平台"具体长什么样？
 - They define their agent graph and prompts, register their tools against the standard interface, and point at the shared memory and eval services — config and their own logic, not infrastructure.
 - The paved deployment path took them to production without each team solving serving, tracing, and rollout from scratch.
 - The win is the *time-to-first-safe-agent* — a new team ships something observable and evaluated on day one instead of rebuilding the plumbing and getting safety wrong. [✏️ 核实 实际 onboarding 体验/时长]
+> 🇨🇳 他们定义自己的 agent graph 和 prompt，按标准接口注册自己的工具，再指向共享的 memory 和 eval 服务 —— 是 config 加他们自己的逻辑，而不是基础设施。一条铺好的部署路径（paved path）把他们带到生产，不用每个团队都从零去解决 serving、tracing 和 rollout。真正的胜利是 *time-to-first-safe-agent* —— 一个新团队第一天就能上一个可观测、被 eval 过的东西，而不是去重搭管线、还把安全搞错。[✏️ 核实 实际 onboarding 体验/时长]
 
 **Q: How does the eval pipeline stay shared when every agent does something different?**
+**中**: 每个 agent 做的事都不一样，eval pipeline 怎么还能是共享的？
 - The *harness* is shared — golden-set runners, LLM-as-judge scaffolding, regression gating on each change — even though the *golden sets* are per-agent.
 - So teams bring their own test cases and rubrics, but the machinery to run them, score them, and block a regression is common.
 - That's the same "mechanics standardized, content open" line applied to eval specifically.
+> 🇨🇳 共享的是那套 *harness* —— golden-set 的 runner、LLM-as-judge 的脚手架、每次改动上的 regression gating —— 尽管 *golden set 本身* 是每个 agent 各自的。所以团队自带他们的测试用例和 rubric，但用来跑它们、给它们打分、并拦住一次 regression 的那套机器，是共用的。这就是那条"机制标准化，内容开放"的线，具体落到 eval 上的版本。
 
 **Q: How do you version and roll out a change without breaking every team on the platform?**
+**中**: 你怎么给改动做版本和发布，又不把平台上的每个团队都搞挂？
 - The platform is itself a dependency, so I treat it like one — versioned interfaces, backward compatibility on the tool and memory contracts, and the eval regression gate runs before anything ships.
 - Teams pin to a version and migrate deliberately rather than getting surprised by a breaking change underneath them.
 - This is the operational maturity that separates a real platform from a shared repo — it has the responsibilities of an internal product. [✏️ 核实 实际版本管理机制]
+> 🇨🇳 平台本身就是一个 dependency，所以我把它当 dependency 来对待 —— 接口带版本、tool 和 memory 契约保持向后兼容，而且任何东西上线前 eval 的 regression gate 都会先跑。团队 pin 在某个版本上，有意识地去迁移，而不是被脚底下一个 breaking change 突然惊到。这就是把一个真正的平台和一个共享 repo 区分开的运营成熟度 —— 它担着一个内部产品的责任。[✏️ 核实 实际版本管理机制]
 
 **Q: Why co-design rather than have one architect own it?**
+**中**: 为什么要 co-design，而不是让一个架构师独自 own 它？
 - The hardest part of a platform is that it has to fit *real* workloads, and no single person has hands in every team's use case.
 - Co-designing with the people who'd actually build on it — me bringing the BNPL and voice patterns, others bringing theirs — is how you abstract the *right* things instead of one person's guess.
 - The risk of a solo architect is an elegant platform nobody can use; co-design is a hedge against that.
+> 🇨🇳 一个平台最难的地方在于它必须贴合*真实*的工作负载，而没有任何一个人能把手伸进每个团队的用例里。跟那些真正会在上面构建的人一起 co-design —— 我带来 BNPL 和 voice 的模式，别人带来他们的 —— 这才是抽象出*对的*那些东西的办法，而不是一个人的猜测。一个单独架构师的风险，是搞出一个优雅但没人用得了的平台；co-design 就是对这个风险的对冲。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

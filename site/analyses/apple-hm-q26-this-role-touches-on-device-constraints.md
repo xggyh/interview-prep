@@ -48,16 +48,24 @@ So my honest framing is: I'm strong on the isomorphic problem and I'd be ramping
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: What's genuinely different about 2-bit QAT versus the quantization you've done?**
+**中**: 2-bit QAT 跟你做过的量化, 真正不一样的地方在哪?
 "The big one is that QAT — quantization-aware training — folds the quantization into training, so the model learns to be robust to 2-bit weights, versus post-training quantization where you quantize a finished model and eat the accuracy drop. At 2-bit, post-training quantization basically falls apart, so QAT isn't optional. I've mostly done post-training-side memory tuning, so the new muscle I'd build is the training-time side — the QAT loop, calibration, and recovering quality at that bit-width. I know the destination; I'd be learning that specific path."
+> 🇨🇳 最大的区别是, QAT — quantization-aware training — 把量化折叠进了训练过程, 所以模型会学着对 2-bit 的权重变得鲁棒; 而 post-training quantization 是你拿一个训完的模型去量化, 然后硬吃那个精度的下跌。到了 2-bit, post-training quantization 基本上就崩了, 所以 QAT 不是可选项。我做的主要是 post-training 侧的 memory tuning, 所以我要新练的那块肌肉, 是训练时 (training-time) 那一侧 — QAT 的 loop、calibration、以及在那个 bit-width 下把质量找回来。我知道目的地在哪; 我要学的是那条具体的路。
 
 **Q: On-device, you can't just scale out. How does that change your architecture thinking?**
+**中**: 在 on-device 上, 你没法直接 scale out。这会怎么改变你做架构的思路?
 "It removes the easy escape hatch. On cloud, if quality needs more compute, I can add GPUs — latency and quality become a money problem. On a phone, the budget is fixed, so every quality gain has to come from the model or the system being smarter: better adapters, better quantization, smarter KV-cache reuse, or offloading the heavy case to a server model. It actually maps to Apple's own design — small capable model on-device, and Private Cloud Compute for the harder requests. Deciding *what runs where* under that split is the interesting architecture problem, and it's a routing/tradeoff decision, which is squarely what I do."
+> 🇨🇳 它把那个简单的逃生舱给拿掉了。在 cloud 上, 如果质量需要更多算力, 我可以加 GPU — latency 和质量就变成一个花钱的问题。但在一部手机上, 预算是固定的, 所以每一点质量的提升都得来自模型或系统变得更聪明: 更好的 adapter、更好的量化、更聪明的 KV-cache 复用、或者把那个重的 case offload 给一个 server 模型。这其实正好对上 Apple 自己的设计 — 一个小而能干的模型在 on-device 上, 再用 Private Cloud Compute 接那些更难的请求。在这个切分之下决定 *什么跑在哪里*, 才是那个有意思的架构问题, 而它是一个 routing / 取舍的决策, 这恰恰就是我在做的事。
 
 **Q: How would you decide what stays on-device versus goes to the server model?**
+**中**: 你会怎么决定什么留在 on-device、什么送去 server 模型?
 "I'd frame it as a routing problem on three axes: can the on-device model hit the quality bar for this request, how latency-sensitive is it, and is there privacy-sensitive data that should never leave the device. Easy, private, latency-critical requests stay local; hard or ambiguous ones escalate to the server model. That's the same intent-gating-and-dispatch pattern I built in the BNPL chatbot — recognized intents to local workflows, hard ones escalate — just with privacy and a fixed device budget added as first-class constraints."
+> 🇨🇳 我会把它框成一个三个维度上的 routing 问题: on-device 模型能不能打到这个请求的质量线、它对 latency 有多敏感、以及有没有那种永远不该离开设备的 privacy-sensitive 数据。那些简单的、私密的、对延迟很敏感的请求留在本地; 难的或者模糊的就升级 (escalate) 到 server 模型。这跟我在 BNPL chatbot 里搭的那套 intent-gating-and-dispatch 模式是一样的 — 识别出来的 intent 走本地 workflow, 难的就升级 — 只不过这里把 privacy 和一个固定的设备预算, 当成了一等公民级别的约束加了进来。
 
 **Q: Honestly, what would your first month look like ramping on device?**
+**中**: 说实话, 你上手 on-device 的第一个月会是什么样子?
 "First, get hands-on with the device tooling — quantization and the on-device runtime — and reproduce a known result so I trust my own measurements. Second, find the actual binding constraint on the target hardware, because 'on-device' is not one budget; memory, power, and thermal each bite differently. Third, map our existing serving optimizations to their device equivalents and see which transfer cleanly and which don't. I'd rather earn a calibrated mental model in month one than guess."
+> 🇨🇳 第一, 先上手设备的 tooling — 量化和 on-device 的 runtime — 然后复现一个已知的结果, 这样我才信得过我自己的测量。第二, 找出目标硬件上那个真正的 binding constraint, 因为 'on-device' 不是单一一个预算; memory、功耗、还有热 (thermal), 每一个咬人的方式都不一样。第三, 把我们现有的 serving 优化映射到它们在设备上的对应物, 看哪些能干净地迁移过去、哪些不行。比起靠猜, 我更愿意在第一个月里挣到一个校准过的 mental model。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

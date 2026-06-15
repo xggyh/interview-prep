@@ -83,25 +83,39 @@ I lived this on our BNPL chatbot. The FAQ side was a pure knowledge problem — 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Can you combine them? Or is it one or the other?**
+**中**: 这三者能组合吗?还是只能三选一?
 "Almost always combined. A real system is usually a fine-tuned-or-base model, with RAG feeding it fresh context, inside a carefully engineered prompt. They're layers, not a menu. My BNPL stack had all three in different parts."
+> 🇨🇳 几乎总是组合用的。一个真实系统通常是一个 fine-tuned 或者 base 的模型，外面套 RAG 给它喂新鲜的 context，再装进一个精心设计的 prompt 里。它们是叠加的层，不是一个菜单。我那个 BNPL 的 stack 在不同的部分里这三样都用上了。
 
 **Q: When would you specifically NOT fine-tune?**
+**中**: 具体在什么情况下你会**不**去 fine-tune?
 "Three cases. One — the gap is knowledge that changes; retrieve it. Two — I haven't exhausted prompting yet; I'd be paying training and maintenance cost to fix something a better prompt solves. Three — I don't have enough clean, representative labeled data; fine-tuning on a few hundred noisy examples usually makes things worse, not better."
+> 🇨🇳 三种情况。第一，gap 是会变的知识，那就去 retrieve。第二，我还没把 prompt 这条路榨干，那样我等于在掏训练和长期维护的成本去修一个更好的 prompt 就能解决的问题。第三，我没有足够干净的、有代表性的标注数据；拿几百条带噪声的样本去 fine-tune，通常是把事情搞得更糟，而不是更好。
 
 **Q: How much data do you need to fine-tune well?**
+**中**: 要把 fine-tune 做好需要多少数据?
 "Depends on the goal. For format or style adaptation, a few thousand high-quality examples can move the needle a lot — quality over quantity. For a genuinely new capability, far more. The bigger lever is curation: I'd rather have [✏️ 核实 数千] clean, deduped, on-distribution examples than ten times that of noisy ones. On the voice agent, data construction and cleaning was the part I personally owned, because that's where the quality actually comes from."
+> 🇨🇳 取决于目标。如果是格式或者风格的适配，几千条高质量样本就能把指标拉动很多 —— 质量重于数量。如果是一个真正全新的能力，那就要多得多。但更大的杠杆是 curation（数据筛选）：我宁愿要 [✏️ 核实 数千] 条干净、去重、在分布上的样本，也不要十倍于它的带噪声样本。在 voice agent 那个项目上，数据构造和清洗是我亲自 own 的那部分，因为质量真正就是从这里来的。
 
 **Q: RAG is retrieving the wrong chunks. Do you fine-tune now?**
+**中**: RAG 检索回来的 chunk 是错的。这时候你会去 fine-tune 吗?
 "No — that's a retrieval-quality problem, not a model problem. I'd fix chunking, try hybrid search (BM25 + dense), add a reranker, tune top-k. Fine-tuning the generator doesn't fix bad retrieval; it just teaches the model to sound confident over wrong context, which is worse."
+> 🇨🇳 不会 —— 那是一个检索质量的问题，不是模型的问题。我会去修 chunking、试 hybrid search（BM25 加 dense）、加一个 reranker、调 top-k。去 fine-tune 那个 generator 根本治不好烂检索；它只会教会模型在错误的 context 上把话说得很有底气，那只会更糟。
 
 **Q: How does this map to Apple's on-device world?**
+**中**: 这套逻辑映射到 Apple 的 on-device 世界是什么样的?
 "Same tree, tighter constraints. On device you can't run a huge model, so the 'distill a small model for a narrow task' branch becomes the *default*, not the fallback — which is exactly Apple's task-specific LoRA-adapter approach: one small base, many small fine-tuned adapters hot-swapped per task. And RAG on device means on-device retrieval over the user's own data, which is also a privacy win."
+> 🇨🇳 同一棵决策树，约束更紧。在设备上你跑不了一个巨大的模型，所以「为一个窄任务蒸馏一个小模型」这条分支就从后备选项变成了*默认*选项 —— 这正好就是 Apple 的 task-specific LoRA-adapter 路线：一个小 base，很多个小的 fine-tuned adapter，按任务热插拔。而 on-device 上的 RAG 意味着在用户自己的数据上做 on-device retrieval，这同时还是一个隐私上的赢。
 
 **Q: A PM says 'just fine-tune it on our docs so it knows our product.' How do you respond?**
+**中**: 一个 PM 说「直接拿我们的文档 fine-tune 一下，让它懂我们的产品就行了」。你怎么回应?
 "I'd gently reframe it — that's a knowledge requirement, so the right tool is RAG, not fine-tuning. Fine-tuning on docs doesn't reliably make a model *recall* facts, and the moment a doc changes you're stale and have to retrain. RAG keeps the docs as a live, updatable source with citations. I'd only fine-tune here if the real ask were a consistent *style* of answer, not the facts themselves."
+> 🇨🇳 我会温和地帮他重新框一下 —— 那是一个知识需求，所以对的工具是 RAG，不是 fine-tune。拿文档去 fine-tune 并不能可靠地让模型*记住*事实，而且文档一旦变了，你的模型立刻就过时了，还得重训。RAG 把文档保留成一个实时的、可更新的、带 citation 的来源。我在这里只有当真正的诉求是一个稳定的回答*风格*、而不是事实本身的时候，才会去 fine-tune。
 
 **Q: Prompt works but it's a 4000-token prompt on a frontier model — fine, or fix it?**
+**中**: prompt 是能用，但它是一个 4000-token 的 prompt 跑在一个 frontier 模型上 —— 这样行不行,还是要改?
 "Works, but it's a cost-and-latency smell. If it's high-volume, I'd fine-tune a smaller model to internalize that behavior so I don't pay for the long prompt every call — distillation again. If it's low-volume, I'd leave it; the engineering and maintenance cost of owning a fine-tuned model wouldn't pay back. The decision is volume-and-economics driven, and I'd back it with the actual cost-per-call numbers."
+> 🇨🇳 能用，但这是一个成本和延迟的坏味道。如果它是高频的，我会 fine-tune 一个更小的模型把那个行为内化进去，这样我就不用每次调用都为那个长 prompt 付钱 —— 又是蒸馏。如果它是低频的，我就让它留着；为了拥有一个 fine-tuned 模型而付出的工程和维护成本根本回不了本。这个决策是由调用量和经济性驱动的，而且我会拿真实的 cost-per-call 数字来支撑它。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

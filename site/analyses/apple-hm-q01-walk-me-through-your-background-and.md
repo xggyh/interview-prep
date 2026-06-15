@@ -85,16 +85,24 @@ That's why this conversation is interesting to me."
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: That's a lot of areas — what would you say is your single strongest area?**
+**中**: 你涉猎的领域挺多——要说你最强的单个领域是哪个?
 "Production agentic systems, end to end. Specifically: taking a multi-turn LLM agent from prototype to something reliable enough to touch money, in multiple languages. The voice agent is the clearest example — I own it from the post-training data all the way to the streaming latency budget."
+> 🇨🇳 端到端的生产级 agentic 系统。具体来说：把一个 multi-turn 的 LLM agent，从原型做到可靠到能碰钱的程度，而且是跨多语言的。voice agent 就是最清楚的例子——从 post-training 的数据，一直到 streaming 的 latency budget，整个都是我 own 的。
 
 **Q: Why did you move from CV into LLMs?**
+**中**: 你为什么从 CV 转到了 LLM?
 "Two reasons. One — in payments, the highest-leverage problems shifted from perception to reasoning and conversation; that's where the customer pain moved. Two — I wanted problems where the system has to *act*, not just classify. Agents do that. I didn't abandon CV — the discipline of shipping ML under a hard precision/recall bar carried straight over."
+> 🇨🇳 两个原因。第一——在 payments 里，杠杆最高的问题，从感知转移到了推理和对话；客户的痛点就是往那边走的。第二——我想做那种系统必须去*行动*的问题，而不只是分类。Agent 就是干这个的。我并没有抛弃 CV——那套在硬性 precision/recall 标准下 ship ML 的功夫，是直接迁移过来的。
 
 **Q: You're a POC — is that an IC role or a lead role?**
+**中**: 你是 POC——这是一个 IC 的角色，还是一个 lead 的角色?
 "Both, honestly. I'm hands-on in the code and the model training, and I'm also the technical point of contact — I make the architecture calls and I'm accountable for them across the three of us. I can be specific about which decisions were mine versus the team's if that's useful." *(为 Q7 埋钩子)*
+> 🇨🇳 老实说，两者都是。我在代码和模型训练上是 hands-on 的，同时我也是技术上的 point of contact——架构上的决策是我拍板，并且在我们三个人里我要为这些决策负责。如果有用的话，我可以具体说清楚哪些决策是我的、哪些是团队的。
 
 **Q: Five years and you've changed domains twice — are you going to get bored at Apple too?**
+**中**: 五年里你换了两次领域——你在 Apple 是不是也会做腻?
 "The opposite read, I'd argue. The thread through all of it is the same: applied ML where mistakes have real consequences. I didn't job-hop — I followed where the hard, consequential problems went, inside payments. On-device agentic systems for customers is the next hard version of that, not a different thing."
+> 🇨🇳 我会说，恰恰相反。贯穿这一切的主线是同一条：出错有真实后果的 applied ML。我不是在跳来跳去——我是在 payments 内部，跟着那些又难、又有后果的问题走。面向客户的 on-device agentic 系统，是这件事的下一个更难的版本，不是另一码事。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

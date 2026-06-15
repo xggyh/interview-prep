@@ -73,22 +73,34 @@ I built exactly this on our BNPL chatbot. The FAQ path was **grounded generation
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How do you actually measure hallucination — what's the metric?**
+**中**: 你到底怎么去测量幻觉 —— 指标是什么?
 "Faithfulness / groundedness rate on a labeled golden set: for each answer, is every claim supported by the retrieved context? I'd report unsupported-claim rate and citation-resolution rate. On live traffic I sample and run the same LLM-judge, and I'd also watch downstream proxies — escalation rate, customer correction/complaint rate. I'd put a real number here from our BNPL eval [✏️ 核实 faithfulness %]."
+> 🇨🇳 在一个标注过的 golden set 上测 faithfulness / groundedness rate：对每一个回答，里面的每一条 claim 是不是都被 retrieved context 支撑?我会报 unsupported-claim rate（无支撑断言率）和 citation-resolution rate（引用能否对上的比率）。在线上流量上我会采样，跑同一个 LLM-judge，我还会盯着下游的代理指标 —— escalation rate（升级率）、客户更正/投诉率。我会在这里放一个从我们 BNPL eval 里来的真实数字 [✏️ 核实 faithfulness %]。
 
 **Q: Isn't using an LLM to judge an LLM circular — what if the judge hallucinates?**
+**中**: 用一个 LLM 去评判另一个 LLM 不是循环论证吗 —— 万一这个 judge 自己也产生幻觉怎么办?
 "It's a real risk, so I calibrate the judge against human labels first and only trust it where it agrees with humans. The judge's job is narrow and easier than the original task — 'is X supported by this passage?' is close to entailment, not open generation — so it's more reliable than the generator. And I keep a human-labeled sample as ground truth to catch judge drift."
+> 🇨🇳 这是一个真实的风险，所以我先拿人工标注去 calibrate 这个 judge，只在它跟人类意见一致的地方才信它。judge 的活儿很窄、比原任务更简单 —— 「X 这条有没有被这段话支撑?」更接近 entailment（蕴含判断），而不是开放式生成 —— 所以它比 generator 更可靠。而且我会留一份人工标注的样本当 ground truth，用来抓 judge 的 drift（漂移）。
 
 **Q: Retrieval returned the wrong document and the model faithfully summarized it. Is that a hallucination?**
+**中**: 检索返回了错误的文档,而模型忠实地把它总结了出来。这算幻觉吗?
 "No — that's a *retrieval* failure, and it's important to separate them because the fix is different. The model was faithful to bad evidence. I'd catch it on the retrieval side — relevance scoring, reranking, top-k tuning — not by touching the generator. Grounding protects you from invention; it does not protect you from wrong sources. Both need their own eval."
+> 🇨🇳 不算 —— 那是一个*检索*的失败，把这两者分开很重要，因为修法不一样。模型是忠实于一份坏证据。我会在检索那一侧去抓它 —— relevance scoring、reranking、调 top-k —— 而不是去动 generator。Grounding 保护你不去凭空编造；它并不能保护你不被错误的来源带偏。这两者各自需要自己的 eval。
 
 **Q: Can you fine-tune the hallucination away?**
+**中**: 你能靠 fine-tune 把幻觉消掉吗?
 "Not directly — facts that change can't be trained in, and fine-tuning a model to 'be confident' often makes it *more* fluently wrong. Fine-tuning helps adjacent behaviors — saying 'I don't know' more reliably, citing more consistently — but the load-bearing fixes are grounding, tool-sourced facts, and the human fallback."
+> 🇨🇳 不能直接消 —— 会变的事实没法被训练进去，而且把模型 fine-tune 成「更有底气」往往会让它*更*流畅地说错话。Fine-tune 能帮上一些相邻的行为 —— 更可靠地说「我不知道」、更一致地给 citation —— 但真正承重的修法是 grounding、把事实交给 tool 去取、以及人工兜底。
 
 **Q: How does this change on-device / at Apple?**
+**中**: 这套东西在 on-device / 在 Apple 会有什么不同?
 "The principles hold, and a couple get sharper. On device you can do **on-device retrieval over the user's own data**, which is both a grounding win and a privacy win — the facts never leave the device. And with a smaller on-device model, the 'escalate when unsure' branch — to a larger server model in Private Cloud Compute, or to a human — matters even more, because a 3B model has a smaller safe envelope than a frontier one."
+> 🇨🇳 原则都成立，有几条会变得更尖锐。在设备上你可以做**在用户自己数据上的 on-device retrieval**，这既是一个 grounding 上的赢、也是一个隐私上的赢 —— 事实从不离开设备。而且因为 on-device 模型更小，「不确定就 escalate」这条分支 —— 升到 Private Cloud Compute 里一个更大的 server 模型、或者升给人工 —— 就更加重要了，因为一个 3B 模型的安全边界比一个 frontier 模型要小。
 
 **Q: What's your single highest-leverage fix if you only had time for one?**
+**中**: 如果你只有时间做一件事,你杠杆最大的那个修法是什么?
 "Separate facts from phrasing. Pull every specific — number, date, policy — from a tool or retrieval, and let the model only do the wording. Most damaging support-agent hallucinations are *wrong specifics*, and that one move removes most of the blast radius before you even touch model quality."
+> 🇨🇳 把事实和措辞分开。把每一个具体的东西 —— 数字、日期、政策 —— 都从一个 tool 或者 retrieval 里取出来，让模型只负责遣词造句。在客服 agent 里最有破坏性的幻觉大多是*错的具体信息*，而这一招在你还没去碰模型质量之前，就已经把大部分的爆炸半径给消掉了。
 
 ## ⚠️ 弱答 vs 强答 (一眼看出什么措辞赢)
 

@@ -92,48 +92,66 @@ JD 明写 "RAG / retrieval / vector search",这是必答硬题。面试官想看
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: What chunk size and overlap, concretely?**
+**中**: 具体说，chunk size 和 overlap 是多少？
 - A structure-aware unit, typically a few hundred tokens, with a small overlap [✏️ 核实 实际 chunk size / overlap].
 - But I'd push back on a fixed number being the right frame — the right unit is *semantic*: a short FAQ answer is one chunk; a long policy section splits on subheadings.
 - I tune size against retrieval recall on an eval set, not by a rule of thumb.
+> 🇨🇳 一个 structure-aware 的单位，通常几百个 token，带一点点 overlap [✏️ 核实 实际 chunk size / overlap]。但我会反驳"一个固定数字"是对的框架 —— 对的单位是*语义*的：一条短的 FAQ 答案就是一个 chunk；一段长的 policy 按子标题切。我是在 eval set 上对着 retrieval recall 来调 size 的，不是靠经验法则拍。
 
 **Q: Which embedding model, and why?**
+**中**: 用的哪个 embedding 模型，为什么？
 - I'd pick based on the eval, and importantly a *multilingual* model given the 7-market, Chinese-inclusive corpus — English-only embeddings degrade badly on Chinese policy text.
 - The specific model is a swappable component [✏️ 核实 实际用的模型].
 - What's load-bearing is that it's multilingual and that I validated it on *our* retrieval set, not a public benchmark.
+> 🇨🇳 我会基于 eval 来选，而且很重要的一点是选一个*多语言*的模型，因为是 7 个市场、包含中文的语料 —— 只支持英文的 embedding 在中文 policy 文本上会退化得很厉害。具体哪个模型是一个可替换的组件 [✏️ 核实 实际用的模型]。真正 load-bearing 的是：它是多语言的，而且我是在*我们自己*的 retrieval set 上验证的，不是在一个公开 benchmark 上。
 
 **Q: How do you fuse BM25 and dense scores?**
+**中**: BM25 和 dense 的分数你怎么融合？
 - Reciprocal rank fusion is my default — it combines two ranked lists without needing the score scales to be comparable, which is the practical pain with raw score blending.
 - Then the reranker does the final ordering anyway, so fusion just needs to assemble a high-recall candidate set.
+> 🇨🇳 reciprocal rank fusion 是我的默认选择 —— 它把两个排好序的列表合起来，不需要两边的分数 scale 可比，而这恰恰是直接混原始分最头疼的地方。反正后面 reranker 还会做最终排序，所以 fusion 只需要拼出一个高 recall 的候选集就行。
 
 **Q: How do you evaluate the RAG path?**
+**中**: 这条 RAG 路径你怎么评估？
 - Two *separate* metrics, deliberately.
 - *Retrieval*: recall@k — is the right passage even in the candidate set? If not, no generation saves you.
 - *Generation*: faithfulness / groundedness — does the answer actually follow from the cited passages? LLM-as-judge plus human spot-checks.
 - Separating them tells me *where* a failure is.
+> 🇨🇳 刻意分成两个*独立*的指标。*Retrieval*：recall@k —— 对的段落到底有没有进候选集？没进的话，再好的 generation 也救不了你。*Generation*：faithfulness / groundedness —— 答案是不是真的从引用的段落里推出来的？用 LLM-as-judge 加人工抽检。把它们分开，能告诉我失败到底*在哪一环*。
 
 **Q: A user asks something genuinely not in the KB. What happens?**
+**中**: 用户问了一个知识库里确实没有的东西，会怎样？
 - Nothing above the relevance floor gets retrieved, so the agent declines and hands off rather than hallucinating.
 - That floor is a tuned threshold.
 - I'd rather have a slightly higher "I don't know" rate than one confident wrong policy statement in a money-touching, regulated flow.
+> 🇨🇳 没有任何东西能超过那个 relevance 下限被检索出来，所以 agent 会拒答并转人工，而不是去 hallucinate。那个下限是一个调出来的阈值。在一个碰钱、受监管的流程里，我宁可"我不知道"的比例略高一点，也不要出现一句自信但错误的 policy 陈述。
 
 **Q: How do you keep the index fresh when policies change?**
+**中**: policy 变了的时候，你怎么保持 index 是新的？
 - Re-index on document change, with source-doc metadata so I can invalidate and re-embed only what changed.
 - Stale policy answers are a real correctness risk in this domain — so freshness is part of correctness, not an afterthought. [✏️ 核实 实际 re-index 频率/机制]
+> 🇨🇳 文档一变就 re-index，带上 source-doc 的 metadata，这样我只对变了的部分做 invalidate 和重新 embed。过期的 policy 答案在这个域里是一个实打实的 correctness 风险 —— 所以新鲜度是 correctness 的一部分，不是事后才想的。[✏️ 核实 实际 re-index 频率/机制]
 
 **Q: Why not just stuff the whole policy doc into a long-context prompt and skip retrieval?**
+**中**: 为什么不干脆把整份 policy 文档塞进 long-context prompt，跳过检索？
 - Cost, latency, and faithfulness. Long-context is expensive per turn and the model still has to find the needle — recall degrades in the middle of long contexts.
 - Retrieval narrows to the relevant passages, which is cheaper *and* easier to ground and cite.
 - For a small, stable FAQ it could be fine; for a large multi-market policy corpus, retrieval wins.
+> 🇨🇳 cost、latency 和 faithfulness。long-context 每一轮都贵，而且模型照样得在里面捞那根针 —— recall 在长上下文的中间会退化。检索把范围收窄到相关段落，既更便宜，又更容易 ground 和 cite。对一个又小又稳定的 FAQ，塞进去也许还行；但对一个大型、多市场的 policy 语料，检索胜出。
 
 **Q: How do you handle a query that needs two different passages to answer — e.g. eligibility *and* the fee?**
+**中**: 一个查询需要两段不同的文本才能回答 —— 比如 eligibility *加* 手续费 —— 你怎么处理？
 - Top-k with k > 1 is exactly for this — I retrieve several passages and let the model synthesize across them, citing each.
 - The reranker matters here: I need *both* relevant passages in the top few, not one passage twice, so I'd watch for redundancy and tune k against multi-passage questions on the eval set.
 - If a question reliably needs multi-hop reasoning I'd flag that as a harder case [✏️ 核实 是否遇到多跳], but most policy/FAQ questions are answerable from a small set of passages, not a reasoning chain.
+> 🇨🇳 top-k 里 k > 1 就是为这个准备的 —— 我检索好几段，让模型跨这几段去综合，每段都 cite。reranker 在这里很关键：我需要*两段*相关的都进前几名，而不是同一段出现两次，所以我会盯着冗余，并在 eval set 上对着多段落的问题去调 k。如果某类问题稳定地需要 multi-hop 推理，我会把它标成更难的 case [✏️ 核实 是否遇到多跳]，但大多数 policy/FAQ 问题是能从一小撮段落里回答出来的，不是一条推理链。
 
 **Q: How do you stop the model from blending retrieved facts with its own pretrained "knowledge" of how BNPL usually works?**
+**中**: 你怎么阻止模型把检索到的事实，和它自己预训练里"BNPL 一般怎么运作"的"知识"混在一起？
 - Instruction plus grounding discipline: the prompt tells it to answer *only* from the provided passages and to say it doesn't know if they don't cover it.
 - Citations are the enforcement mechanism — every claim should map to a passage, and I can check that in faithfulness eval.
 - In a regulated product, the model's generic prior about "how BNPL usually works" is a liability — *our* policy is the only source of truth, which is the whole reason for RAG over a parametric answer.
+> 🇨🇳 靠 instruction 加上 grounding 的纪律：prompt 告诉它*只*能从给定的段落里回答，如果段落没覆盖就说不知道。citation 是强制机制 —— 每一条 claim 都应该映射到某个段落，而我能在 faithfulness eval 里去查这一点。在一个受监管的产品里，模型那个"BNPL 一般怎么运作"的通用先验是个负债 —— *我们的* policy 才是唯一的 source of truth，这正是用 RAG 而不是用参数化答案的全部理由。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

@@ -93,19 +93,29 @@ So: continuous VAD with anti-false-trigger gating; a fast buffer flush enabled b
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: How do you distinguish a real interruption from a backchannel like 'uh-huh' that means 'keep going'?**
+**中**: 你怎么区分一次真正的打断，和一句像'嗯哼'这种意思是'你继续'的 backchannel?
 "That's the subtle one. A short backchannel shouldn't stop me; a sustained utterance should. The first lever is the duration/energy threshold — backchannels are short. The better lever is letting partial ASR inform it: if the incoming speech is a quick affirmation, treat it as a continue signal; if it's substantive, yield the floor. We tuned this from real call data because the cost of getting it wrong is asymmetric — stopping on a backchannel feels broken, but talking over a real objection is worse."
+> 🇨🇳 这是微妙的那个问题。一句短的 backchannel 不该让我停；一段持续的话才应该。第一个杠杆是 duration/energy 的阈值——backchannel 都很短。更好的杠杆是让 partial ASR 来参与判断：如果进来的语音是一句快速的肯定，就当成一个 continue 信号；如果它是实质性的内容，就让出话语权。我们是用真实通话数据来调这个的，因为搞错的代价是不对称的——在一句 backchannel 上停下来会让人觉得坏了，但压着一句真正的异议说话更糟。
 
 **Q: What about echo — doesn't the agent's own audio get picked up by the mic and look like the user talking?**
+**中**: 那回声呢——agent 自己的音频不会被麦克风收进去、看起来像是用户在说话吗?
 "Yes, that's the classic self-interruption bug. Two defenses: acoustic echo cancellation on the inbound path, and the fact that we know exactly what we're playing, so we can reference-cancel our own signal. Without that, the agent stops itself the instant it starts talking."
+> 🇨🇳 对，那是经典的"自我打断"bug。两道防御：入站路径上的 acoustic echo cancellation，以及我们确切知道自己正在播什么这个事实，所以我们能拿它做参考、把我们自己的信号 cancel 掉。没有这个，agent 一开口就会把它自己停掉。
 
 **Q: When you stop, how much audio does the user still hear after they've interrupted? What's the stop latency?**
+**中**: 当你停的时候，用户在打断之后还会听到多少音频? stop latency 是多少?
 "Bounded by the frame size plus whatever's already on the network — so on the order of one to a few 20-millisecond frames locally, plus network jitter. *(具体端到端 stop 数字 [✏️ 核实])* The design point is that fine-grained packetization caps it at a couple of frames instead of a whole buffered sentence. I'd give you the measured number rather than guess."
+> 🇨🇳 上界是 frame size 加上网络上已经在途的那些——所以本地大概是一到几个 20 毫秒的帧，再加上网络抖动。*(具体端到端 stop 数字 [✏️ 核实])* 设计要点是，细粒度的 packetization 把它封顶在几帧，而不是一整句缓冲好的话。我会给你实测的数字而不是去猜。
 
 **Q: After an interruption, how does the LLM know what it actually said versus what it intended to say?**
+**中**: 一次打断之后，LLM 怎么知道它实际说出去的是什么、而不是它本来打算说的?
 "The turn manager tracks played-audio position against the generated text, so on a cut it truncates the agent turn to what was actually rendered and feeds that truncated turn back as history. The next generation is conditioned on the real spoken state plus the user's interrupting utterance. If you skip this, the model's context diverges from reality and the conversation desyncs within a turn or two."
+> 🇨🇳 turn manager 会拿已经播出去的音频位置去对照生成出来的文本，所以一旦被切，它就把 agent 这一轮截断到实际渲染出去的那部分，再把这个被截断的 turn 作为历史喂回去。下一次生成就被条件化成"真实说出去的状态"加上"用户那句打断的话"。如果你跳过这一步，模型的 context 就会和现实脱节，对话在一两轮之内就会 desync。
 
 **Q: Half-duplex would've been way simpler — why pay for full-duplex?**
+**中**: half-duplex 本来会简单得多——为什么要为 full-duplex 买单?
 "Because half-duplex feels like a walkie-talkie — you can't interrupt, you wait for the beep. In a collections call where people are stressed and want to object or correct you mid-sentence, that's a bad, even adversarial-feeling experience. Full-duplex with fast barge-in is what makes it feel like talking to a person. It's more engineering, but it's the difference between tolerable and good."
+> 🇨🇳 因为 half-duplex 感觉像对讲机——你不能打断，你得等那一声 beep。在一通催收电话里，人是有压力的、想在你说到一半时反对你或纠正你，那是一种糟糕、甚至带点对抗感的体验。带快速 barge-in 的 full-duplex，才让它感觉像在跟一个人说话。它要做更多工程，但它就是"勉强能用"和"好用"之间的区别。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

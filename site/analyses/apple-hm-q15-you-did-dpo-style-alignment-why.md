@@ -91,44 +91,60 @@
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: What's DPO actually optimizing — what's the loss doing?**
+**中**: DPO 到底在优化什么 —— 那个 loss 在做什么？
 - Intuitively: it raises the policy's likelihood of the preferred response *relative to* the rejected one, measured against the reference model — so it can't just inflate both.
 - The KL-to-reference is baked into the objective; that's what keeps it from drifting off the SFT policy.
 - The clean insight: DPO shows the optimal RLHF policy has a closed form in terms of the reference and an implicit reward, so you optimize the policy directly and never materialize the reward model. I'd give that intuition, not derive the loss on the spot.
+> 🇨🇳 直觉上：它提高 policy 对那个 preferred 回复的 likelihood，是*相对于* rejected 那个、并对着 reference model 来衡量的 —— 所以它没法把两个一起抬高。KL-to-reference 是焊进 objective 里的；正是这个让它不会从 SFT policy 漂走。那个干净的洞见是：DPO 证明了最优的 RLHF policy 可以用 reference 和一个隐式 reward 写成闭式解，所以你直接优化 policy，从头到尾都不用把 reward model 实体化出来。我会给这个直觉，而不是当场去推那个 loss。
 
 **Q: When would you actually prefer PPO then?**
+**中**: 那你什么时候反而会更想用 PPO？
 - When I need an explicit, reusable reward model — to score arbitrary new outputs, or to do online exploration where the policy generates genuinely novel responses fixed pairs can't cover.
 - PPO's online sampling can find behaviors *outside* the preference dataset; DPO is bounded by the pairs you collected.
 - So if the data is narrow and I need exploration, PPO earns its complexity. For my case the data covered the space well enough that it didn't.
+> 🇨🇳 当我需要一个显式、可复用的 reward model 的时候 —— 用来给任意的新输出打分，或者做 online 探索、让 policy 生成那些固定 pair 覆盖不到的、真正新颖的回复。PPO 的 online 采样能找到 preference 数据集*之外*的行为；DPO 则被你收集到的那些 pair 框死。所以如果数据很窄、我又需要探索，PPO 就对得起它那份复杂度。就我那个 case 而言，数据把空间覆盖得够好，所以它不值。
 
 **Q: How do you ensure preference-data quality — bad pairs poison DPO directly?**
+**中**: 你怎么保证 preference 数据的质量 —— 坏的 pair 会直接毒害 DPO？
 - Exactly — DPO has no reward model to average out noise, so pair quality is critical.
 - Multiple reviewers with agreement checks on the high-stakes pairs, clear rubrics for what 'compliant' and 'better' mean, and I'd throw out low-agreement pairs rather than train on noise.
 - For LLM-judge-generated pairs, I'd validate the judge against human labels before trusting it at scale. [✏️ 核实 实际质控做到哪一步]
+> 🇨🇳 正是 —— DPO 没有一个 reward model 去把噪声平均掉，所以 pair 的质量至关重要。对那些高风险的 pair，用多个 reviewer 加 agreement 检查，对"compliant"和"better"分别给清晰的 rubric，而且我会把 agreement 低的 pair 直接扔掉，而不是拿噪声去训练。对那些 LLM-judge 生成的 pair，我会先拿它跟人工标签做校验，确认可信了再放到大规模上用。[✏️ 核实 实际质控做到哪一步]
 
 **Q: Did you collect preferences once, or iterate?**
+**中**: preference 你是一次性收集的，还是迭代的？
 - Iteratively — the eval-driven loop. Train, evaluate, find failure modes, collect new pairs targeting those failures, retrain.
 - The preference set grows toward the model's current weaknesses.
 - Static preference data goes stale as the model changes. [✏️ 核实 迭代轮次]
+> 🇨🇳 迭代的 —— 还是那个 eval-driven 闭环。训练、评估、找到失败模式、针对这些失败收集新的 pair、再训练。preference 集是朝着模型当前的弱点去生长的。静态的 preference 数据会随着模型变化而过期。[✏️ 核实 迭代轮次]
 
 **Q: How is "DPO-style" different from textbook DPO?**
+**中**: 你说的 "DPO-style" 跟教科书里的 DPO 有什么不同？
 - Honest answer: "-style" because [✏️ 核实 — 据实].
 - If you used a DPO variant (e.g. IPO / KTO, or a length-normalized or modified loss), say which and why.
 - If it was preference optimization with pipeline tweaks but the same core idea, say that. Don't claim a vanilla textbook implementation if it was adapted — the word "style" is doing honest work there.
+> 🇨🇳 老实回答："-style"是因为 [✏️ 核实 —— 据实]。如果你用的是某个 DPO 变体（比如 IPO / KTO，或者一个 length-normalized、改过的 loss），就说是哪个、为什么。如果它是带了一些 pipeline 改动、但核心思想一样的 preference optimization，就这么说。如果是改编过的，别声称是一个原版教科书实现 —— "style"这个词在这里是在做诚实的活儿。
 
 **Q: How does DPO interact with the multilingual / 7-market setup?**
+**中**: DPO 跟多语言 / 7 市场的设置怎么交互？
 - Preference data has to cover each language and market — a "good, compliant turn" differs by locale, so I can't just collect English pairs and expect it to transfer.
 - That's a data-construction cost, not an algorithm change: I need per-market preference signal, ideally from reviewers native to each market.
 - This is exactly the kind of multilingual post-training judgment that maps to Apple's Greater China / Chinese-LLM need.
+> 🇨🇳 preference 数据必须覆盖每一种语言和每一个市场 —— 什么叫"一个好的、compliant 的 turn"是随 locale 变的，所以我没法只收英文 pair 就指望它能 transfer 过去。这是一个 data-construction 的成本，不是算法上的改动：我需要 per-market 的 preference 信号，最好来自每个市场的母语 reviewer。这恰恰就是那种多语言 post-training 的判断，对得上 Apple 的 Greater China / 中文 LLM 需求。
 
 **Q: How much preference data did you need — is DPO data-hungry?**
+**中**: 你需要多少 preference 数据 —— DPO 很吃数据吗？
 - Less than full RLHF in the sense that you don't also train a separate reward model, but pair *quality and coverage* matter more because there's no reward model to smooth over noise.
 - I'd rather have fewer, cleaner, well-targeted pairs covering the failure modes than a large noisy set. [✏️ 核实 实际数据量级]
 - And because I collect iteratively toward current weaknesses, the data grows where it's actually needed rather than uniformly.
+> 🇨🇳 从"你不用再额外训一个单独的 reward model"这个意义上说，比完整的 RLHF 要少；但 pair 的*质量和覆盖*更重要，因为没有 reward model 去把噪声抹平。我宁可要更少、更干净、精准命中失败模式的 pair，也不要一个大而噪的集合。[✏️ 核实 实际数据量级]。而且因为我是朝着当前弱点迭代地收集，数据是在真正需要的地方生长，而不是均匀地铺开。
 
 **Q: Does DPO risk over-optimizing and degrading the model's general ability?**
+**中**: DPO 会不会有过度优化、把模型的通用能力搞退化的风险？
 - Yes — push too hard on preferences and you can get reward-hacking-like degradation or reduced diversity, the model collapsing toward a narrow style.
 - The KL-to-reference term is the main guard; I also watch *general* capability on a held-out set, not just the preference objective, so I catch alignment-tax regressions.
 - It's the same discipline as any fine-tuning: optimize the target, but gate on the things you don't want to break.
+> 🇨🇳 会 —— 在 preference 上推得太狠，你会得到一种类似 reward-hacking 的退化，或者多样性下降、模型坍缩到一个很窄的风格上。KL-to-reference 那一项是主要的护栏；我还会在一个 held-out 集上盯着*通用*能力，而不只是盯 preference 这个 objective，这样我才能抓到 alignment-tax 的 regression。这跟任何 fine-tuning 都是同一个纪律：优化你的目标，但对那些你不想搞坏的东西设 gate。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

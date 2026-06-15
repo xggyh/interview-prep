@@ -44,13 +44,19 @@ The outcome: we shipped to production across all seven markets, and we moved the
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: With a team of three, what did YOU personally build versus delegate?**
+**中**: 一个三人的团队, 哪些是你亲手做的, 哪些是你分出去的?
 "I personally owned the post-training stack and the eval harness — data pipeline, SFT/DPO runs, and the metric definitions. I led, but didn't solo, the voice streaming work; one engineer drove the ASR/TTS integration while I owned the latency-quality tradeoff decisions and the interruption logic. I made the architecture calls; they owned execution on their slices. I'm happy to go deep on the post-training part since that's the piece that was fully mine."
+> 🇨🇳 post-training 这套栈和 eval harness 是我亲手 own 的 — 数据 pipeline、SFT/DPO 的训练、还有那些指标的定义。voice streaming 那块我是带, 但不是一个人单干; 有一个工程师在推 ASR/TTS 的集成, 而我 own 的是 latency-quality 的取舍决策和打断 (interruption) 的逻辑。架构上的判断是我做的, 他们 own 的是各自那一块的执行。我很乐意把 post-training 那部分讲深, 因为那是完完全全属于我的一块。
 
 **Q: What was the hardest single decision you had to make alone?**
+**中**: 你一个人扛下来的最难的一个决策是什么?
 "Whether to ship one shared multilingual model or per-market models. Shared is cheaper to maintain and serve; per-market is higher quality but multiplies the post-training and serving cost. I went with a shared backbone plus lightweight per-market adaptation — best quality-per-dollar, and it kept serving simple. That's a bet I owned, and I'd defend the reasoning even though it cost me more eval work upfront."
+> 🇨🇳 是到底 ship 一个共享的多语模型, 还是每个市场一个模型。共享的维护和 serving 成本更低; per-market 质量更高, 但会把 post-training 和 serving 的成本翻好几倍。我最后选的是一个共享的 backbone, 再加上轻量级的 per-market 适配 — 这是 quality-per-dollar 最优的, 而且让 serving 保持简单。这是我自己 own 的一个 bet, 哪怕它一开始让我多做了不少 eval 的活, 我也会为这个推理辩护。
 
 **Q: How did you know it was actually working, not just looking good in a demo?**
+**中**: 你怎么知道它是真的在 work, 而不只是 demo 里好看?
 "That's exactly why I refused to ship on demos. I built an offline eval harness with market-specific test sets, plus shadow mode in production where the agent ran without affecting the real customer, and I compared its decisions against the live outcome. A demo passing means nothing; a stable shadow-mode number across a week means something."
+> 🇨🇳 这正是我为什么拒绝拿 demo 去 ship。我搭了一个 offline 的 eval harness, 配上每个市场专属的测试集, 再加上 production 里的 shadow mode — agent 在里面跑、但不影响真实客户, 然后我拿它的决策去跟线上真实的结果对比。一个 demo 过了什么都说明不了; 一个在 shadow mode 里稳定跑了一周的数字, 才说明点东西。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

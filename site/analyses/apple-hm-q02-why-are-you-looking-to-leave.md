@@ -87,22 +87,34 @@ on-device 加 PCC 意味着用户的数据默认不脱离他们的掌控，这�
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: Your experience is all cloud GPU. On-device is a different world — aren't you worried about the gap?**
+**中**: 你的经验全是 cloud GPU。On-device 是另一个世界——你不担心这中间的 gap 吗?
 "It's a real gap and I won't pretend otherwise. What transfers is the discipline: I already do quantization, KV-cache optimization, and multi-LoRA serving — Apple does the same techniques, just with 2-bit QAT weights, 8-bit KV-cache, and a unified-memory budget instead of GPU cost. The mental model is the same; I'd need to learn the on-device toolchain and the power-budget intuition. I'd expect a real ramp, and I'd close it the way I closed the LLM gap from CV — ship something small fast and learn from the constraint."
+> 🇨🇳 这是个真实的 gap，我不会假装不是。能迁移过来的是那套功夫：我已经在做 quantization、KV-cache optimization 和 multi-LoRA serving——Apple 用的是同样的技术，只不过是 2-bit QAT 的权重、8-bit 的 KV-cache，预算是 unified memory 而不是 GPU 成本。心智模型是一样的；我需要去学的是 on-device 的 toolchain，还有对 power budget 的那种直觉。我预计会有一段真实的 ramp，而我会用当年从 CV 补上 LLM 那个 gap 的同样方式去补它——快速 ship 一个小东西，从约束里学。
 
 **Q: What specifically don't you like about ByteDance?**
+**中**: 具体说，你有哪些地方不喜欢字节?
 "I'm genuinely not here to complain about them — they gave me the 0-to-1 ownership that makes me a good fit for you. The honest answer is just scope of constraint: cloud cost optimization has a ceiling I've mostly hit. I want the next harder problem, and that's here, not there."
+> 🇨🇳 我真的不是来抱怨他们的——正是他们给了我那个 0-to-1 的 ownership，才让我跟你们这么契合。诚实的答案只是约束的范围：cloud 成本优化有一个天花板，我基本上已经摸到了。我想要下一个更难的问题，而那个问题在这边，不在那边。
 
 **Q: A lot of people say 'privacy' because they think Apple wants to hear it. Why does it actually matter to you?**
+**中**: 很多人说'privacy'是因为他们觉得 Apple 想听这个。它对你来说到底为什么重要?
 "Because I live it. In payments, the data is financial — a leak isn't embarrassing, it's a regulatory event across seven jurisdictions. I already build under data-minimization and compliance constraints. On-device and PCC are a *stronger* version of a discipline I already practice, so it's not a talking point, it's continuity."
+> 🇨🇳 因为我天天在经历它。在 payments 里，数据是金融数据——一次泄露不是丢脸的事，它是横跨七个司法辖区的一个监管事件。我本来就是在 data-minimization 和合规的约束下做开发的。On-device 和 PCC 是我已经在实践的那套功夫的一个*更强*的版本，所以它对我不是一个 talking point，它是一种延续。
 
 **Q: Why this team specifically, not Apple's core ML / Foundation Models team?**
+**中**: 为什么是这个 team，而不是 Apple 的 core ML / Foundation Models team?
 "Because my edge is *applied agentic systems for customers*, not pretraining foundation models. Your team builds multi-turn, multi-agent customer-facing apps and cares about latency, cost, and customer experience — that's the exact thing I do today. I'd be strongest where the model meets a real user with a real task."
+> 🇨🇳 因为我的优势是*面向客户的 applied agentic 系统*，不是 pretrain foundation model。你们 team 做的是 multi-turn、multi-agent 的、面向客户的应用，关心的是 latency、cost 和 customer experience——这正好就是我今天在做的事。在模型遇上一个真实用户、带着一个真实任务的地方，我会是最强的。
 
 **Q: Why now? Why not in a year, once the voice agent is more mature?**
+**中**: 为什么是现在? 为什么不等一年，等 voice agent 更成熟了再说?
 "Two honest reasons. The system is past zero-to-one and into iteration — the hardest, most-mine part is behind me, so I'm not leaving something half-built. And the on-device shift is happening *now*; this is the moment the applied-agent and on-device worlds are converging, and I'd rather be early to that than catch up to it later."
+> 🇨🇳 两个诚实的原因。这个系统已经过了 zero-to-one、进入迭代期了——最难的、最属于我的那部分已经在我身后了，所以我并不是要丢下一个做了一半的东西。还有就是 on-device 这个转变*正在发生*；这是 applied-agent 和 on-device 这两个世界正在汇聚的时刻，我宁愿早一点进去，也不想以后再去追赶它。
 
 **Q: What if I told you a lot of this team's work is unglamorous plumbing — orchestration, monitoring, eval harnesses?**
+**中**: 如果我告诉你，这个 team 的很多工作其实是不光鲜的管道活——orchestration、monitoring、eval harness，你怎么看?
 "That's most of what I actually do today, and it's the part I think I'm good at. The model is the easy 20%; the orchestration, the eval harness, the monitoring, the guardrails — that's the 80% that decides whether it works in production. I'm not looking for glamour, I'm looking for a harder constraint surface on the same kind of plumbing."
+> 🇨🇳 那恰恰就是我今天大部分时间在做的事，而且我觉得这正是我擅长的部分。模型是轻松的那 20%；orchestration、eval harness、monitoring、guardrail——那是决定它在生产里到底跑不跑得起来的那 80%。我要找的不是光鲜，我要找的是同一类管道活上、一个更难的约束面。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

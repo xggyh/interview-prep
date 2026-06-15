@@ -90,49 +90,67 @@
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: PPO vs GRPO — which did you use and why?**
+**中**: PPO 还是 GRPO —— 你用了哪个，为什么？
 - PPO needs a separate learned value network as the baseline — another model to train and tune.
 - GRPO drops the critic: it samples a *group* of trajectories for the same input and uses their relative rewards as the advantage, so the baseline is the group mean. Operationally lighter — that's why it's popular.
 - *Which I actually used:* [✏️ 核实 — 如果你是 DPO 为主、没真跑 PPO/GRPO online,直接说 "the workflow optimization in my case was closer to preference-based offline tuning; I evaluated PPO/GRPO as options but the production path was DPO-style." 别假称跑过 online RLHF].
+> 🇨🇳 PPO 需要一个单独的、学出来的 value network 当 baseline —— 又是一个要训练和调的模型。GRPO 把 critic 去掉了：它对同一个输入采一*组*（group）trajectory，用它们之间的相对 reward 当 advantage，所以 baseline 就是这组的均值。运营上更轻 —— 这就是它流行的原因。*我实际用的是哪个：*[✏️ 核实 —— 如果你是 DPO 为主、没真跑过 online 的 PPO/GRPO，就直接老实说："我这边的 workflow optimization 更接近 preference-based 的 offline tuning；我把 PPO/GRPO 作为选项评估过，但上生产的路径是 DPO-style。"别假称跑过 online RLHF]。
 
 **Q: How do you actually get a reward for a multi-step trajectory — who labels it?**
+**中**: 一个多步 trajectory 的 reward 你到底怎么拿到 —— 谁来标？
 - The terminal outcome is often *observable*, not labeled — did the conversation reach a repayment commitment, was the resolved action correct against the backend.
 - That's the gift of this domain: the business outcome is a natural reward signal.
 - The denser intermediate signals — was this turn compliant, was the tool choice right — is where eval and some labeling come in, including LLM-as-judge for harder-to-measure qualities. [✏️ 核实 中间 reward 实际怎么来的]
+> 🇨🇳 终端结果（terminal outcome）往往是*可观测*的，不是标出来的 —— 对话有没有走到一个还款承诺、最终落地的动作对着后端核对是不是正确。这是这个域的天赐之礼：业务结果本身就是一个天然的 reward 信号。更密的中间信号 —— 这一轮 compliant 吗、工具选对了吗 —— 才是 eval 和一些人工标注介入的地方，包括对那些更难度量的质量用 LLM-as-judge。[✏️ 核实 中间 reward 实际怎么来的]
 
 **Q: Sparse terminal reward over a long horizon — isn't that high variance and slow to learn?**
+**中**: 长 horizon 上稀疏的终端 reward —— 这难道不是高方差、学得慢吗？
 - Yes — that's the central difficulty, and why I lean on reward shaping and a baseline.
 - Shaping adds intermediate signal so learning isn't waiting for the terminal reward; the baseline (or GRPO's group mean) cuts variance.
 - I'd also be honest that offline preference optimization *sidesteps* a lot of this variance — which is part of *why* DPO was attractive over full online RL for my setting.
+> 🇨🇳 是的 —— 这就是核心难点，也是我为什么依赖 reward shaping 和一个 baseline。shaping 加入中间信号，这样学习就不用一直等终端 reward；baseline（或者 GRPO 的 group mean）削掉方差。我也会老实说：offline 的 preference optimization *绕过了*很多这种方差 —— 这正是在我那个场景里，DPO 比完整 online RL 更有吸引力的*部分原因*。
 
 **Q: Reward hacking — how do you stop the agent gaming the reward?**
+**中**: reward hacking —— 你怎么阻止 agent 去钻 reward 的空子？
 - Real risk in a money-touching flow — e.g. the agent learning to push for commitment in non-compliant ways because the terminal reward rewards commitments.
 - Mitigations: a KL penalty against the reference model so it doesn't drift far from the SFT policy.
 - Plus hard compliance guardrails as constraints *outside* the reward, and compliance as a *negative* reward term — so unsafe paths to a good outcome are penalized, not rewarded.
+> 🇨🇳 在一个碰钱的流程里这是实打实的风险 —— 比如 agent 学会用不合规的方式去逼用户做承诺，因为终端 reward 奖励"承诺"。缓解办法：对着 reference model 加一个 KL penalty，让它不会从 SFT policy 漂太远。再加上硬性的 compliance guardrails，作为 reward *之外*的约束；并且把 compliance 作为一个*负*的 reward 项 —— 这样那些"用不安全的路径达成好结果"的走法是被惩罚的，而不是被奖励的。
 
 **Q: How is this different from credit assignment in single-turn RLHF?**
+**中**: 这跟单轮 RLHF 里的 credit assignment 有什么不同？
 - Horizon. Single-turn RLHF assigns reward to one output — no temporal credit problem.
 - The agent case has a *trajectory* of decisions before the reward arrives, so I'm solving sparsity *and* temporal attribution.
 - That's exactly the "long-horizon" phrasing — the multi-step nature is what makes it RL-shaped rather than a single preference update.
+> 🇨🇳 区别在 horizon。单轮 RLHF 把 reward 赋给一个输出 —— 没有时间上的 credit 问题。agent 这个情形里，在 reward 到来之前有一整条决策的 *trajectory*，所以我同时在解 sparsity *和* 时间上的归因。这恰恰是 "long-horizon" 这个说法的含义 —— 正是这种多步的性质，让它变得 RL-shaped，而不是一次单独的 preference 更新。
 
 **Q: Did you train the policy online with rollouts, or offline?**
+**中**: 你是用 rollout 做 online 训练 policy，还是 offline？
 - [✏️ 核实 — 这是最关键的诚实点]
 - *If offline:* "Primarily offline — preference optimization on collected trajectories, not live online rollouts in production. I framed it with RL concepts — trajectory, reward, credit assignment — and evaluated online-RL options, but the shipped path was offline for safety and stability in a regulated flow."
 - *If you genuinely did online rollouts:* say so and describe the loop. **Do not claim online if it was offline.**
+> 🇨🇳 [✏️ 核实 —— 这是最关键的诚实点]。*如果是 offline：*"主要是 offline —— 在收集到的 trajectory 上做 preference optimization，而不是在生产里跑实时的 online rollout。我用 RL 的概念去框它 —— trajectory、reward、credit assignment —— 也评估过 online-RL 的选项，但真正上线的路径是 offline，是出于一个受监管流程里对安全和稳定的考虑。"*如果你确实做了 online rollout：*就这么说，并描述那个闭环。**如果是 offline，绝不要声称是 online。**
 
 **Q: On ByteDance Verl / Slime — did you run the RL infra yourself?**
+**中**: 字节的 Verl / Slime —— RL infra 是你自己跑的吗？
 - Be precise about hands-on depth [✏️ 核实]. If you used Verl for post-training, say what you ran on it.
 - If the heavy RL-infra plumbing was someone else's and you operated at the recipe/data level, say that — "I drove data construction, reward definition, and eval; the distributed RL infra was a shared capability."
 - Don't claim you built the trainer if you used it.
+> 🇨🇳 对你的 hands-on 深度要说精确 [✏️ 核实]。如果你用 Verl 做过 post-training，就说你在它上面具体跑了什么。如果那些重型的 RL-infra 底层管线是别人的、而你是在 recipe/data 这一层操作的，就老实说 —— "我主导的是 data construction、reward 定义和 eval；分布式的 RL infra 是一个共享能力。"如果你只是用了那个 trainer，别声称是你搭的。
 
 **Q: If you had more time/resources, would you move to full online RL?**
+**中**: 如果有更多时间/资源，你会转向完整的 online RL 吗？
 - Honest, forward-looking answer: maybe, and here's the trade-off. Online RL with rollouts can explore behaviors outside my fixed dataset, which is its real advantage.
 - But in a *regulated, money-touching* flow, online exploration means the policy can try things in a space where a wrong action has real consequences — so I'd gate it hard behind simulation and offline eval before any live rollout.
 - So my instinct is: prove it offline first, and only graduate to online where the safety story is airtight. That sequencing *is* the senior judgment, not the algorithm choice.
+> 🇨🇳 老实、且面向未来的回答：也许会，但权衡在这里。带 rollout 的 online RL 能探索我固定数据集之外的行为，这是它真正的优势。但在一个*受监管、碰钱*的流程里，online 探索意味着 policy 会在"一个错误动作有真实后果"的空间里去试 —— 所以在任何 live rollout 之前，我会用仿真和 offline eval 把它死死 gate 住。所以我的直觉是：先在 offline 把它证明出来，只有在安全这条故事滴水不漏的地方，才"毕业"到 online。这个先后次序*本身*才是 senior 的判断，而不是算法的选择。
 
 **Q: How did you know the optimization actually helped — what moved?**
+**中**: 你怎么知道这个 optimization 真的有用 —— 什么指标动了？
 - The same eval-driven loop: I measured the trajectory-level outcomes I care about — resolution, correct-action, compliance, and the business metric like repayment commitment — before and after, on a held-out set. [✏️ 核实 实际提升幅度]
 - I'd be careful to attribute movement to the optimization vs confounds (e.g. data or prompt changes), ideally via A/B rather than a before/after that could be noise.
 - And I'd report compliance as a *guardrail* metric that must not regress — a gain in conversion that costs compliance is not a win in this domain.
+> 🇨🇳 还是那个 eval-driven 闭环：我在一个 held-out 集上，测我关心的那些 trajectory 级别的结果 —— resolution、correct-action、compliance，还有像还款承诺这样的业务指标 —— before 和 after 各测一遍。[✏️ 核实 实际提升幅度]。我会很小心地把指标的变动归因到 optimization，而不是混淆因素（比如数据或 prompt 的改动），最好是通过 A/B，而不是一个可能只是噪声的 before/after。而且我会把 compliance 作为一个*绝不能 regress 的 guardrail 指标*来汇报 —— 一个以牺牲 compliance 为代价换来的转化提升，在这个域里不算赢。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say) — 🔴 本题最重要
 

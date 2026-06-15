@@ -48,13 +48,19 @@ And the loop closes at work — when post-training tooling moved, I went hands-o
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻)
 
 **Q: What's a recent paper or development that changed how you do something?**
+**中**: 最近有哪篇 paper 或者哪个进展, 改变了你做某件事的方式?
 "The on-device efficiency line of work — quantization-aware training at very low bit-widths and KV-cache sharing. It reframed how I think about the latency-quality-memory triangle: I used to treat memory as a given and optimize latency and quality against it, and that literature pushed me to treat memory itself as something you attack with QAT and cache reuse. Concretely, it's what let me map my time-to-first-audio work onto the on-device prefill problem instead of seeing them as unrelated. [✏️ 核实 — 可换成你最近真读、真改变做法的一篇]"
+> 🇨🇳 是 on-device efficiency 那条线的工作 — 极低 bit-width 下的 quantization-aware training, 还有 KV-cache sharing。它重塑了我看 latency-quality-memory 这个三角的方式: 我以前是把 memory 当成一个给定的东西, 然后拿 latency 和质量去跟它较劲; 而那批文献推着我去把 memory 本身也当成一个你可以用 QAT 和 cache 复用去攻击的东西。具体来说, 正是它让我能把我那个 time-to-first-audio 的工作映射到 on-device 的 prefill 问题上, 而不是把它俩看成不相干的两件事。[✏️ 核实 — 可换成你最近真读、真改变做法的一篇]
 
 **Q: The field moves fast — how do you decide what's worth learning versus hype?**
+**中**: 这个领域跑得很快 — 你怎么判断什么值得学、什么只是炒作?
 "I filter by whether it changes a decision I actually make. A lot of releases are incremental and I just note them. I go deep when something shifts a real tradeoff — a serving technique that changes my cost-latency curve, or a post-training method that changes my data strategy. Competitions and shipping are the filter: if a technique doesn't help me score or ship, the hype doesn't survive contact. I'd rather be deep on the ten things that move my work than shallow on a hundred headlines."
+> 🇨🇳 我的筛选标准是: 它会不会改变一个我真正在做的决策。很多发布都是增量式的, 我就只是记一下。当某个东西挪动了一个真实的取舍时, 我才会钻进去 — 一个改变我 cost-latency 曲线的 serving 技术, 或者一个改变我数据策略的 post-training 方法。竞赛和上线就是那个 filter: 如果一个技术没法帮我 score 或者 ship, 那个 hype 一接触现实就活不下来。比起在一百个头条上都浅尝辄止, 我更愿意在那十件真正能挪动我工作的事情上钻得深。
 
 **Q: How do you keep a team current, not just yourself?**
+**中**: 你怎么让一整个团队跟上, 而不只是你自己?
 "That's what the internal talks are for — I don't keep learning to myself. When I dig into something that matters for our roadmap, I write it up and present it, so the team levels up together and we make decisions from shared, current understanding. Knowledge that stays in one head is fragile; a talk plus a doc makes it the team's."
+> 🇨🇳 这就是那些内部 talk 的用途 — 我不会把学到的东西藏在自己这儿。当我钻进一个对我们 roadmap 重要的东西时, 我会把它写下来、讲出去, 这样整个团队是一起升级的, 我们是从一个共享的、最新的理解出发去做决策的。只待在一个人脑子里的知识是脆弱的; 一个 talk 加一份 doc, 就让它变成整个团队的了。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

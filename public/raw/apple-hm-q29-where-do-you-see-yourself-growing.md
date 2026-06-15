@@ -41,13 +41,19 @@ So where I want to grow is **deeper on both ends of that bridge, not off it**. O
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻)
 
 **Q: Five years out — do you see yourself as an IC or moving into management?**
+**中**: 五年之后 — 你看到的自己是一个 IC, 还是会走向管理?
 "My honest answer is I want to deepen as a technical IC who can lead — which is the path I'm already on, leading a team of three while staying fully hands-on in the post-training and serving stack. I'm not chasing a management title for its own sake; I'd take more scope and more technical leadership, the kind where I'm still close enough to the system to make the hard calls myself. If leading more people is how I get more leverage on landing frontier work, I'd grow into that — but I don't want to grow away from the technology."
+> 🇨🇳 我诚实的回答是, 我想作为一个 '能 lead 的技术 IC' 往深里走 — 这也是我现在已经在走的路, 带着一个三人的团队, 同时在 post-training 和 serving 这套栈上完全 hands-on。我不是为了一个管理的头衔本身去追它; 我愿意接更大的 scope 和更多的技术 leadership, 是那种我离系统还足够近、能自己做那些难判断的 leadership。如果带更多的人是我在 '把前沿工作落地' 这件事上拿到更大杠杆的方式, 那我会成长进那个角色 — 但我不想成长到离技术越来越远。
 
 **Q: This role has real product-grunt work — eval harnesses, monitoring, latency tuning. Doesn't that get tedious for someone who likes frontier work?**
+**中**: 这个岗位有不少产品上的脏活 — eval harness、监控、latency 调优。对一个喜欢前沿工作的人来说, 这难道不会很枯燥吗?
 "That's exactly the work I find satisfying, not tedious — and I'd be honest if it weren't. The eval harness is what makes the frontier work real; without it you're shipping on vibes. I built one for the voice agent by choice, not because someone made me, because I don't trust a model I can't measure. To me, monitoring and latency tuning aren't grunt work standing between me and the interesting part — they *are* the interesting part of making something dependable."
+> 🇨🇳 这恰恰是我觉得很有满足感的工作, 而不是枯燥 — 如果不是的话我会诚实地说。eval harness 是让前沿工作变得真实的东西; 没有它, 你就是在凭感觉 (on vibes) ship。我给 voice agent 搭那个 harness 是我自己选的, 不是谁逼我的, 因为我不信任一个我没法度量的模型。对我来说, 监控和 latency 调优不是横在我和那个 '有意思的部分' 之间的脏活 — 它们*就是*那个 '把一个东西做得可靠' 的有意思的部分。
 
 **Q: What would make you feel like you'd outgrown this role?**
+**中**: 什么情况会让你觉得自己已经成长到超出这个岗位了?
 "If the work drifted fully to one end — if it became pure research with no shipping, or pure product maintenance on frozen models with no frontier component. As long as the role keeps both ends live — incorporating the latest models and landing them for real customers — I keep growing in it. That two-ended tension is the feature I'm signing up for, not a phase I'm trying to get past."
+> 🇨🇳 如果这份工作完全漂到了一端 — 如果它变成了纯研究、不上线, 或者变成了在冻住的模型上做纯产品维护、没有任何前沿的成分。只要这个岗位让两端都活着 — 既接进最新的模型、又把它们落地给真实的客户 — 我就会在里面持续成长。那种两端拉扯的张力, 是我签下来时奔着去的那个 feature, 而不是一个我想熬过去的阶段。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

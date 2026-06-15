@@ -59,13 +59,19 @@ Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看�
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
 **Q: What if the data had been ambiguous — no clear answer?**
+**中**: 如果数据本身是模糊的 —— 没有一个清楚的答案,怎么办?
 "Then I'd shrink the bet instead of winning the argument. Ship both behind a flag or an A/B on a small slice of traffic, set the success metric up front — automation lift versus wrong-action rate — and let live data settle it with a quick rollback if it goes wrong. For a money-touching flow, when in genuine doubt I'd still default to the safer path until evidence says otherwise, and I'd say that to my teammate openly rather than pretend the data was clearer than it was."
+> 🇨🇳 那我会去**缩小这个赌注**，而不是去赢这场争论。把两种方案都放在一个 flag 后面、或者在一小片流量上做 A/B，把成功指标提前定好 —— automation lift（自动化提升）对 wrong-action rate（错误动作率）—— 让线上数据来定胜负，万一出问题就快速 roll back。对一个涉钱的流程，当我真的拿不准的时候，在证据说话之前我仍然会默认走更安全的那条路，而且我会把这个想法**坦白地**跟队友讲，而不是假装数据比它实际上更清楚。
 
 **Q: Your teammate disagrees even after seeing the data. Now what?**
+**中**: 你的队友在看了数据之后仍然不同意。接下来怎么办?
 "First I'd make sure I actually understood their objection — sometimes 'still disagrees' means I solved the wrong concern. If we still differ on a reversible call, I'd defer to the owner of that area or escalate to our lead for a tiebreak, then commit fully to whatever we decide — disagree-and-commit. I don't need to win; I need us to ship one thing and learn from it. The one place I'd hold firm is an irreversible safety or compliance risk in a money flow — there I'd escalate rather than let it ship quietly."
+> 🇨🇳 第一步我会先确认我是不是真的听懂了他的反对 —— 有时候「还是不同意」意味着我解决错了那个关切。如果我们在一个可逆的决策上仍然有分歧，我会让那块的 owner 来拍板，或者升给我们的 lead 来打破平局，然后无论定下什么我都全力 commit —— disagree-and-commit（不同意但执行）。我不需要赢；我需要的是我们先 ship 出一个东西、然后从中学到东西。唯一我会坚持不让步的地方，是一个涉钱流程里**不可逆的**安全或合规风险 —— 那种情况我会升级上报，而不是让它悄悄地上线。
 
 **Q: How did you keep the relationship intact?**
+**中**: 你是怎么把这段关系维护好的?
 "By making it their design too. I gave my teammate co-ownership of the threshold and its metric, credited their automation concern as the right concern — because it was — and framed the outcome as *our* trade-off, not my win. People defend a decision they helped build. We worked well together afterward, which to me is the actual test of whether you handled a disagreement well."
+> 🇨🇳 靠的是**让它也成为他的设计**。我把那个阈值和它的指标的 co-ownership（共同所有权）交给了队友，把他对自动化的关切认定为「对的关切」—— 因为它确实是对的 —— 并且把结果框成是*我们的*权衡，不是我的胜利。人们会去捍卫一个自己参与构建的决策。我们之后合作得很好，对我来说这才是检验你有没有把一次分歧处理好的真正标准。
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 
