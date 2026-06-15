@@ -51,6 +51,14 @@
 <p>And <strong>vulnerable customers</strong> — this is the part I care about most. If someone signals hardship, distress, or that they're the wrong party, the agent doesn't push the script. It softens, and it escalates to a <strong>human</strong> — there's a human-in-the-loop path for exactly these cases. Some conversations should not be fully automated, and recognizing those is part of the design.</p>
 <p>So, to sum up: idempotent, bounded, circuit-broken actions; grounded facts via tools; compliance enforced outside the model; and a human escalation path for the cases that need a person. The model handles the conversation; the guardrails handle the consequences."</p>
 <p><em>(可延伸，可背金句)</em>: "The mental model I keep is: let the LLM be creative about <em>how</em> it says things — never about <em>what's true</em> or <em>what's allowed</em>."</p>
+<h3>🇨🇳 中文完整版 (口播稿, 与英文对应)</h3>
+<blockquote><p>哲学先行，然后三层：<strong>reliable actions / safe conversation / vulnerable customers</strong>。按句换行方便背。</p></blockquote>
+<p>"这是核心的设计约束，不是一个 feature。 我的出发前提说得很直白：LLM 是非确定性的，它一定会有出错的时候，所以任何碰钱、碰合规的东西，都不能依赖模型表现良好。 所以我把它建成了两层——<strong>reliable actions</strong> 和 <strong>safe conversation</strong>——再在上面加一条 human 的路径。</p>
+<p>先说 <strong>reliable actions</strong>——tool 这一侧。 每一个碰钱的调用都是 <strong>idempotent</strong> 的：它带着一个 idempotency key，所以一次 timeout 之后的重试，不会重复扣一笔款，也不会把一笔 promise-to-pay 记两遍。 重试是有界的、带 backoff 的，而且有一个 <strong>circuit breaker</strong>——如果某个下游支付 API 开始失败，我们就把它 trip 掉、停止再去猛打它，而不是让故障级联扩散。 还有最关键的，模型永远不是任何财务事实的来源——余额、支付状态、到期日，全都来自对 system of record 发起的一次 tool call。 如果 tool 失败了，agent 就降级到一个安全的 fallback——'我让一位专员来跟进'——它绝不会去编一个数字出来。 在一通催收电话里编一个余额，在我们的 eval 里是一个 hard failure。</p>
+<p>再说 <strong>safe conversation</strong>——合规。 债务催收是受监管的，而且在我们跑的这七个市场里，各地的规定都不一样。 所以 LLM 不会自由发挥地去生成敏感内容。 必需的披露和被禁止的措辞是被约束住的——模型经过 post-train、加了 guard，让它待在批准过的话术范围内，而且我们对输出会跑一道 compliance check。 不威胁、不向第三方泄露债务、遵守 do-not-call 和 dispute——这些是被 enforce 的，不是靠期望它做到的。</p>
+<p>然后是 <strong>vulnerable customers</strong>——这是我最在意的部分。 如果有人发出 hardship、distress、或者'你打错人了'的信号，agent 不会硬推话术。 它会软化下来，并且升级给一个<strong>人</strong>——我们专门为这些 case 留了一条 human-in-the-loop 的路径。 有些对话就是不应该被完全自动化，而能识别出哪些是这种对话，本身就是设计的一部分。</p>
+<p>所以总结一下：idempotent、有界、带 circuit breaker 的动作；通过 tool 拿到的有据可查的事实；在模型之外被 enforce 的合规；以及一条给那些需要真人的 case 用的 human escalation 路径。 模型负责对话；护栏负责后果。"</p>
+<p><em>(可延伸，可背金句)</em>: "我一直放在脑子里的心智模型是：让 LLM 在'怎么说'这件事上去发挥创意——但永远不要在'什么是真的'或者'什么是被允许的'上面发挥。"</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <p><strong>开场哲学句（最重要）</strong>：LLM 是非确定的、一定会出错，所以<strong>碰钱/碰合规的事不能依赖模型听话</strong>——这是出发点，不是补丁。然后分两层。</p>
 <p><strong>第一层 — Reliable actions（可靠动作，tool 侧）</strong>：</p>
@@ -120,6 +128,37 @@ So, to sum up: idempotent, bounded, circuit-broken actions; grounded facts via t
 The model handles the conversation; the guardrails handle the consequences."
 
 *(可延伸，可背金句)*: "The mental model I keep is: let the LLM be creative about *how* it says things — never about *what's true* or *what's allowed*."
+
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 哲学先行，然后三层：**reliable actions / safe conversation / vulnerable customers**。按句换行方便背。
+
+"这是核心的设计约束，不是一个 feature。
+我的出发前提说得很直白：LLM 是非确定性的，它一定会有出错的时候，所以任何碰钱、碰合规的东西，都不能依赖模型表现良好。
+所以我把它建成了两层——**reliable actions** 和 **safe conversation**——再在上面加一条 human 的路径。
+
+先说 **reliable actions**——tool 这一侧。
+每一个碰钱的调用都是 **idempotent** 的：它带着一个 idempotency key，所以一次 timeout 之后的重试，不会重复扣一笔款，也不会把一笔 promise-to-pay 记两遍。
+重试是有界的、带 backoff 的，而且有一个 **circuit breaker**——如果某个下游支付 API 开始失败，我们就把它 trip 掉、停止再去猛打它，而不是让故障级联扩散。
+还有最关键的，模型永远不是任何财务事实的来源——余额、支付状态、到期日，全都来自对 system of record 发起的一次 tool call。
+如果 tool 失败了，agent 就降级到一个安全的 fallback——'我让一位专员来跟进'——它绝不会去编一个数字出来。
+在一通催收电话里编一个余额，在我们的 eval 里是一个 hard failure。
+
+再说 **safe conversation**——合规。
+债务催收是受监管的，而且在我们跑的这七个市场里，各地的规定都不一样。
+所以 LLM 不会自由发挥地去生成敏感内容。
+必需的披露和被禁止的措辞是被约束住的——模型经过 post-train、加了 guard，让它待在批准过的话术范围内，而且我们对输出会跑一道 compliance check。
+不威胁、不向第三方泄露债务、遵守 do-not-call 和 dispute——这些是被 enforce 的，不是靠期望它做到的。
+
+然后是 **vulnerable customers**——这是我最在意的部分。
+如果有人发出 hardship、distress、或者'你打错人了'的信号，agent 不会硬推话术。
+它会软化下来，并且升级给一个**人**——我们专门为这些 case 留了一条 human-in-the-loop 的路径。
+有些对话就是不应该被完全自动化，而能识别出哪些是这种对话，本身就是设计的一部分。
+
+所以总结一下：idempotent、有界、带 circuit breaker 的动作；通过 tool 拿到的有据可查的事实；在模型之外被 enforce 的合规；以及一条给那些需要真人的 case 用的 human escalation 路径。
+模型负责对话；护栏负责后果。"
+
+*(可延伸，可背金句)*: "我一直放在脑子里的心智模型是：让 LLM 在'怎么说'这件事上去发挥创意——但永远不要在'什么是真的'或者'什么是被允许的'上面发挥。"
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

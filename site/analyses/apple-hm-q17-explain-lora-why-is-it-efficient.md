@@ -45,6 +45,18 @@ Now, serving **many** adapters — this is where it gets interesting and it's wo
                                               vLLM / SGLang 原生支持; 共享批处理吞吐 + 服务几十个 adapter
 ```
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *冻结 base，学一个低秩的 ΔW = B·A。可训参数极小 → optimizer state 极小。inference 时 merge 回去 → 零额外 latency。服务很多 adapter 就靠 base 常驻一份 + 跨 adapter 批处理。*
+
+"LoRA 就是 low-rank adaptation，低秩适配。它的想法是：fine-tune 的时候你不去更新整个权重矩阵，而是冻结原始权重，在上面学一个小的**低秩**增量。对一个权重矩阵 W，这个增量 ΔW 被拆成 **B 乘以 A**，B 和 A 是两个秩为 r 的瘦矩阵 —— 比方说 r 等于 16。所以如果 W 是 d 乘 d，full fine-tune 要训 d 的平方个参数，而 LoRA 只训 2·d·r，对一个大的 d 和一个小的 r 来说，这是非常小的一部分 —— 经常远低于模型的 1%。
+
+为什么这样就 efficient？三个原因。**第一，可训参数少太多了**，所以 optimizer state 和梯度都急剧缩水 —— 训练时真正省显存的是这个，不只是省权重本身。**第二，base model 是冻结而且共享的** —— 你不是每个任务复制一个 7B，你是存一个 base 加上每个任务几个 MB 的 adapter。**第三，inference 的时候你可以把 B·A 用简单的加法折回 W 里**，所以一个 merge 过的 LoRA 模型跑起来和 base model *完全*一样快 —— 零额外 latency。底下押的那个注是：你为一个下游任务需要的那个*改变*，本质上是低秩的，哪怕模型很大 —— 而经验上这个假设是成立的。
+
+接下来，服务**很多个** adapter —— 这才是有意思的地方，也是我亲手做过的活。你**绝不**为每个 adapter 起一个 server，那是在浪费 GPU。正确做法是：把 **base model 在 GPU 显存里常驻一份**，然后把 adapter 当成可以按请求加载的、可热插拔的小 tensor。关键的那一招是**跨 adapter 批处理** —— 同一个 batch 里可以装不同 adapter 的请求，kernel 给每一条请求套上它自己的 B·A。像 **vLLM 和 SGLang** 这样的框架就原生支持这种 multi-LoRA serving，所以你既拿到了共享批处理的吞吐，又能从一个 base 上同时服务几十个任务专属的 adapter。我在 vLLM 和 SGLang 上做过推理加速，也包括这类 adapter-aware 的 serving 和显存调优。"
+
+(可延伸 —— 直接桥 Apple) "这跟 Apple 在端侧做的几乎是一对一的。Apple 的端侧模型是一个大约 3B 的 base，配上**按任务热切换的 rank-16 LoRA adapter** —— summarization、reply 等等。这就是同一套架构，只是从'一张 GPU 服务很多用户'挪到了'一台设备服务很多任务'。base 一直常驻，adapter 很小、按需切换。所以我在 vLLM 上建起来的这套 multi-LoRA serving 的纪律，正好就是 Apple 在端侧需要的那套纪律 —— 约束只是从 HBM 和 GPU 成本，换成了 unified memory 和功耗。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **数学骨架**：冻结原权重 W，只学一个**低秩**增量 **ΔW = B·A**，B、A 是秩为 r（如 16）的瘦矩阵。full fine-tune 训 d²；LoRA 只训 2·d·r，常常 <1%。

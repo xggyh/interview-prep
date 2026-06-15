@@ -33,6 +33,33 @@ My job was to make the calls I was accountable for — and to make the other two
 
 *(可延伸，可背金句)*: "The way I think about it — leading three people isn't doing everything. It's owning the decisions that can't be delegated, and being honest about the ones that can."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 三类清晰切分：**mine hands-on / mine to direct / genuinely theirs**。按句换行方便背。
+
+"问得好——让我把它真正拆开，因为'led'这个词能藏很多东西。
+
+哪些是**我亲手做、由我拍板**的——技术方向，以及那些我要负责的决策。
+我 own 了整条 pipeline 的 **architecture**——streaming 的设计、guardrail 放在哪里、tool orchestration 的边界。
+底座模型的 **post-training** 是我自己做的——数据构造、多语言适配策略、SFT 和 DPO-style 的 alignment、还有 eval 驱动的闭环。
+还有最难的那些判断也是我 own 的——latency budget 和 barge-in 的设计，那些必须有人来拍板、有人来负责的 trade-off。
+当我们选择把 barge-in 偏向快速让出，或者选择永远不让模型去断言一个财务事实时——那些都是我的决定。
+
+哪些是**由我定方向、团队来执行**的——
+我定了 eval 框架和那些指标，两位工程师按照我的设计，把很多 tooling、data pipeline、还有 per-market 的集成给搭出来。
+我做 review、我帮他们解 block、我 own'它够不够格上线'这个判断——但那些代码里很大一部分，动手的是他们。
+
+哪些是**真正属于他们**的——
+其中一位工程师把 per-market 的 ASR/TTS 集成和本地化做得比我更深。
+跨七个市场，那是实打实的专门活儿，语言层面的那些细微之处，他比我更在行。
+这一块，老实说，功劳我会算在他头上。
+
+所以诚实地切分：我 own architecture、post-training、那些难的 trade-off、以及上线的标准。
+团队 own 了很多搭建的工作，还有一些他们确实比我更强的领域。
+我的工作是去做那些我要负责的决策——并且让另外两个人在他们各自的事情上做得更高效。"
+
+*(可延伸，可背金句)*: "我是这么看的——带三个人不等于什么都自己做。它是 own 那些不能被下放的决策，并且对那些可以下放的，诚实以待。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **开场拆解（关键动作）**：主动说"'led' can hide a lot, let me separate it"——立刻区别于只会说 "we" 的人。然后**三类清晰切分**：

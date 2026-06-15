@@ -49,6 +49,12 @@
 <p>But a rollback isn't a fix — it just removes the bad change. The real failure was that my change reached production where a flawed assumption could hit real customers at all. So I made it <strong>structural</strong>. I added a shadow-mode rule: changes like that now run in shadow first, observing real traffic and emitting what they <em>would</em> have done, without acting — so a bad assumption shows up as a divergence in the data, not as duplicate codes on a customer's phone. And I built a replay harness so I could run a candidate change against recorded real traffic before it ever went live. After those two changes, our false-fail and false-retry rate dropped by about 47% [✏️ 核实 47%].</p>
 <p>The lesson I actually internalized: a slow signal is not a failed signal, and more broadly — never let an untested assumption reach a customer. Test it against real traffic in the dark first."</p>
 <p>延伸: "That shadow-mode-then-replay discipline is exactly what I carried into the voice agent — I now ship nothing customer-facing without a shadow rollout, because of this incident."</p>
+<h3>🇨🇳 中文完整版 (口播稿, 与英文对应)</h3>
+<p>"说一个真的。在更早的一个系统里, 我们负责印尼市场的 OTP 发送 — 就是一次性验证码。我上线了一个改 retry 逻辑的改动: 当一条验证码发出去之后, 没有在足够快的时间内拿到确认, 我们就重试。我这个改动让 retry 变得更激进, 想提升送达率。我漏掉的一点是: <strong>一个慢的确认, 和一个失败的发送, 不是一回事</strong>。所以我们开始把那些其实成功了的发送当成失败、然后重试 — 出现了一个 false-fail 的尖峰。真实的客户开始收到重复的验证码, 而我们的失败指标看起来很吓人, 但实际上送达根本是正常的。</p>
+<p><strong>我的应对分两部分。</strong> 第一, 先止血。我在一小时之内就发现了, 把改动 rollback 掉, 而且在做任何别的事情之前, 先确认指标恢复了 [✏️ 核实 rollback 时间]。第二 — 这才是我真正在意的部分 — 我主动把这件事披露了出去。我没有等别人来问 '这数字怎么这么奇怪'。我自己写清楚了到底发生了什么、影响范围 (blast radius) 有多大、根因是什么, 然后亲自发给了相关的 stakeholders。对我来说, <strong>own 这个披露这件事, 比让自己看起来干净更重要</strong>。</p>
+<p>但是 rollback 不是 fix — 它只是把那个坏的改动撤掉而已。真正的 failure 在于: 我的改动里有一个有缺陷的假设, 而它居然能一路触达到真实客户。所以我把它变成了<strong>结构性的改进</strong>。我加了一条 shadow-mode 的规则: 这一类的改动, 现在都先在 shadow 里跑, 观察真实流量、并且输出它 '本来会做什么', 但不真的执行 — 这样一个坏的假设, 会以数据里的 divergence 的形式暴露出来, 而不是变成客户手机上的重复验证码。我还搭了一个 replay harness, 让我能把一个候选改动先拿录制下来的真实流量回放一遍, 再让它上线。做完这两个改动之后, 我们的 false-fail 和 false-retry 率降了大概 47% [✏️ 核实 47%]。</p>
+<p>我真正内化下来的教训是: <strong>一个慢的信号不等于一个失败的信号</strong>; 更广义地说 — <strong>永远不要让一个没被测过的假设触达到客户。先在暗处, 拿真实流量去测它</strong>。"</p>
+<p>延伸: "这套 'shadow-mode 然后 replay' 的纪律, 正是我后来带进 voice agent 的东西 — 我现在任何面向客户的东西, 不做 shadow 上线就绝不 ship, 就是因为这次事故。"</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <ul><li><strong>选真事</strong>: 印尼市场 OTP retry 事故。改了 retry 逻辑想提升送达, 漏掉一点: <strong>慢确认 ≠ 发送失败</strong> → 把成功的发送当失败重试 → false-fail spike → 真实用户收到重复验证码, 指标看着吓人但其实送达正常。(这是真有后果的 failure, 不是假谦虚)</li><li><strong>响应两段</strong> (背熟):</li></ul>
 <ol><li><strong>止血</strong>: 1 小时内发现 → rollback → 确认指标恢复 [✏️ 核实时间]</li><li><strong>主动披露</strong>: 不等别人问, 自己写清楚 what happened / blast radius / 根因, 主动发给 stakeholders。<strong>"own 披露这件事比看起来干净更重要"</strong></li></ol>
@@ -93,6 +99,18 @@ But a rollback isn't a fix — it just removes the bad change. The real failure 
 The lesson I actually internalized: a slow signal is not a failed signal, and more broadly — never let an untested assumption reach a customer. Test it against real traffic in the dark first."
 
 延伸: "That shadow-mode-then-replay discipline is exactly what I carried into the voice agent — I now ship nothing customer-facing without a shadow rollout, because of this incident."
+
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"说一个真的。在更早的一个系统里, 我们负责印尼市场的 OTP 发送 — 就是一次性验证码。我上线了一个改 retry 逻辑的改动: 当一条验证码发出去之后, 没有在足够快的时间内拿到确认, 我们就重试。我这个改动让 retry 变得更激进, 想提升送达率。我漏掉的一点是: **一个慢的确认, 和一个失败的发送, 不是一回事**。所以我们开始把那些其实成功了的发送当成失败、然后重试 — 出现了一个 false-fail 的尖峰。真实的客户开始收到重复的验证码, 而我们的失败指标看起来很吓人, 但实际上送达根本是正常的。
+
+**我的应对分两部分。** 第一, 先止血。我在一小时之内就发现了, 把改动 rollback 掉, 而且在做任何别的事情之前, 先确认指标恢复了 [✏️ 核实 rollback 时间]。第二 — 这才是我真正在意的部分 — 我主动把这件事披露了出去。我没有等别人来问 '这数字怎么这么奇怪'。我自己写清楚了到底发生了什么、影响范围 (blast radius) 有多大、根因是什么, 然后亲自发给了相关的 stakeholders。对我来说, **own 这个披露这件事, 比让自己看起来干净更重要**。
+
+但是 rollback 不是 fix — 它只是把那个坏的改动撤掉而已。真正的 failure 在于: 我的改动里有一个有缺陷的假设, 而它居然能一路触达到真实客户。所以我把它变成了**结构性的改进**。我加了一条 shadow-mode 的规则: 这一类的改动, 现在都先在 shadow 里跑, 观察真实流量、并且输出它 '本来会做什么', 但不真的执行 — 这样一个坏的假设, 会以数据里的 divergence 的形式暴露出来, 而不是变成客户手机上的重复验证码。我还搭了一个 replay harness, 让我能把一个候选改动先拿录制下来的真实流量回放一遍, 再让它上线。做完这两个改动之后, 我们的 false-fail 和 false-retry 率降了大概 47% [✏️ 核实 47%]。
+
+我真正内化下来的教训是: **一个慢的信号不等于一个失败的信号**; 更广义地说 — **永远不要让一个没被测过的假设触达到客户。先在暗处, 拿真实流量去测它**。"
+
+延伸: "这套 'shadow-mode 然后 replay' 的纪律, 正是我后来带进 voice agent 的东西 — 我现在任何面向客户的东西, 不做 shadow 上线就绝不 ship, 就是因为这次事故。"
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

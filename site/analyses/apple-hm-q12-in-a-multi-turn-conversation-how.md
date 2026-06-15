@@ -29,6 +29,29 @@ So: protect the facts as structured state, summarize the prose, and hold a hard 
 
 *(可延伸:)* "On the voice agent this discipline was even tighter — every extra token is latency the user *hears* as a pause. So the strict context budget came directly from that latency pressure, not from theory. And honestly, that's the same constraint I'd expect moving to on-device, where the budget is bounded by device memory rather than cost."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"核心原则是：不是所有 context 都等价，所以我不会把它当成一坨整体来管。我把它拆成 structured state 和 conversational history，然后用完全不同的方式对待这两者。
+
+**Structured state —— 受保护，绝不摘要。**
+- 像 order ID、确认过的意图、refund 金额、用户已经同意了什么 —— 这些是 agent 必须*精确*携带的事实。
+- 我把它们作为 structured slots 放在 orchestration 层，*在* prompt 那段自由文本历史*之外*，每一轮都原样注入。
+- 你绝不希望一个 summarizer 把 '$200 refund' 改写成 'a refund' —— 在一个碰钱的流程里，这是一个真实的事故。
+
+**Conversational history —— 在 token budget 下压缩。**
+- 我把最近几轮原样保留 —— 对连贯性来说，recency 最重要。
+- 再往前的全都折进一个 *rolling summary*，随着对话推进我不断更新它。
+- 所以这个 prompt 就是：system instructions、protected state、早期对话的一份 running summary、以及最近 N 轮的完整原文。
+
+**token budget 是显式的。**
+- system 和 state 有一个保留的底线；最近几轮拿大头；rolling summary 有上限封顶。
+- 当我们逼近上限时，是让 summary 去*吸收*更旧的轮次，而不是让 prompt 无限制地涨。
+- 这让 latency 和 cost 在对话变长时保持平稳 —— 这很重要，因为长对话恰恰是用户最烦躁、延迟最伤人的时候。
+
+所以：把事实作为 structured state 保护起来，把那些散文（prose）摘要掉，再守住一个硬的 token budget。"
+
+*(可延伸:)* "在 voice agent 上这个纪律还要更严 —— 每多一个 token 就是用户能*听见*的延迟、是一个停顿。所以这个严格的 context budget 是直接来自那种延迟压力，不是来自理论。而且老实说，这跟我搬到端侧时会遇到的约束是一样的 —— 在端上 budget 是被设备内存框住的，而不是被 cost 框住。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 核心原则:**不是所有 context 都等价 —— 分成 structured state 和 conversational history,分开管。**
@@ -47,6 +70,12 @@ So: protect the facts as structured state, summarize the prose, and hold a hard 
 2. 三块:protected state → rolling summary → token budget,各一句。
 3. 用 **"$200 refund 不能被摘成 a refund"** 这个具体例子坐实 —— 极有说服力,务必讲。
 4. 收尾桥到 voice (token = 听得见的延迟) + 端侧 (budget 受设备内存约束)。
+
+强答 vs 弱答对照 (面试官心里的评分表):
+- 弱答:"我把对话历史塞进 prompt" → 不 scale,显得没在生产里跑过长对话。
+- 弱答:"我用滑动窗口保留最近 K 轮" → 会丢早期关键事实 (订单号被滑出去),money flow 致命。
+- 中等:"我用 rolling summary 压缩历史" → 对,但没区分 state vs prose,关键事实可能被摘掉。
+- **强答 (你要给的):"state 和 history 分开 —— 事实进 protected slots 原样注入、prose 进 rolling summary、硬 token budget 兜底"** → 这才是 senior 信号:你知道哪些**绝不能**被压缩。
 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
@@ -79,6 +108,21 @@ So: protect the facts as structured state, summarize the prose, and hold a hard 
 - Cost and latency scale with context length every single turn, and quality doesn't — models lose recall in the middle of very long contexts.
 - So a 100-turn conversation in full context is expensive *and* less reliable than state + summary + recent window.
 - Long context is a tool, not a substitute for managing what the model actually needs to see.
+
+**Q: How does the agent confirm a critical action when state and the user's words disagree?**
+- Structured state is the source of truth for facts, but before a money-touching action I read the relevant slot back to the user for explicit confirmation — "to confirm, a $200 refund on order 12345?"
+- If their reply contradicts state, I don't silently overwrite — I re-confirm, because in a money flow a wrong write is worse than an extra question.
+- That confirmed value then updates the slot. State is authoritative, but a high-stakes change is always user-confirmed.
+
+**Q: What happens to all this state when the session ends or the user comes back later?**
+- Within a session it lives in the orchestration layer. Across sessions, whether I persist it depends on the use case [✏️ 核实 是否做了跨 session 持久化].
+- If I persist, it's the structured slots — resolved intents, account context — not raw transcript, and it's subject to retention and privacy rules, which in a finance context are strict.
+- I'd be explicit that long-term per-user memory raises privacy questions, so I'd only keep what's needed and govern it — which is exactly the mindset Apple cares about.
+
+**Q: How would this run on-device with a small model and a hard memory ceiling?**
+- The architecture barely changes — it's *built* around a token budget, which is just tighter on-device.
+- Structured state stays cheap because it's compact slots, not prose; the rolling summary and recent window shrink to fit device memory.
+- That's the cloud→device bridge: same discipline, the constraint flips from cost/HBM to unified memory and power.
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

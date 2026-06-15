@@ -55,6 +55,27 @@ The whole thing is built so stages **overlap** — ASR, LLM, and TTS are pipelin
 
 *(可延伸)*: "I can go deeper on any hop — the latency budget across them, or how the turn manager handles barge-in, which was the tricky part."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我从上到下把音频这条路走一遍。
+先把最关键的框架放前面：它是 **streaming、full-duplex** 的，不是 request-response——我们在用户还在说话的时候就处理他的音频，而且我们能同时说和听。
+
+**第一跳——Audio ingest + VAD。** 主叫的音频通过电话这条腿进来，是 20 毫秒一帧的 PCM。每一帧上都跑一个 voice-activity detector 来区分说话和静音——它同时驱动 endpointing 和 barge-in 检测。
+
+**第二跳——Streaming ASR。** 这些帧喂给一个流式识别器，人说话的同时它就吐 **partial** transcript，等 endpointer 判断他停了，再吐一个稳定下来的 **final**。流式之所以重要，是因为它让下一级能提前开工，而不是干等到一句话说完。
+
+**第三跳——Dialogue / LLM policy。** final transcript——加上对话状态和检索到的账户上下文——送进 LLM。这是大脑：它决定下一个动作。它要么生成一句话术回复，要么发一个 **tool call**——查余额、查支付状态、记一笔 promise-to-pay。输出是一个 token 一个 token 流式出来的，这样我们不用等整段 completion。
+
+**第四跳——Tool orchestration。** tool call 通过一个编排层去打后端的支付 API，这层负责 auth、idempotency、retry 和 timeout。结果回灌进 LLM 的上下文，它接着把这一轮说完。
+
+**第五跳——Streaming TTS。** reply 的 token 一边流出来，我们一边增量地合成语音——整句还没生成完，第一个分句就已经开始播了。音频再以帧的形式，通过同一条电话腿送回去。
+
+包在这一切外面的，是一个 **turn manager**，它 own 打断这件事——如果 VAD 在我们说话的时候检测到用户在讲，它就停掉播放、重新打开 ASR。还有一层 **observability + eval**，把每一跳都打点记录：latency、ASR accuracy、action correctness、还有 compliance。
+
+整个东西是为了让各级 **overlap** 而设计的——ASR、LLM、TTS 是 pipeline 起来的，不是串行的。正是这个 overlap，才让它感觉像在打电话，而不是用对讲机。"
+
+*(可延伸)*: "任何一跳我都可以往深讲——它们之间的 latency budget，或者 turn manager 怎么处理 barge-in，那块是最难搞的部分。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **开场先定调（最重要一句）**：streaming + full-duplex，不是 request-response。这一句立刻把你和"调 API 的人"区分开。

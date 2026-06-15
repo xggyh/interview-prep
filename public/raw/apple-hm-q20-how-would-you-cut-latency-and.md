@@ -42,6 +42,26 @@ This is the work I actually did — inference acceleration on NVIDIA GPUs with *
 
 (可延伸 — 桥 Apple) "All of this maps to Apple on-device, just with a different constraint surface. On a GPU I'm optimizing HBM and dollars-per-token; on device I'm optimizing **unified memory, power, and model size**. The exact same levers reappear: aggressive **quantization** — Apple uses ~2-bit weights and 8-bit KV-cache — **KV-cache sharing** to cut prefill memory, and **small task-specific models/adapters** instead of one big model, which is the on-device version of model routing. Same engineering discipline, the cost function just changes from GPU spend to battery and RAM."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *"latency 和 cost" 其实是三个问题：TTFT = prefill，单 token 延迟 = decode（带宽 bound），cost = 每卡 throughput。先问哪个疼，再拉对应的杠杆 —— 别一上来反射性地把名词全报一遍。*
+
+"我会先把它框一下，因为'latency 和 cost'其实是三个不同的问题，它们不共用同一套解法。**Time-to-first-token（首字延迟）**主要由 **prefill** 主导 —— 也就是处理那个 prompt。**之后每个 token 的延迟**是 **decode** 循环，它是内存带宽 bound 的。而 **cost** 真正讲的是**每张 GPU 的 throughput** —— 每块钱能出多少 token。所以我会先问：哪个疼？然后拉对的杠杆。
+
+**对于感知延迟 —— 最便宜的赢先上：streaming。** 一边生成一边把 token 吐出去，让用户在几百毫秒里就看到输出，而不是等整个回答。它不让模型更快，它让模型*感觉*快，对一个对话式 agent 来说这是巨大的收益。
+
+**对于重复的计算 —— 缓存。** 两种。**KV-cache** 是基本盘 —— 你把 attention 的 key/value 缓存下来，这样每个新 token 不用重算整条序列。在这之上，**prefix caching**：如果很多请求共享同一个 prompt 前缀 —— 一个长的 system prompt、一段共享指令、一份公共文档 —— 你就把那个前缀的 KV 算一次，然后跨请求复用。在一个有大块固定 system prompt 的客服 agent 里，这能砍掉很多冗余的 prefill。SGLang 的 **RadixAttention** 就是专门为这个造的，这也是我直接上手做过的东西。
+
+**对于吞吐和成本 —— continuous batching。** 不是用那种要等最慢那条序列的静态 batch，而是在 *token* 这一级做批处理 —— 跑完的序列离开，新的每一步都能加进来，所以 GPU 一直保持打满。这是生产 serving 里最大的那根成本杠杆，也是 vLLM 和 SGLang 拿到吞吐的核心。vLLM 的 **PagedAttention** 还能阻止你因为 KV 过度分配而浪费显存，这让你能跑更大的 batch —— 显存更高效、吞吐更高、每 token 成本更低。
+
+**对于 decode 速度 —— speculative decoding。** 一个小的 draft 模型提议好几个 token，大模型一趟把它们验证掉；当 draft 猜对了，你一个大模型的 step 就拿到了好几个 token。延迟更低*而且*质量不变 —— 代价是额外的算力，加上要维护一个小 draft 模型。
+
+**结构性地降成本 —— 量化和路由。** 量化权重和 KV-cache —— 8-bit、4-bit —— 来缩内存、加速那个带宽 bound 的 decode，一边往下降一边在 eval 上盯着质量。还有 **model cascade / routing**：别把每一个请求都送给最大的模型。把简单的 query 路由到一个小的、便宜的模型，只有难的才升级到大的。大多数流量都是简单的，所以这是一笔很大的成本削减、质量损失很小 —— 前提是你的 router 够好。
+
+这就是我真正做过的活 —— 在 NVIDIA GPU 上用 **vLLM 和 SGLang** 做推理加速，加上显存效率的调优。然后在 voice agent 上 latency 是生死攸关的，所以我主导了 ASR/TTS 的 streaming 升级 —— packetization 和打断处理（interruption handling）—— 把 time-to-first-audio 压下来，这其实就是同一套 streaming 加 pipelining 的纪律，用到了语音栈上。"
+
+(可延伸 —— 桥 Apple) "这一切都能映射到 Apple 的端侧，只是约束面不一样。在 GPU 上我优化的是 HBM 和每 token 的钱；在端侧我优化的是 **unified memory、功耗、和模型大小**。完全一样的那些杠杆又出现了：激进的**量化** —— Apple 用大约 2-bit 的权重加 8-bit 的 KV-cache —— **KV-cache sharing** 来砍 prefill 的内存、以及用**小的任务专属模型/adapter** 来替代一个大模型，这就是端侧版的 model routing。同一套工程纪律，只是成本函数从 GPU 开销变成了电池和 RAM。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **先建框架（别直接报菜名）**：「latency + cost」其实是**三个问题**，招不通用：

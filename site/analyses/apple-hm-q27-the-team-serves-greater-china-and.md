@@ -22,6 +22,22 @@ So my honest claim is: I don't just speak Chinese — I've run the post-training
 
 延伸: "And it's not only Chinese — doing this across Japanese and Korean too taught me a transferable lesson: never assume an English-first pipeline generalizes. You re-examine tokenization, benchmarks, and register for each language, every time."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"这大概是整个岗位里我最有差异化的一块 — 中文是我的母语, 而且在 voice agent 上, 我 own 了跨七个市场的多语 post-training, 其中就包括大陆中文, 所以这些问题我是在 production 里真撞过的, 不是纸上谈兵。我直接讲具体的技术差异, 因为 '中文是另一种语言' 并不是真正的答案。
+
+**第一, tokenization。** 中文没有空格、没有词的边界, 而且一个字可以是一个词, 也可以只是一个词的一部分。那些 English-first 设计的 tokenizer 会把中文切得很碎 — 你为每一个单位的语义烧掉多得多的 token, 这同时伤 latency 和有效的 context window。所以一个模型的 tokenizer 对中文的词表覆盖, 是我会在做任何别的事情之前先去查的东西; 它会悄无声息地锁死你质量和成本的天花板。
+
+**第二, evaluation。** 你不能相信把英文 benchmark 翻译成中文的那种东西 — 翻译的痕迹会泄漏进来, 你最后测的是错的东西。中文需要原生的 benchmark, 比如 C-Eval 和 CMMLU, 它们直接考中文的知识和推理。而且对一个面向客户的 agent 来说, 光有通用 benchmark 本来也不够 — 我会从真实的交互里, 构建领域专属的中文 eval set, 就是我在 voice agent 上用的那套 eval-harness 方法, 只不过这次扎根在中文的 transcript 上。
+
+**第三, 数据特性。** 中文有简体和繁体的区别 — 这对 Greater China 极其重要, 因为大陆是简体, 而台湾和香港是繁体, 它们不是可以互换的。另外, 正式的书面中文, 和人们实际说话的方式之间, 还有一个巨大的 register (语域) 落差, 这对一个对话式的 agent 影响很大。所以数据策展不只是 '搞到中文文本' 而已 — 是要拿到对目标用户来说**对的那个变体和语域**。
+
+**第四, code-switching (混码)。** 真实的中文用户会不停地往里掺英文 — 产品名、技术术语、句子中间冒出来的英文外来词。模型必须能优雅地处理这个, 而且 eval 里必须包含这种情况, 否则你 ship 出去的东西, 用户一在中文句子里说一个英文品牌名就崩了。这个我在我那几个市场里正好处理过。
+
+所以我诚实的说法是: 我不只是会说中文 — 我跑过那个 post-training 加 eval 的 loop, 而在那里, 这些问题正是 '一个感觉像母语的模型' 和 '一个感觉像翻译腔的模型' 之间的差别。"
+
+延伸: "而且不只是中文 — 在日文和韩文上也做过这一套, 教会了我一个可迁移的教训: 永远不要假设一个 English-first 的 pipeline 能自动泛化。每一种语言, 你每次都得重新审视它的 tokenization、benchmark 和 register。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **开场锁定差异化**: native 中文 + voice agent 7 市场 (含 CN) **真做过** multilingual post-training → production 里踩过, 不是理论。

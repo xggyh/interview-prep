@@ -18,6 +18,18 @@ So my honest framing is: I'm strong on the isomorphic problem and I'd be ramping
 
 延伸: "If anything, the on-device constraints are *cleaner* to reason about — a fixed memory and power budget is a more honest forcing function than 'GPU cost,' which can always be papered over by spending more. I'd actually enjoy that."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我先把话说直白: 我没有 ship 过一个跑在 on-device 上的模型 — 我 production 上的活都是 cloud GPU。所以我不会假装我在一个手机上 debug 过那种为了抢 unified memory 而打架的模型。这是一个真实的边界, device 专属的那套 tooling 我是需要学的。
+
+但我真正是这么看这件事的。能迁移过去的, 不是硬件 — 而是**那种在硬资源约束下、把一个模型优化到达标的工程纪律**。在 cloud 上, 我的约束面 (constraint surface) 是 GPU 成本、HBM 容量和吞吐。到了 on-device, 约束面变成了 **unified memory、功耗预算、还有模型尺寸** — 但它是同一个形状的问题: 在一个稀缺资源跟你较劲的同时, 打到一条质量线。过去这一年, 我就活在这个取舍里。
+
+而且那些具体的技术, 几乎是一一对应的。从 Apple 2025 年公开的工作来看: on-device 的模型用的是**任务专属的 rank-16 LoRA adapter, 按任务热切换 (hot-swap)**。这就是 multi-LoRA serving — 这个我在 vLLM 上做过, 针对一个共享的 base、按每个 request 去换 adapter。同一个 primitive, 只是 scale 更小。on-device 这套栈还非常依赖**激进的量化 — 2-bit 的 QAT 权重、8-bit 的 KV-cache、4-bit 的 embedding**。我在 serving 侧做过 memory-efficiency 的调优和量化; 转向 2-bit 的 quantization-aware training, 是我已经在走的同一条曲线上更陡的一段, 而不是另一条曲线。还有**为了省内存、压 prefill 而做的 KV-cache sharing** — 这跟我在 voice agent 上做的 time-to-first-audio 是同一个家族的事情, 那时候整盘棋就是把 prefill 的成本压下来, 让第一个回复尽快吐出来。
+
+所以我诚实的框架是: 在那个同构的问题上我很强, 而在 device 专属的那个表面上我会 ramp。心智模型 — 先定义资源预算, 然后在预算之内优化质量 — 是完全一样的, 而我一直是在 cloud 约束下做这件事。把它指向一部手机, 变的是数字, 不是方法。"
+
+延伸: "要说的话, on-device 的约束**反而更干净、更好 reason** — 一个固定的 memory 和 power 预算, 是一个比 'GPU 成本' 更诚实的 forcing function, 因为 GPU 成本总能靠多花钱糊弄过去。我其实会很享受这种约束。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **先诚实** (Apple humility 加分): 没在 device 上 ship 过, 没在手机里 debug 过抢 unified memory 的模型 — 这是真边界, device 工具链我得学。**先承认, 再反击, 比硬吹可信 10 倍**。

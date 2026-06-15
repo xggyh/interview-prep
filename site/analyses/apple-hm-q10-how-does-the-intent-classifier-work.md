@@ -30,6 +30,30 @@ So the design assumption is: the classifier *will* be wrong some percent of the 
 
 *(可延伸:)* "And those misrouted-then-clarified turns aren't wasted — they're gold-standard labels that flow straight back into the small model's training set. The classifier gets better at exactly the cases it was getting wrong."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我把这个 classifier 当成一个分层系统来做，而不是单个模型，因为路由的成本是高度非对称的。
+
+**第一层 —— 一个又小又便宜的 fine-tuned classifier。**
+- 它在低延迟下扛掉大多数轮次。
+- 对那些清晰、高频的意图 —— order lookup、refund —— 你根本不需要一个大模型就能知道该往哪路由。
+- 它输出的是一个 confidence score，不只是一个 label。整个自愈设计都挂在这个分数上。
+
+**第二层 —— 一个 LLM fallback，专门接那些模糊的 case。**
+- 当小模型的置信度低于一个 threshold 时，我把*路由决策本身*升级给一个 LLM，让它在完整的对话上下文上做推理。
+- 所以贵的模型我只花在它值得花的地方 —— 那难的 10–20% [✏️ 核实 占比]，而不是每一轮。
+
+**关于 accuracy** —— 我会报我们 eval set 上的真实数字，而不是一个凑整的数 [✏️ 核实 实际 intent accuracy]。而且我会主动指出，top-line accuracy 会掩盖真正要紧的东西：*相邻的、碰钱的意图*之间的混淆，比如 refund 和 dispute。混淆矩阵里那一格，才是我真正盯的。
+
+**现在是重点 —— 它错了会怎样。** 我从不假设 router 是对的。三个机制：
+1. **低置信 → 反问，不要瞎猜。** 低于 threshold 时，agent 会问一个澄清问题，而不是盲目路由。
+2. **检测到 misroute → 重新路由。** 如果 refund sub-agent 收到一轮、却找不到任何可退的订单，它不会幻觉出一个动作 —— 它会回信号给 orchestrator，这一轮被 re-route。
+3. **反复失败或敏感意图 → 升级人工。** 在一个合规敏感、碰钱的流程里，不确定时正确的做法是优雅地 handoff，而不是自信地做一个错的动作。
+
+所以这个设计的前提假设就是：classifier *一定*会有某个比例是错的，而系统在它错的时候依然是安全的。"
+
+*(可延伸:)* "而且那些被误路由、又被澄清的轮次并没有白费 —— 它们是 gold-standard 的 label，直接回流进小模型的训练集。classifier 恰恰在它原本做错的那些 case 上变得更好。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **选型 = 分层 (cost 非对称):**
@@ -54,6 +78,12 @@ So the design assumption is: the classifier *will* be wrong some percent of the 
 3. accuracy:**主动**说"我盯的是相邻意图混淆,不是 top-line"。
 4. **重头戏**:三步自愈,慢讲、讲透 —— 这是这题的 senior 信号。
 5. 收尾:错例回流闭环。
+
+强答 vs 弱答对照 (面试官心里的评分表):
+- 弱答:"我们用了个分类模型,准确率 99%" → 然后没了。报漂亮数字 + 没有错分处理 = 正中陷阱,显得没在生产里运营过。
+- 弱答:"用 LLM 做意图识别,很准" → 没成本意识 (每轮都上大模型),也没讲错了怎么办。
+- 中等:"小模型分类 + 置信度门限" → 方向对,但停在"门限",没讲门限触发后**怎么自愈**。
+- **强答 (你要给的):分层选型 (cost 非对称) + 报真实数且主动揭示相邻意图混淆 + 三步自愈闭环 (反问/回弹/升级) + 错例回流再训练** → 这才是"我知道它会错,而且系统在它错时依然安全"。
 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
@@ -86,6 +116,16 @@ So the design assumption is: the classifier *will* be wrong some percent of the 
 - The small model is cheap — a few milliseconds of overhead [✏️ 核实 实际延迟] — which is the whole reason it's tier one.
 - The LLM fallback is slower, but it only fires on the ambiguous minority, so it doesn't move the median.
 - This is a deliberate latency-budget decision, not an afterthought.
+
+**Q: New intents appear over time — how does the taxonomy not go stale?**
+- I monitor the *general* / fallback bucket and the low-confidence cluster — a rising mass there is the signal that a new intent is emerging.
+- When a cluster is big and automatable enough, it graduates into its own labeled intent with a sub-agent.
+- So the taxonomy is data-driven and evolving, not frozen at launch. [✏️ 核实 实际有没有做这个 cluster 监控]
+
+**Q: Could you skip the classifier and let an orchestrator LLM decide routing as part of generation?**
+- You can — that's the "single agent decides its own next action" pattern. The trade-off is you lose the cheap, fast, separately-measurable routing decision.
+- A standalone classifier gives me a confidence score to gate on, a confusion matrix to debug, and a place to enforce risk-weighted thresholds — all harder to isolate inside one big generation call.
+- For a compliance-sensitive flow I value that observability and control over the elegance of one model doing everything.
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

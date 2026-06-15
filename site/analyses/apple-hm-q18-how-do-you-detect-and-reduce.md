@@ -35,6 +35,22 @@ I built exactly this on our BNPL chatbot. The FAQ path was **grounded generation
 
 (可延伸) "If I had to name the highest-leverage single fix: separate facts from phrasing. Most damaging hallucinations in a support agent are *wrong specifics* — a number, a date, a policy. Pull those from tools and retrieval, and you've removed most of the blast radius before you even talk about model quality."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *你做不到零，所以要搭一个闭环：prevent（grounding + citation + 事实走 tool）、detect（LLM-judge 测 faithfulness + 人工 calibrate）、contain（低置信 → 转人工）。把事实和措辞分开。*
+
+"我把它当成一个三段的闭环来做 —— **prevent、detect、contain**，预防、检测、兜底 —— 因为你没法把 hallucination 压到零，所以系统必须在它发生的时候依然是安全的。
+
+**Prevent —— 在生成的时候。** 最大的那根杠杆是 **grounding**：别让模型用它的参数记忆（parametric memory）来答，逼它*基于检索到的上下文*来答。所以是 RAG，加上指令'只根据提供的文档来回答，上下文没覆盖到的就说我不知道（I don't know）'。在这之上我还**强制 citation** —— 每一句陈述都得指回一个 source chunk。这干了两件事：它把模型约束在证据上，同时给了我一个可以核查的东西。任何涉钱的东西 —— 一个余额、一个到期日、一个退款金额 —— 我根本不让 LLM 去*生成*那个数字；我让它调一个 tool，把那个权威值渲染出来。LLM 负责把句子说顺，系统负责拥有那个事实。
+
+**Detect —— 离线加在线。** 离线我跑一个 **faithfulness eval**：用一个 LLM-as-judge 去对着 golden set 检查'这个答案里的每一句话，是不是都被检索到的上下文支持'，我还会去验证 citation 是不是真的能 resolve（指得到）。在线我挂一个**置信度信号** —— 检索分、citation 有没有落地、对一部分线上流量抽样跑 judge 分 —— 然后我把 unsupported-claim rate 当成一个真正的指标来追，不是凭感觉。
+
+**Contain —— 当置信度低的时候。** 这是大家最容易忘的一段。如果模型正要在 grounding 很弱的情况下作答，或者这个问题在知识库之外，我**不让它瞎猜** —— 我把它路由到一个安全的 fallback：'这个我没有，我帮你转一个专员'，也就是**转人工（escalate to a human）**。在一个涉钱的、面向客户的产品里，一个自信的错答，远比一个谦逊的转接要贵得多。
+
+这套我在我们的 BNPL chatbot 上是原样建出来的。FAQ 那条路是 **RAG 上的 grounded generation** —— 答案来自检索到的政策文档，不是自由生成 —— 而订单相关的事实来自打 system of record 的 tool call，绝不来自模型。整个东西坐在一个 intent router 后面，所以任何我们没把握的，都可以 fall back 而不是即兴发挥。"
+
+(可延伸) "如果非要我点出那个杠杆最大的单一改法：把事实和措辞分开。客服 agent 里最有破坏力的 hallucination 大多是*错的具体值* —— 一个数字、一个日期、一条政策。把这些从 tool 和检索里拿，你在还没开始谈模型质量之前，就已经把大半个 blast radius 给砍掉了。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **三段闭环骨架（核心）**：**prevent → detect → contain**。前提先说清：**消不到零，所以系统在它发生时也得安全**。

@@ -47,6 +47,24 @@ I lived this on our BNPL chatbot. The FAQ side was a pure knowledge problem — 
 | **RAG** | 知识 gap (会变的事实) | 低 / 改数据即可 | ✅ 改知识库, 不动模型 | 检索质量到顶但行为/格式仍差 |
 | **Fine-tune** | 行为 gap + 降本降延迟 | 高 / 训练+长期维护 | ❌ 别 fine-tune 事实 | — (最后一档, 慎用) |
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *先 prompt，知识问题上 RAG，行为问题才 fine-tune —— 而且它们是叠加的，不是三选一的菜单。只有上面那档撞到一个我能量出来的天花板，我才往下走一级。*
+
+"我的默认顺序是：prompt engineering 先上，然后 RAG，最后才 fine-tune —— 最上面这层最便宜、迭代最快，最下面这层最贵、最慢。只有上面那一档撞到一个我能真实量出来的天花板，我才会往下走一级。
+
+判据其实就一个问题：**我在补的是哪一种 gap？**
+
+- **知识 gap** —— 模型不知道我们的政策、我们的订单数据、那些每周都在变的事实 —— 这是 **RAG**。会变的事实你永远不要去 fine-tune，你要去 retrieve。检索还顺带给我 citation，而且我更新知识库的时候根本不用动模型。
+- **行为 gap** —— 我需要一个特定的输出格式、一个稳定的语气、可靠的 tool-call JSON、或者把一个窄任务做到很精 —— 这才是我考虑 **fine-tune** 的地方。fine-tune 教的是一个*技能*或者一个*风格*，不是一个*事实*。
+- **prompt engineering** 永远是第一个探针 —— system prompt、few-shot 例子、structured output。它免费、它即时，而且很多时候它就够了。退一步讲，就算我*没法*在 prompt 里把它搞定，那个失败本身也告诉我真正难的问题到底在哪，所以这一步从来不浪费。
+
+另外还有两股力专门把我往 fine-tune 拉：**latency 和 cost**。如果一个大模型配一个长 prompt 能用，但是太慢或者太贵，我就会拿一个*更小*的模型在那个窄任务上做 fine-tune，用更便宜的代价打到同样的质量。这就是经典的蒸馏打法，它也是通往 serving 的桥 —— 每 token 更便宜、latency 更低、footprint 更小。
+
+这个我在我们的 BNPL chatbot 上是真趟过的。FAQ 那一侧是一个纯知识问题 —— 政策、退款规则、会变的争议流程 —— 所以那块走 **RAG**，不 fine-tune。intent routing 是一个窄的、高频的分类任务，而且 latency 很重要，所以那块就偏向用一个**小的 fine-tuned classifier**，而不是每一轮都去问一个大 LLM。同一个产品，两个不同的问题，两种不同的工具。然后在 voice agent 上我做了真正的 post-training —— SFT 加上 DPO-style 的 alignment —— 因为那里的 gap 是*行为*：多语种的风格、什么时候该调哪个 tool、保持合规。这种东西你靠 prompt 是没法在七个市场上都调稳的。"
+
+(可延伸) "fine-tune 真正的成本不是那一次训练 —— 而是你从此就*拥有了一个模型*。每次 base model 升级，你都得重新评估、或者重训一遍。所以我把 fine-tune 当成一个 commitment，不是一个 quick fix，只有当 prompt 加 RAG 已经被证明触顶了，我才会去动它。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **一句话骨架**：先 prompt，再 RAG，最后 fine-tune；只有上一档**测出天花板**才往下走。

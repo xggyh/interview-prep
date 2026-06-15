@@ -18,6 +18,18 @@ The outcome: we shipped to production across all seven markets, and we moved the
 
 延伸 (若给时间): "If I zoom into one decision — early on I had to choose whether to chase the lowest possible latency or protect conversation quality. I'll come back to that if it's useful, because the tradeoff there is the core of the whole system."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"最清楚的一个例子, 是我在 TikTok Global Payment 从 0 到 1 带起来的那个多语言 voice agent, 大概 2025 年中开始做的。这个事情的 mandate 是故意很模糊的 — leadership 就一句话, '我们想要一个能跨市场打 outbound 对话的 voice AI', 就这么多。没有设计, 没有指标, 没有可参考的系统。这整个东西是我端到端扛下来的, 带了一个三个人的小团队。
+
+我把它拆成三层, 三层我都 own。**第一层, voice pipeline** — ASR、TTS、VAD streaming、打包、还有打断处理 (interruption)。**第二层, 大脑** — LLM 的对话策略加上 tool orchestration, 让这个 agent 真的能去查东西、能执行动作, 而不只是会说话。**第三层, 模型本身** — 我 own 了 foundation model 的 post-training: 数据构造、多语适配、SFT, 然后 DPO-style 的 alignment, 这一整套全都是跑在我自己搭的 eval harness 上的, 所以我们是拿数字在迭代, 不是凭感觉。
+
+最难的部分是, 它得在七个市场都能跑 — 中文、英文、日文、韩文、马来语、印尼语、泰语 — 每个市场的说话习惯都不一样, 对 '自然' 的标准也不一样。所以我没有训一个模型就直接 ship; 我搭了一个 market-by-market 的 eval loop, 加上 shadow-mode 上线, 这样我们能在任何真实客户听到之前就把 regression 抓出来。
+
+结果是: 我们在全部七个市场都上了线, 而且把三个真正重要的指标都推动了 — latency 降下来、automation rate 升上去、还有还款 conversion 也涨了 [✏️ 核实 具体数字]。我最自豪的其实不是某一个数字 — 而是这件事根本没有模板, 我得先定义清楚 '什么叫好', 才谈得上去把它做出来。"
+
+延伸 (若给时间): "如果让我钻进某一个决策 — 一开始我就得选, 到底是去追极致的 latency, 还是保住对话质量。如果有用我可以回头展开讲这个, 因为那个取舍其实是整个系统的核心。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **开场一句锁定**: 0→1 voice agent, mandate 故意模糊 ("就一句话: 做个能打电话的语音 AI"), 没设计没指标没参考 → 这就是 "little guidance" 的证据。

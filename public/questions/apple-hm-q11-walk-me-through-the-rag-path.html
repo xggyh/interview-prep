@@ -54,6 +54,17 @@
 <p><strong>Grounding and citation.</strong></p>
 <ul><li>The model answers <em>only</em> from retrieved passages, with citations back to the source.</li><li>If retrieval returns nothing above a relevance floor, the agent says it doesn't know and hands off — it does not free-generate.</li><li>In a compliance context, a confident wrong policy answer is worse than 'let me get a human.'"</li></ul>
 <p><em>(可延伸:)</em> "And I'd be honest that RAG quality is mostly a <em>retrieval</em> problem, not a generation problem — so the metrics I cared about were retrieval recall and answer faithfulness, measured <em>separately</em>, so a failure tells me which half broke."</p>
+<h3>🇨🇳 中文完整版 (口播稿, 与英文对应)</h3>
+<p>"我把 RAG 这条路看成四个决策 —— chunk、retrieve、rerank、ground —— 每一个都是一个 precision lever（精度杠杆）。</p>
+<p><strong>Chunking —— 按语义切，不是定长切。</strong></p>
+<ul><li>对一个 policy 和 FAQ 的语料，我按文档的*结构*来切：一条 FAQ、一个 policy clause、一个 section。</li><li>定长的字符 chunk 会把句子切成两半、把语义毁掉；结构感知的 chunk 能让每个单元自成一体。</li><li>我在 chunk 之间留一点小 overlap，这样在边界处上下文不会丢。</li><li>我会挂上 metadata —— source doc、section、还有 <em>market</em> —— 因为在一个 7 市场的产品里，同一个问题在不同地区答案是不同的，所以我在排序*之前*就先按 market 过滤。</li></ul>
+<p><strong>Retrieval —— hybrid，BM25 加 dense。</strong></p>
+<ul><li>dense embedding 抓改写和语义上的匹配。</li><li>BM25 抓精确的词 —— policy code、产品名、数字 —— 这些地方字面匹配才要紧，而 embedding 偏弱。</li><li>我两路都跑，然后把结果 fuse 起来。纯向量会漏掉精确 token；纯 BM25 会漏掉改写。</li><li>对一个全是专有名词的 policy KB 来说，hybrid 是站得住脚的默认选择。</li></ul>
+<p><strong>Rerank —— 两段式，故意拆开。</strong></p>
+<ul><li>第一段检索优化的是 <em>recall</em> —— 把候选集弄对，比如 top-20 或 30。</li><li>然后一个 cross-encoder reranker 按真实相关性把它们重排；我留最前面那几个进 prompt。</li><li>这个拆分就是 cost lever：第一段在整个索引上又便宜又近似；reranker 很贵，但只在那一小把候选上跑。</li></ul>
+<p><strong>Grounding 和 citation。</strong></p>
+<ul><li>模型*只*从检索到的段落作答，并带 citation 回到 source。</li><li>如果检索结果没有任何东西高过一个相关性下限，agent 就说它不知道、然后 handoff —— 它不会自由生成。</li><li>在合规语境里，一个自信但错误的 policy 答案，比 '让我帮你转个人工' 更糟。"</li></ul>
+<p><em>(可延伸:)</em> "而且我会老实说，RAG 的质量主要是个*检索*问题，不是生成问题 —— 所以我在意的指标是 retrieval recall 和 answer faithfulness，而且是*分开*量的，这样一个 failure 能告诉我是哪一半坏了。"</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <p>记四步:<strong>chunk → retrieve → rerank → ground</strong>,每步都是一个 precision lever。</p>
 <ul><li><strong>Chunking — 语义切,不是定长切</strong>:按文档结构切 (一条 FAQ / 一个 policy clause / 一节)。定长会把句子切断、毁语义。chunk 间留小 overlap 防边界丢失。挂 metadata (source / section / <strong>market</strong>) —— 7 市场同一问题答案不同,<strong>先按 market 过滤再排序</strong>。</li><li><strong>Retrieval — hybrid (BM25 + dense)</strong>:dense 抓 paraphrase / 语义;BM25 抓精确词 (policy code、产品名、数字),embedding 在精确 token 上弱。两路 fuse。纯向量漏精确词,纯 BM25 漏改写 —— policy KB 全是专有名词,<strong>hybrid 是站得住的默认</strong>。</li><li><strong>Rerank — 两段式 (cost lever)</strong>:一段检索优化 recall (top-20/30,便宜、近似、扫全库);cross-encoder reranker 精排,贵但只跑这几十个候选 → 取 top few 进 prompt。</li><li><strong>Ground + cite</strong>:只从检索段落答 + 引用;低于相关性下限就说"不知道"转人工,<strong>绝不 free-generate</strong>。合规场景里,自信答错 policy 比"找人工"更糟。</li></ul>
@@ -61,6 +72,9 @@
 <p>骨架一句话:<strong>"语义 chunk + hybrid 召回 + cross-encoder 精排 + 严格 grounding;recall 和 faithfulness 分开量;RAG 是检索问题不是生成问题。"</strong></p>
 <p>讲述节奏:</p>
 <ol><li>开口给四步总纲 "chunk, retrieve, rerank, ground — each a precision lever"。</li><li>逐步讲,每步<strong>带一句为什么</strong> (定长毁语义 / 纯向量漏精确词 / 两段式是 cost lever / grounding 防幻觉)。</li><li>收尾抛 "RAG 是检索问题不是生成问题" —— 这一句立刻建立可信度。</li><li>细节数字 (chunk size、embedding 模型) <strong>被问再说</strong>,且用原则 + [✏️ 核实],不主动报。</li></ol>
+<p>强答 vs 弱答对照 (这题偏弱,更要靠结构取胜):</p>
+<ul><li>弱答:"embed 文档,query 时取最近的 top-k 塞进 prompt" → 教科书一句话,没有任何取舍,显得没真做过。</li><li>弱答:"用向量数据库做语义检索" → 漏了精确词召回 (policy code)、漏了 rerank、漏了 grounding,一钻就空。</li><li>中等:"chunk + dense retrieval + 塞进 prompt 生成" → 缺 hybrid 和 rerank 的*为什么*。</li><li><strong>强答 (你要给的):四步每步带取舍 (语义 chunk / hybrid 为什么 / rerank 为什么两段 / grounding 防幻觉) + 一句"RAG 是检索问题不是生成问题" + recall 和 faithfulness 分开量</strong> → 即使你实现没那么全,这个*决策框架*本身就证明你懂 RAG。</li></ul>
+<p>口播提醒:这题你不熟,<strong>靠结构不靠细节</strong>。先把四步框架稳稳讲完,把 chunk size / embedding 模型这类细节留到追问、并明确说"按 eval 调 + 可换"。框架完整 &gt; 细节精确。</p>
 <h3>🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)</h3>
 <p><strong>Q: What chunk size and overlap, concretely?</strong></p>
 <ul><li>A structure-aware unit, typically a few hundred tokens, with a small overlap [✏️ 核实 实际 chunk size / overlap].</li><li>But I'd push back on a fixed number being the right frame — the right unit is <em>semantic</em>: a short FAQ answer is one chunk; a long policy section splits on subheadings.</li><li>I tune size against retrieval recall on an eval set, not by a rule of thumb.</li></ul>
@@ -76,6 +90,10 @@
 <ul><li>Re-index on document change, with source-doc metadata so I can invalidate and re-embed only what changed.</li><li>Stale policy answers are a real correctness risk in this domain — so freshness is part of correctness, not an afterthought. [✏️ 核实 实际 re-index 频率/机制]</li></ul>
 <p><strong>Q: Why not just stuff the whole policy doc into a long-context prompt and skip retrieval?</strong></p>
 <ul><li>Cost, latency, and faithfulness. Long-context is expensive per turn and the model still has to find the needle — recall degrades in the middle of long contexts.</li><li>Retrieval narrows to the relevant passages, which is cheaper <em>and</em> easier to ground and cite.</li><li>For a small, stable FAQ it could be fine; for a large multi-market policy corpus, retrieval wins.</li></ul>
+<p>**Q: How do you handle a query that needs two different passages to answer — e.g. eligibility <em>and</em> the fee?**</p>
+<ul><li>Top-k with k &gt; 1 is exactly for this — I retrieve several passages and let the model synthesize across them, citing each.</li><li>The reranker matters here: I need <em>both</em> relevant passages in the top few, not one passage twice, so I'd watch for redundancy and tune k against multi-passage questions on the eval set.</li><li>If a question reliably needs multi-hop reasoning I'd flag that as a harder case [✏️ 核实 是否遇到多跳], but most policy/FAQ questions are answerable from a small set of passages, not a reasoning chain.</li></ul>
+<p><strong>Q: How do you stop the model from blending retrieved facts with its own pretrained "knowledge" of how BNPL usually works?</strong></p>
+<ul><li>Instruction plus grounding discipline: the prompt tells it to answer <em>only</em> from the provided passages and to say it doesn't know if they don't cover it.</li><li>Citations are the enforcement mechanism — every claim should map to a passage, and I can check that in faithfulness eval.</li><li>In a regulated product, the model's generic prior about "how BNPL usually works" is a liability — <em>our</em> policy is the only source of truth, which is the whole reason for RAG over a parametric answer.</li></ul>
 <h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
 <ul><li><strong>这是你偏弱区 —— 用"有原则的默认 + 可调"代替硬编数字。</strong> 被问 chunk size / 具体 embedding 模型,给原则 (语义单元、多语言、按 eval 调) 并标 [✏️ 核实],不要张口报一个假精确值。</li><li>不要声称跑了一整套 advanced RAG (HyDE / GraphRAG / 多跳)。如果当时是直球 hybrid + rerank,就说直球 —— 并能讲清*为什么够用*。把复杂度说超过实际会被钻穿。</li><li>反复强调 RAG 是<strong>检索</strong>问题,measure recall 和 faithfulness 分开 —— 这一句就建立可信度。</li><li>诚实区分:如果 rerank 当时用的是 LLM judge 而不是专门 cross-encoder,直接说;如果只做了 hybrid 没上 rerank,也说,并说明你*会*怎么加。</li><li>如果当时其实只用了纯 dense (没 BM25),诚实说 —— 然后讲"我现在会加 BM25,因为 policy code 这种精确词向量召回不稳",把它变成"我知道怎么改进"而不是假装当时就做了。</li></ul>
 <h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
@@ -127,6 +145,34 @@ JD 明写 "RAG / retrieval / vector search",这是必答硬题。面试官想看
 
 *(可延伸:)* "And I'd be honest that RAG quality is mostly a *retrieval* problem, not a generation problem — so the metrics I cared about were retrieval recall and answer faithfulness, measured *separately*, so a failure tells me which half broke."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我把 RAG 这条路看成四个决策 —— chunk、retrieve、rerank、ground —— 每一个都是一个 precision lever（精度杠杆）。
+
+**Chunking —— 按语义切，不是定长切。**
+- 对一个 policy 和 FAQ 的语料，我按文档的*结构*来切：一条 FAQ、一个 policy clause、一个 section。
+- 定长的字符 chunk 会把句子切成两半、把语义毁掉；结构感知的 chunk 能让每个单元自成一体。
+- 我在 chunk 之间留一点小 overlap，这样在边界处上下文不会丢。
+- 我会挂上 metadata —— source doc、section、还有 *market* —— 因为在一个 7 市场的产品里，同一个问题在不同地区答案是不同的，所以我在排序*之前*就先按 market 过滤。
+
+**Retrieval —— hybrid，BM25 加 dense。**
+- dense embedding 抓改写和语义上的匹配。
+- BM25 抓精确的词 —— policy code、产品名、数字 —— 这些地方字面匹配才要紧，而 embedding 偏弱。
+- 我两路都跑，然后把结果 fuse 起来。纯向量会漏掉精确 token；纯 BM25 会漏掉改写。
+- 对一个全是专有名词的 policy KB 来说，hybrid 是站得住脚的默认选择。
+
+**Rerank —— 两段式，故意拆开。**
+- 第一段检索优化的是 *recall* —— 把候选集弄对，比如 top-20 或 30。
+- 然后一个 cross-encoder reranker 按真实相关性把它们重排；我留最前面那几个进 prompt。
+- 这个拆分就是 cost lever：第一段在整个索引上又便宜又近似；reranker 很贵，但只在那一小把候选上跑。
+
+**Grounding 和 citation。**
+- 模型*只*从检索到的段落作答，并带 citation 回到 source。
+- 如果检索结果没有任何东西高过一个相关性下限，agent 就说它不知道、然后 handoff —— 它不会自由生成。
+- 在合规语境里，一个自信但错误的 policy 答案，比 '让我帮你转个人工' 更糟。"
+
+*(可延伸:)* "而且我会老实说，RAG 的质量主要是个*检索*问题，不是生成问题 —— 所以我在意的指标是 retrieval recall 和 answer faithfulness，而且是*分开*量的，这样一个 failure 能告诉我是哪一半坏了。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 记四步:**chunk → retrieve → rerank → ground**,每步都是一个 precision lever。
@@ -145,6 +191,14 @@ JD 明写 "RAG / retrieval / vector search",这是必答硬题。面试官想看
 2. 逐步讲,每步**带一句为什么** (定长毁语义 / 纯向量漏精确词 / 两段式是 cost lever / grounding 防幻觉)。
 3. 收尾抛 "RAG 是检索问题不是生成问题" —— 这一句立刻建立可信度。
 4. 细节数字 (chunk size、embedding 模型) **被问再说**,且用原则 + [✏️ 核实],不主动报。
+
+强答 vs 弱答对照 (这题偏弱,更要靠结构取胜):
+- 弱答:"embed 文档,query 时取最近的 top-k 塞进 prompt" → 教科书一句话,没有任何取舍,显得没真做过。
+- 弱答:"用向量数据库做语义检索" → 漏了精确词召回 (policy code)、漏了 rerank、漏了 grounding,一钻就空。
+- 中等:"chunk + dense retrieval + 塞进 prompt 生成" → 缺 hybrid 和 rerank 的*为什么*。
+- **强答 (你要给的):四步每步带取舍 (语义 chunk / hybrid 为什么 / rerank 为什么两段 / grounding 防幻觉) + 一句"RAG 是检索问题不是生成问题" + recall 和 faithfulness 分开量** → 即使你实现没那么全,这个*决策框架*本身就证明你懂 RAG。
+
+口播提醒:这题你不熟,**靠结构不靠细节**。先把四步框架稳稳讲完,把 chunk size / embedding 模型这类细节留到追问、并明确说"按 eval 调 + 可换"。框架完整 > 细节精确。
 
 ## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
 
@@ -181,6 +235,16 @@ JD 明写 "RAG / retrieval / vector search",这是必答硬题。面试官想看
 - Cost, latency, and faithfulness. Long-context is expensive per turn and the model still has to find the needle — recall degrades in the middle of long contexts.
 - Retrieval narrows to the relevant passages, which is cheaper *and* easier to ground and cite.
 - For a small, stable FAQ it could be fine; for a large multi-market policy corpus, retrieval wins.
+
+**Q: How do you handle a query that needs two different passages to answer — e.g. eligibility *and* the fee?**
+- Top-k with k > 1 is exactly for this — I retrieve several passages and let the model synthesize across them, citing each.
+- The reranker matters here: I need *both* relevant passages in the top few, not one passage twice, so I'd watch for redundancy and tune k against multi-passage questions on the eval set.
+- If a question reliably needs multi-hop reasoning I'd flag that as a harder case [✏️ 核实 是否遇到多跳], but most policy/FAQ questions are answerable from a small set of passages, not a reasoning chain.
+
+**Q: How do you stop the model from blending retrieved facts with its own pretrained "knowledge" of how BNPL usually works?**
+- Instruction plus grounding discipline: the prompt tells it to answer *only* from the provided passages and to say it doesn't know if they don't cover it.
+- Citations are the enforcement mechanism — every claim should map to a passage, and I can check that in faithfulness eval.
+- In a regulated product, the model's generic prior about "how BNPL usually works" is a liability — *our* policy is the only source of truth, which is the whole reason for RAG over a parametric answer.
 
 ## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
 

@@ -33,6 +33,20 @@ I built this end to end. On the BNPL chatbot I defined the metrics and the eval 
 
 (可延伸) "Two failure modes I specifically design against. One — **judge gaming**: an LLM-judge can be fooled by confident, verbose answers, so I calibrate against humans and keep adversarial examples in the set. Two — **offline-online gap**: golden sets drift from reality, so I feed real failures back into the golden set continuously. Eval is a living asset, not a one-time script."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *离线 gate 发布，在线证明它真行。离线三层 —— golden set、LLM-judge、人工 calibrate。在线 —— 在业务指标上做 A/B。而且永远打两个层级：per-turn 和 task-level，因为每一轮都可能看着对、整段任务还是失败。*
+
+"我把它拆成离线 —— 决定一个版本能不能发 —— 和在线 —— 告诉我它在真实用户身上到底行不行。而让*多轮*这件事变难的，是轮级的质量和任务级的成功是两个不同的指标：每一轮都可能看着挺好，整段对话却没能解决用户的问题。所以这两个我都测。
+
+**离线，三层。** 第一，一个 **golden set** —— 一批精挑的、有代表性的对话，带着已知的好结果，里面包括那些恶心的 edge case 和过去的失败案例。这是我的回归 gate；在这上面只要退步了，任何东西都别想发。第二，**LLM-as-judge** 来做规模化 —— 我没法每一次迭代都人工标几千段对话，所以让一个 judge 去打这些维度的分：*task success、faithfulness/groundedness、tone、以及有没有调对 tool*。关键是我在两个层级上打分：**per-turn**（这一条回应正确吗、贴证据吗？）和 **task-level**（整段对话解决了那个意图吗？）。第三，**人工抽样**来 calibrate —— 我拿人工标注在一个样本上去 validate 这个 judge，只在它和人一致的地方信它，让人工当 ground truth 的锚。
+
+**在线，上线之后。** 真相在这里。我在真实流量上跑 **A/B 测试**，看**业务和行为指标**，不只是模型分 —— task completion rate、correct-action rate、escalation-to-human rate，以及下游的业务结果。在 chatbot 上那是 case-resolution rate；在 voice agent 上是 repayment conversion 和 automation rate。我同时也保留在线的 **LLM-judge 抽样**加上对一部分线上对话的人工 review，这样离线和在线用的是*同一套* rubric —— 正是这种一致性，才让我敢相信'离线赢能预测在线赢'。
+
+这套我是端到端建起来的。在 BNPL chatbot 上，我是**和 product、ops 一起**定义指标和 eval harness 的 —— 那个合作很关键，因为对一个退款争议来说，'正确'是一个业务定义，不只是一个模型定义。然后在 voice agent 上，整个 post-training 闭环都是 **eval 驱动**的：我会去造数据、训、然后让 eval harness 告诉我，到底是 SFT 还是一个 DPO-style 的 pass 真正推动了指标，再决定上不上线。"
+
+(可延伸) "有两个失败模式是我特意去防的。一 —— **judge 被刷分**：一个 LLM-judge 会被自信、啰嗦的答案骗到，所以我拿人工去 calibrate，并且在集合里保留对抗样本。二 —— **离线-在线 gap**：golden set 会和现实漂移，所以我持续把真实的失败回灌进 golden set。Eval 是一个活的资产，不是一次性的脚本。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **总骨架**：离线（gate 发布）+ 在线（真用户验证）。**多轮难点先点破**：**per-turn 对 ≠ task-level 成功**——每轮都像对的、整段任务仍可能失败，所以两个层级都要测。

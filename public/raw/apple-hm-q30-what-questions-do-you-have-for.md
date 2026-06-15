@@ -40,6 +40,40 @@
 **8. Biggest bottleneck right now.**
 "From where you sit, what's the single biggest thing slowing the team down today — is it model capability, serving infrastructure, eval, or something organizational? I'd rather know the real constraint than the polished version."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+开场缓冲句 (自然过渡): *"有的, 我有几个 — 我挑几个接着我们刚才聊的来问。"*
+
+**🔥 第一梯队 (最高杠杆, 优先问这几个):**
+
+**1. Latency vs quality — 团队的核心张力。**
+"当你们要把一个更新、更强的模型接进来的时候, 通常都得在 latency 或者成本上付出代价。这个团队现在在这个取舍上大概处在什么位置 — 当下更痛的是 latency、是成本、还是回复质量? 我问这个, 是因为这正是我在 voice agent 上一直活在里面的那个取舍, 我会很想知道你们现在被哪一个咬得最狠。"
+
+**2. On-device vs Private Cloud Compute 的边界。**
+"对这些面向客户的 agent 来说, 你们是怎么去想 '什么跑在 on-device、什么升级到 server 模型' 的? 这个边界是已经定下来了, 还是说 '什么跑在哪里' 仍然是团队正在积极推进的一个 open 的设计问题?"
+
+**3. Eval 的哲学。**
+"团队是怎么判定一个模型、或者一个 agent 已经好到可以 ship 给客户了? 我挺好奇你们更依赖 offline 的 eval set、shadow 部署、线上指标、还是某种组合 — 因为一个团队的 eval 哲学, 能告诉我很多关于它是怎么做决策的。"
+
+**🟢 第二梯队 (很好的备选):**
+
+**4. 平台的范围 — 多少团队跑在上面。**
+"JD 里把这个描述成一个服务于多条业务线的 multi-agent 平台。今天大概有多少个内部团队在它上面构建? 这会不会让 backward-compatibility 成为一个真实的约束, 限制你们能多快地去改东西?"
+
+**5. 六个月后的成功长什么样。**
+"如果在我入职六个月之后, 你回头看, 觉得这次招人是一个明确的成功 — 那时候我交付了什么、或者改变了什么? 我想搞清楚在这个位置上 '很棒' 是什么样子, 而不只是 '还行'。"
+
+**6. Greater China / 中文 LLM 的路线图。**
+"中文以及 Greater China 的工作, 在团队当前的路线图里有多核心 — 它现在是一个当下的优先级, 还是更偏向一个前瞻性的投资? 这是一个我会很兴奋去推的方向, 所以我想知道它现在处在什么位置。"
+
+**🟡 第三梯队 (有余力、或者对话引到了再问):**
+
+**7. Rust + Python 的分工。**
+"这个 stack 里提到了用 Rust 和 Python 来做 orchestration。实际上这个分工是怎么切的 — 是不是 Rust 主要是 serving 和 orchestration 的核心, Python 在建模那一侧, 而我大概会在每一边各待多少?"
+
+**8. 当下最大的瓶颈。**
+"从你的位置看过去, 今天拖慢这个团队最大的那一个东西是什么 — 是模型能力、是 serving 的 infra、是 eval、还是某种组织上的东西? 比起一个打磨过的版本, 我更想知道那个真实的约束。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **心态**: 反问 = 最后一次秀 judgment, 不是礼貌收尾。一个不问 = 致命。准备 6-8, 现场挑 2-3 个**最贴刚才聊过内容**的问。

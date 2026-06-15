@@ -30,6 +30,20 @@ Apple 看的是**成熟度和协作**，不是「你赢没赢」。他们想看�
 
 (可延伸 — what I'd do differently) "What I'd do differently: I'd pull that ticket data **on day one**, before the disagreement hardened. We spent a couple of days debating in the abstract when an hour of looking at real cases would have framed it correctly from the start. I've since learned to reach for the data *before* the argument, not as a tiebreaker after it."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *我们在低置信 intent 上有分歧 —— 我想要一个安全的 fallback，队友想要激进的自动化。我拒绝打观点对观点的仗；我拉了真实的 ticket 数据，把它重构成一个可量化的取舍。我们收敛到一个 confidence threshold，而且我把这个阈值的所有权分给了队友一份。*
+
+**Situation.** "在 BNPL chatbot 上，我和一个队友在'分类器没把握的那些 intent 怎么处理'上有分歧。我想要一个**保守的 fallback** —— 置信度低的时候，路由到 FAQ RAG 那条路、或者转人工，而不是去猜一个 action。一个队友主张更**激进** —— 让 workflow agent 按 best-guess 的 intent 直接行动，把 automation rate 拉满，因为 automation 是我们被考核的那个头号指标。两边的立场都合理：我护的是一个涉钱流程里的正确性，他护的是领导在意的那个数字。"
+
+**Task.** "我得在不让它变成僵局的前提下把它解决掉 —— 这东西我们是一起 own 的，必须发出一版统一的设计。"
+
+**Action.** "我做了一个刻意的选择：不把它当成观点对观点来争，因为那哪也去不了。我提议让**数据**来定。我们拉了一批分类器低置信的真实 ticket 样本，去看当我们去猜、和当我们 fall back 的时候，实际发生了什么。数据显示，激进那条路确实在那些简单的误判上提升了 automation，但在相当一部分（a meaningful slice）case 上，它在 dispute 和 refund 上产生了**错误的 action** —— 而那些恰恰是最贵、最伤信任的 case。这就把整个对话重构了：这不是我的谨慎对他的进取，这是 automation 和 wrong-action cost 之间一个可量化的取舍。所以我们收敛到一个折中的设计 —— 一个 **confidence threshold（置信阈值）**：高于它，workflow agent 行动；低于它，我们 fall back 或者升级。而且我确保我的队友**共同 own** 这个阈值的调优和它的指标 —— 它是真真正正'我们的'设计，不是我把他给推翻了。那个阈值是我们俩一起对着数据调出来的。"
+
+**Result.** "我们发了这个带阈值的设计，同时追踪 automation 和 wrong-action rate 两个指标，这样我们能靠证据去移那个阈值，而不是靠观点。同样重要的是，我们解决它的那个方式 —— 让数据定、共享所有权 —— 后来也变成了我们处理别的分歧的方式。"
+
+(可延伸 —— what I'd do differently) "我会做得不一样的地方：我会在**第一天**就把那批 ticket 数据拉出来，赶在分歧固化之前。我们抽象地争了好几天，其实花一个小时去看真实的 case，一开始就能把这事框对。从那以后我学会了 —— 在争论*之前*就去拿数据，而不是事后把它当裁判用。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **选题原则**：选一个**靠数据/用户定胜负、且你也部分妥协**的故事——别选你单方碾压的。

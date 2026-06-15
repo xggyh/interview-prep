@@ -20,6 +20,20 @@ And the loop closes at work — when post-training tooling moved, I went hands-o
 
 延伸: "A recent concrete example: reading the on-device quantization literature is exactly what let me reason about the cloud-to-device shift for this role instead of hand-waving — that's the loop working in real time."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我保持一个原则: 学得具体, 而且确保学习会变成输出, 不只是读读而已。三个 channel。
+
+**第一, 看一手来源, 而不是热门评论。** 我读真正的技术报告和论文 — 各大 lab 的 model card 和 tech report, 包括 Apple 自己 2025 年那份 on-device foundation model 的报告, 这也是为什么我能具体地聊 rank-16 adapter 和 2-bit 量化。我宁愿读真正的报告, 也不去看别人关于它的一个 thread, 因为那些真正重要的细节 — 那些 tradeoff、那些 ablation — 只活在原文里。
+
+**第二, 我会把它讲出来, 这逼着我真正搞懂它。** 我做过三个内部 talk: 'LLM Strategy and Roadmap for Payments'、'Agent Harness and Long-Horizon RL'、还有一个讲 'GPU、TPU、LPU 在 GenAI 推理上的取舍'。准备一个 talk 是我学习带宽最高的方式 — 你没法一边讲 inference 硬件的取舍、一边还含含糊糊, 它逼着你把知识变得真实而且结构化。
+
+**第三, 我用竞赛保持手感。** 我在 Kaggle 上是全球 top 1% — 横跨 NLP、CV、multimodal 和 matching, 拿了七银六铜。竞赛让我保持诚实, 因为你没法躲在一页 slide 后面; 要么你的方法 score, 要么就不 score, 它逼着你去用那个月真正 state of the art 的东西。
+
+而这个 loop 最后会在工作里闭合 — 当 post-training 的工具链有变化的时候, 我就去上手当前的 stack: Megatron-LM、DeepSpeed ZeRO、FSDP, 还有 vLLM / SGLang 这个 serving 侧。所以我的学习不是被动的; 它是读源、讲出来、验证它、然后落地 (read the source, teach it, prove it, ship it)。"
+
+延伸: "一个最近的具体例子: 正是因为读了 on-device 量化的文献, 我才能真正地去 reason 这个岗位的 cloud-to-device 转变, 而不是空对空地比划 — 这就是那个 loop 在实时运转。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **总纲一句**: 具体来源 + **学了就变成输出** (不只是读)。三个 channel。

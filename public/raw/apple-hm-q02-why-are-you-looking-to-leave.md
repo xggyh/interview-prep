@@ -45,6 +45,35 @@ So it's the same problem class I'm already strong in, on a constraint surface I 
 
 *(可延伸，一句收口)*: "I'm not running from anything — I'm running toward a harder version of the problem I already care about."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 核心策略：**push 轻、pull 重**。push 一句带过，pull 给两条具体技术理由。
+
+"分两部分讲——而且更多是关于什么在'拉'我，而不是什么在'推'我。
+
+先说 push 这边，老实讲，挺轻的。
+字节是个让我成长得很好的地方，我也得到了机会端到端 own 一个 zero-to-one 的 agent。
+唯一一个真实的局限是，我们优化的目标是 cloud GPU 的经济性——约束本质上就是成本和 HBM。
+这个游戏我玩得挺熟了，我想要一个更难、更有意思的约束面。
+
+这就是 Apple 对我的拉力。
+你们的 Gen AI 工作是 on-device-first 的——大概一个 30 亿参数的模型跑在设备上，更重的请求交给 Private Cloud Compute。
+这就把约束从'一个 GPU-hour 多少钱'翻成了'手机上的 unified memory、功耗预算、还有模型大小'。
+还是同一套工程功夫——quantization、KV-cache efficiency、adapter serving——只不过是在一个紧得多的 envelope 里做。
+举一个具体的例子：Apple 在 base model 之上热插拔 task-specific 的 rank-16 LoRA adapter。
+这正好就是 multi-LoRA serving——云端那个版本我用 vLLM 做过。
+我特别想去做那个预算是 unified memory、而不是 GPU 成本的版本。
+
+第二个拉力是把 privacy 当成一等约束，而不是事后才补的东西。
+我做的是 payments——碰钱、合规很重。
+on-device 加 PCC 意味着用户的数据默认不脱离他们的掌控，这个约束我是真心觉得很 motivating，而不是觉得烦。
+它逼着你做更好的工程，而且它是我已经在做的某件事的一个更强的版本。
+
+至于工作本身，几乎是一对一对上的：面向用户的 multi-turn、multilingual、agentic 的 LLM 应用——包括给 Greater China 用的中文，这个我今天就是母语在做。
+所以它是同一类我已经很强的问题，只是放在一个我想去成长的约束面上。"
+
+*(可延伸，一句收口)*: "我不是在逃离什么——我是在奔向一个更难的版本，奔向那个我本来就在乎的问题。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 结构：**push 轻、pull 重**，pull 给两条具体技术理由。

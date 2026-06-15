@@ -53,6 +53,16 @@
 <p><strong>The red line</strong> — and this one is a <em>constraint</em>, not a metric I trade: compliance-violation rate. I don't optimize this against conversion. It has to stay at or near zero, and a regression is a release blocker, no matter how good the conversion looks.</p>
 <p>The key relationship is the tension. I could juice repayment conversion by letting the agent be more aggressive or over-promise — and that would blow up compliance and customer trust. So the way I frame it: compliance and a vulnerable-customer-safety bar are <strong>hard constraints</strong>; within those, I optimize repayment conversion and automation; and the latency SLO and correct-action rate are quality gates that keep it from being a bad experience. 'The agent is working' means it's resolving calls and recovering money — <em>while</em> staying inside compliance, taking correct actions, and feeling like a real-time conversation. All four at once — not the best conversion number with violations hiding underneath."</p>
 <p><em>(可延伸，离线 vs 线上)</em>: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."</p>
+<h3>🇨🇳 中文完整版 (口播稿, 与英文对应)</h3>
+<blockquote><p>数值全部 [✏️ 核实]——可只讲指标是什么、怎么算、怎么 trade-off，不报硬数。按句换行方便背。</p></blockquote>
+<p>"对这样一个 agent 来说，'working'从来都不是一个数。 而最重要的一点是，这些指标里有些是<strong>互相打架的</strong>——所以设计的本质，其实是想清楚哪些是目标、哪些是 hard constraint。</p>
+<p>我盯四个家族的指标。</p>
+<p><strong>Business outcome（业务结果）</strong>——它存在的理由。 repayment conversion，以及 automation rate——也就是有多大比例的通话是 agent 端到端搞定、不需要人介入的。 这两个就是钱，和省下来的成本。</p>
+<p><strong>Task quality（任务质量）</strong>——它有没有把活干对。 task-completion rate——这通电话有没有达成它的意图——还有 correct-action rate：当 agent 采取了一个动作，比如记一笔 promise-to-pay 或者拉一个余额，它是不是用对的数据做了对的动作。 correct-action 是我盯得最紧的一个，因为一个自信地做错的动作，比不做动作更糟。</p>
+<p><strong>System 和 experience（系统与体验）。</strong> 一条 latency SLO——感知到的 time-to-first-audio 要在我们那条线以下，看的是 p95，不只是均值——再加上 ASR accuracy 和打断处理的质量。 因为如果它感觉卡，或者老压着人说话，那些业务数字一个都不重要了。</p>
+<p><strong>红线（red line）</strong>——这一个是个 <strong>constraint</strong>，不是一个我会拿去交易的指标：compliance-violation rate。 我不会拿它去跟 conversion 做权衡优化。 它必须保持在零、或者接近零，而一旦它回退，就 block 发布，不管 conversion 看起来多漂亮。</p>
+<p>关键的关系，就是这种张力。 我大可以靠让 agent 更激进、或者去过度承诺，来把 repayment conversion 刷上去——但那会把 compliance 和客户信任炸掉。 所以我是这么 frame 的：compliance 和一条 vulnerable-customer-safety 的线是 <strong>hard constraint</strong>；在这些约束之内，我去优化 repayment conversion 和 automation；而 latency SLO 和 correct-action rate 是 quality gate，防止它变成一个糟糕的体验。 'agent is working'的意思是：它在解决通话、在把钱收回来——<strong>与此同时</strong>还待在 compliance 之内、采取正确的动作、感觉像一场实时对话。 四个一起达标——而不是一个最漂亮的 conversion 数字，底下藏着 violation。"</p>
+<p><em>(可延伸，离线 vs 线上)</em>: "而且我把离线和线上分开——一个带标注 case 的 eval harness，用来测 action-correctness 和 compliance，它 gate 住每一次发布，然后是生产里实时的业务和 latency 指标。正是这个离线 harness，让我能快速推进，又不会在红线上 ship 一个 regression。"</p>
 <h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
 <p><strong>开场定调（最重要）</strong>：agent 的"working"从来不是一个数，关键是<strong>有些指标互相打架</strong>，所以设计的本质是分清<strong>哪些是优化目标、哪些是硬约束</strong>。</p>
 <p>四个指标家族（数值全 [✏️]）：</p>
@@ -123,6 +133,39 @@ So the way I frame it: compliance and a vulnerable-customer-safety bar are **har
 All four at once — not the best conversion number with violations hiding underneath."
 
 *(可延伸，离线 vs 线上)*: "And I separate offline from online — an eval harness with labeled cases for action-correctness and compliance that gates every release, then the live business and latency metrics in production. The offline harness is what lets me move fast without shipping a regression on the red line."
+
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 数值全部 [✏️ 核实]——可只讲指标是什么、怎么算、怎么 trade-off，不报硬数。按句换行方便背。
+
+"对这样一个 agent 来说，'working'从来都不是一个数。
+而最重要的一点是，这些指标里有些是**互相打架的**——所以设计的本质，其实是想清楚哪些是目标、哪些是 hard constraint。
+
+我盯四个家族的指标。
+
+**Business outcome（业务结果）**——它存在的理由。
+repayment conversion，以及 automation rate——也就是有多大比例的通话是 agent 端到端搞定、不需要人介入的。
+这两个就是钱，和省下来的成本。
+
+**Task quality（任务质量）**——它有没有把活干对。
+task-completion rate——这通电话有没有达成它的意图——还有 correct-action rate：当 agent 采取了一个动作，比如记一笔 promise-to-pay 或者拉一个余额，它是不是用对的数据做了对的动作。
+correct-action 是我盯得最紧的一个，因为一个自信地做错的动作，比不做动作更糟。
+
+**System 和 experience（系统与体验）。**
+一条 latency SLO——感知到的 time-to-first-audio 要在我们那条线以下，看的是 p95，不只是均值——再加上 ASR accuracy 和打断处理的质量。
+因为如果它感觉卡，或者老压着人说话，那些业务数字一个都不重要了。
+
+**红线（red line）**——这一个是个 **constraint**，不是一个我会拿去交易的指标：compliance-violation rate。
+我不会拿它去跟 conversion 做权衡优化。
+它必须保持在零、或者接近零，而一旦它回退，就 block 发布，不管 conversion 看起来多漂亮。
+
+关键的关系，就是这种张力。
+我大可以靠让 agent 更激进、或者去过度承诺，来把 repayment conversion 刷上去——但那会把 compliance 和客户信任炸掉。
+所以我是这么 frame 的：compliance 和一条 vulnerable-customer-safety 的线是 **hard constraint**；在这些约束之内，我去优化 repayment conversion 和 automation；而 latency SLO 和 correct-action rate 是 quality gate，防止它变成一个糟糕的体验。
+'agent is working'的意思是：它在解决通话、在把钱收回来——**与此同时**还待在 compliance 之内、采取正确的动作、感觉像一场实时对话。
+四个一起达标——而不是一个最漂亮的 conversion 数字，底下藏着 violation。"
+
+*(可延伸，离线 vs 线上)*: "而且我把离线和线上分开——一个带标注 case 的 eval harness，用来测 action-correctness 和 compliance，它 gate 住每一次发布，然后是生产里实时的业务和 latency 指标。正是这个离线 harness，让我能快速推进，又不会在红线上 ship 一个 regression。"
 
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 

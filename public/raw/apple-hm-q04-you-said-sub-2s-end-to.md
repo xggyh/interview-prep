@@ -37,6 +37,37 @@ The endpointer was the other knob — I traded a little latency for not interrup
 
 *(可延伸，主动认尾延迟)*: "Honest caveat — these are the shapes from our dashboards. I'd pull the exact current percentiles before quoting them as hard numbers, and I track p95, not just the mean, because the tail is what callers actually feel."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 数字全部 [✏️ 核实]，口头一律说 "roughly / approximately / on the order of"。
+
+"对——而且更精确地说，对一个主叫真正重要的那个数字，不是 total round-trip。
+是 **time-to-first-audio**：从他停止说话，到他听见我们开口，中间隔了多久。
+那才是感知到的 latency，所以我就按这个口径给你拆 budget。
+
+在一个 sub-2-second 的 budget 里，大概是这样分的：
+
+- **ASR endpointing + final**——大约 [✏️ 300ms]。这里面大部分不是算力；是 endpointer 在等，等到它确信用户是真的停了。这个等待是个可调的旋钮——调太短会把人话切断，调太长又显得我们慢。
+- **Retrieval + context 拼装**——大约 [✏️ 100ms]，把账户状态和对话历史拉进 prompt。
+- **LLM time-to-first-token**——大约 [✏️ 500ms]，这是最难的那一毫秒。TTS 在第一批 token 出现之前根本没法开始，所以 TTFT 就死死卡在关键路径上，后面没有任何东西能藏到它身后。
+- **TTS time-to-first-audio**——从第一批 token 到第一帧合成音频，大约 [✏️ 200ms]。
+- **Network / telephony 开销**——一个 round trip 大约 [✏️ 150ms]。
+
+所以感知 latency 落在大约 [✏️ 1.2s] 到第一声音频——在那条 2 秒线之下。
+
+最难的部分，很清楚,是 **LLM time-to-first-token**，原因是结构性的：别的都能 overlap，但 TTS 严格地在第一个 token 的下游。
+所以我从三个方向去攻它。
+
+第一——在 serving 侧做 **prefill 优化和 KV-cache 复用**，用 vLLM 和 SGLang，让 prompt 里那些静态的部分——system instruction 和 tool schema——不用每一轮都重算。
+
+第二——**让 LLM 流式输出，并且在第一个分句上就启动 TTS**，不是等整句，这样 TTFT 和合成是 overlap 的，而不是一前一后排队。
+
+第三——**缩短 prompt**，只检索 policy 真正需要的那几个账户字段，因为 prefill 成本是随输入长度涨的。
+
+endpointer 是另一个旋钮——我拿一点点 latency 去换'不打断人',因为把一个主叫的话切断，比慢个一百毫秒更糟。"
+
+*(可延伸，主动认尾延迟)*: "诚实地加一句——这些是我们 dashboard 上的'形状'。在把它们当硬数字报出去之前，我会先去拉一下当前确切的 percentile，而且我看的是 p95，不只是均值，因为主叫真正感受到的是 tail。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **第一步重新定义指标（关键，显专业）**：用户感知的不是 total round-trip，是 **time-to-first-audio**（用户停说 → 听到我们开口）。按这个口径给预算。

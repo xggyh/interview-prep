@@ -16,6 +16,16 @@ So where I want to grow is **deeper on both ends of that bridge, not off it**. O
 
 延伸: "If I'm honest about the failure mode I avoid: I've seen brilliant research that never ships and solid products built on stale models. I want to be the person who refuses both — and that only happens in the middle band, which is where this team operates."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"这一题我很清楚, 而且这也是这个岗位为什么很 fit 我的一大原因。我成长的地方, 是在 frontier 工作和 product 之间的那条缝上 — 把模型能力边缘的东西, 变成一个真实客户真正会去依赖的东西。我不想纯粹只做其中一端, 而且这不是一个折中的答案; 这是我刻意往那个方向靠过去的工作。
+
+这其实就是我现在的角色 — 我是一个 technical POC, 意思就是我坐在 research-grade 的工作和产品之间。在 voice agent 上, 我做的是真正贴近 frontier 的活 — 多语 post-training、DPO-style 的 alignment、对 long-horizon agent workflow 做 RL-style 的优化 — 但这些东西在它 ship 到七个市场、并且把还款 conversion 推动起来之前, 都不算数。对我来说最爽的部分恰恰就是那个完整的来回: 一个 post-training 技巧是挺有意思的, 但一个能让客户真切感受到 '对话变好了' 的 post-training 技巧, 才是全部的意义所在。
+
+所以我想成长的方向是 **在这座桥的两端都扎得更深, 而不是从桥上离开**。在 frontier 这一端, 我想在 post-training 和 on-device 的效率前沿上钻得更深 — 量化、adapter、还有 latency-quality-memory 之间的取舍。在 product 这一端, 我想把 '把模糊的客户需求翻译成对的技术 bet' 这件事做得更利落、更快。我追求的成长, 不是 '变成一个 researcher', 也不是 '变成一个 PM' — 而是变成那个团队会信任、能把一个前沿能力端到端地落成真实东西的人。这就是那块肌肉, 而这个岗位正好是它能变得更强的地方。"
+
+延伸: "如果我诚实地说我想避开的那个 failure mode: 我见过惊艳但永远不上线的 research, 也见过建在过时模型上的扎实产品。我想做那个两者都拒绝的人 — 而这只可能发生在中间那条带上, 也正是这个团队所在的位置。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **开场明确表态** (不含糊): 我成长在 **frontier 和 product 之间的那条缝** — 把模型能力边缘的东西, 落成客户真正依赖的东西。**这不是折中答案, 是我刻意选的方向**。

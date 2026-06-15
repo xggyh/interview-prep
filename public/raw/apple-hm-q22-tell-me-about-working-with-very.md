@@ -34,6 +34,24 @@ Apple 想看你**面对模糊不慌**：能不能主动把一句话诉求**收�
 
 (可延伸) "The lesson I carry: when requirements are vague, don't wait for them to firm up and don't guess — go get the data that makes the right scope obvious, and architect so that the things you *know* will change are cheap to change. Ambiguity is a given; my job is to make the system tolerant of it."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> **60 秒脊柱 (背死这句)**: *需求就一句话 —— "用 AI 让客服更聪明"。我用 ticket 数据、而不是开会，把范围收敛下来 —— 然后，senior 的那一层，我把架构设计成让变动的需求落在 config 和 RAG 里，不落在代码里。intent-router 加 RAG-fallback 这个设计本身就吸收了模糊。*
+
+**Situation.** "我们启动 BNPL chatbot 的时候，我拿到的需求基本就一句话：**'用 AI 让客服更聪明（make customer support smarter with AI）'**。就这些。没有定义好的范围、没有目标指标、没有就先解决哪些问题达成一致 —— 而且 product、ops、engineering 每个人脑子里对'更聪明'是什么样，都有一幅不同的画面。"
+
+**Task.** "我的活是把这一句话变成一个我们真能建、也真能量的东西 —— 既不能猜错方向烧掉一个季度，又明知道范围会随着我们学习而不断移动。"
+
+**Action.** "我刻意做了两件事。
+
+**第一，我用数据、而不是开会来收敛范围。** 我没有去抽象地辩论该建什么，而是**把客服 ticket 数据拉出来**，看用户到底为了什么来联系我们。量集中在少数几个 intent 上 —— order lookup、refund、dispute —— 外加一条长尾的通用问题。这就把一个模糊的诉求变成了一个具体的方案：用 workflow sub-agent 去自动化那些高频、定义清楚的 intent，用 FAQ RAG 去接那条长尾。这下 product 和 ops 终于能就一个*真实*的东西去争了，我们也就第一版范围和指标 —— case-resolution rate —— 达成了一致，而这是扎根在真实需求在哪儿之上的。
+
+**第二，也更重要，我把架构设计成让变动的需求不等于重写。** 我知道 intent 的清单会变、政策会变、新的流程会被提出来 —— 所以我把系统建成让这里面大部分东西落在 **配置和数据里，而不是代码里**。新增或改动的 intent 是路由 config；新政策和 FAQ 内容进 **RAG 知识库**，它更新的时候不用碰模型、也不用重新部署；新的动作是 sub-agent 能调的 tool。所以当需求一变 —— 而它确实一直在变 —— 大多数变更都是一次 config 或内容更新，不是一个工程周期。intent router 加 RAG-fallback 这个结构本身就是一种*吸收*模糊的方式：我们不必在前期把每一种可能的请求都枚举出来，因为任何没被识别的请求，都在 FAQ 这条路里有一个安全的归宿。"
+
+**Result.** "我们从一句话的诉求，走到了一个上线的、可量化的系统，而 —— 这是我比较自豪的部分 —— 当范围发生变动时，我们大多是靠 config 和知识库更新把它吸收掉的，而不是去重新架构。这个设计让变化变得便宜，而这才是需求不稳定时真正的考验。再加上一开始就*和* product、ops 一起把指标定下来，'更聪明'就不再是个主观的东西了。"
+
+(可延伸) "我带走的教训是：当需求模糊的时候，别等它自己变清晰，也别去猜 —— 去拿那个能让正确范围变得显而易见的数据，并且把那些你*知道*会变的东西架构成易于改动的。模糊是常态；我的工作就是让系统对它鲁棒。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **两个动作 = 这题的灵魂**：(1) 用**数据**收敛范围；(2) 用**架构**吸收变化。第二点是 senior 分水岭，别漏。

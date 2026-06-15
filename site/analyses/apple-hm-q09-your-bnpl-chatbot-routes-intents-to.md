@@ -35,6 +35,35 @@ The router is intentionally thin and fast; the sub-agents hold the business logi
 
 *(一句话总纲, 如果时间紧只说这句:)* "So: a thin fast router decides, scoped sub-agents act with tool calling, RAG grounds the informational long tail, an orchestrator owns state, and every layer is independently measured — and none of it assumes the router is perfect."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"这是一个三层的设计，核心思想是 separation of concerns —— 一层负责决策、一层负责动作、一层负责兜底。
+
+**第一层 —— router。**
+- 每一轮用户输入先进一个 intent classifier。
+- 它把这条消息映射到一小撮 *actionable* intent —— order lookup、refund、dispute —— 或者一个兜底的 *general* 桶。
+- router 只决定*这一轮去哪*，它本身不回答。这是故意的 —— 它是每一轮关键路径上那个又薄又快的层。
+
+**第二层 —— sub-agent dispatch。**
+- 如果是 actionable intent，我就把它路由到一个专门的 workflow sub-agent。
+- 每个 sub-agent 只管一个域，有自己 *scoped* 的工具 —— order API、refund API、dispute API —— 还有自己的 guardrails。
+- 所以 refund agent 能调 refund 这个 endpoint，但它物理上根本碰不到别的东西。
+- 它做 tool calling，拿回结构化数据，再基于这些数据生成一个 *grounded* 的回复。
+- 这种 containment 是故意的：在一个碰钱的流程里，你希望任何单个 agent 的 blast radius 都尽量小。
+
+**第三层 —— FAQ RAG fallback。**
+- 如果意图是 general —— 比如 'BNPL 是怎么运作的'、'原则上我什么时候该还款' —— 这种没有 API 可调。
+- 所以它走一条 retrieval-augmented 的路：先从我们的 policy 和 FAQ 知识库里 retrieve，再基于检索到的段落生成答案，带 citation。
+- 这一层接的是*信息类*的长尾，跟 sub-agent 处理的*交易类*意图是相对的。
+
+router 是故意做薄做快的；业务逻辑都在 sub-agent 里；RAG 接的是一切信息类而非交易类的东西。而且关键是 —— router 从来不被假设是对的。它路由错的时候有一条自愈路径，这个我可以展开讲。"
+
+*(可延伸 1 — 编排与状态:)* "把这一切兜在一起的是一个 orchestration 层。它持有 conversation state，决定每一轮谁来处理 —— 先 router，再某个 sub-agent，需要的话再回到 router。sub-agent 本身是无状态的 worker；orchestrator 持有 memory 和控制流。正是这个分离，让一个多轮对话能在 order-lookup 那一轮和 refund 那一轮之间干净地切换，而不丢上下文。"
+
+*(可延伸 2 — eval:)* "在这之上，我跟 product 和 ops 一起 owned 了 metrics 和 eval harness —— 我们*按 intent* 定义了什么叫 'resolved'，所以每一层是分开度量的，而不是当成一个大黑盒。router 看 routing accuracy，sub-agent 看 correct-action 和 resolution，RAG 看 grounded-answer 的质量。一旦哪里 regression 了，我能告诉你是*哪一层*动了 —— 这正是把它设计成分层而不是一个大 prompt 的全部意义。"
+
+*(一句话总纲, 如果时间紧只说这句:)* "所以：一个又薄又快的 router 做决策，scoped 的 sub-agent 用 tool calling 做动作，RAG 给信息类长尾兜底并 ground，一个 orchestrator 持有 state，每一层都独立度量 —— 而且没有任何一层假设 router 是完美的。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 记三个词:**route → dispatch → fallback**,外加一个底座 **orchestrator (state)**。

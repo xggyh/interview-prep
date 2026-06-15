@@ -40,6 +40,40 @@ So: continuous VAD with anti-false-trigger gating; a fast buffer flush enabled b
 
 *(可延伸，上升到产品判断)*: "The judgment underneath it: in debt collection especially, talking over an upset customer is a trust-killer — so I biased the tuning toward yielding fast. Let the human win the floor."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+> 三段式骨架 **Detect → Stop → Re-align**，按句换行方便背。
+
+"barge-in 是整个实时工作里真正最难的部分，因为它正是 full-duplex 咬你的地方。
+这个系统得同时听和说，而且要在用户插话的那一瞬间就反应过来——就像打一通真电话，你可以打断对方。
+
+有三个问题要解：**detect、stop、re-align（检测、停、重对齐）。**
+
+**Detect（检测）。**
+一个 VAD 持续地跑在入站音频上，包括我们正在说话的时候。
+当它在我们播放的过程中看到用户那边有持续的语音能量，那就是一个 barge-in 的候选。
+陷阱在于 false trigger——一声咳嗽、一句'嗯哼'这种 backchannel，或者我们自己的音频回声回来了。
+所以我不会靠单独一帧就触发；我要求语音持续超过一个短的阈值，而且我们跑 echo cancellation，这样 agent 不会打断它自己。
+这个阈值是个调节旋钮——太灵敏了，一声咳嗽就把我们说到一半的词切断；太慢了，我们就会压着客户说。
+
+**Stop（停）。**
+这是最脏的部分。
+我们一旦决定要 barge-in，就得**飞快地**杀掉播放——而音频已经在飞了：合成好的帧躺在 TTS 的输出 buffer 里，还有些帧已经推到网络上了。
+所以我停掉 TTS 生成、flush 掉本地 buffer、停止再发帧。
+因为音频被 **packetize 成很小的帧**——20 毫秒一块——'卡在管子里'的最多也就一两帧。
+所以这个停感觉近乎瞬时，而不是让用户又听完一整句。
+这就是细粒度 packetization 的全部意义所在：小帧意味着很紧的 stop latency。
+
+**Re-align（重对齐）。**
+当我们把自己切断的时候，对话状态现在就不一致了——我们大概说了一句话的 60%，但 LLM 以为它说了 100%。
+所以 turn manager 记录下实际播出去的是什么，把 agent 这一轮截断到那个位置，再为用户接下来的语音重新打开 ASR。
+这样下一轮 LLM 就会被条件化成'你是在这里被打断的'。
+不然的话 agent 会当作什么都没发生，继续往下念，那感觉就是坏掉了。
+
+所以总结：持续的 VAD 加上防 false-trigger 的 gating；靠小帧 packetization 实现的快速 buffer flush；以及对话状态的重新对齐，让这次打断是真的被理解了——而不只是被消了声。"
+
+*(可延伸，上升到产品判断)*: "底下那个判断是：尤其是在债务催收里，压着一个情绪激动的客户说话是个 trust-killer——所以我把调参偏向了快速让出。让人类赢得话语权。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 **开场定调**：barge-in 是实时工作里最难的，因为它正是 full-duplex 咬人的地方——边听边说，用户一插话立刻反应（像真打电话能打断对方）。

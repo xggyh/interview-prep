@@ -18,6 +18,18 @@ Where it got real was when compliance wanted a hard rule the agent could never v
 
 延伸: "Earlier, on the BNPL chatbot, I also defined the metrics and the eval harness jointly with product and ops from day one — so this pattern of co-owning the definition of success with business partners is something I've now done across two projects."
 
+## 🇨🇳 中文完整版 (口播稿, 与英文对应)
+
+"我那个 voice agent 项目, 基本上全程是被非技术的合作方驱动的, 所以这件事我天天在做。催收首先是一个合规和业务问题, 其次才是工程问题 — 所以我不能光做我自己觉得 cool 的东西。我主要的合作方是 collections 运营团队和合规团队, 这两边都不讲指标、也不讲模型那套话。
+
+我必须练出来的核心能力, 就是**把模糊的业务诉求翻译成工程指标**。举个具体的例子: 运营来找我, 说 '这个 agent 感觉太 pushy 了, 客户都挂电话'。这不是一个 spec — 我没法去优化 'pushy' 这个词。所以我就跟他们坐下来, 一起听了一批真实的通话录音, 我们把 'pushy' 拆成了三个可度量的东西: early-hangup rate (早挂率)、每通电话催还款的次数、还有一个合规团队真的能签字认可的 tone-compliance score。一旦它变成数字, 我就能把它放进 eval harness 去优化。这个翻译的动作 — 把一种感觉变成一个指标 — 我觉得是很多工程师会跳过的一步, 而真正的合作恰恰发生在这一步上。
+
+我还把这种对齐做成了**结构化的, 而不是临时的**。我们跑了一个每周的 review, 我会带上指标的变化, 再加几段真实的 transcript, 然后运营和合规告诉我 agent 哪里不对。这个会有两个作用: 一是它让他们那些模糊的目标持续地被翻译进我的 backlog; 二是它让他们的预期一直被校准 — 他们能看见取舍, 而不是一次性就把所有东西都要过去。
+
+真正见真章的时刻, 是合规想要一条 agent 永远不能违反的硬规则, 而运营想要最大化的还款 conversion — 这两个是互相拉扯的。我没有选边站。我把它 reframe 成一个 '先约束、再优化' 的问题: 合规规则是不可谈判的 guardrail, 然后在这个 guardrail 之内, 我把 conversion 往死里优化。这么一重新框, 两边都能说 yes, 因为没有人需要输。"
+
+延伸: "更早的时候, 在那个 BNPL chatbot 上, 我也是从第一天起就和产品、运营一起定义指标和 eval harness 的 — 所以这种和业务方共同 own '成功的定义' 的模式, 我现在已经在两个项目上都做过了。"
+
 ## 🇨🇳 中文要点 (理解 + 记忆骨架)
 
 - **定调**: 催收本质是 **compliance + business 驱动**, 工程第二位 → 我天然就长期和 ops / compliance 合作 (把软肋直接框成日常强项)。
