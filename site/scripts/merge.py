@@ -49,6 +49,8 @@ SOURCES = [
     ("Google FDE Summary", ROOT / "site" / "data" / "gfde-summary.json"),
     # Googlyness 标准答 — 26 道 Google behavioral 真题, EN 背诵稿 + 中文速记, 基于 Gao Xin 真实简历
     ("Googlyness 标准答", ROOT / "site" / "data" / "googlyness-answers.json"),
+    # Apple HM 面 — 30 道 Apple hiring-manager 首轮高频题, 极详细英文背诵稿 + 中文要点, 基于真实简历
+    ("Apple HM 面", ROOT / "site" / "data" / "apple-hm.json"),
     # Review / rapid-recall pages — extracted Extended Cheat Sheets from the 49 full pages
     ("Review", ROOT / "site" / "data" / "review-pages.json"),
     # 真题 — Exponent 2026 整理的 FDE 52 道高频真题 (Palantir/OpenAI/Anthropic/Databricks/Scale/ElevenLabs)

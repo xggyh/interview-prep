@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍎 HM Q26 · This role touches on-device constraints. Your experience is cloud GPU — how do you think about that shift? · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Apple HM 面 / 🍎 HM Q26 · This role touches on-device constraints. Your experience is cloud GPU — how do you think about that shift?</div>
+  <h1>🍎 HM Q26 · This role touches on-device constraints. Your experience is cloud GPU — how do you think about that shift?</h1>
+  <div class="header-meta">
+    <span class="tag tag-apple-hm">Apple HM 面</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#000000"><strong>Apple HM 面</strong> · Senior · 📋 5 · 🕒 Jun 17, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/apple-hm-q26-this-role-touches-on-device-constraints.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/apple-hm-q26-this-role-touches-on-device-constraints.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">[Why Apple &amp; Fit] 🔴 关键反杀: 同构问题, 约束面从 HBM 换成设备 RAM/功耗 · 英文背诵稿 + 中文要点 + 边界 + 追问</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🍎 HM Q26 · "This role touches on-device constraints. Your experience is cloud GPU — how do you think about that shift?"</h1>
+<blockquote><p><strong>类别</strong>: Fit / Technical-judgment (🔴 KEY reframe) · <strong>考点</strong>: 能否把 "只有 cloud 经验" 这个看似的缺口, reframe 成 "我已经在解同构问题"; 是否真懂约束面如何切换 · ⚠️ [✏️] 数字背前替换成真实值</p></blockquote>
+<h3>🧠 这题在测什么 / 面试官想看到</h3>
+<p>这是一道<strong>伪装成弱点暴露的反击题</strong>。面试官嘴上问 "你只有 cloud 经验怎么办", 真正想看的是: 你会不会慌、会不会承认这是硬伤、还是能展示你抓住的是<strong>底层的工程纪律和约束优化思维</strong>, 而约束面 (constraint surface) 只是从 GPU 成本/HBM 换成了设备的 unified memory / 功耗 / 模型尺寸。强答案 = 大方承认没在 device 上 ship 过 (humility), 但立刻证明 multi-LoRA、量化、KV-cache 这些你 cloud 上做的事<strong>和 Apple on-device 做的是同构的</strong>, 并给出具体技术映射。弱答案 = 要么心虚道歉, 要么吹 "都一样没区别" (显得没真懂)。陷阱: 假装懂 Apple 内部细节 → 用公开的 2025 Apple tech report 事实就好, 别编。</p>
+<h3>📋 English Answer (背诵稿, 主答 ~90 秒 + 可延伸)</h3>
+<p>"Let me be straight first: I haven't shipped a model running on-device — my production work has been cloud GPU. So I'm not going to pretend I've debugged a model fighting for unified memory on a phone. That's a real boundary, and I'd be learning the device-specific tooling.</p>
+<p>But here's how I actually think about it. The thing that transfers isn't the hardware — it's the <strong>engineering discipline of optimizing a model under a hard resource constraint</strong>. On cloud, my constraint surface is GPU cost and HBM capacity and throughput. On-device, the constraint surface changes to <strong>unified memory, power budget, and model size</strong> — but it's the same shape of problem: hit a quality bar while a scarce resource fights you. I've spent the last year living inside that exact tradeoff.</p>
+<p>And the specific techniques line up almost one-to-one. From what's public in Apple's 2025 work: the on-device model uses <strong>task-specific rank-16 LoRA adapters that get hot-swapped</strong> depending on the task. That is exactly multi-LoRA serving — which I've done on vLLM, swapping adapters per request against a shared base. Same primitive, smaller scale. The on-device stack also leans on <strong>aggressive quantization — 2-bit QAT weights, 8-bit KV-cache, 4-bit embeddings</strong>. I've done memory-efficiency tuning and quantization on the serving side; the move to 2-bit quantization-aware training is a steeper version of a curve I'm already on, not a different curve. And <strong>KV-cache sharing for memory and prefill reduction</strong> — that's the same family as the time-to-first-audio work I did on the voice agent, where the whole game was shrinking prefill cost so the first response came out fast.</p>
+<p>So my honest framing is: I'm strong on the isomorphic problem and I'd be ramping on the device-specific surface. The mental model — define the resource budget, then optimize quality inside it — is identical, and I've been doing it under cloud constraints. Pointing it at a phone changes the numbers, not the method."</p>
+<p>延伸: "If anything, the on-device constraints are <em>cleaner</em> to reason about — a fixed memory and power budget is a more honest forcing function than 'GPU cost,' which can always be papered over by spending more. I'd actually enjoy that."</p>
+<h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
+<ul><li><strong>先诚实</strong> (Apple humility 加分): 没在 device 上 ship 过, 没在手机里 debug 过抢 unified memory 的模型 — 这是真边界, device 工具链我得学。<strong>先承认, 再反击, 比硬吹可信 10 倍</strong>。</li><li><strong>核心 reframe 一句</strong>: 迁移的不是硬件, 是 <strong>"在硬资源约束下优化模型达标" 的工程纪律</strong>。约束面切换:</li><li>cloud: GPU 成本 / HBM 容量 / 吞吐</li><li>device: unified memory / 功耗 / 模型尺寸</li><li><strong>同一形状的问题: 在稀缺资源压力下打到质量线</strong></li><li><strong>技术一一对应</strong> (背熟这三条映射, 这是这题的肉, 全部基于公开的 2025 Apple tech report):</li></ul>
+<ol><li>on-device 用 <strong>rank-16 LoRA adapters 热切换</strong> ↔ 我在 vLLM 上做的 <strong>multi-LoRA serving</strong> (共享 base, per-request 换 adapter)。同一个 primitive, 更小 scale。</li><li>on-device 激进量化 <strong>2-bit QAT 权重 / 8-bit KV-cache / 4-bit embedding</strong> ↔ 我做过 serving 侧的 memory-efficiency tuning + quantization。2-bit QAT 是同一条曲线上更陡的一段, 不是另一条曲线。</li><li>on-device <strong>KV-cache sharing</strong> (省内存/prefill) ↔ 我 voice agent 的 <strong>TTFA (time-to-first-audio) 优化</strong>, 核心就是压 prefill 让首响应快。</li></ol>
+<ul><li><strong>收尾框架</strong>: <strong>"同构问题我强, device-specific 表面我在 ramp"</strong>。心智模型完全一样 (定预算→预算内优化质量), 指向手机只是换了数字, 没换方法。</li><li>延伸杀招: device 约束<strong>更干净</strong> — 固定的 memory/power 预算比 "GPU 成本" 更诚实, 后者总能靠多花钱糊弄过去。我反而喜欢这种硬约束。</li><li>记忆钩子: <strong>"约束面切换 / LoRA↔multi-LoRA / 量化↔量化 / KV-cache↔TTFA / 同构我强device我ramp"</strong>。</li></ul>
+<h3>🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)</h3>
+<p><strong>Q: What's genuinely different about 2-bit QAT versus the quantization you've done?</strong> "The big one is that QAT — quantization-aware training — folds the quantization into training, so the model learns to be robust to 2-bit weights, versus post-training quantization where you quantize a finished model and eat the accuracy drop. At 2-bit, post-training quantization basically falls apart, so QAT isn't optional. I've mostly done post-training-side memory tuning, so the new muscle I'd build is the training-time side — the QAT loop, calibration, and recovering quality at that bit-width. I know the destination; I'd be learning that specific path."</p>
+<p><strong>Q: On-device, you can't just scale out. How does that change your architecture thinking?</strong> "It removes the easy escape hatch. On cloud, if quality needs more compute, I can add GPUs — latency and quality become a money problem. On a phone, the budget is fixed, so every quality gain has to come from the model or the system being smarter: better adapters, better quantization, smarter KV-cache reuse, or offloading the heavy case to a server model. It actually maps to Apple's own design — small capable model on-device, and Private Cloud Compute for the harder requests. Deciding <em>what runs where</em> under that split is the interesting architecture problem, and it's a routing/tradeoff decision, which is squarely what I do."</p>
+<p><strong>Q: How would you decide what stays on-device versus goes to the server model?</strong> "I'd frame it as a routing problem on three axes: can the on-device model hit the quality bar for this request, how latency-sensitive is it, and is there privacy-sensitive data that should never leave the device. Easy, private, latency-critical requests stay local; hard or ambiguous ones escalate to the server model. That's the same intent-gating-and-dispatch pattern I built in the BNPL chatbot — recognized intents to local workflows, hard ones escalate — just with privacy and a fixed device budget added as first-class constraints."</p>
+<p><strong>Q: Honestly, what would your first month look like ramping on device?</strong> "First, get hands-on with the device tooling — quantization and the on-device runtime — and reproduce a known result so I trust my own measurements. Second, find the actual binding constraint on the target hardware, because 'on-device' is not one budget; memory, power, and thermal each bite differently. Third, map our existing serving optimizations to their device equivalents and see which transfer cleanly and which don't. I'd rather earn a calibrated mental model in month one than guess."</p>
+<h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
+<ul><li><strong>必须先承认没在 device 上 ship 过</strong>。不要硬吹 "都一样我都会"。Apple 会立刻钻 device-specific 细节 (功耗/热/runtime), 吹了会当场穿帮。承认 + 展示同构能力 = 最稳。</li><li><strong>别假装懂 Apple 内部</strong>。只用公开的 2025 Apple tech report 事实 (rank-16 LoRA / 2-bit QAT / 8-bit KV-cache / 4-bit embedding / KV-cache sharing / on-device + PCC 双模型)。不要编内部数字或路线。</li><li>QAT 那条要诚实: 我主要做 post-training 侧量化, <strong>训练时的 QAT loop 是要新学的肌肉</strong>。承认这个具体边界反而加分。</li><li>不要贬低 cloud 经验来抬 device ("cloud 太简单")。框成 "约束面不同, 纪律相通"。</li><li>别把 "同构" 说得太满以至于像在抹平差异。比例感: 70% 自信迁移 + 30% 诚实 ramp。</li></ul>
+<h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
+<ul><li><strong>multi-LoRA = rank-16 adapter 热切换</strong> 这条映射是全场最强钩子 — 主动抛, 它把 "你只有 cloud 经验" 瞬间变成 "你已经在做 Apple on-device 的同一件事"。这一条几乎单独就能翻盘这道题。</li><li><strong>TTFA ↔ KV-cache sharing/prefill 优化</strong> — 主动点出 voice agent 的首响应延迟优化, 自然带出你的 latency 强项 (直击 JD 的 latency 重点), 并衔接 Q23 里埋的 latency-quality 取舍钩子。</li><li><strong>on-device + PCC 路由 = 我的 intent-gating/dispatch</strong> — 主动把 Apple 的双模型架构映射到 BNPL chatbot 的 routing 模式, 并把 <strong>privacy 作为一等约束</strong> 抬出来, 直接命中 Apple 文化核心。</li><li><strong>"固定预算是更诚实的 forcing function, 我反而喜欢"</strong> — 主动抛这句, 把被动防守变成主动向往, 表现出对 on-device 这条路的真实兴趣而非勉强适应。</li></ul>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="apple-hm-q25-tell-me-about-a-failure-or.html">← 🍎 HM Q25 · Tell me about a failure or setback, and what you changed afterward.</a>
+    <a href="apple-hm-q27-the-team-serves-greater-china-and.html">🍎 HM Q27 · The team serves Greater China and needs Chinese LLM work. What's different about training/evaluating LLMs in Chinese? →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🍎 HM Q26 · "This role touches on-device constraints. Your experience is cloud GPU — how do you think about that shift?"
+
+> **类别**: Fit / Technical-judgment (🔴 KEY reframe) · **考点**: 能否把 "只有 cloud 经验" 这个看似的缺口, reframe 成 "我已经在解同构问题"; 是否真懂约束面如何切换 · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+这是一道**伪装成弱点暴露的反击题**。面试官嘴上问 "你只有 cloud 经验怎么办", 真正想看的是: 你会不会慌、会不会承认这是硬伤、还是能展示你抓住的是**底层的工程纪律和约束优化思维**, 而约束面 (constraint surface) 只是从 GPU 成本/HBM 换成了设备的 unified memory / 功耗 / 模型尺寸。强答案 = 大方承认没在 device 上 ship 过 (humility), 但立刻证明 multi-LoRA、量化、KV-cache 这些你 cloud 上做的事**和 Apple on-device 做的是同构的**, 并给出具体技术映射。弱答案 = 要么心虚道歉, 要么吹 "都一样没区别" (显得没真懂)。陷阱: 假装懂 Apple 内部细节 → 用公开的 2025 Apple tech report 事实就好, 别编。
+
+## 📋 English Answer (背诵稿, 主答 ~90 秒 + 可延伸)
+
+"Let me be straight first: I haven't shipped a model running on-device — my production work has been cloud GPU. So I'm not going to pretend I've debugged a model fighting for unified memory on a phone. That's a real boundary, and I'd be learning the device-specific tooling.
+
+But here's how I actually think about it. The thing that transfers isn't the hardware — it's the **engineering discipline of optimizing a model under a hard resource constraint**. On cloud, my constraint surface is GPU cost and HBM capacity and throughput. On-device, the constraint surface changes to **unified memory, power budget, and model size** — but it's the same shape of problem: hit a quality bar while a scarce resource fights you. I've spent the last year living inside that exact tradeoff.
+
+And the specific techniques line up almost one-to-one. From what's public in Apple's 2025 work: the on-device model uses **task-specific rank-16 LoRA adapters that get hot-swapped** depending on the task. That is exactly multi-LoRA serving — which I've done on vLLM, swapping adapters per request against a shared base. Same primitive, smaller scale. The on-device stack also leans on **aggressive quantization — 2-bit QAT weights, 8-bit KV-cache, 4-bit embeddings**. I've done memory-efficiency tuning and quantization on the serving side; the move to 2-bit quantization-aware training is a steeper version of a curve I'm already on, not a different curve. And **KV-cache sharing for memory and prefill reduction** — that's the same family as the time-to-first-audio work I did on the voice agent, where the whole game was shrinking prefill cost so the first response came out fast.
+
+So my honest framing is: I'm strong on the isomorphic problem and I'd be ramping on the device-specific surface. The mental model — define the resource budget, then optimize quality inside it — is identical, and I've been doing it under cloud constraints. Pointing it at a phone changes the numbers, not the method."
+
+延伸: "If anything, the on-device constraints are *cleaner* to reason about — a fixed memory and power budget is a more honest forcing function than 'GPU cost,' which can always be papered over by spending more. I'd actually enjoy that."
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+- **先诚实** (Apple humility 加分): 没在 device 上 ship 过, 没在手机里 debug 过抢 unified memory 的模型 — 这是真边界, device 工具链我得学。**先承认, 再反击, 比硬吹可信 10 倍**。
+- **核心 reframe 一句**: 迁移的不是硬件, 是 **"在硬资源约束下优化模型达标" 的工程纪律**。约束面切换:
+  - cloud: GPU 成本 / HBM 容量 / 吞吐
+  - device: unified memory / 功耗 / 模型尺寸
+  - **同一形状的问题: 在稀缺资源压力下打到质量线**
+- **技术一一对应** (背熟这三条映射, 这是这题的肉, 全部基于公开的 2025 Apple tech report):
+  1. on-device 用 **rank-16 LoRA adapters 热切换** ↔ 我在 vLLM 上做的 **multi-LoRA serving** (共享 base, per-request 换 adapter)。同一个 primitive, 更小 scale。
+  2. on-device 激进量化 **2-bit QAT 权重 / 8-bit KV-cache / 4-bit embedding** ↔ 我做过 serving 侧的 memory-efficiency tuning + quantization。2-bit QAT 是同一条曲线上更陡的一段, 不是另一条曲线。
+  3. on-device **KV-cache sharing** (省内存/prefill) ↔ 我 voice agent 的 **TTFA (time-to-first-audio) 优化**, 核心就是压 prefill 让首响应快。
+- **收尾框架**: **"同构问题我强, device-specific 表面我在 ramp"**。心智模型完全一样 (定预算→预算内优化质量), 指向手机只是换了数字, 没换方法。
+- 延伸杀招: device 约束**更干净** — 固定的 memory/power 预算比 "GPU 成本" 更诚实, 后者总能靠多花钱糊弄过去。我反而喜欢这种硬约束。
+- 记忆钩子: **"约束面切换 / LoRA↔multi-LoRA / 量化↔量化 / KV-cache↔TTFA / 同构我强device我ramp"**。
+
+## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
+
+**Q: What's genuinely different about 2-bit QAT versus the quantization you've done?**
+"The big one is that QAT — quantization-aware training — folds the quantization into training, so the model learns to be robust to 2-bit weights, versus post-training quantization where you quantize a finished model and eat the accuracy drop. At 2-bit, post-training quantization basically falls apart, so QAT isn't optional. I've mostly done post-training-side memory tuning, so the new muscle I'd build is the training-time side — the QAT loop, calibration, and recovering quality at that bit-width. I know the destination; I'd be learning that specific path."
+
+**Q: On-device, you can't just scale out. How does that change your architecture thinking?**
+"It removes the easy escape hatch. On cloud, if quality needs more compute, I can add GPUs — latency and quality become a money problem. On a phone, the budget is fixed, so every quality gain has to come from the model or the system being smarter: better adapters, better quantization, smarter KV-cache reuse, or offloading the heavy case to a server model. It actually maps to Apple's own design — small capable model on-device, and Private Cloud Compute for the harder requests. Deciding *what runs where* under that split is the interesting architecture problem, and it's a routing/tradeoff decision, which is squarely what I do."
+
+**Q: How would you decide what stays on-device versus goes to the server model?**
+"I'd frame it as a routing problem on three axes: can the on-device model hit the quality bar for this request, how latency-sensitive is it, and is there privacy-sensitive data that should never leave the device. Easy, private, latency-critical requests stay local; hard or ambiguous ones escalate to the server model. That's the same intent-gating-and-dispatch pattern I built in the BNPL chatbot — recognized intents to local workflows, hard ones escalate — just with privacy and a fixed device budget added as first-class constraints."
+
+**Q: Honestly, what would your first month look like ramping on device?**
+"First, get hands-on with the device tooling — quantization and the on-device runtime — and reproduce a known result so I trust my own measurements. Second, find the actual binding constraint on the target hardware, because 'on-device' is not one budget; memory, power, and thermal each bite differently. Third, map our existing serving optimizations to their device equivalents and see which transfer cleanly and which don't. I'd rather earn a calibrated mental model in month one than guess."
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
+
+- **必须先承认没在 device 上 ship 过**。不要硬吹 "都一样我都会"。Apple 会立刻钻 device-specific 细节 (功耗/热/runtime), 吹了会当场穿帮。承认 + 展示同构能力 = 最稳。
+- **别假装懂 Apple 内部**。只用公开的 2025 Apple tech report 事实 (rank-16 LoRA / 2-bit QAT / 8-bit KV-cache / 4-bit embedding / KV-cache sharing / on-device + PCC 双模型)。不要编内部数字或路线。
+- QAT 那条要诚实: 我主要做 post-training 侧量化, **训练时的 QAT loop 是要新学的肌肉**。承认这个具体边界反而加分。
+- 不要贬低 cloud 经验来抬 device ("cloud 太简单")。框成 "约束面不同, 纪律相通"。
+- 别把 "同构" 说得太满以至于像在抹平差异。比例感: 70% 自信迁移 + 30% 诚实 ramp。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- **multi-LoRA = rank-16 adapter 热切换** 这条映射是全场最强钩子 — 主动抛, 它把 "你只有 cloud 经验" 瞬间变成 "你已经在做 Apple on-device 的同一件事"。这一条几乎单独就能翻盘这道题。
+- **TTFA ↔ KV-cache sharing/prefill 优化** — 主动点出 voice agent 的首响应延迟优化, 自然带出你的 latency 强项 (直击 JD 的 latency 重点), 并衔接 Q23 里埋的 latency-quality 取舍钩子。
+- **on-device + PCC 路由 = 我的 intent-gating/dispatch** — 主动把 Apple 的双模型架构映射到 BNPL chatbot 的 routing 模式, 并把 **privacy 作为一等约束** 抬出来, 直接命中 Apple 文化核心。
+- **"固定预算是更诚实的 forcing function, 我反而喜欢"** — 主动抛这句, 把被动防守变成主动向往, 表现出对 on-device 这条路的真实兴趣而非勉强适应。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

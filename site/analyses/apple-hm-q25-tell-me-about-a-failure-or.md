@@ -1,0 +1,58 @@
+# 🍎 HM Q25 · "Tell me about a failure or setback, and what you changed afterward."
+
+> **类别**: Behavioral / Failure & growth (STAR) · **考点**: 出事后是甩锅还是 own; 是临时补丁还是把问题变成结构性改进; blameless 文化 · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+Apple 不怕你犯错, 怕你**犯错后的反应**。他们想看到三件事: (1) 你真的 own 了它 ("I", 不甩团队/平台/供应商); (2) 事故响应里有 quality bar — 快速止血 + 主动披露, 而不是藏; (3) 最关键 — 你把一次性事故**变成结构性防御**, 让同类问题再也不会发生。强答案 = 一个真实有后果的 failure + 一个具体的根因 + 一个永久性的机制改进 + 一个改进后的数字。弱答案 = 假 failure ("我太追求完美了"), 或者只讲止血没讲结构性改进, 或者甩锅。陷阱: 选一个无关痛痒的 "失败", 或者把 blame 推给别人 → 直接判死。
+
+## 📋 English Answer (背诵稿, 主答 ~80 秒 + 可延伸)
+
+"A real one. In an earlier system handling OTP delivery for the Indonesia market, I shipped a change to the retry logic — when a one-time-passcode send didn't get a confirmation fast enough, we'd retry. My change made the retry more aggressive to improve delivery. What I missed was that a slow confirmation isn't the same as a failed send. So we started counting successful sends as failures and retrying them — a false-fail spike. Real customers were getting duplicate codes, and our failure metrics looked alarming when delivery was actually fine.
+
+**My response had two parts.** First, contain it. I caught it within the hour, rolled back the change, and confirmed the metrics recovered before I did anything else [✏️ 核实 rollback 时间]. Second — and this is the part I care about — I disclosed it proactively. I didn't wait for someone to ask why the numbers looked weird. I wrote up exactly what happened, the blast radius, and the root cause, and sent it to the stakeholders myself. Owning the disclosure mattered more to me than looking clean.
+
+But a rollback isn't a fix — it just removes the bad change. The real failure was that my change reached production where a flawed assumption could hit real customers at all. So I made it **structural**. I added a shadow-mode rule: changes like that now run in shadow first, observing real traffic and emitting what they *would* have done, without acting — so a bad assumption shows up as a divergence in the data, not as duplicate codes on a customer's phone. And I built a replay harness so I could run a candidate change against recorded real traffic before it ever went live. After those two changes, our false-fail and false-retry rate dropped by about 47% [✏️ 核实 47%].
+
+The lesson I actually internalized: a slow signal is not a failed signal, and more broadly — never let an untested assumption reach a customer. Test it against real traffic in the dark first."
+
+延伸: "That shadow-mode-then-replay discipline is exactly what I carried into the voice agent — I now ship nothing customer-facing without a shadow rollout, because of this incident."
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+- **选真事**: 印尼市场 OTP retry 事故。改了 retry 逻辑想提升送达, 漏掉一点: **慢确认 ≠ 发送失败** → 把成功的发送当失败重试 → false-fail spike → 真实用户收到重复验证码, 指标看着吓人但其实送达正常。(这是真有后果的 failure, 不是假谦虚)
+- **响应两段** (背熟):
+  1. **止血**: 1 小时内发现 → rollback → 确认指标恢复 [✏️ 核实时间]
+  2. **主动披露**: 不等别人问, 自己写清楚 what happened / blast radius / 根因, 主动发给 stakeholders。**"own 披露这件事比看起来干净更重要"**
+- **关键转折 — rollback ≠ fix**: 真正的 failure 是 "有缺陷的假设居然能触达真实用户"。所以做**结构性改进**:
+  1. **shadow-mode 规则**: 这类改动先 shadow 跑真实流量, 只输出 "本来会做什么" 不实际动作 → 坏假设变成数据里的 divergence, 而不是用户手机上的重复短信
+  2. **replay harness**: 候选改动先对录制的真实流量回放, 再上线
+  - 改进后 false-fail/false-retry 率降 ~47% [✏️ 核实]
+- **内化的教训**: "慢信号 ≠ 失败信号"; 更广义 — **永远别让未测试的假设触达用户, 先在暗处对真实流量测**。
+- 记忆钩子: **"慢≠失败 / 1小时止血+主动披露 / shadow+replay 变结构性 / -47%"**。
+
+## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
+
+**Q: Why did this get through review/testing in the first place?**
+"Because our tests covered the happy path and clean failures, but not the ambiguous middle — a send that's slow but ultimately succeeds. The assumption 'no fast confirmation means failure' was baked in so quietly that no test challenged it. That's precisely why I didn't just add one test case afterward — a point fix would've left the next hidden assumption exposed. Shadow mode against real traffic catches the class of problem, not just this instance."
+
+**Q: How do you make sure shadow mode doesn't just become a step people skip under deadline pressure?**
+"I made it a rule, not a suggestion — for customer-facing changes of that risk class, shadow-then-replay is the default path, and skipping it is the exception that needs a reason. Process that depends on goodwill erodes; process that's the default path survives deadlines. And because the replay harness is fast, it's cheaper to use it than to argue about skipping it."
+
+**Q: That 47% — how did you measure it, and are you confident in it?**
+"It's the false-fail-and-retry rate before versus after, measured on the same Indonesia traffic over comparable windows [✏️ 核实 — 背前确认口径和数字]. I want to be honest that it's a before/after on production metrics, not a controlled experiment, so I'd frame it as a strong directional improvement rather than a clean causal number."
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
+
+- **绝不甩锅**。不能说 "供应商的确认延迟害的 / 团队没测出来"。根因落在 **"我的改动里有个没被挑战的假设"**, 是 I 不是 they。Apple 对甩锅零容忍。
+- **47% 必须 [✏️ 核实]**, 且被钻时主动降级为 "before/after 方向性改进, 非对照实验" — 诚实地承认口径, 比硬撑一个数字强得多 (这本身就是 Apple 看重的 humility)。
+- 不要选假失败 ("我太 push 团队 / 我太追求完美")。Apple 一眼识破, 视为不真诚。
+- 不要只讲止血就停。这题的分全在**结构性改进**那段 — 没有 shadow+replay 这段, 这题就废了。
+- 全程 blameless: 描述事故不带情绪、不抱怨, 像写 postmortem 一样冷静。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- **主动披露** — 这是最强的 ownership 信号, 重点强调 "不等别人问, 自己先写 postmortem 发出去"。Apple 极度欣赏这种 own-the-bad-news 的成熟度。
+- **从点修复升级到 class 修复** — 主动点出 "我没只加一个 test case, 而是防住整类问题"。这是 senior judgment, 区别于 junior 的补丁思维。
+- **教训被带进下一个项目** — 主动说 voice agent 的 shadow rollout 就是这次事故的遗产, 证明这是真正内化的成长, 不是嘴上说说。同时呼应 Q23 里提到的 shadow-mode, 前后一致。
+- **"never let an untested assumption reach a customer"** — 这句一句话级别的原则, 直接对齐 Apple 的 "上线前不让真实用户踩坑" 质量观, 也天然带出 privacy/用户体验意识。

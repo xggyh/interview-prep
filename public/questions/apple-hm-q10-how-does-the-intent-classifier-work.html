@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍎 HM Q10 · How does the intent classifier work — rules, small model, or LLM? What accuracy, and what happens when it's wrong? · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Apple HM 面 / 🍎 HM Q10 · How does the intent classifier work — rules, small model, or LLM? What accuracy, and what happens when it's wrong?</div>
+  <h1>🍎 HM Q10 · How does the intent classifier work — rules, small model, or LLM? What accuracy, and what happens when it's wrong?</h1>
+  <div class="header-meta">
+    <span class="tag tag-apple-hm">Apple HM 面</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#000000"><strong>Apple HM 面</strong> · Senior · 📋 5 · 🕒 Jun 17, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/apple-hm-q10-how-does-the-intent-classifier-work.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/apple-hm-q10-how-does-the-intent-classifier-work.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">[BNPL &amp; Agent Platform] 错分自愈: 回弹 / 升级, 别假设 100% 准 · 英文背诵稿 + 中文要点 + 边界 + 追问</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🍎 HM Q10 · How does the intent classifier work — rules, small model, or LLM? What accuracy, and what happens when it's wrong?</h1>
+<blockquote><p><strong>类别</strong>: BNPL &amp; Agent Platform · <strong>考点</strong>: 分类器选型 + 准确率 + 错分自愈 (re-route / escalate),绝不假设 100% 准 · ⚠️ [✏️] 数字背前替换成真实值</p></blockquote>
+<h3>🧠 这题在测什么 / 面试官想看到</h3>
+<p>两层意图:(1) 你对 classifier 选型有没有<strong>工程判断</strong> (rules vs small model vs LLM 各自的取舍),(2) —— 这才是真考点 —— <strong>你假不假设它 100% 准</strong>。Apple 在做 customer-facing agent,misroute 会直接伤体验,所以"它错了怎么办"比"它有多准"更重要。强答会给一个<strong>自愈闭环</strong>:置信度门限 → 澄清 / re-route / 升级人工。弱答会甩一个 99% 准确率然后没有下文。陷阱:报一个漂亮的 accuracy 却说不出错分时发生什么。</p>
+<h3>📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)</h3>
+<p>"I treat the classifier as a tiered system, not one model, because routing has very asymmetric cost.</p>
+<p><strong>Tier one is a small, cheap model</strong> — a fine-tuned lightweight classifier — that handles the bulk of turns at low latency. For the clear, high-frequency intents like order lookup or refund, you don't need a large model to know where to route.</p>
+<p><strong>Tier two is an LLM fallback</strong> for the ambiguous cases — when the small model's confidence is below a threshold, I escalate the <em>routing decision itself</em> to an LLM that can reason over the full conversational context. So I spend the expensive model only where it earns its keep.</p>
+<p>I'd be honest about accuracy — I'd quote the real number from our eval set rather than a round figure [✏️ 核实 实际 intent accuracy],and I'd point out top-line accuracy hides the thing that matters: the confusion between <em>adjacent money-touching intents</em>, like refund versus dispute. That specific confusion is what I watched.</p>
+<p>Now — <strong>the important part — what happens when it's wrong.</strong> I never assume the router is correct. Three mechanisms:</p>
+<ol><li><strong>Low confidence → ask, don't guess.</strong> If confidence is below threshold, the agent asks one clarifying question instead of routing blindly.</li><li><strong>Detected misroute → re-route.</strong> If a sub-agent receives a turn that doesn't fit its domain — say the refund agent sees no refundable order — it doesn't hallucinate an action; it signals back to the orchestrator and the turn is re-routed.</li><li><strong>Repeated failure or sensitive intent → escalate to a human.</strong> In a compliance-sensitive, money-touching flow, the right move when the system is uncertain is a graceful handoff, not a confident wrong action.</li></ol>
+<p>So the design assumption is: the classifier <em>will</em> be wrong some percent of the time, and the system stays safe anyway."</p>
+<h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
+<p><strong>选型 = 分层 (cost 非对称):</strong></p>
+<ul><li><strong>小模型 (主力)</strong>: fine-tuned 轻量分类器,扛大多数清晰高频意图,低延迟。</li><li><strong>LLM (fallback)</strong>: 小模型置信度低时,把"路由决策本身"升级给 LLM,让它读全上下文推理。贵模型只用在刀刃上。</li><li>(备选话术:rules 适合极少数硬规则,但维护成本高、不泛化,所以只做兜底/护栏,不做主分类。)</li></ul>
+<p><strong>准确率:</strong> 报真实 eval 数字 [✏️ 核实],并主动说 top-line accuracy 会掩盖关键问题 —— <strong>相邻 money-touching 意图的混淆</strong> (refund vs dispute) 才是我盯的。</p>
+<p><strong>错了怎么办 (真考点,记三步自愈):</strong></p>
+<ol><li><strong>低置信 → 反问澄清</strong>,不盲路由。</li><li><strong>检测到 misroute → re-route</strong>:sub-agent 发现不属于自己域 (refund agent 找不到可退订单) → 不幻觉动作,回信号给 orchestrator 重路由。</li><li><strong>反复失败 / 敏感意图 → 升级人工</strong>:money flow 里不确定时,优雅 handoff &gt; 自信地做错。</li></ol>
+<p>骨架一句话:<strong>"我从不假设 router 100% 准 —— 低置信反问、错分回弹、敏感升级,系统在分类器出错时依然安全。"</strong></p>
+<h3>🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)</h3>
+<p><strong>Q: Why not just use the LLM for routing everywhere — it's more accurate?</strong> Latency and cost. Routing is on the critical path of every single turn — putting a large model there taxes every interaction, even the trivial ones. The tiered approach gives me the LLM's judgment on the hard 10–20% [✏️ 核实 占比] while keeping median latency and cost down. That latency/cost/quality trade-off is exactly the kind of thing this role cares about.</p>
+<p><strong>Q: How do you set the confidence threshold?</strong> It's a precision/recall trade-off I tune on the eval set against the <em>cost of a misroute</em>. For benign intents I can route more aggressively. For money-touching intents — refund, dispute — I raise the bar, because a wrong action there is expensive, so I'd rather ask a clarifying question or escalate. The threshold isn't one global number; it's per-intent risk-weighted.</p>
+<p><strong>Q: How do you know a misroute even happened — that's the hard part?</strong> Two signals. First, <em>in-band</em>: the sub-agent itself can detect domain mismatch — the refund agent queries for a refundable order and finds none, that's a strong misroute signal. Second, <em>out-of-band</em>: I instrument it — user re-asks, user expresses frustration, or the conversation stalls without resolution. Those feed both the live escalation path and the offline retraining set.</p>
+<p><strong>Q: How does the classifier improve over time?</strong> Misrouted and clarified turns are gold-standard labels. They flow back into the training set for the small model, and I review the confusion matrix — especially the adjacent-intent cells — each iteration. That's the eval-driven loop I ran on the voice agent too.</p>
+<p><strong>Q: Rules — did you use any at all?</strong> Yes, narrowly — as deterministic guardrails, not as the classifier. E.g. hard keyword triggers for high-risk phrases that must always escalate (a regulatory complaint, fraud language) regardless of what the model thinks. Rules are good at "never miss this", bad at general coverage — so I use them only where a miss is unacceptable.</p>
+<h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
+<ul><li><strong>绝不报 100% 或一个没核实的漂亮数字。</strong> 报真实 eval 数 [✏️ 核实];如果当时没系统量过 per-intent accuracy,就老实说"我们主要盯 resolution rate 和混淆矩阵的相邻格",别硬编一个。</li><li>不要把 classifier 讲成单一模型就完事 —— 必须带出"错了怎么办"的闭环,否则正中陷阱。</li><li>如果被追"misroute 检测当时是不是真做到了自动",诚实区分:in-band 域不匹配检测是有的;out-of-band 的 frustration 检测如果当时偏人工抽样,就说成"抽样 + 逐步自动化",别说成全自动。</li><li>不要声称 rules 能扛主分类 —— 会显得不懂泛化问题。Rules 只做"绝不能漏"的护栏。</li></ul>
+<h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
+<ul><li>主动把它框成 <strong>latency/cost/quality 三角的路由层取舍</strong> —— 直接命中 JD 的 "improve latency, cost, customer experience"。</li><li>强调 <strong>per-intent risk-weighted threshold</strong> (money-touching 意图门限更高) —— 体现你懂 compliance-sensitive 场景,对上 Apple customer systems。</li><li>提 <strong>"误路由样本回流再训练 + 看相邻意图混淆矩阵"</strong> 的 eval-driven 闭环 —— 跟你 voice agent 的 eval-driven iteration 是同一套方法论,可顺势引到 RL/eval 的强项。</li></ul>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="apple-hm-q09-your-bnpl-chatbot-routes-intents-to.html">← 🍎 HM Q9 · Your BNPL chatbot routes intents to sub-agents with a FAQ RAG fallback — walk me through that design.</a>
+    <a href="apple-hm-q11-walk-me-through-the-rag-path.html">🍎 HM Q11 · Walk me through the RAG path: chunking, retrieval, rerank. Why those choices? →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🍎 HM Q10 · How does the intent classifier work — rules, small model, or LLM? What accuracy, and what happens when it's wrong?
+
+> **类别**: BNPL & Agent Platform · **考点**: 分类器选型 + 准确率 + 错分自愈 (re-route / escalate),绝不假设 100% 准 · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+两层意图:(1) 你对 classifier 选型有没有**工程判断** (rules vs small model vs LLM 各自的取舍),(2) —— 这才是真考点 —— **你假不假设它 100% 准**。Apple 在做 customer-facing agent,misroute 会直接伤体验,所以"它错了怎么办"比"它有多准"更重要。强答会给一个**自愈闭环**:置信度门限 → 澄清 / re-route / 升级人工。弱答会甩一个 99% 准确率然后没有下文。陷阱:报一个漂亮的 accuracy 却说不出错分时发生什么。
+
+## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
+
+"I treat the classifier as a tiered system, not one model, because routing has very asymmetric cost.
+
+**Tier one is a small, cheap model** — a fine-tuned lightweight classifier — that handles the bulk of turns at low latency. For the clear, high-frequency intents like order lookup or refund, you don't need a large model to know where to route.
+
+**Tier two is an LLM fallback** for the ambiguous cases — when the small model's confidence is below a threshold, I escalate the *routing decision itself* to an LLM that can reason over the full conversational context. So I spend the expensive model only where it earns its keep.
+
+I'd be honest about accuracy — I'd quote the real number from our eval set rather than a round figure [✏️ 核实 实际 intent accuracy],and I'd point out top-line accuracy hides the thing that matters: the confusion between *adjacent money-touching intents*, like refund versus dispute. That specific confusion is what I watched.
+
+Now — **the important part — what happens when it's wrong.** I never assume the router is correct. Three mechanisms:
+
+1. **Low confidence → ask, don't guess.** If confidence is below threshold, the agent asks one clarifying question instead of routing blindly.
+2. **Detected misroute → re-route.** If a sub-agent receives a turn that doesn't fit its domain — say the refund agent sees no refundable order — it doesn't hallucinate an action; it signals back to the orchestrator and the turn is re-routed.
+3. **Repeated failure or sensitive intent → escalate to a human.** In a compliance-sensitive, money-touching flow, the right move when the system is uncertain is a graceful handoff, not a confident wrong action.
+
+So the design assumption is: the classifier *will* be wrong some percent of the time, and the system stays safe anyway."
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+**选型 = 分层 (cost 非对称):**
+- **小模型 (主力)**: fine-tuned 轻量分类器,扛大多数清晰高频意图,低延迟。
+- **LLM (fallback)**: 小模型置信度低时,把"路由决策本身"升级给 LLM,让它读全上下文推理。贵模型只用在刀刃上。
+- (备选话术:rules 适合极少数硬规则,但维护成本高、不泛化,所以只做兜底/护栏,不做主分类。)
+
+**准确率:** 报真实 eval 数字 [✏️ 核实],并主动说 top-line accuracy 会掩盖关键问题 —— **相邻 money-touching 意图的混淆** (refund vs dispute) 才是我盯的。
+
+**错了怎么办 (真考点,记三步自愈):**
+1. **低置信 → 反问澄清**,不盲路由。
+2. **检测到 misroute → re-route**:sub-agent 发现不属于自己域 (refund agent 找不到可退订单) → 不幻觉动作,回信号给 orchestrator 重路由。
+3. **反复失败 / 敏感意图 → 升级人工**:money flow 里不确定时,优雅 handoff > 自信地做错。
+
+骨架一句话:**"我从不假设 router 100% 准 —— 低置信反问、错分回弹、敏感升级,系统在分类器出错时依然安全。"**
+
+## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
+
+**Q: Why not just use the LLM for routing everywhere — it's more accurate?**
+Latency and cost. Routing is on the critical path of every single turn — putting a large model there taxes every interaction, even the trivial ones. The tiered approach gives me the LLM's judgment on the hard 10–20% [✏️ 核实 占比] while keeping median latency and cost down. That latency/cost/quality trade-off is exactly the kind of thing this role cares about.
+
+**Q: How do you set the confidence threshold?**
+It's a precision/recall trade-off I tune on the eval set against the *cost of a misroute*. For benign intents I can route more aggressively. For money-touching intents — refund, dispute — I raise the bar, because a wrong action there is expensive, so I'd rather ask a clarifying question or escalate. The threshold isn't one global number; it's per-intent risk-weighted.
+
+**Q: How do you know a misroute even happened — that's the hard part?**
+Two signals. First, *in-band*: the sub-agent itself can detect domain mismatch — the refund agent queries for a refundable order and finds none, that's a strong misroute signal. Second, *out-of-band*: I instrument it — user re-asks, user expresses frustration, or the conversation stalls without resolution. Those feed both the live escalation path and the offline retraining set.
+
+**Q: How does the classifier improve over time?**
+Misrouted and clarified turns are gold-standard labels. They flow back into the training set for the small model, and I review the confusion matrix — especially the adjacent-intent cells — each iteration. That's the eval-driven loop I ran on the voice agent too.
+
+**Q: Rules — did you use any at all?**
+Yes, narrowly — as deterministic guardrails, not as the classifier. E.g. hard keyword triggers for high-risk phrases that must always escalate (a regulatory complaint, fraud language) regardless of what the model thinks. Rules are good at "never miss this", bad at general coverage — so I use them only where a miss is unacceptable.
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
+
+- **绝不报 100% 或一个没核实的漂亮数字。** 报真实 eval 数 [✏️ 核实];如果当时没系统量过 per-intent accuracy,就老实说"我们主要盯 resolution rate 和混淆矩阵的相邻格",别硬编一个。
+- 不要把 classifier 讲成单一模型就完事 —— 必须带出"错了怎么办"的闭环,否则正中陷阱。
+- 如果被追"misroute 检测当时是不是真做到了自动",诚实区分:in-band 域不匹配检测是有的;out-of-band 的 frustration 检测如果当时偏人工抽样,就说成"抽样 + 逐步自动化",别说成全自动。
+- 不要声称 rules 能扛主分类 —— 会显得不懂泛化问题。Rules 只做"绝不能漏"的护栏。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- 主动把它框成 **latency/cost/quality 三角的路由层取舍** —— 直接命中 JD 的 "improve latency, cost, customer experience"。
+- 强调 **per-intent risk-weighted threshold** (money-touching 意图门限更高) —— 体现你懂 compliance-sensitive 场景,对上 Apple customer systems。
+- 提 **"误路由样本回流再训练 + 看相邻意图混淆矩阵"** 的 eval-driven 闭环 —— 跟你 voice agent 的 eval-driven iteration 是同一套方法论,可顺势引到 RL/eval 的强项。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>

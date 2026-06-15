@@ -1,0 +1,107 @@
+# 🍎 HM Q3 · "Walk me through the voice agent architecture end to end — ASR to TTS."
+
+> **类别**: Project deep-dive / 系统设计 · **考点**: 完整画出 pipeline 每一跳，给 per-hop 延迟预算，证明你真的 own 了全栈 · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+HM 想验证简历那句 "owned the full stack" 是不是真的。这是一道"在白板上画给我看"的题。
+
+- **强答案** = 你能像画白板一样按数据流顺序讲清每一跳（音频进 → ASR → dialogue/LLM → tool → TTS → 音频出），每跳说出**为什么这么设计**和**它吃掉多少延迟**，并主动点出 streaming 是关键（不是请求-响应）。
+- **弱答案** = "我们用了 ASR、接了个 LLM、再 TTS"——三个名词，没有数据流、没有并发、没有延迟意识。
+- **陷阱 1**：把它讲成离线 batch pipeline。语音 agent 的灵魂是**流式 + 全双工 + overlap**；讲成串行 batch 立刻露馅。
+- **陷阱 2**：只讲 happy path，不提 barge-in / endpointing（那是 Q5，但这里要埋钩子）。
+- **陷阱 3**：讲不出"为什么这么设计"——只描述拓扑、不讲取舍，会被 Apple 顺着每一跳钻到边界。
+
+建议先口头画一张极简数据流图，再逐跳讲：
+
+```
+  Caller audio (20ms PCM frames)
+        │
+   [VAD]──────────────► barge-in / endpointing 信号 ──► Turn Manager
+        │                                                    ▲
+        ▼                                                    │ (停播/重开 ASR)
+ [Streaming ASR] ──partial──► (speculative)                  │
+        │ └──final (endpointer 判停)                          │
+        ▼                                                    │
+ [LLM dialogue policy] ──tool_call──► [Tool Orchestration] ──► payment APIs
+        │ (token stream)                  (auth/idempotency/retry/timeout)
+        ▼                                       │ result 回灌
+ [Streaming TTS] ◄────── first-clause ──────────┘
+        │
+        ▼
+  Audio frames back to caller
+        │
+   [Observability + Eval]  ◄── 每一跳打点: latency / ASR acc / action / compliance
+```
+
+## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
+
+"Let me walk the audio path top to bottom.
+The key framing up front: it's **streaming and full-duplex**, not request-response — we process the user's audio while they're still talking, and we can speak and listen at the same time.
+
+**Hop 1 — Audio ingest + VAD.** Caller audio comes in over the telephony leg as 20-millisecond PCM frames. A voice-activity detector runs on every frame to tell speech from silence — that drives both endpointing and barge-in detection.
+
+**Hop 2 — Streaming ASR.** Frames feed a streaming recognizer that emits **partial** transcripts as the person speaks, then a stabilized **final** when the endpointer decides they've stopped. Streaming matters because it lets the next stage start early instead of waiting for end-of-utterance.
+
+**Hop 3 — Dialogue / LLM policy.** The final transcript — plus dialogue state and retrieved account context — goes to the LLM. This is the brain: it decides the next action. It either generates a spoken reply, or it emits a **tool call** — look up balance, check payment status, log a promise-to-pay. Output is streamed token by token so we don't wait for the full completion.
+
+**Hop 4 — Tool orchestration.** Tool calls hit backend payment APIs through an orchestration layer that handles auth, idempotency, retries, and timeouts. Results come back into the LLM context and it continues the turn.
+
+**Hop 5 — Streaming TTS.** As reply tokens stream out, we synthesize speech incrementally — we start speaking the first clause before the full sentence is generated. Audio goes back as frames over the same telephony leg.
+
+Wrapped around all of it: a **turn manager** that owns interruption — if VAD detects the user talking while we're speaking, it stops playback and re-opens the ASR. And an **observability + eval layer** logging every hop for latency, ASR accuracy, action correctness, and compliance.
+
+The whole thing is built so stages **overlap** — ASR, LLM, and TTS are pipelined, not sequential. That overlap is what makes it feel like a phone call instead of a walkie-talkie."
+
+*(可延伸)*: "I can go deeper on any hop — the latency budget across them, or how the turn manager handles barge-in, which was the tricky part."
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+**开场先定调（最重要一句）**：streaming + full-duplex，不是 request-response。这一句立刻把你和"调 API 的人"区分开。
+
+按数据流 5 跳 + 2 个横切：
+1. **Audio ingest + VAD**：20ms PCM 帧进来，VAD 每帧判断说话/静音 → 同时驱动 endpointing 和 barge-in。
+2. **Streaming ASR**：边说边出 **partial**，endpointer 判停后出 **final**。流式的意义 = 让下一级早点开工。
+3. **Dialogue / LLM**：final transcript + dialogue state + account context → LLM 是大脑，决定下一步：要么生成话术，要么发 **tool call**。token 流式输出。
+4. **Tool orchestration**：tool call 打后端支付 API，经编排层处理 auth / idempotency / retry / timeout，结果回灌 LLM。
+5. **Streaming TTS**：reply token 边出边合成，第一个分句就开始播。
+
+横切两层：
+- **Turn manager**：管打断（VAD 听到用户插话 → 停播 + 重开 ASR）。← 这是 Q5 钩子，这里点一句。
+- **Observability + eval**：每跳 log 延迟 / ASR 准确率 / action 正确率 / 合规。← 这是 Q8 钩子。
+
+**收口金句**：各级 **overlap**（pipelined，不是 sequential），这才让它"像打电话不是对讲机"。
+
+记忆口诀：**进(VAD)→听(ASR)→想(LLM)→做(tool)→说(TTS)**，外面包**打断管理 + 观测**，灵魂是 **overlap**。
+
+## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
+
+**Q: Where's the latency bottleneck across those hops?**
+"The LLM's time-to-first-token usually dominates the perceived gap, because TTS can't start until the first tokens land. So the biggest lever is TTFT plus ASR endpointing delay. I can break down the full budget if you want — that's a separate detailed answer." *(把 Q4 引出来)*
+
+**Q: Why streaming ASR instead of waiting for the full utterance and transcribing once?**
+"Latency. If I wait for end-of-utterance to even start recognizing, I've already burned the whole utterance duration before the LLM sees anything. Streaming lets ASR finalize within tens of milliseconds of the user stopping, and lets us run speculative work on partials. The cost is partials are unstable — so I only commit the LLM turn on a stabilized final, gated by the endpointer."
+
+**Q: How does the LLM decide between just replying versus calling a tool?**
+"It's a tool-calling policy — the model is post-trained and prompted with the available tools and when to use them. Anything that needs ground truth — balance, payment status, account state — must go through a tool; the model is not allowed to assert those from memory. Conversational turns it answers directly. We enforce that boundary in eval: asserting an unverified financial fact is a hard failure."
+
+**Q: Is the LLM on-device or in the cloud? What size model?**
+"In our system it's a cloud-served LLM — that's the ByteDance GPU environment. Honestly, on-device wasn't our constraint; cost and throughput were. I know Apple's posture is on-device-first with PCC for the heavy turns, and I'd be genuinely interested in re-deriving this pipeline under a unified-memory budget — the hop structure stays, the model-placement and quantization decisions change." *(诚实承认 + 接 on-device 桥)*
+
+**Q: What happens if a tool call times out mid-turn?**
+"The orchestration layer has per-tool timeouts and a circuit breaker. On timeout the agent doesn't hang silently — it either says a holding phrase and retries idempotently, or degrades to a safe fallback like 'let me have an agent follow up.' Never invent the answer. That's the compliance line." *(埋 Q6 钩子)*
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
+
+- 别把它讲成离线/batch pipeline——语音 agent 必须强调 streaming + full-duplex + overlap，否则 HM 立刻判你没真做过实时系统。
+- 模型是否 on-device / 具体哪家 ASR/TTS 供应商：**如实说是 cloud GPU 环境**，别假装是 on-device。承认这一点反而加分（接 on-device 桥）。
+- 别在这一题就把 barge-in 讲透——点一句留到 Q5，否则 Q5 没料。同理 latency 数字留到 Q4。
+- 具体供应商名（哪个 ASR 引擎、哪个 TTS）如果记不准就说"a streaming recognizer / a streaming TTS engine"，别报错名字被抓。
+- 任何具体延迟 ms 都标 [✏️ 核实]，口头说"roughly / on the order of"。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- 开场"streaming and full-duplex, not request-response" —— 一句话证明你懂实时语音的本质，立刻拉高可信度。
+- "the model is not allowed to assert financial facts from memory — that's enforced in eval" —— 主动暴露你对 grounding / 合规边界的工程化处理，正中 Apple 的 money-touching + 质量 bar 关切。
+- 收口"feels like a phone call instead of a walkie-talkie" —— 把技术 overlap 翻译成 customer experience 语言，Apple 最吃这套（UX-first）。
+- 主动说"I can go deeper on the latency budget or barge-in" —— 把 Q4/Q5 主动递出去，显得你对自己系统的每一寸都有掌控。

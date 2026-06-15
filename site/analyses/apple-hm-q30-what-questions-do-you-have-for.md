@@ -1,0 +1,88 @@
+# 🍎 HM Q30 · "What questions do you have for us?"
+
+> **类别**: Fit / Closing (reverse questions) · **考点**: 你问的问题暴露你的 seniority 和 fit; 好问题 = 又一次展示判断力的机会, 不是走过场 · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+反问环节**不是收尾礼貌, 是最后一次 demo 你的 judgment**。HM (Andrew Wee + Yu Ping Ji) 会从你问什么判断: 你关不关心真问题 (latency vs quality、on-device 边界)、你够不够 senior (问系统级取舍而非福利)、你是不是真懂这岗位。强答案 = 2-3 个直击团队真实痛点的尖锐问题, 显得你已经在以团队成员视角思考。弱答案 = 问 HR 能答的 (薪资/假期/晋升流程) 或问能自己 Google 到的 (Apple 多大)。陷阱: 一个不问 ("没有问题") → 显得不在乎, 是致命错误。准备 6-8 个, 现场挑 2-3 个最贴当下对话的问。
+
+## 📋 English Answer (准备 6-8 个, 现场挑 2-3 个最贴对话的)
+
+开场缓冲句 (自然过渡): *"Yeah, I have a few — I'll pick the ones that build on what we talked about."*
+
+**🔥 第一梯队 (最高杠杆, 优先问这几个):**
+
+**1. Latency vs quality — the team's core tension.**
+"When you incorporate a newer, more capable model, you usually pay for it in latency or cost. Where does this team currently sit on that tradeoff — is the bigger pain right now latency, cost, or response quality? I ask because that's the tradeoff I lived on the voice agent, and I'd want to know which one is biting you most."
+
+**2. On-device vs Private Cloud Compute boundary.**
+"For these customer-facing agents, how do you think about what runs on-device versus what escalates to the server model? Is that boundary settled, or is deciding what runs where still an open design question the team is actively working?"
+
+**3. Eval philosophy.**
+"How does the team decide a model or an agent is good enough to ship to a customer? I'm curious whether you lean on offline eval sets, shadow deployments, online metrics, or some mix — because eval philosophy tells me a lot about how a team makes decisions."
+
+**🟢 第二梯队 (很好的备选):**
+
+**4. Platform scope — how many teams ride on it.**
+"The JD describes this as a multi-agent platform serving lines of business. Roughly how many internal teams build on it today, and does that make backward-compatibility a real constraint on how fast you can change things?"
+
+**5. What success looks like in 6 months.**
+"If you're looking back six months after I join and feel the hire was a clear win — what did I deliver or change? I want to understand what 'great' looks like in this seat, not just 'fine.'"
+
+**6. Greater China / Chinese-LLM roadmap.**
+"How central is the Chinese-language and Greater China work to the team's roadmap right now — is it a current priority or more of a forward-looking investment? It's an area I'd be excited to push on, so I'd want to know where it sits."
+
+**🟡 第三梯队 (有余力或对话引到了再问):**
+
+**7. Rust + Python split.**
+"The stack mentions Rust and Python for orchestration. How is that split in practice — is Rust mostly the serving and orchestration core with Python on the modeling side, and how much would I be in each?"
+
+**8. Biggest bottleneck right now.**
+"From where you sit, what's the single biggest thing slowing the team down today — is it model capability, serving infrastructure, eval, or something organizational? I'd rather know the real constraint than the polished version."
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+- **心态**: 反问 = 最后一次秀 judgment, 不是礼貌收尾。一个不问 = 致命。准备 6-8, 现场挑 2-3 个**最贴刚才聊过内容**的问。
+- **过渡句**: "我挑几个接着刚才聊的问" — 显得你在听、在思考, 不是背好的清单。
+- **第一梯队 (优先, 每个都暗藏一次强项展示)**:
+  1. **latency vs quality 取舍** — 团队现在最痛的是 latency / cost / quality 哪个? (顺势亮 voice agent 同款经验)
+  2. **on-device vs PCC 边界** — 什么跑设备、什么升级到 server model? 边界定了没? (亮你懂 Apple 架构, 接 Q26)
+  3. **eval 哲学** — 怎么判断 agent 够好可上线? offline/shadow/online 怎么组合? (亮你重 eval, 接 Q23/Q29)
+- **第二梯队 (很好备选)**:
+  4. **平台规模** — 多少内部团队在用? backward-compat 是不是硬约束?
+  5. **6 个月成功长什么样** — 回头看觉得招对了, 我交付了什么? (显得目标导向)
+  6. **Greater China / 中文路线** — 现在是优先级还是前瞻投资? (亮你的中文差异化兴趣, 接 Q27)
+- **第三梯队 (有余力再问)**:
+  7. **Rust + Python 分工** — 实际怎么切, 我会在哪边多?
+  8. **当前最大瓶颈** — 模型/infra/eval/组织, 真实那个?
+- **记忆钩子**: **"延迟质量 / 设备边界 / eval哲学" 是必问三连; 其余按对话挑**。
+
+## 🔬 现场临机 (如果面试官反问你 / 对话动态)
+
+**若面试官说 "前面已经聊过 X 了":**
+顺势升级, 别重复: "对, 您刚提到 X — 那顺着问, [更深一层]?" 例如已聊 on-device, 就问 "那 on-device 模型达不到质量线时, fallback 到 PCC 的决策是自动路由还是有人工策略?"
+
+**若只剩 1 分钟:**
+只问第 5 题 (6 个月成功长什么样) — 它最像 "已经在想怎么入职做好", 收尾印象最强。
+
+**若面试官明显是技术更硬的那位:**
+优先第 1、2、3 题 (技术取舍), 把第 5、6 题留给更偏 manager 视角的对话。
+
+**追问回去, 把答案变成对话 (不要问完就沉默):**
+听完答案后接一句关联自己经验的话, 例如对方答 "latency 最痛", 你接 "这个我熟 — 我在 voice agent 上是靠 TTFA 优化和 KV-cache 压 prefill 解决的, 不知道你们瓶颈在 prefill 还是 decode?" — 把反问变成又一次 demo。
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to ask)
+
+- **绝不问 HR 能答的**: 薪资、股票、假期、福利、晋升流程、WLB → 这些等 offer/recruiter 阶段, 在 HM 技术轮问会显得动机错位、不 senior。
+- **绝不问能自己 Google 到的**: "Apple 多大 / 这团队做什么 / 用什么模型" → 显得没做功课。问题要建立在 "我已经研究过, 想知道 surface 之下的事"。
+- **绝不说 "我没有问题"** → 致命, 显得不在乎或没在思考。哪怕只剩 30 秒也问第 5 题。
+- 别问太多 (≥4 个) 把环节拖成审问 → 挑 2-3 个, 留出对话空间。
+- 别问让 HM 难堪的政治问题 (裁员/内斗/为什么上一个人走了) → 即使想知道, 用第 8 题 "最大瓶颈" 这种中性框架旁敲。
+- 别一次性念清单。**每问一个, 听答案, 互动, 再决定下一个** — 显得是对话不是背稿。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- **每个问题都暗藏一次强项展示** — 这是设计精髓: 问 latency↔亮 voice agent; 问 on-device↔亮 Q26 的同构能力; 问 eval↔亮你重 eval-harness; 问中文路线↔亮 Q27 差异化。反问环节也在继续卖自己。
+- **"我宁愿知道真实约束, 不要打磨过的版本"** (第 8 题措辞) — 主动用这种坦诚框架, 体现你想真解决问题、不怕听坏消息, 呼应 Apple 的 ownership 文化。
+- **第 6 个月成功 (第 5 题)** — 主动问这个, 信号是 "我已经在以团队成员视角想怎么做好", 是最强的 "想加入并贡献" 的姿态, 适合收尾。
+- **听完答案接自己的经验** — 把反问变成双向对话和又一次 demo, 让 HM 记住的是 "和这个人聊得很顺、他懂我们的痛点", 这是最好的离场印象。

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍎 HM Q17 · Explain LoRA. Why is it efficient, and how would you serve many adapters? · AI Agent Cookbook</title>
+<script>(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="../assets/style.css?v=bff6199c">
+<link rel="stylesheet" href="../assets/prism/prism-tomorrow.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <h1><a href="../index.html">🍳 AI Agent Cookbook</a></h1>
+    <div class="meta"><a href="../index.html">← back to index</a></div>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Toggle dark / light mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</header>
+<main class="container detail">
+  <div class="breadcrumb"><a href="../index.html">所有题目</a> / Apple HM 面 / 🍎 HM Q17 · Explain LoRA. Why is it efficient, and how would you serve many adapters?</div>
+  <h1>🍎 HM Q17 · Explain LoRA. Why is it efficient, and how would you serve many adapters?</h1>
+  <div class="header-meta">
+    <span class="tag tag-apple-hm">Apple HM 面</span>
+    <span class="tag tag-level">Senior</span>
+    <span class="external"><a href="" target="_blank" rel="noopener">原题 ↗</a></span>
+  </div>
+  <div class="company-chips"><span class="company-chip" style="--c:#000000"><strong>Apple HM 面</strong> · Senior · 📋 5 · 🕒 Jun 17, 2026</span></div>
+
+  <div class="md-actions">
+    <a class="md-action" href="https://github.dev/xggyh/interview-prep/blob/main/site/analyses/apple-hm-q17-explain-lora-why-is-it-efficient.md" target="_blank" rel="noopener" title="在浏览器版 VSCode 里打开，支持原生 markdown preview">📝 在 github.dev 打开</a>
+    <a class="md-action" href="../raw/apple-hm-q17-explain-lora-why-is-it-efficient.md" target="_blank" rel="noopener" title="raw .md 文件，可右键 Save Link As 或直接在浏览器查看">📄 raw .md</a>
+    <button class="md-action md-copy" id="md-copy-btn" title="复制 markdown 到剪贴板，粘贴到 VSCode untitled file + Cmd+Shift+V 预览">📋 复制 markdown</button>
+  </div>
+
+  <section class="section">
+    <h2>Problem Statement</h2>
+    <p class="problem-statement">[GenAI / ML Concepts] 🟢 主场, base 常驻 + adapter swap, 对上 Apple 端侧 · 英文背诵稿 + 中文要点 + 边界 + 追问</p>
+  </section>
+
+  <section class="section">
+    <h2>我的思路与解法</h2>
+    <h1>🍎 HM Q17 · Explain LoRA. Why is it efficient, and how would you serve many adapters?</h1>
+<blockquote><p><strong>类别</strong>: GenAI / ML Concepts (🟢 主场) · <strong>考点</strong>: 低秩 ΔW=BA + 冻结 base + base 常驻/adapter 热插拔的 multi-LoRA serving · ⚠️ [✏️] 数字背前替换成真实值</p></blockquote>
+<h3>🧠 这题在测什么 / 面试官想看到</h3>
+<p>这是 Gao 的<strong>主场</strong>，所以答案要<strong>权威</strong>，不能只停在「LoRA 省显存」。面试官想看三层：(1) 数学上为什么 efficient——低秩 + 冻结 base 把可训参数砍到极小；(2) serving 层怎么把<strong>很多 adapter</strong> 一起上线（base 常驻 + adapter 热插拔，多请求批处理）；(3) 你能不能把它<strong>桥到 Apple 的端侧 rank-16 adapter 热切换</strong>。弱答案：「LoRA 就是只训一小部分参数」然后没了。强答案：讲清 ΔW=BA、为什么 inference 可以零额外延迟、以及 vLLM 里多 LoRA 同批服务的工程。陷阱：把 LoRA 和 QLoRA 混为一谈、或说 LoRA inference 一定更慢（merge 后不慢）。</p>
+<h3>📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)</h3>
+<blockquote><p><strong>60 秒脊柱 (背死这句)</strong>: <em>Freeze the base, learn a low-rank ΔW = B·A. Tiny trainable params → tiny optimizer state. Merge at inference → zero added latency. Serve many adapters by keeping one base resident and batching across adapters.</em></p></blockquote>
+<p><strong>🧮 数学一图 (口头画得出)</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">Full fine-tune:   W_new = W  (train all d×d params, huge optimizer state)
+
+LoRA:             W_eff = W  +  B · A        ← W frozen ❄️ , only B,A trained
+                          (d×d)  (d×r)(r×d)
+                                  └──────┘
+                                  rank r ≪ d  (e.g. r=16)
+                  trainable params = 2·d·r   →  often &lt; 1% of model
+
+Inference:        merge once →  W' = W + B·A   →  runs at base speed, 0 extra latency</code></pre>
+<p>"LoRA is low-rank adaptation. The idea: instead of updating the full weight matrix during fine-tuning, you freeze the original weights and learn a small <strong>low-rank</strong> update on top. For a weight matrix W, the update ΔW is factored as <strong>B times A</strong>, where B and A are skinny matrices of rank r — say r equals 16. So if W is d-by-d, full fine-tuning trains d-squared parameters, but LoRA only trains 2·d·r, which for a large d and small r is a tiny fraction — often well under 1% of the model.</p>
+<p>Why is that efficient? Three reasons. <strong>One, far fewer trainable parameters</strong>, so the optimizer state and gradients shrink dramatically — that's the real memory saver during training, not just the weights. <strong>Two, the base model is frozen and shared</strong> — you're not duplicating a 7B model per task, you're storing one base plus a few megabytes of adapter per task. <strong>Three, at inference you can fold B·A back into W</strong> by simple addition, so a merged LoRA model runs at <em>exactly</em> base-model speed — zero added latency. The bet underneath is that the <em>change</em> you need for a downstream task is intrinsically low-rank, even if the model is huge — and empirically that holds.</p>
+<p>Now, serving <strong>many</strong> adapters — this is where it gets interesting and it's work I did directly. You do <strong>not</strong> spin up one server per adapter; that wastes the GPU. Instead: keep the <strong>base model resident in GPU memory once</strong>, and treat adapters as small swappable tensors you load per request. The key trick is <strong>batching across adapters</strong> — a single batch can contain requests for different adapters, and the kernel applies each request's own B·A. Frameworks like <strong>vLLM and SGLang</strong> support exactly this multi-LoRA serving, so you get the throughput of shared batching while serving dozens of task-specific adapters from one base. I did inference acceleration on vLLM and SGLang, including this kind of adapter-aware serving and memory tuning."</p>
+<p>(可延伸 — 直接桥 Apple) "This maps almost one-to-one to what Apple does on device. Apple's on-device model is one ~3B base with <strong>task-specific rank-16 LoRA adapters hot-swapped</strong> per task — summarization, reply, etc. That's the same architecture, just moved from a GPU serving many users to one device serving many tasks. The base stays resident, adapters are tiny and swapped on demand. So the multi-LoRA serving discipline I built on vLLM is exactly the discipline Apple needs on device — the constraint just shifts from HBM and GPU cost to unified memory and power."</p>
+<p><strong>🔌 Multi-LoRA serving 一图</strong></p>
+<pre class="language-plaintext"><code class="language-plaintext">        ❌ 错: 一 adapter 一 server          ✅ 对: base 常驻 + adapter 热插拔 + 跨 adapter 批处理
+        ┌──────────┐ ┌──────────┐            ┌─────────────────────────────────────┐
+        │ base+LoRA_A│ │ base+LoRA_B│          │   ONE base model resident in GPU ❄️  │
+        │  (full GPU)│ │  (full GPU)│          │   ├ req1 → apply LoRA_A (B_A·A_A)    │
+        └──────────┘ └──────────┘            │   ├ req2 → apply LoRA_B (B_B·A_B)    │  ← 同一 batch
+        GPU 浪费 N 倍                          │   └ req3 → apply LoRA_A              │     混不同 adapter
+                                              └─────────────────────────────────────┘
+                                              vLLM / SGLang 原生支持; 共享批处理吞吐 + 服务几十个 adapter</code></pre>
+<h3>🇨🇳 中文要点 (理解 + 记忆骨架)</h3>
+<p><strong>数学骨架</strong>：冻结原权重 W，只学一个<strong>低秩</strong>增量 <strong>ΔW = B·A</strong>，B、A 是秩为 r（如 16）的瘦矩阵。full fine-tune 训 d²；LoRA 只训 2·d·r，常常 &lt;1%。</p>
+<p><strong>为什么 efficient（三点）</strong>：</p>
+<ol><li>可训参数极少 → optimizer state + 梯度大幅缩水（训练时真正的省显存点，不只是省权重）。</li><li>base 冻结且共享 → 不是每个任务复制一个 7B，而是「一个 base + 每任务几 MB adapter」。</li><li>inference 可把 B·A 加回 W（merge）→ 跑得和 base <strong>一样快，零额外延迟</strong>。</li></ol>
+<p>底层假设：下游任务需要的「改变」本质是低秩的——经验上成立。</p>
+<p><strong>多 adapter serving（主场，强调是亲手做的）</strong>：</p>
+<ul><li><strong>不要</strong> 一个 adapter 一个 server——浪费 GPU。</li><li>base <strong>常驻显存一份</strong>，adapter 当成可热插拔的小 tensor 按请求加载。</li><li>关键招：<strong>跨 adapter 批处理</strong>——一个 batch 里混不同 adapter 的请求，kernel 给每条请求套自己的 B·A。</li><li><strong>vLLM / SGLang</strong> 原生支持这种 multi-LoRA serving；我在 vLLM/SGLang 上做过推理加速 + 这类 adapter-aware serving + 显存调优。</li></ul>
+<p><strong>桥 Apple（必抛）</strong>：Apple 端侧 = 一个 ~3B base + <strong>rank-16 LoRA adapter 按任务热切换</strong>。和我的 multi-LoRA 架构<strong>一对一</strong>，只是从「一卡服务多用户」变「一设备服务多任务」，约束从 HBM/GPU 成本换成 unified memory/功耗。</p>
+<h3>🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)</h3>
+<p><strong>Q: How do you pick the rank r?</strong> "It's a quality-vs-size trade-off you sweep empirically. Too low and the adapter can't capture the task; too high and you lose the efficiency and risk overfitting. For most style/format adaptation, a small rank like 8 or 16 is plenty — which is exactly why Apple landed on rank-16. I'd pick it by eval, not by gut: start small, increase only if eval plateaus below target."</p>
+<p><strong>Q: What's the difference between LoRA and QLoRA?</strong> "QLoRA = LoRA on top of a <strong>quantized</strong> (typically 4-bit) frozen base. The base is quantized to save memory, the LoRA adapter is still trained in higher precision. It lets you fine-tune a big model on one GPU. Apple's on-device case rhymes with this — a heavily quantized base (they use ~2-bit weights) plus small adapters."</p>
+<p><strong>Q: Does serving LoRA add latency vs the base model?</strong> "If you <em>merge</em> the adapter into the weights, no — it's identical to base. The latency question only appears in the <em>unmerged, multi-adapter</em> case, because you can't pre-merge when one batch mixes adapters. There the cost is a small extra matmul per request; modern kernels (e.g. in vLLM) make that cheap, and you trade it for not having to run a separate server per adapter."</p>
+<p><strong>Q: Where does LoRA fall short — when wouldn't you use it?</strong> "When the task needs a genuinely large capability shift, not a stylistic or narrow one — low-rank can under-fit there, and full fine-tuning or continued pre-training wins. Also if you only ever serve one task forever, the multi-adapter flexibility buys you nothing, so the choice is just about training memory."</p>
+<p><strong>Q: How do you decide which layers to apply LoRA to?</strong> "Conventionally the attention projection matrices (q, k, v, o); applying to those captures most of the benefit. You can extend to the MLP layers for more capacity at more cost. Again eval-driven — I'd start with attention projections and only widen if quality demands it."</p>
+<h3>⚠️ 边界 &amp; 红线 (honest limits + what NOT to say)</h3>
+<ul><li>别说「LoRA inference 一定更慢」——merge 后零延迟，只有 unmerged 多 adapter 混批才有小开销。说错会被当场纠。</li><li>别把 LoRA 和 QLoRA 混为一谈——QLoRA 多了「base 量化」这层，要能讲清。</li><li>r 怎么选别给死数字当真理——强调「eval 驱动扫描，从小开始」。</li><li>如果被钻到具体 kernel 实现（如 vLLM 的 punica/SGT batched LoRA 内核细节）超出深度，老实说「实现细节我用过没逐行读过，我从 serving 行为和显存层面理解它」——诚实划边界在 Apple 是加分。</li></ul>
+<h3>✅ 加分钩子 (主动抛, steer 到强项)</h3>
+<ul><li>一定主动把 <strong>multi-LoRA serving（base 常驻 + 跨 adapter 批处理 + vLLM/SGLang 亲手做）</strong> 讲出来——这是 JD 没明问但极对口的硬实力。</li><li>主动桥 <strong>Apple 端侧 rank-16 adapter 热切换 = 我的 multi-LoRA 架构同构</strong>——把概念题变成「我已经为你们这套架构练过手」的 Why-Apple 钩子。</li><li>顺带点 <strong>「训练真正省的是 optimizer state/梯度，不只是权重」</strong>——这句话能立刻区分「读过博客」和「真训过模型」。</li></ul>
+  </section>
+
+  
+  
+  
+
+  <div class="nav-footer">
+    <a href="apple-hm-q16-when-do-you-fine-tune-vs.html">← 🍎 HM Q16 · When do you fine-tune vs RAG vs prompt engineering? Give me your decision criteria.</a>
+    <a href="apple-hm-q18-how-do-you-detect-and-reduce.html">🍎 HM Q18 · How do you detect and reduce hallucinations in a customer-facing agent? →</a>
+  </div>
+</main>
+<script id="md-source" type="text/markdown"># 🍎 HM Q17 · Explain LoRA. Why is it efficient, and how would you serve many adapters?
+
+> **类别**: GenAI / ML Concepts (🟢 主场) · **考点**: 低秩 ΔW=BA + 冻结 base + base 常驻/adapter 热插拔的 multi-LoRA serving · ⚠️ [✏️] 数字背前替换成真实值
+
+## 🧠 这题在测什么 / 面试官想看到
+
+这是 Gao 的**主场**，所以答案要**权威**，不能只停在「LoRA 省显存」。面试官想看三层：(1) 数学上为什么 efficient——低秩 + 冻结 base 把可训参数砍到极小；(2) serving 层怎么把**很多 adapter** 一起上线（base 常驻 + adapter 热插拔，多请求批处理）；(3) 你能不能把它**桥到 Apple 的端侧 rank-16 adapter 热切换**。弱答案：「LoRA 就是只训一小部分参数」然后没了。强答案：讲清 ΔW=BA、为什么 inference 可以零额外延迟、以及 vLLM 里多 LoRA 同批服务的工程。陷阱：把 LoRA 和 QLoRA 混为一谈、或说 LoRA inference 一定更慢（merge 后不慢）。
+
+## 📋 English Answer (背诵稿, 主答 ~60-90 秒 + 可延伸)
+
+> **60 秒脊柱 (背死这句)**: *Freeze the base, learn a low-rank ΔW = B·A. Tiny trainable params → tiny optimizer state. Merge at inference → zero added latency. Serve many adapters by keeping one base resident and batching across adapters.*
+
+**🧮 数学一图 (口头画得出)**
+
+```
+Full fine-tune:   W_new = W  (train all d×d params, huge optimizer state)
+
+LoRA:             W_eff = W  +  B · A        ← W frozen ❄️ , only B,A trained
+                          (d×d)  (d×r)(r×d)
+                                  └──────┘
+                                  rank r ≪ d  (e.g. r=16)
+                  trainable params = 2·d·r   →  often < 1% of model
+
+Inference:        merge once →  W' = W + B·A   →  runs at base speed, 0 extra latency
+```
+
+"LoRA is low-rank adaptation. The idea: instead of updating the full weight matrix during fine-tuning, you freeze the original weights and learn a small **low-rank** update on top. For a weight matrix W, the update ΔW is factored as **B times A**, where B and A are skinny matrices of rank r — say r equals 16. So if W is d-by-d, full fine-tuning trains d-squared parameters, but LoRA only trains 2·d·r, which for a large d and small r is a tiny fraction — often well under 1% of the model.
+
+Why is that efficient? Three reasons. **One, far fewer trainable parameters**, so the optimizer state and gradients shrink dramatically — that's the real memory saver during training, not just the weights. **Two, the base model is frozen and shared** — you're not duplicating a 7B model per task, you're storing one base plus a few megabytes of adapter per task. **Three, at inference you can fold B·A back into W** by simple addition, so a merged LoRA model runs at *exactly* base-model speed — zero added latency. The bet underneath is that the *change* you need for a downstream task is intrinsically low-rank, even if the model is huge — and empirically that holds.
+
+Now, serving **many** adapters — this is where it gets interesting and it's work I did directly. You do **not** spin up one server per adapter; that wastes the GPU. Instead: keep the **base model resident in GPU memory once**, and treat adapters as small swappable tensors you load per request. The key trick is **batching across adapters** — a single batch can contain requests for different adapters, and the kernel applies each request's own B·A. Frameworks like **vLLM and SGLang** support exactly this multi-LoRA serving, so you get the throughput of shared batching while serving dozens of task-specific adapters from one base. I did inference acceleration on vLLM and SGLang, including this kind of adapter-aware serving and memory tuning."
+
+(可延伸 — 直接桥 Apple) "This maps almost one-to-one to what Apple does on device. Apple's on-device model is one ~3B base with **task-specific rank-16 LoRA adapters hot-swapped** per task — summarization, reply, etc. That's the same architecture, just moved from a GPU serving many users to one device serving many tasks. The base stays resident, adapters are tiny and swapped on demand. So the multi-LoRA serving discipline I built on vLLM is exactly the discipline Apple needs on device — the constraint just shifts from HBM and GPU cost to unified memory and power."
+
+**🔌 Multi-LoRA serving 一图**
+
+```
+        ❌ 错: 一 adapter 一 server          ✅ 对: base 常驻 + adapter 热插拔 + 跨 adapter 批处理
+        ┌──────────┐ ┌──────────┐            ┌─────────────────────────────────────┐
+        │ base+LoRA_A│ │ base+LoRA_B│          │   ONE base model resident in GPU ❄️  │
+        │  (full GPU)│ │  (full GPU)│          │   ├ req1 → apply LoRA_A (B_A·A_A)    │
+        └──────────┘ └──────────┘            │   ├ req2 → apply LoRA_B (B_B·A_B)    │  ← 同一 batch
+        GPU 浪费 N 倍                          │   └ req3 → apply LoRA_A              │     混不同 adapter
+                                              └─────────────────────────────────────┘
+                                              vLLM / SGLang 原生支持; 共享批处理吞吐 + 服务几十个 adapter
+```
+
+## 🇨🇳 中文要点 (理解 + 记忆骨架)
+
+**数学骨架**：冻结原权重 W，只学一个**低秩**增量 **ΔW = B·A**，B、A 是秩为 r（如 16）的瘦矩阵。full fine-tune 训 d²；LoRA 只训 2·d·r，常常 <1%。
+
+**为什么 efficient（三点）**：
+1. 可训参数极少 → optimizer state + 梯度大幅缩水（训练时真正的省显存点，不只是省权重）。
+2. base 冻结且共享 → 不是每个任务复制一个 7B，而是「一个 base + 每任务几 MB adapter」。
+3. inference 可把 B·A 加回 W（merge）→ 跑得和 base **一样快，零额外延迟**。
+   底层假设：下游任务需要的「改变」本质是低秩的——经验上成立。
+
+**多 adapter serving（主场，强调是亲手做的）**：
+- **不要** 一个 adapter 一个 server——浪费 GPU。
+- base **常驻显存一份**，adapter 当成可热插拔的小 tensor 按请求加载。
+- 关键招：**跨 adapter 批处理**——一个 batch 里混不同 adapter 的请求，kernel 给每条请求套自己的 B·A。
+- **vLLM / SGLang** 原生支持这种 multi-LoRA serving；我在 vLLM/SGLang 上做过推理加速 + 这类 adapter-aware serving + 显存调优。
+
+**桥 Apple（必抛）**：Apple 端侧 = 一个 ~3B base + **rank-16 LoRA adapter 按任务热切换**。和我的 multi-LoRA 架构**一对一**，只是从「一卡服务多用户」变「一设备服务多任务」，约束从 HBM/GPU 成本换成 unified memory/功耗。
+
+## 🔬 深挖追问 + 答法 (面试官会顺着钻, Apple 钻到边界)
+
+**Q: How do you pick the rank r?**
+"It's a quality-vs-size trade-off you sweep empirically. Too low and the adapter can't capture the task; too high and you lose the efficiency and risk overfitting. For most style/format adaptation, a small rank like 8 or 16 is plenty — which is exactly why Apple landed on rank-16. I'd pick it by eval, not by gut: start small, increase only if eval plateaus below target."
+
+**Q: What's the difference between LoRA and QLoRA?**
+"QLoRA = LoRA on top of a **quantized** (typically 4-bit) frozen base. The base is quantized to save memory, the LoRA adapter is still trained in higher precision. It lets you fine-tune a big model on one GPU. Apple's on-device case rhymes with this — a heavily quantized base (they use ~2-bit weights) plus small adapters."
+
+**Q: Does serving LoRA add latency vs the base model?**
+"If you *merge* the adapter into the weights, no — it's identical to base. The latency question only appears in the *unmerged, multi-adapter* case, because you can't pre-merge when one batch mixes adapters. There the cost is a small extra matmul per request; modern kernels (e.g. in vLLM) make that cheap, and you trade it for not having to run a separate server per adapter."
+
+**Q: Where does LoRA fall short — when wouldn't you use it?**
+"When the task needs a genuinely large capability shift, not a stylistic or narrow one — low-rank can under-fit there, and full fine-tuning or continued pre-training wins. Also if you only ever serve one task forever, the multi-adapter flexibility buys you nothing, so the choice is just about training memory."
+
+**Q: How do you decide which layers to apply LoRA to?**
+"Conventionally the attention projection matrices (q, k, v, o); applying to those captures most of the benefit. You can extend to the MLP layers for more capacity at more cost. Again eval-driven — I'd start with attention projections and only widen if quality demands it."
+
+## ⚠️ 边界 & 红线 (honest limits + what NOT to say)
+
+- 别说「LoRA inference 一定更慢」——merge 后零延迟，只有 unmerged 多 adapter 混批才有小开销。说错会被当场纠。
+- 别把 LoRA 和 QLoRA 混为一谈——QLoRA 多了「base 量化」这层，要能讲清。
+- r 怎么选别给死数字当真理——强调「eval 驱动扫描，从小开始」。
+- 如果被钻到具体 kernel 实现（如 vLLM 的 punica/SGT batched LoRA 内核细节）超出深度，老实说「实现细节我用过没逐行读过，我从 serving 行为和显存层面理解它」——诚实划边界在 Apple 是加分。
+
+## ✅ 加分钩子 (主动抛, steer 到强项)
+
+- 一定主动把 **multi-LoRA serving（base 常驻 + 跨 adapter 批处理 + vLLM/SGLang 亲手做）** 讲出来——这是 JD 没明问但极对口的硬实力。
+- 主动桥 **Apple 端侧 rank-16 adapter 热切换 = 我的 multi-LoRA 架构同构**——把概念题变成「我已经为你们这套架构练过手」的 Why-Apple 钩子。
+- 顺带点 **「训练真正省的是 optimizer state/梯度，不只是权重」**——这句话能立刻区分「读过博客」和「真训过模型」。
+</script>
+<script>
+(function(){
+  const btn = document.getElementById('md-copy-btn');
+  if (!btn) return;
+  const src = document.getElementById('md-source');
+  btn.addEventListener('click', async () => {
+    const md = src ? src.textContent : '';
+    if (!md) return;
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制，去 VSCode 粘贴';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e) {
+      // Fallback: select + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ 已复制'; }
+      finally { ta.remove(); setTimeout(() => location.reload(), 1500); }
+    }
+  });
+})();
+
+// Theme toggle
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function update(){
+    const t = document.documentElement.getAttribute('data-theme');
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    btn.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  update();
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch(e) {}
+    update();
+  });
+})();
+</script>
+<script src="../assets/prism/prism-core.min.js"></script>
+<script src="../assets/prism/prism-autoloader.min.js"></script>
+<script>if(window.Prism)Prism.plugins.autoloader.languages_path='../assets/prism/components/';</script>
+</body>
+</html>
