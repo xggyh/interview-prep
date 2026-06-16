@@ -1,0 +1,195 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍎 Apple 语音 ASR/TTS · 20 题专项</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;max-width:880px;margin:0 auto;padding:14px 18px 80px;line-height:1.78;color:#1f2328;background:#fafbfc;font-size:15px}
+header{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;padding:22px 24px;border-radius:12px;margin-bottom:14px}
+header h1{margin:0 0 6px;font-size:22px}
+header .s{font-size:13px;opacity:.93}header a{color:#c7d8ff}
+.note{background:#fff7d1;border-left:4px solid #d4a72c;padding:8px 14px;border-radius:0 6px 6px 0;font-size:13px;margin-bottom:14px}
+nav{background:#f0f3f8;border:1px solid #d0d7de;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;line-height:2}
+nav a{display:inline-block;padding:1px 8px;margin:1px;background:#fff;border:1px solid #d0d7de;border-radius:4px;text-decoration:none;color:#1f2328}
+nav a:hover{background:#1e3a8a;color:#fff}
+.tools{margin-bottom:12px}.tools button{font-family:inherit;font-size:12px;padding:4px 12px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;margin-right:6px}
+details.q{background:#fff;border:1px solid #d0d7de;border-radius:10px;margin-bottom:10px;overflow:hidden;scroll-margin-top:12px}
+summary{padding:13px 16px;cursor:pointer;font-weight:600;font-size:15px;list-style:none}
+summary::-webkit-details-marker{display:none}summary:hover{background:#f6f8fa}
+.qn{display:inline-block;color:#fff;border-radius:5px;padding:1px 8px;font-size:13px;margin-right:5px}
+.cat{display:inline-block;background:#eef1f4;color:#57606a;border-radius:4px;padding:1px 7px;font-size:11px;margin-right:4px}
+.body{padding:4px 18px 16px;border-top:1px solid #eaeef2}
+.lbl{font-size:13px;font-weight:700;color:#57606a;margin:14px 0 5px}
+.sec{font-size:14.5px}
+.sec.sl{color:#374151;background:#f6f8fa;border-radius:6px;padding:8px 12px}
+.sec.an{background:#ecfdf5;border-left:3px solid #10b981;border-radius:0 6px 6px 0;padding:9px 14px;line-height:1.9}
+.sec.en{background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 6px 6px 0;padding:8px 14px;font-style:italic;color:#1e3a8a}
+.fu{margin:8px 0;padding:8px 12px;background:#f9fafb;border:1px solid #eaeef2;border-radius:6px}
+.fq{font-weight:600;color:#1e3a8a;margin-bottom:3px;font-size:14px}.fa{font-size:14px;color:#374151}
+code{background:rgba(0,0,0,.06);padding:0 4px;border-radius:3px;font-size:13px}
+</style></head><body>
+<header><h1>🍎 Apple 语音 ASR/TTS · 20 题专项</h1>
+<div class="s">你的主场 (7 市场 voice agent) · ASR 10 + TTS 10 · 思路 + 中文答 + 英文一句 + 追问 · 回 <a href="apple-hm-cn.html">HM 中文简版</a> / <a href="apple-quant-10.html">量化 10 题</a> / <a href="cram.html">hub</a></div></header>
+<div class="note">⚠️ 架构/概念题 (CTC/RNN-T/AED/Whisper/Conformer/codec TTS/vocoder/TTFA) 是稳定知识可直接背。<strong>具体模型</strong> (Qwen3-ASR / VoxCPM2 / Qwen3-TTS / OmniVoice) 标 <code>[✏️ 核实]</code> 处, 用你真实评测数据填 —— 这些你本来就测过, 你有真数字。诚实边界: 你是从工程选型角度评估的, 不是模型作者, 被深问内部就这么说。</div>
+<div class="tools"><button onclick="document.querySelectorAll('details.q').forEach(d=>d.open=true)">展开全部</button><button onclick="document.querySelectorAll('details.q').forEach(d=>d.open=false)">收起全部</button></div>
+<nav><a href="#qA1">A1</a> <a href="#qA2">A2</a> <a href="#qA3">A3</a> <a href="#qA4">A4</a> <a href="#qA5">A5</a> <a href="#qA6">A6</a> <a href="#qA7">A7</a> <a href="#qA8">A8</a> <a href="#qA9">A9</a> <a href="#qA10">A10</a> <a href="#qT1">T1</a> <a href="#qT2">T2</a> <a href="#qT3">T3</a> <a href="#qT4">T4</a> <a href="#qT5">T5</a> <a href="#qT6">T6</a> <a href="#qT7">T7</a> <a href="#qT8">T8</a> <a href="#qT9">T9</a> <a href="#qT10">T10</a></nav>
+<details class="q" id="qA1">
+<summary><span class="qn" style="background:#2563eb">A1</span> <span class="cat">ASR</span> ASR 三大架构范式: CTC vs RNN-T(Transducer) vs AED(attention seq2seq), 各自适合什么?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这是 ASR 的'地图题', 答出三者的本质区别 + 流式性 + 适用场景就过关。一句话锚点: CTC 帧同步无自回归、RNN-T 帧同步带自回归、AED 标签同步全局注意力。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>三大范式:<br>CTC —— 帧级输出 + blank token, 输出之间条件独立, 非自回归, 天然流式、快, 但语言建模弱 (每帧独立, 不看已输出的词)。<br>RNN-T (Transducer) —— encoder + prediction network + joint network, 帧同步但带自回归的 predictor, 既能流式又有语言建模。这是端侧 / 生产流式 ASR 的主力 (Siri / Google 那条线)。<br>AED (attention encoder-decoder, 即 Whisper 这种 seq2seq) —— 标签同步, decoder 对整段音频做 cross-attention, 精度高、上下文强, 但本质非流式 (要看到足够音频才解码)。<br>选型: 要低延迟流式、端侧 → RNN-T; 要最高精度、离线转写 → AED; 要简单快、对齐自由 → CTC, 常和 attention 混合 (hybrid CTC/attention)。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Three paradigms: CTC (frame-sync, non-autoregressive, streams naturally but weak LM), RNN-T (frame-sync + autoregressive predictor — the on-device streaming workhorse), and AED/seq2seq like Whisper (label-sync, highest accuracy, fundamentally non-streaming)."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: hybrid CTC/attention 为什么常用?</div><div class="fa">训练时 CTC 做对齐正则、attention 做精度, 解码时两者打分融合 (ESPnet 那套), 兼顾收敛稳定和精度。</div></div><div class="fu"><div class="fq">追问: 端侧为什么偏 RNN-T?</div><div class="fa">帧同步天然流式 + 低延迟, predictor 提供语言建模, 模型可做小, 是 on-device 实时 ASR 的事实标准。</div></div></div>
+</div></details>
+<details class="q" id="qA2">
+<summary><span class="qn" style="background:#2563eb">A2</span> <span class="cat">ASR</span> CTC 具体怎么工作?blank token / 对齐 / 条件独立假设 / 为什么能流式?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>考你懂不懂 CTC 的机制而不只是名字。关键词: alignment-free、blank、collapse 规则、条件独立、单调对齐。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>CTC 解决的是'音频帧数远多于文字、又没有逐帧标注'的对齐问题。<br>做法: 模型每个时间帧输出一个分布 (含一个特殊的 blank token), 然后用一个 collapse 规则 —— 先合并连续重复, 再删掉 blank —— 把帧级序列折叠成最终文字。训练时对所有能折叠成正确文本的对齐路径求和 (前向-后向算法)。<br>两个关键性质: 一, 条件独立假设 —— 给定 encoder 输出, 每帧的预测彼此独立, 所以语言建模弱; 二, 单调对齐 —— 音频和文字顺序一致, 不会乱序。<br>为什么能流式: 因为是帧同步的, 每来一帧就能出一帧的预测, 配 causal / chunk encoder 就能边听边出, 不像 attention 要看全局。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"CTC outputs a per-frame distribution with a blank token, then collapses repeats+blanks to text, summing over all valid alignments. Conditional independence (weak LM) + monotonic alignment. It streams because it's frame-synchronous — emit as frames arrive with a causal encoder."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: CTC 的弱点怎么补?</div><div class="fa">条件独立导致语言建模弱, 实践里外接一个 LM 做 shallow fusion / beam search rescoring, 或干脆上 RNN-T。</div></div><div class="fu"><div class="fq">追问: blank 到底代表什么?</div><div class="fa">代表'这一帧不输出新符号', 用来处理帧多字少 + 重复字 (如 'hello' 的两个 l 要靠 blank 隔开才不被 collapse 合并)。</div></div></div>
+</div></details>
+<details class="q" id="qA3">
+<summary><span class="qn" style="background:#2563eb">A3</span> <span class="cat">ASR</span> Whisper 是什么架构?为什么它本质上是非流式的?要流式怎么硬做?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>Whisper 是必考锚点。答出 encoder-decoder + 30s log-mel + multitask, 再点破它为什么非流式。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>Whisper 是一个标准的 encoder-decoder transformer (seq2seq / AED), OpenAI 用 68 万小时弱监督多语数据训的, 鲁棒性极好。输入是固定 30 秒窗口的 log-mel spectrogram, decoder 用 special token 做多任务: 转写 / 翻译 / 语言识别 / 时间戳。<br>为什么本质非流式: 一, 它要把音频 padding/截断到 30 秒整窗再编码, encoder 对整窗做双向 attention; 二, decoder 是自回归地对整段音频做 cross-attention。所以它设计上是'拿到一整段再转写', 不是边听边出。<br>硬做流式的办法: 把音频切成小 chunk 滚动喂 + 维护一个滑动的上下文, 或者用 VAD 切句逐句转 —— 但这都是 hack, 会牺牲精度或带来重复/边界错误。真要低延迟流式, 应该用 RNN-T 而不是把 Whisper 掰成流式。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Whisper is an encoder-decoder transformer trained on 680k hrs, fixed 30s log-mel input, multitask via special tokens. It's non-streaming by design — full-window bidirectional encoding + autoregressive cross-attention. Streaming it via chunking/VAD is a hack; for true low latency use RNN-T."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 那 Whisper 适合你的 voice agent 吗?</div><div class="fa">离线质检 / 批量转写很好; 但实时催收对话要 sub-2s 流式, 我不会把 Whisper 掰成流式, 会用流式架构, Whisper 留给 offline eval / 数据构造。</div></div><div class="fu"><div class="fq">追问: Whisper 为什么鲁棒?</div><div class="fa">68 万小时弱监督 + 多语多场景, 见过大量噪声/口音, 所以 zero-shot 泛化强 —— 代价是大、非流式。</div></div></div>
+</div></details>
+<details class="q" id="qA4">
+<summary><span class="qn" style="background:#2563eb">A4</span> <span class="cat">ASR</span> 流式 vs 非流式 ASR 的根本区别和 trade-off?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题是你的主场 (简历明写 streaming upgrades)。锚点: 延迟 vs 精度/上下文, 以及流式怎么用 chunk attention / look-ahead 找平衡。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>根本区别在'能看到多少未来音频'。<br>非流式看整句, encoder 双向 attention, 精度最高, 但必须等说完才出 —— 延迟高。<br>流式只能看到当前 + 有限的未来, 用 causal 或 chunked attention、有限 look-ahead window, 边听边出 —— 延迟低, 但因为上下文少、精度略降。<br>核心 trade-off 就是 latency vs accuracy。实践里的旋钮: chunk size (块越大精度越高、延迟越大)、look-ahead 帧数、causal convolution。streaming Conformer 就是把这些做进去。<br>在我的 voice agent 里这是核心约束: 电话对话里沉默就是失败, 所以我宁可用流式 + 有限 look-ahead 把首字延迟压下来, 在精度上做可接受的让步, 再靠 LLM 端的纠错和确认步补回来。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"It's about how much future audio you can see. Non-streaming = full bidirectional context, highest accuracy, high latency. Streaming = causal/chunked attention + limited look-ahead, low latency, slight accuracy cost. The knobs are chunk size and look-ahead. In a phone agent, silence kills the call, so I bias to streaming and recover accuracy at the LLM/confirmation layer."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: chunk size 怎么定?</div><div class="fa">看延迟预算反推: 首字延迟目标减去网络和 TTS 的开销, 剩下给 ASR, 再选最大的能塞进这个预算的 chunk —— 精度尽量高。</div></div><div class="fu"><div class="fq">追问: 流式精度掉多少?</div><div class="fa">典型几个点 WER, 但用 look-ahead + 后处理 (LLM 纠错 / 重打分) 能补回大部分, 端到端体验上用户感知不到。</div></div></div>
+</div></details>
+<details class="q" id="qA5">
+<summary><span class="qn" style="background:#2563eb">A5</span> <span class="cat">ASR</span> RNN-T 为什么是端侧 / 生产流式 ASR 的主力?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>承接 A1, 深挖 RNN-T 三件套和它的'既流式又有语言建模'优势。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>RNN-T (RNN Transducer) 有三个组件: encoder (听音频)、prediction network (像个语言模型, 看已输出的文字)、joint network (把两者融合出下一个 token 分布)。<br>它的妙处: 帧同步所以天然流式 (每帧推进, 输出 blank 或一个 token), 同时 prediction network 提供了 CTC 缺的语言建模 —— 解决了 CTC 条件独立的弱点。<br>为什么端侧主力: 一, 低延迟流式; 二, 模型可以做得很小 (encoder + 小 predictor), 适合设备内存预算; 三, 没有 attention 对整段的依赖, 计算和内存随时间线性、可控。Siri、Google 的设备端 ASR 基本都是 RNN-T 家族。<br>这正好接 Apple 端侧的约束: 固定内存 + 实时 + 流式, RNN-T 是为这个场景生的。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"RNN-T has encoder + prediction network (the LM piece CTC lacks) + joint network. Frame-synchronous so it streams naturally, while the predictor gives language modeling. Small, low-latency, linear in time — which is why on-device ASR (Siri, Google) is RNN-T family. It's built for the fixed-memory real-time streaming constraint."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: RNN-T 训练难在哪?</div><div class="fa">joint network 的输出是 (T×U) 的网格, 显存吃得猛, 要做 memory 优化 (function-merging / pruned RNN-T) 才训得动大词表。</div></div><div class="fu"><div class="fq">追问: 和 CTC 比延迟?</div><div class="fa">都帧同步、都能流式, 但 RNN-T 精度更高 (有 LM), 代价是 decode 比 CTC 重一点。</div></div></div>
+</div></details>
+<details class="q" id="qA6">
+<summary><span class="qn" style="background:#2563eb">A6</span> <span class="cat">ASR</span> Conformer 是什么?为什么是 ASR encoder 的 SOTA?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>常见追问。一句话: convolution-augmented transformer, 局部用 conv 全局用 attention。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>Conformer = convolution + transformer 的结合。语音信号既有局部结构 (音素、共振峰, 适合卷积) 又有长程依赖 (韵律、上下文, 适合 attention)。Conformer 在每个 block 里同时放 self-attention (抓全局) 和 convolution module (抓局部), 加上 macaron 式的两个 feed-forward 夹住。<br>结果是它在 ASR encoder 上全面超过纯 transformer 和纯 CNN, 成了事实 SOTA encoder, RNN-T 和 AED 都常用 Conformer 当 encoder。<br>流式版本 (streaming Conformer) 把 attention 换成 chunked、conv 换成 causal, 就能边听边出。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Conformer = convolution-augmented transformer: self-attention for global context + a conv module for local acoustic structure, macaron FFNs around them. It beats pure transformer/CNN and is the de-facto ASR encoder for both RNN-T and AED. Streaming variants use chunked attention + causal conv."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 为什么 conv 对语音重要?</div><div class="fa">音素和共振峰是强局部模式, 卷积的局部感受野和位置不变性正好抓这个, 比纯 attention 更高效。</div></div></div>
+</div></details>
+<details class="q" id="qA7">
+<summary><span class="qn" style="background:#2563eb">A7</span> <span class="cat">ASR</span> LLM-based ASR (如 Qwen3-ASR / Qwen-Audio 路线) 和传统 CTC/RNN-T 比, 强在哪弱在哪?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>新趋势题。围绕'audio 接进 LLM'的概念讲清强弱, 模型具体细节标 [✏️ 核实] 别硬编。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>LLM-based ASR 的思路是把音频编码 (audio encoder + adapter) 接进一个大语言模型, 让 LLM 来'读'音频出文字 —— Qwen-Audio / Qwen2-Audio 到 Qwen3-ASR [✏️ 核实 Qwen3-ASR 具体架构] 是这条线。<br>强在: 一, 语言建模和世界知识强, 长尾词、专名、上下文歧义处理好; 二, 多任务 / 多语统一 (转写 + 翻译 + 问答一个模型); 三, 可以用 prompt 注入上下文 (领域词表、对话历史)。<br>弱在: 一, latency / streaming —— LLM 自回归 decode 慢, 天然非流式, 实时场景吃力; 二, 幻觉 —— LLM 会'脑补'没说的词, 这在催收/支付这种场景是红线; 三, 大、贵, 端侧难塞。<br>我的判断: 实时端侧流式还是 RNN-T 这类专用架构; LLM-based ASR 适合离线、高价值、上下文重的转写, 或者作为流式结果的二次纠错重打分层。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"LLM-based ASR feeds an audio encoder into an LLM (Qwen-Audio → Qwen3-ASR line [✏️ verify specifics]). Strong on language modeling, rare words, multilingual unification, prompt-injectable context — but weak on latency/streaming (autoregressive, non-streaming), prone to hallucination (a red line in payments), and large. I'd keep RNN-T for real-time on-device and use LLM-ASR offline or as a rescoring layer."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 幻觉在 ASR 里具体什么样?</div><div class="fa">LLM-ASR 会输出音频里根本没说的、但语言上很顺的词 —— 比如把含糊的金额'补'成一个整数。CTC/RNN-T 受限于声学帧不会这样, 所以动钱场景我更信帧级架构。</div></div><div class="fu"><div class="fq">追问: 能两者结合吗?</div><div class="fa">能 —— 流式 RNN-T 出初稿压延迟, LLM 做二次纠错/重打分补精度和上下文, 这是我会用的混合。</div></div></div>
+</div></details>
+<details class="q" id="qA8">
+<summary><span class="qn" style="background:#2563eb">A8</span> <span class="cat">ASR</span> 多语种 ASR 的难点?(你 7 市场 CN/EN/JP/KR/MY/ID/TH 的真实经验)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>🟢 你的真实差异化 —— 7 市场、低资源语、code-switching。讲真实坑。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>我在 voice agent 跨 7 个市场 (CN/EN/JP/KR/MY/ID/TH) 踩过的真实难点:<br>一, code-switching —— 用户一句话里中英夹杂、或本地语夹英文专名, 单语模型直接崩, 要么多语联合训练要么语言无关的建模单元。<br>二, 低资源语言 —— 泰语、印尼语的标注数据远少于中英, ASR 基线明显低, 我们靠多语迁移 + 本地数据构造 + 领域适配把它拉上来。<br>三, 建模单元和字符集 —— 中文用字 (CER 而非 WER)、日语有汉字假名混合、泰语没有词边界, 分词和评估口径每个市场都不一样。<br>四, 数字和实体 —— 支付场景金额/日期/OTP 跨语言格式差异大, 这是错误重灾区, 我专门做了 normalization 和确认步。<br>这套'多语 + 低资源 + 领域适配'的经验, 正好对 Apple 服务大中华区 + 多市场本地化的需求。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Across 7 markets I hit: code-switching (mixed CN/EN in one utterance), low-resource languages (TH/ID have far less labeled data — solved via multilingual transfer + local data construction), modeling-unit/charset differences (Chinese uses CER not WER, Thai has no word boundaries), and cross-lingual number/entity formats (the error hotspot in payments). That maps directly to Apple's Greater-China + multi-market localization need."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 低资源语言怎么提升?</div><div class="fa">多语联合预训练做迁移 + 针对性数据构造 (TTS 合成 + 真实数据增广) + 领域微调, 别从零训单语。</div></div><div class="fu"><div class="fq">追问: CER 和 WER 区别?</div><div class="fa">WER 按词算错误率 (英文), 中文/日文没有天然词边界, 用 CER 按字算更稳定, 评估口径要按语言切换。</div></div></div>
+</div></details>
+<details class="q" id="qA9">
+<summary><span class="qn" style="background:#2563eb">A9</span> <span class="cat">ASR</span> ASR 怎么评估?WER / CER / RTF / 延迟, 流式怎么测?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>评估题, 给全维度 + 区分离线/流式指标。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>离线质量: WER (词错误率, 英文) 或 CER (字错误率, 中文/日文); 进一步看 substitution / insertion / deletion 拆分定位问题。<br>速度: RTF (real-time factor, 处理时长 / 音频时长, &lt;1 才能实时); 端侧还要看 energy-per-utterance。<br>流式专属: 首字延迟 (从说话到第一个字出来)、尾字延迟 / endpoint latency (从说完到确定结束)、以及 partial/final 的稳定性 (partial 结果会不会反复跳变)。<br>生产: 不能只看平均 WER, 要按市场 / 口音 / 噪声分层, 盯长尾; 业务上看下游指标 (理解成功率、转人工率)。<br>我做流式升级时, 主指标就是首字延迟和 partial 稳定性, 同时守住 WER 不退 —— 这是个多目标。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Offline: WER (or CER for Chinese/Japanese), broken into sub/ins/del. Speed: RTF&lt;1, plus energy on-device. Streaming-specific: first-token latency, endpoint latency, and partial-result stability. Production: stratify by market/accent/noise, watch the tail, tie to downstream success rate. My streaming work optimized first-token latency + partial stability while holding WER."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: partial 稳定性为什么重要?</div><div class="fa">流式 ASR 的中间结果如果反复跳变, 下游 LLM 会被噪声触发、用户也会困惑; 稳定的 partial 才能让 agent 提前规划。</div></div></div>
+</div></details>
+<details class="q" id="qA10">
+<summary><span class="qn" style="background:#2563eb">A10</span> <span class="cat">ASR</span> endpointing / VAD 在流式 ASR 里的作用?早切 vs 晚切怎么权衡?(接 barge-in)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>接你的 barge-in / 打断处理经验。讲 VAD + endpoint 的 latency-误切 trade-off。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>VAD (voice activity detection) 判断'有没有人在说话', endpointing 判断'这句说完了没'。在流式语音 agent 里它们决定两件事: 什么时候把识别结果交给 LLM, 以及什么时候允许打断 (barge-in)。<br>核心 trade-off 是早切 vs 晚切: 切早了 —— 用户还没说完就抢话, 体验差、还可能漏信息; 切晚了 —— 尾延迟高, 对话像卡顿。旋钮是静音判定阈值 (等多少 ms 静音算说完) + 语义/声学的联合判断。<br>barge-in 这块我专门做过: 用户在 bot 说话时插话, VAD 要立刻检测到语音、打断 TTS 播放、把控制权交回, 还要处理回声 (AEC) 防止把 bot 自己的声音当成用户输入。<br>我的做法是动态 endpoint: 结合声学静音 + 语义完整度 (这句话意思完整了吗) 来决定切点, 而不是固定静音阈值, 在抢话和尾延迟之间找平衡。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"VAD detects speech, endpointing decides when an utterance is done — together they control when to hand off to the LLM and when to allow barge-in. The trade-off is cut-early (interrupting the user) vs cut-late (tail latency). For barge-in I detect user speech mid-TTS, stop playback, hand control back, and run echo cancellation so the bot's own voice isn't mistaken for input. I use dynamic endpointing — acoustic silence + semantic completeness — instead of a fixed silence threshold."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 回声为什么是问题?</div><div class="fa">bot 的 TTS 声音会被麦克风收进去, 不做 AEC (acoustic echo cancellation) 就会把自己说的话当成用户输入, 触发误打断。</div></div><div class="fu"><div class="fq">追问: 固定阈值不行吗?</div><div class="fa">固定静音阈值在'用户停顿思考'和'用户说完了'之间分不清 —— 加语义完整度判断能少抢话又不增尾延迟。</div></div></div>
+</div></details>
+<details class="q" id="qT1">
+<summary><span class="qn" style="background:#9333ea">T1</span> <span class="cat">TTS</span> 现代 TTS 的 pipeline 演进?从 Tacotron 到 codec/LLM-based 到 flow-matching</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>TTS 地图题。讲清四代演进 + 每代的核心变化。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>大致四代:<br>一, 拼接 / 参数合成 (concatenative / HMM) —— 老派, 机械。<br>二, 神经两阶段: 声学模型 (Tacotron2 / FastSpeech 把文字 → mel spectrogram) + vocoder (HiFi-GAN 把 mel → 波形)。这一代质量飞跃, 但要训两段。<br>三, codec-based / LLM-based TTS (VALL-E 路线): 把音频用 neural codec 编成离散 token, 再用一个自回归 transformer 像语言模型一样预测这些 audio token, 最后 decode 回波形。带来零样本音色克隆 + 天然流式。<br>四, flow-matching / diffusion TTS (NaturalSpeech / F5-TTS 这类): 用连续表征 + 流匹配/扩散生成, 质量和自然度更高、更稳, 但流式更难。<br>我评估的那几个引擎 (VoxCPM2 / Qwen3-TTS / OmniVoice / F5) 基本落在第三、四代, 选型就是在质量、流式性、并发、成本之间权衡。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Four generations: concatenative/parametric → neural two-stage (Tacotron/FastSpeech acoustic model + HiFi-GAN vocoder) → codec/LLM-based (VALL-E: audio codec tokens + autoregressive transformer → zero-shot cloning + streaming) → flow-matching/diffusion (F5/NaturalSpeech: higher quality/stability, harder to stream). The engines I evaluated sit in gen 3-4; selection trades quality vs streaming vs concurrency vs cost."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 为什么 codec token 能流式?</div><div class="fa">离散 audio token 是自回归一个个出的, 出几个就能 decode 几个播出去, 和 LLM 出字一样天然增量; diffusion 要迭代去噪整段, 流式难。</div></div></div>
+</div></details>
+<details class="q" id="qT2">
+<summary><span class="qn" style="background:#9333ea">T2</span> <span class="cat">TTS</span> Codec-based / LM TTS (VALL-E 路线) 怎么工作?为什么能零样本克隆?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>深挖第三代。关键: neural audio codec 离散化 + AR transformer + in-context 克隆。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>三步: 一, 用一个 neural audio codec (如 EnCodec / SNAC) 把波形编码成离散 token —— 类似给音频造了个'词表'; 二, 用一个自回归 transformer, 条件是文字 (+ 一段参考音频的 token), 预测目标音频的 token 序列; 三, 用 codec 的 decoder 把 token 解回波形。<br>为什么能零样本音色克隆: 因为它是 in-context 的 —— 你给一段 3 秒的参考音频 token 当 prompt, 模型就把目标文字'用这个音色'读出来, 不用为每个说话人重训。这跟 LLM 的 few-shot 是一个道理。<br>代价: 自回归 + 离散 token 有时不稳定 (漏字、重复、跳音), 所以生产里要加重复检测、长度控制、或上 flow-matching 那代换稳定性。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Three steps: a neural audio codec (EnCodec/SNAC) discretizes waveform into tokens; an autoregressive transformer predicts target tokens conditioned on text + reference-audio tokens; the codec decoder reconstructs waveform. Zero-shot cloning is in-context — a 3s reference as prompt, like LLM few-shot. Cost: AR instability (skips/repeats), mitigated with detection or flow-matching."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: codec 的 token 是怎么来的?</div><div class="fa">RVQ (residual vector quantization) —— 多层码本逐层量化残差, 又是 codebook/VQ 那套, 和量化是同一个数学。</div></div><div class="fu"><div class="fq">追问: 不稳定怎么治?</div><div class="fa">重复/静音检测 + 强制对齐约束 + 长度预测; 或者直接用 flow-matching TTS 换更稳的生成。</div></div></div>
+</div></details>
+<details class="q" id="qT3">
+<summary><span class="qn" style="background:#9333ea">T3</span> <span class="cat">TTS</span> Vocoder 是什么?两阶段 vs 端到端 TTS?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>基础概念题。vocoder = mel→波形, 讲清两阶段和端到端取舍。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>Vocoder 是把中间声学表征 (通常是 mel spectrogram) 转成最终波形的模块, 代表是 HiFi-GAN (GAN-based, 快且高质)。<br>两阶段 TTS: 声学模型 (文字→mel) + vocoder (mel→波形) 分开训。好处是模块清晰、可单独优化、可换 vocoder; 坏处是两段之间有 mismatch (声学模型训练时见的是真 mel, 推理时 vocoder 吃的是预测 mel), 要联合微调。<br>端到端 TTS: 文字直接到波形 (如 VITS), 或 codec token 直接 decode。少了 mismatch、延迟更低, 但训练更难、可解释性差。<br>端侧 / 实时场景我偏好少阶段 + 流式友好的方案, 减少级联延迟。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"A vocoder turns mel-spectrogram into waveform (HiFi-GAN). Two-stage (acoustic model→mel→vocoder) is modular and swappable but has train/inference mel mismatch; end-to-end (VITS / codec-decode) removes mismatch and cuts latency but is harder to train. For real-time on-device I prefer fewer, streaming-friendly stages."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: mismatch 具体什么问题?</div><div class="fa">vocoder 训练吃真 mel, 推理吃声学模型预测的 mel, 分布不一致 → 杂音/金属感; 解法是用预测 mel 微调 vocoder 或端到端。</div></div></div>
+</div></details>
+<details class="q" id="qT4">
+<summary><span class="qn" style="background:#9333ea">T4</span> <span class="cat">TTS</span> 流式 TTS 的关键: time-to-first-audio (TTFA) 怎么压?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>🟢 你的主场 (简历 streaming + latency)。TTFA 是电话场景的命根子。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>TTFA (time-to-first-audio) —— 从拿到文字到第一段声音播出的延迟, 这是电话对话里用户感知最强的指标, 沉默超过几百毫秒就显得卡。<br>怎么压:<br>一, 增量合成 —— 不等整句, 按短语 / 句子片段一来就合成播放, 边生成边播 (和 LLM streaming 配合, LLM 出一句就喂 TTS 一句)。<br>二, 选 AR token TTS 而非 diffusion —— 自回归 token 天然增量出, diffusion 要迭代整段, TTFA 差。<br>三, chunk 调度 —— 第一个 chunk 做小一点先出声, 后面追上, 在 TTFA 和音质连续性之间平衡。<br>四, 模型 / 推理优化 —— 量化、KV-cache、warmup 避免冷启动。<br>我在 voice agent 里做的 streaming 升级核心就是这个: 把首音延迟压到可接受, 同时处理好 chunk 边界不破音、和打断时立刻停。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"TTFA — time from text to first audio out — is what users feel on a call; a few hundred ms of silence reads as lag. Compress it via: incremental synthesis (synthesize per phrase as the LLM streams), AR-token TTS over diffusion (AR emits incrementally), small first-chunk scheduling, and model/inference optimization (quantization, KV-cache, warmup). My streaming upgrade centered on TTFA plus clean chunk boundaries and instant stop-on-barge-in."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 第一个 chunk 太小会怎样?</div><div class="fa">太小可能 prosody 不自然 (一个词一个词蹦), 要在'先出声'和'韵律连续'之间调 chunk 边界, 通常按短语切。</div></div><div class="fu"><div class="fq">追问: 和 LLM streaming 怎么配?</div><div class="fa">LLM 出第一个完整短语就立刻送 TTS, 不等整句; pipeline 并行起来, 端到端首音延迟才压得下去。</div></div></div>
+</div></details>
+<details class="q" id="qT5">
+<summary><span class="qn" style="background:#9333ea">T5</span> <span class="cat">TTS</span> 你在 voice agent 里怎么选 TTS 引擎 — OmniVoice / VoxCPM2 / Fish S2 / F5 之间怎么评估?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>🟢🔴 这是你简历里真实做过的选型 —— Apple 最吃这种'约束下选型'叙事。给评估框架, 最终选型和数字标 [✏️ 核实] 用你真数据。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>我不是挑'质量最高'那个, 是挑'在约束下达标'那个 —— 这是关键叙事。我按几个维度横评 OmniVoice / VoxCPM2 / Fish S2 Pro / F5-TTS [✏️ 核实 你评测的具体引擎列表]:<br>一, TTFA / streaming 支持 —— 电话场景硬约束, 不支持低延迟流式的直接出局;<br>二, 并发 / concurrency —— 一张 GPU 能扛多少路同时合成, 直接决定成本;<br>三, GPU 成本 —— 单位音频的算力开销;<br>四, 质量 / 自然度 —— MOS, 但只要过线即可, 不追极致;<br>五, 多语 / 多方言覆盖 —— 我 7 个市场要全覆盖。<br>最终我选了 [✏️ 核实 最终选型 + 理由 + 关键数字], 因为它在 TTFA 和并发上达标, 质量过线 —— 而不是 MOS 最高但流式差或并发低的那个。<br>这种'不追局部最优、追约束下最优'的取舍, 正好是 Apple 端侧 (固定内存/功耗预算) 的思维方式。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"I don't pick the highest-quality engine — I pick the one that clears the constraints. I benchmarked OmniVoice / VoxCPM2 / Fish S2 Pro / F5 [✏️ verify] on: TTFA &amp; streaming support (hard constraint), concurrency per GPU (drives cost), GPU cost, quality (good-enough not maximal), and multilingual/dialect coverage for 7 markets. I chose [✏️ verify final pick + numbers] because it cleared TTFA and concurrency with acceptable quality — constrained-optimal, not locally-optimal. That's exactly the on-device mindset."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 为什么不选质量最高的?</div><div class="fa">质量最高的那个 [✏️ 核实] TTFA 或并发不达标, 电话场景里延迟和成本是硬约束, 质量过线即可 —— 局部最优 ≠ 系统最优。</div></div><div class="fu"><div class="fq">追问: 多市场一个引擎还是多个?</div><div class="fa">[✏️ 据实] —— 主引擎覆盖多语, 个别低资源语 (如 TH) 可能单独适配/换引擎, 用 per-market 配置而不是一个引擎硬扛所有。</div></div></div>
+</div></details>
+<details class="q" id="qT6">
+<summary><span class="qn" style="background:#9333ea">T6</span> <span class="cat">TTS</span> VoxCPM2 的特点是什么?(tokenizer-free / 连续表征 / context-aware)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>模型具体题。讲我了解的 VoxCPM 路线特征, 细节标 [✏️ 核实], 重点是它在你评估里的定位。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>VoxCPM 这条线 (面壁 / MiniCPM 系) 的特点是 tokenizer-free —— 不走'先离散成 audio token'那套, 而是用连续语音表征 + 局部扩散式生成, 主打表现力和上下文感知 (context-aware prosody, 能根据语境调整语气) [✏️ 核实 VoxCPM2 架构细节]。<br>和 codec-token TTS (VALL-E 路线) 比, 连续表征的好处是音质 / 自然度更高、少了离散化的信息损失; 代价通常是流式性和并发要看实现。<br>在我的评估里它的定位是 [✏️ 核实: 质量强项 / 但 TTFA 或并发上的表现], 这决定了它适不适合我的实时电话场景。<br>诚实边界: VoxCPM2 的内部细节我是从评估和文档层面了解的, 不是它的作者, 具体数字以我实测为准。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"VoxCPM (MiniCPM/ModelBest line) is tokenizer-free — continuous speech representations + local diffusion-style generation, strong on expressiveness and context-aware prosody [✏️ verify VoxCPM2 internals]. Versus codec-token TTS, continuous reps give higher naturalness but streaming/concurrency depend on implementation. In my eval its role was [✏️ verify]. Honest boundary: I know it from evaluation/docs, not as an author — exact numbers per my own benchmark."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: tokenizer-free 是优点还是缺点?</div><div class="fa">音质上是优点 (无离散化损失), 但少了'audio token'就不能像 LLM 那样简单自回归流式, 流式实现更讲究 —— 取舍。</div></div></div>
+</div></details>
+<details class="q" id="qT7">
+<summary><span class="qn" style="background:#9333ea">T7</span> <span class="cat">TTS</span> Qwen3-TTS 的特点?(多语种多方言, 低延迟 Flash)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>模型题。讲 Qwen3-TTS 路线特征, 细节 [✏️ 核实], 接你多市场需求。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>Qwen3-TTS (阿里通义) 这条线主打多语种 + 多方言 + 低延迟 —— 有个 Flash 版本专门压延迟, 适合实时场景 [✏️ 核实 Qwen3-TTS 具体规格 / 支持语言方言数]。<br>对我的价值: 多语多方言覆盖正好对 7 市场 + 大中华区 (普通话 / 粤语等方言) 的需求; Flash 的低延迟取向对电话场景友好。<br>在我的横评里它的定位是 [✏️ 核实: 多语覆盖 + 延迟表现 vs 质量]。<br>和 VoxCPM 的对比就是典型选型: 一个偏多语/低延迟工程化, 一个偏表现力/音质, 看场景哪个约束更硬。我的电话催收场景延迟和多语是硬约束, 所以评估权重偏前者。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Qwen3-TTS (Alibaba Tongyi) emphasizes multilingual + multi-dialect + low latency, with a Flash variant tuned for real-time [✏️ verify specs]. Value to me: dialect coverage (Mandarin/Cantonese) fits Greater China + my 7 markets, and Flash's latency suits telephony. Versus VoxCPM it's the classic trade — engineering/latency/coverage vs expressiveness/quality. My telephony case weights latency+multilingual, so I leaned that way."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 方言为什么对 Apple 重要?</div><div class="fa">Apple 服务大中华区, 普通话之外的粤语等方言覆盖是真实需求, 多方言 TTS 是加分项。</div></div></div>
+</div></details>
+<details class="q" id="qT8">
+<summary><span class="qn" style="background:#9333ea">T8</span> <span class="cat">TTS</span> OmniVoice 你为什么 (没) 选它?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>模型题。OmniVoice 公开细节少, 完全围绕你的评估维度讲, 结论 [✏️ 核实]。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>OmniVoice 在我的横评里主要看它在 streaming / 并发 / 成本这几个工程维度的表现 [✏️ 核实 OmniVoice 具体特性和你的实测]。<br>我的评估逻辑是一致的: 先卡硬约束 (能不能低延迟流式、单 GPU 并发够不够、单位成本可不可接受), 再看质量是否过线。OmniVoice 最终 [✏️ 核实: 选了 / 没选, 因为 X]。<br>诚实边界: OmniVoice 公开资料不多, 我对它的判断主要来自自己的实测对比, 不是从架构论文层面 —— 如果面试官深问内部, 我会说我是从工程评估角度选型的, 关注的是它在我场景下的 TTFA / 并发 / 成本数字。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"In my benchmark I evaluated OmniVoice mainly on streaming / concurrency / cost [✏️ verify specifics + my measurements]. Same logic: clear the hard constraints (low-latency streaming, per-GPU concurrency, unit cost) first, then check quality is good enough. Final call: [✏️ verify chose/didn't, because X]. Honest boundary: limited public detail, so my judgment is from my own benchmark, not the architecture paper — I selected on engineering metrics for my scenario."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 面试官问你不懂的引擎细节怎么办?</div><div class="fa">老实说'我是从工程选型角度评估的, 关注 TTFA/并发/成本/质量这几个我场景下的实测维度', 不硬编架构 —— Apple 把承认边界当加分。</div></div></div>
+</div></details>
+<details class="q" id="qT9">
+<summary><span class="qn" style="background:#9333ea">T9</span> <span class="cat">TTS</span> AR token TTS vs diffusion/flow-matching TTS 的 trade-off?为什么实时/端侧偏 AR?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>把第三代和第四代对立起来讲取舍, 落到端侧/实时为什么偏 AR。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>AR token TTS (VALL-E 路线): 自回归一个个出 audio token。优点 —— 天然增量流式、TTFA 低、零样本克隆方便; 缺点 —— 可能不稳定 (漏字/重复)、长句误差累积。<br>Diffusion / flow-matching TTS (F5 / NaturalSpeech 路线): 用连续表征迭代生成。优点 —— 音质和自然度更高、更稳、并行生成整段快; 缺点 —— 要迭代多步、对整段生成, 流式难、TTFA 差。<br>为什么实时 / 端侧偏 AR: 电话场景 TTFA 是硬约束, AR 能边出边播; diffusion 虽然质量高但要等整段去噪完, 首音延迟吃不消。端侧还要考虑 diffusion 多步迭代的算力/功耗。<br>所以我的选型在实时催收场景偏 AR 或流式友好的方案, 把质量做到过线而不是用 diffusion 追极致音质。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"AR token TTS streams naturally (low TTFA, easy cloning) but can be unstable (skips/repeats). Diffusion/flow-matching gives higher quality and stability but iterates over the whole segment — bad TTFA, hard to stream, and costly multi-step on device. Real-time/on-device favors AR because TTFA is the hard constraint; I take good-enough quality over diffusion's peak quality."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 有没有两全的?</div><div class="fa">有折中 —— 流式 flow-matching / 蒸馏成少步, 或 AR 出初稿 + 轻量后处理提质; 但成熟度和成本要权衡, 实时场景我先保 TTFA。</div></div></div>
+</div></details>
+<details class="q" id="qT10">
+<summary><span class="qn" style="background:#9333ea">T10</span> <span class="cat">TTS</span> TTS 怎么评估?MOS / 可懂度 / 相似度 / TTFA, 生产怎么自动化?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>评估题, 给主客观全维度 + 生产自动化, 接你 eval harness 经验。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>主观: MOS (mean opinion score, 人打 1-5 分自然度)、CMOS (和参考对比的相对偏好)。这是金标准但慢、贵。<br>客观 / 可自动化: 一, 可懂度 —— 用 ASR 把合成语音转回文字算 WER (WER-via-ASR), 高就说明吐字清楚; 二, speaker similarity —— 用说话人 embedding 算和目标音色的余弦相似度 (克隆场景); 三, prosody / 韵律指标; 四, 工程指标 TTFA / RTF / 并发。<br>生产自动化: 不能每次都人评, 我会建 eval harness —— 固定一组测试文本 (含数字、专名、多语), 每次模型/引擎变更自动跑 WER-via-ASR + similarity + TTFA, 出回归报告; MOS 只在大版本抽样人评校准。<br>这套和我在 BNPL chatbot 建 eval harness 的思路一致: 自动指标守底线、人评做校准, 别只靠'听起来还行'。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Subjective: MOS / CMOS (gold but slow). Automatable: intelligibility via ASR round-trip (WER-via-ASR), speaker similarity via embedding cosine (for cloning), prosody metrics, and engineering TTFA/RTF/concurrency. In production I build an eval harness — fixed test set with numbers/names/multilingual, auto-run WER-via-ASR + similarity + TTFA on every change, MOS only sampled for calibration. Same philosophy as my chatbot eval harness: automated metrics hold the line, human eval calibrates — never just 'sounds fine'."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: WER-via-ASR 可靠吗?</div><div class="fa">它测可懂度不测自然度 —— 一个机械但清楚的声音 WER 会很低。所以要配 MOS 抽样, 两者互补, 不能只看一个。</div></div><div class="fu"><div class="fq">追问: 数字/专名为什么单列?</div><div class="fa">支付场景金额、OTP、日期是错误重灾区, 测试集必须专门覆盖, 否则平均分好看但关键信息读错就是事故。</div></div></div>
+</div></details>
+</body></html>
