@@ -1,0 +1,122 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍎 Apple 端侧量化 · 10 题专项</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;max-width:880px;margin:0 auto;padding:14px 18px 80px;line-height:1.78;color:#1f2328;background:#fafbfc;font-size:15px}
+header{background:linear-gradient(135deg,#0b3d2e,#0f9d58);color:#fff;padding:22px 24px;border-radius:12px;margin-bottom:14px}
+header h1{margin:0 0 6px;font-size:22px}
+header .s{font-size:13px;opacity:.93}
+header a{color:#9cffc4}
+.note{background:#fff7d1;border-left:4px solid #d4a72c;padding:8px 14px;border-radius:0 6px 6px 0;font-size:13px;margin-bottom:12px}
+.chain{background:#eef6ff;border:1px solid #cfe0f5;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+nav{background:#f0f3f8;border:1px solid #d0d7de;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;line-height:2}
+nav a{display:inline-block;padding:1px 8px;margin:1px;background:#fff;border:1px solid #d0d7de;border-radius:4px;text-decoration:none;color:#1f2328}
+nav a:hover{background:#0f9d58;color:#fff}
+.tools{margin-bottom:12px}
+.tools button{font-family:inherit;font-size:12px;padding:4px 12px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;margin-right:6px}
+details.q{background:#fff;border:1px solid #d0d7de;border-radius:10px;margin-bottom:10px;overflow:hidden;scroll-margin-top:12px}
+summary{padding:13px 16px;cursor:pointer;font-weight:600;font-size:15.5px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary:hover{background:#f6f8fa}
+.qn{display:inline-block;background:#0f9d58;color:#fff;border-radius:5px;padding:1px 8px;font-size:13px;margin-right:6px}
+.body{padding:4px 18px 16px;border-top:1px solid #eaeef2}
+.lbl{font-size:13px;font-weight:700;color:#57606a;margin:14px 0 5px}
+.sec{font-size:14.5px}
+.sec.sl{color:#374151;background:#f6f8fa;border-radius:6px;padding:8px 12px}
+.sec.an{background:#ecfdf5;border-left:3px solid #10b981;border-radius:0 6px 6px 0;padding:9px 14px;line-height:1.9}
+.sec.en{background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 6px 6px 0;padding:8px 14px;font-style:italic;color:#1e3a8a}
+.fu{margin:8px 0;padding:8px 12px;background:#f9fafb;border:1px solid #eaeef2;border-radius:6px}
+.fq{font-weight:600;color:#1e3a8a;margin-bottom:3px;font-size:14px}
+.fa{font-size:14px;color:#374151}
+code{background:rgba(0,0,0,.06);padding:0 4px;border-radius:3px;font-size:13px}
+</style></head><body>
+<header>
+<h1>🍎 Apple 端侧量化 · 10 题专项</h1>
+<div class="s">端侧/定位系统签名考点 · 题目 + 思路 + 中文口播答 + 英文一句 + 中文追问 · 回 <a href="apple-hm-cn.html">Apple HM 中文简版</a> / <a href="cram.html">hub</a></div>
+</header>
+<div class="note">⚠️ 真实可用: 7 markets / 95% TAR@1%FAR / vLLM·SGLang·multi-LoRA serving。诚实边界 (量10): 你做的是 inference-side / serving 优化, 没亲手跑过 2-bit QAT 训练 —— 别硬说做过。</div>
+<div class="chain">🔗 一条链记忆: <strong>bit → 整数档位 → 反量化 (scale×(q−zp)) → 聚类/VQ → codebook → PTQ vs QAT → LoRA 找回精度 → 按张量差异化分配 bit</strong></div>
+<div class="tools"><button onclick="document.querySelectorAll('details.q').forEach(d=>d.open=true)">展开全部</button><button onclick="document.querySelectorAll('details.q').forEach(d=>d.open=false)">收起全部</button></div>
+<nav><a href="#q1">量1</a> <a href="#q2">量2</a> <a href="#q3">量3</a> <a href="#q4">量4</a> <a href="#q5">量5</a> <a href="#q6">量6</a> <a href="#q7">量7</a> <a href="#q8">量8</a> <a href="#q9">量9</a> <a href="#q10">量10</a></nav>
+<details class="q" id="q1">
+<summary><span class="qn">量1</span> 什么是量化?为什么端侧模型几乎必须量化?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>先讲清量化是什么 + 端侧的根本约束。重点不是'省空间'这一句, 而是要点出 decode 阶段是 memory-bandwidth-bound, 所以低 bit 既省内存又加快出 token —— 一石二鸟。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>量化就是用更低的精度去存权重 —— 比如把 FP16 的 16 bits-per-weight 压到 8/4/2 bit。<br>端侧几乎必须量化, 有两个根本原因。<br>第一是 unified memory: Apple silicon 上 CPU/GPU/NPU 共享一块内存, 模型要和 OS、前台 App 抢 RAM。一个 3B 模型 FP16 就是 ~6GB, 一台 8GB 的 iPhone 直接装不下, 你又不能像云端那样'再加一块 GPU', 所以必须激进压缩。<br>第二, 也是更深的一点: LLM 的 decode 阶段是 memory-bandwidth-bound 的 —— 瓶颈是访存不是算力。所以降低 bits-per-weight 不只是省空间, 它直接让每个 token 出得更快, 因为每个权重要搬的字节更少。这就是低 bit 量化在端侧'一石二鸟'的根本原因。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Quantization stores weights at lower precision. On-device it's mandatory because of unified memory pressure, and because decode is memory-bandwidth-bound — fewer bits per weight means both smaller and faster, not just smaller."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 功耗呢?</div><div class="fa">手机是电池供电 + 被动散热, 持续负载会 throttle, 所以端侧真正的优化目标是 energy-per-token, 不是吞吐。量化降访存也直接降功耗。</div></div><div class="fu"><div class="fq">追问: 那为什么不无脑全压到最低?</div><div class="fa">bit 越低信息损失越大, 精度会崩。整个游戏就是把 bit 压低、同时用 QAT / LoRA / palettization 把精度抢回来。</div></div></div>
+</div></details>
+<details class="q" id="q2">
+<summary><span class="qn">量2</span> INT8 / INT4 / INT2 各能表示多少个值?反量化怎么还原成真实权重?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>先点破一个关键认知: INT 存的不是真实权重, 是'档位编号'。真实值靠反量化算出来。这一点答出来就显出你真懂、不是背名词。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>n-bit 能表示 2 的 n 次方个离散值: 8-bit 是 256 个, 4-bit 是 16 个, 2-bit 只有 4 个。<br>关键认知是: INT2/4/8 存的那个整数不是真实权重, 是一个'档位编号 (code)'。真实权重是靠反量化算出来的, 公式是 w ≈ scale × (q_int − zero_point)。<br>scale 决定'一格'多大, zero_point 决定零点落在哪。<br>权重一般用 symmetric (zero_point = 0), 因为权重大致以 0 为中心; 激活值常用 asymmetric, 因为像 ReLU 之后全是正数, 把范围整体偏移更省档位。<br>所以一组固定的整数 {0..15}, 配一个 scale 就映射到真实数轴上一组等距的点 —— 换个 scale 整体拉伸或压缩。这也是为什么 Apple 要 learnable scale: 让模型自己学出最贴合权重分布的那个间距。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"The stored INT is a code, not the weight. Dequant is w ≈ scale × (q − zero_point). Weights use symmetric, activations asymmetric. n-bit gives 2ⁿ levels."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: symmetric 和 asymmetric 怎么选?</div><div class="fa">权重零中心用 symmetric (zero_point=0, 省一次减法); 激活有偏 (ReLU 后全正) 用 asymmetric, 不浪费负半轴。</div></div><div class="fu"><div class="fq">追问: scale 是每个权重一个吗?</div><div class="fa">不是, 那样开销太大。通常一个 block (比如 32 或 64 个权重) 共享一个 FP16 scale —— 这也是下一题小数 bit 的来源之一。</div></div></div>
+</div></details>
+<details class="q" id="q3">
+<summary><span class="qn">量3</span> 为什么有时候看到 3.56、3.7 这种小数 bits-per-weight?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题在测你懂不懂量化的工程细节, 不是只会背整数。两个来源: 混合位宽 + 元数据开销摊销。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>你不可能把单个权重存进 3.56 个 bit —— 它是个平均值, 有两个来源。<br>第一是 mixed precision: 不同层用不同精度。敏感的层多给 bit (比如 4-bit), 不敏感的狠压 (2-bit), 平摊下来就是 3 点几。<br>第二是元数据开销摊销: 量化不只存权重的整数索引, 还要存 scale (有的还有 zero_point)。如果每 64 个权重共享一个 FP16 的 scale, 那 16 / 64 = 0.25 bit 就摊到了每个权重上。所以一个名义上 '2-bit' 的方案, 有效 bit 往往是 2.x。<br>Apple server 模型那个 3.56 bits-per-weight 就是 ASTC 块压缩, 块的开销摊进去就成了小数。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"It's an average — from mixed precision (sensitive layers get more bits) plus per-block scale/metadata overhead amortized across weights. A nominal 2-bit scheme is effectively 2.x."</p></div>
+<div class="lbl">🔬 中文追问 (1)</div><div class="sec"><div class="fu"><div class="fq">追问: 怎么决定哪层多给 bit?</div><div class="fa">按每层对量化的敏感度 —— 用一个 calibration set 测量化后每层对最终 loss 的影响, 敏感的多给 bit。这就是 mixed-precision 的核心。</div></div></div>
+</div></details>
+<details class="q" id="q4">
+<summary><span class="qn">量4</span> PTQ 和 QAT 的区别?什么时候用哪个?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这是量化的分水岭题, 必考。一句话本质: PTQ 优化'重建误差最小', QAT 优化'任务 loss 最小'。再给选型依据。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>一句话分界: PTQ 是拿一个已经训好的模型事后量化、不更新权重; QAT 是训练过程中就模拟量化, 让权重学着对量化鲁棒。<br>PTQ 便宜、快、几乎不用数据, 靠一个小 calibration set 定 scale。最朴素的是 round-to-nearest, 8-bit 还行, 4-bit 以下就崩。现代 PTQ 靠 GPTQ (逐列量化 + 用没量化的权重补偿误差)、AWQ (保护被大激活乘到的显著权重)、SmoothQuant (把量化难度从激活迁移到权重) 把低 bit 救活, 能做到 ~4-bit。<br>QAT 贵、要训练流程和数据, 但 2-bit 这种极端档位只能靠它。<br>选型: 8/4-bit、模型够强、要快速部署 → PTQ; 2-bit、精度敏感、又扛得起重训 → QAT。<br>Apple 正好两个都用: 端侧小模型压到 2-bit 用 QAT, server 大模型用 post-training 的 ASTC —— 因为 bit 够高 PTQ 够用, 而重训一个大模型不划算。这个取舍本身就是个很好的答题点。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"PTQ quantizes a trained model with a calibration set, no retrain — GPTQ/AWQ push it to ~4-bit. QAT simulates quantization during training, needed for 2-bit. Apple uses QAT on-device, PTQ (ASTC) server-side."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: PTQ 怎么把 4-bit 救活的?</div><div class="fa">GPTQ 逐列量化, 每量化完一列用剩下没量化的权重补偿刚引入的误差 (借 Hessian 信息), 误差不累积; AWQ 发现 ~1% 被大激活乘到的权重最重要, 量化时保护它们。</div></div><div class="fu"><div class="fq">追问: 中间路线有没有?</div><div class="fa">有 —— 压完之后训一个 LoRA adapter 把精度找回来, 不重训整个基座。Apple 就这么做。介于纯 PTQ 和全量 QAT 之间。</div></div></div>
+</div></details>
+<details class="q" id="q5">
+<summary><span class="qn">量5</span> QAT 里 round() 几乎处处梯度为 0, 怎么反向传播训练?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题专钻 QAT 的实现细节, 答出 STE 就过关, 再带 learnable scale (LSQ) 就是加分。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>核心难题就是 round() 是阶梯函数, 梯度几乎处处为 0, 没法 backprop。<br>解法是 Straight-Through Estimator (STE): 前向用量化后的值算 loss, 反向时假装量化是恒等函数, 梯度直接穿过去 —— 即假设 round 的导数是 1。<br>具体流程是: 全程维护一份 FP 的 master weights (影子权重), 每一步把它做 fake quantization (量化再反量化) 跑前向、算任务 loss、STE 反传、更新 FP master, 最后才烘焙成定版的量化权重。<br>再进一步, scale 和裁剪范围本身也可以做成可学习参数用梯度训 —— 代表作 LSQ (Learned Step Size Quantization)。这就是 Apple 说的 learnable scaling factor: 模型自己和权重联合学出最贴合的档位间距。<br>为什么 QAT 在 2-bit 碾压 PTQ: 因为它直接优化任务 loss, 而不是'权重还原得像不像'。2-bit 下这两个目标严重不等价, 后者才要紧。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"round() has zero gradient, so QAT uses the Straight-Through Estimator — forward uses quantized values, backward pretends quant is identity. Keep FP master weights; LSQ makes the scale learnable. QAT optimizes task loss, not reconstruction error — that's why it wins at 2-bit."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: fake quantization 具体是什么?</div><div class="fa">前向时把权重 (有时含激活) 量化再立刻反量化, 让网络'看见'量化误差, 在退化后的值上算 loss。</div></div><div class="fu"><div class="fq">追问: STE 有没有副作用?</div><div class="fa">有, 它是个有偏估计 (前向和反向不一致), 极低 bit 下会带来训练不稳定, 所以才配 learnable scale + 好的初始化来缓解。</div></div></div>
+</div></details>
+<details class="q" id="q6">
+<summary><span class="qn">量6</span> Palettization / codebook 是什么?和普通标量量化有什么区别?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题区分'只会标量量化'和'懂量化全貌'。核心: palettization 就是 k-means, 它和标量量化都是 Vector Quantization 的特例, 区别只在 codebook 是均匀网格还是自由聚类。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>Palettization 字面上就是 k-means。把权重聚成若干簇, 簇的质心存进一张小表 (palette / 查找表 / codebook), 每个权重只存一个'属于哪个簇'的索引。n-bit palettization 就是 2 的 n 次方个质心: 2-bit 是 4 个质心, 4-bit 是 16 个。<br>它和标量量化的唯一区别在 codebook 怎么来: 标量量化的质心被锁死在均匀网格上 (scale × 整数, 间距固定); palettization 的质心是 k-means 学出来的, 可以落在任意位置 —— non-uniform。<br>为什么端侧好用: 权重分布通常是钟形、挤在 0 附近。均匀网格会在稀疏的尾部浪费档位, 而 k-means 天然把质心放到数据密集处, 同样 bit 预算保留更多信息。<br>拔高一句: 标量量化和 palettization 其实都是 Vector Quantization 的特例, codebook design 就是聚类。round() 把权重分配给最近的质心, 本质和 k-means 的 assignment 一模一样。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Palettization is k-means: cluster weights, store centroids in a codebook/LUT, keep only indices. Scalar quant locks centroids to a uniform grid; palettization learns them freely (non-uniform). Both are vector quantization — codebook design is clustering."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: Apple 基础模型用的是 palettization 还是标量?</div><div class="fa">Apple 旗舰那个 3B 走的是 2-bit QAT (标量 + learnable scale); palettization 更多是 Core ML 工具链给一般开发者的通用端侧压缩路径。别把两者混为一谈, 这个区分讲准很加分。</div></div><div class="fu"><div class="fq">追问: codebook 到底是什么?</div><div class="fa">就是一张'档位编号 → 真实数值'的对照表。bit 决定它有几行 (2ⁿ), codebook design 决定每行填什么值, index 决定每个权重查哪一行。</div></div></div>
+</div></details>
+<details class="q" id="q7">
+<summary><span class="qn">量7</span> 量化把精度压掉了, 怎么把精度找回来?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题接你的主场 —— LoRA。Apple 端侧的一个巧妙用法: LoRA adapter 不只做任务特化, 还用来补偿量化损失。这正好桥到你的 multi-LoRA 经验。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>三条路, 由轻到重。<br>最轻: PTQ 配 GPTQ / AWQ 这类聪明算法, 在不重训的前提下把误差压住。<br>最重: QAT, 训练时就让模型对量化鲁棒 —— 2-bit 只能走这条。<br>中间一条很巧, 也是 Apple 在用的: 把模型压到 2-bit 之后, 引入一个 low-rank 的 LoRA adapter 来找回压缩损失的精度。注意这是 LoRA 的一个反向用法 —— adapter 不只是做任务特化, 这里是专门补偿量化误差, 而且不用重训整个基座, 只训几十 MB 的小 adapter。<br>这正好接我做的事: 我在 serving 侧用 vLLM 做 multi-LoRA —— base model 常驻、adapter 按需 swap。Apple 在端侧做的是同构的事, 用 rank-16 的 adapter 热插拔, 既做任务特化又做精度恢复。核心工程问题 —— 在内存预算下让基座常驻、adapter 分页换进换出 —— 是同一个, 只是预算从 GPU HBM 换成了设备 RAM。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Three levers: smart PTQ (GPTQ/AWQ), QAT for 2-bit, and — Apple's trick — a low-rank LoRA adapter after compression to recover accuracy without retraining the base. That's exactly my multi-LoRA serving, just with the budget being device RAM instead of GPU HBM."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: LoRA 为什么能找回精度?</div><div class="fa">量化误差是个低秩可补偿的扰动, 用 ΔW = B·A 这个低秩增量去拟合'压缩前后的差', 几十 MB 就能补回大部分掉的点。</div></div><div class="fu"><div class="fq">追问: 这和任务特化的 LoRA 冲突吗?</div><div class="fa">不冲突, 是两个角色叠加。同一个 rank-16 adapter 既承载任务特化又承载精度恢复, 热插拔, 不用为每个任务存整份模型。</div></div></div>
+</div></details>
+<details class="q" id="q8">
+<summary><span class="qn">量8</span> KV-cache 为什么单独拎出来量化、而且只到 8-bit?为什么不像权重压到 2-bit?</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这题考你懂不懂'按张量敏感度差异化分配 bit', 以及激活量化为什么比权重难。答出 differentiated bit budget 就高一档。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>因为不同张量对量化的敏感度不一样, bit 预算要差异化分配, 不是一刀切。<br>Apple 端侧的配方就是个好例子: 权重 2-bit、KV-cache 8-bit、embedding 4-bit。权重占内存大头, 所以压最狠; 但 KV-cache 是激活类的东西, 它的精度对输出质量影响大, 所以多给到 8-bit。<br>更深一层: 激活量化本来就比权重量化难, 因为激活有 outlier channel —— 少数几个维度的值特别大, 把整个张量的量化范围撑开, 低 bit 一压就糊。这也是 SmoothQuant 这类方法存在的原因 (把量化难度从激活迁移到权重)。KV-cache 是被反复读写的激活, 错误会累积, 所以保守给 8-bit 最稳。<br>能讲出这层'按敏感度差异化分配 + 激活比权重难'的逻辑, 比单纯报 2/8/4 三个数字高一档。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"Different tensors have different quantization sensitivity, so you allocate bits differentially: weights 2-bit (bulk of memory), KV-cache 8-bit, embeddings 4-bit. Activations are harder than weights because of outlier channels — and KV-cache is read-write activation where error compounds, so it stays at 8-bit."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: KV-cache sharing 听过吗?</div><div class="fa">听过 —— 把 transformer 切两块, 第二块省略 K/V 投影、复用第一块的 KV cache, memory 和 prefill 计算降约 37.5%, 直接改善 TTFT。这和我在流式 pipeline 里压 time-to-first-audio 的思路同源。</div></div><div class="fu"><div class="fq">追问: embedding 为什么是 4-bit 不是 2-bit?</div><div class="fa">embedding table 占内存也不小但对精度敏感 (查表直接进模型), 4-bit 是 size 和质量的折中。</div></div></div>
+</div></details>
+<details class="q" id="q9">
+<summary><span class="qn">量9</span> Apple 端侧模型真实的量化配方是什么?(背数字)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>这是硬通货题 —— 报得出 Apple 2025 tech report 的真实数字 = 你认真读过。背下来。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>按 Apple 2025 的 tech report:<br>端侧那个 ~3B 的基础模型: 权重用 QAT 压到 2 bits-per-weight, KV-cache 量化到 8-bit, embedding table 量化到 4-bit。<br>server 模型 (跑在 Private Cloud Compute 上的): 用 ASTC —— 一个本来是 GPU 纹理压缩的格式 —— 做 post-training 压到 3.56 bits-per-weight。<br>两个亮点值得点出来: 一, 2-bit 是极端区间, 所以端侧必须上 QAT + learnable scale, 光 PTQ 撑不住; 二, server 端把图形学的纹理压缩格式 ASTC 搬来压 LLM, 这种巧思你点一句会显得读得很细。<br>再补一个架构层的: 压缩之后他们用 task-specific 的 rank-16 LoRA adapter 做特化和精度恢复, 几十 MB, 可以热插拔。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"On-device ~3B: weights 2-bit via QAT, KV-cache 8-bit, embeddings 4-bit. Server model: ASTC post-training to 3.56 bits/weight. Plus rank-16 LoRA adapters for specialization and accuracy recovery."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 为什么端侧 QAT、server 用 PTQ?</div><div class="fa">端侧小模型压到极端 2-bit, PTQ 活不下来且模型小重训成本可接受 → QAT; server 大模型 3.56-bit 够高 PTQ 够用, 重训大模型不划算 → PTQ/ASTC。</div></div><div class="fu"><div class="fq">追问: ASTC 是什么?</div><div class="fa">Adaptive Scalable Texture Compression, 本来是 GPU 压纹理的块压缩格式, Apple 复用来 post-training 压 server 模型权重。</div></div></div>
+</div></details>
+<details class="q" id="q10">
+<summary><span class="qn">量10</span> 你做过的量化 / 推理优化, 怎么迁移到端侧这套?(诚实边界 + 反杀)</summary>
+<div class="body">
+<div class="lbl">💡 思路 / 考点</div><div class="sec sl"><p>🔴 这题是把'你只有云端经验'翻成'我已经在解同构问题'的关键。但要诚实划边界: 你做的是 inference-side / serving 优化, training-time 2-bit QAT 是要新建的肌肉。</p></div>
+<div class="lbl">🗣 中文回答 (口播稿)</div><div class="sec an"><p>先诚实划清楚我做过什么: 我在 NVIDIA GPU 上用 vLLM、SGLang 做过 inference 加速和 memory-efficiency tuning —— KV-cache 管理、PagedAttention、量化后的 serving、continuous batching 这些 inference-side 的东西; 也做过 multi-LoRA serving。我没有亲手跑过 2-bit QAT 的训练 loop, 那是 training-time 的活, 是我要新建的肌肉。<br>但底层的工程纪律是同一套, 只是约束面变了: 云端我优化的是 GPU cost 和 HBM 带宽, 端侧换成 unified memory、功耗、模型尺寸 —— 都是'在固定预算下用更聪明的模型/系统换质量'的 routing 和 trade-off 问题, 这正是我天天做的。<br>而且有几个直接同构: 我的 multi-LoRA serving 对应 Apple 端侧 rank-16 adapter 热插拔; 我压 time-to-first-audio 的思路对应 KV-cache sharing 降 TTFT; 我做的量化-延迟-成本权衡对应端侧的量化-质量权衡。<br>所以我的说法是: 我已经在另一个约束面下解同一类问题, 端侧那条 QAT 的训练路径我懂目的地、知道怎么学, 第一个月就能 ramp 上去。</p></div>
+<div class="lbl">🔑 英文一句 (英文面直接说)</div><div class="sec en"><p>"I've done inference-side optimization — vLLM/SGLang memory tuning, KV-cache, multi-LoRA serving — not the 2-bit QAT training loop itself; that's the muscle I'd build. But the discipline is identical, the constraint surface just shifts from GPU cost/HBM to unified memory/power. multi-LoRA ↔ Apple's rank-16 adapters; my TTFA work ↔ KV-cache sharing."</p></div>
+<div class="lbl">🔬 中文追问 (2)</div><div class="sec"><div class="fu"><div class="fq">追问: 那你第一个月怎么 ramp 端侧?</div><div class="fa">先上手端侧 tooling (量化 + on-device runtime), 复现一个已知结果让我信自己的测量; 再找目标硬件上真正的 binding constraint (memory/power/thermal 各咬人不同); 再把现有 serving 优化逐个映射到端侧等价物, 看哪些迁得过去。</div></div><div class="fu"><div class="fq">追问: 如果直接问你'做过 QAT 吗'?</div><div class="fa">老实说没亲手跑过 2-bit QAT 训练, 我做的是 inference-side 和 serving 优化 —— 但我完全理解 STE、learnable scale、为什么 2-bit 必须 QAT。硬撑说做过、被一钻就穿, 那才是真扣分。</div></div></div>
+</div></details>
+</body></html>
